@@ -10,10 +10,10 @@ msgstr ""
 "Project-Id-Version: Calibre-Web (GPLV3)\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-01 19:35+0000\n"
+"POT-Creation-Date: 2026-07-01 15:58-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
-"me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
+"proton.me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -2458,6 +2458,10 @@ msgstr ""
 msgid "Manual (drag below)"
 msgstr ""
 
+#: cps/spa_strings.py:29
+msgid "Read now"
+msgstr "Nu lezen"
+
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
 msgid "Tasks"
@@ -2750,8 +2754,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
-"%(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
+"(eReadermail)s"
 
 #: cps/web.py:2562
 msgid "Please wait one minute to register next user"
@@ -8938,9 +8942,6 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
-#~ msgid "Read now"
-#~ msgstr "Nu lezen"
-
 #~ msgid "Read in Browser"
 #~ msgstr "Lezen in webbrowser"
 
@@ -9078,10 +9079,11 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
-#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
-#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
-#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
+#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
+#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
+#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
+#~ "bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

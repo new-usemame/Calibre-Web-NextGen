@@ -36,3 +36,12 @@ def test_read_now_in_pot_template():
     """The new msgid is tracked in the POT so msgmerge propagates it to locales."""
     pot = (pathlib.Path(__file__).resolve().parents[2] / "messages.pot").read_text()
     assert 'msgid "Read now"' in pot
+
+
+@pytest.mark.unit
+def test_spa_only_msgid_is_extraction_anchored():
+    """SPA-only msgids (not in any .py/.jinja the classic UI uses) must be anchored
+    in cps/spa_strings.py, or the auto-extract drops them from the POT and their
+    translations go obsolete (the #577 regression). Guard the anchor."""
+    anchor = (pathlib.Path(__file__).resolve().parents[2] / "cps" / "spa_strings.py").read_text()
+    assert '"Read now"' in anchor

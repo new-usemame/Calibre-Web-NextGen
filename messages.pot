@@ -2328,6 +2328,10 @@ msgstr ""
 msgid "Manual (drag below)"
 msgstr ""
 
+#: cps/spa_strings.py:29
+msgid "Read now"
+msgstr ""
+
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
 msgid "Tasks"

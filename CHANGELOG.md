@@ -16,6 +16,11 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.3] - 2026-07-01
+
+Corrective release: if you're on v4.1.1 or v4.1.2, update — those versions show
+a stuck popup over the classic view.
+
 ### Fixed
 - **The classic view no longer shows a feedback popup you can't close.** In
   v4.1.1 and v4.1.2, the optional "what made you switch back?" prompt appeared

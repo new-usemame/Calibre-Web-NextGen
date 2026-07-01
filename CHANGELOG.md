@@ -32,6 +32,11 @@ is for things you can see or feel when running the app.
   appears right after you switch back, and won't nag you again.
 
 ### Fixed
+- **The new UI now keeps your place in the library when you go back from a book.**
+  Scrolling down, opening a book, then pressing Back used to jump you to the top
+  of the library (losing loaded pages) — annoying when opening several books in a
+  row. It now restores your scroll position and the books you'd already loaded.
+  Reported in #578.
 - **The mobile menu drawer in the new UI is now solid and scrolls properly.** On
   phones, opening the navigation menu showed a see-through panel that couldn't be
   scrolled — trying to scroll it moved the page behind instead, so lower items

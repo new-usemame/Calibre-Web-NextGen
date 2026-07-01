@@ -10,6 +10,7 @@ import { DiscoverSection } from '../components/DiscoverSection';
 import { useBooks, useEntityList, ENTITY_PLURAL } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import type { Book } from '../lib/api';
+import { saveCatalog, loadCatalog } from '../lib/scrollCache';
 import { usePersistentBool } from '../lib/usePersistentBool';
 import { useT } from '../lib/i18n';
 import styles from './Catalog.module.css';
@@ -71,12 +72,21 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   // hidden for both entity-scoped and discovery views.
   const hideLibraryControls = filtered || isView;
 
-  const [page, setPage] = useState(1);
-  const [allBooks, setAllBooks] = useState<Book[]>([]);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('new');
-  const [readFilter, setReadFilter] = useState<ReadFilter>('all');
+  // Scroll/state restoration (#578): identity of THIS catalog instance (library
+  // vs a specific entity vs a discovery view) — stable across a book → Back trip.
+  const restoreKey = `catalog:${entityKind ?? ''}:${entityId ?? ''}:${view ?? ''}`;
+  const snapRef = useRef(loadCatalog(restoreKey));
+  const snap = snapRef.current;
+  // True only for this first restored mount — used to stop the reset/urlQ effects
+  // from clobbering the rehydrated page/filters before the user does anything.
+  const restoringRef = useRef(!!snap);
+
+  const [page, setPage] = useState(() => snap?.page ?? 1);
+  const [allBooks, setAllBooks] = useState<Book[]>(() => snap?.books ?? []);
+  const [searchInput, setSearchInput] = useState(() => snap?.searchInput ?? '');
+  const [search, setSearch] = useState(() => snap?.search ?? '');
+  const [sort, setSort] = useState(() => snap?.sort ?? 'new');
+  const [readFilter, setReadFilter] = useState<ReadFilter>(() => (snap?.readFilter as ReadFilter) ?? 'all');
 
   // Multi-select / bulk mode
   const [selecting, setSelecting] = useState(false);
@@ -87,7 +97,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
 
-  const accKeyRef = useRef<string>('');
+  const accKeyRef = useRef<string>(snap?.resetKey ?? '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Resolve the entity's display name (for the heading) from its browse list —
@@ -103,6 +113,9 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   const urlQ = new URLSearchParams(rawSearch).get('q') || '';
   useEffect(() => {
     if (filtered || isView) return;
+    // On the first restored mount, keep the rehydrated search rather than letting
+    // the (empty) URL query clobber it (#578).
+    if (restoringRef.current) return;
     setSearchInput(urlQ);
     setSearch(urlQ);
   }, [urlQ, filtered, isView]);
@@ -134,10 +147,44 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
 
   const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? ''].join('|');
 
-  // Any filter change resets paging to the first page.
+  // Any filter change resets paging to the first page — except on the first
+  // restored mount, where the rehydrated page must survive (#578).
   useEffect(() => {
+    if (restoringRef.current) return;
     setPage(1);
   }, [resetKey]);
+
+  // Clear the restoring flag after the initial mount so later filter/URL changes
+  // behave normally. Runs after the two guarded effects above (effect order).
+  useEffect(() => {
+    restoringRef.current = false;
+  }, []);
+
+  // Persist this catalog's state on unmount (e.g. navigating into a book) so a
+  // later Back rehydrates the loaded pages, filters and scroll position (#578).
+  const persistRef = useRef({ page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter });
+  persistRef.current = { page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter };
+  useEffect(() => {
+    return () => {
+      const s = persistRef.current;
+      saveCatalog(restoreKey, { ...s, scrollY: window.scrollY });
+    };
+  }, [restoreKey]);
+
+  // Restore the saved scroll position on the first mount, once the rehydrated
+  // grid has painted (its height comes from the restored books, so the offset is
+  // reachable). Retry briefly to cover late layout (fonts/cover boxes).
+  useEffect(() => {
+    const y = snap?.scrollY ?? 0;
+    if (!y) return;
+    let tries = 0;
+    const tick = () => {
+      window.scrollTo(0, y);
+      if (++tries < 6 && Math.abs(window.scrollY - y) > 2) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data, isLoading, isFetching, isPlaceholderData, error } = useBooks({
     page,

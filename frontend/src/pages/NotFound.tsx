@@ -11,7 +11,11 @@ export function NotFound() {
   // The path after the <prefix>/app base, so the legacy-UI suggestion points at
   // the equivalent classic route the user may have been looking for. Keep the
   // reverse-proxy mount prefix so the classic link stays under the same subpath.
-  const afterApp = window.location.pathname.replace(new RegExp(`^${BASE_PREFIX}/app`), '') || '/';
+  // Plain string slice (not a RegExp) so a dotted prefix like /app.v2 is matched
+  // literally rather than as a wildcard.
+  const appBase = `${BASE_PREFIX}/app`;
+  const { pathname } = window.location;
+  const afterApp = pathname.startsWith(appBase) ? pathname.slice(appBase.length) || '/' : '/';
   const legacyPath = BASE_PREFIX + afterApp;
   return (
     <main style={{ padding: '48px 24px', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>

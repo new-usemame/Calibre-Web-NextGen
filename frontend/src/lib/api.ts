@@ -26,9 +26,12 @@ export function apiUrl(path: string): string {
 
 /** Prefix a server-generated resource URL (cover/download/read) with the mount
  *  prefix. Leaves absolute (http/https/protocol-relative) and data: URLs — e.g.
- *  an external metadata provider's cover — untouched. */
+ *  an external metadata provider's cover — untouched, and is idempotent: a value
+ *  that already carries the prefix (e.g. a Flask url_for path returned by an
+ *  apply endpoint) is not prefixed a second time. */
 export function resourceUrl(u: string): string {
   if (/^(https?:)?\/\//i.test(u) || u.startsWith('data:')) return u;
+  if (BASE_PREFIX && (u === BASE_PREFIX || u.startsWith(BASE_PREFIX + '/'))) return u;
   return BASE_PREFIX + u;
 }
 

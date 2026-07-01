@@ -147,6 +147,24 @@ def test_app_router_base_uses_prefix():
 
 
 @pytest.mark.unit
+def test_resource_url_is_idempotent():
+    """resourceUrl must not double-prefix a value that already carries the mount
+    prefix (e.g. a Flask url_for path from an apply endpoint) → /cwa/cwa/…."""
+    src = (_FE / "lib" / "api.ts").read_text()
+    assert "u.startsWith(BASE_PREFIX + '/')" in src, "resourceUrl missing double-prefix guard"
+
+
+@pytest.mark.unit
+def test_notfound_prefix_matched_literally():
+    """The NotFound legacy-link must strip the <prefix>/app base with a literal
+    string compare, not an unescaped RegExp (a dotted prefix like /app.v2 would
+    otherwise match loosely)."""
+    src = (_FE / "pages" / "NotFound.tsx").read_text()
+    assert "startsWith(appBase)" in src
+    assert "new RegExp(" not in src
+
+
+@pytest.mark.unit
 def test_resource_urls_prefixed_at_consumption():
     """Covers/downloads served by the backend must be routed through resourceUrl
     so they resolve under the mount prefix."""

@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.1] - 2026-07-01
+
 ### Added
 - **The new-UI edit page can now edit identifiers, and you choose which fetched
   values to apply.** Editing a book in the new interface now has an Identifiers

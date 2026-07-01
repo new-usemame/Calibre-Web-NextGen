@@ -16,6 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+- **The read/unread checkmark shows again in the new UI when read status is
+  linked to a Calibre column.** If you set Admin → View Configuration → "Link
+  Read/Unread Status to Calibre Column" to a custom column, the new interface
+  showed every book as unread (no checkmark) and the read/unread filters returned
+  everything. The new UI now reads that column, so finished books get their badge
+  and the Read/Unread/Discover filters work again. The built-in read status is
+  unchanged. Reported by @uschi1 (#579).
+
 ## [v4.1.0] - 2026-06-30
 
 ### Changed

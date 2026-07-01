@@ -8,10 +8,12 @@ from sqlalchemy.sql.functions import coalesce
 
 from . import api_v1
 from .serializers import serialize_book_list_item, serialize_book_detail
-from .. import calibre_db, config, db, ub, isoLanguages
+from .. import calibre_db, config, db, ub, isoLanguages, logger
 from ..cw_login import current_user
 from ..helper import edit_book_read_status
 from ..usermanagement import login_required_if_no_ano
+
+log = logger.create()
 
 # Stateless sort map — mirrors web.py sort options without calling get_sort_function
 # (which writes per-user state and must not be called from a read-only API endpoint).
@@ -30,7 +32,14 @@ SORT_MAP = {
 def _row_to_item(e):
     """Unwrap a SQLAlchemy Row (Books, is_archived, read_status) or plain Books object."""
     book = getattr(e, "Books", e)
-    read = getattr(e, "read_status", None) == ub.ReadBook.STATUS_FINISHED
+    if config.config_read_column:
+        # Custom read column: generate_linked_query selects read_column.value as the
+        # third column (Row attr "value"), NOT ub.ReadBook.read_status — a truthy
+        # value means the book is read. Without this the badge is always false when
+        # an admin links read status to a Calibre column (fork #579).
+        read = bool(getattr(e, "value", None))
+    else:
+        read = getattr(e, "read_status", None) == ub.ReadBook.STATUS_FINISHED
     archived = bool(getattr(e, "is_archived", False))
     return serialize_book_list_item(book, read=read, archived=archived)
 
@@ -71,14 +80,24 @@ def _build_entity_filter(author, series, tag, publisher, language, rating=None, 
 
 
 def _build_read_filter(filter_val):
-    """Return a db_filter for ?filter=read|unread (config_read_column==0 path).
+    """Return a db_filter for ?filter=read|unread.
 
-    When a custom read column is configured this returns True (no-op) — the
-    API consumer should be informed via the response that the filter was skipped,
-    but for now we silently fall back to unfiltered rather than 500.
+    When an admin links read status to a Calibre column (config_read_column),
+    filter on that column's value (mirrors web.py's books_list); otherwise use the
+    built-in per-user ub.ReadBook table. The join for the custom column is provided
+    by generate_linked_query inside fill_indexpage, so the value is queryable here.
     """
     if config.config_read_column:
-        # Custom read column path — not yet supported; return no-op filter
+        try:
+            read_col = db.cc_classes[config.config_read_column].value
+        except (KeyError, AttributeError):
+            log.error("Custom Column No.%s does not exist in calibre database",
+                      config.config_read_column)
+            return True
+        if filter_val == "read":
+            return coalesce(read_col, False) == True   # noqa: E712
+        if filter_val == "unread":
+            return coalesce(read_col, False) != True   # noqa: E712
         return True
     if filter_val == "read":
         return and_(
@@ -172,7 +191,10 @@ def list_books():
         if not config.config_read_column:
             disc_filter = coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
         else:
-            disc_filter = True
+            try:
+                disc_filter = coalesce(db.cc_classes[config.config_read_column].value, False) != True  # noqa: E712
+            except (KeyError, AttributeError):
+                disc_filter = True
         entries, _random, _pg = calibre_db.fill_indexpage(
             1, per_page, db.Books, disc_filter, [func.randomblob(2)],
             True, config.config_read_column)
@@ -254,9 +276,14 @@ def book_detail(book_id):
                   .filter(ub.UserHiddenBook.user_id == uid, ub.UserHiddenBook.book_id == book_id)
                   .first() is not None)
 
+    # With a custom read column, get_book_read_archived returns the column's value
+    # (truthy = read); otherwise the built-in ub.ReadBook.read_status. Match the
+    # list badge's logic (fork #579) so both surfaces agree.
+    read = bool(read_status) if config.config_read_column \
+        else read_status == ub.ReadBook.STATUS_FINISHED
     return jsonify(serialize_book_detail(
         book,
-        read=(read_status == ub.ReadBook.STATUS_FINISHED),
+        read=read,
         archived=bool(is_archived),
         favorited=favorited,
         hidden=hidden,

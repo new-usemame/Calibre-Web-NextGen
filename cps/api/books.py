@@ -267,6 +267,7 @@ def book_detail(book_id):
     # Per-user favorite + hidden state (presence-based rows). Anonymous/guest
     # sessions have no real id, so they simply read back as not-favorited/hidden.
     favorited = hidden = False
+    kosync_progress = None
     if current_user.is_authenticated and not current_user.is_anonymous:
         uid = int(current_user.id)
         favorited = (ub.session.query(ub.FavoriteBook)
@@ -275,19 +276,33 @@ def book_detail(book_id):
         hidden = (ub.session.query(ub.UserHiddenBook)
                   .filter(ub.UserHiddenBook.user_id == uid, ub.UserHiddenBook.book_id == book_id)
                   .first() is not None)
+        # KOReader/Kobo synced reading progress (#587) — surfaced on the new-UI
+        # book page like the classic detail view. Same source as web.show_book:
+        # KoboReadingState.current_bookmark.progress_percent (None when unsynced).
+        try:
+            kobo_state = (ub.session.query(ub.KoboReadingState)
+                          .filter(ub.KoboReadingState.user_id == uid,
+                                  ub.KoboReadingState.book_id == book_id)
+                          .first())
+            if kobo_state and kobo_state.current_bookmark:
+                kosync_progress = kobo_state.current_bookmark.progress_percent
+        except Exception:
+            log.debug("Failed to load KOReader progress for book %s", book_id, exc_info=True)
 
     # With a custom read column, get_book_read_archived returns the column's value
     # (truthy = read); otherwise the built-in ub.ReadBook.read_status. Match the
     # list badge's logic (fork #579) so both surfaces agree.
     read = bool(read_status) if config.config_read_column \
         else read_status == ub.ReadBook.STATUS_FINISHED
-    return jsonify(serialize_book_detail(
+    body = serialize_book_detail(
         book,
         read=read,
         archived=bool(is_archived),
         favorited=favorited,
         hidden=hidden,
-    ))
+    )
+    body["kosync_progress"] = kosync_progress
+    return jsonify(body)
 
 
 @api_v1.route("/books/<int:book_id>/read", methods=["POST"])

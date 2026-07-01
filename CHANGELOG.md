@@ -32,6 +32,10 @@ is for things you can see or feel when running the app.
   appears right after you switch back, and won't nag you again.
 
 ### Fixed
+- **The new UI's book page now shows your KOReader/Kobo reading progress.** If
+  you sync progress from KOReader or a Kobo, the book page again shows "KOReader
+  progress: X%" (it was only on the classic page before — the synced progress was
+  never lost). Reported by @alva-seal (#587).
 - **Dutch: the new UI's book buttons read correctly.** The button that opens the
   reader said "Gelezen" ("has been read") instead of a "read now" verb, and the
   already-read marker showed the English word "Read". The reader button now says

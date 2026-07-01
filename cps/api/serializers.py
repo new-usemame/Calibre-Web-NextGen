@@ -99,11 +99,21 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
     # Publishers — {id, name} for linking
     publishers = [{"id": p.id, "name": p.name} for p in (getattr(book, "publishers", None) or [])]
 
-    # Identifiers
-    identifiers = [
-        {"type": i.type, "val": i.val}
-        for i in (getattr(book, "identifiers", None) or [])
-    ]
+    # Identifiers — expose a clickable link (Goodreads, StoryGraph, Hardcover,
+    # Amazon, ISBN…) and a display label, mirroring the classic detail page (#582).
+    # The link is the model's own URL rule (Identifiers.__repr__), but only emitted
+    # when it's a real http(s) URL — never a javascript:/data:/raw-value repr — so
+    # a crafted identifier can't inject a dangerous href. Non-linkable IDs stay as
+    # plain text (url=None).
+    identifiers = []
+    for i in (getattr(book, "identifiers", None) or []):
+        try:
+            link = repr(i)
+        except Exception:
+            link = None
+        url = link if (link and (link.startswith("http://") or link.startswith("https://"))) else None
+        label = i.format_type() if hasattr(i, "format_type") else i.type
+        identifiers.append({"type": i.type, "val": i.val, "url": url, "label": label})
 
     # Formats
     formats = []

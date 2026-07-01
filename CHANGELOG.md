@@ -32,6 +32,10 @@ is for things you can see or feel when running the app.
   appears right after you switch back, and won't nag you again.
 
 ### Fixed
+- **Book identifiers are clickable links again in the new UI.** On a book's page,
+  identifiers like Goodreads, StoryGraph, Hardcover, Amazon and ISBN now link out
+  to the book on that site (as they did in the classic UI) instead of showing as
+  plain text. Reported by @alva-seal (#582).
 - **The new UI now keeps your place in the library when you go back from a book.**
   Scrolling down, opening a book, then pressing Back used to jump you to the top
   of the library (losing loaded pages) — annoying when opening several books in a

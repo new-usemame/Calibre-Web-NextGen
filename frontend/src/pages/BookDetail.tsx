@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { Link, useParams } from 'wouter';
 import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon } from 'lucide-react';
 import {
@@ -346,11 +346,15 @@ export function BookDetail() {
                 </dd>
               </>
             )}
-            {book.identifiers.map((id) => (
-              <>
-                <dt key={`dt-${id.type}`} className={styles.metaLabel}>{id.type.toUpperCase()}</dt>
-                <dd key={`dd-${id.type}`} className={styles.metaValue}>{id.val}</dd>
-              </>
+            {book.identifiers.map((id, i) => (
+              <Fragment key={`id-${i}`}>
+                <dt className={styles.metaLabel}>{id.label || id.type.toUpperCase()}</dt>
+                <dd className={styles.metaValue}>
+                  {id.url
+                    ? <a href={id.url} target="_blank" rel="noopener noreferrer" className={styles.metaLink}>{id.val}</a>
+                    : id.val}
+                </dd>
+              </Fragment>
             ))}
           </dl>
 

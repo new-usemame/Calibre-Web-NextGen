@@ -90,7 +90,7 @@ export interface BookDetail {
   tags: EntityRef[];
   languages: EntityRef[];
   publishers: EntityRef[];
-  identifiers: { type: string; val: string }[];
+  identifiers: { type: string; val: string; url: string | null; label: string }[];
   formats: BookFormat[];
   read: boolean;
   archived: boolean;

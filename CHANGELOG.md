@@ -32,6 +32,11 @@ is for things you can see or feel when running the app.
   appears right after you switch back, and won't nag you again.
 
 ### Fixed
+- **The mobile menu drawer in the new UI is now solid and scrolls properly.** On
+  phones, opening the navigation menu showed a see-through panel that couldn't be
+  scrolled — trying to scroll it moved the page behind instead, so lower items
+  (like Magic Shelves) were unreachable. The drawer now has a solid background and
+  scrolls on its own. Reported in #576.
 - **The new UI now shows the Calibre-Web favicon in the browser tab.** The
   redesigned interface had a blank tab icon; it now uses the same favicon as the
   classic UI (and it works behind a reverse-proxy subpath too). Reported in #574.

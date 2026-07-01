@@ -1,5 +1,9 @@
-/* Persistent left rail on desktop; slide-in drawer on mobile. */
-.nav {
+/* Persistent left rail on desktop; slide-in drawer on mobile.
+   These base declarations must cover BOTH the closed (.nav) and open (.navOpen)
+   classes: the open mobile drawer uses .navOpen, and if it lacked the background
+   / overflow it rendered transparent and couldn't scroll (#576). */
+.nav,
+.navOpen {
   background: var(--surface-1);
   border-right: 1px solid var(--border);
   padding: var(--sp-4) var(--sp-3);
@@ -128,6 +132,10 @@
     z-index: var(--z-overlay);
     transition: transform var(--dur-base) var(--ease-out);
     box-shadow: var(--elev-3);
+    /* Keep drawer scrolling self-contained — don't chain to the page behind it
+       when you reach the top/bottom of the menu (#576). */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .nav {

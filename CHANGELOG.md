@@ -16,6 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+- **The classic view no longer shows a feedback popup you can't close.** In
+  v4.1.1 and v4.1.2, the optional "what made you switch back?" prompt appeared
+  on every classic page — not just after switching from the new UI — and none of
+  its buttons could dismiss it (on phones it didn't even fit the screen). It now
+  stays hidden unless you've just switched back from the new interface, every
+  button closes it, and it fits and scrolls on small screens. Reported by
+  @iroQuai (#576).
+
 ## [v4.1.2] - 2026-07-01
 
 This release carries exactly the same fixes as v4.1.1, re-published under a new

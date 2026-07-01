@@ -96,10 +96,16 @@
     animation:cwng-fb-fade .18s ease;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
+  /* display:flex above would silently defeat the [hidden] attribute (author CSS
+     outranks the UA's [hidden]{display:none}) — keep hidden authoritative, or the
+     popup renders on every page and no dismiss button can close it (#576). */
+  .cwng-fb-overlay[hidden]{display:none !important;}
   @keyframes cwng-fb-fade{from{opacity:0}to{opacity:1}}
   @keyframes cwng-fb-rise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
   .cwng-fb-card{
     position:relative; width:100%; max-width:440px;
+    max-height:calc(100vh - 40px); max-height:calc(100dvh - 40px);
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
     background:linear-gradient(180deg,#1b2530,#141c24);
     color:#ece8e1; border:1px solid rgba(255,255,255,.09);
     border-radius:16px; padding:26px 24px 20px;

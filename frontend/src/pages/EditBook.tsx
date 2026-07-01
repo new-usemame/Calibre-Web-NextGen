@@ -313,6 +313,14 @@ function ResultRow({ r, onApply }: { r: MetaResult; onApply: (r: MetaResult, sel
   const [expanded, setExpanded] = useState(false);
   const [sel, setSel] = useState<Set<ApplyKey>>(() => new Set(fields.map((f) => f.key)));
 
+  // Results are keyed by index, so a new search reuses this instance rather than
+  // remounting — reset the checklist (and collapse) whenever the result changes,
+  // or a prior result's selection would leak onto a different book.
+  useEffect(() => {
+    setSel(new Set(APPLY_FIELDS.filter((f) => f.has(r)).map((f) => f.key)));
+    setExpanded(false);
+  }, [r]);
+
   const toggle = (k: ApplyKey) => setSel((s) => {
     const n = new Set(s);
     if (n.has(k)) n.delete(k); else n.add(k);

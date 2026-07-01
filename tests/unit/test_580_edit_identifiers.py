@@ -89,7 +89,10 @@ def test_update_metadata_duplicate_identifier_reports_field_error():
     session = MagicMock()
 
     def fake_modify(inp, dbids, sess):
-        return False, True  # no change, duplicate-type error
+        # Realistic duplicate case: modify_identifiers may queue partial add/deletes
+        # (changed=True) AND flag the duplicate (error=True). A rejected payload must
+        # roll back, not commit the partial changes.
+        return True, True
 
     body = {"identifiers": [{"type": "isbn", "val": "1"}, {"type": "isbn", "val": "2"}]}
     with _ctx("/api/v1/books/5/metadata", body=body):
@@ -102,7 +105,8 @@ def test_update_metadata_duplicate_identifier_reports_field_error():
 
     payload = json.loads(resp.get_data())
     assert "identifiers" in payload.get("errors", {})
-    session.commit.assert_not_called()
+    session.commit.assert_not_called()   # rejected payload must NOT persist
+    session.rollback.assert_called()     # partial staged changes discarded
 
 
 def test_update_metadata_without_identifiers_key_does_not_touch_them():

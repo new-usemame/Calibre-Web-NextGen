@@ -141,8 +141,11 @@ def update_metadata(book_id):
         changed, id_error = modify_identifiers(
             input_identifiers, book.identifiers, calibre_db.session)
         if id_error:
+            # A duplicate type may have already queued partial add/deletes on the
+            # session — discard them so a rejected payload never persists partially.
+            calibre_db.session.rollback()
             errors["identifiers"] = "Duplicate identifier type — each type may appear once."
-        if changed:
+        elif changed:
             try:
                 calibre_db.session.commit()
             except Exception as exc:  # noqa: BLE001 — surface as a field error, don't 500

@@ -16,6 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.2] - 2026-07-01
+
+This release carries exactly the same fixes as v4.1.1, re-published under a new
+version number so the in-app "update available" prompt reaches everyone. If you
+updated to v4.1.1 in the short window right after it first went out, you may have
+landed on an earlier build of it; moving to v4.1.2 guarantees you're on the
+corrected version. Nothing else changed — the full list of what's fixed is in the
+v4.1.1 notes below.
+
 ## [v4.1.1] - 2026-07-01
 
 ### Added

@@ -104,6 +104,21 @@ def test_malicious_prefix_rejected(monkeypatch, tmp_path, bad):
     assert 'src="/static/app/assets/index-abc.js"' in body  # untouched
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize("value,ok", [
+    ("/cwa", True), ("/a/b/c", True), ("/lib_2", True),
+    ("/cwa\n", False),          # trailing newline must not slip past the anchor
+    ("/cwa\n/evil", False), ("//evil.com", False), ("/../etc", False),
+    ("/a b", False), ('/a"x', False), ("", False),
+])
+def test_safe_prefix_regex(value, ok):
+    """Direct check of the prefix allowlist, incl. the \\Z anchor rejecting a
+    trailing newline (defence-in-depth; HTTP headers can't carry raw newlines)."""
+    import cps.spa as spa_mod
+    matched = bool(spa_mod._SAFE_PREFIX_RE.match(value)) and ".." not in value
+    assert matched is ok
+
+
 # ---- client-side source pins (guard the runtime prefix wiring) ---------------
 
 _FE = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"

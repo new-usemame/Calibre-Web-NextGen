@@ -54,7 +54,8 @@ def _inject_spa_flag():
 # unreserved URL chars. Anything else (quotes, angle brackets, spaces) is
 # rejected to "" so a spoofed X-Forwarded-Prefix / X-Script-Name header can't
 # break out of the injected <script> string or the asset-URL rewrite below.
-_SAFE_PREFIX_RE = re.compile(r"^(/[A-Za-z0-9._~-]+)+$")
+# \Z (not $) so a trailing newline can't sneak past the end anchor.
+_SAFE_PREFIX_RE = re.compile(r"^(/[A-Za-z0-9._~-]+)+\Z")
 
 
 def _mount_prefix():

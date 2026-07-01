@@ -32,6 +32,9 @@ is for things you can see or feel when running the app.
   appears right after you switch back, and won't nag you again.
 
 ### Fixed
+- **The new UI now shows the Calibre-Web favicon in the browser tab.** The
+  redesigned interface had a blank tab icon; it now uses the same favicon as the
+  classic UI (and it works behind a reverse-proxy subpath too). Reported in #574.
 - **The new UI now works behind a reverse proxy with a path prefix.** If you
   serve Calibre-Web NextGen under a subpath (e.g. `https://host/cwa/` via nginx,
   Traefik or similar), the new interface showed a blank white page because its

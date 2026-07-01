@@ -83,9 +83,17 @@ def _render_shell(index_path, prefix):
         html = fh.read()
     if prefix:
         html = html.replace("/static/app/", prefix + "/static/app/")
-    # Always inject the prefix (even "") so the SPA reads an authoritative value
-    # rather than guessing from the URL. json.dumps → safely-quoted JS string.
-    inject = "<script>window.__CWNG_PREFIX__=%s;</script>" % json.dumps(prefix)
+    # Inject, into <head>:
+    #  * the favicon (#574 — the Vite shell ships none, so the new UI had a blank
+    #    tab icon); reuse the app's existing /static/favicon.ico, prefix-aware.
+    #  * the mount prefix (even "") so the SPA reads an authoritative value rather
+    #    than guessing from the URL. json.dumps → safely-quoted JS string.
+    static = prefix + "/static"
+    inject = (
+        '<link rel="icon" href="%s/favicon.ico">'
+        '<link rel="apple-touch-icon" sizes="140x140" href="%s/favicon.ico">'
+        '<script>window.__CWNG_PREFIX__=%s;</script>'
+    ) % (static, static, json.dumps(prefix))
     html = html.replace("</head>", inject + "</head>", 1)
     return Response(html, mimetype="text/html")
 

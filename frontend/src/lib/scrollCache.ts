@@ -44,3 +44,14 @@ export function saveCatalog(key: string, snap: CatalogSnapshot): void {
 export function loadCatalog(key: string): CatalogSnapshot | undefined {
   return _cache.get(key);
 }
+
+/** Drop a book from every cached snapshot — call when a book is deleted so a
+ *  later scroll-restore can't resurrect it as a ghost card that 404s on click
+ *  (#578). A re-fetch would still contain it on pages we don't re-request, so we
+ *  evict it from the snapshots directly. */
+export function removeBookFromCache(id: number): void {
+  for (const snap of _cache.values()) {
+    const filtered = snap.books.filter((b) => b.id !== id);
+    if (filtered.length !== snap.books.length) snap.books = filtered;
+  }
+}

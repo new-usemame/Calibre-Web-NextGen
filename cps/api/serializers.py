@@ -112,7 +112,10 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         except Exception:
             link = None
         url = link if (link and (link.startswith("http://") or link.startswith("https://"))) else None
-        label = i.format_type() if hasattr(i, "format_type") else i.type
+        try:
+            label = i.format_type() if hasattr(i, "format_type") else i.type
+        except Exception:
+            label = i.type
         identifiers.append({"type": i.type, "val": i.val, "url": url, "label": label})
 
     # Formats

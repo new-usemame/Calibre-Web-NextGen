@@ -136,6 +136,11 @@
        when you reach the top/bottom of the menu (#576). */
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    /* Respect notch / status bar / home indicator when the drawer runs edge to
+       edge (notched phones in landscape, installed PWA). */
+    padding-left: max(var(--sp-3), env(safe-area-inset-left));
+    padding-top: max(var(--sp-4), env(safe-area-inset-top));
+    padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
   }
 
   .nav {
@@ -153,6 +158,10 @@
     background: rgba(0, 0, 0, 0.55);
     z-index: var(--z-overlay);
     animation: scrimIn var(--dur-fast) var(--ease) both;
+    /* Swallow touch-scroll on the backdrop so dragging it doesn't scroll the
+       page behind the drawer (belt-and-braces with the body scroll-lock). */
+    touch-action: none;
+    overscroll-behavior: contain;
   }
 
   @keyframes scrimIn {

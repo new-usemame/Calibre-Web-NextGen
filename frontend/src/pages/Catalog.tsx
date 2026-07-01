@@ -58,10 +58,24 @@ interface CatalogProps {
   view?: DiscoveryView;
 }
 
+// Merge a freshly-fetched page into the accumulator: UPSERT existing books by id
+// (a re-fetch — e.g. after restoring a scroll snapshot then react-query
+// revalidates — brings updated fields, which must replace the stale copy, #578)
+// and append genuinely-new ones. Add-only append would leave edited books showing
+// their old title/cover after edit → Back.
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
+  if (!next.length) return prev;
+  const byId = new Map(next.map((b) => [b.id, b]));
+  let changed = false;
+  const merged = prev.map((b) => {
+    const upd = byId.get(b.id);
+    if (upd && upd !== b) { changed = true; return upd; }
+    return b;
+  });
   const seen = new Set(prev.map((b) => b.id));
   const fresh = next.filter((b) => !seen.has(b.id));
-  return fresh.length ? [...prev, ...fresh] : prev;
+  if (!fresh.length && !changed) return prev;
+  return [...merged, ...fresh];
 }
 
 export function Catalog({ entityKind, entityId, view }: CatalogProps) {
@@ -186,11 +200,17 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
     const y = snap?.scrollY ?? 0;
     if (!y) return;
     let tries = 0;
+    let raf = 0;
+    let cancelled = false;
     const tick = () => {
+      if (cancelled) return;
       window.scrollTo(0, y);
-      if (++tries < 6 && Math.abs(window.scrollY - y) > 2) requestAnimationFrame(tick);
+      if (++tries < 6 && Math.abs(window.scrollY - y) > 2) raf = requestAnimationFrame(tick);
     };
-    requestAnimationFrame(tick);
+    raf = requestAnimationFrame(tick);
+    // Cancel on unmount: without this, a quick book-open right after Back keeps
+    // the retry alive and scrolls the NEXT page to this offset / fights the user (#578).
+    return () => { cancelled = true; cancelAnimationFrame(raf); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

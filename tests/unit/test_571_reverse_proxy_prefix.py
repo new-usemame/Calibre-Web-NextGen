@@ -173,3 +173,14 @@ def test_resource_urls_prefixed_at_consumption():
     detail = (_FE / "pages" / "BookDetail.tsx").read_text()
     assert "resourceUrl(book.cover_url)" in detail
     assert "resourceUrl(fmt.download_url)" in detail
+
+
+@pytest.mark.unit
+def test_vite_runtime_asset_base_is_prefix_aware():
+    """The lazy chunk loader must derive asset URLs from window.__CWNG_PREFIX__ at
+    runtime (renderBuiltUrl), else code-split JS/CSS (the readers) 404 behind a
+    proxy prefix and render unstyled — the server index.html rewrite can't reach
+    runtime-computed URLs. Regression guard for the v4.1.1 reader-CSS bug."""
+    cfg = (_FE.parent / "vite.config.ts").read_text()
+    assert "renderBuiltUrl" in cfg
+    assert "__CWNG_PREFIX__" in cfg

@@ -316,7 +316,7 @@ export function BookDetail() {
           <dl className={styles.meta}>
             {book.kosync_progress != null && (
               <>
-                <dt className={styles.metaLabel}>{t('KOReader progress')}</dt>
+                <dt className={styles.metaLabel}>{t('KOReader Progress')}</dt>
                 <dd className={styles.metaValue}>{book.kosync_progress.toFixed(1)}%</dd>
               </>
             )}

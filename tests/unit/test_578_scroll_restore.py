@@ -41,3 +41,32 @@ def test_catalog_state_seeded_from_snapshot():
     src = (_FE / "pages" / "Catalog.tsx").read_text()
     assert "snap?.page ?? 1" in src
     assert "snap?.books ?? []" in src
+
+
+@pytest.mark.unit
+def test_dedupappend_upserts_not_append_only():
+    """A re-fetched page must UPDATE existing books by id (edits propagate), not be
+    add-only — else edit→Back shows the stale card (adversarial-review regression)."""
+    src = (_FE / "pages" / "Catalog.tsx").read_text()
+    # upsert shape: build a by-id map from the incoming page and merge.
+    assert "new Map(next.map" in src
+    assert "byId.get(b.id)" in src
+
+
+@pytest.mark.unit
+def test_scroll_restore_raf_is_cancelled():
+    """The scroll-restore retry must cancel on unmount, or a quick book-open right
+    after Back scrolls the next page / fights the user (adversarial-review finding)."""
+    src = (_FE / "pages" / "Catalog.tsx").read_text()
+    assert "cancelAnimationFrame" in src
+    assert "cancelled = true" in src
+
+
+@pytest.mark.unit
+def test_deleted_book_evicted_from_scroll_cache():
+    """Deleting a book must purge it from cached snapshots so scroll-restore can't
+    resurrect a ghost card that 404s on click (adversarial-review finding)."""
+    cache = (_FE / "lib" / "scrollCache.ts").read_text()
+    assert "export function removeBookFromCache" in cache
+    queries = (_FE / "lib" / "queries.ts").read_text()
+    assert "removeBookFromCache" in queries

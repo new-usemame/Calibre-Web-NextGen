@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { HelpBanner } from './HelpBanner';
@@ -12,6 +12,16 @@ interface AppShellProps {
 
 export function AppShell({ userName, onLogout, children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Lock the page behind the mobile drawer: overscroll-behavior only stops scroll
+  // chaining AT the drawer's edge, not touches on the scrim, so without this the
+  // page still scrolled behind the open drawer (#576). Only affects the open state.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [drawerOpen]);
 
   return (
     <div className={styles.shell}>

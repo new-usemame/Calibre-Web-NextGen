@@ -90,4 +90,4 @@ def test_detail_endpoint_null_progress_when_unsynced():
 def test_bookdetail_renders_progress():
     src = (_ROOT / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
     assert "book.kosync_progress != null" in src
-    assert "KOReader progress" in src
+    assert "KOReader Progress" in src  # aligned to the classic, translatable msgid

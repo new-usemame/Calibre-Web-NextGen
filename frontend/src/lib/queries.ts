@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost, apiUpload, apiPostForm, ApiError } from './api';
+import { removeBookFromCache } from './scrollCache';
 import type { MetaSearchResponse } from './api';
 import type {
   Me, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
@@ -516,7 +517,12 @@ export function useBulkActions() {
   });
   const remove = useMutation({
     mutationFn: (ids: number[]) => settle(ids.map((id) => apiPost(`/api/v1/books/${id}/delete`))),
-    onSuccess: refresh,
+    onSuccess: (_data, ids) => {
+      // Evict deleted books from every cached catalog snapshot so a later
+      // scroll-restore can't resurrect them as ghost cards (#578).
+      ids.forEach(removeBookFromCache);
+      refresh();
+    },
   });
   // Bulk metadata: apply the same partial field set to every selected book via
   // the per-book metadata endpoint (replace semantics for the filled fields).

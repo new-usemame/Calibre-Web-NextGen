@@ -45,3 +45,18 @@ def test_open_drawer_has_background_and_scroll():
 def test_mobile_drawer_contains_its_scroll():
     """The mobile drawer must not chain its scroll to the page behind it."""
     assert "overscroll-behavior: contain" in CSS
+
+
+@pytest.mark.unit
+def test_body_scroll_locked_while_drawer_open():
+    """The page behind the open mobile drawer must be scroll-locked (overscroll
+    only stops chaining at the drawer edge, not scrim touches) — adversarial-review
+    finding. AppShell toggles body overflow while the drawer is open."""
+    import pathlib
+    fe = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
+    shell = (fe / "components" / "AppShell.tsx").read_text()
+    assert "document.body.style.overflow" in shell
+    assert "drawerOpen" in shell
+    css = (fe / "components" / "Sidebar.module.css").read_text()
+    assert "touch-action: none" in css          # scrim swallows backdrop drags
+    assert "env(safe-area-inset" in css          # notch/PWA safe areas

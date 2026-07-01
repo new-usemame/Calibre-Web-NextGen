@@ -75,7 +75,15 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   // Scroll/state restoration (#578): identity of THIS catalog instance (library
   // vs a specific entity vs a discovery view) — stable across a book → Back trip.
   const restoreKey = `catalog:${entityKind ?? ''}:${entityId ?? ''}:${view ?? ''}`;
-  const snapRef = useRef(loadCatalog(restoreKey));
+  // Only restore a snapshot when it's consistent with the current URL query. A
+  // fresh top-bar search navigates to /?q=… on the SAME library route; a stale
+  // snapshot must not be rehydrated there or it would ignore the new search
+  // (Greptile #593). Entity/discovery views carry no ?q, so any snapshot applies.
+  const urlQAtMount = new URLSearchParams(
+    typeof window !== 'undefined' ? window.location.search : '').get('q') || '';
+  const rawSnap = loadCatalog(restoreKey);
+  const snapRef = useRef(
+    (filtered || isView || (rawSnap?.search ?? '') === urlQAtMount) ? rawSnap : undefined);
   const snap = snapRef.current;
   // True only for this first restored mount — used to stop the reset/urlQ effects
   // from clobbering the rehydrated page/filters before the user does anything.

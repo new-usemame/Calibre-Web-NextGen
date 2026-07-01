@@ -29,6 +29,9 @@ def test_catalog_restores_and_persists():
     assert "window.scrollTo(0, y)" in src
     # The rehydrated page/filters must survive the mount reset + urlQ effects.
     assert "restoringRef" in src
+    # A snapshot is only restored when consistent with the URL query, so a fresh
+    # top-bar search (/?q=…) isn't ignored in favour of a stale snapshot.
+    assert "urlQAtMount" in src
 
 
 @pytest.mark.unit

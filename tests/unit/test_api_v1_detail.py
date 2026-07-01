@@ -8,6 +8,7 @@ import pytest
 import flask
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
+from cps.db import Identifiers
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +29,7 @@ def _make_book(**kwargs):
         tags=[SimpleNamespace(id=11, name="sci-fi")],
         languages=[SimpleNamespace(lang_code="eng", language_name="English")],
         publishers=[SimpleNamespace(id=5, name="Chilton Books")],
-        identifiers=[SimpleNamespace(type="isbn", val="9780441013593")],
+        identifiers=[Identifiers("9780441013593", "isbn", 1)],
         pubdate=datetime.datetime(1965, 8, 1),
     )
     defaults.update(kwargs)
@@ -56,7 +57,10 @@ def test_serialize_book_detail_full():
     assert out["tags"] == [{"id": 11, "name": "sci-fi"}]
     assert out["languages"] == [{"id": "eng", "name": "English"}]
     assert out["publishers"] == [{"id": 5, "name": "Chilton Books"}]
-    assert out["identifiers"] == [{"type": "isbn", "val": "9780441013593"}]
+    assert out["identifiers"] == [{
+        "type": "isbn", "val": "9780441013593",
+        "url": "https://www.worldcat.org/isbn/9780441013593", "label": "ISBN",
+    }]
     assert len(out["formats"]) == 1
     fmt = out["formats"][0]
     assert fmt["format"] == "EPUB"

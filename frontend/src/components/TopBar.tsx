@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
+import { BASE_PREFIX } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './TopBar.module.css';
 
@@ -151,8 +152,7 @@ function HelpMenu() {
  *  "what made you switch back?" feedback prompt on arrival. The base prefix (if
  *  the app is served under a reverse-proxy subpath, before /app) is preserved. */
 function backToClassicView() {
-  const prefix = window.location.pathname.replace(/\/app(\/.*)?$/, '');
-  window.location.assign((prefix || '') + '/?cwng_feedback=newui');
+  window.location.assign(BASE_PREFIX + '/?cwng_feedback=newui');
 }
 
 function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => void }) {

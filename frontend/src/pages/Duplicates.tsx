@@ -1,6 +1,7 @@
 import { Link } from 'wouter';
 import { Files, X } from 'lucide-react';
 import { useDuplicates, useDismissDuplicate } from '../lib/queries';
+import { resourceUrl } from '../lib/api';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
@@ -55,7 +56,7 @@ export function Duplicates() {
                 {g.books.map((b) => (
                   <li key={b.id} className={styles.book}>
                     {b.cover_url
-                      ? <img src={b.cover_url} alt="" className={styles.cover} loading="lazy" />
+                      ? <img src={resourceUrl(b.cover_url)} alt="" className={styles.cover} loading="lazy" />
                       : <div className={styles.coverEmpty} />}
                     <div className={styles.bookInfo}>
                       <Link href={`/book/${b.id}`} className={styles.bookTitle}>{b.title}</Link>

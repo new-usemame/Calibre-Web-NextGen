@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { apiGet } from '../lib/api';
+import { apiGet, apiUrl } from '../lib/api';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
@@ -17,7 +17,7 @@ const COMIC = new Set(['cbz', 'cbr', 'cbt']);
 export function NativeReader({ id, format }: { id: string; format: string }) {
   const t = useT();
   const fmt = format.toLowerCase();
-  const src = `/show/${id}/${fmt}`;
+  const src = apiUrl(`/show/${id}/${fmt}`);
   const [text, setText] = useState<string | null>(null);
   const [textErr, setTextErr] = useState(false);
 
@@ -65,7 +65,7 @@ export function NativeReader({ id, format }: { id: string; format: string }) {
           // djvu / other — server reader handles rendering
           <div className={styles.fallback}>
             <p>{t('This format opens in the full-screen reader.')}</p>
-            <a className={styles.fallbackBtn} href={`/read/${id}/${fmt}`}>{t('Open reader')}</a>
+            <a className={styles.fallbackBtn} href={apiUrl(`/read/${id}/${fmt}`)}>{t('Open reader')}</a>
           </div>
         )}
       </div>
@@ -110,7 +110,7 @@ function ComicViewer({ id }: { id: string }) {
     <div className={styles.comic}>
       <button className={styles.comicNav} onClick={() => go(-1)} disabled={page === 0}
         aria-label={t('Previous page')}><ChevronLeft size={28} /></button>
-      <img className={styles.comicPage} src={`/api/v1/books/${id}/comic/${page}`} alt={`Page ${page + 1}`} />
+      <img className={styles.comicPage} src={apiUrl(`/api/v1/books/${id}/comic/${page}`)} alt={`Page ${page + 1}`} />
       <button className={styles.comicNav} onClick={() => go(1)} disabled={page >= pages - 1}
         aria-label={t('Next page')}><ChevronRight size={28} /></button>
       <div className={styles.comicPager}>{page + 1} / {pages}</div>

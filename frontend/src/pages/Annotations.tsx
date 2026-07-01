@@ -1,7 +1,7 @@
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, Download, Upload as UploadIcon, Highlighter } from 'lucide-react';
-import { apiGet } from '../lib/api';
+import { apiGet, apiUrl } from '../lib/api';
 import { useBook } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
@@ -49,10 +49,10 @@ export function Annotations({ id }: { id: string }) {
       </div>
 
       <div className={styles.toolbar}>
-        <a className={styles.toolBtn} href={`/annotations/${id}/export.md`}><Download size={14} /> Markdown</a>
-        <a className={styles.toolBtn} href={`/annotations/${id}/export.csv`}><Download size={14} /> CSV</a>
-        <a className={styles.toolBtn} href={`/annotations/${id}/export.json`}><Download size={14} /> JSON</a>
-        <a className={styles.toolBtn} href="/annotations/import"><UploadIcon size={14} /> {t('Import from Kobo')}</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.md`)}><Download size={14} /> Markdown</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.csv`)}><Download size={14} /> CSV</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.json`)}><Download size={14} /> JSON</a>
+        <a className={styles.toolBtn} href={apiUrl('/annotations/import')}><UploadIcon size={14} /> {t('Import from Kobo')}</a>
       </div>
 
       {error ? (

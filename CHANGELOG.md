@@ -32,6 +32,13 @@ is for things you can see or feel when running the app.
   appears right after you switch back, and won't nag you again.
 
 ### Fixed
+- **The new UI now works behind a reverse proxy with a path prefix.** If you
+  serve Calibre-Web NextGen under a subpath (e.g. `https://host/cwa/` via nginx,
+  Traefik or similar), the new interface showed a blank white page because its
+  scripts, styles, API calls, covers and downloads were requested without the
+  prefix and 404'd. Everything now honours the mount prefix automatically, so the
+  new UI loads and works the same behind a subpath as at the domain root. Reported
+  by @chloeroform (#571).
 - **The read/unread checkmark shows again in the new UI when read status is
   linked to a Calibre column.** If you set Admin → View Configuration → "Link
   Read/Unread Status to Calibre Column" to a custom column, the new interface

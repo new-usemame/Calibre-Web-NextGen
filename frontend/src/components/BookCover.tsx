@@ -1,3 +1,4 @@
+import { resourceUrl } from '../lib/api';
 import styles from './BookCover.module.css';
 
 interface BookCoverProps {
@@ -10,7 +11,7 @@ export function BookCover({ coverUrl, title }: BookCoverProps) {
     return (
       <div className={styles.wrap}>
         <img
-          src={coverUrl}
+          src={resourceUrl(coverUrl)}
           alt={title}
           loading="lazy"
           className={styles.img}

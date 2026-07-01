@@ -9,7 +9,7 @@ import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { MetadataUpdate, MetaResult } from '../lib/api';
-import { ApiError } from '../lib/api';
+import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './EditBook.module.css';
 
@@ -393,7 +393,7 @@ function CoverManager({ id }: { id: string }) {
     <section className={styles.coverSection}>
       <div className={styles.coverPreview}>
         {book?.cover_url
-          ? <img src={book.cover_url} alt={t('Current cover')} className={styles.coverImg} />
+          ? <img src={resourceUrl(book.cover_url)} alt={t('Current cover')} className={styles.coverImg} />
           : <div className={styles.coverPlaceholder}><ImageIcon size={28} /></div>}
       </div>
       <div className={styles.coverControls}>
@@ -464,7 +464,7 @@ function FormatsManager({ id }: { id: string }) {
         {book!.formats.map((f) => (
           <li key={f.format} className={styles.formatItem}>
             <span className={styles.formatName}>{f.format}</span>
-            <a className={styles.formatDownload} href={f.download_url} download>{t('Download')}</a>
+            <a className={styles.formatDownload} href={resourceUrl(f.download_url)} download>{t('Download')}</a>
             {canDelete && (
               <button className={styles.formatDelete}
                 onClick={() => {

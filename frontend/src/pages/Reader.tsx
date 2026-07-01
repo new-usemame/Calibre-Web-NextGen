@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, X, List, Type, Sun, Moon, Coffee, Loader2,
 } from 'lucide-react';
 import { useBook, useBookmark, useSaveBookmark } from '../lib/queries';
-import { apiPost } from '../lib/api';
+import { apiPost, apiUrl, resourceUrl } from '../lib/api';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
 import styles from './Reader.module.css';
@@ -151,7 +151,7 @@ export function Reader({ id }: { id: string }) {
       try {
         // Fetch the .epub ourselves (same-origin cookie auth) and hand epub.js
         // an ArrayBuffer — reliable archive open regardless of the URL extension.
-        const res = await fetch(epubFormat.download_url, { credentials: 'include' });
+        const res = await fetch(resourceUrl(epubFormat.download_url), { credentials: 'include' });
         if (!res.ok) throw new Error(`Could not load the book file (${res.status})`);
         const buf = await res.arrayBuffer();
         if (cancelled) return;
@@ -202,7 +202,7 @@ export function Reader({ id }: { id: string }) {
         });
 
         // Render existing highlights (the CFI-anchored ones we can place).
-        fetch(`/annotations/${id}/data.json`, { credentials: 'include' })
+        fetch(apiUrl(`/annotations/${id}/data.json`), { credentials: 'include' })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
             if (cancelled || !d) return;
@@ -308,7 +308,7 @@ export function Reader({ id }: { id: string }) {
       <div className={styles.fullCenter}>
         <EmptyState message={t('In-browser reading currently supports EPUB. Use download or the classic reader for other formats.')} />
         <div className={styles.fallbackRow}>
-          {other && <a className={styles.exitLink} href={other.read_url}>{t('Open classic reader')}</a>}
+          {other && <a className={styles.exitLink} href={resourceUrl(other.read_url)}>{t('Open classic reader')}</a>}
           <Link href={`/book/${id}`} className={styles.exitLink}>{t('← Back to book')}</Link>
         </div>
       </div>

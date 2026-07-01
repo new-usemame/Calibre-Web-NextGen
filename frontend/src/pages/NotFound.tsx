@@ -1,4 +1,5 @@
 import { Link } from 'wouter';
+import { BASE_PREFIX } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { EmptyState } from '../components/EmptyState';
 
@@ -7,9 +8,11 @@ import { EmptyState } from '../components/EmptyState';
  *  content area. Also links to the legacy UI in case the path exists there. */
 export function NotFound() {
   const t = useT();
-  // The path after the /app base, so the legacy-UI suggestion points at the
-  // equivalent classic route the user may have been looking for.
-  const legacyPath = window.location.pathname.replace(/^\/app/, '') || '/';
+  // The path after the <prefix>/app base, so the legacy-UI suggestion points at
+  // the equivalent classic route the user may have been looking for. Keep the
+  // reverse-proxy mount prefix so the classic link stays under the same subpath.
+  const afterApp = window.location.pathname.replace(new RegExp(`^${BASE_PREFIX}/app`), '') || '/';
+  const legacyPath = BASE_PREFIX + afterApp;
   return (
     <main style={{ padding: '48px 24px', maxWidth: 560, margin: '0 auto', textAlign: 'center' }}>
       <EmptyState message={t("This page doesn't exist here.")} />

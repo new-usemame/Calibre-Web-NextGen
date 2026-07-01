@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Router, Route, Switch } from 'wouter';
+import { BASE_PREFIX } from './lib/api';
 import { useMe, useLogout } from './lib/queries';
 import { Login } from './pages/Login';
 import { MagicLink } from './pages/MagicLink';
@@ -32,6 +33,11 @@ const Reader = lazy(() => import('./pages/Reader').then((m) => ({ default: m.Rea
 // Native multi-format reader (PDF/audio/text) — also lazy, full-screen.
 const NativeReader = lazy(() => import('./pages/NativeReader').then((m) => ({ default: m.NativeReader })));
 
+// The SPA is mounted at <prefix>/app — where <prefix> is the reverse-proxy mount
+// path (empty at the domain root). wouter needs the full base so client-side
+// links resolve to <prefix>/app/… rather than a prefix-less /app/….
+const ROUTER_BASE = BASE_PREFIX + '/app';
+
 export function App() {
   const { data: me, isLoading } = useMe();
   const logout = useLogout();
@@ -45,7 +51,7 @@ export function App() {
     // Login can navigate to it via wouter. On success the me-cache flips and the
     // authenticated tree below mounts.
     return (
-      <Router base="/app">
+      <Router base={ROUTER_BASE}>
         <Switch>
           <Route path="/magic-link">{() => <MagicLink />}</Route>
           <Route>{() => <Login />}</Route>
@@ -56,7 +62,7 @@ export function App() {
 
   return (
     <I18nProvider locale={me.locale}>
-    <Router base="/app">
+    <Router base={ROUTER_BASE}>
       <Switch>
         {/* Full-screen reader — outside the app shell (no sidebar/topbar). */}
         <Route path="/read/:id">

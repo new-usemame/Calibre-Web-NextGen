@@ -15,7 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import { ApiError } from '../lib/api';
+import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './CoverPicker.module.css';
 
@@ -47,10 +47,11 @@ export function CoverPicker({ id }: { id: string }) {
 
   const back = useBackTarget(id);
 
-  // Current cover, cache-busted after an apply.
+  // Current cover, cache-busted after an apply. resourceUrl() applies the
+  // reverse-proxy mount prefix (both branches are server /cover/… resources).
   const currentCover = useMemo(() => {
-    if (coverBust) return coverBust;
-    return book?.cover_url ?? null;
+    const raw = coverBust ?? book?.cover_url ?? null;
+    return raw ? resourceUrl(raw) : null;
   }, [book?.cover_url, coverBust]);
 
   const onApplied = useCallback((coverUrl?: string) => {

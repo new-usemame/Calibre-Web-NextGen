@@ -7,7 +7,7 @@
  * / {valid,...} envelope (not the /api/v1 {error:{…}} shape), so these wrappers
  * parse that here. CSRF + session cookie are reused from api.ts. */
 import { useQuery } from '@tanstack/react-query';
-import { ApiError, getCsrf } from './api';
+import { ApiError, getCsrf, apiUrl } from './api';
 
 // ---- shapes (mirror cps/services/cover_picker.py + cover_url_validator.py) ----
 
@@ -107,14 +107,14 @@ async function envelopeError(res: Response): Promise<never> {
 }
 
 async function cpGet<T>(path: string): Promise<T> {
-  const res = await fetch(path, { credentials: 'include', headers: { Accept: 'application/json' } });
+  const res = await fetch(apiUrl(path), { credentials: 'include', headers: { Accept: 'application/json' } });
   if (!res.ok) return envelopeError(res);
   return res.json() as Promise<T>;
 }
 
 /** POST JSON with the same one-shot CSRF refresh-and-retry as api.apiPost. */
 async function cpPostJson<T>(path: string, body: unknown): Promise<T> {
-  const doPost = (csrf: string) => fetch(path, {
+  const doPost = (csrf: string) => fetch(apiUrl(path), {
     method: 'POST', credentials: 'include',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
     body: JSON.stringify(body ?? {}),
@@ -129,7 +129,7 @@ async function cpPostJson<T>(path: string, body: unknown): Promise<T> {
 
 /** POST multipart (file upload) — browser sets the boundary, so no Content-Type. */
 async function cpUpload<T>(path: string, form: FormData): Promise<T> {
-  const doPost = (csrf: string) => fetch(path, {
+  const doPost = (csrf: string) => fetch(apiUrl(path), {
     method: 'POST', credentials: 'include', headers: { 'X-CSRFToken': csrf }, body: form,
   });
   let res = await doPost(await getCsrf());

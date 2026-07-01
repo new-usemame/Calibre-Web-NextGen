@@ -1,5 +1,37 @@
 /* Typed fetch helpers — same-origin, credentials included. */
 
+declare global {
+  interface Window { __CWNG_PREFIX__?: string; }
+}
+
+// Reverse-proxy mount prefix (e.g. "/cwa" when the app is served at
+// https://host/cwa/). The server injects window.__CWNG_PREFIX__ into the SPA
+// shell from request.script_root; fall back to deriving it from the current
+// path (strip the "/app…" SPA segment) so a stale cached shell still works.
+// Empty string when mounted at the domain root — the common case.
+function _detectPrefix(): string {
+  if (typeof window === 'undefined') return '';
+  const injected = window.__CWNG_PREFIX__;
+  if (injected !== undefined && injected !== null) return injected.replace(/\/+$/, '');
+  const derived = window.location.pathname.replace(/\/app(\/.*)?$/, '');
+  return derived.replace(/\/+$/, '');
+}
+
+export const BASE_PREFIX: string = _detectPrefix();
+
+/** Prefix an app-internal API/route path with the reverse-proxy mount prefix. */
+export function apiUrl(path: string): string {
+  return BASE_PREFIX + path;
+}
+
+/** Prefix a server-generated resource URL (cover/download/read) with the mount
+ *  prefix. Leaves absolute (http/https/protocol-relative) and data: URLs — e.g.
+ *  an external metadata provider's cover — untouched. */
+export function resourceUrl(u: string): string {
+  if (/^(https?:)?\/\//i.test(u) || u.startsWith('data:')) return u;
+  return BASE_PREFIX + u;
+}
+
 export interface ServerFeatures {
   hide_books: boolean;
   mail_configured: boolean;
@@ -244,7 +276,7 @@ let _csrfCache: string | null = null;
 
 export async function getCsrf(): Promise<string> {
   if (_csrfCache) return _csrfCache;
-  const res = await fetch('/api/v1/auth/csrf', { credentials: 'include' });
+  const res = await fetch(apiUrl('/api/v1/auth/csrf'), { credentials: 'include' });
   if (!res.ok) throw new ApiError(res.status, 'Failed to fetch CSRF token');
   const data = await res.json() as { csrf_token: string };
   _csrfCache = data.csrf_token;
@@ -256,7 +288,7 @@ function clearCsrf() {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(path, { credentials: 'include' });
+  const res = await fetch(apiUrl(path), { credentials: 'include' });
   if (!res.ok) {
     let msg = res.statusText;
     // API errors are shaped { error: { code, message } }; fall back to a bare
@@ -273,7 +305,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> => {
-    return fetch(path, {
+    return fetch(apiUrl(path), {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -322,7 +354,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
  *  rather than duplicating it under /api/v1. Same CSRF-retry as apiPost. */
 export async function apiPostForm<T>(path: string, fields: Record<string, string>): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> =>
-    fetch(path, {
+    fetch(apiUrl(path), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf },
@@ -374,7 +406,7 @@ export interface MetaSearchResponse {
  *  browser set the multipart Content-Type + boundary (so we must NOT set it). */
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> =>
-    fetch(path, {
+    fetch(apiUrl(path), {
       method: 'POST',
       credentials: 'include',
       headers: { 'X-CSRFToken': csrf },

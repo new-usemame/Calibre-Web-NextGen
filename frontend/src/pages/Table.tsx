@@ -7,6 +7,7 @@ import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
 import type { Book } from '../lib/api';
+import { resourceUrl } from '../lib/api';
 import styles from './Table.module.css';
 
 // Column key -> the API sort tokens for ascending / descending.
@@ -117,7 +118,7 @@ export function Table() {
                   <tr key={b.id}>
                     <td className={styles.coverCol}>
                       {b.cover_url
-                        ? <img src={b.cover_url} alt="" className={styles.coverThumb} loading="lazy" />
+                        ? <img src={resourceUrl(b.cover_url)} alt="" className={styles.coverThumb} loading="lazy" />
                         : <div className={styles.coverThumbEmpty} />}
                     </td>
                     {visible.map((c) => (

@@ -10,7 +10,7 @@ import { AddToShelf } from '../components/AddToShelf';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { BookFormat } from '../lib/api';
-import { ApiError } from '../lib/api';
+import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './BookDetail.module.css';
 
@@ -137,7 +137,7 @@ export function BookDetail() {
           <div className={styles.coverWrap}>
             {book.cover_url ? (
               <img
-                src={book.cover_url}
+                src={resourceUrl(book.cover_url)}
                 alt={book.title}
                 className={styles.cover}
               />
@@ -244,7 +244,7 @@ export function BookDetail() {
             {book.formats.map((fmt) => (
               <a
                 key={fmt.format}
-                href={fmt.download_url}
+                href={resourceUrl(fmt.download_url)}
                 className={styles.downloadBtn}
                 download
               >

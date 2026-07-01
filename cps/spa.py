@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Serves the SPA shell at /app. Opt-OUT via env CWNG_SPA (default: enabled)."""
+import json
 import os
-from flask import Blueprint, send_from_directory, abort
+import re
+from flask import Blueprint, request, Response, abort
 
 from . import logger, constants
 
@@ -48,6 +50,45 @@ def _inject_spa_flag():
     }
 
 
+# A reverse-proxy mount prefix is a URL path: leading-slash segments of
+# unreserved URL chars. Anything else (quotes, angle brackets, spaces) is
+# rejected to "" so a spoofed X-Forwarded-Prefix / X-Script-Name header can't
+# break out of the injected <script> string or the asset-URL rewrite below.
+_SAFE_PREFIX_RE = re.compile(r"^(/[A-Za-z0-9._~-]+)+$")
+
+
+def _mount_prefix():
+    """The reverse-proxy path prefix the app is mounted under (e.g. ``/cwa``),
+    or ``""`` at the domain root. Sourced from ``request.script_root`` — set by
+    ReverseProxied (X-Script-Name) / ProxyFix (X-Forwarded-Prefix) upstream, the
+    same value ``url_for`` already uses to build prefixed links for the classic
+    UI. Sanitized so it's safe to reflect into HTML/JS."""
+    prefix = (request.script_root or "").rstrip("/")
+    if prefix and (not _SAFE_PREFIX_RE.match(prefix) or ".." in prefix):
+        log.warning("Ignoring unexpected script_root/prefix %r for SPA shell", prefix)
+        return ""
+    return prefix
+
+
+def _render_shell(index_path, prefix):
+    """Serve the built index.html adapted to the current mount prefix.
+
+    The Vite build hardcodes root-absolute asset URLs (``/static/app/…``); behind
+    a reverse-proxy subpath those 404 (the reporter's white page, #571). Rewrite
+    them to ``<prefix>/static/app/…`` and expose the prefix to the SPA runtime via
+    ``window.__CWNG_PREFIX__`` so its API calls, router base and resource URLs are
+    prefixed too. At the domain root (prefix="") the file is served unchanged."""
+    with open(index_path, "r", encoding="utf-8") as fh:
+        html = fh.read()
+    if prefix:
+        html = html.replace("/static/app/", prefix + "/static/app/")
+    # Always inject the prefix (even "") so the SPA reads an authoritative value
+    # rather than guessing from the URL. json.dumps → safely-quoted JS string.
+    inject = "<script>window.__CWNG_PREFIX__=%s;</script>" % json.dumps(prefix)
+    html = html.replace("</head>", inject + "</head>", 1)
+    return Response(html, mimetype="text/html")
+
+
 @spa.route("/app")
 @spa.route("/app/")
 @spa.route("/app/<path:path>")
@@ -59,4 +100,4 @@ def spa_shell(path=""):
         log.warning("SPA shell requested but build artifact not found: %s — run the Vite build "
                     "or set CWNG_SPA=0 to suppress this warning", index_path)
         abort(404)
-    return send_from_directory(_SPA_DIR, "index.html")
+    return _render_shell(index_path, _mount_prefix())

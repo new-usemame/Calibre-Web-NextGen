@@ -70,3 +70,24 @@ def test_deleted_book_evicted_from_scroll_cache():
     assert "export function removeBookFromCache" in cache
     queries = (_FE / "lib" / "queries.ts").read_text()
     assert "removeBookFromCache" in queries
+
+
+@pytest.mark.unit
+def test_scroll_saved_from_tracked_ref_not_clamped_unmount_read():
+    """#578 first-page regression (@KucharczykL): the loaded pages rehydrated but
+    the scroll landed at the top. Reading window.scrollY in the unmount cleanup is
+    too late — the catalog has already been replaced by the shorter book page and
+    the browser has clamped window.scrollY down to that page's max scroll, so the
+    first-page offset was saved as ~0. The save must record a scroll position
+    tracked live during scrolling (a ref fed by a scroll listener), which survives
+    the clamp because the navigating click flushes this cleanup before the clamp's
+    async scroll event.
+    """
+    src = (_FE / "pages" / "Catalog.tsx").read_text()
+    # A live scroll listener feeds a ref with the real offset.
+    assert ("addEventListener('scroll'" in src) or ('addEventListener("scroll"' in src)
+    assert "lastScrollYRef" in src
+    # The unmount save records the tracked ref, not a fresh (clamped) read.
+    assert "scrollY: lastScrollYRef.current" in src
+    # Regression guard: never revert to reading window.scrollY inline at save time.
+    assert "scrollY: window.scrollY" not in src

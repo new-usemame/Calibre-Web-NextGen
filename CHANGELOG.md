@@ -16,6 +16,12 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+- **The library now keeps your scroll position when you scroll the first page
+  and go Back from a book.** The scroll-restore added in v4.1.1 worked once you'd
+  loaded more pages, but if you only scrolled the first screen of books, opened
+  one, and came back, the list jumped to the top. Reported by @KucharczykL.
+
 ## [v4.1.3] - 2026-07-01
 
 Corrective release: if you're on v4.1.1 or v4.1.2, update — those versions show

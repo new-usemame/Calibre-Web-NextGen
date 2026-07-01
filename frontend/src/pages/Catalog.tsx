@@ -186,10 +186,27 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   // later Back rehydrates the loaded pages, filters and scroll position (#578).
   const persistRef = useRef({ page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter });
   persistRef.current = { page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter };
+
+  // Track the live scroll offset in a ref. Reading window.scrollY in the unmount
+  // cleanup is too late: by then the catalog has been swapped for the (shorter)
+  // book page and the browser has already clamped window.scrollY down to that
+  // page's max scroll — so a first-page position (nothing tall enough to survive
+  // the clamp) was saved as ~0 and Back landed back at the top (#578 first-page
+  // regression, reported by @KucharczykL). We record every scroll here and save
+  // the tracked value; the click that triggers navigation is a discrete event,
+  // so React flushes this unmount cleanup before the clamp's async scroll event,
+  // and the real offset is preserved.
+  const lastScrollYRef = useRef(snap?.scrollY ?? 0);
+  useEffect(() => {
+    const onScroll = () => { lastScrollYRef.current = window.scrollY; };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   useEffect(() => {
     return () => {
       const s = persistRef.current;
-      saveCatalog(restoreKey, { ...s, scrollY: window.scrollY });
+      saveCatalog(restoreKey, { ...s, scrollY: lastScrollYRef.current });
     };
   }, [restoreKey]);
 

@@ -18,7 +18,12 @@ export default defineConfig({
       if (hostType === 'js') {
         return { runtime: `(window.__CWNG_PREFIX__||"")+"/static/app/"+${JSON.stringify(filename)}` }
       }
-      return { relative: false }
+      // CSS url() refs (fonts/images) → relative, so they resolve against the
+      // stylesheet's own (already-prefixed) /…/static/app/assets/ location behind
+      // a subpath. HTML refs (index.html script/CSS) stay absolute — the shell is
+      // served at <prefix>/app, not under /static/app/, and the server rewrites
+      // that base in the served index.html.
+      return { relative: hostType === 'css' }
     },
   },
 })

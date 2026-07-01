@@ -176,6 +176,7 @@ export interface BookMetadata {
   languages: string;
   comments: string;
   rating: number;
+  identifiers: { type: string; val: string }[];
   errors?: Record<string, string>;
 }
 

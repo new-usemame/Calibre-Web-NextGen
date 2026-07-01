@@ -20,7 +20,7 @@ from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 import time
 
-from ..editbooks import edit_book_param, delete_book_from_table
+from ..editbooks import edit_book_param, delete_book_from_table, modify_identifiers
 from ..helper import convert_book_format, save_cover, save_cover_from_url
 
 # Fields the SPA edit form can change, applied in this order. Title/authors come
@@ -81,6 +81,11 @@ def _editable_metadata(book):
         "comments": comments[0].text if comments else "",
         # calibre ratings are stored 0-10 (half-stars); expose 0-5.
         "rating": (rating_rows[0].rating / 2) if rating_rows else 0,
+        # ISBN/ASIN/etc. — editable as a table in the SPA (fork #580).
+        "identifiers": [
+            {"type": i.type, "val": i.val}
+            for i in (getattr(book, "identifiers", None) or [])
+        ],
     }
 
 
@@ -119,6 +124,30 @@ def update_metadata(book_id):
         ok, message = _parse_edit_result(edit_book_param(field, vals))
         if not ok:
             errors[field] = message
+
+    # Identifiers (ISBN/ASIN/…) — a list of {type, val}, reconciled against the
+    # book's existing rows via the same helper the legacy editor uses (fork #580).
+    if "identifiers" in data:
+        raw_ids = data.get("identifiers") or []
+        input_identifiers = []
+        for entry in raw_ids if isinstance(raw_ids, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            id_type = str(entry.get("type") or "").strip().lower()
+            id_val = str(entry.get("val") or "").strip()
+            if not id_type or not id_val:
+                continue  # skip blank rows (a half-filled row isn't an error)
+            input_identifiers.append(db.Identifiers(id_val, id_type, book_id))
+        changed, id_error = modify_identifiers(
+            input_identifiers, book.identifiers, calibre_db.session)
+        if id_error:
+            errors["identifiers"] = "Duplicate identifier type — each type may appear once."
+        if changed:
+            try:
+                calibre_db.session.commit()
+            except Exception as exc:  # noqa: BLE001 — surface as a field error, don't 500
+                calibre_db.session.rollback()
+                errors["identifiers"] = str(exc)
 
     # Re-fetch so the response reflects the committed state.
     fresh = calibre_db.get_book(book_id)

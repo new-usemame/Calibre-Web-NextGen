@@ -153,8 +153,47 @@
 .metaSearchRow .input { flex: 1; }
 .metaResults { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); max-height: 420px; overflow-y: auto; }
 .metaResult {
-  display: flex; align-items: center; gap: var(--sp-3);
+  display: flex; flex-direction: column; gap: var(--sp-2);
   padding: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-md);
+}
+.metaResultHead { display: flex; align-items: center; gap: var(--sp-3); }
+
+/* Per-field apply checklist (fork #580) */
+.applyPanel {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--sp-2); border-top: 1px solid var(--border);
+}
+.applyRow {
+  display: grid; grid-template-columns: auto minmax(80px, 120px) 1fr; align-items: center;
+  gap: var(--sp-2); padding: 4px 2px; font-size: var(--fs-sm); cursor: pointer;
+}
+.applyRow input { accent-color: var(--accent); }
+.applyLabel { color: var(--text); font-weight: 500; }
+.applyPreview { color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.applyActions { display: flex; justify-content: flex-end; margin-top: var(--sp-2); }
+
+/* Identifiers table (fork #580) */
+.identSection { display: flex; flex-direction: column; gap: var(--sp-2); }
+.identTable { display: flex; flex-direction: column; gap: var(--sp-2); }
+.identRow { display: flex; gap: var(--sp-2); align-items: center; }
+.identType { width: 160px; flex-shrink: 0; }
+.identVal { flex: 1; min-width: 0; }
+.identRemove {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: none; color: var(--text-muted); cursor: pointer;
+}
+.identRemove:hover { color: var(--danger); border-color: var(--danger); }
+.identAdd {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: 1px dashed var(--border-strong); border-radius: var(--r-sm);
+  background: none; color: var(--text); font-size: var(--fs-sm); cursor: pointer;
+}
+.identAdd:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 560px) {
+  .identType { width: 110px; }
+  .applyRow { grid-template-columns: auto 1fr; }
+  .applyRow .applyPreview { grid-column: 1 / -1; padding-left: 26px; }
 }
 .metaCover { width: 40px; height: 60px; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; }
 .metaInfo { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search } from 'lucide-react';
+import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search, Plus, X } from 'lucide-react';
 import {
   useBookMetadata, useUpdateMetadata, useBook, useMe, useDeleteFormat, useConvertFormat,
   useSetCover, useMetadataSearch, useAddFormat,
@@ -13,6 +13,8 @@ import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './EditBook.module.css';
 
+interface Ident { type: string; val: string }
+
 interface FormState {
   title: string;
   authors: string;
@@ -23,14 +25,34 @@ interface FormState {
   languages: string;
   rating: string;
   comments: string;
+  identifiers: Ident[];
 }
 
 const RATINGS = ['', '1', '2', '3', '4', '5'];
+
+/** Which fields a fetched result can contribute, in display order. `has` decides
+ *  whether the result actually offers the field (so we only show applicable rows),
+ *  and `preview` renders the incoming value in the per-field apply checklist. */
+type ApplyKey = 'title' | 'authors' | 'series' | 'tags' | 'publisher' | 'rating' | 'description' | 'identifiers' | 'cover';
+const APPLY_FIELDS: { key: ApplyKey; label: string; has: (r: MetaResult) => boolean; preview: (r: MetaResult) => string }[] = [
+  { key: 'title', label: 'Title', has: (r) => !!r.title, preview: (r) => r.title },
+  { key: 'authors', label: 'Authors', has: (r) => !!r.authors?.length, preview: (r) => (r.authors || []).join(', ') },
+  { key: 'series', label: 'Series', has: (r) => !!r.series, preview: (r) => `${r.series}${r.series_index ? ` #${r.series_index}` : ''}` },
+  { key: 'tags', label: 'Tags', has: (r) => !!r.tags?.length, preview: (r) => (r.tags || []).join(', ') },
+  { key: 'publisher', label: 'Publisher', has: (r) => !!r.publisher, preview: (r) => r.publisher || '' },
+  { key: 'rating', label: 'Rating', has: (r) => !!r.rating, preview: (r) => `${Math.round(r.rating || 0)} ★` },
+  { key: 'description', label: 'Description', has: (r) => !!r.description, preview: (r) => stripTags(r.description || '').slice(0, 140) },
+  { key: 'identifiers', label: 'Identifiers', has: (r) => !!r.identifiers && Object.keys(r.identifiers).length > 0, preview: (r) => Object.entries(r.identifiers || {}).map(([k, v]) => `${k}:${v}`).join(', ') },
+  { key: 'cover', label: 'Cover', has: (r) => !!r.cover, preview: () => '' },
+];
+
+function stripTags(s: string) { return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); }
 
 export function EditBook({ id }: { id: string }) {
   const t = useT();
   const { data: meta, isLoading, error } = useBookMetadata(id);
   const update = useUpdateMetadata(id);
+  const setCover = useSetCover(id);
   const [, navigate] = useLocation();
 
   const [form, setForm] = useState<FormState | null>(null);
@@ -49,6 +71,7 @@ export function EditBook({ id }: { id: string }) {
       languages: meta.languages,
       rating: meta.rating ? String(meta.rating) : '',
       comments: meta.comments,
+      identifiers: (meta.identifiers || []).map((i) => ({ type: i.type, val: i.val })),
     });
   }, [meta]);
 
@@ -66,19 +89,46 @@ export function EditBook({ id }: { id: string }) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
 
-  // Apply an online metadata result into the form (one merged update).
-  const applyResult = (r: MetaResult) =>
-    setForm((f) => (f ? {
-      ...f,
-      title: r.title || f.title,
-      authors: r.authors?.length ? r.authors.join(' & ') : f.authors,
-      tags: r.tags?.length ? r.tags.join(', ') : f.tags,
-      publishers: r.publisher || f.publishers,
-      comments: r.description || f.comments,
-      series: r.series || f.series,
-      series_index: r.series_index ? String(r.series_index) : f.series_index,
-      rating: r.rating ? String(Math.round(r.rating)) : f.rating,
-    } : f));
+  // Apply only the user-selected fields of an online result into the form. Cover
+  // is applied as a side effect (it isn't a form field). Identifiers merge by
+  // type (result overrides same-type rows, keeps the rest).
+  const applySelected = (r: MetaResult, sel: Set<ApplyKey>) => {
+    setForm((f) => {
+      if (!f) return f;
+      const next = { ...f };
+      if (sel.has('title') && r.title) next.title = r.title;
+      if (sel.has('authors') && r.authors?.length) next.authors = r.authors.join(' & ');
+      if (sel.has('tags') && r.tags?.length) next.tags = r.tags.join(', ');
+      if (sel.has('publisher') && r.publisher) next.publishers = r.publisher;
+      if (sel.has('series') && r.series) {
+        next.series = r.series;
+        if (r.series_index) next.series_index = String(r.series_index);
+      }
+      if (sel.has('rating') && r.rating) next.rating = String(Math.round(r.rating));
+      if (sel.has('description') && r.description) next.comments = r.description;
+      if (sel.has('identifiers') && r.identifiers) {
+        const byType = new Map(next.identifiers.map((i) => [i.type.toLowerCase(), i]));
+        for (const [type, val] of Object.entries(r.identifiers)) {
+          const ty = String(type || '').trim().toLowerCase();
+          const vv = String(val ?? '').trim();
+          if (ty && vv) byType.set(ty, { type: ty, val: vv });
+        }
+        next.identifiers = [...byType.values()];
+      }
+      return next;
+    });
+    if (sel.has('cover') && r.cover) {
+      setCover.mutate({ url: r.cover }, {
+        onSuccess: () => setBanner({ ok: true, text: t('Cover updated from the selected result.') }),
+        onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : 'Cover update failed.' }),
+      });
+    }
+  };
+
+  const setIdent = (i: number, patch: Partial<Ident>) =>
+    setForm((f) => (f ? { ...f, identifiers: f.identifiers.map((row, j) => (j === i ? { ...row, ...patch } : row)) } : f));
+  const addIdent = () => setForm((f) => (f ? { ...f, identifiers: [...f.identifiers, { type: '', val: '' }] } : f));
+  const removeIdent = (i: number) => setForm((f) => (f ? { ...f, identifiers: f.identifiers.filter((_, j) => j !== i) } : f));
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +144,10 @@ export function EditBook({ id }: { id: string }) {
       languages: form.languages,
       rating: form.rating ? Number(form.rating) : 0,
       comments: form.comments,
+      // Drop blank rows; the backend reconciles the rest against existing rows.
+      identifiers: form.identifiers
+        .map((i) => ({ type: i.type.trim().toLowerCase(), val: i.val.trim() }))
+        .filter((i) => i.type && i.val),
     };
     update.mutate(payload, {
       onSuccess: (data) => {
@@ -119,7 +173,7 @@ export function EditBook({ id }: { id: string }) {
 
       <CoverManager id={id} />
 
-      <MetadataFetch defaultQuery={form.title} onApply={applyResult} />
+      <MetadataFetch defaultQuery={form.title} onApply={applySelected} />
 
       <form className={styles.form} onSubmit={onSubmit}>
         <Field label={t('Title')} error={fieldErrors.title}>
@@ -163,6 +217,30 @@ export function EditBook({ id }: { id: string }) {
           <span className={styles.hint}>{t('HTML is allowed and sanitized on display.')}</span>
         </Field>
 
+        {/* Identifiers table (ISBN/ASIN/…) — fork #580. */}
+        <div className={styles.identSection}>
+          <span className={styles.label}>{t('Identifiers')}</span>
+          {fieldErrors.identifiers && <span className={styles.fieldError}>{fieldErrors.identifiers}</span>}
+          {form.identifiers.length > 0 && (
+            <div className={styles.identTable} role="group" aria-label={t('Identifiers')}>
+              {form.identifiers.map((idn, i) => (
+                <div key={i} className={styles.identRow}>
+                  <input className={styles.identType} value={idn.type} aria-label={t('Identifier type')}
+                    placeholder={t('type (isbn, amazon, doi…)')} onChange={(e) => setIdent(i, { type: e.target.value })} />
+                  <input className={styles.identVal} value={idn.val} aria-label={t('Identifier value')}
+                    placeholder={t('value')} onChange={(e) => setIdent(i, { val: e.target.value })} />
+                  <button type="button" className={styles.identRemove} onClick={() => removeIdent(i)}
+                    aria-label={t('Remove identifier')}><X size={15} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button type="button" className={styles.identAdd} onClick={addIdent}>
+            <Plus size={14} /> {t('Add identifier')}
+          </button>
+          <span className={styles.hint}>{t('Each type (isbn, amazon, google, doi…) may appear once.')}</span>
+        </div>
+
         <div className={styles.actions}>
           <Button type="submit" disabled={update.isPending}>
             <Save size={16} /> {t('Save changes')}
@@ -178,9 +256,11 @@ export function EditBook({ id }: { id: string }) {
 }
 
 /** Fetch metadata from online providers (Google Books, OpenLibrary, Amazon,
- *  ComicVine, …) and apply a result to the form. Reuses the legacy
- *  /metadata/search endpoint (per-user provider toggles live there). */
-function MetadataFetch({ defaultQuery, onApply }: { defaultQuery: string; onApply: (r: MetaResult) => void }) {
+ *  ComicVine, …). Each result expands a per-field checklist so you apply only the
+ *  values you want (fork #580) instead of overwriting the whole form. Reuses the
+ *  legacy /metadata/search endpoint (per-user provider toggles live there). */
+function MetadataFetch({ defaultQuery, onApply }:
+  { defaultQuery: string; onApply: (r: MetaResult, sel: Set<ApplyKey>) => void }) {
   const t = useT();
   const search = useMetadataSearch();
   const [open, setOpen] = useState(false);
@@ -216,22 +296,60 @@ function MetadataFetch({ defaultQuery, onApply }: { defaultQuery: string; onAppl
           {err && <span className={styles.msgErr}>{err}</span>}
           {results.length > 0 && (
             <ul className={styles.metaResults}>
-              {results.map((r, i) => (
-                <li key={i} className={styles.metaResult}>
-                  {r.cover && <img src={r.cover} alt="" className={styles.metaCover} loading="lazy" />}
-                  <div className={styles.metaInfo}>
-                    <span className={styles.metaTitle}>{r.title}</span>
-                    <span className={styles.metaAuthors}>{(r.authors || []).join(', ')}</span>
-                    {r.source?.id && <span className={styles.metaSource}>{r.source.id}</span>}
-                  </div>
-                  <Button type="button" variant="ghost" onClick={() => onApply(r)}>{t('Use')}</Button>
-                </li>
-              ))}
+              {results.map((r, i) => <ResultRow key={i} r={r} onApply={onApply} />)}
             </ul>
           )}
         </div>
       )}
     </section>
+  );
+}
+
+/** One search result: shows the book, and (on "Choose fields") a checklist of the
+ *  values it offers so the user applies exactly what they want. */
+function ResultRow({ r, onApply }: { r: MetaResult; onApply: (r: MetaResult, sel: Set<ApplyKey>) => void }) {
+  const t = useT();
+  const fields = APPLY_FIELDS.filter((f) => f.has(r));
+  const [expanded, setExpanded] = useState(false);
+  const [sel, setSel] = useState<Set<ApplyKey>>(() => new Set(fields.map((f) => f.key)));
+
+  const toggle = (k: ApplyKey) => setSel((s) => {
+    const n = new Set(s);
+    if (n.has(k)) n.delete(k); else n.add(k);
+    return n;
+  });
+
+  return (
+    <li className={styles.metaResult}>
+      <div className={styles.metaResultHead}>
+        {r.cover && <img src={r.cover} alt="" className={styles.metaCover} loading="lazy" />}
+        <div className={styles.metaInfo}>
+          <span className={styles.metaTitle}>{r.title}</span>
+          <span className={styles.metaAuthors}>{(r.authors || []).join(', ')}</span>
+          {r.source?.id && <span className={styles.metaSource}>{r.source.id}</span>}
+        </div>
+        <Button type="button" variant="ghost" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? t('Hide fields') : t('Choose fields')}
+        </Button>
+      </div>
+      {expanded && (
+        <div className={styles.applyPanel}>
+          {fields.map((f) => (
+            <label key={f.key} className={styles.applyRow}>
+              <input type="checkbox" checked={sel.has(f.key)} onChange={() => toggle(f.key)} />
+              <span className={styles.applyLabel}>{t(f.label)}</span>
+              <span className={styles.applyPreview}>{f.key === 'cover' ? t('(replace cover)') : f.preview(r)}</span>
+            </label>
+          ))}
+          <div className={styles.applyActions}>
+            <Button type="button" disabled={sel.size === 0}
+              onClick={() => { onApply(r, sel); setExpanded(false); }}>
+              {t('Apply selected')}
+            </Button>
+          </div>
+        </div>
+      )}
+    </li>
   );
 }
 

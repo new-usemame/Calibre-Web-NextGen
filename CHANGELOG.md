@@ -17,6 +17,12 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Added
+- **The new-UI edit page can now edit identifiers, and you choose which fetched
+  values to apply.** Editing a book in the new interface now has an Identifiers
+  table — add, change or remove ISBN, ASIN/Amazon, Google, DOI and the rest — and
+  when you fetch metadata from the web, each result has a "Choose fields" checklist
+  so you apply just the title, cover, description, identifiers (or whatever you
+  pick) instead of overwriting everything. Reported by @uschi1 (#580).
 - **Switching back to the classic view now asks (optionally) what made you
   switch.** The new interface's user menu has a "Back to the classic view" item;
   when you use it, the classic page shows a short, two-step prompt — pick what

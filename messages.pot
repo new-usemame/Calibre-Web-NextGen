@@ -6302,6 +6302,11 @@ msgstr ""
 msgid "Read"
 msgstr ""
 
+#. New-UI "open the reader" button — the verb "to read", distinct from the
+#. "Read" read-status label above (a past participle in many languages).
+msgid "Read now"
+msgstr ""
+
 #: cps/templates/detail.html:692 cps/templates/detail.html:693
 #: cps/templates/detail.html:1069 cps/templates/listenmp3.html:158
 msgid "Mark As Unread"

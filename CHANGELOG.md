@@ -32,6 +32,12 @@ is for things you can see or feel when running the app.
   appears right after you switch back, and won't nag you again.
 
 ### Fixed
+- **Dutch: the new UI's book buttons read correctly.** The button that opens the
+  reader said "Gelezen" ("has been read") instead of a "read now" verb, and the
+  already-read marker showed the English word "Read". The reader button now says
+  "Nu lezen" and the marker shows "Gelezen ✓". (Under the hood the reader action
+  and the read-status label are now separate strings, so this collision can't
+  recur in other languages either.) Reported in #577.
 - **Book identifiers are clickable links again in the new UI.** On a book's page,
   identifiers like Goodreads, StoryGraph, Hardcover, Amazon and ISBN now link out
   to the book on that site (as they did in the classic UI) instead of showing as

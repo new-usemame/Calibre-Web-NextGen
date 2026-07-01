@@ -184,13 +184,13 @@ export function BookDetail() {
             {hasEpub ? (
               // EPUB opens in the in-browser SPA reader (resumes saved progress).
               <Link href={`/read/${book.id}`} className={styles.actionPrimary}>
-                {t('Read')}
+                {t('Read now')}
               </Link>
             ) : primaryReadable ? (
               // PDF/audio/text open in the native multi-format reader; comics/
               // DjVu fall through there to the server reader for image extraction.
               <Link href={`/view/${book.id}/${primaryReadable.format.toLowerCase()}`} className={styles.actionPrimary}>
-                {t('Read')}
+                {t('Read now')}
               </Link>
             ) : null}
 
@@ -200,7 +200,7 @@ export function BookDetail() {
               disabled={toggleRead.isPending}
               aria-label={book.read ? t('Mark as unread') : t('Mark as read')}
             >
-              {book.read ? t('Read ✓') : t('Mark as read')}
+              {book.read ? `${t('Read')} ✓` : t('Mark as read')}
             </button>
 
             <AddToShelf bookId={book.id} />

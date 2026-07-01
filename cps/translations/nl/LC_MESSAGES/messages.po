@@ -6600,6 +6600,11 @@ msgstr ""
 msgid "Read"
 msgstr "Gelezen"
 
+#. New-UI "open the reader" button — distinct from the "Read" read-status label
+#. above (which is "Gelezen"/past tense). This one is the verb "to read".
+msgid "Read now"
+msgstr "Nu lezen"
+
 #: cps/templates/detail.html:692 cps/templates/detail.html:693
 #: cps/templates/detail.html:1069 cps/templates/listenmp3.html:158
 msgid "Mark As Unread"

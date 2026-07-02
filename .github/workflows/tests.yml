@@ -8,6 +8,10 @@ on:
     # on the same SHA, which doubles the surface for the xdist worker-IPC
     # hang documented in notes/xdist-worker-ipc-hang-followup-2026-05-21.md.
     branches: [main, dev]
+    # Version tags run the SPA e2e release gate (the e2e-tests job pulls the
+    # tag's GHCR image once it publishes). Without this, the job's tag
+    # condition is dead code — `branches:` alone filters out tag events.
+    tags: ['v*']
   pull_request:
     branches: [main, dev]  # Run Job 1 on PRs to main/dev
   workflow_dispatch:  # Manual trigger button in Actions tab
@@ -289,16 +293,22 @@ jobs:
   e2e-tests:
     name: E2E Tests (SPA)
     runs-on: ubuntu-latest
-    # Release-gate + canary: version tags, dev pushes, and manual dispatch. The
-    # SPA e2e matrix (Layer 2 of the verification system, frontend/e2e/) is the
-    # "earn the release" gate; /CWNG_verify runs the same harness on-demand in dev.
-    # ADVISORY until the first green run is observed, then promote to a required
-    # check in branch protection + add to the test-summary hard gate.
+    # Release gate + manual dispatch. The SPA e2e matrix (Layer 2 of the
+    # verification system, frontend/e2e/) is the "earn the release" gate;
+    # /CWNG_verify runs the same harness on-demand in dev. Tag runs test the
+    # tag's own GHCR image (requires `on.push.tags` above — a `branches:`-only
+    # push trigger never delivers tag events). The dev-branch condition is
+    # forward wiring: no dev branch exists today, so per-merge canary coverage
+    # is a follow-up (workflow_run after the :dev image build).
+    # ADVISORY: a failure warns in test-summary + alerts Discord on tag runs,
+    # but does not block. Promote to a hard gate once several tag runs are green.
     if: |
       startsWith(github.ref, 'refs/tags/v') ||
       github.ref == 'refs/heads/dev' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_e2e)
-    timeout-minutes: 45
+    # Tag runs may wait up to ~40 min for the GHCR release build to publish
+    # the image (see the pull loop below) before the ~15 min harness run.
+    timeout-minutes: 75
     permissions:
       contents: read
       packages: read   # pull the private pbs-cache mirror images the Dockerfile COPYs from
@@ -338,7 +348,19 @@ jobs:
           IMAGE: ${{ steps.img.outputs.image }}
         run: |
           echo "Testing image: $IMAGE"
-          docker pull "$IMAGE"
+          # On tag pushes this job races the GHCR release build, which publishes
+          # the tag's image 15–35 min after the tag lands (v4.0.169 lesson) —
+          # poll instead of failing on the first pull. :dev / dispatch runs hit
+          # an already-published image and pull on the first attempt.
+          for i in $(seq 1 80); do
+            docker pull "$IMAGE" && break
+            echo "image not pullable yet (attempt $i/80); retrying in 30s..."
+            sleep 30
+          done
+          if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "::error::$IMAGE never became pullable — check the GHCR build for this ref"
+            exit 1
+          fi
           mkdir -p /tmp/cwn/config /tmp/cwn/ingest
           docker run -d --name cwn-e2e \
             -e PUID=1000 -e PGID=1000 -e TZ=UTC -e CWNG_SPA=1 \

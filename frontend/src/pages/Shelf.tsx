@@ -28,7 +28,7 @@ export function Shelf({ id }: { id: string }) {
   const [books, setBooks] = useState<Book[]>([]);
   const accKeyRef = useRef<string>('');
 
-  const { data, isLoading, isFetching, error } = useShelf(id, page);
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page);
   const updateShelf = useUpdateShelf(id);
   const deleteShelf = useDeleteShelf();
   const reorder = useReorderShelfBooks(id);
@@ -40,9 +40,21 @@ export function Shelf({ id }: { id: string }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
 
-  // Reset accumulation if the shelf id changes (route reuse) or membership shrinks.
+  // Route reuse (/shelf/A -> /shelf/B keeps this component mounted): reset
+  // paging and per-shelf UI modes when the shelf changes (#612).
   useEffect(() => {
-    if (!data) return;
+    setPage(1);
+    setEditing(false);
+    setReordering(false);
+    setActionError(null);
+  }, [id]);
+
+  // Accumulate pages; replace when the shelf changes. Skip placeholder data:
+  // on an id change react-query would briefly serve the PREVIOUS shelf's rows
+  // (placeholderData) — accumulating those stamps them as the new shelf's and
+  // appends the real rows behind them, mixing both shelves' books (#612).
+  useEffect(() => {
+    if (!data || isPlaceholderData) return;
     const key = String(id);
     if (key !== accKeyRef.current) {
       setBooks(data.items);
@@ -50,7 +62,7 @@ export function Shelf({ id }: { id: string }) {
     } else {
       setBooks((prev) => dedupAppend(prev, data.items));
     }
-  }, [data, id]);
+  }, [data, id, isPlaceholderData]);
 
   if (isLoading && !data) return <SpinnerCentered size={40} />;
   if (error || !data) {

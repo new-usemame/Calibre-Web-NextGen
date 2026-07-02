@@ -256,7 +256,11 @@ export function useShelf(id: string | number | undefined, page = 1) {
     queryKey: ['shelf', String(id), page],
     queryFn: () => apiGet<ShelfDetail>(`/api/v1/shelves/${id}?page=${page}&per_page=24`),
     enabled: id !== undefined && id !== '',
-    placeholderData: (prev) => prev,
+    // Keep the previous page's rows only while paging within the SAME shelf —
+    // never carry one shelf's rows across an id change, where they'd render
+    // under the next shelf's key and mix both shelves' books (#612).
+    placeholderData: (prev, prevQuery) =>
+      prevQuery && String(prevQuery.queryKey[1]) === String(id) ? prev : undefined,
   });
 }
 
@@ -795,7 +799,9 @@ export function useMagicShelfBooks(id: string | number, page = 1) {
   return useQuery<{ id: number; name: string; icon: string; is_owner: boolean } & BooksPage>({
     queryKey: ['magicshelf', String(id), page],
     queryFn: () => apiGet(`/api/v1/magicshelf/${id}?page=${page}`),
-    placeholderData: (prev) => prev,
+    // Same-shelf paging only — see useShelf (#612).
+    placeholderData: (prev, prevQuery) =>
+      prevQuery && String(prevQuery.queryKey[1]) === String(id) ? prev : undefined,
   });
 }
 

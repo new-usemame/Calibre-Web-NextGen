@@ -23,15 +23,22 @@ export function MagicShelfView({ id }: { id: string }) {
   const [page, setPage] = useState(1);
   const [books, setBooks] = useState<Book[]>([]);
   const accKey = useRef('');
-  const { data, isLoading, isFetching, error } = useMagicShelfBooks(id, page);
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(id, page);
   const del = useDeleteMagicShelf();
   const dup = useDuplicateMagicShelf();
 
+  // Route reuse: reset paging when the shelf id changes (#612).
   useEffect(() => {
-    if (!data) return;
+    setPage(1);
+  }, [id]);
+
+  // Skip placeholder data — accumulating the previous shelf's briefly-served
+  // rows under the new id would mix both shelves' books (#612, see Shelf.tsx).
+  useEffect(() => {
+    if (!data || isPlaceholderData) return;
     if (String(id) !== accKey.current) { setBooks(data.items); accKey.current = String(id); }
     else setBooks((p) => dedupAppend(p, data.items));
-  }, [data, id]);
+  }, [data, id, isPlaceholderData]);
 
   if (isLoading && !data) return <SpinnerCentered size={40} />;
   if (error || !data) {

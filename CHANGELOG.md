@@ -17,6 +17,12 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **Switching shelves no longer mixes both shelves' books.** In the new UI,
+  going from one shelf straight to another kept the first shelf's books on
+  screen and drew the next shelf's books after them — and removing one of the
+  leftover books actually removed it from the shelf you were now on. Each
+  shelf (and smart shelf) now shows only its own books, and the page counter
+  resets when you switch. Reported by @mstewart14.
 - **Table view covers are no longer squished.** In the new UI's Table view,
   cover thumbnails rendered as narrow 32px slivers that cropped the sides off
   the artwork. They now display at a proper book-cover shape (48×72), and on

@@ -30,12 +30,19 @@
 .sortable:hover { color: var(--text); }
 .thInner { display: inline-flex; align-items: center; gap: 4px; }
 .table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+/* Desktop only: let unbreakable tokens (filename-style titles) wrap instead of
+   forcing the table to scroll. NOT applied on narrow viewports — `anywhere`
+   collapses min-content width there and shreds every cell to ~1ch columns. */
+@media (min-width: 768px) {
+  .table td { overflow-wrap: anywhere; }
+}
 .table tr:last-child td { border-bottom: none; }
 .table tbody tr:hover { background: var(--surface-1); }
 
-.coverCol { width: 40px; }
-.coverThumb { width: 32px; height: 46px; object-fit: cover; border-radius: var(--r-sm); display: block; }
-.coverThumbEmpty { width: 32px; height: 46px; background: var(--surface-2, var(--surface-1)); border-radius: var(--r-sm); }
+.coverCol { width: 56px; }
+/* 48x72 = true 2:3 book-cover aspect; anything narrower side-crops real covers (#608) */
+.coverThumb { width: 48px; height: 72px; object-fit: cover; border-radius: var(--r-sm); display: block; }
+.coverThumbEmpty { width: 48px; height: 72px; background: var(--surface-2, var(--surface-1)); border-radius: var(--r-sm); }
 .titleLink { color: var(--text); font-weight: 600; }
 .titleLink:hover { color: var(--accent); }
 .readYes { color: var(--success); }

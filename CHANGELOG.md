@@ -17,6 +17,12 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **Table view covers are no longer squished.** In the new UI's Table view,
+  cover thumbnails rendered as narrow 32px slivers that cropped the sides off
+  the artwork. They now display at a proper book-cover shape (48×72), and on
+  desktop a title made of one long unbreakable string (common for auto-ingested
+  filenames) wraps inside its cell instead of forcing the whole table to scroll
+  sideways. Reported by @blahblah57.
 - **The library now keeps your scroll position when you scroll the first page
   and go Back from a book.** The scroll-restore added in v4.1.1 worked once you'd
   loaded more pages, but if you only scrolled the first screen of books, opened

@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2026-04-06 17:03+0000\n"
 "Last-Translator: Manuel Drescher\n"
 "Language-Team: German\n"
@@ -2495,6 +2495,16 @@ msgstr "Manuell (unten ziehen)"
 #, fuzzy
 msgid "Read now"
 msgstr "Im Browser lesen"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Regal nicht gefunden"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Serie: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7

@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2021-05-13 11:00+0000\n"
 "Last-Translator: Jonatan Nyberg <jonatan.nyberg.karl@gmail.com>\n"
 "Language-Team: \n"
@@ -2449,6 +2449,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "Läs i webbläsaren"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Serieindex"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Serier: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9148,6 +9158,3 @@ msgstr "Visa läst/oläst val"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klicka på omslaget för att läsa in metadata till formuläret"
-
-#~ msgid "Series Index"
-#~ msgstr "Serieindex"

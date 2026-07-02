@@ -7,25 +7,36 @@ import { useShelves, useMe, useMagicShelves } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import styles from './Sidebar.module.css';
 
-const NAV = [
+// `vis` is the sidebar-visibility key (#585) the entry is gated on, matching a
+// key in Me.sidebar (server-side check_visibility on the sidebar_view bitmask).
+// Entries without a `vis` (e.g. Library) are always shown.
+interface NavEntry {
+  href: string;
+  label: string;
+  icon: typeof Library;
+  exact?: boolean;
+  vis?: string;
+}
+
+const NAV: NavEntry[] = [
   { href: '/', label: 'Library', icon: Library, exact: true },
-  { href: '/authors', label: 'Authors', icon: Users },
-  { href: '/series', label: 'Series', icon: Layers },
-  { href: '/tags', label: 'Tags', icon: Tag },
-  { href: '/publishers', label: 'Publishers', icon: Building2 },
-  { href: '/languages', label: 'Languages', icon: Languages },
-  { href: '/ratings', label: 'Ratings', icon: Star },
-  { href: '/formats', label: 'Formats', icon: FileType },
+  { href: '/authors', label: 'Authors', icon: Users, vis: 'author' },
+  { href: '/series', label: 'Series', icon: Layers, vis: 'series' },
+  { href: '/tags', label: 'Tags', icon: Tag, vis: 'category' },
+  { href: '/publishers', label: 'Publishers', icon: Building2, vis: 'publisher' },
+  { href: '/languages', label: 'Languages', icon: Languages, vis: 'language' },
+  { href: '/ratings', label: 'Ratings', icon: Star, vis: 'rating' },
+  { href: '/formats', label: 'Formats', icon: FileType, vis: 'format' },
 ];
 
 // Discovery views — fixed server-side filter categories (parity with the
 // legacy sidebar's Hot/Discover/Rated + per-user Favorites/Archived).
-const DISCOVER = [
-  { href: '/favorites', label: 'Favorites', icon: Star },
-  { href: '/hot', label: 'Hot', icon: Flame },
-  { href: '/discover', label: 'Discover', icon: Shuffle },
-  { href: '/rated', label: 'Top Rated', icon: Star },
-  { href: '/archived', label: 'Archived', icon: Archive },
+const DISCOVER: NavEntry[] = [
+  { href: '/favorites', label: 'Favorites', icon: Star, vis: 'favorites' },
+  { href: '/hot', label: 'Hot', icon: Flame, vis: 'hot' },
+  { href: '/discover', label: 'Discover', icon: Shuffle, vis: 'random' },
+  { href: '/rated', label: 'Top Rated', icon: Star, vis: 'best_rated' },
+  { href: '/archived', label: 'Archived', icon: Archive, vis: 'archived' },
 ];
 
 // Lower-frequency info pages.
@@ -55,12 +66,22 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
   const canUpload = !!me?.role?.upload;
   const isAdmin = !!me?.role?.admin;
 
+  // #585: honour the classic sidebar-visibility config. A key is hidden only
+  // when the server explicitly reports it disabled (=== false); missing keys
+  // (older server, or non-configurable entries) stay visible.
+  const sidebarVis = me?.sidebar;
+  const isVisible = (vis?: string) => !vis || sidebarVis?.[vis] !== false;
+  const navEntries = NAV.filter((n) => isVisible(n.vis));
+  const discoverEntries = DISCOVER.filter((n) => isVisible(n.vis));
+  const showList = isVisible('list');
+  const showDuplicates = isVisible('duplicates');
+
   return (
     <>
       {open && <div className={styles.scrim} onClick={onNavigate} aria-hidden="true" />}
       <nav className={open ? styles.navOpen : styles.nav} aria-label="Browse">
         <ul className={styles.list}>
-          {NAV.map(({ href, label, icon: Icon, exact }) => {
+          {navEntries.map(({ href, label, icon: Icon, exact }) => {
             const active = isActive(location, href, exact);
             return (
               <li key={href}>
@@ -78,24 +99,26 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           })}
         </ul>
 
-        <ul className={styles.list}>
-          {DISCOVER.map(({ href, label, icon: Icon }) => {
-            const active = isActive(location, href, true);
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={active ? styles.itemActive : styles.item}
-                  aria-current={active ? 'page' : undefined}
-                  onClick={onNavigate}
-                >
-                  <Icon size={18} className={styles.icon} />
-                  <span>{t(label)}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        {discoverEntries.length > 0 && (
+          <ul className={styles.list}>
+            {discoverEntries.map(({ href, label, icon: Icon }) => {
+              const active = isActive(location, href, true);
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    className={active ? styles.itemActive : styles.item}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Icon size={18} className={styles.icon} />
+                    <span>{t(label)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
         {(canUpload || isAdmin) && (
           <ul className={styles.list}>
@@ -162,17 +185,19 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
         {/* Power features served by the legacy UI under the hybrid cutover —
             plain <a> so they leave the SPA. Reachable, not omitted. */}
         <ul className={styles.list}>
-          <li>
-            <Link
-              href="/table"
-              className={isActive(location, '/table', true) ? styles.itemActive : styles.item}
-              aria-current={isActive(location, '/table', true) ? 'page' : undefined}
-              onClick={onNavigate}
-            >
-              <Table2 size={18} className={styles.icon} />
-              <span>{t('Table view')}</span>
-            </Link>
-          </li>
+          {showList && (
+            <li>
+              <Link
+                href="/table"
+                className={isActive(location, '/table', true) ? styles.itemActive : styles.item}
+                aria-current={isActive(location, '/table', true) ? 'page' : undefined}
+                onClick={onNavigate}
+              >
+                <Table2 size={18} className={styles.icon} />
+                <span>{t('Table view')}</span>
+              </Link>
+            </li>
+          )}
           <li>
             <Link
               href="/magic"
@@ -201,7 +226,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
               </li>
             );
           })}
-          {(canUpload || isAdmin) && (
+          {(canUpload || isAdmin) && showDuplicates && (
             <li>
               <Link
                 href="/duplicates"

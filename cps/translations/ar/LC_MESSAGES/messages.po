@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2025-06-07 14:44+0300\n"
 "Last-Translator: UsamaFoad <usamafoad@gmail.com>\n"
 "Language-Team: \n"
@@ -2415,6 +2415,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "قراءة في المتصفح"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "فهرس السلسلة"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "السلسلة: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -8999,9 +9009,6 @@ msgstr "إظهار قسم المقروء/غير المقروء"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "انقر على الغلاف لتحميل البيانات الوصفية إلى النموذج"
-
-#~ msgid "Series Index"
-#~ msgstr "فهرس السلسلة"
 
 #~ msgid "Separate Book Files from Library"
 #~ msgstr "فصل ملفات الكتب عن المكتبة"

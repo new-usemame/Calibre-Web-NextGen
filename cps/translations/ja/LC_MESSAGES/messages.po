@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2018-02-07 02:20-0500\n"
 "Last-Translator: subdiox <subdiox@gmail.com>\n"
 "Language-Team: ja <LL@li.org>\n"
@@ -2465,6 +2465,16 @@ msgstr "手動（ドラッグで並び替え）"
 #, fuzzy
 msgid "Read now"
 msgstr "ブラウザで読む"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "巻数"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "シリーズ: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9599,6 +9609,3 @@ msgstr "既読/未読セクションを表示"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "カバー画像をクリックしてメタデータをフォームに読み込んでください"
-
-#~ msgid "Series Index"
-#~ msgstr "巻数"

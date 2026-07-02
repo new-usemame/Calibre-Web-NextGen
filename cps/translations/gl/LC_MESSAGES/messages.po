@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2022-08-11 16:46+0200\n"
 "Last-Translator: pollitor <pollitor@gmx.com>\n"
 "Language-Team: gl\n"
@@ -2461,6 +2461,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "Ler no navegador"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Índice da serie"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Series: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9220,6 +9230,3 @@ msgstr "Mostrar selección lidos/non lidos"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Premer na portada para cargar los metadatos no formulario"
-
-#~ msgid "Series Index"
-#~ msgstr "Índice da serie"

@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2020-06-09 21:11+0100\n"
 "Last-Translator: Lukas Heroudek <lukas.heroudek@gmail.com>\n"
 "Language-Team: \n"
@@ -2423,6 +2423,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "Číst v prohližeči"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Uživatel nenalezen"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Série: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7

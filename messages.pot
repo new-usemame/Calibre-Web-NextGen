@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web Automated v4.0.6\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -2330,6 +2330,14 @@ msgstr ""
 
 #: cps/spa_strings.py:29 cps/templates/detail.html:634
 msgid "Read now"
+msgstr ""
+
+#: cps/spa_strings.py:33
+msgid "Series order"
+msgstr ""
+
+#: cps/spa_strings.py:34
+msgid "Series order (reverse)"
 msgstr ""
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369

@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web (GPLV3)\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
 "Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
 "me>\n"
@@ -2461,6 +2461,16 @@ msgstr ""
 #: cps/spa_strings.py:29 cps/templates/detail.html:634
 msgid "Read now"
 msgstr "Nu lezen"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Serie index"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Reeks: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9410,6 +9420,3 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"
-
-#~ msgid "Series Index"
-#~ msgstr "Serie index"

@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: Calibre Web - polski (POT: 2021-06-12 08:52)\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2021-06-12 15:35+0200\n"
 "Last-Translator: Radosław Kierznowski <radek.kierznowski@outlook.com>\n"
 "Language-Team: \n"
@@ -2451,6 +2451,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "Czytaj w przeglądarce"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Indeks serii"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Cykl: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9432,6 +9442,3 @@ msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Kliknij okładkę, aby załadować metadane do formularza"
-
-#~ msgid "Series Index"
-#~ msgstr "Indeks serii"

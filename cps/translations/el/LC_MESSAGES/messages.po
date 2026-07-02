@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2025-09-03 14:59+0200\n"
 "Last-Translator: Depountis Georgios\n"
 "Language-Team: \n"
@@ -2468,6 +2468,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "Διάβασε στο Πρόγραμμα Περιήγησης"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Ευρετήριο Σειρών"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Σειρές: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9178,6 +9188,3 @@ msgstr "Προβολή επιλογών σειράς"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Κάνε κλικ στο εξώφυλλο για φόρτωση μεταδεδομένων στη φόρμα"
-
-#~ msgid "Series Index"
-#~ msgstr "Ευρετήριο Σειρών"

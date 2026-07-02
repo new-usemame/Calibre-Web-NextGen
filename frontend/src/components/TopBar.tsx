@@ -2,12 +2,14 @@ import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
+import { BrandName } from './BrandName';
 import { BASE_PREFIX } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './TopBar.module.css';
 
 interface TopBarProps {
   userName: string;
+  instanceName?: string;
   onLogout: () => void;
   onMenu?: () => void;
 }
@@ -182,7 +184,7 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
   );
 }
 
-export function TopBar({ userName, onLogout, onMenu }: TopBarProps) {
+export function TopBar({ userName, instanceName, onLogout, onMenu }: TopBarProps) {
   const t = useT();
   const [, setLocation] = useLocation();
   const [q, setQ] = useState('');
@@ -201,9 +203,8 @@ export function TopBar({ userName, onLogout, onMenu }: TopBarProps) {
         )}
         <Link href="/" className={styles.brand}>
           <BookMarked size={22} className={styles.brandIcon} />
-          <span className={styles.brandText}>
-            <span className={styles.brandMain}>Calibre-Web </span>
-            <span className={styles.brandAccent}>NextGen</span>
+          <span className={`${styles.brandText} ${styles.brandMain}`}>
+            <BrandName name={instanceName} accentClassName={styles.brandAccent} />
           </span>
         </Link>
       </div>

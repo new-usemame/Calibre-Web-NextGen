@@ -146,12 +146,14 @@ def test_auth_config_is_public_and_shaped():
         cfg.config_register_email = False
         cfg.get_mail_server_configured.return_value = True
         cfg.config_disable_standard_login = False
+        cfg.config_calibre_web_title = "Calibre-Web NextGen"
         resp = app.test_client().get("/api/v1/auth/config")
     assert resp.status_code == 200
     d = resp.get_json()
     assert d["public_registration"] is True
     assert d["mail_configured"] is True
     assert d["oauth_providers"] == []
+    assert d["instance_name"] == "Calibre-Web NextGen"
 
 
 @pytest.mark.unit
@@ -324,6 +326,7 @@ def test_auth_config_exposes_remote_login():
         cfg.get_mail_server_configured.return_value = True
         cfg.config_disable_standard_login = False
         cfg.config_remote_login = True
+        cfg.config_calibre_web_title = "Calibre-Web NextGen"
         d = app.test_client().get("/api/v1/auth/config").get_json()
     assert d["remote_login"] is True
     assert d["remote_login_url"] == "/remote/login"

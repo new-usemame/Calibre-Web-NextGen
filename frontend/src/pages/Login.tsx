@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { BookMarked, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/Button';
+import { BrandName } from '../components/BrandName';
 import { Spinner } from '../components/Spinner';
 import { useLogin, useAuthConfig, useRegister, useForgotPassword } from '../lib/queries';
 import { ApiError } from '../lib/api';
@@ -25,6 +26,11 @@ export function Login() {
   const register = useRegister();
   const forgot = useForgotPassword();
   const { data: cfg } = useAuthConfig();
+
+  // #609: the classic login page titles itself with the configured instance name.
+  useEffect(() => {
+    if (cfg?.instance_name) document.title = cfg.instance_name;
+  }, [cfg?.instance_name]);
 
   const reset = () => { setErrorMsg(null); setOkMsg(null); };
 
@@ -66,7 +72,7 @@ export function Login() {
       <div className={styles.card}>
         <div className={styles.brandMark}>
           <BookMarked size={32} className={styles.brandIcon} />
-          <span className={styles.brandText}>Calibre-Web <span className={styles.brandAccent}>NextGen</span></span>
+          <span className={styles.brandText}><BrandName name={cfg?.instance_name} accentClassName={styles.brandAccent} /></span>
         </div>
         <p className={styles.tagline}>
           {mode === 'register' ? t('Create your account')

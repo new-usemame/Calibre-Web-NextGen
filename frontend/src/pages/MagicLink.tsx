@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { Spinner } from '../components/Spinner';
 import { Button } from '../components/Button';
-import { useMagicLinkStart, useMagicLinkPoll } from '../lib/queries';
+import { BrandName } from '../components/BrandName';
+import { useMagicLinkStart, useMagicLinkPoll, useAuthConfig } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import styles from './MagicLink.module.css';
 
@@ -26,6 +27,7 @@ export function MagicLink() {
   const [, navigate] = useLocation();
   const start = useMagicLinkStart();
   const poll = useMagicLinkPoll();
+  const { data: cfg } = useAuthConfig();
 
   const [phase, setPhase] = useState<Phase>('starting');
   const [token, setToken] = useState<string | null>(null);
@@ -122,7 +124,7 @@ export function MagicLink() {
         <div className={styles.brandMark}>
           <BookMarked size={28} className={styles.brandIcon} />
           <span className={styles.brandText}>
-            Calibre-Web <span className={styles.brandAccent}>NextGen</span>
+            <BrandName name={cfg?.instance_name} accentClassName={styles.brandAccent} />
           </span>
         </div>
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Router, Route, Switch } from 'wouter';
 import { BASE_PREFIX } from './lib/api';
 import { useMe, useLogout } from './lib/queries';
@@ -42,6 +42,12 @@ export function App() {
   const { data: me, isLoading } = useMe();
   const logout = useLogout();
 
+  // #609: the classic UI puts the configured instance title in <title> on every
+  // page; index.html ships the stock name as the pre-boot fallback.
+  useEffect(() => {
+    if (me?.instance_name) document.title = me.instance_name;
+  }, [me?.instance_name]);
+
   if (isLoading) {
     return <SpinnerCentered size={40} />;
   }
@@ -84,7 +90,7 @@ export function App() {
 
         {/* Everything else lives inside the shell. */}
         <Route>
-          <AppShell userName={me.name} onLogout={() => logout.mutate()}>
+          <AppShell userName={me.name} instanceName={me.instance_name} onLogout={() => logout.mutate()}>
             <Switch>
           <Route path="/book/:id/edit">{(p) => <EditBook id={p.id} />}</Route>
           <Route path="/book/:id/cover">{(p) => <CoverPicker id={p.id} />}</Route>

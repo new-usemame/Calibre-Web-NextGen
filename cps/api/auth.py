@@ -72,6 +72,14 @@ def auth_csrf():
     return jsonify({"csrf_token": token})
 
 
+def _instance_name():
+    """The admin-configured site title (config_calibre_web_title). The classic
+    UI shows it in the navbar and <title> on every page (render_template.py
+    passes instance=…); the SPA reads it from here. Blank falls back to the
+    stock name."""
+    return getattr(config, "config_calibre_web_title", None) or "Calibre-Web NextGen"
+
+
 def _server_features():
     """Instance-level capability flags the SPA gates UI off (mirrors the Jinja
     template gates: hide-books button, send-to-e-reader, register link, …).
@@ -95,6 +103,7 @@ def auth_me():
         return jsonify({"error": {"code": "unauthenticated", "message": "Login required"}}), 401
     payload = serialize_user(current_user)
     payload["features"] = _server_features()
+    payload["instance_name"] = _instance_name()
     return jsonify(payload)
 
 
@@ -116,6 +125,7 @@ def auth_login():
         login_user(user, remember=bool(data.get("remember")))
         payload = serialize_user(user)
         payload["features"] = _server_features()
+        payload["instance_name"] = _instance_name()
         return jsonify(payload)
     return jsonify({"error": {"code": "invalid_credentials",
                               "message": "Invalid username or password"}}), 401
@@ -142,6 +152,7 @@ def auth_config():
     except Exception:
         remote_login_url = ""
     return jsonify({
+        "instance_name": _instance_name(),
         "public_registration": bool(getattr(config, "config_public_reg", False)),
         "register_email": bool(getattr(config, "config_register_email", False)),
         "mail_configured": mail_ok,

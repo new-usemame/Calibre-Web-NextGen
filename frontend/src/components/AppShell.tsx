@@ -6,11 +6,12 @@ import styles from './AppShell.module.css';
 
 interface AppShellProps {
   userName: string;
+  instanceName?: string;
   onLogout: () => void;
   children: ReactNode;
 }
 
-export function AppShell({ userName, onLogout, children }: AppShellProps) {
+export function AppShell({ userName, instanceName, onLogout, children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Lock the page behind the mobile drawer: overscroll-behavior only stops scroll
@@ -25,7 +26,7 @@ export function AppShell({ userName, onLogout, children }: AppShellProps) {
 
   return (
     <div className={styles.shell}>
-      <TopBar userName={userName} onLogout={onLogout} onMenu={() => setDrawerOpen(true)} />
+      <TopBar userName={userName} instanceName={instanceName} onLogout={onLogout} onMenu={() => setDrawerOpen(true)} />
       <HelpBanner />
       <div className={styles.body}>
         <Sidebar open={drawerOpen} onNavigate={() => setDrawerOpen(false)} />

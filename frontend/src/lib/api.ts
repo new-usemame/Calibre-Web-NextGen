@@ -50,6 +50,7 @@ export interface Me {
   theme: string;
   role: Record<string, boolean>;
   features?: ServerFeatures;
+  instance_name?: string;
 }
 
 export interface Book {
@@ -243,6 +244,7 @@ export interface OAuthProvider {
 }
 
 export interface AuthConfig {
+  instance_name?: string;
   public_registration: boolean;
   register_email: boolean;
   mail_configured: boolean;

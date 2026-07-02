@@ -16,6 +16,13 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+- **The library's view-settings (gear) menu no longer opens offscreen on
+  phones.** On narrow screens the toolbar wraps, and when the gear ended up on
+  the left side its menu opened toward the left and slid off the edge of the
+  screen. The menu now drops below the toolbar and stays fully visible at any
+  width. Reported by @iroQuai.
+
 ## [v4.1.4] - 2026-07-02
 
 ### Added

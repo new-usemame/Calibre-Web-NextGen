@@ -240,6 +240,16 @@
   border-color: var(--accent);
 }
 
+/* On narrow screens the wrapping toolbar can land the gear at the LEFT edge,
+   and the right-aligned 220px menu anchored to the 38px button then extends
+   offscreen (fork #628). Anchor the menu to the toolbar itself instead: it
+   drops below the whole toolbar, aligned to its right edge — always onscreen
+   regardless of where the gear wrapped. */
+@media (max-width: 520px) {
+  .toolbar { position: relative; }
+  .settingsWrap { position: static; }
+}
+
 .settingsMenu {
   position: absolute;
   top: calc(100% + 8px);

@@ -352,12 +352,13 @@ jobs:
       - name: Seed a book and wait for ingest
         run: |
           # Drop a public-domain EPUB into the ingest folder; auto-ingest imports it.
-          # The ingest service runs as UID 1000 and REMOVES files after processing,
-          # so the dropped file must be owned/writable by that uid or it's skipped.
-          # Copy first (runner owns the dir), THEN hand ownership to uid 1000.
-          cp tests/fixtures/sample_books/alice_in_wonderland.epub /tmp/cwn/ingest/
-          sudo chown -R 1000:1000 /tmp/cwn/ingest
-          sudo chmod 666 /tmp/cwn/ingest/alice_in_wonderland.epub
+          # The container's init chowns the bind-mounted /cwa-book-ingest to uid
+          # 1000, so the runner can't write to it from the host. Use `docker cp`
+          # (root inside the container) and hand the file to uid 1000, which the
+          # ingest service needs to process and then remove it.
+          docker cp tests/fixtures/sample_books/alice_in_wonderland.epub \
+            cwn-e2e:/cwa-book-ingest/alice_in_wonderland.epub
+          docker exec -u 0 cwn-e2e chown 1000:1000 /cwa-book-ingest/alice_in_wonderland.epub
           echo "Polling for the imported book via the API..."
           jar=$(mktemp); total=0
           for i in $(seq 1 60); do

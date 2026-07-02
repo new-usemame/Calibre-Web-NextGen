@@ -299,6 +299,9 @@ jobs:
       github.ref == 'refs/heads/dev' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_e2e)
     timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read   # pull the private pbs-cache mirror images the Dockerfile COPYs from
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -310,8 +313,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Log in to GHCR (for the pbs-cache build mirror)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build image from source
-        run: docker build -t cwn:e2e .
+        run: DOCKER_BUILDKIT=1 docker build -t cwn:e2e .
 
       - name: Start container (SPA enabled)
         run: |

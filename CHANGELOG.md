@@ -21,6 +21,11 @@ is for things you can see or feel when running the app.
   and go Back from a book.** The scroll-restore added in v4.1.1 worked once you'd
   loaded more pages, but if you only scrolled the first screen of books, opened
   one, and came back, the list jumped to the top. Reported by @KucharczykL.
+- **App passwords now work with the KOReader plugin.** KOReader sync only
+  accepted your main Calibre-Web password, so OAuth- or LDAP-only accounts (which
+  have no local password) got "Invalid password" and a 401. KOReader progress and
+  annotation sync now accept per-user app passwords, the same as OPDS already
+  does. Reported by @alva-seal.
 
 ## [v4.1.3] - 2026-07-01
 

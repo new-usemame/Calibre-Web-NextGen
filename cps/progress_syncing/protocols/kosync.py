@@ -224,6 +224,15 @@ def authenticate_user() -> Optional[ub.User]:
         log.info(f"User authenticated successfully: {username}")
         return user
 
+    # Fork issue #586: OAuth / LDAP-only users have no usable local password,
+    # so the check above always fails for them. Accept per-user app passwords
+    # here the same way the OPDS / web Basic-auth path already does
+    # (usermanagement.verify_password -> _verify_app_password). This login path
+    # is shared by KOReader progress AND annotation sync, so both are covered.
+    if usermanagement._verify_app_password(user, password):
+        log.info("KOReader auth: authenticated via app password: %s", username)
+        return user
+
     # Fork issue #312: promoted from DEBUG. Invalid-password attempts
     # for a real user are exactly the signal needed to diagnose stale
     # device-side credentials after a password change.

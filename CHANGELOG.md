@@ -17,6 +17,12 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **You can log out again on mobile in the classic view.** With the caliBlur
+  theme on a phone, tapping your username in the menu did nothing — an
+  invisible upload control was swallowing the tap, so the account submenu
+  with Logout never opened, and the drawer's profile area rendered squashed
+  with overlapping text. The profile block now sits in its own space again
+  and tapping your name reliably opens the menu. Reported by @iroQuai.
 - **Switching shelves no longer mixes both shelves' books.** In the new UI,
   going from one shelf straight to another kept the first shelf's books on
   screen and drew the next shelf's books after them — and removing one of the

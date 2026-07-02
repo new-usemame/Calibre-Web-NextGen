@@ -6312,6 +6312,26 @@ body.edituser.admin > div.container-fluid > div.row-fluid > div.col-sm-10 > div.
         z-index: 99
     }
 
+    /* Fork #602: the slot-1 rule above assumes the profile dropdown is the
+       first item, but the "Switch to New UI" pill renders ahead of it. Give
+       the pill its natural height and assign the 130px profile band to the
+       dropdown li by class (identical when the pill is absent); without this
+       the 120px profileDrop anchor overflows under the invisible #btn-upload
+       file input and taps on the username never open the logout menu. */
+    #main-nav > li.cwng-switch-li:nth-child(1) {
+        height: auto;
+        z-index: auto
+    }
+
+    #main-nav > li.dropdown {
+        margin-left: 0;
+        width: 100%;
+        height: 130px;
+        z-index: 99;
+        border-bottom: 1px solid hsla(0, 0%, 78%, .15);
+        float: left
+    }
+
     body > div.navbar.navbar-default.navbar-static-top > div > div.navbar-collapse.collapse > ul > li > a.profileDrop {
         height: 120px;
         width: 100%

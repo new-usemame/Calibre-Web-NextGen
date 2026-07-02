@@ -17,6 +17,13 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **Admin config links now work behind a reverse proxy on a sub-path.** In the
+  new UI, the "More server configuration" cards on the Admin page (Basic
+  configuration, Database & library path, Scheduled tasks, Logs, and the rest)
+  pointed at the domain root instead of inside your mount, so on a setup served
+  at something like `https://host/cwa/` they broke out of the app and landed on
+  a 404. They now stay inside the sub-path like the rest of the interface.
+  Installs mounted at the domain root are unaffected. Reported by @chloeroform.
 - **The new UI now shows your site's name.** If you set a custom title under
   Admin → Basic Configuration, the new UI ignored it — the top bar, the login
   screen, and the browser tab always said "Calibre-Web NextGen". All three now

@@ -10,7 +10,7 @@ import type { SecurityConfig, SecurityUpdate } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { AdminUser } from '../lib/api';
-import { ApiError } from '../lib/api';
+import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './Admin.module.css';
 
@@ -228,7 +228,7 @@ export function Admin() {
       </p>
       <div className={styles.settingsGrid}>
         {SERVER_SETTINGS.map(({ href, label, icon: Icon }) => (
-          <a key={href} href={href} className={styles.settingsCard}>
+          <a key={href} href={resourceUrl(href)} className={styles.settingsCard}>
             <Icon size={18} className={styles.settingsIcon} />
             <span className={styles.settingsLabel}>{t(label)}</span>
             <ExternalLink size={13} className={styles.settingsExt} />

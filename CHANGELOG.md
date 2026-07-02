@@ -24,6 +24,14 @@ is for things you can see or feel when running the app.
   at something like `https://host/cwa/` they broke out of the app and landed on
   a 404. They now stay inside the sub-path like the rest of the interface.
   Installs mounted at the domain root are unaffected. Reported by @chloeroform.
+- **Opening a "More server configuration" page no longer throws you out of the
+  new UI.** Those cards on the Admin page link to the deep, classic
+  configuration screens (database path, scheduled tasks, logs, and the like).
+  Clicking one used to replace the whole new interface with the old page, so it
+  felt like the app had reverted to the old UI. They now open in a new browser
+  tab, so the new UI stays exactly where it was and you can close the tab to
+  come back. The full native rebuild of those config screens is still on the
+  roadmap. Reported by @Glennza1962.
 - **The new UI now shows your site's name.** If you set a custom title under
   Admin → Basic Configuration, the new UI ignored it — the top bar, the login
   screen, and the browser tab always said "Calibre-Web NextGen". All three now

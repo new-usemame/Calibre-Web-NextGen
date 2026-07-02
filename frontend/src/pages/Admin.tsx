@@ -228,10 +228,16 @@ export function Admin() {
       </p>
       <div className={styles.settingsGrid}>
         {SERVER_SETTINGS.map(({ href, label, icon: Icon }) => (
-          <a key={href} href={resourceUrl(href)} className={styles.settingsCard}>
-            <Icon size={18} className={styles.settingsIcon} />
+          <a
+            key={href}
+            href={resourceUrl(href)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.settingsCard}
+          >
+            <Icon size={18} className={styles.settingsIcon} aria-hidden="true" />
             <span className={styles.settingsLabel}>{t(label)}</span>
-            <ExternalLink size={13} className={styles.settingsExt} />
+            <ExternalLink size={13} className={styles.settingsExt} aria-hidden="true" />
           </a>
         ))}
       </div>

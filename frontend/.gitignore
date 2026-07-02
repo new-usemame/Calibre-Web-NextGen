@@ -1,0 +1,7 @@
+
+# Playwright e2e harness artifacts (Layer 2 verification)
+e2e/.auth/
+e2e/.results/
+e2e/.report/
+test-results/
+playwright-report/

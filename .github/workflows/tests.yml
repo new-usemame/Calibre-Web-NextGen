@@ -287,113 +287,115 @@ jobs:
   # NOTE: Tests run AFTER tag creation. Check results before publishing release!
   # ============================================================================
   e2e-tests:
-    name: E2E Tests (Full Stack)
+    name: E2E Tests (SPA)
     runs-on: ubuntu-latest
-    # Run on any version tag OR manual dispatch
+    # Release-gate + canary: version tags, dev pushes, and manual dispatch. The
+    # SPA e2e matrix (Layer 2 of the verification system, frontend/e2e/) is the
+    # "earn the release" gate; /CWNG_verify runs the same harness on-demand in dev.
+    # ADVISORY until the first green run is observed, then promote to a required
+    # check in branch protection + add to the test-summary hard gate.
     if: |
       startsWith(github.ref, 'refs/tags/v') ||
+      github.ref == 'refs/heads/dev' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_e2e)
-    
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-      
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.13'
-          cache: 'pip'
-      
-      - name: Set up Docker Compose
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build image from source
+        run: docker build -t cwn:e2e .
+
+      - name: Start container (SPA enabled)
         run: |
-          docker compose version
-      
-      - name: Install system dependencies
+          mkdir -p /tmp/cwn/config /tmp/cwn/ingest
+          docker run -d --name cwn-e2e \
+            -e PUID=1000 -e PGID=1000 -e TZ=UTC -e CWNG_SPA=1 \
+            -p 8083:8083 \
+            -v /tmp/cwn/config:/config \
+            -v /tmp/cwn/ingest:/cwa-book-ingest \
+            cwn:e2e
+          echo "Waiting for the app to answer..."
+          timeout 240 bash -c 'until curl -fsS http://localhost:8083/ -o /dev/null; do sleep 5; done'
+
+      - name: Seed a book and wait for ingest
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libldap2-dev libsasl2-dev libssl-dev
-      
-      - name: Install dependencies
+          # Drop a public-domain EPUB into the ingest folder; auto-ingest imports it.
+          sudo cp tests/fixtures/sample_books/alice_in_wonderland.epub /tmp/cwn/ingest/ || \
+            cp tests/fixtures/sample_books/alice_in_wonderland.epub /tmp/cwn/ingest/
+          echo "Polling for the imported book via the API..."
+          jar=$(mktemp)
+          for i in $(seq 1 48); do
+            csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])' 2>/dev/null || true)
+            [ -n "$csrf" ] && curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
+              -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
+              -d '{"username":"admin","password":"admin123"}' -o /dev/null || true
+            total=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?limit=1' | python3 -c 'import sys,json;print(json.load(sys.stdin).get("total",0))' 2>/dev/null || echo 0)
+            echo "  attempt $i: books total=$total"
+            [ "${total:-0}" -gt 0 ] && break
+            sleep 5
+          done
+
+      - name: Install Playwright
+        working-directory: frontend
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-          # E2E dependencies (when implemented)
-          # pip install playwright pytest-playwright
-          # playwright install chromium firefox
-      
-      - name: Start Docker Compose stack
-        run: |
-          docker compose -f docker-compose.yml up -d
-          echo "Waiting for services to be healthy..."
-          timeout 180 bash -c 'until curl -f http://localhost:8083/health 2>/dev/null; do sleep 5; done'
-      
-      - name: Run E2E tests
-        run: |
-          # When tests/e2e/ exists:
-          # pytest tests/e2e/ \
-          #   -v \
-          #   --headed \
-          #   --video=on-failure \
-          #   --screenshot=on-failure \
-          #   --junitxml=e2e-results.xml
-          
-          # For now, just verify stack is healthy
-          curl -f http://localhost:8083/health
-          echo "E2E test placeholder - implement tests/e2e/ directory"
-        timeout-minutes: 60
-      
-      - name: Upload E2E artifacts
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run SPA e2e harness
+        working-directory: frontend
+        env:
+          CI: 'true'
+          E2E_BASE_URL: http://localhost:8083
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: e2e-test-artifacts
+          name: playwright-report
           path: |
-            e2e-results.xml
-            test-results/
-            videos/
-            screenshots/
-          retention-days: 14  # Keep longer for release debugging
-      
+            frontend/e2e/.report
+            frontend/e2e/.results
+          retention-days: 14
+
       - name: Dump container logs
         if: always()
-        run: |
-          docker compose logs > docker-compose-logs.txt
-          docker compose ps
-      
+        run: docker logs cwn-e2e > cwn-e2e-logs.txt 2>&1 || true
+
       - name: Upload container logs
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: docker-compose-logs
-          path: docker-compose-logs.txt
+          name: cwn-e2e-logs
+          path: cwn-e2e-logs.txt
           retention-days: 14
-      
+
       - name: Notify on failure
         uses: sarisia/actions-status-discord@v1
-        if: failure() && env.DISCORD_WEBHOOK != ''
+        if: failure() && startsWith(github.ref, 'refs/tags/v') && env.DISCORD_WEBHOOK != ''
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          title: "⛔ E2E tests failed for ${{ github.ref_name }}"
+          title: "⛔ SPA e2e failed for ${{ github.ref_name }}"
           description: |
             **DO NOT RELEASE** until fixed!
-            
-            **Tag**: ${{ github.ref_name }}
-            **Commit**: ${{ github.sha }}
-            **Author**: ${{ github.actor }}
-            
-            Review artifacts and browser recordings.
+            **Tag**: ${{ github.ref_name }} · **Commit**: ${{ github.sha }}
             [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           color: 0xFF0000
           username: GitHub Actions
-      
+
       - name: Cleanup
         if: always()
-        run: |
-          docker compose down -v
-          docker system prune -f
+        run: docker rm -f cwn-e2e || true
 
   # ============================================================================
   # Summary Job (Optional)

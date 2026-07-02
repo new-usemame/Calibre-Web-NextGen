@@ -313,25 +313,39 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Log in to GHCR (for the pbs-cache build mirror)
+      - name: Log in to GHCR (to pull the app image)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image from source
-        run: DOCKER_BUILDKIT=1 docker build -t cwn:e2e .
+      - name: Resolve image to test
+        id: img
+        run: |
+          # Test the image users actually get (Class 2/4: verify the shipped
+          # artifact, not a locally-rebuilt one). Version tag → that tag's image;
+          # otherwise → the :dev canary. Avoids the from-source build, which
+          # cold-pulls the private pbs-cache mirror and is fragile in CI.
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "image=ghcr.io/new-usemame/calibre-web-nextgen:${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=ghcr.io/new-usemame/calibre-web-nextgen:dev" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Start container (SPA enabled)
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
         run: |
+          echo "Testing image: $IMAGE"
+          docker pull "$IMAGE"
           mkdir -p /tmp/cwn/config /tmp/cwn/ingest
           docker run -d --name cwn-e2e \
             -e PUID=1000 -e PGID=1000 -e TZ=UTC -e CWNG_SPA=1 \
             -p 8083:8083 \
             -v /tmp/cwn/config:/config \
             -v /tmp/cwn/ingest:/cwa-book-ingest \
-            cwn:e2e
+            "$IMAGE"
           echo "Waiting for the app to answer..."
           timeout 240 bash -c 'until curl -fsS http://localhost:8083/ -o /dev/null; do sleep 5; done'
 

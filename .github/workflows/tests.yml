@@ -352,11 +352,15 @@ jobs:
       - name: Seed a book and wait for ingest
         run: |
           # Drop a public-domain EPUB into the ingest folder; auto-ingest imports it.
-          sudo cp tests/fixtures/sample_books/alice_in_wonderland.epub /tmp/cwn/ingest/ || \
-            cp tests/fixtures/sample_books/alice_in_wonderland.epub /tmp/cwn/ingest/
+          # The ingest service runs as UID 1000 and REMOVES files after processing,
+          # so the dropped file must be owned/writable by that uid or it's skipped.
+          sudo chown -R 1000:1000 /tmp/cwn
+          cp tests/fixtures/sample_books/alice_in_wonderland.epub /tmp/cwn/ingest/
+          sudo chown 1000:1000 /tmp/cwn/ingest/alice_in_wonderland.epub
+          sudo chmod 666 /tmp/cwn/ingest/alice_in_wonderland.epub
           echo "Polling for the imported book via the API..."
-          jar=$(mktemp)
-          for i in $(seq 1 48); do
+          jar=$(mktemp); total=0
+          for i in $(seq 1 60); do
             csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])' 2>/dev/null || true)
             [ -n "$csrf" ] && curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
               -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
@@ -366,6 +370,11 @@ jobs:
             [ "${total:-0}" -gt 0 ] && break
             sleep 5
           done
+          if [ "${total:-0}" -eq 0 ]; then
+            echo "::error::ingest never imported the seed book (books total=0) — dumping ingest logs"
+            docker logs cwn-e2e 2>&1 | grep -iE 'ingest|convert|import|error|watch' | tail -40 || true
+            exit 1
+          fi
 
       - name: Install Playwright
         working-directory: frontend

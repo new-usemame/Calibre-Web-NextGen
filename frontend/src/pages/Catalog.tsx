@@ -34,6 +34,15 @@ const SORT_OPTIONS = [
   { label: 'Oldest published', value: 'pubold' },
 ];
 
+// Series-order sorts (by metadata series_index). Only offered when viewing a
+// single series, where a numeric position is meaningful — a whole-library
+// series_index sort is not. The ascending option is also the series view's
+// default (see defaultSort below) so a series reads 1, 2, 3… out of the box (#573).
+const SERIES_SORT_OPTIONS = [
+  { label: 'Series order', value: 'seriesasc' },
+  { label: 'Series order (reverse)', value: 'seriesdesc' },
+];
+
 const READ_FILTERS: { label: string; value: ReadFilter }[] = [
   { label: 'All', value: 'all' },
   { label: 'Unread', value: 'unread' },
@@ -82,6 +91,11 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   const t = useT();
   const filtered = !!entityKind;
   const isView = !!view;
+  const isSeries = entityKind === 'series';
+  // Series views expose two extra series-order options and default to ascending
+  // series order so the list reads 1, 2, 3… instead of newest-first (#573).
+  const sortOptions = isSeries ? [...SERIES_SORT_OPTIONS, ...SORT_OPTIONS] : SORT_OPTIONS;
+  const defaultSort = isSeries ? 'seriesasc' : 'new';
   // Library-only controls (search box, advanced link, read-status filter) are
   // hidden for both entity-scoped and discovery views.
   const hideLibraryControls = filtered || isView;
@@ -107,7 +121,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   const [allBooks, setAllBooks] = useState<Book[]>(() => snap?.books ?? []);
   const [searchInput, setSearchInput] = useState(() => snap?.searchInput ?? '');
   const [search, setSearch] = useState(() => snap?.search ?? '');
-  const [sort, setSort] = useState(() => snap?.sort ?? 'new');
+  const [sort, setSort] = useState(() => snap?.sort ?? defaultSort);
   const [readFilter, setReadFilter] = useState<ReadFilter>(() => (snap?.readFilter as ReadFilter) ?? 'all');
 
   // Multi-select / bulk mode
@@ -332,7 +346,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
           onChange={(e) => setSort(e.target.value)}
           aria-label={t('Sort order')}
         >
-          {SORT_OPTIONS.map((opt) => (
+          {sortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {t(opt.label)}
             </option>
@@ -412,6 +426,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
               <BookCard
                 key={book.id}
                 book={book}
+                showSeriesIndex={isSeries}
                 style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }}
                 selectable={selecting}
                 selected={selected.has(book.id)}

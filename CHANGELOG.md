@@ -17,6 +17,13 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **The new UI can now sort a series by its reading order, and shows each book's
+  position.** Opening a series in the new UI listed its books newest-first with
+  no way to order them 1, 2, 3, and the series position never appeared on the
+  covers unless you'd baked it into the titles. A series now opens in ascending
+  series order by default, the sort menu gains "Series order" (and its reverse)
+  while you're inside a series, and every cover shows its number. Reported by
+  @magdalar.
 - **Admin config links now work behind a reverse proxy on a sub-path.** In the
   new UI, the "More server configuration" cards on the Admin page (Basic
   configuration, Database & library path, Scheduled tasks, Logs, and the rest)

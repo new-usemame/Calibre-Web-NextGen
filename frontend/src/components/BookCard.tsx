@@ -14,13 +14,26 @@ interface BookCardProps {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: (book: Book) => void;
+  /** When true, show the book's position within its series (#573) — used by the
+   *  series view so the reading order is visible without duplicating it in titles. */
+  showSeriesIndex?: boolean;
+}
+
+/** Format a Calibre series_index (a float, e.g. 1.0, 2.5) for display: whole
+ *  numbers show as "1", fractional as "2.5". Returns null when there's nothing
+ *  to show so the badge is omitted entirely. */
+function formatSeriesIndex(idx: number | null | undefined): string | null {
+  if (idx == null || Number.isNaN(idx)) return null;
+  return Number.isInteger(idx) ? String(idx) : String(idx);
 }
 
 export function BookCard({
   book, style, onRemove, removeLabel = 'Remove',
   selectable = false, selected = false, onToggleSelect,
+  showSeriesIndex = false,
 }: BookCardProps) {
   const authorStr = book.authors.join(', ');
+  const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
 
   const inner = (
     <article
@@ -34,6 +47,15 @@ export function BookCard({
         {book.read && (
           <span className={styles.readBadge} aria-label="Read" title="Read">
             <Check size={14} strokeWidth={3} />
+          </span>
+        )}
+        {seriesIndexLabel && (
+          <span
+            className={styles.seriesBadge}
+            aria-label={`Series position ${seriesIndexLabel}`}
+            title={`Series position ${seriesIndexLabel}`}
+          >
+            #{seriesIndexLabel}
           </span>
         )}
         {selectable && (

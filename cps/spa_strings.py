@@ -27,3 +27,8 @@ def _(message):  # noqa: E743 - intentional gettext extraction marker, not the b
 # read-status label (which is a past participle in many languages, e.g. nl
 # "Gelezen") so the verb and the status can be translated separately.
 _("Read now")
+
+# #573 — the new-UI series view's series-order sort options (Catalog.tsx). Only
+# shown when viewing a single series, so the reader can order by position.
+_("Series order")
+_("Series order (reverse)")

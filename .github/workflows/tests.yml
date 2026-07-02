@@ -354,9 +354,9 @@ jobs:
           # Drop a public-domain EPUB into the ingest folder; auto-ingest imports it.
           # The ingest service runs as UID 1000 and REMOVES files after processing,
           # so the dropped file must be owned/writable by that uid or it's skipped.
-          sudo chown -R 1000:1000 /tmp/cwn
+          # Copy first (runner owns the dir), THEN hand ownership to uid 1000.
           cp tests/fixtures/sample_books/alice_in_wonderland.epub /tmp/cwn/ingest/
-          sudo chown 1000:1000 /tmp/cwn/ingest/alice_in_wonderland.epub
+          sudo chown -R 1000:1000 /tmp/cwn/ingest
           sudo chmod 666 /tmp/cwn/ingest/alice_in_wonderland.epub
           echo "Polling for the imported book via the API..."
           jar=$(mktemp); total=0

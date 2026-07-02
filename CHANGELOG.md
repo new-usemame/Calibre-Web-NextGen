@@ -16,7 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
-### Fixed
+### Added
+- **The new UI's sidebar now respects which sections you've turned off.** Just
+  like the classic UI, if an admin (or a per-user setting) has hidden sections
+  such as Hot, Top Rated, Discover, Categories, Series, Authors, Publishers,
+  Languages, Ratings, Formats, Archived, Favorites, Table view, or Duplicates,
+  those entries no longer appear in the new-UI sidebar — it follows your
+  configured Visibility settings instead of always showing everything. Nothing
+  changes if you never hid anything. Reordering sidebar entries is still on the
+  list for a later update. Requested by @Glennza1962.
 - **Admin config links now work behind a reverse proxy on a sub-path.** In the
   new UI, the "More server configuration" cards on the Admin page (Basic
   configuration, Database & library path, Scheduled tasks, Logs, and the rest)

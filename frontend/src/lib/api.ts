@@ -49,6 +49,10 @@ export interface Me {
   locale: string;
   theme: string;
   role: Record<string, boolean>;
+  /** Sidebar-entry visibility (#585) — {key: enabled}. Mirrors the classic UI's
+   *  per-user/instance sidebar_view config. Absent on older servers → treat
+   *  every entry as visible. */
+  sidebar?: Record<string, boolean>;
   features?: ServerFeatures;
   instance_name?: string;
 }

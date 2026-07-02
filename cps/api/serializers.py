@@ -2,7 +2,44 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Pure (context-free) JSON serializers for the /api/v1 surface."""
 
+from .. import constants
 from ..clean_html import clean_string
+
+
+# Fork #585 (@Glennza1962 et al.): map the SPA sidebar's nav entries to the
+# classic sidebar-visibility bits (constants.SIDEBAR_*). The classic UI hides
+# entries an admin/user disabled via ``user.check_visibility(bit)`` on the
+# ``sidebar_view`` bitmask; the new UI must honour the same config. Keys are
+# stable, UI-agnostic identifiers the SPA filters its nav list by.
+SIDEBAR_VISIBILITY_BITS = {
+    "author": constants.SIDEBAR_AUTHOR,
+    "series": constants.SIDEBAR_SERIES,
+    "category": constants.SIDEBAR_CATEGORY,
+    "publisher": constants.SIDEBAR_PUBLISHER,
+    "language": constants.SIDEBAR_LANGUAGE,
+    "rating": constants.SIDEBAR_RATING,
+    "format": constants.SIDEBAR_FORMAT,
+    "hot": constants.SIDEBAR_HOT,
+    "random": constants.SIDEBAR_RANDOM,
+    "best_rated": constants.SIDEBAR_BEST_RATED,
+    "read_and_unread": constants.SIDEBAR_READ_AND_UNREAD,
+    "archived": constants.SIDEBAR_ARCHIVED,
+    "favorites": constants.SIDEBAR_FAVORITES,
+    "download": constants.SIDEBAR_DOWNLOAD,
+    "list": constants.SIDEBAR_LIST,
+    "duplicates": constants.SIDEBAR_DUPLICATES,
+}
+
+
+def serialize_sidebar_visibility(user):
+    """Return {key: bool} for each configurable sidebar entry, using the same
+    ``check_visibility`` the classic UI + OPDS use. Degrades to all-visible when
+    the object has no ``check_visibility`` (keeps the serializer pure/testable
+    and never over-hides on an unexpected shape)."""
+    check = getattr(user, "check_visibility", None)
+    if not callable(check):
+        return {key: True for key in SIDEBAR_VISIBILITY_BITS}
+    return {key: bool(check(bit)) for key, bit in SIDEBAR_VISIBILITY_BITS.items()}
 
 
 def serialize_user(user):
@@ -21,6 +58,8 @@ def serialize_user(user):
             "viewer": user.role_viewer(),
             "passwd": user.role_passwd(),
         },
+        # Fork #585: which sidebar entries the admin/user has enabled.
+        "sidebar": serialize_sidebar_visibility(user),
     }
 
 

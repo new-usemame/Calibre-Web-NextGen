@@ -3224,7 +3224,7 @@ msgstr ""
 #: cps/templates/_book_organizer.html:139 cps/templates/book_table.html:60
 #: cps/templates/book_table.html:254
 msgid "Mark as read"
-msgstr "Marcar como no leído"
+msgstr "Marcar como leído"
 
 #: cps/templates/_book_organizer.html:145 cps/templates/book_table.html:63
 #: cps/templates/book_table.html:274

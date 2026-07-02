@@ -3131,7 +3131,7 @@ msgstr ""
 #: cps/templates/book_table.html:254
 #, fuzzy
 msgid "Mark as read"
-msgstr "Označit jako nepřečtené"
+msgstr "Označit jako přečtené"
 
 #: cps/templates/_book_organizer.html:145 cps/templates/book_table.html:63
 #: cps/templates/book_table.html:274

@@ -3107,7 +3107,7 @@ msgstr ""
 #: cps/templates/book_table.html:254
 #, fuzzy
 msgid "Mark as read"
-msgstr "標為未讀"
+msgstr "標為已讀"
 
 #: cps/templates/_book_organizer.html:145 cps/templates/book_table.html:63
 #: cps/templates/book_table.html:274

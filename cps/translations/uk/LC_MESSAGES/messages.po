@@ -3098,7 +3098,7 @@ msgstr ""
 #: cps/templates/book_table.html:254
 #, fuzzy
 msgid "Mark as read"
-msgstr "Відмітити як не прочитане"
+msgstr "Відмітити як прочитане"
 
 #: cps/templates/_book_organizer.html:145 cps/templates/book_table.html:63
 #: cps/templates/book_table.html:274

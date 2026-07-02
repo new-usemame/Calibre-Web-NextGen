@@ -3178,7 +3178,7 @@ msgstr ""
 #: cps/templates/book_table.html:254
 #, fuzzy
 msgid "Mark as read"
-msgstr "Marcar como non lido"
+msgstr "Marcar como lido"
 
 #: cps/templates/_book_organizer.html:145 cps/templates/book_table.html:63
 #: cps/templates/book_table.html:274

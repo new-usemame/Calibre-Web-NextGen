@@ -2568,9 +2568,8 @@ msgid "Manual (drag below)"
 msgstr "Manuel (glisser pour réorganiser)"
 
 #: cps/spa_strings.py:29
-#, fuzzy
 msgid "Read now"
-msgstr "Lire dans le navigateur"
+msgstr "Lire"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -3270,7 +3269,7 @@ msgstr ""
 #: cps/templates/_book_organizer.html:139 cps/templates/book_table.html:60
 #: cps/templates/book_table.html:254
 msgid "Mark as read"
-msgstr "Marquer comme non lu"
+msgstr "Marquer comme lu"
 
 #: cps/templates/_book_organizer.html:145 cps/templates/book_table.html:63
 #: cps/templates/book_table.html:274

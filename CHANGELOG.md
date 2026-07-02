@@ -17,6 +17,16 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **French (and 16 other languages) no longer offer "mark as unread" on a book
+  you haven't read.** The new UI's read toggle said "Marquer comme non lu"
+  (mark as unread) on unread books because the translation for "Mark as read"
+  carried the opposite meaning — the same copy-paste slip existed in Arabic,
+  Czech, Greek, Spanish, Finnish, Galician, Indonesian, Portuguese, Slovak,
+  Slovenian, Swedish, Turkish, Ukrainian, Vietnamese, and both Chinese
+  variants. All 17 are fixed. The classic detail page's big read button also
+  said "Lu" (has been read) in French where it meant "open the reader" — it
+  now says "Lire", and the status badge keeps "Lu" where that's correct.
+  Reported by @hayvan96.
 - **You can log out again on mobile in the classic view.** With the caliBlur
   theme on a phone, tapping your username in the menu did nothing — an
   invisible upload control was swallowing the tap, so the account submenu

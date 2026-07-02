@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2025-11-24 17:12+0100\n"
 "Last-Translator: Massimo Pissarello <mapi68@gmail.com>\n"
 "Language-Team: Italian\n"
@@ -2457,6 +2457,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "Leggi nel browser"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Indice serie"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Serie: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9552,9 +9562,6 @@ msgstr "Mostra sezione Libri letti e Libri da leggere"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Fai clic sulla copertina per caricare i metadati nel modulo"
-
-#~ msgid "Series Index"
-#~ msgstr "Indice serie"
 
 #~ msgid "Separate Book Files from Library"
 #~ msgstr "Separa i file dei libri dalla biblioteca"

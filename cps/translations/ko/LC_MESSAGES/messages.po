@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2025-09-08 00:53+0900\n"
 "Last-Translator: limeade23 <admin@limeade.me>\n"
 "Language-Team: Korean <>\n"
@@ -2386,6 +2386,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "웹에서 보기"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "시리즈 순서"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "시리즈: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9303,9 +9313,6 @@ msgstr "읽음/읽지 않음 표시"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "검색 결과를 사용하려면 표지를 클릭하세요."
-
-#~ msgid "Series Index"
-#~ msgstr "시리즈 순서"
 
 #~ msgid "Separate Book Files from Library"
 #~ msgstr "책 저장 경로 분리"

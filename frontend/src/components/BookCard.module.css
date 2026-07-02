@@ -112,6 +112,29 @@
   pointer-events: none;
 }
 
+/* Series position (#573): pinned to the bottom-left of the cover so it never
+   collides with the read badge (top-right) or the select/remove controls
+   (top-left). Shown only in a series view. */
+.seriesBadge {
+  position: absolute;
+  bottom: var(--sp-2);
+  left: var(--sp-2);
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: rgba(20, 28, 36, 0.82);
+  color: #fff;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: var(--elev-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
 /* Remove-from-shelf control: top-left so it never overlaps the read badge.
    Hidden until hover/focus to keep the grid calm, but always reachable. */
 .removeBtn {

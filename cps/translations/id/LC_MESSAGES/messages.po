@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-02 14:34+0000\n"
+"POT-Creation-Date: 2026-07-02 16:41+0000\n"
 "PO-Revision-Date: 2023-01-21 10:00+0700\n"
 "Last-Translator: Arief Hidayat<arihid95@gmail.com>\n"
 "Language-Team: Arief Hidayat <arihid95@gmail.com>\n"
@@ -2451,6 +2451,16 @@ msgstr ""
 #, fuzzy
 msgid "Read now"
 msgstr "Baca di Peramban"
+
+#: cps/spa_strings.py:33
+#, fuzzy
+msgid "Series order"
+msgstr "Indeks Pencarian"
+
+#: cps/spa_strings.py:34
+#, fuzzy
+msgid "Series order (reverse)"
+msgstr "Seri: %(serie)s"
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
 #: cps/templates/tasks.html:7
@@ -9183,6 +9193,3 @@ msgstr "Tampilkan pilihan baca/belum dibaca"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik sampul untuk memuat metadata ke formulir"
-
-#~ msgid "Series Index"
-#~ msgstr "Indeks Pencarian"

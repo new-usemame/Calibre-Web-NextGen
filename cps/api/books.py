@@ -26,6 +26,12 @@ SORT_MAP = {
     "pubold": [db.Books.pubdate],
     "authaz": [db.Books.author_sort.asc(), db.Series.name, db.Books.series_index],
     "authza": [db.Books.author_sort.desc(), db.Series.name.desc(), db.Books.series_index.desc()],
+    # Series reading order — mirrors web.py get_sort_function's seriesasc/seriesdesc.
+    # Every list_books path already joins db.Series (series_join), so ordering by
+    # db.Books.series_index needs no extra plumbing. Used by the new-UI series view
+    # so a series reads 1, 2, 3… instead of newest-first (fork #573).
+    "seriesasc": [db.Books.series_index.asc()],
+    "seriesdesc": [db.Books.series_index.desc()],
 }
 
 

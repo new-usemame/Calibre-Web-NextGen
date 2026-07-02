@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search as SearchIcon, RotateCcw } from 'lucide-react';
-import { useSearchOptions, useAdvancedSearch } from '../lib/queries';
+import { useSearchOptions, useAdvancedSearch, useMe } from '../lib/queries';
 import { MultiSelect } from '../components/MultiSelect';
 import { BookCard } from '../components/BookCard';
 import { Button } from '../components/Button';
@@ -49,6 +49,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
 
 export function AdvancedSearch() {
   const t = useT();
+  const canEdit = !!useMe().data?.role?.edit;  // quick-edit pencil on results (#572)
   const { data: options } = useSearchOptions();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [submitted, setSubmitted] = useState<AdvancedSearchParams | null>(null);
@@ -207,7 +208,7 @@ export function AdvancedSearch() {
               </p>
               <div className={styles.resultsGrid}>
                 {results.map((book, i) => (
-                  <BookCard key={book.id} book={book}
+                  <BookCard key={book.id} book={book} quickEdit={canEdit}
                     style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }} />
                 ))}
               </div>

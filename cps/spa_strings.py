@@ -32,3 +32,10 @@ _("Read now")
 # shown when viewing a single series, so the reader can order by position.
 _("Series order")
 _("Series order (reverse)")
+
+# #572 — inline tag add/remove on the book detail page (quick-edit, no full
+# editor). SPA-only strings, anchored so the auto-translation job keeps them.
+_("Add tag")
+_("New tag")
+_("Remove tag")
+_("Remove tag %(name)s")

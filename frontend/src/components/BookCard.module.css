@@ -168,3 +168,38 @@
   color: #fff;
   border-color: var(--danger);
 }
+
+/* Quick-edit pencil (fork #572): bottom-right so it never overlaps the read
+   badge (top-right) or the remove control (top-left). Hover/focus-reveal like
+   the remove button, but always reachable via keyboard focus. */
+.quickEditBtn {
+  position: absolute;
+  bottom: var(--sp-2);
+  right: var(--sp-2);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  background: rgba(20, 28, 36, 0.82);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--elev-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+
+.card:hover .quickEditBtn,
+.card:focus-within .quickEditBtn,
+.quickEditBtn:focus-visible {
+  opacity: 1;
+}
+
+.quickEditBtn:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}

@@ -1,5 +1,5 @@
-import { Check, X } from 'lucide-react';
-import { Link } from 'wouter';
+import { Check, X, Pencil } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
 import type { Book } from '../lib/api';
 import { BookCover } from './BookCover';
 import styles from './BookCard.module.css';
@@ -17,6 +17,10 @@ interface BookCardProps {
   /** When true, show the book's position within its series (#573) — used by the
    *  series view so the reading order is visible without duplicating it in titles. */
   showSeriesIndex?: boolean;
+  /** Show a hover pencil that jumps straight to the edit page (fork #572). Opt-in
+   *  so it only appears where it's wanted (catalog + search) and only for users
+   *  who can edit. Suppressed in selection mode. */
+  quickEdit?: boolean;
 }
 
 /** Format a Calibre series_index (a float, e.g. 1.0, 2.5) for display: whole
@@ -31,9 +35,11 @@ export function BookCard({
   book, style, onRemove, removeLabel = 'Remove',
   selectable = false, selected = false, onToggleSelect,
   showSeriesIndex = false,
+  quickEdit = false,
 }: BookCardProps) {
   const authorStr = book.authors.join(', ');
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
+  const [, navigate] = useLocation();
 
   const inner = (
     <article
@@ -76,6 +82,24 @@ export function BookCard({
             }}
           >
             <X size={14} strokeWidth={3} />
+          </button>
+        )}
+        {quickEdit && !selectable && (
+          // Drop straight into the edit page without opening the book first
+          // (fork #572). Sits inside the card's <Link>, so stop the click from
+          // also navigating to the detail view.
+          <button
+            type="button"
+            className={styles.quickEditBtn}
+            aria-label={`Edit ${book.title}`}
+            title="Edit metadata"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate(`/book/${book.id}/edit`);
+            }}
+          >
+            <Pencil size={13} strokeWidth={2.5} />
           </button>
         )}
       </div>

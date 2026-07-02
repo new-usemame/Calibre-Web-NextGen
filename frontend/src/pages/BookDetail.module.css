@@ -151,6 +151,78 @@
   display: inline-flex;
 }
 
+/* Inline tag editor (fork #572): a chip = the tag link + a remove ×; plus an
+   add-tag control. Styled to sit alongside the read-only Pill look. */
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  font-size: var(--fs-sm, 0.85rem);
+}
+.tagChipLink {
+  color: var(--text);
+  text-decoration: none;
+}
+.tagChipLink:hover {
+  color: var(--accent);
+}
+.tagRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  border: none;
+  background: transparent;
+  color: var(--text-muted, var(--text));
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.tagRemove:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+.tagRemove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.tagAddBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-full);
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--text-muted, var(--text));
+  font-size: var(--fs-sm, 0.85rem);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.tagAddBtn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.tagAddRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.tagAddInput {
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-full);
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-sm, 0.85rem);
+  min-width: 8rem;
+}
+
 
 /* Actions row */
 .actions {

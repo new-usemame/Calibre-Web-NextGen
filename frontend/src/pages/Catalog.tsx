@@ -7,7 +7,7 @@ import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { DiscoverSection } from '../components/DiscoverSection';
-import { useBooks, useEntityList, ENTITY_PLURAL } from '../lib/queries';
+import { useBooks, useEntityList, ENTITY_PLURAL, useMe } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import type { Book } from '../lib/api';
 import { saveCatalog, loadCatalog } from '../lib/scrollCache';
@@ -127,6 +127,10 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   // Multi-select / bulk mode
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
+  // never while multi-selecting (the whole card toggles selection then).
+  const canEdit = !!useMe().data?.role?.edit;
 
   // Discover section visibility (persisted; toggled by the gear menu or its ×).
   const [discoverHidden, setDiscoverHidden] = usePersistentBool('cwng_discover_hidden_v1', false);
@@ -428,6 +432,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
                 book={book}
                 showSeriesIndex={isSeries}
                 style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }}
+                quickEdit={canEdit && !selecting}
                 selectable={selecting}
                 selected={selected.has(book.id)}
                 onToggleSelect={(b) =>

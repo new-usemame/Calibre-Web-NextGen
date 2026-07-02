@@ -1,15 +1,15 @@
 import { useState, Fragment } from 'react';
 import { Link, useParams } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X } from 'lucide-react';
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
-  useSendToEreader, useMe,
+  useSendToEreader, useMe, useUpdateMetadata,
 } from '../lib/queries';
 import { Pill } from '../components/Pill';
 import { AddToShelf } from '../components/AddToShelf';
-import { SpinnerCentered } from '../components/Spinner';
+import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import type { BookFormat } from '../lib/api';
+import type { BookFormat, EntityRef } from '../lib/api';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './BookDetail.module.css';
@@ -93,6 +93,92 @@ function SendPanel({ formats, pending, banner, onSend }: SendPanelProps) {
         </button>
       </div>
       {banner && <p className={banner.ok ? styles.sendOk : styles.sendErr}>{banner.text}</p>}
+    </div>
+  );
+}
+
+/** Inline tag add/remove on the book page (fork #572), so you can tweak a book's
+ *  tags without opening the full editor and hand-editing a comma-separated string.
+ *  The /metadata endpoint has replace semantics for `tags`, so each change rebuilds
+ *  the whole comma-separated string from the book's current tags. Non-editors see
+ *  the original read-only linked pills. */
+function TagEditor({ bookId, tags, canEdit }:
+  { bookId: number; tags: EntityRef[]; canEdit: boolean }) {
+  const t = useT();
+  const update = useUpdateMetadata(bookId);
+  const [adding, setAdding] = useState(false);
+  const [input, setInput] = useState('');
+
+  const names = tags.map((tg) => tg.name);
+  const apply = (next: string[]) => update.mutate({ tags: next.join(', ') });
+  const removeTag = (name: string) => apply(names.filter((n) => n !== name));
+  const addTag = () => {
+    const v = input.trim();
+    if (!v) { setAdding(false); return; }
+    // Case-insensitive dedupe — don't re-add an existing tag.
+    if (!names.some((n) => n.toLowerCase() === v.toLowerCase())) apply([...names, v]);
+    setInput('');
+    setAdding(false);
+  };
+
+  if (!canEdit) {
+    if (tags.length === 0) return null;
+    return (
+      <div className={styles.tags}>
+        {tags.map((tag) => (
+          <Link key={tag.id} href={`/tags/${tag.id}`} className={styles.tagLink}>
+            <Pill>{tag.name}</Pill>
+          </Link>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.tags}>
+      {tags.map((tag) => (
+        <span key={tag.id} className={styles.tagChip}>
+          <Link href={`/tags/${tag.id}`} className={styles.tagChipLink}>{tag.name}</Link>
+          <button
+            type="button"
+            className={styles.tagRemove}
+            aria-label={t('Remove tag %(name)s', { name: tag.name })}
+            title={t('Remove tag')}
+            disabled={update.isPending}
+            onClick={() => removeTag(tag.name)}
+          >
+            <X size={12} strokeWidth={2.5} />
+          </button>
+        </span>
+      ))}
+      {adding ? (
+        <span className={styles.tagAddRow}>
+          <input
+            className={styles.tagAddInput}
+            value={input}
+            autoFocus
+            placeholder={t('New tag')}
+            aria-label={t('Add tag')}
+            disabled={update.isPending}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); addTag(); }
+              else if (e.key === 'Escape') { setInput(''); setAdding(false); }
+            }}
+            onBlur={addTag}
+          />
+          {update.isPending && <Spinner size={13} />}
+        </span>
+      ) : (
+        <button
+          type="button"
+          className={styles.tagAddBtn}
+          disabled={update.isPending}
+          onClick={() => setAdding(true)}
+        >
+          <Plus size={13} strokeWidth={2.5} /> {t('Add tag')}
+        </button>
+      )}
     </div>
   );
 }
@@ -301,16 +387,9 @@ export function BookDetail() {
             />
           )}
 
-          {/* Tags */}
-          {book.tags.length > 0 && (
-            <div className={styles.tags}>
-              {book.tags.map((tag) => (
-                <Link key={tag.id} href={`/tags/${tag.id}`} className={styles.tagLink}>
-                  <Pill>{tag.name}</Pill>
-                </Link>
-              ))}
-            </div>
-          )}
+          {/* Tags — inline add/remove for editors (fork #572), read-only links
+              otherwise. */}
+          <TagEditor bookId={book.id} tags={book.tags} canEdit={!!me?.role?.edit} />
 
           {/* Metadata definition list */}
           <dl className={styles.meta}>

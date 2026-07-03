@@ -530,23 +530,50 @@ def build_filter_from_rule(rule, user_id=None):
 
         read_col_class = db.cc_classes[config.config_read_column]
         column = read_col_class.value
-        
-        # Get the operator
-        operator = OPERATOR_MAP.get(operator_name)
-        if not operator:
-            return None
-        
-        # Convert integer value (0/1) to boolean (False/True) for proper comparison
-        # QueryBuilder sends integers from radio buttons, but custom column expects boolean
-        if isinstance(value, int):
-            value = bool(value)
 
         # Read status custom columns are joined via relationship - get the dynamic relationship name
         cc_relationship = f'custom_column_{config.config_read_column}'
-        if hasattr(db.Books, cc_relationship):
-            return getattr(db.Books, cc_relationship).any(operator(column, value))
-        else:
+        if not hasattr(db.Books, cc_relationship):
             log.error(f"Books model does not have relationship '{cc_relationship}'")
+            return None
+
+        try:
+            status_value = int(value)
+        except (ValueError, TypeError):
+            status_value = 0
+
+        # "Marked read" in custom-column mode means a truthy column row exists.
+        cc_read = getattr(db.Books, cc_relationship).any(column == True)  # noqa: E712
+
+        if status_value == ub.ReadBook.STATUS_IN_PROGRESS:
+            # The in-progress tri-state exists only in ub.ReadBook — KOReader/
+            # Kobo sync writes it there regardless of the configured read
+            # column, and a boolean column can't represent it. The previous
+            # bool(value) coercion collapsed 2 into True, turning "Currently
+            # Reading" into "Read" whenever a custom read column was set
+            # (fork #634). Marking a book read via the column never clears
+            # the ReadBook row, so custom-read books are excluded explicitly.
+            if user_id is None:
+                log.debug("read_status in-progress rule without user_id, skipping filter")
+                return None
+            in_progress_ids = [rb.book_id for rb in ub.session.query(ub.ReadBook).filter(
+                ub.ReadBook.user_id == user_id,
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS
+            ).all()]
+            condition = and_(db.Books.id.in_(in_progress_ids), ~cc_read)
+        elif status_value == ub.ReadBook.STATUS_FINISHED:
+            condition = cc_read
+        else:
+            # Unread: no truthy column row. Books never touched have no row
+            # at all, so match on absence-of-read rather than value == False
+            # (the old shape hid every never-marked book from "Yet to Read").
+            condition = ~cc_read
+
+        if operator_name == 'equal':
+            return condition
+        elif operator_name == 'not_equal':
+            return ~condition
+        else:
             return None
     else:
         if not model:

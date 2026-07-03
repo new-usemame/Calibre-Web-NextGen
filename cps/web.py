@@ -3571,9 +3571,26 @@ def show_book(book_id):
         read_book = entries[1]
         archived_book = entries[2]
         entry = entries[0]
-        entry.read_status = read_book == ub.ReadBook.STATUS_FINISHED
-        # Raw tri-state for the "currently reading" detail-page marker. fork #509.
-        entry.read_status_raw = read_book or ub.ReadBook.STATUS_UNREAD
+        if config.config_read_column:
+            # read_book carries the custom column's boolean value here, which
+            # can never express the in-progress tri-state — KOReader/Kobo sync
+            # writes that only to ub.ReadBook, whatever column is configured.
+            # Overlay it so the currently-reading marker still renders for
+            # custom-read-column users (fork #634).
+            entry.read_status = bool(read_book)
+            entry.read_status_raw = (ub.ReadBook.STATUS_FINISHED if read_book
+                                     else ub.ReadBook.STATUS_UNREAD)
+            if not read_book and current_user.is_authenticated:
+                in_progress = ub.session.query(ub.ReadBook).filter(
+                    ub.ReadBook.user_id == int(current_user.id),
+                    ub.ReadBook.book_id == book_id,
+                    ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
+                if in_progress:
+                    entry.read_status_raw = ub.ReadBook.STATUS_IN_PROGRESS
+        else:
+            entry.read_status = read_book == ub.ReadBook.STATUS_FINISHED
+            # Raw tri-state for the "currently reading" detail-page marker. fork #509.
+            entry.read_status_raw = read_book or ub.ReadBook.STATUS_UNREAD
         entry.is_archived = archived_book
         for lang_index in range(0, len(entry.languages)):
             entry.languages[lang_index].language_name = isoLanguages.get_language_name(get_locale(), entry.languages[

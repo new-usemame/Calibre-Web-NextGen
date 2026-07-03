@@ -17,6 +17,16 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **"Currently Reading" now shows the right books for libraries that use a
+  Calibre "Read" column.** If your admin settings link read status to a
+  custom Calibre column, the Currently Reading smart shelf listed every book
+  you'd marked read and never the book you were actually partway through —
+  and the "reading now" badge on a book's page never appeared, even with
+  KOReader progress synced. In-progress state (which comes from KOReader and
+  Kobo sync) is now read from the sync tracker regardless of the configured
+  column, and finished books stay out of the shelf. "Yet to Read" also now
+  counts books you've never touched, instead of only books explicitly marked
+  unread. Reported by @alva-seal, seconded by @iroQuai.
 - **KOReader sync now works when your reader matches books by filename.**
   KOReader's sync plugin (and apps like Crossink) can identify a book by a
   hash of its filename instead of its file contents. The server only ever

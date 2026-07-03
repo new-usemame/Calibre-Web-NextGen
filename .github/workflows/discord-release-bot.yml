@@ -1,12 +1,15 @@
 name: Post New Release Notes to Discord
-# Manually posts a release's notes to a Discord webhook. Dispatch-only
-# and gated on DISCORD_RELEASE_WEBHOOK_URL being present so operators
-# without a webhook configured get a clean no-op instead of a red run.
+# Posts a release's notes to a Discord webhook. Fires automatically when a
+# GitHub release is published, and can still be run manually from the Actions
+# tab. Gated on DISCORD_RELEASE_WEBHOOK_URL being present so operators without
+# a webhook configured get a clean no-op instead of a red run.
 # (Same pattern as dockerhub-description.yml — backports CWA #1254's
 # "don't fail on missing CI creds" intent; issue #152.)
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -14,6 +17,7 @@ permissions:
 jobs:
   github-releases-to-discord:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Probe Discord webhook secret
         id: probe

@@ -185,6 +185,9 @@ jobs:
   integration-tests:
     name: Integration Tests (Docker)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read   # pull the private pbs-cache mirror images the Dockerfile COPYs from
     # Tier-2 auto-merge requires Integration Tests as a hard gate — small
     # code changes still need to clear the actual ingest/Calibre flow.
     # We keep the broad-PR exemption: tier-1 (.po / *.md) PRs and PRs
@@ -215,7 +218,17 @@ jobs:
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-      
+
+      - name: Log in to GHCR (pbs-cache mirror pull)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          # GH_PAT (read:packages) so BuildKit can COPY --from our private
+          # pbs-cache mirror; falls back to GITHUB_TOKEN where the PAT
+          # secret isn't in scope.
+          password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
       - name: Install system dependencies
         run: |
           sudo apt-get update

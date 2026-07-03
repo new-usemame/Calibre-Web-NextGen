@@ -435,6 +435,66 @@ def test_no_merges_still_catches_foreign_non_merge_commit():
         )
 
 
+# ─── Wall 8: image-building test jobs authenticate to GHCR ─────────────
+#
+# The Dockerfile COPYs from the private ghcr.io/new-usemame/pbs-cache
+# mirror, so any tests.yml job that builds the image from source must
+# (a) hold `packages: read` and (b) run a docker/login-action step
+# against ghcr.io before the build. Without both, BuildKit's pull of
+# the mirror is anonymous and dies with 401 — which continue-on-error
+# then masks on main pushes, leaving integration coverage silently
+# dead (observed 2026-07-03, run 28677049810).
+
+
+def _steps(job: dict) -> list[dict]:
+    return [s for s in (job.get("steps") or []) if isinstance(s, dict)]
+
+
+def test_integration_tests_job_authenticates_to_ghcr():
+    """The integration-tests job builds the image from source, so it
+    needs packages:read + a ghcr.io login step ordered before the
+    docker build step. This went missing while the dev/e2e jobs had
+    it, and the job failed 401 on every main push unnoticed."""
+    wf = _load(WF_DIR / "tests.yml")
+    job = (wf.get("jobs") or {}).get("integration-tests")
+    assert isinstance(job, dict), "tests.yml must define an integration-tests job"
+
+    perms = job.get("permissions") or {}
+    assert perms.get("packages") == "read", (
+        "integration-tests must grant `packages: read` so the private "
+        "pbs-cache mirror the Dockerfile COPYs from can be pulled"
+    )
+
+    steps = _steps(job)
+    login_idx = next(
+        (
+            i
+            for i, s in enumerate(steps)
+            if str(s.get("uses", "")).startswith("docker/login-action")
+            and (s.get("with") or {}).get("registry") == "ghcr.io"
+        ),
+        None,
+    )
+    assert login_idx is not None, (
+        "integration-tests must log in to ghcr.io before building — the "
+        "Dockerfile COPYs from the private pbs-cache mirror and an "
+        "anonymous pull 401s"
+    )
+    build_idx = next(
+        (
+            i
+            for i, s in enumerate(steps)
+            if str(s.get("uses", "")).startswith("docker/build-push-action")
+        ),
+        None,
+    )
+    assert build_idx is not None, "integration-tests must build the image"
+    assert login_idx < build_idx, (
+        "GHCR login must come before the image build, or BuildKit still "
+        "pulls the pbs-cache mirror anonymously"
+    )
+
+
 def test_all_workflows_have_minimum_permissions_block():
     """Every workflow that does any mutating action (commenting,
     labeling, merging) must have an explicit top-level OR job-level

@@ -17,6 +17,17 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **KOReader sync now works when your reader matches books by filename.**
+  KOReader's sync plugin (and apps like Crossink) can identify a book by a
+  hash of its filename instead of its file contents. The server only ever
+  knew the content hash, so filename-mode devices always got "no book found"
+  and progress never linked up. The server now registers a filename digest
+  for every book — on download and, for your existing library, automatically
+  at startup. This also gives devices holding older copies of a book (from
+  before an update, or side-loaded) a way back into sync without re-sending
+  every file: switch the KOReader sync plugin's document-matching method to
+  "filename". Reported by @natabat, seconded by @Metamatam; also relevant to
+  reports from @uschi1 and @Glalith121.
 - **A single problem PDF can no longer hang the whole server on download.**
   Downloading certain PDFs (UI or OPDS) triggered a metadata-embedding step
   that could hang inside Calibre's PDF writer, pinning a CPU core, eating

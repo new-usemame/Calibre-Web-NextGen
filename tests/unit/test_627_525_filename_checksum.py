@@ -230,3 +230,82 @@ class TestLookupIsVersionAgnostic:
             "get_book_by_checksum must only filter by version when the "
             "caller asks — the filename-hash channel (#525/#627) relies on "
             "version-agnostic matching.")
+
+
+@pytest.mark.unit
+class TestBinaryPassNotMaskedByFilenameRows:
+    """Greptile finding on PR #636, confirmed: the binary pass's LEFT JOIN
+    matched rows of ANY version. Since the filename pass needs no file I/O,
+    a book whose file was unreadable at boot got a filename row anyway —
+    and every later boot's binary pass then skipped the pair permanently.
+    The binary pass must only treat version='koreader' rows as satisfying."""
+
+    @pytest.fixture
+    def library_with_absent_file(self, tmp_path, monkeypatch):
+        lib = tmp_path / "library"
+        lib.mkdir()
+        db = sqlite3.connect(lib / "metadata.db")
+        db.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, path TEXT)")
+        db.execute("CREATE TABLE data (id INTEGER PRIMARY KEY, book INTEGER, format TEXT, name TEXT)")
+        db.execute(CHECKSUM_TABLE_SQL)
+        # The book's file is NOT on disk yet (mid-move, unreadable mount…).
+        db.execute("INSERT INTO books VALUES (1, 'Ghost Book', 'ghost')")
+        db.execute("INSERT INTO data VALUES (1, 1, 'EPUB', 'Ghost Book - Author')")
+        db.commit()
+        db.close()
+
+        cfg = tmp_path / "config"
+        cfg.mkdir()
+        cdb = sqlite3.connect(cfg / "cwa.db")
+        cdb.execute("CREATE TABLE cwa_settings (koreader_sync_enabled INTEGER)")
+        cdb.execute("INSERT INTO cwa_settings VALUES (1)")
+        cdb.commit()
+        cdb.close()
+        monkeypatch.setenv("CWA_DB_PATH", str(cfg) + "/")
+        return lib
+
+    def _rows(self, library, version):
+        conn = sqlite3.connect(library / "metadata.db")
+        try:
+            return conn.execute(
+                "SELECT book FROM book_format_checksums WHERE version=?",
+                (version,)).fetchall()
+        finally:
+            conn.close()
+
+    def test_binary_pass_retries_after_filename_row_exists(
+            self, library_with_absent_file):
+        import generate_book_checksums as gbc
+        lib = library_with_absent_file
+
+        # Boot 1: file absent — binary pass can't hash it, filename pass
+        # (DB-only) registers its row regardless.
+        gbc.generate_checksums(str(lib), batch_size=10)
+        assert self._rows(lib, CHECKSUM_VERSION) == []
+        assert self._rows(lib, FILENAME_CHECKSUM_VERSION) == [(1,)]
+
+        # File appears (move completed / mount back).
+        (lib / "ghost").mkdir()
+        (lib / "ghost" / "Ghost Book - Author.epub").write_bytes(b"z" * 4096)
+
+        # Boot 2: the filename row must NOT satisfy the binary pass —
+        # the pair still needs its partial-MD5 computed.
+        gbc.generate_checksums(str(lib), batch_size=10)
+        assert self._rows(lib, CHECKSUM_VERSION) == [(1,)], (
+            "binary pass skipped a pair that only carries a filename-digest "
+            "row — its LEFT JOIN must filter on version='koreader'")
+
+
+@pytest.mark.unit
+class TestGetLatestChecksumScopedToBinaryChannel:
+    """Source-pin: get_latest_checksum must filter by version (default
+    binary 'koreader'). A newer filename-digest row would otherwise shadow
+    the binary checksum for any future caller of this exported API."""
+
+    def test_query_filters_on_version(self):
+        import inspect
+        from cps.progress_syncing.checksums import manager
+        src = inspect.getsource(manager.get_latest_checksum)
+        assert "version = :version" in src
+        sig = inspect.signature(manager.get_latest_checksum)
+        assert sig.parameters["version"].default == CHECKSUM_VERSION

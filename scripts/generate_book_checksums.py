@@ -160,6 +160,10 @@ def generate_checksums(library_path: str, books_path: str = None, force: bool = 
             '''
             formats = cur.execute(query).fetchall()
         else:
+            # Only a binary-channel row satisfies the binary pass. Filename
+            # rows (version 'koreader_filename') are created without file
+            # I/O, so an any-version join would permanently skip books whose
+            # files were unreadable when the filename pass first ran.
             query = '''
                 SELECT b.id, b.path, b.title, d.format, d.name
                 FROM books b
@@ -167,11 +171,12 @@ def generate_checksums(library_path: str, books_path: str = None, force: bool = 
                 LEFT JOIN book_format_checksums bfc ON (
                     bfc.book = b.id
                     AND bfc.format = d.format
+                    AND bfc.version = ?
                 )
                 WHERE bfc.id IS NULL
                 ORDER BY b.id
             '''
-            formats = cur.execute(query).fetchall()
+            formats = cur.execute(query, (CHECKSUM_VERSION,)).fetchall()
     except sqlite3.Error as e:
         print(f"ERROR: Database error: {e}")
         sys.exit(1)

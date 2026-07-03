@@ -104,8 +104,14 @@ class TestChecksumHistoryPreserved:
         assert h1 is not None and h2 is not None
         assert h1 != h2, "different file contents must produce different partial-MD5"
 
+        # Scope to the binary partial-MD5 channel: since #636,
+        # calculate_and_store_checksum also registers a filename-digest row
+        # (version 'koreader_filename') per call. That channel has its own
+        # coverage in test_627_525_filename_checksum.py; this test's subject
+        # is binary-checksum history preservation.
         rows = test_db.execute(
-            "SELECT checksum FROM book_format_checksums WHERE book = 7 ORDER BY created"
+            "SELECT checksum FROM book_format_checksums"
+            " WHERE book = 7 AND version = 'koreader' ORDER BY created"
         ).fetchall()
         assert len(rows) == 2
         assert {r[0] for r in rows} == {h1, h2}

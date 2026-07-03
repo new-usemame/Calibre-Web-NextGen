@@ -308,6 +308,15 @@ def _itunes_result_matches(
     track = (result.get("trackName") or result.get("collectionName") or "").lower()
     if not track:
         return False
+    # Volume guard (#638): the token overlap below compares only the first
+    # 6 tokens and _tokenize drops tokens <=2 chars, so "Vol.1" vs "Vol.3"
+    # of a long-titled series are indistinguishable to it - Apple returns
+    # the same first hit for every volume's search and the whole series
+    # collapses onto one cover. A volume designator, when present on
+    # either side, must agree exactly; a missed boost keeps the record's
+    # original (correct) cover, which is the cheaper failure.
+    if _volume_number(query_title) != _volume_number(track):
+        return False
     qtokens = _tokenize(query_title)[:6]
     if not qtokens:
         return False
@@ -329,6 +338,31 @@ def _itunes_result_matches(
 
 def _tokenize(text: str) -> List[str]:
     return [tok for tok in re.split(r"[^a-z0-9]+", (text or "").lower()) if len(tok) > 2]
+
+
+_VOLUME_MARKER_RE = re.compile(
+    r"\b(?:vol(?:ume)?|tome|book|part|no)\.?\s*0*(\d{1,4})\b|#\s*0*(\d{1,4})\b",
+    re.IGNORECASE,
+)
+_TRAILING_INT_RE = re.compile(r"(?:^|[\s:,\-(\[])0*(\d{1,4})\s*[)\]]?\s*$")
+
+
+def _volume_number(title: str) -> Optional[int]:
+    """Best-effort volume/issue number from a book title, None when absent.
+
+    Recognizes explicit markers ("Vol. 3", "Volume 3", "Tome 3", "Book 3",
+    "Part 3", "No. 3", "#3") and a bare trailing integer ("Foo 3"). Titles
+    that ARE numbers ("1984") yield that number on both sides of a
+    comparison, so equal-title matches are unaffected.
+    """
+    text = title or ""
+    m = _VOLUME_MARKER_RE.search(text)
+    if m:
+        return int(m.group(1) or m.group(2))
+    m = _TRAILING_INT_RE.search(text)
+    if m:
+        return int(m.group(1))
+    return None
 
 
 def _itunes_artwork(result: Optional[Dict]) -> Optional[str]:

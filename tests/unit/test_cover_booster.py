@@ -258,3 +258,112 @@ class TestBoostedCoverPathOrder:
             result = cover_booster._boosted_cover_for(record)
         itunes_search.assert_called_once()
         assert result and "1500x1500bb" in result
+
+
+@pytest.mark.unit
+class TestVolumeAwareMatching:
+    """Fork issue #638: iTunes title-search collapsed every volume of a
+    series onto one cover. Apple returns the same first hit for
+    "<long series title> Vol.1/2/3" queries because the first-6-token
+    overlap can never see the volume number (_tokenize drops tokens
+    <=2 chars). The match must reject a hit whose volume designator
+    disagrees with the query's."""
+
+    def _hit(self, track, artist="Toyozo Okamura", year="2024-03-01"):
+        return {
+            "trackName": track,
+            "artistName": artist,
+            "releaseDate": year,
+            "kind": "ebook",
+        }
+
+    TITLE = (
+        "Love & Magic Academy: Who Cares about the Heroine and Villainess? "
+        "I Want to Be the Strongest in this Otome Game World"
+    )
+
+    def test_different_volume_numbers_reject(self):
+        assert not cover_booster._itunes_result_matches(
+            f"{self.TITLE} Vol.2", "Toyozo Okamura",
+            self._hit(f"{self.TITLE} Vol. 3"),
+        )
+
+    def test_same_volume_number_passes(self):
+        assert cover_booster._itunes_result_matches(
+            f"{self.TITLE} Vol.2", "Toyozo Okamura",
+            self._hit(f"{self.TITLE}, Vol. 2"),
+        )
+
+    def test_query_volume_but_hit_unnumbered_rejects(self):
+        assert not cover_booster._itunes_result_matches(
+            f"{self.TITLE} Vol.2", "Toyozo Okamura",
+            self._hit(self.TITLE),
+        )
+
+    def test_hit_volume_but_query_unnumbered_rejects(self):
+        assert not cover_booster._itunes_result_matches(
+            self.TITLE, "Toyozo Okamura",
+            self._hit(f"{self.TITLE} Vol. 3"),
+        )
+
+    def test_volume_marker_variants_are_equivalent(self):
+        # "Vol. 2", "Volume 2", "Book 2", "#2" all designate the same volume
+        for marker in ("Vol. 2", "Volume 2", "Book 2", "#2"):
+            assert cover_booster._itunes_result_matches(
+                f"{self.TITLE} Vol.2", "Toyozo Okamura",
+                self._hit(f"{self.TITLE} {marker}"),
+            ), marker
+
+    def test_numeric_title_both_sides_equal_passes(self):
+        # Titles that ARE numbers must not self-reject
+        assert cover_booster._itunes_result_matches(
+            "1984", "George Orwell",
+            self._hit("1984", artist="George Orwell"),
+        )
+
+    def test_unnumbered_titles_unaffected(self):
+        assert cover_booster._itunes_result_matches(
+            "Wuthering Heights", "Emily Bronte",
+            self._hit("Wuthering Heights", artist="Emily Bronte"),
+        )
+
+
+@pytest.mark.unit
+class TestSeriesVolumeNoCollapse:
+    """End-to-end through boost_covers: three ISBN-less volumes of one
+    series must NOT all converge on the single cover Apple returns first
+    (the user-visible symptom in #638 - identical thumbnails for
+    Vol.1/2/3 in the fetch-metadata modal)."""
+
+    def test_boost_covers_does_not_collapse_series_volumes(self):
+        base = (
+            "Love & Magic Academy: Who Cares about the Heroine and "
+            "Villainess? I Want to Be the Strongest in this Otome Game World"
+        )
+        records = [
+            {
+                "title": f"{base} Vol.{n}",
+                "authors": ["Toyozo Okamura"],
+                "identifiers": {"kobo": f"slug-vol-{n}"},
+                "cover": f"https://cdn.kobo.com/book-images/vol{n}/1200/1200/90/False/img.jpg",
+                "publishedDate": "2024",
+            }
+            for n in (1, 2, 3)
+        ]
+        # Apple returns Vol.3 as the FIRST hit for all three queries
+        # (observed live 2026-07-03 on the /search API for this series).
+        vol3_hit = {
+            "trackName": f"{base} Vol. 3",
+            "artistName": "Toyozo Okamura",
+            "releaseDate": "2024-09-01",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/img/vol3/100x100bb.jpg",
+            "kind": "ebook",
+        }
+        with patch.object(cover_booster, "_itunes_search", return_value=vol3_hit):
+            boosted = cover_booster.boost_covers(records)
+        covers = [r["cover"] for r in boosted]
+        # Vol.3 may legitimately take the Apple artwork; Vol.1 and Vol.2
+        # must keep their original (correct) Kobo covers.
+        assert "vol1" in covers[0], f"Vol.1 cover was overwritten: {covers[0]}"
+        assert "vol2" in covers[1], f"Vol.2 cover was overwritten: {covers[1]}"
+        assert len(set(covers)) == 3, f"covers collapsed: {covers}"

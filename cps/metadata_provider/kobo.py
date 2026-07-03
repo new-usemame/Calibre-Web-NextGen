@@ -426,6 +426,8 @@ class Kobo(Metadata):
         series_index = data.get("series_index", 0)
         identifiers: Dict[str, Union[str, int]] = {}
         identifiers["kobo"] = self._extract_kobo_id_from_url(url)
+        if data.get("isbn"):
+            identifiers["isbn"] = data["isbn"]
 
         # Normalize languages to display names like other providers
         languages: List[str] = []
@@ -542,6 +544,7 @@ class Kobo(Metadata):
                     "publishedDate": published,
                     "series": series_name,
                     "series_index": series_index,
+                    "isbn": isbn or "",
                 }
                 # Only accept if it looks like a book
                 if out["title"] or out["authors"]:
@@ -1069,6 +1072,14 @@ class Kobo(Metadata):
             img = book.get("ImageUrl") or book.get("Image")
             if isinstance(img, str) and img:
                 assign_if_empty("image", img)
+
+            # ISBN - edition identifier; the cover booster keys its
+            # edition-exact paths on identifiers["isbn"] (#638)
+            raw_isbn = book.get("ISBN") or book.get("Isbn") or book.get("isbn")
+            if raw_isbn is not None:
+                valid_isbn = self._validate_isbn(str(raw_isbn))
+                if valid_isbn:
+                    assign_if_empty("isbn", valid_isbn)
 
         try:
             j = next_data or self._get_next_data_json(soup)

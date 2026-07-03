@@ -16,6 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+- **Fetch Metadata no longer shows the same cover for every volume of a
+  series.** Searching for one volume of a series could return results where
+  Vol.1, Vol.2, and Vol.3 all carried an identical cover — and applying
+  metadata then saved that wrong cover onto the book. The cover-upgrade step
+  now refuses to swap in artwork whose volume number disagrees with the
+  book's title, and Kobo search results keep their ISBN so the exact-edition
+  cover sources can be used in the first place. Reported by @boegill (#638).
+
 ## [v4.1.5] - 2026-07-03
 
 ### Fixed

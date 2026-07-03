@@ -39,7 +39,10 @@ def _kill_export_tree(p):
         os.killpg(os.getpgid(p.pid), signal.SIGKILL)
     except (AttributeError, OSError):
         # Windows (no killpg) or the group is already gone
-        p.kill()
+        try:
+            p.kill()
+        except OSError:
+            pass
     try:
         p.communicate(timeout=10)
     except Exception:
@@ -66,13 +69,14 @@ def do_calibre_export(book_id, book_format):
                        '--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
                        str(book_id)]
         p = process_open(opf_command, quotes, my_env)
+        embed_timeout = _embed_timeout()
         try:
-            _, err = p.communicate(timeout=_embed_timeout())
+            _, err = p.communicate(timeout=embed_timeout)
         except subprocess.TimeoutExpired:
             _kill_export_tree(p)
             log.error('Metadata embed timed out after %ss for book %s (%s); '
                       'falling back to the original file without embedded metadata',
-                      _embed_timeout(), book_id, book_format)
+                      embed_timeout, book_id, book_format)
             return None, None
         if err:
             log.error('Metadata embedder encountered an error: %s', err)

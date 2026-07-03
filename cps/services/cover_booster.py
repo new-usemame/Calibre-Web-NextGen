@@ -341,9 +341,10 @@ def _tokenize(text: str) -> List[str]:
 
 
 _VOLUME_MARKER_RE = re.compile(
-    r"\b(?:vol(?:ume)?|tome|book|part|no)\.?\s*0*(\d{1,4})\b|#\s*0*(\d{1,4})\b",
+    r"\b(?:vol(?:ume)?|tome|book|part)\.?\s*0*(\d{1,4})\b|#\s*0*(\d{1,4})\b",
     re.IGNORECASE,
 )
+_NO_MARKER_RE = re.compile(r"\bno\.?\s*0*(\d{1,4})\b", re.IGNORECASE)
 _TRAILING_INT_RE = re.compile(r"(?:^|[\s:,\-(\[])0*(\d{1,4})\s*[)\]]?\s*$")
 
 
@@ -351,14 +352,21 @@ def _volume_number(title: str) -> Optional[int]:
     """Best-effort volume/issue number from a book title, None when absent.
 
     Recognizes explicit markers ("Vol. 3", "Volume 3", "Tome 3", "Book 3",
-    "Part 3", "No. 3", "#3") and a bare trailing integer ("Foo 3"). Titles
-    that ARE numbers ("1984") yield that number on both sides of a
-    comparison, so equal-title matches are unaffected.
+    "Part 3", "#3"), then "No. 3", then a bare trailing integer ("Foo 3").
+    "No" is checked only after the strong markers because it doubles as a
+    series name ("No. 6 Vol. 3" must extract 3, not the leftmost 6 -
+    otherwise every volume of such a series extracts the series number on
+    both sides and the guard is neutralized). Titles that ARE numbers
+    ("1984") yield that number on both sides of a comparison, so
+    equal-title matches are unaffected.
     """
     text = title or ""
     m = _VOLUME_MARKER_RE.search(text)
     if m:
         return int(m.group(1) or m.group(2))
+    m = _NO_MARKER_RE.search(text)
+    if m:
+        return int(m.group(1))
     m = _TRAILING_INT_RE.search(text)
     if m:
         return int(m.group(1))

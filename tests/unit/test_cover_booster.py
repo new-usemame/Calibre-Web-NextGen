@@ -314,6 +314,34 @@ class TestVolumeAwareMatching:
                 self._hit(f"{self.TITLE} {marker}"),
             ), marker
 
+    def test_no_series_name_does_not_mask_volume_marker(self):
+        # Greptile P2 on #642: "No. 6" is a series NAME (Atsuko Asano);
+        # the leftmost "No. 6" must not win over the real "Vol. 3" marker,
+        # or every volume of the series extracts 6 on both sides and the
+        # guard is neutralized.
+        assert cover_booster._volume_number("No. 6 Vol. 3") == 3
+        assert cover_booster._volume_number("No. 6, Volume 1") == 1
+
+    def test_no_series_different_volumes_reject(self):
+        # Pre-fix: both sides extract the series number (6 == 6), the
+        # guard passes, and the surviving token overlap is trivially 100%
+        # ("no"/"6"/digits all drop in _tokenize) - the exact collapse
+        # this guard exists to prevent.
+        assert not cover_booster._itunes_result_matches(
+            "No. 6 Vol. 3", "Atsuko Asano",
+            self._hit("No. 6 Vol. 1", artist="Atsuko Asano"),
+        )
+
+    def test_no_marker_alone_still_recognized(self):
+        # Without a strong marker, "No. N" still designates the volume
+        # and equal values on both sides still match.
+        assert cover_booster._volume_number("The No. 1 Ladies' Detective Agency") == 1
+        assert cover_booster._itunes_result_matches(
+            "The No. 1 Ladies' Detective Agency", "Alexander McCall Smith",
+            self._hit("The No. 1 Ladies' Detective Agency",
+                      artist="Alexander McCall Smith"),
+        )
+
     def test_numeric_title_both_sides_equal_passes(self):
         # Titles that ARE numbers must not self-reject
         assert cover_booster._itunes_result_matches(

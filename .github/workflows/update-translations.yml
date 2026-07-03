@@ -12,6 +12,16 @@ on:
       - '.github/workflows/update-translations.yml'
   workflow_dispatch:
 
+# Two merges to main in quick succession trigger two runs; both commit a
+# translation update and the loser's push is rejected non-fast-forward.
+# Serialize runs so only pushes from outside this workflow can race the
+# commit step (those are handled by the rebase-and-retry loop below).
+# cancel-in-progress stays false: cancelling a run mid-push could strand
+# a half-finished commit.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   actions: write
@@ -83,7 +93,29 @@ jobs:
             echo "TRANSLATION_COMMITTED=0" >> $GITHUB_ENV
           else
             git commit -m "Update translations [skip ci]"
-            git push
+            # The autopilot pushes docs commits to main minutes after each
+            # merge, so a bare `git push` here loses that race and fails
+            # non-fast-forward (3 of the last 30 runs). The commit holds
+            # only generated files; rebasing it onto updated main is safe.
+            # On a genuine rebase conflict, abort and fail — the push that
+            # beat us triggers its own run, which regenerates everything.
+            pushed=0
+            for attempt in 1 2 3; do
+              if git push; then
+                pushed=1
+                break
+              fi
+              echo "push rejected (attempt ${attempt}/3); rebasing onto updated main"
+              if ! git pull --rebase origin main; then
+                git rebase --abort
+                echo "::error::rebase conflict while retrying translation push"
+                exit 1
+              fi
+            done
+            if [ "${pushed}" != "1" ]; then
+              echo "::error::translation push failed after 3 attempts"
+              exit 1
+            fi
             echo "TRANSLATION_COMMITTED=1" >> $GITHUB_ENV
             echo "TRANSLATION_COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           fi

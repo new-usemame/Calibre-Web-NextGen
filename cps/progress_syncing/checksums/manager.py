@@ -26,7 +26,12 @@ from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 
 from ... import logger
-from .koreader import calculate_koreader_partial_md5, CHECKSUM_VERSION
+from .koreader import (
+    calculate_koreader_partial_md5,
+    calculate_koreader_filename_md5,
+    CHECKSUM_VERSION,
+    FILENAME_CHECKSUM_VERSION,
+)
 
 log = logger.create()
 
@@ -170,6 +175,20 @@ def calculate_and_store_checksum(
         version=CHECKSUM_VERSION,
         db_connection=db_connection
     )
+
+    # Also register the filename-matching digest of the served basename so
+    # clients in 'filename' document-matching mode (kosync plugin option,
+    # Crossink/x4) resolve this book too. Fork #525 / #627. Failure here
+    # must not disturb the binary-channel result.
+    filename_digest = calculate_koreader_filename_md5(os.path.basename(file_path))
+    if filename_digest:
+        store_checksum(
+            book_id=book_id,
+            book_format=book_format,
+            checksum=filename_digest,
+            version=FILENAME_CHECKSUM_VERSION,
+            db_connection=db_connection
+        )
 
     if success:
         return checksum

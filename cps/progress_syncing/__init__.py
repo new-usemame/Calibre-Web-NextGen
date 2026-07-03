@@ -31,7 +31,12 @@ Architecture:
 # Export commonly used components
 # NOTE: kosync blueprint is NOT imported here to avoid circular imports
 # Import it directly from .protocols.kosync where needed
-from .checksums.koreader import calculate_koreader_partial_md5, CHECKSUM_VERSION
+from .checksums.koreader import (
+    calculate_koreader_partial_md5,
+    calculate_koreader_filename_md5,
+    CHECKSUM_VERSION,
+    FILENAME_CHECKSUM_VERSION,
+)
 from .checksums.manager import (
     store_checksum,
     calculate_and_store_checksum,
@@ -49,7 +54,9 @@ from .models import (
 __all__ = [
     # Checksum functions
     'calculate_koreader_partial_md5',
+    'calculate_koreader_filename_md5',
     'CHECKSUM_VERSION',
+    'FILENAME_CHECKSUM_VERSION',
     'store_checksum',
     'calculate_and_store_checksum',
     'get_latest_checksum',

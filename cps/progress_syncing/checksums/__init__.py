@@ -13,7 +13,12 @@ Provides checksum calculation and management for book files.
 Supports KOReader's partial MD5 algorithm for efficient file identification.
 """
 
-from .koreader import calculate_koreader_partial_md5, CHECKSUM_VERSION
+from .koreader import (
+    calculate_koreader_partial_md5,
+    calculate_koreader_filename_md5,
+    CHECKSUM_VERSION,
+    FILENAME_CHECKSUM_VERSION,
+)
 from .manager import (
     store_checksum,
     calculate_and_store_checksum,
@@ -23,7 +28,9 @@ from .manager import (
 
 __all__ = [
     'calculate_koreader_partial_md5',
+    'calculate_koreader_filename_md5',
     'CHECKSUM_VERSION',
+    'FILENAME_CHECKSUM_VERSION',
     'store_checksum',
     'calculate_and_store_checksum',
     'get_latest_checksum',

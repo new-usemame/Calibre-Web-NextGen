@@ -18,6 +18,8 @@ Reference: https://github.com/koreader/koreader/blob/master/frontend/util.lua#L1
 
 Version History:
 - Version 'koreader': Initial implementation of KOReader partialMD5 algorithm (November 2025)
+- Version 'koreader_filename': MD5 of the export basename, for clients in
+  'filename' document-matching mode (fork #525 / #627, July 2026)
 """
 
 import hashlib
@@ -30,6 +32,33 @@ log = logger.create()
 
 # Current algorithm version - use string identifier for clarity
 CHECKSUM_VERSION = 'koreader'
+
+# Filename-matching channel: KOReader's kosync plugin (and Crossink/x4) can be
+# configured to identify a document by md5 of its FILENAME instead of its
+# bytes. Byte-verified against the #525 reporter's oracle:
+# md5("More Everything Forever - Adam Becker.epub") == 9ea1b31e133214bb1169acce6ff4affb
+FILENAME_CHECKSUM_VERSION = 'koreader_filename'
+
+
+def calculate_koreader_filename_md5(filename: Optional[str]) -> Optional[str]:
+    """
+    Calculate the filename-matching digest KOReader/Crossink send when the
+    kosync plugin is set to 'filename' document matching.
+
+    The digest is the MD5 of the UTF-8 bytes of the basename INCLUDING the
+    lowercase format extension, with no case folding or sanitization —
+    exactly the OPDS/Kobo download name CW-NG serves
+    (``data.name + "." + book_format``).
+
+    Args:
+        filename: Basename with extension, e.g. "Title - Author.epub"
+
+    Returns:
+        32-character hexadecimal MD5 string, or None for empty input
+    """
+    if not filename:
+        return None
+    return hashlib.md5(filename.encode('utf-8')).hexdigest()  # nosec - identification, not security
 
 
 def calculate_koreader_partial_md5(filepath: str) -> Optional[str]:

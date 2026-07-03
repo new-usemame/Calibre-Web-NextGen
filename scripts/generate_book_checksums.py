@@ -122,7 +122,9 @@ def generate_checksums(library_path: str, books_path: str = None, force: bool = 
     # etc.), but the cost is amortized over actual checksum computation.
     from cps.progress_syncing.checksums import (  # noqa: E402
         calculate_koreader_partial_md5,
+        calculate_koreader_filename_md5,
         CHECKSUM_VERSION,
+        FILENAME_CHECKSUM_VERSION,
     )
 
     metadata_db = os.path.join(library_path, 'metadata.db')
@@ -179,7 +181,13 @@ def generate_checksums(library_path: str, books_path: str = None, force: bool = 
     total = len(formats)
 
     if total == 0:
-        print("✓ All books already have checksums!")
+        print("✓ All books already have binary checksums!")
+        # The filename-hash pass still has to run: pairs with binary rows
+        # can be missing their filename digest (fork #525 / #627).
+        filename_queued = _backfill_filename_hashes(
+            metadata_db, calculate_koreader_filename_md5,
+            FILENAME_CHECKSUM_VERSION, batch_size)
+        print(f"  Filename hashes: {filename_queued}")
         return
 
     print(f"Found {total} book format(s) to process\n")
@@ -219,6 +227,16 @@ def generate_checksums(library_path: str, books_path: str = None, force: bool = 
     if batch_rows:
         _flush_batch(metadata_db, batch_rows)
 
+    # Filename-hash pass (fork #525 / #627): register the digest of the
+    # OPDS/Kobo export basename for every (book, format) pair missing one,
+    # so clients in 'filename' document-matching mode resolve books. Runs
+    # independently of the binary pass above — pairs that already carry a
+    # binary row (skipped by the any-row LEFT JOIN) still need this.
+    # No file I/O: the digest is derived from database fields alone.
+    filename_queued = _backfill_filename_hashes(
+        metadata_db, calculate_koreader_filename_md5,
+        FILENAME_CHECKSUM_VERSION, batch_size)
+
     print()
     print("=" * 60)
     print("Summary:")
@@ -226,7 +244,65 @@ def generate_checksums(library_path: str, books_path: str = None, force: bool = 
     print(f"  Queued:          {queued}")
     print(f"  Failed:          {failed}")
     print(f"  Skipped:         {skipped}")
+    print(f"  Filename hashes: {filename_queued}")
     print("=" * 60)
+
+
+def _backfill_filename_hashes(metadata_db, digest_fn, version, batch_size=100):
+    """Insert missing 'koreader_filename' checksum rows.
+
+    The hashed string is ``data.name + "." + lower(data.format)`` — the
+    basename CW-NG serves on OPDS/Kobo downloads and the on-disk library
+    basename, which is what a device in filename-matching mode hashes.
+    Returns the number of rows queued for insert.
+    """
+    try:
+        conn = sqlite3.connect(metadata_db, timeout=30)
+        cur = conn.cursor()
+        missing = cur.execute('''
+            SELECT b.id, d.format, d.name
+            FROM books b
+            JOIN data d ON b.id = d.book
+            LEFT JOIN book_format_checksums bfc ON (
+                bfc.book = b.id
+                AND bfc.format = d.format
+                AND bfc.version = ?
+            )
+            WHERE bfc.id IS NULL
+            ORDER BY b.id
+        ''', (version,)).fetchall()
+    except sqlite3.Error as e:
+        print(f"WARNING: filename-hash pass could not read library: {e}")
+        return 0
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+    if not missing:
+        return 0
+
+    print(f"\nFilename-hash pass: {len(missing)} format(s) missing a filename digest")
+
+    queued = 0
+    batch_rows = []
+    for book_id, format_ext, format_name in missing:
+        digest = digest_fn(f"{format_name}.{format_ext.lower()}")
+        if not digest:
+            continue
+        fmt = format_ext.upper()
+        created = datetime.now(timezone.utc).isoformat()
+        batch_rows.append((book_id, fmt, digest, version, created,
+                           book_id, fmt, digest))
+        queued += 1
+        if len(batch_rows) >= batch_size:
+            _flush_batch(metadata_db, batch_rows)
+            batch_rows = []
+
+    if batch_rows:
+        _flush_batch(metadata_db, batch_rows)
+
+    print(f"Filename-hash pass: committed {queued} digest(s)")
+    return queued
 
 
 def get_books_path():

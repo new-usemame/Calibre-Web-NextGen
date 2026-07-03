@@ -24,7 +24,14 @@ def process_open(command, quotes=(), env=None, sout=subprocess.PIPE, serr=subpro
     else:
         exc_command = [x for x in command]
 
-    return subprocess.Popen(exc_command, shell=False, stdout=sout, stderr=serr, universal_newlines=newlines, env=env) # nosec
+    popen_kwargs = {}
+    if os.name != 'nt':
+        # Run the child in its own session/process group so a hung export tree
+        # (calibredb -> calibre-parallel) can be killed as a group on timeout.
+        popen_kwargs['start_new_session'] = True
+
+    return subprocess.Popen(exc_command, shell=False, stdout=sout, stderr=serr, universal_newlines=newlines, env=env,
+                            **popen_kwargs) # nosec
 
 
 def process_wait(command, serr=subprocess.PIPE, pattern=""):

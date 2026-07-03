@@ -1583,6 +1583,11 @@ def do_download_file(book, book_format, client, data, headers):
                 elif book_format != "kepub" and config.config_binariesdir:
                     filename, download_name = do_calibre_export(book.id, book_format)
                     metadata_was_embedded = True
+                    if not filename or not download_name:
+                        # Embed failed or timed out — serve the staged original instead of a 500
+                        filename = os.path.dirname(output)
+                        download_name = os.path.splitext(os.path.basename(output))[0]
+                        metadata_was_embedded = False
             else:
                 return gd.do_gdrive_download(df, headers)
         else:
@@ -1608,6 +1613,11 @@ def do_download_file(book, book_format, client, data, headers):
         elif book_format != "kepub" and config.config_binariesdir and config.config_embed_metadata:
             filename, download_name = do_calibre_export(book.id, book_format)
             metadata_was_embedded = True
+            if not filename or not download_name:
+                # Embed failed or timed out — serve the original library file instead of a 500
+                filename = os.path.join(config.get_book_path(), book.path)
+                download_name = book_name
+                metadata_was_embedded = False
 
             # Rename the exported file to match the expected download name (from Content-Disposition)
             # This ensures KOReader calculates the checksum on the same file we calculated it on

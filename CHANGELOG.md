@@ -17,6 +17,15 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **A single problem PDF can no longer hang the whole server on download.**
+  Downloading certain PDFs (UI or OPDS) triggered a metadata-embedding step
+  that could hang inside Calibre's PDF writer, pinning a CPU core, eating
+  memory, and leaving the request stuck until a 504. The embed step is now
+  bounded (90 seconds by default, tunable with `CWA_EMBED_TIMEOUT`), the hung
+  Calibre process tree is cleaned up, and the download falls back to serving
+  the original file from your library — you get your book instead of a dead
+  server. Send-to-eReader and Kepub conversion degrade the same way instead
+  of failing. Reported by @darkmatterpelican.
 - **The library's view-settings (gear) menu no longer opens offscreen on
   phones.** On narrow screens the toolbar wraps, and when the gear ended up on
   the left side its menu opened toward the left and slid off the edge of the

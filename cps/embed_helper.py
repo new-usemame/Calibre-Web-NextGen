@@ -7,6 +7,8 @@
 
 from uuid import uuid4
 import os
+import signal
+import subprocess
 
 from .file_helper import get_temp_dir
 from .subproc_wrapper import process_open
@@ -14,6 +16,34 @@ from . import logger, config
 from .constants import SUPPORTED_CALIBRE_BINARIES
 
 log = logger.create()
+
+DEFAULT_EMBED_TIMEOUT = 90
+
+
+def _embed_timeout():
+    """Seconds to wait for `calibredb export` before killing it.
+
+    Optional override via CWA_EMBED_TIMEOUT; malformed or non-positive
+    values fall back to the default rather than crashing a download.
+    """
+    try:
+        timeout = int(os.environ.get("CWA_EMBED_TIMEOUT", DEFAULT_EMBED_TIMEOUT))
+    except (TypeError, ValueError):
+        return DEFAULT_EMBED_TIMEOUT
+    return timeout if timeout > 0 else DEFAULT_EMBED_TIMEOUT
+
+
+def _kill_export_tree(p):
+    """Kill a timed-out export and its children (calibre-parallel)."""
+    try:
+        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+    except (AttributeError, OSError):
+        # Windows (no killpg) or the group is already gone
+        p.kill()
+    try:
+        p.communicate(timeout=10)
+    except Exception:
+        pass
 
 
 def do_calibre_export(book_id, book_format):
@@ -36,7 +66,14 @@ def do_calibre_export(book_id, book_format):
                        '--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
                        str(book_id)]
         p = process_open(opf_command, quotes, my_env)
-        _, err = p.communicate()
+        try:
+            _, err = p.communicate(timeout=_embed_timeout())
+        except subprocess.TimeoutExpired:
+            _kill_export_tree(p)
+            log.error('Metadata embed timed out after %ss for book %s (%s); '
+                      'falling back to the original file without embedded metadata',
+                      _embed_timeout(), book_id, book_format)
+            return None, None
         if err:
             log.error('Metadata embedder encountered an error: %s', err)
 

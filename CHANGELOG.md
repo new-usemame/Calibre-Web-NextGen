@@ -40,6 +40,11 @@ is for things you can see or feel when running the app.
   inherited upstream icon.
 
 ### Fixed
+- **The new interface now hides the smart shelves you turned off.** If you
+  unticked some entries under "Magic Shelves Visibility" in your account
+  settings, the new UI sidebar still listed every smart shelf — the setting only
+  worked in the classic view. The sidebar now honours it, so hidden smart
+  shelves stay hidden in both interfaces. Reported by @chloeroform (#667).
 - **Fetch Metadata no longer shows the same cover for every volume of a
   series.** Searching for one volume of a series could return results where
   Vol.1, Vol.2, and Vol.3 all carried an identical cover — and applying

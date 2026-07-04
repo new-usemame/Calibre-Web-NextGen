@@ -32,6 +32,14 @@ is for things you can see or feel when running the app.
   grouped by release, each with a "Try it" link straight to the thing it
   describes. A small dot on the Help menu points it out once after an update and
   clears the moment you open it.
+- **Customize your sidebar from the new interface.** A **Customize sidebar**
+  button in the left rail now lets you choose which sections show (Authors, Hot,
+  Top Rated, and the rest) and drag them into the order you want — for example,
+  move **Shelves** to the top so you don't have to scroll. Reordering works with
+  the mouse, on touch, and with the keyboard, and your layout is saved to your
+  account. Earlier (v4.1.4) the new UI started respecting the visibility settings
+  from the classic interface; now you can set both visibility and order without
+  leaving the new UI. Requested by @Glennza1962 and @alva-seal (#585).
 
 ### Changed
 - **New browser-tab icon that matches the app.** The favicon is now the amber

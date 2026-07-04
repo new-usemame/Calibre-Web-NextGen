@@ -133,6 +133,22 @@
   margin: var(--sp-1) 0 0;
 }
 
+/* Sync-driven "currently reading" marker (fork #634) — an accent-tinted inline
+   pill, distinct from the read/unread toggle. */
+.currentlyReading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
 /* Inline entity links (author, series, language, publisher) */
 .metaLink {
   color: inherit;

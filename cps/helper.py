@@ -511,6 +511,36 @@ def get_sorted_author(value):
     return value2
 
 
+def book_is_in_progress(book_id, read_status_value, read_column_configured, user):
+    """Return True when a book is sync-driven "currently reading".
+
+    The single source of truth for the tri-state in-progress marker shown on the
+    book detail page (fork #509/#634). Mirrors ``web.show_book``'s
+    ``read_status_raw == STATUS_IN_PROGRESS`` derivation so the classic detail
+    page and the new-UI (SPA) book page never disagree — the exact class of
+    read-state drift that fork #579/#637 fixed for the "read" badge.
+
+    ``read_status_value`` is the third column returned by
+    ``calibre_db.get_book_read_archived`` — the built-in ``ub.ReadBook.read_status``
+    (0/1/2/None) when no custom read column is configured, or the custom column's
+    boolean-ish value when one is. In-progress is a tri-state KOReader/Kobo sync
+    writes only to ``ub.ReadBook``, so with a custom read column configured the
+    flag must be read from ``ub.ReadBook`` regardless of which column is linked.
+    """
+    if user is None or not user.is_authenticated or getattr(user, "is_anonymous", False):
+        return False
+    if read_column_configured:
+        # A finished custom-column value is unambiguous — never in-progress.
+        if read_status_value:
+            return False
+        row = ub.session.query(ub.ReadBook).filter(
+            ub.ReadBook.user_id == int(user.id),
+            ub.ReadBook.book_id == book_id,
+            ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
+        return row is not None
+    return read_status_value == ub.ReadBook.STATUS_IN_PROGRESS
+
+
 def edit_book_read_status(book_id, read_status=None):
     if not config.config_read_column:
         book = ub.session.query(ub.ReadBook).filter(and_(ub.ReadBook.user_id == int(current_user.id),

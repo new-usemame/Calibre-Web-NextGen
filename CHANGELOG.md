@@ -17,6 +17,11 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **The "Currently reading" badge now shows on the new-UI book page.** A book
+  you're partway through on KOReader/Kobo showed the "Currently reading" marker
+  on the classic book page but nothing on the new UI. The new-UI book page now
+  displays the same marker — with the synced percentage when it's known — while
+  unread and finished books still don't show it. Reported by @iroQuai (#634).
 - **Fetch Metadata no longer shows the same cover for every volume of a
   series.** Searching for one volume of a series could return results where
   Vol.1, Vol.2, and Vol.3 all carried an identical cover — and applying

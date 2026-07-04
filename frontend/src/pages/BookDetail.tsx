@@ -1,6 +1,6 @@
 import { useState, Fragment } from 'react';
 import { Link, useParams } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen } from 'lucide-react';
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useUpdateMetadata,
@@ -261,6 +261,17 @@ export function BookDetail() {
                 </Link>
                 {' · Book '}
                 {book.series_index}
+              </p>
+            )}
+            {/* Passive "currently reading" marker (fork #634) — mirrors the classic
+                detail page. Sync-driven display only; the read toggle below stays a
+                2-state read/unread control. Shows the synced percent when known. */}
+            {book.in_progress && (
+              <p className={styles.currentlyReading}>
+                <BookOpen size={14} aria-hidden="true" />
+                {book.kosync_progress != null
+                  ? `${t('Currently reading')} · ${Math.round(book.kosync_progress)}%`
+                  : t('Currently reading')}
               </p>
             )}
           </div>

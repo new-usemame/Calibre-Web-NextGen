@@ -31,15 +31,22 @@ export function SidebarCustomize({ open, onClose }: Props) {
   const [order, setOrder] = useState<string[]>([]);
   const [vis, setVis] = useState<Record<string, boolean>>({});
   const [dragKey, setDragKey] = useState<string | null>(null);
+  const seededRef = useRef(false);
 
-  // Seed local edit state from the server each time the editor opens.
+  // Seed local edit state from the server ONCE per open — after `me` is present.
+  // Keeping `me` out of the seed would race a not-yet-loaded profile; re-seeding
+  // on every `me` change would let a background refetch (TanStack's window-focus
+  // default) silently discard the user's unsaved reorder/toggle edits. So: wait
+  // for `me`, seed once, and reset the latch on close.
   useEffect(() => {
-    if (!open) return;
-    setOrder(resolveSidebarOrder(me?.sidebar_order).map((e) => e.key));
+    if (!open) { seededRef.current = false; return; }
+    if (seededRef.current || !me) return;
+    seededRef.current = true;
+    setOrder(resolveSidebarOrder(me.sidebar_order).map((e) => e.key));
     const v: Record<string, boolean> = {};
     for (const e of ORDERABLE_ENTRIES) {
       if (e.isShelvesBlock) continue; // Shelves is always visible, only movable
-      v[e.key] = me?.sidebar?.[e.key] !== false;
+      v[e.key] = me.sidebar?.[e.key] !== false;
     }
     setVis(v);
   }, [open, me]);

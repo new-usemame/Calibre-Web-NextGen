@@ -1,48 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
-  Library, Users, Layers, Tag, Building2, Languages, BookCopy, UploadCloud, Shield,
-  Flame, Shuffle, Star, Archive, Info, ListChecks, Table2, Wand2, Files, FileType, X,
+  Library, BookCopy, UploadCloud, Shield,
+  Info, ListChecks, Table2, Wand2, Files, Settings2, X,
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useIsMobile } from '../lib/a11y/useIsMobile';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
+import { resolveSidebarOrder, type SidebarEntryDef } from '../lib/sidebarEntries';
+import { SidebarCustomize } from './SidebarCustomize';
 import styles from './Sidebar.module.css';
 
-// `vis` is the sidebar-visibility key (#585) the entry is gated on, matching a
-// key in Me.sidebar (server-side check_visibility on the sidebar_view bitmask).
-// Entries without a `vis` (e.g. Library) are always shown.
-interface NavEntry {
-  href: string;
-  label: string;
-  icon: typeof Library;
-  exact?: boolean;
-  vis?: string;
-}
-
-const NAV: NavEntry[] = [
-  { href: '/', label: 'Library', icon: Library, exact: true },
-  { href: '/authors', label: 'Authors', icon: Users, vis: 'author' },
-  { href: '/series', label: 'Series', icon: Layers, vis: 'series' },
-  { href: '/tags', label: 'Tags', icon: Tag, vis: 'category' },
-  { href: '/publishers', label: 'Publishers', icon: Building2, vis: 'publisher' },
-  { href: '/languages', label: 'Languages', icon: Languages, vis: 'language' },
-  { href: '/ratings', label: 'Ratings', icon: Star, vis: 'rating' },
-  { href: '/formats', label: 'Formats', icon: FileType, vis: 'format' },
-];
-
-// Discovery views — fixed server-side filter categories (parity with the
-// legacy sidebar's Hot/Discover/Rated + per-user Favorites/Archived).
-const DISCOVER: NavEntry[] = [
-  { href: '/favorites', label: 'Favorites', icon: Star, vis: 'favorites' },
-  { href: '/hot', label: 'Hot', icon: Flame, vis: 'hot' },
-  { href: '/discover', label: 'Discover', icon: Shuffle, vis: 'random' },
-  { href: '/rated', label: 'Top Rated', icon: Star, vis: 'best_rated' },
-  { href: '/archived', label: 'Archived', icon: Archive, vis: 'archived' },
-];
-
-// Lower-frequency info pages.
+// Lower-frequency info pages (pinned; not customizable).
 const SYSTEM = [
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
   { href: '/about', label: 'About', icon: Info },
@@ -66,6 +36,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const t = useT();
   const isMobile = useIsMobile();
   const navRef = useRef<HTMLElement>(null);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   // C5 (SC 2.1.1/2.1.2/2.4.3): on mobile the drawer is off-canvas. When CLOSED it
   // must leave the tab order + a11y tree; when OPEN it traps focus and Escape
@@ -85,16 +56,103 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const me = useMe().data;
   const canUpload = !!me?.role?.upload;
   const isAdmin = !!me?.role?.admin;
+  const isAuthed = !!me?.id;
 
   // #585: honour the classic sidebar-visibility config. A key is hidden only
   // when the server explicitly reports it disabled (=== false); missing keys
   // (older server, or non-configurable entries) stay visible.
   const sidebarVis = me?.sidebar;
   const isVisible = (vis?: string) => !vis || sidebarVis?.[vis] !== false;
-  const navEntries = NAV.filter((n) => isVisible(n.vis));
-  const discoverEntries = DISCOVER.filter((n) => isVisible(n.vis));
   const showList = isVisible('list');
   const showDuplicates = isVisible('duplicates');
+
+  // #585 v2: the browse-by + discovery entries and the Shelves block render in
+  // the user's saved order (default when unset). Contiguous runs of nav entries
+  // are wrapped in their own <ul role="list"> (valid list semantics), and the
+  // Shelves block is emitted inline at its ordered position.
+  const orderedEntries = resolveSidebarOrder(me?.sidebar_order);
+
+  const renderShelvesBlock = () => (
+    <Fragment key="shelves-block">
+      <div className={styles.sectionHeader}>
+        <Link
+          href="/shelves"
+          className={isActive(location, '/shelves', true) ? styles.sectionTitleActive : styles.sectionTitle}
+          onClick={onNavigate}
+        >
+          <BookCopy size={16} className={styles.icon} aria-hidden="true" focusable={false} />
+          <span>{t('Shelves')}</span>
+        </Link>
+      </div>
+      {shelves.length > 0 && (
+        <ul className={styles.shelfList} role="list">
+          {shelves.map((s) => {
+            const href = `/shelf/${s.id}`;
+            const active = location === href;
+            return (
+              <li key={s.id}>
+                <Link
+                  href={href}
+                  className={active ? styles.shelfItemActive : styles.shelfItem}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={onNavigate}
+                  title={s.name}
+                >
+                  <span className={styles.shelfName}>{s.name}</span>
+                  <span className={styles.shelfCount}>{s.count}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Fragment>
+  );
+
+  const renderOrderedRegion = () => {
+    const nodes: React.ReactNode[] = [];
+    let run: SidebarEntryDef[] = [];
+    const flushRun = (id: string) => {
+      if (run.length === 0) return;
+      const items = run;
+      run = [];
+      nodes.push(
+        <ul key={`run-${id}`} className={styles.list} role="list">
+          {items.map(({ key, href, label, icon: Icon, exact }) => {
+            const active = isActive(location, href, exact);
+            return (
+              <li key={key}>
+                <Link
+                  href={href}
+                  className={active ? styles.itemActive : styles.item}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={onNavigate}
+                >
+                  <Icon size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                  <span>{t(label)}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>,
+      );
+    };
+    orderedEntries.forEach((entry, idx) => {
+      if (entry.isShelvesBlock) {
+        flushRun(String(idx));
+        nodes.push(renderShelvesBlock());
+      } else if (isVisible(entry.key)) {
+        run.push(entry);
+      }
+    });
+    flushRun('end');
+    return nodes;
+  };
+
+  const openCustomize = () => {
+    onClose();            // close the mobile drawer first so only the modal traps focus
+    setCustomizeOpen(true);
+  };
 
   return (
     <>
@@ -109,45 +167,24 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
         <button type="button" className={styles.drawerClose} onClick={onClose} aria-label={t('Close menu')}>
           <X size={20} aria-hidden="true" focusable={false} />
         </button>
+
+        {/* Library — pinned at the top, always shown. */}
         <ul className={styles.list} role="list">
-          {navEntries.map(({ href, label, icon: Icon, exact }) => {
-            const active = isActive(location, href, exact);
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={active ? styles.itemActive : styles.item}
-                  aria-current={active ? 'page' : undefined}
-                  onClick={onNavigate}
-                >
-                  <Icon size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                  <span>{t(label)}</span>
-                </Link>
-              </li>
-            );
-          })}
+          <li>
+            <Link
+              href="/"
+              className={isActive(location, '/', true) ? styles.itemActive : styles.item}
+              aria-current={isActive(location, '/', true) ? 'page' : undefined}
+              onClick={onNavigate}
+            >
+              <Library size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+              <span>{t('Library')}</span>
+            </Link>
+          </li>
         </ul>
 
-        {discoverEntries.length > 0 && (
-          <ul className={styles.list} role="list">
-            {discoverEntries.map(({ href, label, icon: Icon }) => {
-              const active = isActive(location, href, true);
-              return (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className={active ? styles.itemActive : styles.item}
-                    aria-current={active ? 'page' : undefined}
-                    onClick={onNavigate}
-                  >
-                    <Icon size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                    <span>{t(label)}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        {/* #585 v2: customizable region (browse-by + discovery + Shelves), in order. */}
+        {renderOrderedRegion()}
 
         {(canUpload || isAdmin) && (
           <ul className={styles.list} role="list">
@@ -180,47 +217,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           </ul>
         )}
 
-        {/* Shelves: the section header links to the manage page and the user's
-            own shelves are listed directly beneath it (the group they belong to).
-            Smart shelves + power tools follow, and the low-frequency info pages
-            (Tasks / About) come last. Regression guard: the shelves used to
-            render as the very last block of the nav, orphaned below Tasks/About. */}
-        <div className={styles.sectionHeader}>
-          <Link
-            href="/shelves"
-            className={isActive(location, '/shelves', true) ? styles.sectionTitleActive : styles.sectionTitle}
-            onClick={onNavigate}
-          >
-            <BookCopy size={16} className={styles.icon} aria-hidden="true" focusable={false} />
-            <span>{t('Shelves')}</span>
-          </Link>
-        </div>
-
-        {shelves.length > 0 && (
-          <ul className={styles.shelfList} role="list">
-            {shelves.map((s) => {
-              const href = `/shelf/${s.id}`;
-              const active = location === href;
-              return (
-                <li key={s.id}>
-                  <Link
-                    href={href}
-                    className={active ? styles.shelfItemActive : styles.shelfItem}
-                    aria-current={active ? 'page' : undefined}
-                    onClick={onNavigate}
-                    title={s.name}
-                  >
-                    <span className={styles.shelfName}>{s.name}</span>
-                    <span className={styles.shelfCount}>{s.count}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {/* Smart shelves + power features served by the legacy UI under the
-            hybrid cutover — plain <a> so they leave the SPA. Reachable, not omitted. */}
+        {/* Smart shelves + power features (pinned). */}
         <ul className={styles.list} role="list">
           {showList && (
             <li>
@@ -297,7 +294,20 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
             );
           })}
         </ul>
+
+        {/* #585 v2: open the Customize editor (visibility + order). Signed-in
+            users only — the settings are per-user and saved server-side. */}
+        {isAuthed && (
+          <div className={styles.customizeRow}>
+            <button type="button" className={styles.customizeBtn} onClick={openCustomize}>
+              <Settings2 size={16} className={styles.icon} aria-hidden="true" focusable={false} />
+              <span>{t('Customize sidebar')}</span>
+            </button>
+          </div>
+        )}
       </nav>
+
+      <SidebarCustomize open={customizeOpen} onClose={() => setCustomizeOpen(false)} />
     </>
   );
 }

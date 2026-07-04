@@ -191,3 +191,28 @@
     to { opacity: 1; }
   }
 }
+
+/* #585 v2: Customize-sidebar affordance, pinned to the bottom of the rail. */
+.customizeRow {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+.customizeBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.customizeBtn:hover { background: var(--surface-2); color: var(--text); }

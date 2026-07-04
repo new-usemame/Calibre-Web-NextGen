@@ -53,6 +53,23 @@ export function useMe() {
   });
 }
 
+/** Persist the user's sidebar customization (#585 v2): visibility toggles
+ *  (flips the classic sidebar_view bitmask) and/or entry order. Seeds + refreshes
+ *  the me-cache so the live sidebar re-renders immediately. */
+export function useUpdateSidebar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { visibility?: Record<string, boolean>; order?: string[] }) =>
+      apiPost<{ sidebar: Record<string, boolean>; sidebar_order: string[] }>(
+        '/api/v1/account/sidebar', vars),
+    onSuccess: (data) => {
+      queryClient.setQueryData<Me | null>(['me'], (prev) =>
+        prev ? { ...prev, sidebar: data.sidebar, sidebar_order: data.sidebar_order } : prev);
+      void queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -74,10 +74,13 @@ const EDITION_RESULTS = [
   },
 ];
 
-async function mockSearch(page: import('@playwright/test').Page) {
+async function mockSearch(page: import('@playwright/test').Page, opts: { editionDelayMs?: number } = {}) {
   await page.route('**/metadata/search', async (route) => {
     const body = route.request().postData() || '';
     const isEditionQuery = decodeURIComponent(body).includes('hardcover-id:');
+    if (isEditionQuery && opts.editionDelayMs) {
+      await new Promise((r) => setTimeout(r, opts.editionDelayMs));
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -155,6 +158,39 @@ test('applying an edition merges its identifiers into the form', async ({ page }
   });
   expect(idents).toContainEqual({ type: 'hardcover-edition', val: '32701290' });
   expect(idents).toContainEqual({ type: 'isbn', val: '9789815204230' });
+});
+
+test('editions view has a Close, and reopening returns to the search form (not stranded)', async ({ page }) => {
+  await mockSearch(page);
+  await openFetchPanel(page);
+  await page.getByRole('button', { name: /^Editions$/ }).click();
+  await expect(page.getByText('Back to results')).toBeVisible();
+
+  // Close directly from the editions view, then reopen the panel.
+  await page.getByRole('button', { name: /^Close$/ }).click();
+  await expect(page.getByRole('button', { name: /fetch metadata from web/i })).toBeVisible();
+  await page.getByRole('button', { name: /fetch metadata from web/i }).click();
+
+  // Must land on the search form, never stranded in the editions drill-down.
+  await expect(page.getByRole('button', { name: /^Search$/ })).toBeVisible();
+  await expect(page.getByText('Back to results')).toHaveCount(0);
+});
+
+test('closing during a pending editions search does not strand the panel', async ({ page }) => {
+  await mockSearch(page, { editionDelayMs: 1500 });
+  await openFetchPanel(page);
+
+  await page.getByRole('button', { name: /^Editions$/ }).click();
+  // While the editions request is in flight, close the panel.
+  await page.getByRole('button', { name: /^Close$/ }).click();
+  await expect(page.getByRole('button', { name: /fetch metadata from web/i })).toBeVisible();
+  // Let the abandoned response resolve, then reopen.
+  await page.waitForTimeout(1800);
+  await page.getByRole('button', { name: /fetch metadata from web/i }).click();
+
+  // The late response must not have forced the panel into the editions view.
+  await expect(page.getByRole('button', { name: /^Search$/ })).toBeVisible();
+  await expect(page.getByText('Back to results')).toHaveCount(0);
 });
 
 test('View all details overlay shows full-length info', async ({ page }) => {

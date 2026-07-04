@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'wouter';
 import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search, Plus, X, MoreHorizontal } from 'lucide-react';
@@ -271,6 +271,11 @@ function MetadataFetch({ defaultQuery, onApply }:
   // Editions drill-down (Hardcover): when set we're showing the editions of one
   // book, and `prev` holds the title-level view to return to via "Back".
   const [editions, setEditions] = useState<{ prevQuery: string; prevResults: MetaResult[] } | null>(null);
+  // Monotonic search id. Every search (and closing the panel) bumps it; a response
+  // only applies if it's still the latest — so a slow editions request that the
+  // user has since abandoned (Close) or superseded (a second Editions click)
+  // can't force the panel into a stale editions view or show the wrong book.
+  const seq = useRef(0);
 
   // Single search path for the normal form, the editions drill-down, and Back.
   // `ed` is the title-level snapshot captured before drilling in; when present we
@@ -279,10 +284,12 @@ function MetadataFetch({ defaultQuery, onApply }:
   const doSearch = (q: string, ed?: { prevQuery: string; prevResults: MetaResult[] }) => {
     const term = q.trim();
     if (!term) return;
+    const mine = ++seq.current;
     setErr(null);
     setQuery(term);
     search.mutate(term, {
       onSuccess: (r) => {
+        if (mine !== seq.current) return; // superseded/abandoned — ignore
         if (ed) {
           setResults(r.results.filter((x) => x.identifiers && 'hardcover-edition' in x.identifiers));
           setEditions(ed);
@@ -291,7 +298,7 @@ function MetadataFetch({ defaultQuery, onApply }:
           setEditions(null);
         }
       },
-      onError: (e2) => setErr(e2 instanceof ApiError ? e2.message : 'Search failed.'),
+      onError: (e2) => { if (mine === seq.current) setErr(e2 instanceof ApiError ? e2.message : 'Search failed.'); },
     });
   };
 
@@ -305,11 +312,15 @@ function MetadataFetch({ defaultQuery, onApply }:
     setEditions(null);
     setErr(null);
   };
+  // Open/close the panel from a clean state: never reopen stranded in an editions
+  // drill-down, and invalidate any in-flight request on close.
+  const openPanel = () => { seq.current++; setOpen(true); setQuery(defaultQuery); setEditions(null); setErr(null); };
+  const closePanel = () => { seq.current++; setOpen(false); setEditions(null); };
 
   return (
     <section className={styles.metaFetch}>
       {!open ? (
-        <Button type="button" variant="ghost" onClick={() => { setOpen(true); setQuery(defaultQuery); }}>
+        <Button type="button" variant="ghost" onClick={openPanel}>
           <Sparkles size={15} /> {t('Fetch metadata from web')}
         </Button>
       ) : (
@@ -321,6 +332,7 @@ function MetadataFetch({ defaultQuery, onApply }:
               </button>
               <span className={styles.editionsTitle}>{t('Editions')}</span>
               {search.isPending && <Spinner size={14} />}
+              <button type="button" className={styles.cancel} style={{ marginLeft: 'auto' }} onClick={closePanel}>{t('Close')}</button>
             </div>
           ) : (
             <form className={styles.metaSearchRow} onSubmit={run}>
@@ -329,7 +341,7 @@ function MetadataFetch({ defaultQuery, onApply }:
               <Button type="submit" disabled={search.isPending || !query.trim()}>
                 {search.isPending ? <Spinner size={15} /> : <Search size={15} />} {t('Search')}
               </Button>
-              <button type="button" className={styles.cancel} onClick={() => setOpen(false)}>{t('Close')}</button>
+              <button type="button" className={styles.cancel} onClick={closePanel}>{t('Close')}</button>
             </form>
           )}
           {err && <span className={styles.msgErr}>{err}</span>}
@@ -374,6 +386,7 @@ function ResultRow({ r, onApply, onEditions }:
   useEffect(() => {
     setSel(new Set(APPLY_FIELDS.filter((f) => f.has(r)).map((f) => f.key)));
     setExpanded(false);
+    setShowDetails(false);
   }, [r]);
 
   const toggle = (k: ApplyKey) => setSel((s) => {
@@ -437,9 +450,17 @@ function ResultRow({ r, onApply, onEditions }:
 function ResultDetails({ r, onClose }: { r: MetaResult; onClose: () => void }) {
   const t = useT();
   const modalRef = useRef<HTMLDivElement>(null);
+  // Keep the latest onClose in a ref so the focus/scroll effect can run once on
+  // open ([] deps) — `onClose` is a fresh closure each parent render, and using
+  // it as a dep would re-run the effect on any background re-render (e.g. a search
+  // resolving), re-grabbing focus mid-read and flickering the trap.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const titleId = `md-details-title-${useId()}`;
 
   // Accessibility: focus the dialog on open, trap Tab within it, restore focus to
-  // the trigger on close, Escape closes (mirrors CoverPicker's confirm modal).
+  // the trigger on close, Escape closes, and lock background scroll while open
+  // (mirrors CoverPicker's confirm modal, plus scroll-lock for the mobile sheet).
   useEffect(() => {
     const prevFocus = document.activeElement as HTMLElement | null;
     const node = modalRef.current;
@@ -451,7 +472,7 @@ function ResultDetails({ r, onClose }: { r: MetaResult; onClose: () => void }) {
     (focusables()[0] ?? node)?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Escape') { onCloseRef.current(); return; }
       if (e.key !== 'Tab') return;
       const els = focusables();
       if (!els.length) return;
@@ -460,8 +481,14 @@ function ResultDetails({ r, onClose }: { r: MetaResult; onClose: () => void }) {
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('keydown', onKey); prevFocus?.focus?.(); };
-  }, [onClose]);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      prevFocus?.focus?.();
+    };
+  }, []);
 
   const idents = Object.entries(r.identifiers || {}).filter(([, v]) => v !== '' && v != null);
   const rows = [
@@ -478,9 +505,9 @@ function ResultDetails({ r, onClose }: { r: MetaResult; onClose: () => void }) {
   return createPortal(
     <div className={styles.detailsOverlay} onClick={onClose} role="presentation">
       <div className={styles.detailsModal} onClick={(e) => e.stopPropagation()} ref={modalRef}
-        role="dialog" aria-modal="true" aria-label={t('Result details')} tabIndex={-1}>
+        role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <div className={styles.detailsHead}>
-          <span className={styles.detailsTitle}>{r.title}</span>
+          <span className={styles.detailsTitle} id={titleId}>{r.title}</span>
           <button type="button" className={styles.detailsClose} onClick={onClose} aria-label={t('Close')}>
             <X size={18} />
           </button>

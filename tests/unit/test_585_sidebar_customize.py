@@ -191,19 +191,30 @@ def test_sidebar_component_applies_saved_order():
 
 
 @pytest.mark.unit
-def test_customize_modal_has_keyboard_reorder():
-    src = (_FE / "components" / "SidebarCustomize.tsx").read_text(encoding="utf-8")
+def test_edit_list_has_keyboard_reorder():
+    src = (_FE / "components" / "SidebarEditList.tsx").read_text(encoding="utf-8")
     # keyboard move (ArrowUp/ArrowDown) + live announce — a11y reorder, not drag-only
     assert "ArrowUp" in src and "ArrowDown" in src, \
         "reorder must be keyboard-operable (arrow keys)"
-    assert "aria-live" in src or "ariaLive" in src or "announce" in src.lower(), \
+    assert "announce" in src.lower(), \
         "position changes must be announced for screen readers"
 
 
 @pytest.mark.unit
-def test_customize_modal_posts_to_sidebar_endpoint():
-    modal = (_FE / "components" / "SidebarCustomize.tsx").read_text(encoding="utf-8")
-    assert "useUpdateSidebar" in modal, "modal must persist via the useUpdateSidebar mutation"
-    # the mutation hits POST /account/sidebar (the endpoint path lives in the query layer)
+def test_edit_list_supports_delete():
+    src = (_FE / "components" / "SidebarEditList.tsx").read_text(encoding="utf-8")
+    # deleting a section hides it (visibility off) with a restore affordance
+    assert "Delete {label}" in src and "Restore {label}" in src, \
+        "edit list must let a section be deleted (hidden) and restored"
+
+
+@pytest.mark.unit
+def test_customize_capsule_at_top_toggles_edit_and_posts():
+    src = (_FE / "components" / "Sidebar.tsx").read_text(encoding="utf-8")
+    # the Customize capsule opens an inline edit mode (not a modal) and persists it
+    assert "capsule" in src.lower(), "a Customize capsule must exist in the sidebar"
+    assert "editMode" in src, "the capsule must toggle an inline edit mode"
+    assert "SidebarEditList" in src, "edit mode renders the inline edit list"
+    assert "useUpdateSidebar" in src, "saving must persist via the useUpdateSidebar mutation"
     queries = (_FE / "lib" / "queries.ts").read_text(encoding="utf-8")
     assert "/account/sidebar" in queries, "useUpdateSidebar must POST /api/v1/account/sidebar"

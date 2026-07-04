@@ -204,7 +204,9 @@ def test_step4_sanity_passes_when_counts_match(pre_decouple_engine):
         _migrate_step4_sanity_check(conn)  # no raise
 
 
-def test_step4_raises_on_mismatch(pre_decouple_engine):
+def test_step4_raises_on_incomplete_backfill(pre_decouple_engine):
+    """A synced legacy row with no matching target row means the backfill
+    did not complete — step 4 must refuse to proceed to destructive steps."""
     from cps.ub import (
         _migrate_step1_create_target_table,
         _migrate_step4_sanity_check,
@@ -212,9 +214,83 @@ def test_step4_raises_on_mismatch(pre_decouple_engine):
     with pre_decouple_engine.begin() as conn:
         _migrate_step1_create_target_table(conn)
         _seed_row(conn, synced_to_hardcover=1, hardcover_journal_id=10)
-        # Skip step 2 → count mismatch
-        with pytest.raises(RuntimeError, match="count mismatch"):
+        # Skip step 2 → synced row left un-backfilled
+        with pytest.raises(RuntimeError, match="backfill incomplete"):
             _migrate_step4_sanity_check(conn)
+
+
+def _seed_target_row(conn, annotation_id, target="hardcover",
+                     target_record_id="999", status="synced"):
+    """Insert a row directly into annotation_sync_target, simulating an
+    organic write by the live annotation-sync pipeline (not migration output)."""
+    conn.execute(
+        text(
+            "INSERT INTO annotation_sync_target "
+            "(annotation_id, target, target_record_id, status, "
+            " created_at, updated_at) "
+            "VALUES (:aid, :tgt, :rec, :st, :now, :now)"
+        ),
+        {"aid": annotation_id, "tgt": target, "rec": target_record_id,
+         "st": status, "now": "2026-05-13 09:00:00"},
+    )
+
+
+def test_step4_passes_with_organic_pipeline_target_rows(pre_decouple_engine):
+    """Regression for #684. annotation_sync_target may already hold
+    'hardcover' rows written organically by the live sync pipeline before
+    the rename completed. Their presence makes the total 'hardcover' count
+    exceed the legacy synced count — but the backfill is still complete, so
+    step 4 must NOT raise. The old total-equality check crash-looped here."""
+    from cps.ub import (
+        _migrate_step1_create_target_table,
+        _migrate_step2_backfill_sync_state,
+        _migrate_step4_sanity_check,
+    )
+    with pre_decouple_engine.begin() as conn:
+        _migrate_step1_create_target_table(conn)
+        _seed_row(conn, annotation_id="legacy-1", synced_to_hardcover=1,
+                  hardcover_journal_id=10)
+        _migrate_step2_backfill_sync_state(conn)  # 1 backfilled 'hardcover' row
+        # Two organic pipeline rows for annotations that never lived in the
+        # legacy synced set — annotation_id values not matching any kas.id.
+        _seed_target_row(conn, annotation_id=90001)
+        _seed_target_row(conn, annotation_id=90002)
+        # pre (synced=1) == 1, post (target='hardcover') == 3, backfill complete.
+        _migrate_step4_sanity_check(conn)  # must not raise
+
+
+def test_full_migration_with_organic_target_rows_684(pre_decouple_engine):
+    """End-to-end #684 repro: a DB that used the live annotation-sync
+    pipeline (organic annotation_sync_target rows) before the rename
+    completed must migrate cleanly instead of crash-looping on step 4."""
+    from cps.ub import (
+        _migrate_step1_create_target_table,
+        migrate_annotation_decouple_source_target,
+    )
+    with pre_decouple_engine.begin() as conn:
+        _migrate_step1_create_target_table(conn)
+        _seed_row(conn, annotation_id="a1", synced_to_hardcover=1,
+                  hardcover_journal_id=11, source="hardcover")
+        _seed_row(conn, annotation_id="a2", synced_to_hardcover=0, source="kobo")
+        # Organic pipeline rows predating the migration (the #684 trigger).
+        _seed_target_row(conn, annotation_id=90001)
+        _seed_target_row(conn, annotation_id=90002)
+    migrate_annotation_decouple_source_target(pre_decouple_engine, None)
+    inspector = sa_inspect(pre_decouple_engine)
+    tables = set(inspector.get_table_names())
+    assert "annotation" in tables
+    assert "kobo_annotation_sync" not in tables
+    with pre_decouple_engine.connect() as conn:
+        ann_rows = {r[0] for r in conn.execute(text(
+            "SELECT annotation_id FROM annotation"
+        )).fetchall()}
+        target_count = conn.execute(text(
+            "SELECT COUNT(*) FROM annotation_sync_target WHERE target='hardcover'"
+        )).scalar()
+    # Both legacy annotations survived the rename; organic + backfilled
+    # target rows all preserved (1 backfill + 2 organic).
+    assert ann_rows == {"a1", "a2"}
+    assert target_count == 3
 
 
 # ---------------------------------------------------------------------------

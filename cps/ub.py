@@ -2286,18 +2286,31 @@ def _migrate_step3_fix_source_values(conn):
 
 
 def _migrate_step4_sanity_check(conn):
-    """Refuse destructive steps unless backfill row counts match exactly."""
-    pre = conn.execute(text(
-        "SELECT COUNT(*) FROM kobo_annotation_sync WHERE synced_to_hardcover = 1"
-    )).scalar()
-    post = conn.execute(text(
-        "SELECT COUNT(*) FROM annotation_sync_target WHERE target = 'hardcover'"
-    )).scalar()
-    if pre != post:
+    """Refuse destructive steps unless every synced legacy row was backfilled.
+
+    Verifies backfill *completeness* — that no ``synced_to_hardcover = 1`` row
+    was left without a matching ``annotation_sync_target`` row — rather than a
+    total-count equality. ``annotation_sync_target`` can already hold organic
+    ``'hardcover'`` rows written by the live annotation-sync pipeline before
+    the rename completed, so its total 'hardcover' count legitimately exceeds
+    the legacy synced count. The old ``pre == post`` check falsely assumed the
+    target table starts empty and crash-looped on any DB that had ever synced
+    annotations to Hardcover (issue #684). This check is anchored on the legacy
+    table's synced rows, so unrelated organic rows can't trip it.
+    """
+    missing = conn.execute(text("""
+        SELECT COUNT(*) FROM kobo_annotation_sync kas
+        WHERE kas.synced_to_hardcover = 1
+          AND NOT EXISTS (
+              SELECT 1 FROM annotation_sync_target ast
+              WHERE ast.annotation_id = kas.id AND ast.target = 'hardcover'
+          )
+    """)).scalar()
+    if missing:
         raise RuntimeError(
-            f"[annotation-decouple-migration] count mismatch: "
-            f"pre-migration synced_to_hardcover=1 rows={pre}, "
-            f"post-backfill annotation_sync_target rows={post}"
+            f"[annotation-decouple-migration] backfill incomplete: "
+            f"{missing} synced_to_hardcover=1 row(s) have no matching "
+            f"annotation_sync_target 'hardcover' row"
         )
 
 

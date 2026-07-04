@@ -40,6 +40,13 @@ is for things you can see or feel when running the app.
   inherited upstream icon.
 
 ### Fixed
+- **Fixed a startup crash-loop on servers that had synced annotations to
+  Hardcover.** If your library had ever synced highlights to Hardcover, an
+  upgrade could get stuck restarting over and over, never finishing boot. A
+  one-time database migration was refusing to run because it double-counted
+  sync records the app had written during normal use. The migration now checks
+  the right thing and completes, so the server starts normally again — no data
+  is lost and no manual steps are needed. Reported by @PulsarFTW (#684).
 - **Fetch Metadata no longer shows the same cover for every volume of a
   series.** Searching for one volume of a series could return results where
   Vol.1, Vol.2, and Vol.3 all carried an identical cover — and applying

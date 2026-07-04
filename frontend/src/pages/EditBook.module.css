@@ -156,7 +156,55 @@
   display: flex; flex-direction: column; gap: var(--sp-2);
   padding: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-md);
 }
-.metaResultHead { display: flex; align-items: center; gap: var(--sp-3); }
+.metaResultHead { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.metaResultActions { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; margin-left: auto; }
+/* On narrow screens the action buttons drop to their own full-width row so the
+ * title/meta column keeps enough width to stay legible (mobile-reflow guard). */
+@media (max-width: 560px) {
+  .metaResultActions { width: 100%; justify-content: flex-end; margin-left: 0; }
+}
+
+/* Hardcover editions drill-down */
+.editionsHead { display: flex; align-items: center; gap: var(--sp-3); }
+.editionsTitle { color: var(--text); font-size: var(--fs-sm); font-weight: 600; }
+.metaEmpty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--sp-2) 0; }
+.metaEdition { color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* Result "View all details" overlay: centered dialog on desktop, bottom sheet on
+ * mobile. Shows every field at full length (the row/checklist truncate them). */
+.detailsOverlay {
+  position: fixed; inset: 0; z-index: var(--z-overlay); background: rgba(8,12,16,.66);
+  display: grid; place-items: center; padding: var(--sp-4); backdrop-filter: blur(3px);
+}
+.detailsModal {
+  width: min(560px, 100%); max-height: min(80vh, 720px); display: flex; flex-direction: column;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--elev-3); overflow: hidden;
+}
+.detailsHead {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-4); border-bottom: 1px solid var(--border);
+}
+.detailsTitle { font-family: var(--font-display); font-size: var(--fs-md); color: var(--text); font-weight: 600; }
+.detailsClose {
+  flex-shrink: 0; background: none; border: 0; color: var(--text-muted); cursor: pointer;
+  display: inline-flex; padding: 4px; border-radius: var(--r-sm);
+}
+.detailsClose:hover { color: var(--text); background: var(--surface-2); }
+.detailsBody { padding: var(--sp-4); overflow-y: auto; display: flex; gap: var(--sp-4); }
+.detailsCover { width: 96px; height: 144px; object-fit: cover; border-radius: var(--r-md); flex-shrink: 0; }
+.detailsFields { display: flex; flex-direction: column; gap: var(--sp-3); margin: 0; min-width: 0; flex: 1; }
+.detailsRow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.detailsLabel { color: var(--text-faint); font-size: var(--fs-xs); font-weight: var(--fw-semi); text-transform: uppercase; letter-spacing: .03em; }
+.detailsValue { color: var(--text); font-size: var(--fs-sm); margin: 0; overflow-wrap: anywhere; }
+.detailsIdents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.detailsIdents code { color: var(--text-muted); font-size: var(--fs-xs); }
+@media (max-width: 560px) {
+  .detailsOverlay { place-items: end center; padding: 0; }
+  .detailsModal { width: 100%; max-height: 88vh; border-radius: var(--r-lg) var(--r-lg) 0 0; border-bottom: 0; }
+  .detailsBody { flex-direction: column; align-items: flex-start; }
+  .detailsCover { align-self: center; }
+}
 
 /* Per-field apply checklist (fork #580) */
 .applyPanel {

@@ -17,6 +17,15 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Added
+- **Pick the right Hardcover edition when fetching metadata (new interface).**
+  On a Hardcover search result you can now click **Editions** to drill into that
+  book's individual editions (paperback, e-book, translations…) and apply the one
+  you want — so the correct edition ISBN and Hardcover edition id land on your
+  book, which is what Hardcover reading-progress sync needs to match the right
+  copy. Every result also gets a **⋯ (View all details)** button that opens the
+  full record — complete description, every tag, and each identifier on its own
+  line — as a popup on desktop or a bottom sheet on mobile, so nothing is hidden
+  behind the truncated preview. Requested on Discord (mgrimace, Wasabi).
 - **A "What's New" page, so you can see what changed without reading a
   changelog.** The Help menu (the "?" in the top bar) now has a What's New entry
   that opens a plain-English log of recent features and fixes — newest first,

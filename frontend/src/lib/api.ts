@@ -406,6 +406,7 @@ export interface MetaResult {
   rating?: number | null;
   tags?: string[];
   identifiers?: Record<string, string | number>;
+  format?: string | null;
   source?: { id?: string; description?: string };
 }
 

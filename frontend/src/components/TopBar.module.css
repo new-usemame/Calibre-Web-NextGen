@@ -109,6 +109,20 @@
   width: 32px;
   justify-content: center;
   padding: 0;
+  position: relative;
+}
+
+/* Subtle "new updates" dot on the Help (?) button. Amber, ringed against the
+   bar so it reads on the surface. Cleared once What's New is opened. */
+.triggerDot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface-1);
 }
 
 .trigger:hover,
@@ -224,6 +238,20 @@
 .menuItemIcon {
   display: inline-flex;
   color: var(--text-muted);
+}
+
+.menuItemLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Unread dot trailing the "What's new" item, matching the trigger dot. */
+.itemDot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  background: var(--accent);
 }
 
 /* Bug + brand sub-badge (Report Issue on GitHub / Discord). The badge is a tiny

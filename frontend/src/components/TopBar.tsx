@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2 } from 'lucide-react';
+import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { BrandName } from './BrandName';
 import { BASE_PREFIX } from '../lib/api';
 import { useT } from '../lib/i18n';
+import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
 
 interface TopBarProps {
@@ -86,14 +87,22 @@ interface MenuItemProps {
   /** External URL — opens in a new tab. */
   href?: string;
   danger?: boolean;
+  /** Optional trailing element (e.g. an unread dot), pinned to the right. */
+  trailing?: ReactNode;
   onClick?: () => void;
   onSelect: () => void;
 }
 
-function MenuItem({ icon, label, to, href, danger, onClick, onSelect }: MenuItemProps) {
+function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }: MenuItemProps) {
   const cls = danger ? `${styles.menuItem} ${styles.menuItemDanger}` : styles.menuItem;
   const handle = () => { onClick?.(); onSelect(); };
-  const inner = <><span className={styles.menuItemIcon}>{icon}</span>{label}</>;
+  const inner = (
+    <>
+      <span className={styles.menuItemIcon}>{icon}</span>
+      <span className={styles.menuItemLabel}>{label}</span>
+      {trailing}
+    </>
+  );
   if (to) {
     // Internal: wouter Link keeps it client-side (no full reload) and respects the base.
     return (
@@ -119,6 +128,7 @@ function MenuItem({ icon, label, to, href, danger, onClick, onSelect }: MenuItem
 function HelpMenu() {
   const t = useT();
   const { open, close, wrapperProps, onTriggerClick } = useMenu();
+  const unread = useWhatsNewUnread();
   return (
     <div className={styles.menu} {...wrapperProps}>
       <button
@@ -126,14 +136,21 @@ function HelpMenu() {
         className={styles.triggerSquare}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={t('Help')}
+        aria-label={unread ? t('Help — new updates available') : t('Help')}
         onClick={onTriggerClick}
       >
         <span className={styles.qmark} aria-hidden="true">?</span>
+        {unread && <span className={styles.triggerDot} aria-hidden="true" />}
       </button>
       {open && (
         <div className={`${styles.panel} ${styles.panelHelp}`} role="menu">
           <p className={styles.panelHead}>{t('Help & support')}</p>
+          <MenuItem
+            icon={<Sparkles size={15} />}
+            label={t("What's new")}
+            to="/whats-new"
+            trailing={unread ? <span className={styles.itemDot} aria-hidden="true" /> : undefined}
+            onSelect={close} />
           <MenuItem
             icon={<IconWithBadge base={<Bug size={16} />} badge={<GithubMark />} />}
             label={t('Report Issue on GitHub')} href={HELP_LINKS.issue} onSelect={close} />

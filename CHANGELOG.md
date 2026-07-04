@@ -16,6 +16,14 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+- **A "What's New" page, so you can see what changed without reading a
+  changelog.** The Help menu (the "?" in the top bar) now has a What's New entry
+  that opens a plain-English log of recent features and fixes — newest first,
+  grouped by release, each with a "Try it" link straight to the thing it
+  describes. A small dot on the Help menu points it out once after an update and
+  clears the moment you open it.
+
 ### Changed
 - **New browser-tab icon that matches the app.** The favicon is now the amber
   book mark from the refreshed interface, on the app's dark background — so the

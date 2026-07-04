@@ -21,6 +21,7 @@ import { Tasks } from './pages/Tasks';
 import { Table } from './pages/Table';
 import { Duplicates } from './pages/Duplicates';
 import { Annotations } from './pages/Annotations';
+import { WhatsNew } from './pages/WhatsNew';
 import { MagicShelf } from './pages/MagicShelf';
 import { MagicShelfView } from './pages/MagicShelfView';
 import { AppShell } from './components/AppShell';
@@ -157,6 +158,7 @@ export function App() {
           <Route path="/admin">{() => <Admin />}</Route>
 
           {/* Info pages */}
+          <Route path="/whats-new">{() => <WhatsNew />}</Route>
           <Route path="/about">{() => <About />}</Route>
           <Route path="/tasks">{() => <Tasks />}</Route>
           <Route path="/table">{() => <Table />}</Route>

@@ -16,6 +16,12 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+- **New browser-tab icon that matches the app.** The favicon is now the amber
+  book mark from the refreshed interface, on the app's dark background — so the
+  tab, bookmark, and home-screen icon read as Calibre-Web NextGen instead of the
+  inherited upstream icon.
+
 ### Fixed
 - **Fetch Metadata no longer shows the same cover for every volume of a
   series.** Searching for one volume of a series could return results where

@@ -1,6 +1,7 @@
 import { Check, X, Pencil } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import type { Book } from '../lib/api';
+import { useT } from '../lib/i18n';
 import { BookCover } from './BookCover';
 import styles from './BookCard.module.css';
 
@@ -37,96 +38,97 @@ export function BookCard({
   showSeriesIndex = false,
   quickEdit = false,
 }: BookCardProps) {
+  const t = useT();
   const authorStr = book.authors.join(', ');
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
   const [, navigate] = useLocation();
 
-  const inner = (
-    <article
-      className={selected ? styles.cardSelected : styles.card}
-      style={style}
-      tabIndex={0}
-      aria-pressed={selectable ? selected : undefined}
-    >
-      <div className={styles.coverWrap}>
-        <BookCover coverUrl={book.cover_url} title={book.title} />
-        {book.read && (
-          <span className={styles.readBadge} aria-label="Read" title="Read">
-            <Check size={14} strokeWidth={3} />
-          </span>
-        )}
-        {seriesIndexLabel && (
-          <span
-            className={styles.seriesBadge}
-            aria-label={`Series position ${seriesIndexLabel}`}
-            title={`Series position ${seriesIndexLabel}`}
-          >
-            #{seriesIndexLabel}
-          </span>
-        )}
-        {selectable && (
-          <span className={selected ? styles.checkboxOn : styles.checkboxOff} aria-hidden="true">
-            {selected && <Check size={14} strokeWidth={3} />}
-          </span>
-        )}
-        {onRemove && !selectable && (
-          <button
-            type="button"
-            className={styles.removeBtn}
-            aria-label={removeLabel}
-            title={removeLabel}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRemove(book);
-            }}
-          >
-            <X size={14} strokeWidth={3} />
-          </button>
-        )}
-        {quickEdit && !selectable && (
-          // Drop straight into the edit page without opening the book first
-          // (fork #572). Sits inside the card's <Link>, so stop the click from
-          // also navigating to the detail view.
-          <button
-            type="button"
-            className={styles.quickEditBtn}
-            aria-label={`Edit ${book.title}`}
-            title="Edit metadata"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              navigate(`/book/${book.id}/edit`);
-            }}
-          >
-            <Pencil size={13} strokeWidth={2.5} />
-          </button>
-        )}
-      </div>
-      <div className={styles.info}>
-        <p className={styles.title}>{book.title}</p>
-        <p className={styles.author}>{authorStr}</p>
-      </div>
-    </article>
+  // Cover + overlay badges. All non-interactive (pointer-events: none via CSS) so
+  // the single wrapping control (link or toggle button) is the only tab stop.
+  const cover = (
+    <div className={styles.coverWrap}>
+      <BookCover coverUrl={book.cover_url} title={book.title} />
+      {book.read && (
+        <span className={styles.readBadge} role="img" aria-label={t('Read')}>
+          <Check size={14} strokeWidth={3} aria-hidden="true" />
+        </span>
+      )}
+      {seriesIndexLabel && (
+        <span
+          className={styles.seriesBadge}
+          role="img"
+          aria-label={t('Series position {n}', { n: seriesIndexLabel })}
+        >
+          #{seriesIndexLabel}
+        </span>
+      )}
+      {selectable && (
+        <span className={selected ? styles.checkboxOn : styles.checkboxOff} aria-hidden="true">
+          {selected && <Check size={14} strokeWidth={3} />}
+        </span>
+      )}
+    </div>
   );
 
-  // In selection mode the whole card toggles selection instead of navigating.
+  const info = (
+    <div className={styles.info}>
+      <p className={styles.title}>{book.title}</p>
+      <p className={styles.author}>{authorStr}</p>
+    </div>
+  );
+
+  // Selection mode: the whole card is a single toggle button. aria-pressed is
+  // valid here (a real button) and announces the selection state.
   if (selectable) {
     return (
-      <button
-        type="button"
-        className={styles.cardLink}
-        onClick={() => onToggleSelect?.(book)}
-        aria-label={`${selected ? 'Deselect' : 'Select'} ${book.title}`}
-      >
-        {inner}
-      </button>
+      <div className={styles.wrap} style={style}>
+        <button
+          type="button"
+          className={selected ? styles.cardSelected : styles.card}
+          aria-pressed={selected}
+          aria-label={
+            selected
+              ? t('Deselect {title}', { title: book.title })
+              : t('Select {title}', { title: book.title })
+          }
+          onClick={() => onToggleSelect?.(book)}
+        >
+          {cover}
+          {info}
+        </button>
+      </div>
     );
   }
 
+  // Browse mode: the card is a single link. Action buttons are SIBLINGS of the
+  // link (never nested inside <a> — that's invalid + a second tab stop),
+  // absolutely positioned over the cover by .wrap.
   return (
-    <Link href={`/book/${book.id}`} className={styles.cardLink}>
-      {inner}
-    </Link>
+    <div className={styles.wrap} style={style}>
+      <Link href={`/book/${book.id}`} className={styles.card} aria-label={book.title}>
+        {cover}
+        {info}
+      </Link>
+      {onRemove && (
+        <button
+          type="button"
+          className={styles.removeBtn}
+          aria-label={t(removeLabel)}
+          onClick={() => onRemove(book)}
+        >
+          <X size={14} strokeWidth={3} aria-hidden="true" />
+        </button>
+      )}
+      {quickEdit && (
+        <button
+          type="button"
+          className={styles.quickEditBtn}
+          aria-label={t('Edit {title}', { title: book.title })}
+          onClick={() => navigate(`/book/${book.id}/edit`)}
+        >
+          <Pencil size={13} strokeWidth={2.5} aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 }

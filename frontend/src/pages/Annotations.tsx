@@ -27,6 +27,9 @@ const COLOR_HEX: Record<string, string> = {
 export function Annotations({ id }: { id: string }) {
   const t = useT();
   const book = useBook(id).data;
+  // SC 1.4.1: name the highlight color; the colored bar alone is not enough.
+  const colorName = (c: string | null) =>
+    ({ yellow: t('Yellow'), red: t('Red'), green: t('Green'), blue: t('Blue') })[c || 'yellow'] || t('Yellow');
   const { data, isLoading, error } = useQuery<{ annotations: Annotation[] }>({
     queryKey: ['annotations', id],
     queryFn: () => apiGet<{ annotations: Annotation[] }>(`/annotations/${id}/data.json`),
@@ -39,20 +42,20 @@ export function Annotations({ id }: { id: string }) {
   return (
     <main className={styles.container}>
       <Link href={`/book/${id}`} className={styles.back}>
-        <ChevronLeft size={16} /> {t('Back to book')}
+        <ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Back to book')}
       </Link>
 
       <div className={styles.header}>
-        <Highlighter size={22} className={styles.headerIcon} />
+        <Highlighter size={22} className={styles.headerIcon} aria-hidden="true" focusable={false} />
         <h1 className={styles.title}>{t('Highlights')}{book ? ` — ${book.title}` : ''}</h1>
         <span className={styles.count}>{annotations.length}</span>
       </div>
 
       <div className={styles.toolbar}>
-        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.md`)}><Download size={14} /> Markdown</a>
-        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.csv`)}><Download size={14} /> CSV</a>
-        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.json`)}><Download size={14} /> JSON</a>
-        <a className={styles.toolBtn} href={apiUrl('/annotations/import')}><UploadIcon size={14} /> {t('Import from Kobo')}</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.md`)}><Download size={14} aria-hidden="true" focusable={false} /> Markdown</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.csv`)}><Download size={14} aria-hidden="true" focusable={false} /> CSV</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.json`)}><Download size={14} aria-hidden="true" focusable={false} /> JSON</a>
+        <a className={styles.toolBtn} href={apiUrl('/annotations/import')}><UploadIcon size={14} aria-hidden="true" focusable={false} /> {t('Import from Kobo')}</a>
       </div>
 
       {error ? (
@@ -63,7 +66,8 @@ export function Annotations({ id }: { id: string }) {
         <ul className={styles.list}>
           {annotations.map((a) => (
             <li key={a.annotation_id} className={styles.item}>
-              <span className={styles.bar} style={{ background: COLOR_HEX[a.highlight_color || 'yellow'] || '#e6c34a' }} />
+              <span className={styles.bar} role="img" aria-label={colorName(a.highlight_color)}
+                style={{ background: COLOR_HEX[a.highlight_color || 'yellow'] || '#e6c34a' }} />
               <div className={styles.body}>
                 <blockquote className={styles.quote}>{a.highlighted_text}</blockquote>
                 {a.note_text && <p className={styles.note}>{a.note_text}</p>}

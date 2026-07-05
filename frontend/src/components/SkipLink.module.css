@@ -1,0 +1,20 @@
+/* Visually hidden until focused, then pinned top-left over everything. */
+.skipLink {
+  position: fixed;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  z-index: 1000; /* above --z-overlay */
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: var(--fw-semi);
+  border-radius: var(--r-sm);
+  box-shadow: var(--elev-2);
+  /* Off-screen until focused. */
+  transform: translateY(-160%);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.skipLink:focus {
+  transform: translateY(0);
+}

@@ -7,8 +7,15 @@ import {
 import { useBook, useBookmark, useSaveBookmark } from '../lib/queries';
 import { apiPost, apiUrl, resourceUrl } from '../lib/api';
 import { EmptyState } from '../components/EmptyState';
+import { VisuallyHidden } from '../components/VisuallyHidden';
+import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import { useT } from '../lib/i18n';
 import styles from './Reader.module.css';
+
+// Highlight colors as ARIA/label keys (SC 1.4.1: a color must never be conveyed
+// by hue alone — every swatch + saved highlight carries the color's name).
+const HILITE_ORDER = ['yellow', 'green', 'blue', 'red'] as const;
+type HiliteColor = (typeof HILITE_ORDER)[number];
 
 // Highlight colors (match the legacy/Kobo set). Rendered semi-transparent.
 const HILITE_FILL: Record<string, string> = {
@@ -56,8 +63,14 @@ export function Reader({ id }: { id: string }) {
   const saveBookmark = useSaveBookmark(id);
 
   const viewerRef = useRef<HTMLDivElement>(null);
+  const tocRef = useRef<HTMLElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
   const renditionRef = useRef<any>(null);
   const bookRef = useRef<any>(null);
+
+  // Localized color names for highlight swatches + accessible labels.
+  const colorLabel = (c: HiliteColor) =>
+    ({ yellow: t('Yellow'), green: t('Green'), blue: t('Blue'), red: t('Red') })[c];
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Hold the freshest saved CFI so it survives re-renders without re-running the effect.
   const savedCfiRef = useRef<string | null>(null);
@@ -73,6 +86,11 @@ export function Reader({ id }: { id: string }) {
   const [pendingSel, setPendingSel] = useState<{ cfiRange: string; text: string } | null>(null);
 
   const epubFormat = book?.formats.find((f) => f.format.toLowerCase() === 'epub');
+
+  // C10: the TOC drawer and highlight popover are overlays — trap focus while
+  // open, restore on close, Escape closes (hooks run unconditionally every render).
+  useFocusTrap(tocRef, { onClose: () => setTocOpen(false), active: tocOpen });
+  useFocusTrap(popRef, { onClose: () => setPendingSel(null), active: !!pendingSel });
 
   // Paint a highlight onto the live rendition (epub.js annotations API).
   const paintHighlight = useCallback((cfiRange: string, color: string) => {
@@ -152,7 +170,7 @@ export function Reader({ id }: { id: string }) {
         // Fetch the .epub ourselves (same-origin cookie auth) and hand epub.js
         // an ArrayBuffer — reliable archive open regardless of the URL extension.
         const res = await fetch(resourceUrl(epubFormat.download_url), { credentials: 'include' });
-        if (!res.ok) throw new Error(`Could not load the book file (${res.status})`);
+        if (!res.ok) throw new Error(t('Could not load the book file ({status})', { status: res.status }));
         const buf = await res.arrayBuffer();
         if (cancelled) return;
 
@@ -169,6 +187,15 @@ export function Reader({ id }: { id: string }) {
         Object.entries(THEMES).forEach(([name, t]) => rendition.themes.register(name, t));
         rendition.themes.select(theme);
         rendition.themes.fontSize(`${fontPct}%`);
+
+        // C10 (SC 4.1.2): epub.js renders each section into an <iframe> with no
+        // title — screen readers announce "frame" with no name. Title them as
+        // they render so the book content region is named.
+        rendition.on('rendered', () => {
+          viewerRef.current?.querySelectorAll('iframe').forEach((f) => {
+            f.setAttribute('title', t('Book content'));
+          });
+        });
 
         await rendition.display(savedCfiRef.current || undefined);
         if (cancelled) return;
@@ -224,7 +251,7 @@ export function Reader({ id }: { id: string }) {
           if (cfiRange) setPendingSel({ cfiRange, text });
         });
       } catch (e) {
-        if (!cancelled) setRenderError(e instanceof Error ? e.message : 'Failed to open the book.');
+        if (!cancelled) setRenderError(e instanceof Error ? e.message : t('Failed to open the book.'));
       }
     })();
 
@@ -319,26 +346,29 @@ export function Reader({ id }: { id: string }) {
     <div className={`${styles.reader} ${styles[`bg_${theme}`]}`}>
       {/* Top bar */}
       <header className={styles.bar}>
+        {/* Page heading for the reader view (SC 1.3.1), visually the bar title. */}
+        <VisuallyHidden as="h1">{book.title}</VisuallyHidden>
         <Link href={`/book/${id}`} className={styles.iconBtn} title={t('Close reader')} aria-label={t('Close reader')}>
-          <X size={20} />
+          <X size={20} aria-hidden="true" focusable={false} />
         </Link>
-        <span className={styles.bookTitle}>{book.title}</span>
+        <span className={styles.bookTitle} aria-hidden="true">{book.title}</span>
         <div className={styles.barControls}>
-          <button className={styles.iconBtn} onClick={() => setTocOpen((o) => !o)} aria-label={t('Table of contents')} title={t('Contents')}>
-            <List size={19} />
+          <button className={styles.iconBtn} onClick={() => setTocOpen((o) => !o)}
+            aria-label={t('Table of contents')} aria-expanded={tocOpen} title={t('Contents')}>
+            <List size={19} aria-hidden="true" focusable={false} />
           </button>
           <div className={styles.fontControls}>
             <button className={styles.iconBtn} onClick={() => setFontPct((p) => Math.max(FONT_MIN, p - 10))} aria-label={t('Smaller text')} title={t('Smaller')}>
-              <Type size={14} />
+              <Type size={14} aria-hidden="true" focusable={false} />
             </button>
             <button className={styles.iconBtn} onClick={() => setFontPct((p) => Math.min(FONT_MAX, p + 10))} aria-label={t('Larger text')} title={t('Larger')}>
-              <Type size={20} />
+              <Type size={20} aria-hidden="true" focusable={false} />
             </button>
           </div>
           <div className={styles.themeControls}>
-            <button className={theme === 'light' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('light')} aria-label={t('Light theme')} title={t('Light')}><Sun size={17} /></button>
-            <button className={theme === 'sepia' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('sepia')} aria-label={t('Sepia theme')} title={t('Sepia')}><Coffee size={17} /></button>
-            <button className={theme === 'dark' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('dark')} aria-label={t('Dark theme')} title={t('Dark')}><Moon size={17} /></button>
+            <button className={theme === 'light' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('light')} aria-label={t('Light theme')} aria-pressed={theme === 'light'} title={t('Light')}><Sun size={17} aria-hidden="true" focusable={false} /></button>
+            <button className={theme === 'sepia' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('sepia')} aria-label={t('Sepia theme')} aria-pressed={theme === 'sepia'} title={t('Sepia')}><Coffee size={17} aria-hidden="true" focusable={false} /></button>
+            <button className={theme === 'dark' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('dark')} aria-label={t('Dark theme')} aria-pressed={theme === 'dark'} title={t('Dark')}><Moon size={17} aria-hidden="true" focusable={false} /></button>
           </div>
         </div>
       </header>
@@ -347,7 +377,7 @@ export function Reader({ id }: { id: string }) {
       {tocOpen && (
         <>
           <div className={styles.tocScrim} onClick={() => setTocOpen(false)} aria-hidden="true" />
-          <nav className={styles.toc} aria-label={t('Table of contents')}>
+          <nav ref={tocRef} className={styles.toc} aria-label={t('Table of contents')} tabIndex={-1}>
             <p className={styles.tocHeading}>{t('Contents')}</p>
             {toc.length === 0 ? (
               <p className={styles.tocEmpty}>{t('No contents found.')}</p>
@@ -367,11 +397,11 @@ export function Reader({ id }: { id: string }) {
       {/* Viewer + page-turn zones */}
       <div className={styles.stage}>
         <button className={`${styles.navZone} ${styles.navPrev}`} onClick={goPrev} aria-label={t('Previous page')}>
-          <ChevronLeft size={28} />
+          <ChevronLeft size={28} aria-hidden="true" focusable={false} />
         </button>
         <div ref={viewerRef} className={styles.viewer} />
         <button className={`${styles.navZone} ${styles.navNext}`} onClick={goNext} aria-label={t('Next page')}>
-          <ChevronRight size={28} />
+          <ChevronRight size={28} aria-hidden="true" focusable={false} />
         </button>
 
         {!rendered && !renderError && (
@@ -388,20 +418,24 @@ export function Reader({ id }: { id: string }) {
 
       {/* Highlight color popover for the current selection */}
       {pendingSel && (
-        <div className={styles.hilitePop} role="dialog" aria-label={t('Highlight')}>
+        <div ref={popRef} className={styles.hilitePop} role="dialog" aria-modal="true"
+          aria-label={t('Highlight color')} tabIndex={-1}>
           <span className={styles.hiliteLabel}>{t('Highlight')}</span>
-          {(['yellow', 'green', 'blue', 'red'] as const).map((c) => (
+          {HILITE_ORDER.map((c) => (
             <button key={c} className={styles.hiliteSwatch} style={{ background: HILITE_FILL[c] }}
-              onClick={() => createHighlight(c)} aria-label={c} title={c} />
+              onClick={() => createHighlight(c)} aria-label={colorLabel(c)} title={colorLabel(c)} />
           ))}
           <button className={styles.hiliteCancel} onClick={() => setPendingSel(null)} aria-label={t('Cancel')}>
-            <X size={16} />
+            <X size={16} aria-hidden="true" focusable={false} />
           </button>
         </div>
       )}
 
-      {/* Progress */}
-      <div className={styles.progressBar} aria-hidden="true">
+      {/* Progress (SC 4.1.2: a named progressbar, not an aria-hidden bar). */}
+      <div className={styles.progressBar} role="progressbar"
+        aria-label={t('Reading progress')}
+        aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}
+        aria-valuetext={t('{pct}% read', { pct: Math.round(progress) })}>
         <div className={styles.progressFill} style={{ width: `${progress}%` }} />
       </div>
     </div>

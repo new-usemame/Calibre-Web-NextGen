@@ -1,24 +1,23 @@
-.cardLink {
-  text-decoration: none;
-  color: inherit;
+/* Positioning root: the link/toggle button fills it; action buttons overlay it
+   as siblings of that control (never nested inside the <a>). */
+.wrap {
+  position: relative;
   display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
 }
 
+/* The single focusable control (a <Link> or a toggle <button>). */
 .card, .cardSelected {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+  width: 100%;
   cursor: pointer;
   background: none;
   border: none;
-  text-align: left;
   padding: 0;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
   transition: transform var(--dur-base) var(--ease-out);
   outline: none;
 }
@@ -33,9 +32,10 @@
   outline-offset: 2px;
 }
 
-.card:hover .coverWrap,
-.card:focus-within .coverWrap,
-.cardSelected:hover .coverWrap {
+/* Lift on hover or when anything in the card (card control or an action button)
+   is focused. Keyed off .wrap so focusing a sibling action button lifts too. */
+.wrap:hover .coverWrap,
+.wrap:focus-within .coverWrap {
   transform: translateY(-4px);
   box-shadow: var(--elev-3);
   outline-color: var(--accent);
@@ -157,8 +157,8 @@
               color var(--dur-fast) var(--ease);
 }
 
-.card:hover .removeBtn,
-.card:focus-within .removeBtn,
+.wrap:hover .removeBtn,
+.wrap:focus-within .removeBtn,
 .removeBtn:focus-visible {
   opacity: 1;
 }
@@ -192,8 +192,8 @@
               color var(--dur-fast) var(--ease);
 }
 
-.card:hover .quickEditBtn,
-.card:focus-within .quickEditBtn,
+.wrap:hover .quickEditBtn,
+.wrap:focus-within .quickEditBtn,
 .quickEditBtn:focus-visible {
   opacity: 1;
 }

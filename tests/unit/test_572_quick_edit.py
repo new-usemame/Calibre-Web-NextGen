@@ -29,18 +29,24 @@ def test_bookcard_has_quick_edit_affordance():
     assert "useLocation" in src or "navigate" in src
     # A pencil icon, consistent with the detail-page Edit button.
     assert "Pencil" in src
-    # Must not fire when the card is in multi-select mode.
-    assert "!selectable" in src
+    # Must not appear in multi-select mode: selection is a separate early-return
+    # branch, and the quick-edit overlay is only rendered in the browse return.
+    assert "if (selectable)" in src
+    assert "quickEdit &&" in src
 
 
 def test_bookcard_quick_edit_stops_navigation_bubble():
-    """The overlay button sits inside the card's <Link>; the click must not also
-    navigate to the detail page (preventDefault + stopPropagation), same pattern
-    as the existing remove-from-shelf button."""
+    """The overlay buttons (quick-edit, remove) are SIBLINGS of the card's <Link>,
+    not nested inside it (the a11y fix: nested interactive content is invalid and a
+    second tab stop). Because they're outside the link, a click on them never fires
+    the card's navigation — no preventDefault/stopPropagation needed."""
     src = (_FE / "components" / "BookCard.tsx").read_text()
-    # The quick-edit handler guards against the parent link firing.
-    assert "e.preventDefault()" in src
-    assert "e.stopPropagation()" in src
+    # A single <Link> wraps only the cover + info (the one tab stop per card).
+    assert "className={styles.card}" in src
+    # The quick-edit button is positioned AFTER the </Link> close — i.e. a sibling
+    # under .wrap, not a descendant of the link.
+    assert src.index("styles.quickEditBtn") > src.index("</Link>"), \
+        "quick-edit button must be a sibling of <Link>, not nested inside it"
 
 
 def test_catalog_wires_quick_edit_gated_on_edit_role():

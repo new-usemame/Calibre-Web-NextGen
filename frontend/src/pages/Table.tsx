@@ -103,14 +103,25 @@ export function Table() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.coverCol} aria-label="Cover" />
-                  {visible.map((c) => (
-                    <th key={c.key}
-                      className={c.sortAsc ? styles.sortable : undefined}
-                      onClick={() => onSort(c)}>
-                      <span className={styles.thInner}>{t(c.label)} {sortIcon(c)}</span>
-                    </th>
-                  ))}
+                  <th className={styles.coverCol} aria-label={t('Cover')} />
+                  {visible.map((c) => {
+                    if (!c.sortAsc) {
+                      return <th key={c.key}><span className={styles.thInner}>{t(c.label)}</span></th>;
+                    }
+                    // SC 2.1.1 + 4.1.2: the sort control is a real <button> and the
+                    // <th> carries aria-sort so SR users hear the current order.
+                    const ariaSort = c.sortAsc === sort ? 'ascending'
+                      : c.sortDesc === sort ? 'descending' : 'none';
+                    return (
+                      <th key={c.key} className={styles.sortable} aria-sort={ariaSort}>
+                        <button type="button" className={styles.thButton} onClick={() => onSort(c)}>
+                          <span className={styles.thInner}>
+                            {t(c.label)} <span aria-hidden="true">{sortIcon(c)}</span>
+                          </span>
+                        </button>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -129,7 +140,9 @@ export function Table() {
                         {c.key === 'authors' && (b.authors || []).join(', ')}
                         {c.key === 'series' && (b.series ? `${b.series}${b.series_index ? ` #${b.series_index}` : ''}` : '—')}
                         {c.key === 'formats' && (b.formats || []).join(', ')}
-                        {c.key === 'read' && (b.read ? <Check size={15} className={styles.readYes} /> : '—')}
+                        {c.key === 'read' && (b.read
+                          ? <Check size={15} className={styles.readYes} role="img" aria-label={t('Read')} />
+                          : <span aria-label={t('Unread')} role="img">—</span>)}
                       </td>
                     ))}
                   </tr>

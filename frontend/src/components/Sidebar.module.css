@@ -36,7 +36,7 @@
 
 .itemActive {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .icon {
@@ -66,7 +66,7 @@
 }
 
 .sectionTitle:hover { color: var(--text); background: var(--surface-2); }
-.sectionTitleActive { color: var(--accent); background: var(--accent-soft); }
+.sectionTitleActive { color: var(--accent-text); background: var(--accent-soft); }
 
 .shelfList {
   display: flex;
@@ -89,7 +89,7 @@
 }
 
 .shelfItem:hover { color: var(--text); background: var(--surface-2); }
-.shelfItemActive { color: var(--accent); background: var(--accent-soft); }
+.shelfItemActive { color: var(--accent-text); background: var(--accent-soft); }
 
 .shelfName {
   overflow: hidden;
@@ -101,6 +101,11 @@
   flex-shrink: 0;
   font-size: var(--fs-xs);
   color: var(--text-faint);
+}
+
+/* Drawer close button — mobile only (the desktop rail has no close affordance). */
+.drawerClose {
+  display: none;
 }
 
 /* Mobile scrim behind the drawer */
@@ -151,6 +156,23 @@
     transform: translateX(0);
   }
 
+  .drawerClose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    margin-bottom: var(--sp-2);
+    border-radius: var(--r-md);
+    color: var(--text-muted);
+  }
+
+  .drawerClose:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
   .scrim {
     display: block;
     position: fixed;
@@ -168,4 +190,171 @@
     from { opacity: 0; }
     to { opacity: 1; }
   }
+}
+
+/* #585 v2: Customize-sidebar affordance, pinned to the bottom of the rail. */
+.customizeRow {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+.customizeBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.customizeBtn:hover { background: var(--surface-2); color: var(--text); }
+
+/* ── #585 v3: liquid-glass Customize capsule + inline edit list ──────────── */
+.capsuleWrap {
+  padding: var(--sp-2) var(--sp-1) var(--sp-3);
+}
+
+/* The capsule: a translucent "liquid glass" pill pinned at the top of the rail. */
+.capsule, .capsuleDone {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-full);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  cursor: pointer;
+  color: var(--text);
+  /* frosted glass: translucent fill + blur + a soft top-edge sheen + inner ring */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, .02));
+  border: 1px solid rgba(255, 255, 255, .16);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .22),
+    inset 0 -1px 2px rgba(0, 0, 0, .30),
+    0 6px 18px rgba(0, 0, 0, .28);
+  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.capsule {
+  width: 100%;
+  justify-content: center;
+}
+.capsule:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05));
+  transform: translateY(-1px);
+}
+.capsule:active { transform: translateY(0); }
+.capsuleIcon { color: var(--accent); }
+
+/* Edit-mode header: a glass "Done" pill + ghost reset/cancel actions. */
+.capsuleActive {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.capsuleDone {
+  flex: 1;
+  justify-content: center;
+  color: var(--on-accent, #0b0f14);
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover, var(--accent)));
+  border-color: rgba(255, 255, 255, .28);
+}
+.capsuleDone:hover { transform: translateY(-1px); }
+.capsuleGhost {
+  display: inline-flex;
+  padding: var(--sp-2);
+  border-radius: var(--r-full);
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .05);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.capsuleGhost:hover { color: var(--text); background: rgba(255, 255, 255, .10); }
+
+.editHint {
+  margin: 0 var(--sp-2) var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: var(--lh-snug);
+}
+
+.editList {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--sp-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.editRow, .editRowHidden {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  transition: background var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+.editRowHidden { opacity: .5; }
+.editHandle {
+  display: inline-flex;
+  padding: var(--sp-1);
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  border-radius: var(--r-sm);
+  cursor: grab;
+  touch-action: none;
+}
+.editHandle:hover { color: var(--text-muted); }
+.editIcon { color: var(--text-muted); flex: none; }
+.editLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.editRowHidden .editLabel { text-decoration: line-through; color: var(--text-faint); }
+.editAlways {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  padding: 0 var(--sp-1);
+  white-space: nowrap;
+  flex: none;
+}
+.editDeleteBtn, .editRestoreBtn {
+  display: inline-flex;
+  padding: var(--sp-1);
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  flex: none;
+}
+.editDeleteBtn { color: var(--text-muted); }
+.editDeleteBtn:hover { color: var(--danger); background: var(--danger-soft); }
+.editRestoreBtn { color: var(--accent); }
+.editRestoreBtn:hover { background: var(--accent-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .capsule, .capsuleDone, .editRow, .editRowHidden { transition: none; }
+  .capsule:hover, .capsuleDone:hover { transform: none; }
 }

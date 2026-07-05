@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense } from 'react';
 import { Router, Route, Switch } from 'wouter';
+import { RouteA11y } from './lib/a11y/useRouteA11y';
 import { BASE_PREFIX } from './lib/api';
 import { useMe, useLogout } from './lib/queries';
 import { Login } from './pages/Login';
@@ -44,10 +45,8 @@ export function App() {
   const logout = useLogout();
 
   // #609: the classic UI puts the configured instance title in <title> on every
-  // page; index.html ships the stock name as the pre-boot fallback.
-  useEffect(() => {
-    if (me?.instance_name) document.title = me.instance_name;
-  }, [me?.instance_name]);
+  // page. Per-page titling + route focus is handled by <RouteA11y> below
+  // (SC 2.4.2 / 2.4.3); index.html ships the stock name as the pre-boot fallback.
 
   if (isLoading) {
     return <SpinnerCentered size={40} />;
@@ -59,6 +58,7 @@ export function App() {
     // authenticated tree below mounts.
     return (
       <Router base={ROUTER_BASE}>
+        <RouteA11y />
         <Switch>
           <Route path="/magic-link">{() => <MagicLink />}</Route>
           <Route>{() => <Login />}</Route>
@@ -70,6 +70,7 @@ export function App() {
   return (
     <I18nProvider locale={me.locale}>
     <Router base={ROUTER_BASE}>
+      <RouteA11y instanceName={me.instance_name} />
       <Switch>
         {/* Full-screen reader — outside the app shell (no sidebar/topbar). */}
         <Route path="/read/:id">

@@ -7,6 +7,13 @@
   img, picture, svg { display: block; max-width: 100%; }
   button, input, textarea, select { font: inherit; color: inherit; }
   button { background: none; border: none; cursor: pointer; }
+  /* Native text controls inherit the light --text color; without an explicit
+     background they fall back to the UA default (white), which is unreadable on
+     this dark theme AND fails contrast (SC 1.4.3). Give them a sane dark default
+     so a control that forgets to style itself is never white-on-light. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select {
+    background-color: var(--surface-3);
+  }
   a { color: inherit; text-decoration: none; }
   ul, ol { list-style: none; padding: 0; }
 }
@@ -60,5 +67,19 @@
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+}
+
+@layer utilities {
+  /* Visually-hidden but exposed to assistive tech (the canonical clip pattern).
+     Used by <VisuallyHidden>, the live-region announcer, and skip link. */
+  .sr-only {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 }

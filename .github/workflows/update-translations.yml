@@ -1,4 +1,4 @@
-name: Update Translations and Wiki Status
+name: Update Translations
 
 on:
   push:
@@ -149,32 +149,10 @@ jobs:
             exit 1
           fi
 
-      - name: Clone wiki repo
-        # The wiki is optional. Calibre-Web-NextGen is a standalone repo and the
-        # GitHub wiki has never been initialized (the .wiki.git remote 404s
-        # until someone creates the first page in the Wiki tab). We let the
-        # clone fail soft and skip the downstream wiki steps so the job stays
-        # green; if/when the wiki is initialized, the rest light up
-        # automatically.
-        if: steps.commit_pat.outputs.available == 'true'
-        id: clone_wiki
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git wiki-tmp
-
-      - name: Generate translation status table (in wiki repo)
-        if: steps.commit_pat.outputs.available == 'true' && steps.clone_wiki.outcome == 'success'
-        run: |
-          python scripts/generate_translation_status.py wiki-tmp/Contributing-Translations.md
-
-      - name: Commit and push wiki update
-        if: steps.commit_pat.outputs.available == 'true' && steps.clone_wiki.outcome == 'success'
-        run: |
-          cd wiki-tmp
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Contributing-Translations.md
-          git commit -m "Update translation status table [skip ci]" || echo "No changes to commit"
-          git push
+      # The per-language translation-status table lives in the repo README
+      # (single source of truth) — see the "Translations" section of the
+      # wiki's Contributing page. The old steps here cloned the wiki and
+      # wrote the table into a `Contributing-Translations` page; that page
+      # was consolidated away, so the generator crashed on the missing file
+      # and this job went red on every push. The README refresh above is the
+      # canonical output, so the wiki-write steps are gone.

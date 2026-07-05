@@ -8,7 +8,7 @@
  *   - a string not yet in the catalog falls back to its English source key.
  * No missing-key placeholders, ever. See notes/FRONTEND-REBUILD-DESIGN.md §10.
  */
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from './api';
 
@@ -44,6 +44,13 @@ export function I18nProvider({ locale, children }: { locale: string; children: R
   // English is the source locale — its catalog is empty by construction, so skip
   // the network round-trip entirely.
   const enabled = !!locale && locale !== 'en';
+
+  // SC 3.1.1 Language of Page — keep <html lang> in sync with the user's locale
+  // so screen readers use the right pronunciation rules. Normalize e.g. "de_DE"
+  // (server form) to the BCP-47 "de-DE" the lang attribute expects.
+  useEffect(() => {
+    document.documentElement.lang = (locale || 'en').replace('_', '-');
+  }, [locale]);
 
   const { data, isSuccess } = useQuery({
     queryKey: ['i18n', locale],

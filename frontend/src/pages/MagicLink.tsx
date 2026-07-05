@@ -119,10 +119,10 @@ export function MagicLink() {
   }, [verifyUrl]);
 
   return (
-    <div className={styles.page}>
+    <main className={styles.page} id="main" tabIndex={-1}>
       <div className={styles.card}>
         <div className={styles.brandMark}>
-          <BookMarked size={28} className={styles.brandIcon} />
+          <BookMarked size={28} className={styles.brandIcon} aria-hidden="true" focusable={false} />
           <span className={styles.brandText}>
             <BrandName name={cfg?.instance_name} accentClassName={styles.brandAccent} />
           </span>
@@ -198,9 +198,9 @@ export function MagicLink() {
         )}
 
         <Link href="/" className={styles.back}>
-          <ArrowLeft size={15} /> {t('Back to sign in')}
+          <ArrowLeft size={15} aria-hidden="true" focusable={false} /> {t('Back to sign in')}
         </Link>
       </div>
-    </div>
+    </main>
   );
 }

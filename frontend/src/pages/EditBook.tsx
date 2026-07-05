@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useId, cloneElement, isValidElement, type ReactElement } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search, Plus, X } from 'lucide-react';
+import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search, Plus, X, MoreHorizontal } from 'lucide-react';
 import {
   useBookMetadata, useUpdateMetadata, useBook, useMe, useDeleteFormat, useConvertFormat,
   useSetCover, useMetadataSearch, useAddFormat,
@@ -79,7 +80,7 @@ export function EditBook({ id }: { id: string }) {
     if (error) {
       return (
         <main className={styles.container}>
-          <EmptyState message={error instanceof Error ? error.message : 'Could not load metadata.'} />
+          <EmptyState message={error instanceof Error ? error.message : t('Could not load metadata.')} />
         </main>
       );
     }
@@ -120,7 +121,7 @@ export function EditBook({ id }: { id: string }) {
     if (sel.has('cover') && r.cover) {
       setCover.mutate({ url: r.cover }, {
         onSuccess: () => setBanner({ ok: true, text: t('Cover updated from the selected result.') }),
-        onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : 'Cover update failed.' }),
+        onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Cover update failed.') }),
       });
     }
   };
@@ -153,14 +154,14 @@ export function EditBook({ id }: { id: string }) {
       onSuccess: (data) => {
         if (data.errors && Object.keys(data.errors).length > 0) {
           setFieldErrors(data.errors);
-          setBanner({ ok: false, text: 'Some fields could not be saved.' });
+          setBanner({ ok: false, text: t('Some fields could not be saved.') });
         } else {
-          setBanner({ ok: true, text: 'Saved.' });
+          setBanner({ ok: true, text: t('Saved.') });
           navigate(`/book/${id}`);
         }
       },
       onError: (err) =>
-        setBanner({ ok: false, text: err instanceof ApiError ? err.message : 'Save failed.' }),
+        setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Save failed.') }),
     });
   };
 
@@ -220,7 +221,7 @@ export function EditBook({ id }: { id: string }) {
         {/* Identifiers table (ISBN/ASIN/…) — fork #580. */}
         <div className={styles.identSection}>
           <span className={styles.label}>{t('Identifiers')}</span>
-          {fieldErrors.identifiers && <span className={styles.fieldError}>{fieldErrors.identifiers}</span>}
+          {fieldErrors.identifiers && <span className={styles.fieldError} role="alert">{fieldErrors.identifiers}</span>}
           {form.identifiers.length > 0 && (
             <div className={styles.identTable} role="group" aria-label={t('Identifiers')}>
               {form.identifiers.map((idn, i) => (
@@ -246,7 +247,7 @@ export function EditBook({ id }: { id: string }) {
             <Save size={16} /> {t('Save changes')}
           </Button>
           <Link href={`/book/${id}`} className={styles.cancel}>{t('Cancel')}</Link>
-          {banner && <span className={banner.ok ? styles.msgOk : styles.msgErr}>{banner.text}</span>}
+          <span className={banner ? (banner.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{banner?.text}</span>
         </div>
       </form>
 
@@ -267,36 +268,93 @@ function MetadataFetch({ defaultQuery, onApply }:
   const [query, setQuery] = useState(defaultQuery);
   const [results, setResults] = useState<MetaResult[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  // Editions drill-down (Hardcover): when set we're showing the editions of one
+  // book, and `prev` holds the title-level view to return to via "Back".
+  const [editions, setEditions] = useState<{ prevQuery: string; prevResults: MetaResult[] } | null>(null);
+  // Monotonic search id. Every search (and closing the panel) bumps it; a response
+  // only applies if it's still the latest — so a slow editions request that the
+  // user has since abandoned (Close) or superseded (a second Editions click)
+  // can't force the panel into a stale editions view or show the wrong book.
+  const seq = useRef(0);
 
-  const run = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Single search path for the normal form, the editions drill-down, and Back.
+  // `ed` is the title-level snapshot captured before drilling in; when present we
+  // keep only Hardcover edition rows (a `hardcover-id:<id>` query still fans out
+  // to every enabled provider, so other providers return noise for that string).
+  const doSearch = (q: string, ed?: { prevQuery: string; prevResults: MetaResult[] }) => {
+    const term = q.trim();
+    if (!term) return;
+    const mine = ++seq.current;
     setErr(null);
-    search.mutate(query.trim(), {
-      onSuccess: (r) => setResults(r.results),
-      onError: (e2) => setErr(e2 instanceof ApiError ? e2.message : 'Search failed.'),
+    setQuery(term);
+    search.mutate(term, {
+      onSuccess: (r) => {
+        if (mine !== seq.current) return; // superseded/abandoned — ignore
+        if (ed) {
+          setResults(r.results.filter((x) => x.identifiers && 'hardcover-edition' in x.identifiers));
+          setEditions(ed);
+        } else {
+          setResults(r.results);
+          setEditions(null);
+        }
+      },
+      onError: (e2) => { if (mine === seq.current) setErr(e2 instanceof ApiError ? e2.message : t('Search failed.')); },
     });
   };
+
+  const run = (e: React.FormEvent) => { e.preventDefault(); doSearch(query); };
+  const openEditions = (hardcoverId: string) =>
+    doSearch(`hardcover-id:${hardcoverId}`, { prevQuery: query, prevResults: results });
+  const backToResults = () => {
+    if (!editions) return;
+    setQuery(editions.prevQuery);
+    setResults(editions.prevResults);
+    setEditions(null);
+    setErr(null);
+  };
+  // Open/close the panel from a clean state: never reopen stranded in an editions
+  // drill-down, and invalidate any in-flight request on close.
+  const openPanel = () => { seq.current++; setOpen(true); setQuery(defaultQuery); setEditions(null); setErr(null); };
+  const closePanel = () => { seq.current++; setOpen(false); setEditions(null); };
 
   return (
     <section className={styles.metaFetch}>
       {!open ? (
-        <Button type="button" variant="ghost" onClick={() => { setOpen(true); setQuery(defaultQuery); }}>
+        <Button type="button" variant="ghost" onClick={openPanel}>
           <Sparkles size={15} /> {t('Fetch metadata from web')}
         </Button>
       ) : (
         <div className={styles.metaPanel}>
-          <form className={styles.metaSearchRow} onSubmit={run}>
-            <input className={styles.input} value={query} onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('Title, author, or ISBN')} autoFocus />
-            <Button type="submit" disabled={search.isPending || !query.trim()}>
-              {search.isPending ? <Spinner size={15} /> : <Search size={15} />} {t('Search')}
-            </Button>
-            <button type="button" className={styles.cancel} onClick={() => setOpen(false)}>{t('Close')}</button>
-          </form>
-          {err && <span className={styles.msgErr}>{err}</span>}
+          {editions ? (
+            <div className={styles.editionsHead}>
+              <button type="button" className={styles.cancel} onClick={backToResults}>
+                <ChevronLeft size={14} aria-hidden="true" focusable={false} /> {t('Back to results')}
+              </button>
+              <span className={styles.editionsTitle}>{t('Editions')}</span>
+              {search.isPending && <Spinner size={14} />}
+              <button type="button" className={styles.cancel} style={{ marginLeft: 'auto' }} onClick={closePanel}>{t('Close')}</button>
+            </div>
+          ) : (
+            <form className={styles.metaSearchRow} onSubmit={run}>
+              <input className={styles.input} value={query} onChange={(e) => setQuery(e.target.value)}
+                aria-label={t('Search for metadata')}
+                placeholder={t('Title, author, or ISBN')} autoFocus />
+              <Button type="submit" disabled={search.isPending || !query.trim()}>
+                {search.isPending ? <Spinner size={15} /> : <Search size={15} />} {t('Search')}
+              </Button>
+              <button type="button" className={styles.cancel} onClick={closePanel}>{t('Close')}</button>
+            </form>
+          )}
+          {/* Announced to screen readers (SC 4.1.3). */}
+          <span className={err ? styles.msgErr : undefined} role="alert">{err}</span>
+          {editions && !search.isPending && results.length === 0 && (
+            <span className={styles.metaEmpty}>{t('No editions found for this book.')}</span>
+          )}
           {results.length > 0 && (
             <ul className={styles.metaResults}>
-              {results.map((r, i) => <ResultRow key={i} r={r} onApply={onApply} />)}
+              {results.map((r, i) => (
+                <ResultRow key={i} r={r} onApply={onApply} onEditions={editions ? undefined : openEditions} />
+              ))}
             </ul>
           )}
         </div>
@@ -306,10 +364,21 @@ function MetadataFetch({ defaultQuery, onApply }:
 }
 
 /** One search result: shows the book, and (on "Choose fields") a checklist of the
- *  values it offers so the user applies exactly what they want. */
-function ResultRow({ r, onApply }: { r: MetaResult; onApply: (r: MetaResult, sel: Set<ApplyKey>) => void }) {
+ *  values it offers so the user applies exactly what they want. Hardcover title
+ *  results also expose an "Editions" drill-down (via `onEditions`) so the user can
+ *  pick a specific edition — each carries its own `hardcover-edition`/ISBN
+ *  identifiers, which Hardcover progress-sync needs. */
+function ResultRow({ r, onApply, onEditions }:
+  { r: MetaResult; onApply: (r: MetaResult, sel: Set<ApplyKey>) => void; onEditions?: (hardcoverId: string) => void }) {
   const t = useT();
   const fields = APPLY_FIELDS.filter((f) => f.has(r));
+  const [showDetails, setShowDetails] = useState(false);
+  // Offer "Editions" only on a title-level Hardcover result (has hardcover-id but
+  // is not itself an edition row). onEditions is absent while already viewing editions.
+  const hcId = r.identifiers?.['hardcover-id'];
+  const canEditions = !!onEditions && hcId != null && hcId !== ''
+    && !(r.identifiers && 'hardcover-edition' in r.identifiers);
+  const editionMeta = [r.format, r.publisher, r.publishedDate].filter(Boolean).join(' · ');
   const [expanded, setExpanded] = useState(false);
   const [sel, setSel] = useState<Set<ApplyKey>>(() => new Set(fields.map((f) => f.key)));
 
@@ -319,6 +388,7 @@ function ResultRow({ r, onApply }: { r: MetaResult; onApply: (r: MetaResult, sel
   useEffect(() => {
     setSel(new Set(APPLY_FIELDS.filter((f) => f.has(r)).map((f) => f.key)));
     setExpanded(false);
+    setShowDetails(false);
   }, [r]);
 
   const toggle = (k: ApplyKey) => setSel((s) => {
@@ -334,12 +404,25 @@ function ResultRow({ r, onApply }: { r: MetaResult; onApply: (r: MetaResult, sel
         <div className={styles.metaInfo}>
           <span className={styles.metaTitle}>{r.title}</span>
           <span className={styles.metaAuthors}>{(r.authors || []).join(', ')}</span>
+          {editionMeta && <span className={styles.metaEdition}>{editionMeta}</span>}
           {r.source?.id && <span className={styles.metaSource}>{r.source.id}</span>}
         </div>
-        <Button type="button" variant="ghost" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? t('Hide fields') : t('Choose fields')}
-        </Button>
+        <div className={styles.metaResultActions}>
+          {canEditions && (
+            <Button type="button" variant="ghost" onClick={() => onEditions!(String(hcId))}>
+              <Search size={14} /> {t('Editions')}
+            </Button>
+          )}
+          <Button type="button" variant="ghost" onClick={() => setShowDetails(true)}
+            aria-label={t('View all details')} title={t('View all details')}>
+            <MoreHorizontal size={16} />
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setExpanded((v) => !v)}>
+            {expanded ? t('Hide fields') : t('Choose fields')}
+          </Button>
+        </div>
       </div>
+      {showDetails && <ResultDetails r={r} onClose={() => setShowDetails(false)} />}
       {expanded && (
         <div className={styles.applyPanel}>
           {fields.map((f) => (
@@ -361,6 +444,111 @@ function ResultRow({ r, onApply }: { r: MetaResult; onApply: (r: MetaResult, sel
   );
 }
 
+/** Full-record overlay for one search result. The compact result row + per-field
+ *  checklist truncate long values (identifiers, tags, description) to one line; a
+ *  Hardcover edition can carry a long ISBN/edition id that must be readable in full
+ *  to pick the right one. This shows every field at full length — identifiers one
+ *  per line. Centered dialog on desktop, bottom sheet on mobile. */
+function ResultDetails({ r, onClose }: { r: MetaResult; onClose: () => void }) {
+  const t = useT();
+  const modalRef = useRef<HTMLDivElement>(null);
+  // Keep the latest onClose in a ref so the focus/scroll effect can run once on
+  // open ([] deps) — `onClose` is a fresh closure each parent render, and using
+  // it as a dep would re-run the effect on any background re-render (e.g. a search
+  // resolving), re-grabbing focus mid-read and flickering the trap.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const titleId = `md-details-title-${useId()}`;
+
+  // Accessibility: focus the dialog on open, trap Tab within it, restore focus to
+  // the trigger on close, Escape closes, and lock background scroll while open
+  // (mirrors CoverPicker's confirm modal, plus scroll-lock for the mobile sheet).
+  useEffect(() => {
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const node = modalRef.current;
+    const focusables = () => node
+      ? Array.from(node.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+        .filter((el) => !el.hasAttribute('disabled'))
+      : [];
+    (focusables()[0] ?? node)?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onCloseRef.current(); return; }
+      if (e.key !== 'Tab') return;
+      const els = focusables();
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      prevFocus?.focus?.();
+    };
+  }, []);
+
+  const idents = Object.entries(r.identifiers || {}).filter(([, v]) => v !== '' && v != null);
+  const rows = [
+    { label: t('Authors'), value: (r.authors || []).join(', ') },
+    { label: t('Series'), value: r.series ? `${r.series}${r.series_index ? ` #${r.series_index}` : ''}` : '' },
+    { label: t('Format'), value: r.format || '' },
+    { label: t('Publisher'), value: r.publisher || '' },
+    { label: t('Published'), value: r.publishedDate || '' },
+    { label: t('Rating'), value: r.rating ? `${Math.round(r.rating)} ★` : '' },
+    { label: t('Tags'), value: (r.tags || []).join(', ') },
+    { label: t('Source'), value: r.source?.id || '' },
+  ].filter((row) => row.value);
+
+  return createPortal(
+    <div className={styles.detailsOverlay} onClick={onClose} role="presentation">
+      <div className={styles.detailsModal} onClick={(e) => e.stopPropagation()} ref={modalRef}
+        role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+        <div className={styles.detailsHead}>
+          <span className={styles.detailsTitle} id={titleId}>{r.title}</span>
+          <button type="button" className={styles.detailsClose} onClick={onClose} aria-label={t('Close')}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className={styles.detailsBody}>
+          {r.cover && <img src={r.cover} alt="" className={styles.detailsCover} loading="lazy" />}
+          <dl className={styles.detailsFields}>
+            {rows.map((row) => (
+              <div key={row.label} className={styles.detailsRow}>
+                <dt className={styles.detailsLabel}>{row.label}</dt>
+                <dd className={styles.detailsValue}>{row.value}</dd>
+              </div>
+            ))}
+            {r.description && (
+              <div className={styles.detailsRow}>
+                <dt className={styles.detailsLabel}>{t('Description')}</dt>
+                <dd className={styles.detailsValue}>{stripTags(r.description)}</dd>
+              </div>
+            )}
+            {idents.length > 0 && (
+              <div className={styles.detailsRow}>
+                <dt className={styles.detailsLabel}>{t('Identifiers')}</dt>
+                <dd className={styles.detailsValue}>
+                  <ul className={styles.detailsIdents}>
+                    {idents.map(([k, v]) => (
+                      <li key={k}><code>{k}</code>: {String(v)}</li>
+                    ))}
+                  </ul>
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 /** Replace the book cover: upload a file or paste a URL. The full provider
  *  candidate grid + e-reader padding preview lives at the legacy /book/:id/cover. */
 function CoverManager({ id }: { id: string }) {
@@ -375,8 +563,8 @@ function CoverManager({ id }: { id: string }) {
     if (!file) return;
     setMsg(null);
     setCover.mutate({ file }, {
-      onSuccess: () => setMsg({ ok: true, text: 'Cover updated.' }),
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Upload failed.' }),
+      onSuccess: () => setMsg({ ok: true, text: t('Cover updated.') }),
+      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Upload failed.') }),
     });
   };
 
@@ -384,8 +572,8 @@ function CoverManager({ id }: { id: string }) {
     if (!url.trim()) return;
     setMsg(null);
     setCover.mutate({ url: url.trim() }, {
-      onSuccess: () => { setMsg({ ok: true, text: 'Cover updated.' }); setUrl(''); },
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Could not fetch cover.' }),
+      onSuccess: () => { setMsg({ ok: true, text: t('Cover updated.') }); setUrl(''); },
+      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not fetch cover.') }),
     });
   };
 
@@ -398,11 +586,15 @@ function CoverManager({ id }: { id: string }) {
       </div>
       <div className={styles.coverControls}>
         <label className={styles.coverUploadBtn}>
-          <UploadIcon size={15} /> {t('Upload image')}
-          <input type="file" accept="image/*" hidden onChange={onFile} disabled={setCover.isPending} />
+          <UploadIcon size={15} aria-hidden="true" focusable={false} /> {t('Upload image')}
+          {/* C3: sr-only (NOT hidden) keeps the input focusable + in tab order;
+              the label shows a focus ring via :focus-within. */}
+          <input type="file" accept="image/*" className={styles.fileInput}
+            onChange={onFile} disabled={setCover.isPending} />
         </label>
         <div className={styles.coverUrlRow}>
           <input className={styles.input} value={url} onChange={(e) => setUrl(e.target.value)}
+            aria-label={t('Cover image URL')}
             placeholder={t('…or paste an image URL')} />
           <Button type="button" variant="ghost" onClick={onUrl} disabled={setCover.isPending || !url.trim()}>
             {t('Fetch')}
@@ -411,7 +603,7 @@ function CoverManager({ id }: { id: string }) {
         <Link className={styles.coverAdvanced} href={`/book/${id}/cover?origin=edit`}>
           <ExternalLink size={13} /> {t('More cover options (search providers, e-reader preview)')}
         </Link>
-        {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+        <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
       </div>
     </section>
   );
@@ -440,7 +632,7 @@ function FormatsManager({ id }: { id: string }) {
     setMsg(null);
     addFormat.mutate(file, {
       onSuccess: () => setMsg({ ok: true, text: t('Format queued — it will appear once processed.') }),
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Upload failed.' }),
+      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Upload failed.') }),
     });
     e.target.value = '';
   };
@@ -452,7 +644,7 @@ function FormatsManager({ id }: { id: string }) {
       { from: from || formats[0], to: to.trim().toUpperCase() },
       {
         onSuccess: (r) => { setMsg({ ok: true, text: r.message }); setTo(''); },
-        onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Convert failed.' }),
+        onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Convert failed.') }),
       },
     );
   };
@@ -468,12 +660,12 @@ function FormatsManager({ id }: { id: string }) {
             {canDelete && (
               <button className={styles.formatDelete}
                 onClick={() => {
-                  if (window.confirm(`Delete the ${f.format} file? The book stays; only this format is removed.`)) {
+                  if (window.confirm(t('Delete the {fmt} file? The book stays; only this format is removed.', { fmt: f.format }))) {
                     deleteFormat.mutate(f.format);
                   }
                 }}
                 disabled={deleteFormat.isPending}
-                aria-label={`Delete ${f.format}`}>
+                aria-label={t('Delete {fmt}', { fmt: f.format })}>
                 <Trash2 size={14} />
               </button>
             )}
@@ -492,7 +684,7 @@ function FormatsManager({ id }: { id: string }) {
           <label className={styles.fieldNarrow}>
             <span className={styles.label}>{t('to')}</span>
             <input className={styles.inputNarrow} value={to} onChange={(e) => setTo(e.target.value)}
-              placeholder="e.g. MOBI" />
+              aria-label={t('Convert to format')} placeholder={t('e.g. MOBI')} />
           </label>
           <Button type="submit" variant="ghost" disabled={convertFormat.isPending || !to.trim()}>
             <RefreshCw size={15} /> {t('Convert')}
@@ -502,22 +694,31 @@ function FormatsManager({ id }: { id: string }) {
 
       {canUpload && (
         <label className={styles.coverUploadBtn} style={{ marginTop: 'var(--sp-3)' }}>
-          <UploadIcon size={15} /> {addFormat.isPending ? t('Uploading…') : t('Add a format')}
-          <input type="file" hidden onChange={onAddFormat} disabled={addFormat.isPending} />
+          <UploadIcon size={15} aria-hidden="true" focusable={false} /> {addFormat.isPending ? t('Uploading…') : t('Add a format')}
+          <input type="file" className={styles.fileInput} onChange={onAddFormat} disabled={addFormat.isPending} />
         </label>
       )}
-      {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+      <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
     </section>
   );
 }
 
 function Field({ label, error, grow = true, children }:
   { label: string; error?: string; grow?: boolean; children: React.ReactNode }) {
+  const errId = useId();
+  // SC 3.3.1: associate the error with the field (aria-invalid + aria-describedby)
+  // and announce it (role=alert), rather than leaving a disconnected red string.
+  const child = error && isValidElement(children)
+    ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+        'aria-invalid': true,
+        'aria-describedby': errId,
+      })
+    : children;
   return (
     <label className={grow ? styles.field : styles.fieldNarrow}>
       <span className={styles.label}>{label}</span>
-      {children}
-      {error && <span className={styles.fieldError}>{error}</span>}
+      {child}
+      {error && <span className={styles.fieldError} id={errId} role="alert">{error}</span>}
     </label>
   );
 }

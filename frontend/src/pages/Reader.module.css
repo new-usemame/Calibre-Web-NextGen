@@ -207,7 +207,8 @@
   border-radius: 999px; padding: 8px 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
 }
 .hiliteLabel { color: #cdc6bb; font-size: 13px; margin-right: 2px; }
-.hiliteSwatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); cursor: pointer; }
+/* SC 2.5.8: 24x24 minimum target size. */
+.hiliteSwatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); cursor: pointer; }
 .hiliteSwatch:hover { border-color: #fff; }
 .hiliteCancel { color: #cdc6bb; display: inline-flex; align-items: center; margin-left: 4px; }
 .hiliteCancel:hover { color: #fff; }

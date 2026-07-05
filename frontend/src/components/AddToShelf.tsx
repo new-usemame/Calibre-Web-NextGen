@@ -71,12 +71,14 @@ export function AddToShelf({ bookId }: { bookId: number }) {
         aria-haspopup="true"
         aria-expanded={open}
       >
-        <BookCopy size={15} />
+        <BookCopy size={15} aria-hidden="true" focusable={false} />
         {t('Add to shelf')}
       </button>
 
       {open && (
-        <div className={styles.panel} role="menu">
+        // Disclosure, not an ARIA menu: it holds toggles + a form + a link, which
+        // a menu can't contain (S8). Toggles use aria-pressed.
+        <div className={styles.panel}>
           {isLoading ? (
             <div className={styles.loading}>
               <Spinner size={16} />
@@ -93,15 +95,17 @@ export function AddToShelf({ bookId }: { bookId: number }) {
                           type="button"
                           className={styles.item}
                           onClick={() => toggle(s.id)}
-                          role="menuitemcheckbox"
-                          aria-checked={active}
+                          aria-pressed={active}
                         >
-                          <span className={active ? styles.checkOn : styles.checkOff}>
+                          <span className={active ? styles.checkOn : styles.checkOff} aria-hidden="true">
                             {active && <Check size={13} strokeWidth={3} />}
                           </span>
                           <span className={styles.itemName}>{s.name}</span>
-                          <span className={styles.itemIcon}>
-                            {s.is_public ? <Globe size={12} /> : <Lock size={12} />}
+                          <span className={styles.itemIcon} role="img"
+                            aria-label={s.is_public ? t('Public shelf') : t('Private shelf')}>
+                            {s.is_public
+                              ? <Globe size={12} aria-hidden="true" focusable={false} />
+                              : <Lock size={12} aria-hidden="true" focusable={false} />}
                           </span>
                         </button>
                       </li>
@@ -127,7 +131,7 @@ export function AddToShelf({ bookId }: { bookId: number }) {
                   disabled={!newName.trim() || createShelf.isPending}
                   aria-label={t('Create shelf and add book')}
                 >
-                  <Plus size={15} />
+                  <Plus size={15} aria-hidden="true" focusable={false} />
                 </button>
               </form>
 

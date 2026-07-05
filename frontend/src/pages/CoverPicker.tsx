@@ -368,18 +368,36 @@ function AddOwnPanel({ id, locked, onApplied, onError }: {
 }) {
   const t = useT();
   const [tab, setTab] = useState<'url' | 'upload'>('url');
+  // Tab keyboard contract (APG): Left/Right/Home/End move + activate, and focus
+  // follows the selection. Only the selected tab is in the tab order (roving).
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const next = tab === 'url' ? 'upload' : 'url';
+    setTab(next);
+    const el = e.currentTarget.parentElement?.querySelector<HTMLElement>(`#cp-tab-${next}`);
+    el?.focus();
+  };
   return (
     <div className={styles.addOwn}>
       <div className={styles.cardLabel}>{t('Add your own')}</div>
-      <div className={styles.tabs} role="tablist">
-        <button role="tab" aria-selected={tab === 'url'} className={tab === 'url' ? styles.tabOn : styles.tab}
-                onClick={() => setTab('url')}><Link2 size={14} /> {t('Paste URL')}</button>
-        <button role="tab" aria-selected={tab === 'upload'} className={tab === 'upload' ? styles.tabOn : styles.tab}
-                onClick={() => setTab('upload')}><UploadIcon size={14} /> {t('Upload')}</button>
+      <div className={styles.tabs} role="tablist" aria-label={t('Add your own')}>
+        <button role="tab" id="cp-tab-url" aria-controls="cp-panel-url" aria-selected={tab === 'url'}
+                tabIndex={tab === 'url' ? 0 : -1} onKeyDown={onTabKey}
+                className={tab === 'url' ? styles.tabOn : styles.tab}
+                onClick={() => setTab('url')}><Link2 size={14} aria-hidden="true" focusable={false} /> {t('Paste URL')}</button>
+        <button role="tab" id="cp-tab-upload" aria-controls="cp-panel-upload" aria-selected={tab === 'upload'}
+                tabIndex={tab === 'upload' ? 0 : -1} onKeyDown={onTabKey}
+                className={tab === 'upload' ? styles.tabOn : styles.tab}
+                onClick={() => setTab('upload')}><UploadIcon size={14} aria-hidden="true" focusable={false} /> {t('Upload')}</button>
       </div>
-      {tab === 'url'
-        ? <UrlTab id={id} locked={locked} onApplied={onApplied} onError={onError} />
-        : <UploadTab id={id} locked={locked} onApplied={onApplied} onError={onError} />}
+      <div role="tabpanel"
+           id={tab === 'url' ? 'cp-panel-url' : 'cp-panel-upload'}
+           aria-labelledby={tab === 'url' ? 'cp-tab-url' : 'cp-tab-upload'}>
+        {tab === 'url'
+          ? <UrlTab id={id} locked={locked} onApplied={onApplied} onError={onError} />
+          : <UploadTab id={id} locked={locked} onApplied={onApplied} onError={onError} />}
+      </div>
     </div>
   );
 }
@@ -457,9 +475,10 @@ function UploadTab({ id, locked, onApplied, onError }: {
   return (
     <div className={styles.tabBody}>
       <label className={styles.dropZone}>
-        <UploadIcon size={18} />
+        <UploadIcon size={18} aria-hidden="true" focusable={false} />
         <span>{file ? file.name : t('Choose an image…')}</span>
-        <input type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.gif" hidden
+        {/* C3: sr-only keeps the input focusable + in tab order (not hidden). */}
+        <input type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.gif" className={styles.fileInput}
                aria-label={t('Choose a cover image to upload')}
                onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </label>
@@ -514,6 +533,7 @@ function KeyRow({ k }: { k: ProviderKey }) {
       {k.can_edit && (
         <>
           <input className={styles.keyInput} type="password" value={val} placeholder="••••••"
+                 aria-label={t('{name} API key', { name: k.name })}
                  onChange={(e) => setVal(e.target.value)} />
           <Button size="sm" variant="ghost" onClick={save} disabled={saving || !val}>{t('Save')}</Button>
         </>

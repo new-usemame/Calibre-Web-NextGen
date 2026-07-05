@@ -115,6 +115,12 @@
   transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .dropZone:hover { border-color: var(--accent); color: var(--text); }
+.dropZone:focus-within { border-color: var(--accent); outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+/* C3: file input hidden but focusable + in the tab order (not display:none). */
+.fileInput {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 
 /* ---- main column ---- */
 .main { min-width: 0; }

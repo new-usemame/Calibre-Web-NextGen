@@ -39,6 +39,12 @@
 .chipX {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  /* SC 2.5.8: 24x24 minimum target size. Negative margin keeps the chip from
+     ballooning while the hit area stays full-size. */
+  width: 24px;
+  height: 24px;
+  margin: -6px -4px -6px 0;
   color: var(--accent);
   opacity: 0.7;
   transition: opacity var(--dur-fast) var(--ease);
@@ -81,7 +87,8 @@
   padding: var(--sp-1);
 }
 
-.option {
+.option,
+.optionActive {
   display: block;
   width: 100%;
   text-align: left;
@@ -89,7 +96,13 @@
   border-radius: var(--r-sm);
   color: var(--text);
   font-size: var(--fs-sm);
+  cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
 
-.option:hover { background: var(--surface-3); }
+/* Active descendant (keyboard ArrowUp/Down or hover). The input keeps DOM focus;
+   this is the visible "where Enter will act" indicator. */
+.option:hover,
+.optionActive {
+  background: var(--surface-3);
+}

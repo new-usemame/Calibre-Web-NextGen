@@ -145,7 +145,7 @@
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-soft);
   border-radius: var(--r-full);
   padding: 2px var(--sp-2);

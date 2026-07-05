@@ -298,7 +298,9 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
       <div className={styles.header}>
         {filtered && <span className={styles.kindLabel}>{t(KIND_LABEL[entityKind!])}</span>}
         <h1 className={styles.title}>{heading}</h1>
-        {countLabel && <span className={styles.count}>{countLabel}</span>}
+        {/* role=status so the result count is announced when filters/search
+            change it and when load-more grows it (SC 4.1.3). */}
+        {countLabel && <span className={styles.count} role="status">{countLabel}</span>}
       </div>
 
       {/* Toolbar */}
@@ -412,15 +414,15 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
       {isFirstLoad ? (
         <SpinnerCentered size={36} />
       ) : error ? (
-        <EmptyState message={error instanceof Error ? error.message : 'Failed to load books.'} />
+        <EmptyState message={error instanceof Error ? error.message : t('Failed to load books.')} />
       ) : allBooks.length === 0 && !isFetching ? (
         <EmptyState
           message={
             search && !filtered
-              ? `No results for "${search}".`
+              ? t('No results for "{q}".', { q: search })
               : readFilter !== 'all'
-                ? `No ${readFilter} books here.`
-                : 'No books here.'
+                ? t('No {filter} books here.', { filter: readFilter })
+                : t('No books here.')
           }
         />
       ) : (

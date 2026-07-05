@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2 } from 'lucide-react';
+import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { BrandName } from './BrandName';
 import { BASE_PREFIX } from '../lib/api';
 import { useT } from '../lib/i18n';
+import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
 
 interface TopBarProps {
@@ -86,31 +87,40 @@ interface MenuItemProps {
   /** External URL — opens in a new tab. */
   href?: string;
   danger?: boolean;
+  /** Optional trailing element (e.g. an unread dot), pinned to the right. */
+  trailing?: ReactNode;
   onClick?: () => void;
   onSelect: () => void;
 }
 
-function MenuItem({ icon, label, to, href, danger, onClick, onSelect }: MenuItemProps) {
+function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }: MenuItemProps) {
   const cls = danger ? `${styles.menuItem} ${styles.menuItemDanger}` : styles.menuItem;
   const handle = () => { onClick?.(); onSelect(); };
-  const inner = <><span className={styles.menuItemIcon}>{icon}</span>{label}</>;
+  // Disclosure pattern (not an ARIA menu): plain links/buttons, icons decorative.
+  const inner = (
+    <>
+      <span className={styles.menuItemIcon} aria-hidden="true">{icon}</span>
+      <span className={styles.menuItemLabel}>{label}</span>
+      {trailing}
+    </>
+  );
   if (to) {
     // Internal: wouter Link keeps it client-side (no full reload) and respects the base.
     return (
-      <Link href={to} role="menuitem" className={cls} onClick={onSelect}>
+      <Link href={to} className={cls} onClick={onSelect}>
         {inner}
       </Link>
     );
   }
   if (href) {
     return (
-      <a role="menuitem" className={cls} href={href} target="_blank" rel="noopener noreferrer" onClick={onSelect}>
+      <a className={cls} href={href} target="_blank" rel="noopener noreferrer" onClick={onSelect}>
         {inner}
       </a>
     );
   }
   return (
-    <button role="menuitem" type="button" className={cls} onClick={handle}>
+    <button type="button" className={cls} onClick={handle}>
       {inner}
     </button>
   );
@@ -119,21 +129,29 @@ function MenuItem({ icon, label, to, href, danger, onClick, onSelect }: MenuItem
 function HelpMenu() {
   const t = useT();
   const { open, close, wrapperProps, onTriggerClick } = useMenu();
+  const unread = useWhatsNewUnread();
   return (
     <div className={styles.menu} {...wrapperProps}>
       <button
         type="button"
         className={styles.triggerSquare}
-        aria-haspopup="menu"
+        aria-haspopup="true"
         aria-expanded={open}
-        aria-label={t('Help')}
+        aria-label={unread ? t('Help — new updates available') : t('Help')}
         onClick={onTriggerClick}
       >
         <span className={styles.qmark} aria-hidden="true">?</span>
+        {unread && <span className={styles.triggerDot} aria-hidden="true" />}
       </button>
       {open && (
-        <div className={`${styles.panel} ${styles.panelHelp}`} role="menu">
+        <div className={`${styles.panel} ${styles.panelHelp}`}>
           <p className={styles.panelHead}>{t('Help & support')}</p>
+          <MenuItem
+            icon={<Sparkles size={15} />}
+            label={t("What's new")}
+            to="/whats-new"
+            trailing={unread ? <span className={styles.itemDot} aria-hidden="true" /> : undefined}
+            onSelect={close} />
           <MenuItem
             icon={<IconWithBadge base={<Bug size={16} />} badge={<GithubMark />} />}
             label={t('Report Issue on GitHub')} href={HELP_LINKS.issue} onSelect={close} />
@@ -165,16 +183,18 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
       <button
         type="button"
         className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`}
-        aria-haspopup="menu"
+        aria-haspopup="true"
         aria-expanded={open}
+        // The visible userName label is display:none <420px; keep a stable name.
+        aria-label={t('Account: {name}', { name: userName })}
         onClick={onTriggerClick}
       >
-        <User size={15} className={styles.triggerLeadIcon} />
+        <User size={15} className={styles.triggerLeadIcon} aria-hidden="true" focusable={false} />
         <span className={styles.triggerLabel}>{userName}</span>
-        <ChevronDown size={15} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} />
+        <ChevronDown size={15} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} aria-hidden="true" focusable={false} />
       </button>
       {open && (
-        <div className={styles.panel} role="menu">
+        <div className={styles.panel}>
           <MenuItem icon={<User size={15} />} label={t('My account')} to="/account" onSelect={close} />
           <MenuItem icon={<Undo2 size={15} />} label={t('Back to the classic view')} onClick={backToClassicView} onSelect={close} />
           <MenuItem icon={<LogOut size={15} />} label={t('Sign out')} danger onClick={onLogout} onSelect={close} />
@@ -188,38 +208,65 @@ export function TopBar({ userName, instanceName, onLogout, onMenu }: TopBarProps
   const t = useT();
   const [, setLocation] = useLocation();
   const [q, setQ] = useState('');
+  // The search bar is hidden on narrow screens; a toggle button reveals it as an
+  // overlay row so mobile users can still search (Tier-3 gap).
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const term = q.trim();
     setLocation(term ? `/?q=${encodeURIComponent(term)}` : '/');
+    setMobileSearchOpen(false);
+  };
+  const toggleMobileSearch = () => {
+    setMobileSearchOpen((open) => {
+      const next = !open;
+      if (next) setTimeout(() => searchInputRef.current?.focus(), 0);
+      return next;
+    });
   };
   return (
     <header className={styles.bar}>
       <div className={styles.left}>
         {onMenu && (
           <button className={styles.menuBtn} onClick={onMenu} aria-label={t('Open navigation')}>
-            <Menu size={20} />
+            <Menu size={20} aria-hidden="true" focusable={false} />
           </button>
         )}
         <Link href="/" className={styles.brand}>
-          <BookMarked size={22} className={styles.brandIcon} />
+          <BookMarked size={22} className={styles.brandIcon} aria-hidden="true" focusable={false} />
           <span className={`${styles.brandText} ${styles.brandMain}`}>
             <BrandName name={instanceName} accentClassName={styles.brandAccent} />
           </span>
         </Link>
       </div>
-      <form className={styles.search} onSubmit={onSearch} role="search">
-        <Search size={16} className={styles.searchIcon} />
+      <form
+        className={`${styles.search} ${mobileSearchOpen ? styles.searchMobileOpen : ''}`}
+        onSubmit={onSearch}
+        role="search"
+      >
+        <Search size={16} className={styles.searchIcon} aria-hidden="true" focusable={false} />
         <input
+          ref={searchInputRef}
           type="search"
           className={styles.searchInput}
           placeholder={t('Search title, author…')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setMobileSearchOpen(false); }}
           aria-label={t('Search the library')}
         />
       </form>
       <div className={styles.right}>
+        <button
+          type="button"
+          className={styles.mobileSearchBtn}
+          onClick={toggleMobileSearch}
+          aria-label={t('Search the library')}
+          aria-expanded={mobileSearchOpen}
+        >
+          <Search size={20} aria-hidden="true" focusable={false} />
+        </button>
         <HelpMenu />
         <UserMenu userName={userName} onLogout={onLogout} />
       </div>

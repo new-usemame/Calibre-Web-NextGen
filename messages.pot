@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web Automated v4.0.6\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-04 04:46+0000\n"
+"POT-Creation-Date: 2026-07-05 04:22+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -143,7 +143,7 @@ msgstr ""
 msgid "{} users deleted successfully"
 msgstr ""
 
-#: cps/admin.py:801 cps/api/account.py:56
+#: cps/admin.py:801 cps/api/account.py:58
 #: cps/templates/config_view_edit.html:186 cps/templates/user_edit.html:270
 #: cps/templates/user_edit.html:292 cps/templates/user_table.html:81
 msgid "Show All"
@@ -958,7 +958,8 @@ msgstr ""
 msgid "Back to edit metadata"
 msgstr ""
 
-#: cps/cover_picker.py:116 cps/templates/book_edit.html:39
+#: cps/cover_picker.py:116 cps/spa_strings.py:64
+#: cps/templates/book_edit.html:39
 msgid "Back to book"
 msgstr ""
 
@@ -1618,7 +1619,7 @@ msgstr ""
 msgid "Only jpg/jpeg files are supported as coverfile"
 msgstr ""
 
-#: cps/helper.py:1695 cps/helper.py:1947
+#: cps/helper.py:1695 cps/helper.py:1947 cps/spa_strings.py:83
 msgid "Cover"
 msgstr ""
 
@@ -1908,9 +1909,10 @@ msgstr ""
 msgid "Books ordered by category"
 msgstr ""
 
-#: cps/opds.py:223 cps/render_template.py:107 cps/templates/book_edit.html:143
-#: cps/templates/book_table.html:111 cps/templates/cwa_settings.html:362
-#: cps/templates/cwa_settings.html:364 cps/templates/cwa_settings.html:1133
+#: cps/opds.py:223 cps/render_template.py:107 cps/spa_strings.py:152
+#: cps/templates/book_edit.html:143 cps/templates/book_table.html:111
+#: cps/templates/cwa_settings.html:362 cps/templates/cwa_settings.html:364
+#: cps/templates/cwa_settings.html:1133
 #: cps/templates/hardcover_review_matches.html:140
 #: cps/templates/search_form.html:70 cps/web.py:2113 cps/web.py:2125
 msgid "Series"
@@ -2105,10 +2107,11 @@ msgid ""
 "strings in your language still need translating."
 msgstr ""
 
-#: cps/search.py:53 cps/search.py:454 cps/templates/book_edit.html:338
-#: cps/templates/cwa_epub_fixer.html:25 cps/templates/feed.xml:43
-#: cps/templates/index.xml:12 cps/templates/layout.html:313
-#: cps/templates/layout.html:316 cps/templates/search_form.html:247
+#: cps/search.py:53 cps/search.py:454 cps/spa_strings.py:144
+#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
+#: cps/templates/feed.xml:43 cps/templates/index.xml:12
+#: cps/templates/layout.html:313 cps/templates/layout.html:316
+#: cps/templates/search_form.html:247
 msgid "Search"
 msgstr ""
 
@@ -2328,34 +2331,767 @@ msgstr ""
 msgid "Manual (drag below)"
 msgstr ""
 
-#: cps/spa_strings.py:29 cps/templates/detail.html:634
+#: cps/spa_strings.py:35 cps/templates/detail.html:634
 msgid "Read now"
 msgstr ""
 
-#: cps/spa_strings.py:33
+#: cps/spa_strings.py:39
 msgid "Series order"
 msgstr ""
 
-#: cps/spa_strings.py:34
+#: cps/spa_strings.py:40
 msgid "Series order (reverse)"
 msgstr ""
 
-#: cps/spa_strings.py:38 cps/templates/detail.html:966
+#: cps/spa_strings.py:44 cps/templates/detail.html:966
 #: cps/templates/detail.html:967 cps/templates/detail.html:1532
 msgid "Add tag"
 msgstr ""
 
-#: cps/spa_strings.py:39
+#: cps/spa_strings.py:45
 msgid "New tag"
 msgstr ""
 
-#: cps/spa_strings.py:40 cps/templates/detail.html:958
+#: cps/spa_strings.py:46 cps/templates/detail.html:958
 msgid "Remove tag"
 msgstr ""
 
-#: cps/spa_strings.py:41
+#: cps/spa_strings.py:47
 #, python-format
 msgid "Remove tag %(name)s"
+msgstr ""
+
+#: cps/spa_strings.py:56
+msgid "Add a format"
+msgstr ""
+
+#: cps/spa_strings.py:57
+msgid "Add rule"
+msgstr ""
+
+#: cps/spa_strings.py:58 cps/templates/detail.html:787
+#: cps/templates/detail.html:998 cps/templates/detail.html:999
+#: cps/templates/detail.html:1654 cps/templates/listenmp3.html:190
+#: cps/templates/search.html:17
+msgid "Add to shelf"
+msgstr ""
+
+#: cps/spa_strings.py:59
+msgid "Add your own"
+msgstr ""
+
+#: cps/spa_strings.py:60
+msgid "App password label"
+msgstr ""
+
+#: cps/spa_strings.py:61
+msgid "App passwords"
+msgstr ""
+
+#: cps/spa_strings.py:62 cps/templates/book_edit.html:135
+#: cps/templates/book_edit.html:459 cps/templates/cwa_settings.html:1121
+#: cps/templates/search_form.html:12
+msgid "Author"
+msgstr ""
+
+#: cps/spa_strings.py:63
+msgid "Authors (separate with &)"
+msgstr ""
+
+#: cps/spa_strings.py:65
+msgid "Back to sign in"
+msgstr ""
+
+#: cps/spa_strings.py:66 cps/templates/read.html:188
+msgid "Blue"
+msgstr ""
+
+#: cps/spa_strings.py:67
+msgid "Book content"
+msgstr ""
+
+#: cps/spa_strings.py:68 cps/templates/layout.html:610
+msgid "Browse"
+msgstr ""
+
+#: cps/spa_strings.py:69
+msgid "Change password"
+msgstr ""
+
+#: cps/spa_strings.py:70 cps/templates/book_edit.html:94
+#: cps/templates/book_edit.html:378 cps/templates/book_table.html:346
+#: cps/templates/cwng_feedback_popup.html:63
+#: cps/templates/cwng_feedback_popup.html:72 cps/templates/duplicates.html:766
+#: cps/templates/layout.html:358 cps/templates/layout.html:720
+#: cps/templates/layout.html:863 cps/templates/modal_dialogs.html:34
+#: cps/templates/shelf.html:110 cps/templates/update_now_modal.html:69
+#: cps/templates/user_edit.html:673
+msgid "Close"
+msgstr ""
+
+#: cps/spa_strings.py:71
+msgid "Close menu"
+msgstr ""
+
+#: cps/spa_strings.py:72
+msgid "Contents"
+msgstr ""
+
+#: cps/spa_strings.py:73
+msgid "Convert failed."
+msgstr ""
+
+#: cps/spa_strings.py:74
+msgid "Convert to format"
+msgstr ""
+
+#: cps/spa_strings.py:75 cps/templates/cwa_settings.html:770
+#: cps/templates/update_now_modal.html:36
+#: cps/templates/update_now_modal.html:45
+#: cps/templates/update_now_modal.html:63 cps/templates/user_edit.html:618
+msgid "Copy"
+msgstr ""
+
+#: cps/spa_strings.py:76
+msgid "Could not change password."
+msgstr ""
+
+#: cps/spa_strings.py:77
+msgid "Could not create."
+msgstr ""
+
+#: cps/spa_strings.py:78
+msgid "Could not fetch cover."
+msgstr ""
+
+#: cps/spa_strings.py:79
+msgid "Could not load metadata."
+msgstr ""
+
+#: cps/spa_strings.py:80
+#, python-brace-format
+msgid "Could not load the book file ({status})"
+msgstr ""
+
+#: cps/spa_strings.py:81
+msgid "Could not load your account."
+msgstr ""
+
+#: cps/spa_strings.py:82
+msgid "Could not save."
+msgstr ""
+
+#: cps/spa_strings.py:84
+msgid "Cover image URL"
+msgstr ""
+
+#: cps/spa_strings.py:85
+msgid "Cover update failed."
+msgstr ""
+
+#: cps/spa_strings.py:86 cps/templates/cover_picker.html:225
+msgid "Cover updated."
+msgstr ""
+
+#: cps/spa_strings.py:87
+msgid "Create smart shelf"
+msgstr ""
+
+#: cps/spa_strings.py:88
+msgid "Create your account"
+msgstr ""
+
+#: cps/spa_strings.py:89 cps/templates/read.html:109
+#: cps/templates/readcbr.html:106
+msgid "Dark"
+msgstr ""
+
+#: cps/spa_strings.py:90
+msgid "Dark theme"
+msgstr ""
+
+#: cps/spa_strings.py:91 cps/templates/_book_organizer.html:155
+#: cps/templates/admin.html:27 cps/templates/book_edit.html:59
+#: cps/templates/book_table.html:66 cps/templates/book_table.html:145
+#: cps/templates/book_table.html:194 cps/templates/duplicates.html:718
+#: cps/templates/modal_dialogs.html:63 cps/templates/modal_dialogs.html:116
+#: cps/templates/read.html:179 cps/templates/user_edit.html:333
+#: cps/templates/user_table.html:150
+msgid "Delete"
+msgstr ""
+
+#: cps/spa_strings.py:92
+#, python-brace-format
+msgid "Delete the {fmt} file? The book stays; only this format is removed."
+msgstr ""
+
+#: cps/spa_strings.py:93
+#, python-brace-format
+msgid "Delete {fmt}"
+msgstr ""
+
+#: cps/spa_strings.py:94
+#, python-brace-format
+msgid "Delete {n} book(s)? This cannot be undone."
+msgstr ""
+
+#: cps/spa_strings.py:95
+msgid "Description contains"
+msgstr ""
+
+#: cps/spa_strings.py:96
+#, python-brace-format
+msgid "Deselect {title}"
+msgstr ""
+
+#: cps/spa_strings.py:97
+msgid "Edit metadata"
+msgstr ""
+
+#: cps/spa_strings.py:98
+#, python-brace-format
+msgid "Edit {title}"
+msgstr ""
+
+#: cps/spa_strings.py:99
+msgid "Failed to load books."
+msgstr ""
+
+#: cps/spa_strings.py:100
+msgid "Failed to open the book."
+msgstr ""
+
+#: cps/spa_strings.py:101
+msgid "Generate"
+msgstr ""
+
+#: cps/spa_strings.py:102 cps/templates/read.html:187
+msgid "Green"
+msgstr ""
+
+#: cps/spa_strings.py:103
+msgid "Help"
+msgstr ""
+
+#: cps/spa_strings.py:104
+msgid "Highlight color"
+msgstr ""
+
+#: cps/spa_strings.py:105 cps/templates/annotations_view.html:46
+msgid "Import from Kobo"
+msgstr ""
+
+#: cps/spa_strings.py:106
+msgid "Interface language"
+msgstr ""
+
+#: cps/spa_strings.py:107
+msgid "Invalid username or password."
+msgstr ""
+
+#: cps/spa_strings.py:108
+msgid "Label (e.g. KOReader on phone)"
+msgstr ""
+
+#: cps/spa_strings.py:109
+msgid "Languages (comma separated)"
+msgstr ""
+
+#: cps/spa_strings.py:110 cps/templates/read.html:108
+#: cps/templates/readcbr.html:105
+msgid "Light"
+msgstr ""
+
+#: cps/spa_strings.py:111
+msgid "Light theme"
+msgstr ""
+
+#: cps/spa_strings.py:112
+msgid "Login failed."
+msgstr ""
+
+#: cps/spa_strings.py:113
+msgid "Mark read"
+msgstr ""
+
+#: cps/spa_strings.py:114
+msgid "Mark unread"
+msgstr ""
+
+#: cps/spa_strings.py:115 cps/templates/book_table.html:48
+#: cps/templates/book_table.html:175 cps/templates/duplicates.html:745
+msgid "Merge"
+msgstr ""
+
+#: cps/spa_strings.py:116
+#, python-brace-format
+msgid "Metadata applied to {n} book(s)."
+msgstr ""
+
+#: cps/spa_strings.py:117
+#, python-brace-format
+msgid "New password for “{label}” — copy it now, it won’t be shown again:"
+msgstr ""
+
+#: cps/spa_strings.py:118
+msgid "New passwords do not match."
+msgstr ""
+
+#: cps/spa_strings.py:119
+msgid "No books here."
+msgstr ""
+
+#: cps/spa_strings.py:120
+#, python-brace-format
+msgid "No results for \"{q}\"."
+msgstr ""
+
+#: cps/spa_strings.py:121
+#, python-brace-format
+msgid "No {filter} books here."
+msgstr ""
+
+#: cps/spa_strings.py:122
+msgid "Password changed."
+msgstr ""
+
+#: cps/spa_strings.py:123
+msgid "Paste URL"
+msgstr ""
+
+#: cps/spa_strings.py:124
+msgid "Private shelf"
+msgstr ""
+
+#: cps/spa_strings.py:125
+msgid "Profile"
+msgstr ""
+
+#: cps/spa_strings.py:126
+msgid "Profile saved."
+msgstr ""
+
+#: cps/spa_strings.py:127
+msgid "Public shelf"
+msgstr ""
+
+#: cps/spa_strings.py:128 cps/templates/book_edit.html:159
+#: cps/templates/book_edit.html:460 cps/templates/cwa_settings.html:348
+#: cps/templates/cwa_settings.html:350 cps/templates/cwa_settings.html:1139
+#: cps/templates/detail.html:1006
+#: cps/templates/hardcover_review_matches.html:148
+#: cps/templates/listenmp3.html:102 cps/templates/search_form.html:16
+msgid "Publisher"
+msgstr ""
+
+#: cps/spa_strings.py:129
+msgid "Publishers (comma separated)"
+msgstr ""
+
+#: cps/spa_strings.py:130 cps/templates/image.html:26
+#: cps/templates/listenmp3.html:159
+msgid "Read"
+msgstr ""
+
+#: cps/spa_strings.py:131
+msgid "Reading progress"
+msgstr ""
+
+#: cps/spa_strings.py:132 cps/templates/read.html:186
+msgid "Red"
+msgstr ""
+
+#: cps/spa_strings.py:133
+msgid "Registration failed."
+msgstr ""
+
+#: cps/spa_strings.py:134
+#, python-brace-format
+msgid "Remove {name}"
+msgstr ""
+
+#: cps/spa_strings.py:135
+msgid "Request failed."
+msgstr ""
+
+#: cps/spa_strings.py:136
+msgid "Reset"
+msgstr ""
+
+#: cps/spa_strings.py:137
+msgid "Reset your password"
+msgstr ""
+
+#: cps/spa_strings.py:138
+#, python-brace-format
+msgid "Revoke {label}"
+msgstr ""
+
+#: cps/spa_strings.py:139
+msgid "Save changes"
+msgstr ""
+
+#: cps/spa_strings.py:140
+msgid "Save failed."
+msgstr ""
+
+#: cps/spa_strings.py:141
+msgid "Save profile"
+msgstr ""
+
+#: cps/spa_strings.py:142
+msgid "Saved."
+msgstr ""
+
+#: cps/spa_strings.py:143 cps/templates/shelf_order.html:33
+msgid "Saving…"
+msgstr ""
+
+#: cps/spa_strings.py:145
+msgid "Search failed."
+msgstr ""
+
+#: cps/spa_strings.py:146
+msgid "Search for metadata"
+msgstr ""
+
+#: cps/spa_strings.py:147 cps/templates/shelf.html:119
+msgid "Search results"
+msgstr ""
+
+#: cps/spa_strings.py:148
+msgid "Search the library"
+msgstr ""
+
+#: cps/spa_strings.py:149
+#, python-brace-format
+msgid "Select {title}"
+msgstr ""
+
+#: cps/spa_strings.py:150 cps/templates/read.html:110
+msgid "Sepia"
+msgstr ""
+
+#: cps/spa_strings.py:151
+msgid "Sepia theme"
+msgstr ""
+
+#: cps/spa_strings.py:153
+#, python-brace-format
+msgid "Series position {n}"
+msgstr ""
+
+#: cps/spa_strings.py:154
+msgid "Sign in"
+msgstr ""
+
+#: cps/spa_strings.py:155
+msgid "Sign in failed. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py:156
+msgid "Skip to content"
+msgstr ""
+
+#: cps/spa_strings.py:157
+msgid "Some fields could not be saved."
+msgstr ""
+
+#: cps/spa_strings.py:158
+msgid "Table of contents"
+msgstr ""
+
+#: cps/spa_strings.py:159
+msgid "Tags (comma separated)"
+msgstr ""
+
+#: cps/spa_strings.py:160 cps/templates/book_table.html:106
+#: cps/templates/config_view_edit.html:39 cps/templates/cwa_settings.html:327
+#: cps/templates/cwa_settings.html:329 cps/templates/cwa_settings.html:1115
+#: cps/templates/shelf_edit.html:8 cps/templates/tasks.html:41
+#: cps/templates/tasks.html:64
+msgid "Title"
+msgstr ""
+
+#: cps/spa_strings.py:161
+msgid "Unread"
+msgstr ""
+
+#: cps/spa_strings.py:162
+msgid "Update password"
+msgstr ""
+
+#: cps/spa_strings.py:163 cps/tasks/upload.py:28 cps/templates/admin.html:22
+#: cps/templates/layout.html:361 cps/templates/user_table.html:146
+msgid "Upload"
+msgstr ""
+
+#: cps/spa_strings.py:164
+msgid "Upload failed."
+msgstr ""
+
+#: cps/spa_strings.py:165
+msgid "Upload image"
+msgstr ""
+
+#: cps/spa_strings.py:166
+msgid "Uploading…"
+msgstr ""
+
+#: cps/spa_strings.py:167 cps/templates/read.html:185
+msgid "Yellow"
+msgstr ""
+
+#: cps/spa_strings.py:168
+msgid "e.g. MOBI"
+msgstr ""
+
+#: cps/spa_strings.py:169
+#, python-brace-format
+msgid "{format} reader"
+msgstr ""
+
+#: cps/spa_strings.py:170
+#, python-brace-format
+msgid "{name} API key"
+msgstr ""
+
+#: cps/spa_strings.py:171
+#, python-brace-format
+msgid "{n} book(s) added to the shelf."
+msgstr ""
+
+#: cps/spa_strings.py:172
+#, python-brace-format
+msgid "{n} book(s) deleted."
+msgstr ""
+
+#: cps/spa_strings.py:173
+#, python-brace-format
+msgid "{n} marked as read."
+msgstr ""
+
+#: cps/spa_strings.py:174
+#, python-brace-format
+msgid "{n} marked as unread."
+msgstr ""
+
+#: cps/spa_strings.py:175 cps/templates/_book_organizer.html:162
+#, python-brace-format
+msgid "{n} selected"
+msgstr ""
+
+#: cps/spa_strings.py:176
+#, python-brace-format, python-format
+msgid "{pct}% read"
+msgstr ""
+
+#: cps/spa_strings.py:182
+msgid "What's new"
+msgstr ""
+
+#: cps/spa_strings.py:183
+msgid "Help — new updates available"
+msgstr ""
+
+#: cps/spa_strings.py:184
+msgid "The latest features and fixes in Calibre-Web NextGen — newest first."
+msgstr ""
+
+#: cps/spa_strings.py:185
+#, python-brace-format
+msgid "{n} update"
+msgstr ""
+
+#: cps/spa_strings.py:186
+#, python-brace-format
+msgid "{n} updates"
+msgstr ""
+
+#: cps/spa_strings.py:187
+msgid "No release notes yet — check back after the next update."
+msgstr ""
+
+#: cps/spa_strings.py:188
+msgid ""
+"The interface is translated into your language; these update notes are "
+"written in English."
+msgstr ""
+
+#: cps/spa_strings.py:190 cps/templates/image.html:27
+msgid "Reading"
+msgstr ""
+
+#: cps/spa_strings.py:191
+msgid "Library"
+msgstr ""
+
+#: cps/spa_strings.py:192
+msgid "Sync"
+msgstr ""
+
+#: cps/spa_strings.py:193 cps/templates/layout.html:340
+#: cps/templates/layout.html:376 cps/templates/user_edit.html:312
+#: cps/templates/user_edit.html:314
+msgid "Account"
+msgstr ""
+
+#: cps/spa_strings.py:194 cps/templates/admin.html:19
+#: cps/templates/layout.html:372 cps/templates/user_table.html:144
+msgid "Admin"
+msgstr ""
+
+#: cps/spa_strings.py:195
+msgid "Under the hood"
+msgstr ""
+
+#: cps/spa_strings.py:198
+msgid "Open your library"
+msgstr ""
+
+#: cps/spa_strings.py:199
+msgid "Open your shelves"
+msgstr ""
+
+#: cps/spa_strings.py:200
+msgid "Manage sync & app passwords"
+msgstr ""
+
+#: cps/spa_strings.py:201
+msgid "Create an app password"
+msgstr ""
+
+#: cps/spa_strings.py:202
+msgid "Browse series"
+msgstr ""
+
+#: cps/spa_strings.py:203
+msgid "Open Table view"
+msgstr ""
+
+#: cps/spa_strings.py:204
+msgid "Open Admin"
+msgstr ""
+
+#: cps/spa_strings.py:205
+msgid "Browse Discover"
+msgstr ""
+
+#: cps/spa_strings.py:206
+msgid "Explore your library"
+msgstr ""
+
+#: cps/spa_strings.py:207
+msgid "Go to Upload"
+msgstr ""
+
+#: cps/spa_strings.py:209
+msgid "Editions"
+msgstr ""
+
+#: cps/spa_strings.py:210
+msgid "Back to results"
+msgstr ""
+
+#: cps/spa_strings.py:211
+msgid "No editions found for this book."
+msgstr ""
+
+#: cps/spa_strings.py:213
+msgid "View all details"
+msgstr ""
+
+#: cps/spa_strings.py:214
+msgid "Result details"
+msgstr ""
+
+#: cps/spa_strings.py:215 cps/templates/detail.html:1012
+#: cps/templates/listenmp3.html:111
+msgid "Published"
+msgstr ""
+
+#: cps/spa_strings.py:216 cps/templates/cwa_settings.html:1145
+msgid "Format"
+msgstr ""
+
+#: cps/spa_strings.py:217 cps/templates/book_edit.html:462
+msgid "Source"
+msgstr ""
+
+#: cps/spa_strings.py:220
+msgid "Customize"
+msgstr ""
+
+#: cps/spa_strings.py:221
+msgid "Customize sidebar"
+msgstr ""
+
+#: cps/spa_strings.py:222 cps/templates/_book_organizer.html:164
+msgid "Done"
+msgstr ""
+
+#: cps/spa_strings.py:223
+msgid "Reset to default"
+msgstr ""
+
+#: cps/spa_strings.py:224
+msgid "Always shown"
+msgstr ""
+
+#: cps/spa_strings.py:225
+msgid "Editing sidebar. Reorder or hide sections, then tap Done."
+msgstr ""
+
+#: cps/spa_strings.py:226
+msgid "Editing cancelled."
+msgstr ""
+
+#: cps/spa_strings.py:227
+msgid ""
+"Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused "
+"handle."
+msgstr ""
+
+#: cps/spa_strings.py:228
+msgid "Sidebar saved."
+msgstr ""
+
+#: cps/spa_strings.py:229
+msgid "Sidebar reset to default."
+msgstr ""
+
+#: cps/spa_strings.py:230
+#, python-brace-format
+msgid "{label} moved to position {pos} of {total}"
+msgstr ""
+
+#: cps/spa_strings.py:231
+#, python-brace-format
+msgid "Reorder {label} (position {pos} of {total}). Use arrow keys to move."
+msgstr ""
+
+#: cps/spa_strings.py:232
+#, python-brace-format
+msgid "Delete {label}"
+msgstr ""
+
+#: cps/spa_strings.py:233
+#, python-brace-format
+msgid "Restore {label}"
+msgstr ""
+
+#: cps/spa_strings.py:234
+#, python-brace-format
+msgid "{label} hidden"
+msgstr ""
+
+#: cps/spa_strings.py:235
+#, python-brace-format
+msgid "{label} restored"
+msgstr ""
+
+#: cps/spa_strings.py:236
+msgid "Could not save sidebar. Please try again."
 msgstr ""
 
 #: cps/tasks_status.py:37 cps/templates/layout.html:369
@@ -2954,11 +3690,6 @@ msgstr ""
 msgid "Clearing cover thumbnail cache"
 msgstr ""
 
-#: cps/tasks/upload.py:28 cps/templates/admin.html:22
-#: cps/templates/layout.html:361 cps/templates/user_table.html:146
-msgid "Upload"
-msgstr ""
-
 #: cps/templates/_book_organizer.html:11
 msgid "Book organizer"
 msgstr ""
@@ -3013,24 +3744,6 @@ msgstr ""
 #: cps/templates/_book_organizer.html:145 cps/templates/book_table.html:63
 #: cps/templates/book_table.html:274
 msgid "Mark as unread"
-msgstr ""
-
-#: cps/templates/_book_organizer.html:155 cps/templates/admin.html:27
-#: cps/templates/book_edit.html:59 cps/templates/book_table.html:66
-#: cps/templates/book_table.html:145 cps/templates/book_table.html:194
-#: cps/templates/duplicates.html:718 cps/templates/modal_dialogs.html:63
-#: cps/templates/modal_dialogs.html:116 cps/templates/read.html:179
-#: cps/templates/user_edit.html:333 cps/templates/user_table.html:150
-msgid "Delete"
-msgstr ""
-
-#: cps/templates/_book_organizer.html:162
-#, python-brace-format
-msgid "{n} selected"
-msgstr ""
-
-#: cps/templates/_book_organizer.html:164
-msgid "Done"
 msgstr ""
 
 #: cps/templates/_book_organizer.html:180
@@ -3132,11 +3845,6 @@ msgstr ""
 
 #: cps/templates/admin.html:17 cps/templates/user_edit.html:228
 msgid "Send to eReader Subject"
-msgstr ""
-
-#: cps/templates/admin.html:19 cps/templates/layout.html:372
-#: cps/templates/user_table.html:144
-msgid "Admin"
 msgstr ""
 
 #: cps/templates/admin.html:20 cps/templates/login.html:22
@@ -3556,10 +4264,6 @@ msgstr ""
 msgid "No annotations on this book yet."
 msgstr ""
 
-#: cps/templates/annotations_view.html:46
-msgid "Import from Kobo"
-msgstr ""
-
 #: cps/templates/author.html:18
 msgid "via"
 msgstr ""
@@ -3607,16 +4311,6 @@ msgstr ""
 msgid "Convert book"
 msgstr ""
 
-#: cps/templates/book_edit.html:94 cps/templates/book_edit.html:378
-#: cps/templates/book_table.html:346 cps/templates/cwng_feedback_popup.html:63
-#: cps/templates/cwng_feedback_popup.html:72 cps/templates/duplicates.html:766
-#: cps/templates/layout.html:358 cps/templates/layout.html:720
-#: cps/templates/layout.html:863 cps/templates/modal_dialogs.html:34
-#: cps/templates/shelf.html:110 cps/templates/update_now_modal.html:69
-#: cps/templates/user_edit.html:673
-msgid "Close"
-msgstr ""
-
 #: cps/templates/book_edit.html:94 cps/templates/duplicates.html:799
 #: cps/templates/hardcover_review_matches.html:279
 #: cps/templates/hardcover_review_matches.html:288
@@ -3638,11 +4332,6 @@ msgstr ""
 msgid "Imported as"
 msgstr ""
 
-#: cps/templates/book_edit.html:135 cps/templates/book_edit.html:459
-#: cps/templates/cwa_settings.html:1121 cps/templates/search_form.html:12
-msgid "Author"
-msgstr ""
-
 #: cps/templates/book_edit.html:139 cps/templates/search_form.html:52
 msgid "Tags"
 msgstr ""
@@ -3653,14 +4342,6 @@ msgstr ""
 
 #: cps/templates/book_edit.html:150
 msgid "Published Date"
-msgstr ""
-
-#: cps/templates/book_edit.html:159 cps/templates/book_edit.html:460
-#: cps/templates/cwa_settings.html:348 cps/templates/cwa_settings.html:350
-#: cps/templates/cwa_settings.html:1139 cps/templates/detail.html:1006
-#: cps/templates/hardcover_review_matches.html:148
-#: cps/templates/listenmp3.html:102 cps/templates/search_form.html:16
-msgid "Publisher"
 msgstr ""
 
 #: cps/templates/book_edit.html:163 cps/templates/cwa_settings.html:1127
@@ -3816,19 +4497,10 @@ msgstr ""
 msgid "No Result(s) found! Please try another keyword."
 msgstr ""
 
-#: cps/templates/book_edit.html:462
-msgid "Source"
-msgstr ""
-
 #: cps/templates/book_table.html:12 cps/templates/book_table.html:112
 #: cps/templates/user_table.html:14 cps/templates/user_table.html:77
 #: cps/templates/user_table.html:100
 msgid "This Field is Required"
-msgstr ""
-
-#: cps/templates/book_table.html:48 cps/templates/book_table.html:175
-#: cps/templates/duplicates.html:745
-msgid "Merge"
 msgstr ""
 
 #: cps/templates/book_table.html:54 cps/templates/book_table.html:214
@@ -3862,13 +4534,6 @@ msgstr ""
 
 #: cps/templates/book_table.html:106 cps/templates/book_table.html:112
 msgid "Enter Title"
-msgstr ""
-
-#: cps/templates/book_table.html:106 cps/templates/config_view_edit.html:39
-#: cps/templates/cwa_settings.html:327 cps/templates/cwa_settings.html:329
-#: cps/templates/cwa_settings.html:1115 cps/templates/shelf_edit.html:8
-#: cps/templates/tasks.html:41 cps/templates/tasks.html:64
-msgid "Title"
 msgstr ""
 
 #: cps/templates/book_table.html:107
@@ -5168,10 +5833,6 @@ msgstr ""
 msgid "Applying…"
 msgstr ""
 
-#: cps/templates/cover_picker.html:225
-msgid "Cover updated."
-msgstr ""
-
 #: cps/templates/cover_picker.html:226
 msgid "Something went wrong. Try again."
 msgstr ""
@@ -5754,12 +6415,6 @@ msgstr ""
 msgid "Copied!"
 msgstr ""
 
-#: cps/templates/cwa_settings.html:770 cps/templates/update_now_modal.html:36
-#: cps/templates/update_now_modal.html:45
-#: cps/templates/update_now_modal.html:63 cps/templates/user_edit.html:618
-msgid "Copy"
-msgstr ""
-
 #: cps/templates/cwa_settings.html:773
 msgid ""
 "The label means Watchtower only ever touches Calibre-Web NextGen. The "
@@ -6058,10 +6713,6 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html:1140
 msgid "Consider book publisher when detecting duplicates"
-msgstr ""
-
-#: cps/templates/cwa_settings.html:1145
-msgid "Format"
 msgstr ""
 
 #: cps/templates/cwa_settings.html:1146
@@ -6413,12 +7064,6 @@ msgstr ""
 msgid "Unhidden"
 msgstr ""
 
-#: cps/templates/detail.html:787 cps/templates/detail.html:998
-#: cps/templates/detail.html:999 cps/templates/detail.html:1654
-#: cps/templates/listenmp3.html:190 cps/templates/search.html:17
-msgid "Add to shelf"
-msgstr ""
-
 #: cps/templates/detail.html:810 cps/templates/detail.html:992
 msgid "Remove from shelf"
 msgstr ""
@@ -6471,10 +7116,6 @@ msgstr ""
 
 #: cps/templates/detail.html:914
 msgid "File sizes"
-msgstr ""
-
-#: cps/templates/detail.html:1012 cps/templates/listenmp3.html:111
-msgid "Published"
 msgstr ""
 
 #: cps/templates/detail.html:1018
@@ -6981,14 +7622,6 @@ msgstr ""
 msgid "Favorite"
 msgstr ""
 
-#: cps/templates/image.html:26 cps/templates/listenmp3.html:159
-msgid "Read"
-msgstr ""
-
-#: cps/templates/image.html:27
-msgid "Reading"
-msgstr ""
-
 #: cps/templates/index.html:104
 msgid "Mobile Notice"
 msgstr ""
@@ -7063,11 +7696,6 @@ msgstr ""
 msgid "Switch to New UI"
 msgstr ""
 
-#: cps/templates/layout.html:340 cps/templates/layout.html:376
-#: cps/templates/user_edit.html:312 cps/templates/user_edit.html:314
-msgid "Account"
-msgstr ""
-
 #: cps/templates/layout.html:346 cps/templates/layout.html:378
 msgid "Logout"
 msgstr ""
@@ -7111,10 +7739,6 @@ msgstr ""
 
 #: cps/templates/layout.html:550
 msgid "Please do not refresh the page"
-msgstr ""
-
-#: cps/templates/layout.html:610
-msgid "Browse"
 msgstr ""
 
 #: cps/templates/layout.html:633
@@ -7420,18 +8044,6 @@ msgstr ""
 msgid "Theme"
 msgstr ""
 
-#: cps/templates/read.html:108 cps/templates/readcbr.html:105
-msgid "Light"
-msgstr ""
-
-#: cps/templates/read.html:109 cps/templates/readcbr.html:106
-msgid "Dark"
-msgstr ""
-
-#: cps/templates/read.html:110
-msgid "Sepia"
-msgstr ""
-
 #: cps/templates/read.html:111
 msgid "Black"
 msgstr ""
@@ -7494,22 +8106,6 @@ msgstr ""
 
 #: cps/templates/read.html:182
 msgid "Select within a paragraph to highlight."
-msgstr ""
-
-#: cps/templates/read.html:185
-msgid "Yellow"
-msgstr ""
-
-#: cps/templates/read.html:186
-msgid "Red"
-msgstr ""
-
-#: cps/templates/read.html:187
-msgid "Green"
-msgstr ""
-
-#: cps/templates/read.html:188
-msgid "Blue"
 msgstr ""
 
 #: cps/templates/readcbr.html:8
@@ -7826,10 +8422,6 @@ msgstr ""
 msgid "Search your library"
 msgstr ""
 
-#: cps/templates/shelf.html:119
-msgid "Search results"
-msgstr ""
-
 #: cps/templates/shelf_edit.html:14
 msgid "Share with Everyone"
 msgstr ""
@@ -7848,10 +8440,6 @@ msgstr ""
 
 #: cps/templates/shelf_order.html:30
 msgid "Keyboard: focus a cover with Tab, then move it with the arrow keys."
-msgstr ""
-
-#: cps/templates/shelf_order.html:33
-msgid "Saving…"
 msgstr ""
 
 #: cps/templates/shelf_order.html:34

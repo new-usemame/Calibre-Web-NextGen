@@ -26,8 +26,21 @@
   border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface-1);
   position: sticky; top: 0;
 }
-.sortable { cursor: pointer; user-select: none; }
-.sortable:hover { color: var(--text); }
+.sortable { user-select: none; }
+/* Sort control fills the header cell so the whole cell is the click/tap target. */
+.thButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: calc(-1 * var(--sp-3));
+  padding: var(--sp-3);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.thButton:hover { color: var(--text); }
 .thInner { display: inline-flex; align-items: center; gap: 4px; }
 .table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
 /* Desktop only: let unbreakable tokens (filename-style titles) wrap instead of

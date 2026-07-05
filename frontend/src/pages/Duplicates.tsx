@@ -38,7 +38,7 @@ export function Duplicates() {
       ) : (
         <div className={styles.groups}>
           {data.items.map((g) => (
-            <section key={g.group_hash} className={styles.group}>
+            <section key={g.group_hash} className={styles.group} aria-label={`${g.title} — ${g.author}`}>
               <div className={styles.groupHead}>
                 <div>
                   <span className={styles.groupTitle}>{g.title}</span>

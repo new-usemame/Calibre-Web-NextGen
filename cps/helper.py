@@ -511,6 +511,45 @@ def get_sorted_author(value):
     return value2
 
 
+def reset_reading_position(session, user_id, book_id):
+    """Clear a user's stored reading position for one book so marking it
+    'unread' is a genuine reset (#683).
+
+    Two independent stores surface as the "% read" the user sees:
+      * ``ub.KoboReadingState.current_bookmark`` — the KOReader/Kobo synced
+        progress percentage shown on the classic detail page and the new-UI book
+        page (fork #587);
+      * ``ub.Bookmark`` — the web-reader (epub.js) resume point, keyed per
+        format; left in place it re-derives the percentage on the next reader
+        scroll, so the ghost would return.
+
+    Kobo/KOReader propagation is automatic: zeroing the KoboBookmark bumps its
+    ``last_modified`` (onupdate) and the before_flush listener in ``ub.py`` lifts
+    that onto the parent KoboReadingState, so the reset is emitted as the newest
+    reading state on the device's next sync. A device that still holds a position
+    legitimately re-establishes it on its next push — the device owns its own
+    position, and device sync never routes through this function.
+
+    Returns the number of position records cleared (bookmarks deleted + a
+    progress row zeroed) so callers/tests can tell it acted.
+    """
+    uid = int(user_id)
+    cleared = session.query(ub.Bookmark).filter(
+        ub.Bookmark.user_id == uid,
+        ub.Bookmark.book_id == book_id).delete(synchronize_session=False)
+    kobo_state = session.query(ub.KoboReadingState).filter(
+        ub.KoboReadingState.user_id == uid,
+        ub.KoboReadingState.book_id == book_id).first()
+    if kobo_state is not None and kobo_state.current_bookmark is not None:
+        bookmark = kobo_state.current_bookmark
+        if (bookmark.progress_percent is not None
+                or bookmark.content_source_progress_percent is not None):
+            bookmark.progress_percent = None
+            bookmark.content_source_progress_percent = None
+            cleared += 1
+    return cleared
+
+
 def edit_book_read_status(book_id, read_status=None):
     if not config.config_read_column:
         book = ub.session.query(ub.ReadBook).filter(and_(ub.ReadBook.user_id == int(current_user.id),
@@ -527,14 +566,20 @@ def edit_book_read_status(book_id, read_status=None):
             read_book = ub.ReadBook(user_id=current_user.id, book_id=book_id)
             read_book.read_status = ub.ReadBook.STATUS_FINISHED
             book = read_book
+        now_unread = book.read_status == ub.ReadBook.STATUS_UNREAD
         if not book.kobo_reading_state:
             kobo_reading_state = ub.KoboReadingState(user_id=current_user.id, book_id=book_id)
             kobo_reading_state.current_bookmark = ub.KoboBookmark()
             kobo_reading_state.statistics = ub.KoboStatistics()
             book.kobo_reading_state = kobo_reading_state
+        # #683: marking a book unread resets its reading progress so the ghost
+        # "% read" the user can't otherwise clear goes away.
+        if now_unread:
+            reset_reading_position(ub.session, current_user.id, book_id)
         ub.session.merge(book)
         ub.session_commit("Book {} readbit toggled".format(book_id))
     else:
+        now_unread = False
         try:
             book = calibre_db.get_filtered_book(book_id, True)
             book_read_status = getattr(book, 'custom_column_' + str(config.config_read_column))
@@ -544,6 +589,7 @@ def edit_book_read_status(book_id, read_status=None):
                 else:
                     book_read_status[0].value = read_status is True
                 calibre_db.session.commit()
+                now_unread = not book_read_status[0].value
             else:
                 cc_class = db.cc_classes[config.config_read_column]
                 new_cc = cc_class(value=read_status or 1, book=book_id)
@@ -557,6 +603,11 @@ def edit_book_read_status(book_id, read_status=None):
             calibre_db.session.rollback()
             log.error("Read status could not set: {}".format(ex))
             return _("Read status could not set: {}".format(ex.orig))
+        # #683: keep the reading progress in step with a custom read column too —
+        # marking unread there also clears the ghost "% read".
+        if now_unread:
+            reset_reading_position(ub.session, current_user.id, book_id)
+            ub.session_commit("Reading progress reset for book {}".format(book_id))
     return ""
 
 

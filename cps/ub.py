@@ -2456,8 +2456,11 @@ def migrate_annotation_decouple_source_target(engine, _session):
     8-step transactional migration. Idempotent. See
     notes/2026-05-21-annotation-decouple-source-target-DESIGN.md §4.
 
-    Refuses destructive steps if the sanity check (step 4) detects a
-    count mismatch — DB stays in pre-migration state in that case.
+    Refuses destructive steps if the sanity check (step 4) finds a
+    ``synced_to_hardcover`` row left without a matching
+    ``annotation_sync_target`` row (an incomplete backfill) — DB stays in
+    pre-migration state in that case. Organic pipeline-written target rows
+    are ignored, so a Hardcover-synced server no longer trips the check.
 
     Note on co-existence: ``add_missing_tables`` (which runs before this
     migration in ``migrate_Database``) creates an empty ``annotation``

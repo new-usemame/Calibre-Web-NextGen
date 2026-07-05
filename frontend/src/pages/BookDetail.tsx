@@ -92,7 +92,7 @@ function SendPanel({ formats, pending, banner, onSend }: SendPanelProps) {
           {pending ? t('Sending…') : t('Send')}
         </button>
       </div>
-      {banner && <p className={banner.ok ? styles.sendOk : styles.sendErr}>{banner.text}</p>}
+      <p className={banner ? (banner.ok ? styles.sendOk : styles.sendErr) : undefined} role="status">{banner?.text}</p>
     </div>
   );
 }

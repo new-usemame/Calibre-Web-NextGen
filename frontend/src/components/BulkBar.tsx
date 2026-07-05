@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Check, X, BookCopy, Trash2, CheckCheck, Pencil, Combine } from 'lucide-react';
 import { useBulkActions, useShelves, useMe, useMergeBooks } from '../lib/queries';
 import { useT } from '../lib/i18n';
+import { useAnnouncer } from '../lib/a11y/announcer';
 import { Spinner } from './Spinner';
 import type { MetadataUpdate } from '../lib/api';
 import styles from './BulkBar.module.css';
@@ -18,6 +19,7 @@ interface BulkBarProps {
  *  out over the selected book ids via the existing per-book endpoints. */
 export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
   const t = useT();
+  const announce = useAnnouncer();
   const me = useMe().data;
   const { markRead, addToShelf, remove, setMetadata } = useBulkActions();
   const mergeBooks = useMergeBooks();
@@ -32,8 +34,13 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
     const onDoc = (e: MouseEvent) => {
       if (shelfRef.current && !shelfRef.current.contains(e.target as Node)) setShelfOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShelfOpen(false); };
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [shelfOpen]);
 
   const canDelete = !!me?.role?.delete_books;
@@ -52,15 +59,24 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
   };
 
   const onDelete = () => {
-    if (!window.confirm(`Delete ${count} book${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
-    remove.mutate(ids, { onSuccess: () => { onChanged?.(); onClear(); } });
+    if (!window.confirm(t('Delete {n} book(s)? This cannot be undone.', { n: count }))) return;
+    remove.mutate(ids, {
+      onSuccess: () => { announce(t('{n} book(s) deleted.', { n: count })); onChanged?.(); onClear(); },
+    });
   };
 
   const doMarkRead = (read: boolean) =>
-    markRead.mutate({ ids, read }, { onSuccess: () => onChanged?.() });
+    markRead.mutate({ ids, read }, {
+      onSuccess: () => {
+        announce(read ? t('{n} marked as read.', { n: count }) : t('{n} marked as unread.', { n: count }));
+        onChanged?.();
+      },
+    });
 
   const doAddToShelf = (shelfId: number) => {
-    addToShelf.mutate({ ids, shelfId }, { onSuccess: () => onChanged?.() });
+    addToShelf.mutate({ ids, shelfId }, {
+      onSuccess: () => { announce(t('{n} book(s) added to the shelf.', { n: count })); onChanged?.(); },
+    });
     setShelfOpen(false);
   };
 
@@ -76,6 +92,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
     if (Object.keys(fields).length === 0) return;
     setMetadata.mutate({ ids, fields }, {
       onSuccess: () => {
+        announce(t('Metadata applied to {n} book(s).', { n: count }));
         onChanged?.();
         setMetaOpen(false);
         setMeta({ tags: '', series: '', publishers: '', languages: '', authors: '' });
@@ -89,15 +106,15 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
       <div className={styles.metaPanel}>
         <p className={styles.metaHint}>{t('Apply to all selected (only filled fields change; replaces existing values):')}</p>
         <div className={styles.metaGrid}>
-          <input placeholder={t('Authors (separate with &)')} value={meta.authors}
+          <input placeholder={t('Authors (separate with &)')} aria-label={t('Authors (separate with &)')} value={meta.authors}
             onChange={(e) => setMeta({ ...meta, authors: e.target.value })} />
-          <input placeholder={t('Series')} value={meta.series}
+          <input placeholder={t('Series')} aria-label={t('Series')} value={meta.series}
             onChange={(e) => setMeta({ ...meta, series: e.target.value })} />
-          <input placeholder={t('Tags (comma separated)')} value={meta.tags}
+          <input placeholder={t('Tags (comma separated)')} aria-label={t('Tags (comma separated)')} value={meta.tags}
             onChange={(e) => setMeta({ ...meta, tags: e.target.value })} />
-          <input placeholder={t('Publishers (comma separated)')} value={meta.publishers}
+          <input placeholder={t('Publishers (comma separated)')} aria-label={t('Publishers (comma separated)')} value={meta.publishers}
             onChange={(e) => setMeta({ ...meta, publishers: e.target.value })} />
-          <input placeholder={t('Languages (comma separated)')} value={meta.languages}
+          <input placeholder={t('Languages (comma separated)')} aria-label={t('Languages (comma separated)')} value={meta.languages}
             onChange={(e) => setMeta({ ...meta, languages: e.target.value })} />
         </div>
         <button className={styles.metaApply} onClick={applyMeta} disabled={setMetadata.isPending}>
@@ -106,27 +123,29 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
       </div>
     )}
     <div className={styles.bar} role="toolbar" aria-label={t('Bulk actions')}>
-      <span className={styles.count}>{count} selected</span>
+      <span className={styles.count}>{t('{n} selected', { n: count })}</span>
 
       <div className={styles.actions}>
         <button className={styles.action} disabled={busy}
           onClick={() => doMarkRead(true)}>
-          <CheckCheck size={15} /> {t('Mark read')}
+          <CheckCheck size={15} aria-hidden="true" focusable={false} /> {t('Mark read')}
         </button>
         <button className={styles.action} disabled={busy}
           onClick={() => doMarkRead(false)}>
-          <Check size={15} /> {t('Mark unread')}
+          <Check size={15} aria-hidden="true" focusable={false} /> {t('Mark unread')}
         </button>
 
         <div className={styles.shelfWrap} ref={shelfRef}>
           <button className={styles.action} disabled={busy || editableShelves.length === 0}
+            aria-haspopup="true" aria-expanded={shelfOpen}
             onClick={() => setShelfOpen((o) => !o)}>
-            <BookCopy size={15} /> {t('Add to shelf')}
+            <BookCopy size={15} aria-hidden="true" focusable={false} /> {t('Add to shelf')}
           </button>
           {shelfOpen && (
-            <div className={styles.shelfMenu} role="menu">
+            // Disclosure (not an ARIA menu): plain buttons, Tab-through + Escape.
+            <div className={styles.shelfMenu}>
               {editableShelves.map((s) => (
-                <button key={s.id} className={styles.shelfItem} role="menuitem"
+                <button key={s.id} className={styles.shelfItem}
                   onClick={() => doAddToShelf(s.id)}>
                   {s.name}
                 </button>
@@ -136,20 +155,21 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
         </div>
 
         {canEdit && (
-          <button className={styles.action} disabled={busy} onClick={() => setMetaOpen((o) => !o)}>
-            <Pencil size={15} /> {t('Edit metadata')}
+          <button className={styles.action} disabled={busy} aria-expanded={metaOpen}
+            onClick={() => setMetaOpen((o) => !o)}>
+            <Pencil size={15} aria-hidden="true" focusable={false} /> {t('Edit metadata')}
           </button>
         )}
 
         {canEdit && count >= 2 && (
           <button className={styles.action} disabled={busy} onClick={onMerge}>
-            <Combine size={15} /> {t('Merge')}
+            <Combine size={15} aria-hidden="true" focusable={false} /> {t('Merge')}
           </button>
         )}
 
         {canDelete && (
           <button className={styles.actionDanger} disabled={busy} onClick={onDelete}>
-            <Trash2 size={15} /> {t('Delete')}
+            <Trash2 size={15} aria-hidden="true" focusable={false} /> {t('Delete')}
           </button>
         )}
 
@@ -157,7 +177,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
       </div>
 
       <button className={styles.clear} onClick={onClear} aria-label={t('Clear selection')}>
-        <X size={18} />
+        <X size={18} aria-hidden="true" focusable={false} />
       </button>
     </div>
     </>

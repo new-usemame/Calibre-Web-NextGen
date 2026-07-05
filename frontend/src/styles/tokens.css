@@ -24,11 +24,18 @@
   --accent-press:  #b86d12;
   --accent-soft:   rgba(204, 123, 25, 0.14);  /* tinted fills, focus halos */
   --accent-ring:   rgba(224, 144, 42, 0.55);  /* focus-visible ring */
+  /* Amber TEXT on a tinted/dark surface (active nav, badges). --accent as text
+     on --accent-soft is only 3.95:1; this brighter amber clears AA (≥4.5:1).
+     SC 1.4.3 — do not use --accent for small text on a raised/tinted surface. */
+  --accent-text:   #e6a13f;
 
   /* ---- Color: text (warm paper-white, not clinical grey) ---- */
   --text:          #ece8e1;
   --text-muted:    #9aa7b2;
-  --text-faint:    #6d7b87;
+  /* WCAG 2.2 AA (SC 1.4.3): faint text must clear 4.5:1 on the lightest surface
+     it lands on (--surface-3 #2a3845). #94a1af = 4.56:1 there; the prior #6d7b87
+     failed universally (2.76–3.96:1). Do NOT darken past this without recomputing. */
+  --text-faint:    #94a1af;
   --on-accent:     #1a1206;   /* text on amber fills */
 
   /* ---- Color: status ---- */

@@ -132,7 +132,7 @@ export function Admin() {
         </button>
       </div>
 
-      {banner && <p className={banner.ok ? styles.msgOk : styles.msgErr}>{banner.text}</p>}
+      <p className={banner ? (banner.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{banner?.text}</p>
 
       {showNew && (
         <form className={styles.newForm} onSubmit={onCreate}>
@@ -341,7 +341,7 @@ function AdminConfigForm() {
         <button type="submit" className={styles.submitBtn} disabled={update.isPending}>
           {update.isPending ? t('Saving…') : t('Save settings')}
         </button>
-        {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+        <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
       </div>
     </form>
   );
@@ -419,7 +419,7 @@ function MailConfigForm() {
         <button type="submit" className={styles.submitBtn} disabled={update.isPending}>
           {update.isPending ? t('Saving…') : t('Save email settings')}
         </button>
-        {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+        <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
       </div>
     </form>
   );
@@ -700,7 +700,7 @@ function SecurityConfigForm() {
         <button type="submit" className={styles.submitBtn} disabled={update.isPending}>
           {update.isPending ? t('Saving…') : t('Save security settings')}
         </button>
-        {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+        <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
       </div>
     </form>
   );

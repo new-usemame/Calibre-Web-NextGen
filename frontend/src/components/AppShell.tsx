@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { HelpBanner } from './HelpBanner';
+import { SkipLink } from './SkipLink';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
@@ -26,11 +27,17 @@ export function AppShell({ userName, instanceName, onLogout, children }: AppShel
 
   return (
     <div className={styles.shell}>
+      {/* First focusable element on the page (SC 2.4.1). */}
+      <SkipLink />
       <TopBar userName={userName} instanceName={instanceName} onLogout={onLogout} onMenu={() => setDrawerOpen(true)} />
       <HelpBanner />
       <div className={styles.body}>
-        <Sidebar open={drawerOpen} onNavigate={() => setDrawerOpen(false)} />
-        <div className={styles.content}>{children}</div>
+        <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} onNavigate={() => setDrawerOpen(false)} />
+        {/* The one <main> landmark (SC 1.3.1); tabIndex=-1 lets route changes
+            move focus here (see useRouteA11y). */}
+        <main id="main" tabIndex={-1} className={styles.content}>
+          {children}
+        </main>
       </div>
     </div>
   );

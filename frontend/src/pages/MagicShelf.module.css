@@ -19,7 +19,8 @@
   padding: var(--sp-2); color: var(--text); font-size: var(--fs-sm);
 }
 .ruleRow input { flex: 1; }
-.removeRule { color: var(--text-muted); padding: var(--sp-1); }
+/* SC 2.5.8: keep the remove control at least 24x24. */
+.removeRule { color: var(--text-muted); padding: var(--sp-1); min-width: 24px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center; }
 .removeRule:hover:not(:disabled) { color: var(--danger); }
 .removeRule:disabled { opacity: 0.3; }
 .addRule { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--accent); font-size: var(--fs-sm); align-self: flex-start; padding: var(--sp-1) 0; }

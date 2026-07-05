@@ -33,6 +33,7 @@ cwa.code-workspace
 DEV
 */REFERENCE
 cwa.db
+gdrive.db
 *.epub
 # BUT allow test fixture ebooks
 !tests/fixtures/**/*.epub

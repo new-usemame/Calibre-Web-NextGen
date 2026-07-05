@@ -53,6 +53,9 @@ export interface Me {
    *  per-user/instance sidebar_view config. Absent on older servers → treat
    *  every entry as visible. */
   sidebar?: Record<string, boolean>;
+  /** Saved per-user sidebar order (#585 v2) — list of entry keys. Absent/empty
+   *  → the SPA default order. */
+  sidebar_order?: string[];
   features?: ServerFeatures;
   instance_name?: string;
 }

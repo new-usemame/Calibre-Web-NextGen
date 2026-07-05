@@ -120,8 +120,14 @@ def test_topbar_consumes_instance_name_not_only_hardcoded_brand():
 
 @pytest.mark.unit
 def test_app_sets_document_title_from_instance_name():
-    src = (FRONTEND / "App.tsx").read_text()
-    assert re.search(r"document\.title", src), "App must sync document.title (classic <title> parity)"
+    # Per-page title sync moved into the route-a11y hook (SC 2.4.2 Page Titled),
+    # which App mounts as <RouteA11y>. Still classic <title> parity, just factored
+    # out so titles also update on every SPA navigation, not only on login.
+    route_a11y = (FRONTEND / "lib" / "a11y" / "useRouteA11y.ts").read_text()
+    assert re.search(r"document\.title", route_a11y), \
+        "the SPA must sync document.title (classic <title> parity)"
+    app_src = (FRONTEND / "App.tsx").read_text()
+    assert "RouteA11y" in app_src, "App must mount RouteA11y so titles sync on navigation"
 
 
 @pytest.mark.unit

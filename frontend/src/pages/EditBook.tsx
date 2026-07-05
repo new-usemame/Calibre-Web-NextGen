@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useId } from 'react';
+import { useState, useEffect, useRef, useId, cloneElement, isValidElement, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'wouter';
 import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search, Plus, X, MoreHorizontal } from 'lucide-react';
@@ -80,7 +80,7 @@ export function EditBook({ id }: { id: string }) {
     if (error) {
       return (
         <main className={styles.container}>
-          <EmptyState message={error instanceof Error ? error.message : 'Could not load metadata.'} />
+          <EmptyState message={error instanceof Error ? error.message : t('Could not load metadata.')} />
         </main>
       );
     }
@@ -121,7 +121,7 @@ export function EditBook({ id }: { id: string }) {
     if (sel.has('cover') && r.cover) {
       setCover.mutate({ url: r.cover }, {
         onSuccess: () => setBanner({ ok: true, text: t('Cover updated from the selected result.') }),
-        onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : 'Cover update failed.' }),
+        onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Cover update failed.') }),
       });
     }
   };
@@ -154,14 +154,14 @@ export function EditBook({ id }: { id: string }) {
       onSuccess: (data) => {
         if (data.errors && Object.keys(data.errors).length > 0) {
           setFieldErrors(data.errors);
-          setBanner({ ok: false, text: 'Some fields could not be saved.' });
+          setBanner({ ok: false, text: t('Some fields could not be saved.') });
         } else {
-          setBanner({ ok: true, text: 'Saved.' });
+          setBanner({ ok: true, text: t('Saved.') });
           navigate(`/book/${id}`);
         }
       },
       onError: (err) =>
-        setBanner({ ok: false, text: err instanceof ApiError ? err.message : 'Save failed.' }),
+        setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Save failed.') }),
     });
   };
 
@@ -221,7 +221,7 @@ export function EditBook({ id }: { id: string }) {
         {/* Identifiers table (ISBN/ASIN/…) — fork #580. */}
         <div className={styles.identSection}>
           <span className={styles.label}>{t('Identifiers')}</span>
-          {fieldErrors.identifiers && <span className={styles.fieldError}>{fieldErrors.identifiers}</span>}
+          {fieldErrors.identifiers && <span className={styles.fieldError} role="alert">{fieldErrors.identifiers}</span>}
           {form.identifiers.length > 0 && (
             <div className={styles.identTable} role="group" aria-label={t('Identifiers')}>
               {form.identifiers.map((idn, i) => (
@@ -247,7 +247,7 @@ export function EditBook({ id }: { id: string }) {
             <Save size={16} /> {t('Save changes')}
           </Button>
           <Link href={`/book/${id}`} className={styles.cancel}>{t('Cancel')}</Link>
-          {banner && <span className={banner.ok ? styles.msgOk : styles.msgErr}>{banner.text}</span>}
+          <span className={banner ? (banner.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{banner?.text}</span>
         </div>
       </form>
 
@@ -298,7 +298,7 @@ function MetadataFetch({ defaultQuery, onApply }:
           setEditions(null);
         }
       },
-      onError: (e2) => { if (mine === seq.current) setErr(e2 instanceof ApiError ? e2.message : 'Search failed.'); },
+      onError: (e2) => { if (mine === seq.current) setErr(e2 instanceof ApiError ? e2.message : t('Search failed.')); },
     });
   };
 
@@ -328,7 +328,7 @@ function MetadataFetch({ defaultQuery, onApply }:
           {editions ? (
             <div className={styles.editionsHead}>
               <button type="button" className={styles.cancel} onClick={backToResults}>
-                <ChevronLeft size={14} /> {t('Back to results')}
+                <ChevronLeft size={14} aria-hidden="true" focusable={false} /> {t('Back to results')}
               </button>
               <span className={styles.editionsTitle}>{t('Editions')}</span>
               {search.isPending && <Spinner size={14} />}
@@ -337,6 +337,7 @@ function MetadataFetch({ defaultQuery, onApply }:
           ) : (
             <form className={styles.metaSearchRow} onSubmit={run}>
               <input className={styles.input} value={query} onChange={(e) => setQuery(e.target.value)}
+                aria-label={t('Search for metadata')}
                 placeholder={t('Title, author, or ISBN')} autoFocus />
               <Button type="submit" disabled={search.isPending || !query.trim()}>
                 {search.isPending ? <Spinner size={15} /> : <Search size={15} />} {t('Search')}
@@ -344,7 +345,8 @@ function MetadataFetch({ defaultQuery, onApply }:
               <button type="button" className={styles.cancel} onClick={closePanel}>{t('Close')}</button>
             </form>
           )}
-          {err && <span className={styles.msgErr}>{err}</span>}
+          {/* Announced to screen readers (SC 4.1.3). */}
+          <span className={err ? styles.msgErr : undefined} role="alert">{err}</span>
           {editions && !search.isPending && results.length === 0 && (
             <span className={styles.metaEmpty}>{t('No editions found for this book.')}</span>
           )}
@@ -561,8 +563,8 @@ function CoverManager({ id }: { id: string }) {
     if (!file) return;
     setMsg(null);
     setCover.mutate({ file }, {
-      onSuccess: () => setMsg({ ok: true, text: 'Cover updated.' }),
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Upload failed.' }),
+      onSuccess: () => setMsg({ ok: true, text: t('Cover updated.') }),
+      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Upload failed.') }),
     });
   };
 
@@ -570,8 +572,8 @@ function CoverManager({ id }: { id: string }) {
     if (!url.trim()) return;
     setMsg(null);
     setCover.mutate({ url: url.trim() }, {
-      onSuccess: () => { setMsg({ ok: true, text: 'Cover updated.' }); setUrl(''); },
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Could not fetch cover.' }),
+      onSuccess: () => { setMsg({ ok: true, text: t('Cover updated.') }); setUrl(''); },
+      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not fetch cover.') }),
     });
   };
 
@@ -584,11 +586,15 @@ function CoverManager({ id }: { id: string }) {
       </div>
       <div className={styles.coverControls}>
         <label className={styles.coverUploadBtn}>
-          <UploadIcon size={15} /> {t('Upload image')}
-          <input type="file" accept="image/*" hidden onChange={onFile} disabled={setCover.isPending} />
+          <UploadIcon size={15} aria-hidden="true" focusable={false} /> {t('Upload image')}
+          {/* C3: sr-only (NOT hidden) keeps the input focusable + in tab order;
+              the label shows a focus ring via :focus-within. */}
+          <input type="file" accept="image/*" className={styles.fileInput}
+            onChange={onFile} disabled={setCover.isPending} />
         </label>
         <div className={styles.coverUrlRow}>
           <input className={styles.input} value={url} onChange={(e) => setUrl(e.target.value)}
+            aria-label={t('Cover image URL')}
             placeholder={t('…or paste an image URL')} />
           <Button type="button" variant="ghost" onClick={onUrl} disabled={setCover.isPending || !url.trim()}>
             {t('Fetch')}
@@ -597,7 +603,7 @@ function CoverManager({ id }: { id: string }) {
         <Link className={styles.coverAdvanced} href={`/book/${id}/cover?origin=edit`}>
           <ExternalLink size={13} /> {t('More cover options (search providers, e-reader preview)')}
         </Link>
-        {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+        <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
       </div>
     </section>
   );
@@ -626,7 +632,7 @@ function FormatsManager({ id }: { id: string }) {
     setMsg(null);
     addFormat.mutate(file, {
       onSuccess: () => setMsg({ ok: true, text: t('Format queued — it will appear once processed.') }),
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Upload failed.' }),
+      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Upload failed.') }),
     });
     e.target.value = '';
   };
@@ -638,7 +644,7 @@ function FormatsManager({ id }: { id: string }) {
       { from: from || formats[0], to: to.trim().toUpperCase() },
       {
         onSuccess: (r) => { setMsg({ ok: true, text: r.message }); setTo(''); },
-        onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Convert failed.' }),
+        onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Convert failed.') }),
       },
     );
   };
@@ -654,12 +660,12 @@ function FormatsManager({ id }: { id: string }) {
             {canDelete && (
               <button className={styles.formatDelete}
                 onClick={() => {
-                  if (window.confirm(`Delete the ${f.format} file? The book stays; only this format is removed.`)) {
+                  if (window.confirm(t('Delete the {fmt} file? The book stays; only this format is removed.', { fmt: f.format }))) {
                     deleteFormat.mutate(f.format);
                   }
                 }}
                 disabled={deleteFormat.isPending}
-                aria-label={`Delete ${f.format}`}>
+                aria-label={t('Delete {fmt}', { fmt: f.format })}>
                 <Trash2 size={14} />
               </button>
             )}
@@ -678,7 +684,7 @@ function FormatsManager({ id }: { id: string }) {
           <label className={styles.fieldNarrow}>
             <span className={styles.label}>{t('to')}</span>
             <input className={styles.inputNarrow} value={to} onChange={(e) => setTo(e.target.value)}
-              placeholder="e.g. MOBI" />
+              aria-label={t('Convert to format')} placeholder={t('e.g. MOBI')} />
           </label>
           <Button type="submit" variant="ghost" disabled={convertFormat.isPending || !to.trim()}>
             <RefreshCw size={15} /> {t('Convert')}
@@ -688,22 +694,31 @@ function FormatsManager({ id }: { id: string }) {
 
       {canUpload && (
         <label className={styles.coverUploadBtn} style={{ marginTop: 'var(--sp-3)' }}>
-          <UploadIcon size={15} /> {addFormat.isPending ? t('Uploading…') : t('Add a format')}
-          <input type="file" hidden onChange={onAddFormat} disabled={addFormat.isPending} />
+          <UploadIcon size={15} aria-hidden="true" focusable={false} /> {addFormat.isPending ? t('Uploading…') : t('Add a format')}
+          <input type="file" className={styles.fileInput} onChange={onAddFormat} disabled={addFormat.isPending} />
         </label>
       )}
-      {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+      <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
     </section>
   );
 }
 
 function Field({ label, error, grow = true, children }:
   { label: string; error?: string; grow?: boolean; children: React.ReactNode }) {
+  const errId = useId();
+  // SC 3.3.1: associate the error with the field (aria-invalid + aria-describedby)
+  // and announce it (role=alert), rather than leaving a disconnected red string.
+  const child = error && isValidElement(children)
+    ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+        'aria-invalid': true,
+        'aria-describedby': errId,
+      })
+    : children;
   return (
     <label className={grow ? styles.field : styles.fieldNarrow}>
       <span className={styles.label}>{label}</span>
-      {children}
-      {error && <span className={styles.fieldError}>{error}</span>}
+      {child}
+      {error && <span className={styles.fieldError} id={errId} role="alert">{error}</span>}
     </label>
   );
 }

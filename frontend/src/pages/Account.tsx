@@ -62,7 +62,7 @@ export function Account() {
   if (error || !account) {
     return (
       <main className={styles.container}>
-        <EmptyState message={error instanceof Error ? error.message : 'Could not load your account.'} />
+        <EmptyState message={error instanceof Error ? error.message : t('Could not load your account.')} />
       </main>
     );
   }
@@ -77,9 +77,9 @@ export function Account() {
         locale, default_language: defaultLanguage,
       },
       {
-        onSuccess: () => setProfileMsg({ ok: true, text: 'Profile saved.' }),
+        onSuccess: () => setProfileMsg({ ok: true, text: t('Profile saved.') }),
         onError: (err) =>
-          setProfileMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Could not save.' }),
+          setProfileMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') }),
       },
     );
   };
@@ -91,7 +91,7 @@ export function Account() {
     createAppPw.mutate(appPwLabel.trim(), {
       onSuccess: (r) => { setNewToken({ label: r.label, token: r.token }); setAppPwLabel(''); },
       onError: (err) =>
-        setAppPwMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Could not create.' }),
+        setAppPwMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not create.') }),
     });
   };
 
@@ -99,20 +99,20 @@ export function Account() {
     e.preventDefault();
     setPwMsg(null);
     if (newPw !== confirmPw) {
-      setPwMsg({ ok: false, text: 'New passwords do not match.' });
+      setPwMsg({ ok: false, text: t('New passwords do not match.') });
       return;
     }
     changePassword.mutate(
       { current_password: currentPw, new_password: newPw },
       {
         onSuccess: () => {
-          setPwMsg({ ok: true, text: 'Password changed.' });
+          setPwMsg({ ok: true, text: t('Password changed.') });
           setCurrentPw('');
           setNewPw('');
           setConfirmPw('');
         },
         onError: (err) =>
-          setPwMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Could not change password.' }),
+          setPwMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not change password.') }),
       },
     );
   };
@@ -126,7 +126,7 @@ export function Account() {
       {/* Identity */}
       <section className={styles.card}>
         <div className={styles.identity}>
-          <UserCircle size={48} className={styles.avatar} />
+          <UserCircle size={48} className={styles.avatar} aria-hidden="true" focusable={false} />
           <div>
             <p className={styles.name}>{account.name}</p>
             <div className={styles.roles}>
@@ -140,7 +140,7 @@ export function Account() {
 
       {/* Profile */}
       <form className={styles.card} onSubmit={onSaveProfile}>
-        <h2 className={styles.cardTitle}><Mail size={16} /> {t('Profile')}</h2>
+        <h2 className={styles.cardTitle}><Mail size={16} aria-hidden="true" focusable={false} /> {t('Profile')}</h2>
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="acc-email">{t('Email')}</label>
@@ -176,7 +176,7 @@ export function Account() {
 
         <div className={styles.row}>
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="acc-locale"><Globe size={13} /> {t('Interface language')}</label>
+            <label className={styles.label} htmlFor="acc-locale"><Globe size={13} aria-hidden="true" focusable={false} /> {t('Interface language')}</label>
             <select id="acc-locale" className={styles.input}
               value={locale} onChange={(e) => setLocale(e.target.value)}>
               {account.locales.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -193,18 +193,22 @@ export function Account() {
 
         <div className={styles.actions}>
           <Button type="submit" disabled={updateProfile.isPending}>
-            <Check size={16} /> {t('Save profile')}
+            <Check size={16} aria-hidden="true" focusable={false} /> {t('Save profile')}
           </Button>
-          {profileMsg && (
-            <span className={profileMsg.ok ? styles.msgOk : styles.msgErr}>{profileMsg.text}</span>
-          )}
+          {/* Persistent live region so the save result is announced (SC 4.1.3). */}
+          <span
+            className={profileMsg ? (profileMsg.ok ? styles.msgOk : styles.msgErr) : undefined}
+            role="status"
+          >
+            {profileMsg?.text}
+          </span>
         </div>
       </form>
 
       {/* Password */}
       {account.can_change_password && (
         <form className={styles.card} onSubmit={onChangePassword}>
-          <h2 className={styles.cardTitle}><KeyRound size={16} /> {t('Change password')}</h2>
+          <h2 className={styles.cardTitle}><KeyRound size={16} aria-hidden="true" focusable={false} /> {t('Change password')}</h2>
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="acc-cur">{t('Current password')}</label>
@@ -215,42 +219,52 @@ export function Account() {
             <div className={styles.field}>
               <label className={styles.label} htmlFor="acc-new">{t('New password')}</label>
               <input id="acc-new" type="password" autoComplete="new-password" className={styles.input}
-                value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+                value={newPw} onChange={(e) => setNewPw(e.target.value)}
+                aria-invalid={pwMsg && !pwMsg.ok ? true : undefined}
+                aria-describedby={pwMsg && !pwMsg.ok ? 'acc-pw-msg' : undefined} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="acc-confirm">{t('Confirm new password')}</label>
               <input id="acc-confirm" type="password" autoComplete="new-password" className={styles.input}
-                value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
+                value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)}
+                aria-invalid={pwMsg && !pwMsg.ok ? true : undefined}
+                aria-describedby={pwMsg && !pwMsg.ok ? 'acc-pw-msg' : undefined} />
             </div>
           </div>
 
           <div className={styles.actions}>
             <Button type="submit" variant="ghost"
               disabled={changePassword.isPending || !currentPw || !newPw}>
-              <KeyRound size={15} /> {t('Update password')}
+              <KeyRound size={15} aria-hidden="true" focusable={false} /> {t('Update password')}
             </Button>
-            {pwMsg && (
-              <span className={pwMsg.ok ? styles.msgOk : styles.msgErr}>{pwMsg.text}</span>
-            )}
+            <span
+              id="acc-pw-msg"
+              className={pwMsg ? (pwMsg.ok ? styles.msgOk : styles.msgErr) : undefined}
+              role="status"
+            >
+              {pwMsg?.text}
+            </span>
           </div>
         </form>
       )}
 
       {/* App passwords (for OPDS readers / KOReader sync over HTTP Basic) */}
       <section className={styles.card}>
-        <h2 className={styles.cardTitle}><Smartphone size={16} /> {t('App passwords')}</h2>
+        <h2 className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('App passwords')}</h2>
         <p className={styles.hint}>
           {t('Use these to connect OPDS readers or KOReader sync without your main password.')}
         </p>
 
         {newToken && (
-          <div className={styles.tokenBox}>
-            <p className={styles.tokenLabel}>New password for “{newToken.label}” — copy it now, it won’t be shown again:</p>
+          <div className={styles.tokenBox} role="status">
+            <p className={styles.tokenLabel}>
+              {t('New password for “{label}” — copy it now, it won’t be shown again:', { label: newToken.label })}
+            </p>
             <div className={styles.tokenRow}>
               <code className={styles.token}>{newToken.token}</code>
               <button type="button" className={styles.copyBtn}
                 onClick={() => navigator.clipboard?.writeText(newToken.token)}>
-                <Copy size={14} /> {t('Copy')}
+                <Copy size={14} aria-hidden="true" focusable={false} /> {t('Copy')}
               </button>
             </div>
           </div>
@@ -264,8 +278,8 @@ export function Account() {
                 <button type="button" className={styles.revokeBtn}
                   disabled={revokeAppPw.isPending}
                   onClick={() => revokeAppPw.mutate(ap.id)}
-                  aria-label={`Revoke ${ap.label}`}>
-                  <Trash2 size={14} />
+                  aria-label={t('Revoke {label}', { label: ap.label })}>
+                  <Trash2 size={14} aria-hidden="true" focusable={false} />
                 </button>
               </li>
             ))}
@@ -275,12 +289,15 @@ export function Account() {
         <form className={styles.appPwForm} onSubmit={onCreateAppPw}>
           <input type="text" className={styles.input} value={appPwLabel}
             onChange={(e) => setAppPwLabel(e.target.value)}
-            placeholder="Label (e.g. KOReader on phone)" maxLength={64} />
+            aria-label={t('App password label')}
+            placeholder={t('Label (e.g. KOReader on phone)')} maxLength={64} />
           <Button type="submit" variant="ghost" disabled={createAppPw.isPending || !appPwLabel.trim()}>
-            <KeyRound size={15} /> {t('Generate')}
+            <KeyRound size={15} aria-hidden="true" focusable={false} /> {t('Generate')}
           </Button>
         </form>
-        {appPwMsg && <span className={appPwMsg.ok ? styles.msgOk : styles.msgErr}>{appPwMsg.text}</span>}
+        <span className={appPwMsg ? (appPwMsg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">
+          {appPwMsg?.text}
+        </span>
       </section>
     </main>
   );

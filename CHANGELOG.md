@@ -32,6 +32,14 @@ is for things you can see or feel when running the app.
   grouped by release, each with a "Try it" link straight to the thing it
   describes. A small dot on the Help menu points it out once after an update and
   clears the moment you open it.
+- **Customize your sidebar from the new interface.** A **Customize** capsule at
+  the top of the left rail turns the sidebar into an editable list: drag sections
+  into the order you want (for example, move **Shelves** to the top so you don't
+  have to scroll) and tap the ✕ to hide the ones you don't use. Reordering works
+  with the mouse, on touch, and with the keyboard, and your layout is saved to
+  your account. Earlier (v4.1.4) the new UI started respecting the visibility
+  settings from the classic interface; now you set both visibility and order
+  without leaving the new UI. Requested by @Glennza1962 and @alva-seal (#585).
 
 ### Changed
 - **New browser-tab icon that matches the app.** The favicon is now the amber
@@ -45,6 +53,13 @@ is for things you can see or feel when running the app.
   settings, the new UI sidebar still listed every smart shelf — the setting only
   worked in the classic view. The sidebar now honours it, so hidden smart
   shelves stay hidden in both interfaces. Reported by @chloeroform (#667).
+- **Fixed a startup crash-loop on servers that had synced annotations to
+  Hardcover.** If your library had ever synced highlights to Hardcover, an
+  upgrade could get stuck restarting over and over, never finishing boot. A
+  one-time database migration was refusing to run because it double-counted
+  sync records the app had written during normal use. The migration now checks
+  the right thing and completes, so the server starts normally again — no data
+  is lost and no manual steps are needed. Reported by @PulsarFTW (#684).
 - **Fetch Metadata no longer shows the same cover for every volume of a
   series.** Searching for one volume of a series could return results where
   Vol.1, Vol.2, and Vol.3 all carried an identical cover — and applying

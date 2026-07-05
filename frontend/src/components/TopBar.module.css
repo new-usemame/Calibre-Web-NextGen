@@ -337,6 +337,32 @@
   font-size: var(--fs-sm);
   outline: none;
 }
+/* Mobile search toggle — hidden on desktop where the search bar is always shown. */
+.mobileSearchBtn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+}
+.mobileSearchBtn:hover { background: var(--surface-2); color: var(--text); }
+
 @media (max-width: 640px) {
   .search { display: none; }
+  .mobileSearchBtn { display: inline-flex; }
+  /* Revealed by the toggle: a full-width overlay row under the bar. */
+  .searchMobileOpen {
+    display: flex;
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: calc(100% + 4px);
+    max-width: none;
+    margin: 0;
+    z-index: var(--z-overlay);
+    background: var(--surface-2);
+    box-shadow: var(--elev-2);
+  }
 }

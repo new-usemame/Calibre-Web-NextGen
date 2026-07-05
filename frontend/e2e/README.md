@@ -33,8 +33,10 @@ reverse-proxy project).
 | `subpath` | reverse proxy (opt-in) | assets/nav under a base path (v4.1.1 reader 404, #571) |
 
 Specs: `browse.spec.ts` (grid→detail→reader flow + clean console + default-state), `mobile.spec.ts`
-(drawer), `a11y.spec.ts` (axe, fails on NEW critical rules; known backlog in `KNOWN_CRITICAL`),
-`subpath.spec.ts` (base-path).
+(drawer), `a11y.spec.ts` (WCAG 2.2 AA gate — axe across every route, **fails on any critical OR
+serious** violation, `KNOWN` allowlist must stay empty; plus keyboard/focus invariants: skip link,
+single `<main>`, no nested-card tab stop, mobile drawer inert/trapped), `subpath.spec.ts` (base-path).
+Grow the a11y gate via the `CWNG_a11y` skill.
 
 ## Extending it (keep it honest)
 

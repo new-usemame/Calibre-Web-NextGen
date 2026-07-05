@@ -72,6 +72,10 @@ is for things you can see or feel when running the app.
   beneath it, while your actual shelves were pushed to the very bottom of the
   menu, off the end of the drawer. Shelves now appear right under the SHELVES
   heading, with Tasks and About moved to the bottom where they belong.
+- **The "Contribute here!" link on the translation banner works again.** When
+  your language is only partly translated, the banner offering to help now points
+  at the wiki page that exists instead of a renamed one that returned a "page not
+  found".
 
 ## [v4.1.5] - 2026-07-03
 

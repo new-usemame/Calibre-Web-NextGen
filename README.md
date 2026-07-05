@@ -1,6 +1,8 @@
-# Calibre-Web-NextGen
+<p align="center">
+  <img src="README_images/calibre-web-nextgen-banner.png" alt="Calibre-Web NextGen" width="520">
+</p>
 
-A bug-fix build of [Calibre-Web-Automated](https://github.com/crocodilestick/Calibre-Web-Automated) (CWA). Same data layout, same configuration, same UI. The differences are listed in [`CHANGES-vs-upstream.md`](CHANGES-vs-upstream.md) and per release on the [Releases page](https://github.com/new-usemame/Calibre-Web-NextGen/releases).
+A bug-fix build of [Calibre-Web-Automated](https://github.com/crocodilestick/Calibre-Web-Automated) (CWA). Same data layout, same configuration, drop-in replacement — with a refreshed interface on top. The differences are listed in [`CHANGES-vs-upstream.md`](CHANGES-vs-upstream.md) and per release on the [Releases page](https://github.com/new-usemame/Calibre-Web-NextGen/releases).
 
 Built on **[Calibre-Web-Automated](https://github.com/crocodilestick/Calibre-Web-Automated)** by [@crocodilestick](https://github.com/crocodilestick), which is built on **[Calibre-Web](https://github.com/janeczku/calibre-web)** by [@janeczku](https://github.com/janeczku) and contributors, which is built on **[Calibre](https://github.com/kovidgoyal/calibre)** by [@kovidgoyal](https://github.com/kovidgoyal). Original PR authors are credited by handle on every backport — see full [Credits](#credits) at the bottom.
 
@@ -35,6 +37,8 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 ---
 
 ## Table of contents
+
+> **Prefer a browsable version?** The same guides live in the **[project wiki](https://github.com/new-usemame/Calibre-Web-NextGen/wiki)** — install, configuration, KOReader/Kobo sync, and troubleshooting, split into pages with a sidebar.
 
 - [Why this fork exists](#why-this-fork-exists)
 - [What's included](#whats-included)
@@ -573,34 +577,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Hungarian (`hu`) | `██████████████████░░` 89% | 1679/1894 | 140 |
-| German (`de`) | `█████████████████░░░` 85% | 1607/1894 | 151 |
-| French (`fr`) | `█████████████████░░░` 85% | 1602/1894 | 155 |
-| Japanese (`ja`) | `█████████████████░░░` 85% | 1602/1894 | 282 |
-| Spanish (`es`) | `█████████████████░░░` 84% | 1601/1894 | 225 |
-| Slovenian (`sl`) | `█████████████████░░░` 83% | 1571/1894 | 356 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████░░░░` 82% | 1560/1894 | 385 |
-| Russian (`ru`) | `███████████████░░░░░` 77% | 1454/1894 | 454 |
-| Dutch (`nl`) | `██████████████░░░░░░` 68% | 1295/1894 | 323 |
-| Italian (`it`) | `█████████████░░░░░░░` 66% | 1257/1894 | 301 |
-| Polish (`pl`) | `█████████████░░░░░░░` 66% | 1257/1894 | 306 |
-| Portuguese (Brazil) (`pt_BR`) | `█████████████░░░░░░░` 66% | 1257/1894 | 433 |
-| Korean (`ko`) | `█████████████░░░░░░░` 66% | 1251/1894 | 301 |
-| Arabic (`ar`) | `████████████░░░░░░░░` 59% | 1111/1894 | 320 |
-| Slovak (`sk`) | `████████████░░░░░░░░` 58% | 1100/1894 | 350 |
-| Portuguese (`pt`) | `████████████░░░░░░░░` 58% | 1099/1894 | 398 |
-| Indonesian (`id`) | `███████████░░░░░░░░░` 57% | 1079/1894 | 400 |
-| Galician (`gl`) | `███████████░░░░░░░░░` 57% | 1077/1894 | 399 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `███████████░░░░░░░░░` 55% | 1036/1894 | 418 |
-| Swedish (`sv`) | `███████████░░░░░░░░░` 54% | 1013/1894 | 428 |
-| Greek (`el`) | `██████████░░░░░░░░░░` 50% | 946/1894 | 439 |
-| Czech (`cs`) | `██████████░░░░░░░░░░` 49% | 926/1894 | 448 |
-| Norwegian (`no`) | `██████████░░░░░░░░░░` 48% | 913/1894 | 482 |
-| Vietnamese (`vi`) | `█████████░░░░░░░░░░░` 43% | 821/1894 | 399 |
-| Finnish (`fi`) | `████████░░░░░░░░░░░░` 42% | 787/1894 | 432 |
-| Ukrainian (`uk`) | `████████░░░░░░░░░░░░` 38% | 717/1894 | 415 |
-| Turkish (`tr`) | `████████░░░░░░░░░░░░` 38% | 716/1894 | 426 |
-| Khmer (`km`) | `██████░░░░░░░░░░░░░░` 31% | 588/1894 | 381 |
+| Hungarian (`hu`) | `██████████████████░░` 88% | 1781/2029 | 242 |
+| German (`de`) | `█████████████████░░░` 84% | 1706/2029 | 250 |
+| French (`fr`) | `█████████████████░░░` 84% | 1702/2029 | 255 |
+| Japanese (`ja`) | `█████████████████░░░` 84% | 1702/2029 | 382 |
+| Spanish (`es`) | `█████████████████░░░` 84% | 1701/2029 | 325 |
+| Slovenian (`sl`) | `████████████████░░░░` 82% | 1671/2029 | 456 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████████████░░░░` 82% | 1660/2029 | 485 |
+| Russian (`ru`) | `███████████████░░░░░` 77% | 1555/2029 | 555 |
+| Dutch (`nl`) | `██████████████░░░░░░` 69% | 1395/2029 | 423 |
+| Italian (`it`) | `█████████████░░░░░░░` 67% | 1357/2029 | 401 |
+| Polish (`pl`) | `█████████████░░░░░░░` 67% | 1357/2029 | 406 |
+| Portuguese (Brazil) (`pt_BR`) | `█████████████░░░░░░░` 67% | 1357/2029 | 533 |
+| Korean (`ko`) | `█████████████░░░░░░░` 66% | 1350/2029 | 400 |
+| Arabic (`ar`) | `████████████░░░░░░░░` 60% | 1209/2029 | 418 |
+| Portuguese (`pt`) | `████████████░░░░░░░░` 59% | 1197/2029 | 496 |
+| Slovak (`sk`) | `████████████░░░░░░░░` 59% | 1198/2029 | 448 |
+| Indonesian (`id`) | `████████████░░░░░░░░` 58% | 1177/2029 | 498 |
+| Galician (`gl`) | `████████████░░░░░░░░` 58% | 1175/2029 | 497 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `███████████░░░░░░░░░` 56% | 1130/2029 | 512 |
+| Swedish (`sv`) | `███████████░░░░░░░░░` 55% | 1107/2029 | 522 |
+| Greek (`el`) | `██████████░░░░░░░░░░` 51% | 1038/2029 | 531 |
+| Czech (`cs`) | `██████████░░░░░░░░░░` 50% | 1018/2029 | 540 |
+| Norwegian (`no`) | `██████████░░░░░░░░░░` 50% | 1007/2029 | 576 |
+| Vietnamese (`vi`) | `█████████░░░░░░░░░░░` 45% | 910/2029 | 488 |
+| Finnish (`fi`) | `█████████░░░░░░░░░░░` 43% | 877/2029 | 522 |
+| Turkish (`tr`) | `████████░░░░░░░░░░░░` 40% | 806/2029 | 516 |
+| Ukrainian (`uk`) | `████████░░░░░░░░░░░░` 40% | 803/2029 | 501 |
+| Khmer (`km`) | `███████░░░░░░░░░░░░░` 33% | 661/2029 | 454 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

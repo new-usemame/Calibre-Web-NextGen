@@ -4,6 +4,7 @@ import { BookMarked, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/Button';
 import { BrandName } from '../components/BrandName';
 import { Spinner } from '../components/Spinner';
+import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useLogin, useAuthConfig, useRegister, useForgotPassword } from '../lib/queries';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -40,7 +41,7 @@ export function Login() {
     login.mutate({ username, password, remember }, {
       onError: (err) =>
         setErrorMsg(err instanceof ApiError && err.status === 401
-          ? 'Invalid username or password.' : 'Sign in failed. Please try again.'),
+          ? t('Invalid username or password.') : t('Sign in failed. Please try again.')),
     });
   };
 
@@ -49,7 +50,7 @@ export function Login() {
     reset();
     register.mutate({ name: username, email }, {
       onSuccess: (r) => { setOkMsg(r.message); setMode('login'); },
-      onError: (err) => setErrorMsg(err instanceof ApiError ? err.message : 'Registration failed.'),
+      onError: (err) => setErrorMsg(err instanceof ApiError ? err.message : t('Registration failed.')),
     });
   };
 
@@ -58,7 +59,7 @@ export function Login() {
     reset();
     forgot.mutate(username, {
       onSuccess: (r) => { setOkMsg(r.message); setMode('login'); },
-      onError: (err) => setErrorMsg(err instanceof ApiError ? err.message : 'Request failed.'),
+      onError: (err) => setErrorMsg(err instanceof ApiError ? err.message : t('Request failed.')),
     });
   };
 
@@ -67,11 +68,17 @@ export function Login() {
   const canForgot = !!cfg?.mail_configured;
   const providers = cfg?.oauth_providers ?? [];
 
+  const headingText = mode === 'register' ? t('Create your account')
+    : mode === 'forgot' ? t('Reset your password')
+      : t('Sign in');
+
   return (
-    <div className={styles.page}>
+    <main className={styles.page} id="main" tabIndex={-1}>
       <div className={styles.card}>
+        {/* A real page heading for screen readers / document outline (SC 1.3.1). */}
+        <VisuallyHidden as="h1">{headingText}</VisuallyHidden>
         <div className={styles.brandMark}>
-          <BookMarked size={32} className={styles.brandIcon} />
+          <BookMarked size={32} className={styles.brandIcon} aria-hidden="true" focusable={false} />
           <span className={styles.brandText}><BrandName name={cfg?.instance_name} accentClassName={styles.brandAccent} /></span>
         </div>
         <p className={styles.tagline}>
@@ -98,8 +105,10 @@ export function Login() {
                 <button type="button" className={styles.revealBtn}
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? t('Hide password') : t('Show password')}
-                  aria-pressed={showPassword} tabIndex={-1}>
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  aria-pressed={showPassword}>
+                  {showPassword
+                    ? <EyeOff size={16} aria-hidden="true" focusable={false} />
+                    : <Eye size={16} aria-hidden="true" focusable={false} />}
                 </button>
               </div>
             </label>
@@ -167,7 +176,7 @@ export function Login() {
             the native SPA page (not the legacy /remote/login Jinja view). */}
         {mode === 'login' && cfg?.remote_login && (
           <Link href="/magic-link" className={styles.magicLink}>
-            <KeyRound size={15} />
+            <KeyRound size={15} aria-hidden="true" focusable={false} />
             {t('Log in with a magic link')}
           </Link>
         )}
@@ -191,6 +200,6 @@ export function Login() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -7,7 +7,6 @@ cps/magic_shelf.build_query_from_rules (the same rule→SQL engine the legacy vi
 uses). Create/edit/duplicate/delete reuse the existing /magicshelf routes.
 """
 from flask import jsonify, request
-from sqlalchemy import or_
 
 from . import api_v1
 from .books import _row_to_item
@@ -29,12 +28,21 @@ def _uid():
 @api_v1.route("/magicshelves")
 @login_required_if_no_ano
 def list_magic_shelves():
-    """The caller's own smart shelves plus public ones."""
+    """The caller's visible smart shelves — own + public, minus the ones the
+    user hid via the classic "Magic Shelves Visibility" settings (#667).
+
+    Delegates to magic_shelf.get_visible_magic_shelves_for_user so the SPA
+    honours the same hidden_magic_shelf_templates filtering the classic sidebar
+    (cps/__init__.py) and OPDS already apply — one source of truth. Anonymous
+    callers have no user row to hide against, so they get the public shelves.
+    """
     uid = _uid()
-    visibility = ub.MagicShelf.is_public == 1
     if uid is not None:
-        visibility = or_(ub.MagicShelf.user_id == uid, ub.MagicShelf.is_public == 1)
-    shelves = ub.session.query(ub.MagicShelf).filter(visibility).order_by(ub.MagicShelf.name).all()
+        shelves = magic_shelf.get_visible_magic_shelves_for_user(uid)
+        shelves.sort(key=lambda s: (s.name or "").casefold())
+    else:
+        shelves = ub.session.query(ub.MagicShelf).filter(
+            ub.MagicShelf.is_public == 1).order_by(ub.MagicShelf.name).all()
     items = [{
         "id": s.id, "name": s.name, "icon": s.icon or "🪄",
         "is_public": bool(s.is_public), "is_owner": (s.user_id == uid),

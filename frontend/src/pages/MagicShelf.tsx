@@ -118,7 +118,7 @@ export function MagicShelf({ editId }: { editId?: string }) {
   return (
     <main className={styles.container}>
       <div className={styles.header}>
-        <Wand2 size={22} className={styles.headerIcon} />
+        <Wand2 size={22} className={styles.headerIcon} aria-hidden="true" focusable={false} />
         <h1 className={styles.title}>{editId ? t('Edit smart shelf') : t('New smart shelf')}</h1>
       </div>
 
@@ -160,13 +160,13 @@ export function MagicShelf({ editId }: { editId?: string }) {
                 placeholder={t('value')} type={isNum(r.id) ? 'number' : 'text'} />
               <button className={styles.removeRule} onClick={() => setRules((rs) => rs.filter((x) => x._k !== r._k))}
                 disabled={rules.length === 1} aria-label={t('Remove rule')}>
-                <Trash2 size={15} />
+                <Trash2 size={15} aria-hidden="true" focusable={false} />
               </button>
             </div>
           );
         })}
         <button className={styles.addRule} onClick={() => setRules((rs) => [...rs, newRule()])}>
-          <Plus size={15} /> {t('Add rule')}
+          <Plus size={15} aria-hidden="true" focusable={false} /> {t('Add rule')}
         </button>
       </div>
 
@@ -183,7 +183,7 @@ export function MagicShelf({ editId }: { editId?: string }) {
 
       <div className={styles.actions}>
         <Button onClick={onSave} disabled={saving}>
-          <Wand2 size={16} /> {saving ? t('Saving…') : (editId ? t('Save changes') : t('Create smart shelf'))}
+          <Wand2 size={16} aria-hidden="true" focusable={false} /> {saving ? t('Saving…') : (editId ? t('Save changes') : t('Create smart shelf'))}
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={saving}>{t('Cancel')}</Button>
       </div>

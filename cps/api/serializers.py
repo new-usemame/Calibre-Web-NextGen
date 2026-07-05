@@ -30,6 +30,18 @@ SIDEBAR_VISIBILITY_BITS = {
     "duplicates": constants.SIDEBAR_DUPLICATES,
 }
 
+# Fork #585 v2: the entries the SPA lets a user reorder in the Customize panel —
+# the browse-by + discovery nav items (each backed by a visibility bit) plus the
+# ``shelves`` block (always visible, only movable). Library / Upload / Admin /
+# Table / Duplicates / Smart-shelves / Tasks / About keep fixed structural
+# positions and are intentionally NOT reorderable. Order values POSTed to
+# ``/account/sidebar`` are validated against this set.
+ORDERABLE_SIDEBAR_KEYS = [
+    "author", "series", "category", "publisher", "language", "rating", "format",
+    "favorites", "hot", "random", "best_rated", "archived",
+    "shelves",
+]
+
 
 def serialize_sidebar_visibility(user):
     """Return {key: bool} for each configurable sidebar entry, using the same
@@ -40,6 +52,22 @@ def serialize_sidebar_visibility(user):
     if not callable(check):
         return {key: True for key in SIDEBAR_VISIBILITY_BITS}
     return {key: bool(check(bit)) for key, bit in SIDEBAR_VISIBILITY_BITS.items()}
+
+
+def serialize_sidebar_order(user):
+    """Return the user's saved sidebar order (list of keys), or [] when unset.
+    Reads ``view_settings['sidebar']['order']`` via ``get_view_property``; stays
+    tolerant of objects without the helper (returns [])."""
+    getter = getattr(user, "get_view_property", None)
+    if not callable(getter):
+        return []
+    try:
+        order = getter("sidebar", "order")
+    except Exception:
+        # view_settings not yet a usable dict (fresh/unmigrated row) → default
+        # order. The serializer must never 500 on a read.
+        return []
+    return order if isinstance(order, list) else []
 
 
 def serialize_user(user):
@@ -60,6 +88,8 @@ def serialize_user(user):
         },
         # Fork #585: which sidebar entries the admin/user has enabled.
         "sidebar": serialize_sidebar_visibility(user),
+        # Fork #585 v2: the user's saved sidebar order ([] = SPA default order).
+        "sidebar_order": serialize_sidebar_order(user),
     }
 
 

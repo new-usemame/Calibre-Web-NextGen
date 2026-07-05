@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import { Search as SearchIcon, RotateCcw } from 'lucide-react';
 import { useSearchOptions, useAdvancedSearch, useMe } from '../lib/queries';
 import { MultiSelect } from '../components/MultiSelect';
@@ -101,19 +101,19 @@ export function AdvancedSearch() {
       <form className={styles.form} onSubmit={onSubmit}>
         <div className={styles.grid}>
           <Field label={t('Title')}>
-            <input className={styles.input} value={form.title}
+            <input className={styles.input} value={form.title} aria-label={t('Title')}
               onChange={(e) => set('title', e.target.value)} />
           </Field>
           <Field label={t('Author')}>
-            <input className={styles.input} value={form.authors}
+            <input className={styles.input} value={form.authors} aria-label={t('Author')}
               onChange={(e) => set('authors', e.target.value)} />
           </Field>
           <Field label={t('Publisher')}>
-            <input className={styles.input} value={form.publisher}
+            <input className={styles.input} value={form.publisher} aria-label={t('Publisher')}
               onChange={(e) => set('publisher', e.target.value)} />
           </Field>
           <Field label={t('Description contains')}>
-            <input className={styles.input} value={form.comments}
+            <input className={styles.input} value={form.comments} aria-label={t('Description contains')}
               onChange={(e) => set('comments', e.target.value)} />
           </Field>
 
@@ -183,19 +183,19 @@ export function AdvancedSearch() {
 
         <div className={styles.actions}>
           <Button type="submit">
-            <SearchIcon size={16} /> {t('Search')}
+            <SearchIcon size={16} aria-hidden="true" focusable={false} /> {t('Search')}
           </Button>
           <Button type="button" variant="ghost" onClick={onReset}>
-            <RotateCcw size={15} /> {t('Reset')}
+            <RotateCcw size={15} aria-hidden="true" focusable={false} /> {t('Reset')}
           </Button>
         </div>
       </form>
 
       {/* Results */}
       {submitted !== null && (
-        <section className={styles.results}>
+        <section className={styles.results} aria-label={t('Search results')}>
           {error ? (
-            <EmptyState message={error instanceof Error ? error.message : 'Search failed.'} />
+            <EmptyState message={error instanceof Error ? error.message : t('Search failed.')} />
           ) : isFetching && results.length === 0 ? (
             <SpinnerCentered size={32} />
           ) : results.length === 0 ? (
@@ -227,11 +227,15 @@ export function AdvancedSearch() {
   );
 }
 
+// A labelled group. role=group + aria-labelledby is valid for one OR several
+// controls (a <label> may only wrap a single control — several date/rating/
+// MultiSelect fields wrap two+). Individual controls carry their own names.
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const id = useId();
   return (
-    <label className={styles.field}>
-      <span className={styles.label}>{label}</span>
+    <div className={styles.field} role="group" aria-labelledby={id}>
+      <span className={styles.label} id={id}>{label}</span>
       {children}
-    </label>
+    </div>
   );
 }

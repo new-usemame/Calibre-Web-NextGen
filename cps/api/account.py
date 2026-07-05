@@ -19,6 +19,8 @@ from .. import calibre_db, ub
 from ..cw_login import current_user
 from ..cw_babel import get_available_locale
 from ..helper import valid_password, valid_email, check_email
+from .serializers import (SIDEBAR_VISIBILITY_BITS, ORDERABLE_SIDEBAR_KEYS,
+                          serialize_sidebar_visibility, serialize_sidebar_order)
 
 
 def _iso(dt):
@@ -204,3 +206,78 @@ def revoke_app_password(app_password_id):
         ub.session.rollback()
         return _err("db_error", "Could not revoke app password: %s" % ex, 500)
     return "", 204
+
+
+@api_v1.route("/account/sidebar", methods=["POST"])
+def update_sidebar():
+    """Fork #585 v2 — the logged-in user customizes their own sidebar from the
+    new UI: section visibility and entry order.
+
+    Body (both keys optional): ``{"visibility": {key: bool}, "order": [key,...]}``.
+      * ``visibility`` flips the user's ``sidebar_view`` bitmask — the SAME
+        per-user store the classic UI + OPDS honour, so a toggle here also
+        reflects in the classic UI (one config, by design). Keys must be known
+        (``SIDEBAR_VISIBILITY_BITS``); unknown → 400.
+      * ``order`` persists into ``view_settings['sidebar']['order']`` (per-user,
+        no schema change — same mechanism as shelf reorder #237). Must be a list
+        of known, unique orderable keys (``ORDERABLE_SIDEBAR_KEYS``); anything
+        else → 400.
+    Session + CSRF guarded like the other /account mutations (self-service only,
+    scoped to ``current_user``).
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    data = request.get_json(silent=True) or {}
+
+    visibility = data.get("visibility")
+    order = data.get("order")
+    if visibility is None and order is None:
+        return _err("invalid_request", "Nothing to update", 400)
+
+    # ── validate before mutating (all-or-nothing) ──────────────────────────
+    if visibility is not None:
+        if not isinstance(visibility, dict):
+            return _err("invalid_request", "visibility must be an object", 400)
+        for key in visibility:
+            if key not in SIDEBAR_VISIBILITY_BITS:
+                return _err("invalid_request", "Unknown sidebar key: %s" % key, 400)
+
+    if order is not None:
+        if not isinstance(order, list):
+            return _err("invalid_request", "order must be a list", 400)
+        seen = set()
+        for key in order:
+            if key not in ORDERABLE_SIDEBAR_KEYS:
+                return _err("invalid_request", "Unknown sidebar key: %s" % key, 400)
+            if key in seen:
+                return _err("invalid_request", "Duplicate sidebar key: %s" % key, 400)
+            seen.add(key)
+
+    # ── apply ──────────────────────────────────────────────────────────────
+    try:
+        if visibility is not None:
+            view = int(current_user.sidebar_view or 0)
+            for key, on in visibility.items():
+                bit = SIDEBAR_VISIBILITY_BITS[key]
+                if on:
+                    view |= bit
+                else:
+                    view &= ~bit
+            current_user.sidebar_view = view
+        if order is not None:
+            current_user.set_view_property("sidebar", "order", order)
+    except Exception as ex:
+        ub.session.rollback()
+        return _err("invalid_request", str(ex), 400)
+
+    try:
+        ub.session.commit()
+    except Exception as ex:
+        ub.session.rollback()
+        return _err("db_error", "Could not save sidebar: %s" % ex, 500)
+
+    return jsonify({
+        "sidebar": serialize_sidebar_visibility(current_user),
+        "sidebar_order": serialize_sidebar_order(current_user),
+    })

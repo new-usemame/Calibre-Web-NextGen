@@ -4,6 +4,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiGet, apiUrl } from '../lib/api';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useT } from '../lib/i18n';
 import styles from './NativeReader.module.css';
 
@@ -33,9 +34,10 @@ export function NativeReader({ id, format }: { id: string; format: string }) {
 
   return (
     <div className={styles.shell}>
+      <VisuallyHidden as="h1">{t('{format} reader', { format: fmt.toUpperCase() })}</VisuallyHidden>
       <div className={styles.bar}>
         <Link href={`/book/${id}`} className={styles.close} title={t('Close reader')} aria-label={t('Close reader')}>
-          <X size={18} /> {t('Close')}
+          <X size={18} aria-hidden="true" focusable={false} /> {t('Close')}
         </Link>
         <span className={styles.fmt}>{fmt.toUpperCase()}</span>
       </div>

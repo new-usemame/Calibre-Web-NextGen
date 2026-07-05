@@ -30,7 +30,7 @@
   align-items: center;
   gap: var(--sp-2);
   font-size: var(--fs-sm);
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-soft);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -89,7 +89,7 @@
   align-items: center;
   gap: var(--sp-2);
   font-size: var(--fs-sm);
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   border-radius: var(--r-md);
   padding: var(--sp-2) var(--sp-4);
@@ -136,7 +136,7 @@
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-soft);
   border-radius: var(--r-full);
   padding: 1px var(--sp-2);

@@ -16,7 +16,50 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+- **Pick the right Hardcover edition when fetching metadata (new interface).**
+  On a Hardcover search result you can now click **Editions** to drill into that
+  book's individual editions (paperback, e-book, translations…) and apply the one
+  you want — so the correct edition ISBN and Hardcover edition id land on your
+  book, which is what Hardcover reading-progress sync needs to match the right
+  copy. Every result also gets a **⋯ (View all details)** button that opens the
+  full record — complete description, every tag, and each identifier on its own
+  line — as a popup on desktop or a bottom sheet on mobile, so nothing is hidden
+  behind the truncated preview. Requested on Discord (mgrimace, Wasabi).
+- **A "What's New" page, so you can see what changed without reading a
+  changelog.** The Help menu (the "?" in the top bar) now has a What's New entry
+  that opens a plain-English log of recent features and fixes — newest first,
+  grouped by release, each with a "Try it" link straight to the thing it
+  describes. A small dot on the Help menu points it out once after an update and
+  clears the moment you open it.
+- **Customize your sidebar from the new interface.** A **Customize** capsule at
+  the top of the left rail turns the sidebar into an editable list: drag sections
+  into the order you want (for example, move **Shelves** to the top so you don't
+  have to scroll) and tap the ✕ to hide the ones you don't use. Reordering works
+  with the mouse, on touch, and with the keyboard, and your layout is saved to
+  your account. Earlier (v4.1.4) the new UI started respecting the visibility
+  settings from the classic interface; now you set both visibility and order
+  without leaving the new UI. Requested by @Glennza1962 and @alva-seal (#585).
+
+### Changed
+- **New browser-tab icon that matches the app.** The favicon is now the amber
+  book mark from the refreshed interface, on the app's dark background — so the
+  tab, bookmark, and home-screen icon read as Calibre-Web NextGen instead of the
+  inherited upstream icon.
+
 ### Fixed
+- **The new interface now hides the smart shelves you turned off.** If you
+  unticked some entries under "Magic Shelves Visibility" in your account
+  settings, the new UI sidebar still listed every smart shelf — the setting only
+  worked in the classic view. The sidebar now honours it, so hidden smart
+  shelves stay hidden in both interfaces. Reported by @chloeroform (#667).
+- **Fixed a startup crash-loop on servers that had synced annotations to
+  Hardcover.** If your library had ever synced highlights to Hardcover, an
+  upgrade could get stuck restarting over and over, never finishing boot. A
+  one-time database migration was refusing to run because it double-counted
+  sync records the app had written during normal use. The migration now checks
+  the right thing and completes, so the server starts normally again — no data
+  is lost and no manual steps are needed. Reported by @PulsarFTW (#684).
 - **The "Currently reading" badge now shows on the new-UI book page.** A book
   you're partway through on KOReader/Kobo showed the "Currently reading" marker
   on the classic book page but nothing on the new UI. The new-UI book page now
@@ -29,6 +72,15 @@ is for things you can see or feel when running the app.
   now refuses to swap in artwork whose volume number disagrees with the
   book's title, and Kobo search results keep their ISBN so the exact-edition
   cover sources can be used in the first place. Reported by @boegill (#638).
+- **Your shelves are listed under the SHELVES heading in the sidebar again.** In
+  the new UI the sidebar showed a SHELVES heading with Tasks and About directly
+  beneath it, while your actual shelves were pushed to the very bottom of the
+  menu, off the end of the drawer. Shelves now appear right under the SHELVES
+  heading, with Tasks and About moved to the bottom where they belong.
+- **The "Contribute here!" link on the translation banner works again.** When
+  your language is only partly translated, the banner offering to help now points
+  at the wiki page that exists instead of a renamed one that returned a "page not
+  found".
 
 ## [v4.1.5] - 2026-07-03
 

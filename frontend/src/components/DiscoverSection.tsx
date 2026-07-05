@@ -25,7 +25,7 @@ export function DiscoverSection({ onClose }: { onClose: () => void }) {
     <section className={styles.box} aria-label={t('Discover')}>
       <div className={styles.head}>
         <div className={styles.titleWrap}>
-          <span className={styles.sparkle}><Sparkles size={18} /></span>
+          <span className={styles.sparkle}><Sparkles size={18} aria-hidden="true" focusable={false} /></span>
           <div className={styles.titleText}>
             <h2 className={styles.title}>{t('Discover')}</h2>
             <p className={styles.sub}>{t('A few random picks from your library')}</p>
@@ -40,7 +40,7 @@ export function DiscoverSection({ onClose }: { onClose: () => void }) {
             title={t('Shuffle picks')}
             aria-label={t('Shuffle picks')}
           >
-            <Shuffle size={16} className={isFetching ? styles.spin : undefined} />
+            <Shuffle size={16} className={isFetching ? styles.spin : undefined} aria-hidden="true" focusable={false} />
           </button>
           <button
             type="button"
@@ -49,7 +49,7 @@ export function DiscoverSection({ onClose }: { onClose: () => void }) {
             title={t('Hide Discover section')}
             aria-label={t('Hide Discover section')}
           >
-            <X size={16} />
+            <X size={16} aria-hidden="true" focusable={false} />
           </button>
         </div>
       </div>

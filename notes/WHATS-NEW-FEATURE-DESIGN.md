@@ -1,7 +1,23 @@
 # "What's New" — in-app feature log (SPA) + per-release skill
 
-**Status:** QUEUED (design captured 2026-06-28; not yet built). Operator-requested.
+**Status:** BUILT (design captured 2026-06-28; implemented 2026-07-04). Operator-requested.
 **Owner surface:** new React UI (`/app`) only. No classic-UI counterpart needed.
+
+**As-built notes (deltas from the original design):**
+- Page: `frontend/src/pages/WhatsNew.tsx` + `.module.css` — vertical amber-rail
+  timeline, native `<details>` collapsibles (newest open), category-tinted chips,
+  "Try it" deep-link buttons, English-entries footnote, empty-state guard.
+- Data: `frontend/src/data/whatsNew.ts` (typed `WHATS_NEW`, seeded v4.1.5→v4.1.0).
+- Unread dot: `frontend/src/lib/whatsNew.ts` — keyed to `LATEST_WHATS_NEW_VERSION`
+  (the newest version baked into the data file), NOT a runtime `INSTALLED_VERSION`
+  (no such SPA constant exists). `markWhatsNewSeen()` persists to localStorage
+  (`cwng_whats_new_seen_version`) + fires a same-tab window event so the dot clears
+  live. Dot lights whenever seen ≠ latest (incl. first-ever visit — one discovery
+  nudge, cleared on open).
+- Help menu + route wired in `TopBar.tsx` / `App.tsx`; chrome anchored in
+  `cps/spa_strings.py`.
+- Per-release skill: `~/.claude/skills/whats-new-populate/`; hooked into workspace
+  `CLAUDE.md` "Release policy" and `CWNG_goal_act` train-departs step.
 
 ## The intent (operator's words, distilled)
 Avid CWNG readers — smart but **not technical** — should be able to discover what's

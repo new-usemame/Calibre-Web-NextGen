@@ -77,12 +77,13 @@ def test_me_type_declares_sidebar():
 @pytest.mark.unit
 def test_sidebar_component_honors_visibility():
     src = (_FE / "components" / "Sidebar.tsx").read_text()
-    # Reads the visibility map off the current user.
+    # Reads the visibility map off the current user and filters by it.
     assert "sidebar" in src
-    # Entries carry a visibility key and are filtered by it.
     assert "vis" in src
     assert "me?.sidebar" in src or "me.sidebar" in src
-    # Specific mappings present (a couple of representative ones).
-    assert "'author'" in src or '"author"' in src
-    assert "'hot'" in src or '"hot"' in src
-    assert "'best_rated'" in src or '"best_rated"' in src
+    # The stable key→entry mappings live in the shared sidebarEntries module
+    # (single source of truth for the live sidebar + the Customize editor, #585 v2).
+    entries = (_FE / "lib" / "sidebarEntries.ts").read_text()
+    assert "'author'" in entries or '"author"' in entries
+    assert "'hot'" in entries or '"hot"' in entries
+    assert "'best_rated'" in entries or '"best_rated"' in entries

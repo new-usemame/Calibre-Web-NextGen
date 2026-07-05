@@ -112,7 +112,14 @@ def render_wiki_table(stats):
 def update_between_markers(path: Path, body: str) -> bool:
     """Replace text between START_MARKER and END_MARKER. Returns True if
     file was modified (or markers needed to be inserted), False if the
-    file lacked markers AND we're not allowed to invent them."""
+    file lacked markers AND we're not allowed to invent them.
+
+    A non-existent path has no markers to update, so this returns False
+    without raising. main() relies on that to fall through to its
+    seed-on-first-run fallback; reading unconditionally here would raise
+    FileNotFoundError and defeat it."""
+    if not path.exists():
+        return False
     text = path.read_text(encoding="utf-8")
     block = f"{START_MARKER}\n{body}\n{END_MARKER}"
     if START_MARKER in text and END_MARKER in text:

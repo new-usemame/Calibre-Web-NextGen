@@ -56,6 +56,10 @@ export interface Me {
   /** Saved per-user sidebar order (#585 v2) — list of entry keys. Absent/empty
    *  → the SPA default order. */
   sidebar_order?: string[];
+  /** Custom profile picture (#668) — a `data:image/…;base64,…` URI set in the
+   *  classic profile-pictures panel, or null when the user has none. Absent on
+   *  older servers → treat as null (falls back to the neutral glyph). */
+  avatar?: string | null;
   features?: ServerFeatures;
   instance_name?: string;
 }

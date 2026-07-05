@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { UserCircle, Mail, Globe, KeyRound, Check, Smartphone, Trash2, Copy } from 'lucide-react';
+import { Mail, Globe, KeyRound, Check, Smartphone, Trash2, Copy } from 'lucide-react';
 import {
-  useAccount, useUpdateProfile, useChangePassword,
+  useAccount, useMe, useUpdateProfile, useChangePassword,
   useCreateAppPassword, useRevokeAppPassword,
 } from '../lib/queries';
+import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
@@ -20,6 +21,7 @@ const ROLE_LABELS: Record<string, string> = {
 export function Account() {
   const t = useT();
   const { data: account, isLoading, error } = useAccount();
+  const avatar = useMe().data?.avatar;
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
   const createAppPw = useCreateAppPassword();
@@ -126,7 +128,7 @@ export function Account() {
       {/* Identity */}
       <section className={styles.card}>
         <div className={styles.identity}>
-          <UserCircle size={48} className={styles.avatar} aria-hidden="true" focusable={false} />
+          <Avatar src={avatar} size={48} className={styles.avatar} />
           <div>
             <p className={styles.name}>{account.name}</p>
             <div className={styles.roles}>

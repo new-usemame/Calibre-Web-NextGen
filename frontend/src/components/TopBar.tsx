@@ -3,7 +3,9 @@ import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Und
 import { Link, useLocation } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { BrandName } from './BrandName';
+import { Avatar } from './Avatar';
 import { BASE_PREFIX } from '../lib/api';
+import { useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
@@ -178,6 +180,7 @@ function backToClassicView() {
 function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => void }) {
   const t = useT();
   const { open, close, wrapperProps, onTriggerClick } = useMenu();
+  const avatar = useMe().data?.avatar;
   return (
     <div className={styles.menu} {...wrapperProps}>
       <button
@@ -189,7 +192,7 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
         aria-label={t('Account: {name}', { name: userName })}
         onClick={onTriggerClick}
       >
-        <User size={15} className={styles.triggerLeadIcon} aria-hidden="true" focusable={false} />
+        <Avatar src={avatar} size={20} className={styles.triggerLeadIcon} />
         <span className={styles.triggerLabel}>{userName}</span>
         <ChevronDown size={15} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} aria-hidden="true" focusable={false} />
       </button>

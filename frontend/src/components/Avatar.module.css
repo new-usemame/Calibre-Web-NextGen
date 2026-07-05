@@ -1,0 +1,8 @@
+.image {
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  display: block;
+  /* A picture may not fill the browser cache yet; keep the circle stable. */
+  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+}

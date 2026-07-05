@@ -48,6 +48,11 @@ is for things you can see or feel when running the app.
   inherited upstream icon.
 
 ### Fixed
+- **Your profile picture now shows in the new interface.** If you set a profile
+  picture in the classic account settings, the new interface didn't use it — the
+  account button in the top bar and the account page both showed a generic
+  silhouette. Both now display your picture, and fall back to the silhouette only
+  when you haven't set one. Reported by @chloeroform (#668).
 - **The new interface now hides the smart shelves you turned off.** If you
   unticked some entries under "Magic Shelves Visibility" in your account
   settings, the new UI sidebar still listed every smart shelf — the setting only

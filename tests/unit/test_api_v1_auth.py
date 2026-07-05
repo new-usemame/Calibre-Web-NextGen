@@ -292,8 +292,10 @@ def test_magic_link_poll_success_logs_in_and_consumes_token():
          patch.object(cps.api.auth, "ub") as ub, \
          patch.object(cps.api.auth, "login_user") as lu, \
          patch.object(cps.api.auth, "serialize_user", return_value={"name": "maggie"}), \
-         patch.object(cps.api.auth, "_server_features", return_value={}):
+         patch.object(cps.api.auth, "_server_features", return_value={}), \
+         patch.object(cps.api.auth, "_user_avatar", return_value=None):
         cfg.config_remote_login = True
+        cfg.config_calibre_web_title = "Calibre-Web NextGen"
         # token lookup, then user lookup
         q = ub.session.query.return_value.filter.return_value
         q.first.side_effect = [tok, user]
@@ -301,6 +303,10 @@ def test_magic_link_poll_success_logs_in_and_consumes_token():
                                    json={"token": "t"}).get_json()
     assert d["status"] == "success"
     assert d["user"]["name"] == "maggie"
+    # #668: magic-link now returns the same me-shape as /me and login (built by
+    # the shared _me_payload), so instance_name + avatar are present.
+    assert d["user"]["instance_name"] == "Calibre-Web NextGen"
+    assert d["user"]["avatar"] is None
     lu.assert_called_once_with(user)
     ub.session.delete.assert_called_once_with(tok)
 

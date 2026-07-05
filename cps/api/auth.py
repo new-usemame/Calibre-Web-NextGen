@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Auth endpoints for /api/v1 — reuse the existing cw_login session + CSRF."""
+import json
 from datetime import datetime
 
 from flask import jsonify, request, url_for
@@ -97,14 +98,44 @@ def _server_features():
     }
 
 
+# Written by cps.cwa_functions.set_profile_picture (the profile_pictures
+# blueprint): a {username: "data:image/…;base64,…"} map. The classic UI reads
+# the whole map via /profile_pictures/user_profiles.json and looks the name up
+# client-side; the SPA gets only the current user's picture on /me instead, so
+# it never downloads every user's avatar. Path is kept in sync with that writer.
+_USER_PROFILES_JSON = "/config/user_profiles.json"
+
+
+def _user_avatar(name):
+    """Return the profile-picture data-URI set for ``name`` in the classic
+    profile-pictures panel, or None. A missing file, malformed JSON, absent
+    user, or non-image value must never fault the /me response — the SPA falls
+    back to a neutral glyph. The ``data:image/`` guard keeps a corrupted entry
+    from becoming an arbitrary URL the frontend would render."""
+    try:
+        with open(_USER_PROFILES_JSON, "r") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    value = data.get(name) if isinstance(data, dict) else None
+    return value if isinstance(value, str) and value.startswith("data:image/") else None
+
+
+def _me_payload(user):
+    """Single source of truth for the /me-shaped payload the SPA consumes across
+    login, magic-link, and /auth/me. Keeps the three sites from drifting."""
+    payload = serialize_user(user)
+    payload["features"] = _server_features()
+    payload["instance_name"] = _instance_name()
+    payload["avatar"] = _user_avatar(user.name)
+    return payload
+
+
 @api_v1.route("/auth/me")
 def auth_me():
     if not current_user.is_authenticated:
         return jsonify({"error": {"code": "unauthenticated", "message": "Login required"}}), 401
-    payload = serialize_user(current_user)
-    payload["features"] = _server_features()
-    payload["instance_name"] = _instance_name()
-    return jsonify(payload)
+    return jsonify(_me_payload(current_user))
 
 
 @api_v1.route("/auth/login", methods=["POST"])
@@ -123,10 +154,7 @@ def auth_login():
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
     if user and not user.role_anonymous() and check_password_hash(str(user.password), password):
         login_user(user, remember=bool(data.get("remember")))
-        payload = serialize_user(user)
-        payload["features"] = _server_features()
-        payload["instance_name"] = _instance_name()
-        return jsonify(payload)
+        return jsonify(_me_payload(user))
     return jsonify({"error": {"code": "invalid_credentials",
                               "message": "Invalid username or password"}}), 401
 
@@ -244,9 +272,7 @@ def auth_magic_link_poll():
     login_user(user)
     ub.session.delete(auth_token)
     ub.session_commit("User {} logged in via SPA magic-link, token deleted".format(user.name))
-    payload = serialize_user(user)
-    payload["features"] = _server_features()
-    return jsonify({"status": "success", "user": payload})
+    return jsonify({"status": "success", "user": _me_payload(user)})
 
 
 @api_v1.route("/auth/register", methods=["POST"])

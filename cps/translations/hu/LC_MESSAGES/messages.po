@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-04 21:38+0000\n"
+"POT-Creation-Date: 2026-07-06 14:12+0000\n"
 "PO-Revision-Date: 2026-05-12 00:06+0200\n"
 "Last-Translator: Gabor L. <nom@il.thx>\n"
 "Language-Team: \n"
@@ -1621,12 +1621,12 @@ msgstr "%(book)s küldése e-olvasóra"
 msgid "The requested file could not be read. Maybe wrong permissions?"
 msgstr "A kért fájl nem olvasható. Esetleg jogosultsági probléma lenne?"
 
-#: cps/helper.py:559
+#: cps/helper.py:605
 #, python-brace-format
 msgid "Read status could not set: {}"
 msgstr "Az olvasási állapot nem állítható be: {}"
 
-#: cps/helper.py:582
+#: cps/helper.py:633
 #, python-format
 msgid ""
 "Deleting bookfolder for book %(id)s failed, path has subfolders: %(path)s"
@@ -1634,12 +1634,12 @@ msgstr ""
 "A %(id)s könyv könyvtárának törlése sikertelen, az útvonal alkönyvtárakkal "
 "rendelkezik: %(path)s"
 
-#: cps/helper.py:594
+#: cps/helper.py:645
 #, python-format
 msgid "Deleting book %(id)s failed: %(message)s"
 msgstr "A %(id)s könyv törlése sikertelen: %(message)s"
 
-#: cps/helper.py:605
+#: cps/helper.py:656
 #, python-format
 msgid ""
 "Deleting book %(id)s from database only, book path in database not valid: "
@@ -1648,7 +1648,7 @@ msgstr ""
 "A %(id)s könyv törlése csak az adatbázisból. A könyv elérési útja az "
 "adatbázisban érvénytelen: %(path)s"
 
-#: cps/helper.py:695
+#: cps/helper.py:746
 #, python-format
 msgid ""
 "Rename author from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
@@ -1656,64 +1656,64 @@ msgstr ""
 "A szerző átnevezése erről: \"%(src)s\" erre: \"%(dest)s\" nem sikerült a "
 "következőhiba miatt: %(error)s"
 
-#: cps/helper.py:764 cps/helper.py:773
+#: cps/helper.py:815 cps/helper.py:824
 #, python-format
 msgid "File %(file)s not found on Google Drive"
 msgstr "A \"%(file)s\" fájl nem található a Google Drive-on"
 
-#: cps/helper.py:863
+#: cps/helper.py:914
 #, python-format
 msgid "Rename title from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr ""
 "A cím átnevezése \"%(src)s\"-ról \"%(dest)s\"-ra nem sikerült a következő "
 "hiba miatt: %(error)s"
 
-#: cps/helper.py:902
+#: cps/helper.py:953
 #, python-format
 msgid "Book path %(path)s not found on Google Drive"
 msgstr "A könyv elérési útja (\"%(path)s\") nem található a Google Drive-on"
 
-#: cps/helper.py:962
+#: cps/helper.py:1013
 msgid "Found an existing account for this Email address"
 msgstr "Létező fiókot találtunk ehhez az e-mail címhez"
 
-#: cps/helper.py:970
+#: cps/helper.py:1021
 msgid "This username is already taken"
 msgstr "Ez a felhasználónév már foglalt"
 
-#: cps/helper.py:984
+#: cps/helper.py:1035
 msgid "Invalid Email address format"
 msgstr "Érvénytelen e-mail cím formátum"
 
-#: cps/helper.py:1006
+#: cps/helper.py:1057
 msgid "Password doesn't comply with password validation rules"
 msgstr "A jelszó nem felel meg a jelszó érvényesítési szabályoknak"
 
-#: cps/helper.py:1350
+#: cps/helper.py:1401
 msgid ""
 "Python module 'advocate' is not installed but is needed for cover uploads"
 msgstr ""
 "A Python modul „advocate” nincs telepítve, de szükséges a borítók "
 "feltöltéséhez"
 
-#: cps/helper.py:1358 cps/helper.py:1393
+#: cps/helper.py:1409 cps/helper.py:1444
 msgid "Error Downloading Cover"
 msgstr "Hiba a borító letöltése közben"
 
-#: cps/helper.py:1362 cps/helper.py:1370
+#: cps/helper.py:1413 cps/helper.py:1421
 #, python-format
 msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr "Borítókép meghaladja a maximum %(size)s MB méretet"
 
-#: cps/helper.py:1379 cps/helper.py:1426 cps/helper.py:1439 cps/helper.py:1442
+#: cps/helper.py:1430 cps/helper.py:1477 cps/helper.py:1490 cps/helper.py:1493
 msgid "Cover-file is not a valid image file, or could not be stored"
 msgstr "A borítófájl nem érvényes képfájl, vagy nem tárolható"
 
-#: cps/helper.py:1396
+#: cps/helper.py:1447
 msgid "Cover Format Error"
 msgstr "Borító formátum hiba"
 
-#: cps/helper.py:1399
+#: cps/helper.py:1450
 msgid ""
 "You are not allowed to access localhost or the local network for cover "
 "uploads"
@@ -1721,68 +1721,68 @@ msgstr ""
 "Nem férhet hozzá a localhost-hoz vagy a helyi hálózathoz, hogy borítókat "
 "töltsön fel"
 
-#: cps/helper.py:1415
+#: cps/helper.py:1466
 msgid "Failed to create path for cover"
 msgstr "A borító útvonalának létrehozása sikertelen"
 
-#: cps/helper.py:1459
+#: cps/helper.py:1510
 msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 msgstr "Csak jpg/jpeg/png/webp/bmp fájlok támogatottak borítófájlként"
 
-#: cps/helper.py:1475 cps/helper.py:1480
+#: cps/helper.py:1526 cps/helper.py:1531
 msgid "Invalid cover file content"
 msgstr "Hibás borítófájl"
 
-#: cps/helper.py:1484
+#: cps/helper.py:1535
 msgid "Only jpg/jpeg files are supported as coverfile"
 msgstr "Csak jpg/jpeg fájlok támogatottak borítófájlként"
 
-#: cps/helper.py:1695 cps/helper.py:1947 cps/spa_strings.py:83
+#: cps/helper.py:1746 cps/helper.py:1998 cps/spa_strings.py:83
 msgid "Cover"
 msgstr "Borító"
 
-#: cps/helper.py:1712
+#: cps/helper.py:1763
 msgid "UnRar binary file not found"
 msgstr "UnRar bináris fájl nem található"
 
-#: cps/helper.py:1723
+#: cps/helper.py:1774
 msgid "Error executing UnRar"
 msgstr "Hiba az UnRar végrehajtása közben"
 
-#: cps/helper.py:1729
+#: cps/helper.py:1780
 #, python-format
 msgid ""
 "Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is "
 "optimized for x86_64 and aarch64."
 msgstr ""
 
-#: cps/helper.py:1738
+#: cps/helper.py:1789
 msgid "Could not find the specified directory"
 msgstr "A megadott könyvtár nem található"
 
-#: cps/helper.py:1741
+#: cps/helper.py:1792
 msgid "Please specify a directory, not a file"
 msgstr "Kérjük, adjon meg egy könyvtárat, ne fájlt!"
 
-#: cps/helper.py:1755
+#: cps/helper.py:1806
 msgid "Calibre binaries not viable"
 msgstr "A Calibre bináris fájlok nem használhatók"
 
-#: cps/helper.py:1764
+#: cps/helper.py:1815
 #, python-format
 msgid "Missing calibre binaries: %(missing)s"
 msgstr "Hiányzó Calibre bináris fájlok: %(missing)s"
 
-#: cps/helper.py:1766
+#: cps/helper.py:1817
 #, python-format
 msgid "Missing executable permissions: %(missing)s"
 msgstr "Hiányzó végrehajtható engedély: %(missing)s"
 
-#: cps/helper.py:1771
+#: cps/helper.py:1822
 msgid "Error executing Calibre"
 msgstr "Hiba a Calibre futtatása közben"
 
-#: cps/helper.py:1949 cps/templates/admin.html:242
+#: cps/helper.py:2000 cps/templates/admin.html:242
 msgid "Queue all books for metadata backup"
 msgstr "Az összes könyv sorba állítása a metaadatok biztonsági mentéséhez"
 

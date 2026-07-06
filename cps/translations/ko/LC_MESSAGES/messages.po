@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-04 21:38+0000\n"
+"POT-Creation-Date: 2026-07-06 14:12+0000\n"
 "PO-Revision-Date: 2025-09-08 00:53+0900\n"
 "Last-Translator: limeade23 <admin@limeade.me>\n"
 "Language-Team: Korean <>\n"
@@ -1553,23 +1553,23 @@ msgstr "%(book)s을(를) 전자책 리더로 보내기"
 msgid "The requested file could not be read. Maybe wrong permissions?"
 msgstr "요청한 파일을 읽을 수 없습니다. 파일 접근 권한을 확인해주세요."
 
-#: cps/helper.py:559
+#: cps/helper.py:605
 #, python-brace-format
 msgid "Read status could not set: {}"
 msgstr "읽기 상태를 설정할 수 없습니다: {}"
 
-#: cps/helper.py:582
+#: cps/helper.py:633
 #, python-format
 msgid ""
 "Deleting bookfolder for book %(id)s failed, path has subfolders: %(path)s"
 msgstr "책 %(id)s의 폴더 삭제에 실패했습니다. %(path)s에 하위 폴더가 있습니다."
 
-#: cps/helper.py:594
+#: cps/helper.py:645
 #, python-format
 msgid "Deleting book %(id)s failed: %(message)s"
 msgstr "책 %(id)s 삭제에 실패했습니다: %(message)s"
 
-#: cps/helper.py:605
+#: cps/helper.py:656
 #, python-format
 msgid ""
 "Deleting book %(id)s from database only, book path in database not valid: "
@@ -1578,133 +1578,133 @@ msgstr ""
 "데이터베이스 경로가 올바르지 않아 책 %(id)s을(를) 데이터베이스에서만 삭제합니"
 "다: %(path)s"
 
-#: cps/helper.py:695
+#: cps/helper.py:746
 #, python-format
 msgid ""
 "Rename author from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr "저자명 '%(src)s'에서 '%(dest)s'(으)로 변경하지 못했습니다: %(error)s"
 
-#: cps/helper.py:764 cps/helper.py:773
+#: cps/helper.py:815 cps/helper.py:824
 #, python-format
 msgid "File %(file)s not found on Google Drive"
 msgstr "Google 드라이브에서 %(file)s 파일을 찾을 수 없습니다."
 
-#: cps/helper.py:863
+#: cps/helper.py:914
 #, python-format
 msgid "Rename title from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr "제목을 '%(src)s'에서 '%(dest)s'(으)로 변경하지 못했습니다: %(error)s"
 
-#: cps/helper.py:902
+#: cps/helper.py:953
 #, python-format
 msgid "Book path %(path)s not found on Google Drive"
 msgstr "Google 드라이브에서 경로 %(path)s을(를) 찾을 수 없습니다."
 
-#: cps/helper.py:962
+#: cps/helper.py:1013
 msgid "Found an existing account for this Email address"
 msgstr "이미 사용 중인 이메일 주소입니다."
 
-#: cps/helper.py:970
+#: cps/helper.py:1021
 msgid "This username is already taken"
 msgstr "이미 사용 중인 사용자 이름입니다."
 
-#: cps/helper.py:984
+#: cps/helper.py:1035
 msgid "Invalid Email address format"
 msgstr "올바른 이메일 주소가 아닙니다."
 
-#: cps/helper.py:1006
+#: cps/helper.py:1057
 msgid "Password doesn't comply with password validation rules"
 msgstr "비밀번호가 설정된 규칙에 맞지 않습니다."
 
-#: cps/helper.py:1350
+#: cps/helper.py:1401
 msgid ""
 "Python module 'advocate' is not installed but is needed for cover uploads"
 msgstr "표지 업로드에 필요한 Python 모듈 'advocate'이 설치되지 않았습니다."
 
-#: cps/helper.py:1358 cps/helper.py:1393
+#: cps/helper.py:1409 cps/helper.py:1444
 msgid "Error Downloading Cover"
 msgstr "표지 다운로드 중 오류가 발생했습니다."
 
-#: cps/helper.py:1362 cps/helper.py:1370
+#: cps/helper.py:1413 cps/helper.py:1421
 #, python-format
 msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr ""
 
-#: cps/helper.py:1379 cps/helper.py:1426 cps/helper.py:1439 cps/helper.py:1442
+#: cps/helper.py:1430 cps/helper.py:1477 cps/helper.py:1490 cps/helper.py:1493
 msgid "Cover-file is not a valid image file, or could not be stored"
 msgstr "표지 파일이 올바른 이미지 파일이 아니거나 저장할 수 없습니다."
 
-#: cps/helper.py:1396
+#: cps/helper.py:1447
 msgid "Cover Format Error"
 msgstr "표지 형식 오류입니다."
 
-#: cps/helper.py:1399
+#: cps/helper.py:1450
 msgid ""
 "You are not allowed to access localhost or the local network for cover "
 "uploads"
 msgstr "표지 업로드를 위해 로컬 호스트나 로컬 네트워크에 접근할 수 없습니다."
 
-#: cps/helper.py:1415
+#: cps/helper.py:1466
 msgid "Failed to create path for cover"
 msgstr "표지 경로 생성에 실패했습니다."
 
-#: cps/helper.py:1459
+#: cps/helper.py:1510
 msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 msgstr "jpg/jpeg/png/webp/bmp 형식만 지원합니다."
 
-#: cps/helper.py:1475 cps/helper.py:1480
+#: cps/helper.py:1526 cps/helper.py:1531
 msgid "Invalid cover file content"
 msgstr "올바르지 않은 표지 파일입니다."
 
-#: cps/helper.py:1484
+#: cps/helper.py:1535
 msgid "Only jpg/jpeg files are supported as coverfile"
 msgstr "표지 파일은 jpg/jpeg 형식만 지원합니다."
 
-#: cps/helper.py:1695 cps/helper.py:1947 cps/spa_strings.py:83
+#: cps/helper.py:1746 cps/helper.py:1998 cps/spa_strings.py:83
 msgid "Cover"
 msgstr "표지"
 
-#: cps/helper.py:1712
+#: cps/helper.py:1763
 msgid "UnRar binary file not found"
 msgstr "UnRar 바이너리 파일을 찾을 수 없습니다."
 
-#: cps/helper.py:1723
+#: cps/helper.py:1774
 msgid "Error executing UnRar"
 msgstr "UnRar 실행 중 오류가 발생했습니다."
 
-#: cps/helper.py:1729
+#: cps/helper.py:1780
 #, python-format
 msgid ""
 "Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is "
 "optimized for x86_64 and aarch64."
 msgstr ""
 
-#: cps/helper.py:1738
+#: cps/helper.py:1789
 msgid "Could not find the specified directory"
 msgstr "지정된 디렉토리를 찾을 수 없습니다."
 
-#: cps/helper.py:1741
+#: cps/helper.py:1792
 msgid "Please specify a directory, not a file"
 msgstr "파일이 아닌 폴더를 지정하세요."
 
-#: cps/helper.py:1755
+#: cps/helper.py:1806
 msgid "Calibre binaries not viable"
 msgstr "Calibre 바이너리 파일을 사용할 수 없습니다."
 
-#: cps/helper.py:1764
+#: cps/helper.py:1815
 #, python-format
 msgid "Missing calibre binaries: %(missing)s"
 msgstr "Calibre 바이너리 파일이 누락되었습니다: %(missing)s"
 
-#: cps/helper.py:1766
+#: cps/helper.py:1817
 #, python-format
 msgid "Missing executable permissions: %(missing)s"
 msgstr "실행 권한이 없습니다: %(missing)s"
 
-#: cps/helper.py:1771
+#: cps/helper.py:1822
 msgid "Error executing Calibre"
 msgstr "Calibre 실행 오류"
 
-#: cps/helper.py:1949 cps/templates/admin.html:242
+#: cps/helper.py:2000 cps/templates/admin.html:242
 msgid "Queue all books for metadata backup"
 msgstr "메타데이터 백업이 작업에 추가되었습니다."
 

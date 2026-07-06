@@ -48,6 +48,13 @@ is for things you can see or feel when running the app.
   inherited upstream icon.
 
 ### Fixed
+- **Marking a book "unread" now clears its reading progress.** If you opened a
+  book just to peek at it, it could stick at something like "0.6% read" with no
+  way to reset it — the read/unread switch flipped the status but left the
+  percentage behind. Marking a book unread now also resets its progress to zero
+  (and clears where the in-browser reader would resume), so an unread book reads
+  as untouched everywhere. Marking a book read is unchanged. Reported by
+  @uschi1 (#683).
 - **The new interface now hides the smart shelves you turned off.** If you
   unticked some entries under "Magic Shelves Visibility" in your account
   settings, the new UI sidebar still listed every smart shelf — the setting only

@@ -38,6 +38,8 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 
 ## Table of contents
 
+> **Prefer a browsable version?** The same guides live in the **[project wiki](https://github.com/new-usemame/Calibre-Web-NextGen/wiki)** — install, configuration, KOReader/Kobo sync, and troubleshooting, split into pages with a sidebar.
+
 - [Why this fork exists](#why-this-fork-exists)
 - [What's included](#whats-included)
 - [Quick start](#quick-start)

@@ -27,6 +27,7 @@ def _user(**kw):
         name="maggie", email="m@example.com", kindle_mail="",
         locale="en", default_language="all", password="HASH",
         kindle_mail_subject="", kobo_only_shelves_sync=0, opds_only_shelves_sync=0,
+        ui_font_body="", ui_font_display="",
         role_admin=lambda: False, role_passwd=lambda: True,
         role_upload=lambda: False, role_edit=lambda: False,
         role_download=lambda: True, role_delete_books=lambda: False,
@@ -205,7 +206,7 @@ def test_revoke_app_password_sets_revoked():
 
 @pytest.mark.unit
 def test_profile_update_accepts_new_fields():
-    """Source-pin: update_profile handles the extended sync/subject fields."""
+    """Source-pin: update_profile handles the extended sync/subject and font fields."""
     src = inspect.getsource(__import__("cps.api.account", fromlist=["update_profile"]).update_profile)
-    for field in ("kindle_mail_subject", "kobo_only_shelves_sync", "opds_only_shelves_sync"):
+    for field in ("kindle_mail_subject", "kobo_only_shelves_sync", "opds_only_shelves_sync", "ui_font_body", "ui_font_display"):
         assert field in src

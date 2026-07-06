@@ -33,6 +33,8 @@ export function Account() {
   const [opdsSync, setOpdsSync] = useState(false);
   const [locale, setLocale] = useState('');
   const [defaultLanguage, setDefaultLanguage] = useState('');
+  const [uiFontBody, setUiFontBody] = useState('');
+  const [uiFontDisplay, setUiFontDisplay] = useState('');
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // App passwords
@@ -56,6 +58,8 @@ export function Account() {
     setOpdsSync(account.opds_only_shelves_sync);
     setLocale(account.locale);
     setDefaultLanguage(account.default_language);
+    setUiFontBody(account.ui_font_body || '');
+    setUiFontDisplay(account.ui_font_display || '');
   }, [account]);
 
   if (isLoading) return <SpinnerCentered size={40} />;
@@ -75,6 +79,7 @@ export function Account() {
         email, kindle_mail: kindleMail, kindle_mail_subject: kindleSubject,
         kobo_only_shelves_sync: koboSync, opds_only_shelves_sync: opdsSync,
         locale, default_language: defaultLanguage,
+        ui_font_body: uiFontBody, ui_font_display: uiFontDisplay,
       },
       {
         onSuccess: () => setProfileMsg({ ok: true, text: t('Profile saved.') }),
@@ -187,6 +192,30 @@ export function Account() {
             <select id="acc-lang" className={styles.input}
               value={defaultLanguage} onChange={(e) => setDefaultLanguage(e.target.value)}>
               {account.languages.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="acc-font-body">{t('UI body font')}</label>
+            <select id="acc-font-body" className={styles.input}
+              value={uiFontBody} onChange={(e) => setUiFontBody(e.target.value)}>
+              <option value="">{t('Default (Optima / Sans-Serif)')}</option>
+              <option value="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">{t('System Sans-Serif')}</option>
+              <option value="'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif">{t('Bookish Serif')}</option>
+              <option value="ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace">{t('Monospace')}</option>
+              <option value="'OpenDyslexic', sans-serif">{t('OpenDyslexic')}</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="acc-font-display">{t('UI display font')}</label>
+            <select id="acc-font-display" className={styles.input}
+              value={uiFontDisplay} onChange={(e) => setUiFontDisplay(e.target.value)}>
+              <option value="">{t('Default (Bookish Serif)')}</option>
+              <option value="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">{t('System Sans-Serif')}</option>
+              <option value="ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace">{t('Monospace')}</option>
+              <option value="'OpenDyslexic', sans-serif">{t('OpenDyslexic')}</option>
             </select>
           </div>
         </div>

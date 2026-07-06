@@ -76,6 +76,8 @@ def serialize_user(user):
         "name": user.name,
         "locale": user.locale,
         "theme": user.theme,
+        "ui_font_body": user.ui_font_body or "",
+        "ui_font_display": user.ui_font_display or "",
         "role": {
             "admin": user.role_admin(),
             "upload": user.role_upload(),

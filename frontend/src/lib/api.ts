@@ -48,6 +48,8 @@ export interface Me {
   name: string;
   locale: string;
   theme: string;
+  ui_font_body?: string;
+  ui_font_display?: string;
   role: Record<string, boolean>;
   /** Sidebar-entry visibility (#585) — {key: enabled}. Mirrors the classic UI's
    *  per-user/instance sidebar_view config. Absent on older servers → treat
@@ -194,6 +196,8 @@ export interface Account {
   opds_only_shelves_sync: boolean;
   locale: string;
   default_language: string;
+  ui_font_body: string;
+  ui_font_display: string;
   role: Record<string, boolean>;
   can_change_password: boolean;
   locales: { id: string; name: string }[];
@@ -209,6 +213,8 @@ export interface ProfileUpdate {
   opds_only_shelves_sync?: boolean;
   locale?: string;
   default_language?: string;
+  ui_font_body?: string;
+  ui_font_display?: string;
 }
 
 export interface BookMetadata {

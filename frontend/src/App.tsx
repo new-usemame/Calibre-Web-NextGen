@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Router, Route, Switch } from 'wouter';
 import { RouteA11y } from './lib/a11y/useRouteA11y';
 import { BASE_PREFIX } from './lib/api';
@@ -43,6 +43,19 @@ const ROUTER_BASE = BASE_PREFIX + '/app';
 export function App() {
   const { data: me, isLoading } = useMe();
   const logout = useLogout();
+
+  useEffect(() => {
+    if (me?.ui_font_body) {
+      document.documentElement.style.setProperty('--font-body', me.ui_font_body);
+    } else {
+      document.documentElement.style.removeProperty('--font-body');
+    }
+    if (me?.ui_font_display) {
+      document.documentElement.style.setProperty('--font-display', me.ui_font_display);
+    } else {
+      document.documentElement.style.removeProperty('--font-display');
+    }
+  }, [me?.ui_font_body, me?.ui_font_display]);
 
   // #609: the classic UI puts the configured instance title in <title> on every
   // page. Per-page titling + route focus is handled by <RouteA11y> below

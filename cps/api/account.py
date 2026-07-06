@@ -66,6 +66,8 @@ def _serialize_account():
         "opds_only_shelves_sync": bool(current_user.opds_only_shelves_sync),
         "locale": current_user.locale,
         "default_language": current_user.default_language,
+        "ui_font_body": current_user.ui_font_body or "",
+        "ui_font_display": current_user.ui_font_display or "",
         "role": {
             "admin": current_user.role_admin(),
             "upload": current_user.role_upload(),
@@ -119,6 +121,10 @@ def update_profile():
             current_user.locale = data["locale"]
         if "default_language" in data and data["default_language"]:
             current_user.default_language = data["default_language"]
+        if "ui_font_body" in data:
+            current_user.ui_font_body = data["ui_font_body"] or ""
+        if "ui_font_display" in data:
+            current_user.ui_font_display = data["ui_font_display"] or ""
     except Exception as ex:  # validators raise generic Exception with a message
         ub.session.rollback()
         return _err("invalid_request", str(ex), 400)

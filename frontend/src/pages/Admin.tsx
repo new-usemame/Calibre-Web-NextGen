@@ -122,7 +122,6 @@ export function Admin() {
       <div className={styles.header}>
         <Shield size={22} className={styles.headerIcon} />
         <h1 className={styles.title}>{t('User administration')}</h1>
-        <span className={styles.count}>{data.items.length}</span>
         <button
           type="button"
           className={styles.addBtn}

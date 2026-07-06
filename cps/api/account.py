@@ -122,9 +122,20 @@ def update_profile():
         if "default_language" in data and data["default_language"]:
             current_user.default_language = data["default_language"]
         if "ui_font_body" in data:
-            current_user.ui_font_body = data["ui_font_body"] or ""
+            val = data["ui_font_body"] or ""
+            if val not in ("",
+                           "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                           "'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif",
+                           "ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace"):
+                return _err("invalid_request", "Invalid body font option", 400)
+            current_user.ui_font_body = val
         if "ui_font_display" in data:
-            current_user.ui_font_display = data["ui_font_display"] or ""
+            val = data["ui_font_display"] or ""
+            if val not in ("",
+                           "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                           "ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace"):
+                return _err("invalid_request", "Invalid display font option", 400)
+            current_user.ui_font_display = val
     except Exception as ex:  # validators raise generic Exception with a message
         ub.session.rollback()
         return _err("invalid_request", str(ex), 400)

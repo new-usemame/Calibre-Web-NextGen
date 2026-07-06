@@ -205,7 +205,6 @@ export function Account() {
               <option value="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">{t('System Sans-Serif')}</option>
               <option value="'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif">{t('Bookish Serif')}</option>
               <option value="ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace">{t('Monospace')}</option>
-              <option value="'OpenDyslexic', sans-serif">{t('OpenDyslexic')}</option>
             </select>
           </div>
           <div className={styles.field}>
@@ -215,7 +214,6 @@ export function Account() {
               <option value="">{t('Default (Bookish Serif)')}</option>
               <option value="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">{t('System Sans-Serif')}</option>
               <option value="ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace">{t('Monospace')}</option>
-              <option value="'OpenDyslexic', sans-serif">{t('OpenDyslexic')}</option>
             </select>
           </div>
         </div>

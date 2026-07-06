@@ -53,6 +53,13 @@ is for things you can see or feel when running the app.
   account button in the top bar and the account page both showed a generic
   silhouette. Both now display your picture, and fall back to the silhouette only
   when you haven't set one. Reported by @chloeroform (#668).
+- **Marking a book "unread" now clears its reading progress.** If you opened a
+  book just to peek at it, it could stick at something like "0.6% read" with no
+  way to reset it — the read/unread switch flipped the status but left the
+  percentage behind. Marking a book unread now also resets its progress to zero
+  (and clears where the in-browser reader would resume), so an unread book reads
+  as untouched everywhere. Marking a book read is unchanged. Reported by
+  @uschi1 (#683).
 - **The new interface now hides the smart shelves you turned off.** If you
   unticked some entries under "Magic Shelves Visibility" in your account
   settings, the new UI sidebar still listed every smart shelf — the setting only
@@ -65,6 +72,11 @@ is for things you can see or feel when running the app.
   sync records the app had written during normal use. The migration now checks
   the right thing and completes, so the server starts normally again — no data
   is lost and no manual steps are needed. Reported by @PulsarFTW (#684).
+- **The "Currently reading" badge now shows on the new-UI book page.** A book
+  you're partway through on KOReader/Kobo showed the "Currently reading" marker
+  on the classic book page but nothing on the new UI. The new-UI book page now
+  displays the same marker — with the synced percentage when it's known — while
+  unread and finished books still don't show it. Reported by @iroQuai (#634).
 - **Fetch Metadata no longer shows the same cover for every volume of a
   series.** Searching for one volume of a series could return results where
   Vol.1, Vol.2, and Vol.3 all carried an identical cover — and applying

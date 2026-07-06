@@ -108,6 +108,10 @@ export interface BookDetail {
   archived: boolean;
   favorited: boolean;
   hidden: boolean;
+  /** Sync-driven "currently reading" tri-state (fork #634) — true when KOReader/
+   *  Kobo reports the book as in progress (read_status IN_PROGRESS) and it isn't
+   *  marked read. Distinct from `read`; matches the classic detail page marker. */
+  in_progress: boolean;
   /** KOReader/Kobo synced reading progress as a percentage (0–100), or null when
    *  not synced. */
   kosync_progress: number | null;

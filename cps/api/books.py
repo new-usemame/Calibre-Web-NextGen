@@ -10,7 +10,7 @@ from . import api_v1
 from .serializers import serialize_book_list_item, serialize_book_detail
 from .. import calibre_db, config, db, ub, isoLanguages, logger
 from ..cw_login import current_user
-from ..helper import edit_book_read_status
+from ..helper import edit_book_read_status, book_is_in_progress
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
@@ -300,12 +300,19 @@ def book_detail(book_id):
     # list badge's logic (fork #579) so both surfaces agree.
     read = bool(read_status) if config.config_read_column \
         else read_status == ub.ReadBook.STATUS_FINISHED
+    # Sync-driven "currently reading" tri-state (fork #634). The classic detail
+    # page renders this marker off read_status_raw == STATUS_IN_PROGRESS; the SPA
+    # book page never received the flag, so the badge was missing in the new UI.
+    # Derive it from the shared helper so both surfaces stay in agreement.
+    in_progress = book_is_in_progress(
+        book_id, read_status, config.config_read_column, current_user)
     body = serialize_book_detail(
         book,
         read=read,
         archived=bool(is_archived),
         favorited=favorited,
         hidden=hidden,
+        in_progress=in_progress,
     )
     body["kosync_progress"] = kosync_progress
     return jsonify(body)

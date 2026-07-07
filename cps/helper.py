@@ -94,6 +94,63 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
         kobo_sync_status.remove_synced_book(book.id, all=True)
 
 
+# Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
+# metadata-change-detector s6 service) watches for change logs. Env-overridable
+# for tests.
+CWA_METADATA_CHANGE_LOGS_DIR = os.environ.get(
+    "CWA_METADATA_CHANGE_LOGS_DIR",
+    "/app/calibre-web-automated/metadata_change_logs")
+
+
+def log_metadata_change(book, changed=None):
+    """Queue a CWA metadata/cover *file-level* enforcement for ``book`` (#707).
+
+    Writes a ``{YYYYmmddHHMMSS}-{book_id}.json`` entry the enforcer consumes; it
+    then re-embeds ``cover.jpg`` and metadata into the actual book file(s) with
+    ebook-polish. The enforcer keys the book off the filename, so the payload
+    only needs to be valid JSON describing what changed.
+
+    This is the single source of truth for triggering enforcement. It matters
+    because ``mark_book_modified`` alone only stamps ``last_modified`` and the
+    calibre ``metadata_dirtied`` bit — neither embeds anything into the file. So
+    a cover changed via the cover picker updated the stored ``cover.jpg`` but the
+    book file kept its old embedded cover: OPDS/Kobo downloads and the picker's
+    "Currently embedded" preview stayed stale (fork #707). Cover- and
+    metadata-edit paths must both call this so the two never diverge again.
+
+    Best-effort: a logging failure must never fail the user's edit/cover change.
+    """
+    import json
+    payload = dict(changed or {})
+    payload.setdefault('title', getattr(book, 'title', '') or '')
+    try:
+        payload.setdefault('authors', ' & '.join(a.name for a in book.authors))
+    except Exception:
+        payload.setdefault('authors', '')
+    payload['_cwa_meta'] = {
+        'modify_date': True,
+        'change_count': len([k for k in payload if not k.startswith('_')]),
+        'has_content': any(v not in ('', None) for k, v in payload.items()
+                           if not k.startswith('_')),
+        'timestamp': datetime.now().isoformat(),
+    }
+    try:
+        os.makedirs(CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
+        now = datetime.now()
+        log_path = os.path.join(
+            CWA_METADATA_CHANGE_LOGS_DIR,
+            f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json')
+        with open(log_path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=4, ensure_ascii=False)
+        log.debug("Queued metadata/cover enforcement for book %s: %s",
+                  book.id, [k for k in payload if not k.startswith('_')])
+        return log_path
+    except Exception as e:
+        log.error_or_exception(
+            f"Failed to write metadata change log for book {getattr(book, 'id', '?')}: {e}")
+        return None
+
+
 def _directory_contains_only_nfs_placeholders(path):
     try:
         entries = os.listdir(path)

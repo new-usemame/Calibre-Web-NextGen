@@ -544,6 +544,13 @@ def _apply_response(ok: bool, message, book):
             # runs post-commit below (best-effort) so a commit failure can't
             # leave it half-applied. Single source of truth: helper.mark_book_modified.
             helper.mark_book_modified(book)
+            # #707: a cover change must also embed into the book file, not just
+            # update cover.jpg. mark_book_modified only stamps last_modified +
+            # the dirty bit; the file-level cover embed is driven by the metadata
+            # enforcer, which fires off a change-log entry. Without this the
+            # download/embedded cover (and the picker's "Currently embedded"
+            # preview) stayed on the old image.
+            helper.log_metadata_change(book, {'cover': True})
             calibre_db.session.commit()
         except Exception as exc:
             # The cover bytes are on disk but we could not record the change.

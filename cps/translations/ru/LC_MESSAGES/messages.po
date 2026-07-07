@@ -10,7 +10,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-07 02:09+0000\n"
-"PO-Revision-Date: 2026-07-05 11:16+0300\n"
+"PO-Revision-Date: 2026-07-07 09:18+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -707,8 +707,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py:2708
 msgid "Password length has to be between 1 and 40"
@@ -2766,33 +2766,31 @@ msgstr "Неверное имя пользователя или пароль."
 
 #: cps/spa_strings.py:109
 msgid "UI body font"
-msgstr ""
+msgstr "Основной шрифт интерфейса"
 
 #: cps/spa_strings.py:110
 msgid "UI display font"
-msgstr ""
+msgstr "Шрифт заголовков интерфейса"
 
 #: cps/spa_strings.py:111
 msgid "Default (Optima / Sans-Serif)"
-msgstr ""
+msgstr "По умолчанию (Optima / Без засечек)"
 
 #: cps/spa_strings.py:112
 msgid "Default (Bookish Serif)"
-msgstr ""
+msgstr "По умолчанию (Книжный с засечками)"
 
 #: cps/spa_strings.py:113
-#, fuzzy
 msgid "System Sans-Serif"
-msgstr "Статистика системы"
+msgstr "Системный шрифт без засечек"
 
 #: cps/spa_strings.py:114
-#, fuzzy
 msgid "Bookish Serif"
-msgstr "Список книг"
+msgstr "Книжный шрифт с засечками"
 
 #: cps/spa_strings.py:115
 msgid "Monospace"
-msgstr ""
+msgstr "Моноширинный шрифт"
 
 #: cps/spa_strings.py:116
 msgid "Label (e.g. KOReader on phone)"
@@ -3184,9 +3182,8 @@ msgid "Open Admin"
 msgstr "Открыть панель администратора"
 
 #: cps/spa_strings.py:213
-#, fuzzy
 msgid "Open account settings"
-msgstr "Настройки CWA"
+msgstr "Открыть настройки учетной записи"
 
 #: cps/spa_strings.py:214
 msgid "Browse Discover"
@@ -5410,9 +5407,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html:292
 msgid "Allow Reverse Proxy Authentication"
@@ -6420,9 +6417,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html:181
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -6445,9 +6442,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html:192
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -10055,9 +10052,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

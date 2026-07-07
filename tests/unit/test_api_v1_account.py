@@ -275,6 +275,31 @@ def test_profile_update_empty_font_clears_to_default():
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("bad", [0, False, [], {}, 1])
+def test_profile_update_rejects_non_string_font_400(bad):
+    """A falsy/typed non-string (0, false, [], {}) must 400 — not be coerced
+    to '' and silently reset the font to default (Greptile P2 on #713)."""
+    user = _user(ui_font_body="serif")
+    mod, ctx, *patches = _profile_ctx(user, {"ui_font_body": bad})
+    with ctx:
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            resp = inspect.unwrap(mod.update_profile)()
+    assert resp[1] == 400
+    assert user.ui_font_body == "serif"  # unchanged, not reset to default
+
+
+@pytest.mark.unit
+def test_profile_update_null_font_means_default():
+    """Explicit null is the intended 'reset to theme default' → persists as ''."""
+    user = _user(ui_font_body="serif")
+    mod, ctx, *patches = _profile_ctx(user, {"ui_font_body": None})
+    with ctx:
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            resp = inspect.unwrap(mod.update_profile)()
+    assert user.ui_font_body == ""
+
+
+@pytest.mark.unit
 def test_font_allowlists_match_frontend_ssot_keys():
     """The backend key allowlist must stay in lock-step with the SPA preset
     keys (frontend/src/lib/fonts.ts). If someone edits one, this catches the

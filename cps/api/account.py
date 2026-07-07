@@ -128,13 +128,13 @@ def update_profile():
         if "default_language" in data and data["default_language"]:
             current_user.default_language = data["default_language"]
         if "ui_font_body" in data:
-            val = data["ui_font_body"] or ""
-            if val not in ALLOWED_UI_FONT_BODY:
+            val = "" if data["ui_font_body"] is None else data["ui_font_body"]
+            if not isinstance(val, str) or val not in ALLOWED_UI_FONT_BODY:
                 return _err("invalid_request", "Invalid body font option", 400)
             current_user.ui_font_body = val
         if "ui_font_display" in data:
-            val = data["ui_font_display"] or ""
-            if val not in ALLOWED_UI_FONT_DISPLAY:
+            val = "" if data["ui_font_display"] is None else data["ui_font_display"]
+            if not isinstance(val, str) or val not in ALLOWED_UI_FONT_DISPLAY:
                 return _err("invalid_request", "Invalid display font option", 400)
             current_user.ui_font_display = val
     except Exception as ex:  # validators raise generic Exception with a message

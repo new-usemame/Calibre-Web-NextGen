@@ -314,7 +314,8 @@ def _load_cps_settings_from_app_db() -> None:
             cur = con.cursor()
             row = cur.execute(
                 "SELECT config_use_google_drive, config_google_drive_folder, "
-                "config_calibre_dir, config_certfile, config_keyfile "
+                "config_calibre_dir, config_certfile, config_keyfile, "
+                "config_calibre_split, config_calibre_split_dir "
                 "FROM settings LIMIT 1"
             ).fetchone()
             if not row:
@@ -328,6 +329,14 @@ def _load_cps_settings_from_app_db() -> None:
                 _cps_config.config_certfile = row[3]
             if row[4]:
                 _cps_config.config_keyfile = row[4]
+            # config.get_book_path() reads both of these; without them any
+            # ingest-side cover write (auto metadata fetch, fork #709) blows up
+            # with "'ConfigSQL' object has no attribute 'config_calibre_split'"
+            # because this minimal loader — not the main app's config.load() —
+            # is what populates config in the ingest process. Split-library
+            # users also need the split dir so covers land in the right tree.
+            _cps_config.config_calibre_split = bool(row[5]) if row[5] is not None else False
+            _cps_config.config_calibre_split_dir = row[6]
     except Exception as e:
         print(f"[ingest-processor] WARN: Could not read CPS settings from app.db ({app_db_path}): {e}", flush=True)
 

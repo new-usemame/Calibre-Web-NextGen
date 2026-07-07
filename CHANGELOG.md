@@ -25,6 +25,13 @@ is for things you can see or feel when running the app.
   looking half-empty.
 
 ### Fixed
+- **Author names with a comma (like "William H. Keith, Jr.") now show the comma,
+  not a pipe.** In the redesigned interface, an author whose name contains a
+  comma appeared under book titles as "William H. Keith| Jr." — a raw `|` where
+  the comma should be. Calibre stores those commas internally as a pipe, and the
+  new interface was showing the stored form instead of the display form. Book
+  cards on the Library and author pages, and the book detail page, now render the
+  comma correctly. Reported on Discord by neontapir (#730).
 - **Admins can find the Admin page in the new interface again.** In the
   redesigned UI the Admin/Settings entry lived only in the left sidebar rail, so
   admins who looked in the account (avatar) menu — the usual home for

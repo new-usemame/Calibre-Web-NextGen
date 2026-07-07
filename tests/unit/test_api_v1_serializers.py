@@ -108,3 +108,31 @@ def test_serialize_book_detail_rating_absent_is_null():
     assert serialize_book_detail(_detail_book(ratings=[]))["rating"] is None
     # Attribute absent entirely (getattr fallback path).
     assert serialize_book_detail(_detail_book())["rating"] is None
+
+
+@pytest.mark.unit
+def test_serialize_book_list_item_author_pipe_unescaped():
+    """Calibre escapes a comma inside a single author name as '|' in the DB
+    (e.g. "William H. Keith, Jr." is stored "William H. Keith| Jr."). The list
+    serializer must un-escape it so the SPA book cards show a comma, not a pipe
+    (fork #730, reported by neontapir). Every other display path (web.py,
+    api/browse.py, api/edit.py, api/duplicates.py) already does this replace."""
+    from cps.api.serializers import serialize_book_list_item
+    book = SimpleNamespace(
+        id=1, title="Warstrider", series_index="1.0", has_cover=0,
+        authors=[SimpleNamespace(name="William H. Keith| Jr.")],
+        series=[], data=[],
+    )
+    assert serialize_book_list_item(book)["authors"] == ["William H. Keith, Jr."]
+
+
+@pytest.mark.unit
+def test_serialize_book_detail_author_pipe_unescaped():
+    """The detail serializer must un-escape the Calibre '|' comma in author
+    names too, so the SPA detail page renders "William H. Keith, Jr." instead
+    of the raw stored form (fork #730). The author id is preserved for linking."""
+    from cps.api.serializers import serialize_book_detail
+    book = _detail_book(authors=[SimpleNamespace(id=9, name="William H. Keith| Jr.")])
+    assert serialize_book_detail(book)["authors"] == [
+        {"id": 9, "name": "William H. Keith, Jr."}
+    ]

@@ -19,11 +19,6 @@
   color: var(--text);
 }
 
-.count {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-
 .addBtn {
   margin-left: auto;
   display: inline-flex;

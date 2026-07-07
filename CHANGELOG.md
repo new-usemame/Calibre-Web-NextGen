@@ -48,6 +48,11 @@ is for things you can see or feel when running the app.
   inherited upstream icon.
 
 ### Fixed
+- **Removed the stray number next to "User administration" in the new
+  interface.** The admin page showed a bare, unlabeled count (e.g. "1") beside
+  the title that read as a glitch rather than information. It's gone; the user
+  count is already clear from the list itself. Reported by @chloeroform (#669),
+  patch by @chloeroform.
 - **KOReader reading position now syncs between two devices even after a book
   is re-uploaded or edited.** If one reader was ahead (say 80%) and the other
   behind (67%), the second device could refuse to jump forward — a manual pull

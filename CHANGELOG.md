@@ -50,6 +50,31 @@ is for things you can see or feel when running the app.
   wrong text (the "System Sans-Serif" font option read «Статистика системы»).
   Russian now reads correctly throughout those settings. Contributed by
   @standhaftsohnsergius (#718).
+- **Auto-adding metadata during import no longer skips the cover on some setups.**
+  On libraries that store book files separately from `metadata.db` (the "split
+  library" option), fetching metadata during ingest failed to save the downloaded
+  cover and logged an internal error. Covers now apply correctly during import.
+  Reported by @maraken (#709).
+- **Marking a book "unread" now fully resets it.** After opening a book "just to
+  test it", marking it unread cleared the reading percentage but the book could
+  stay flagged as *Currently reading*. Unread now clears that state too, so the
+  book reads as untouched everywhere. Reported by @uschi1 (#683).
+- **Converting from formats that need a Calibre plugin works again.** Converting
+  e.g. KFX→EPUB failed with "No plugin to handle input format" even with the
+  plugin installed, because the converter wasn't looking in your Calibre plugins
+  folder. It now does. Reported by @jhazan-jpg (#724).
+- **Changing a book's cover now updates the cover inside the file.** Picking a new
+  cover updated it in the library but downloads (and the "Currently embedded"
+  preview) kept the old image. The new cover is now embedded into the book file.
+  Reported by @GustavPersson (#707).
+- **Kobo no longer keeps a duplicate after the duplicate-scanner removes a book.**
+  When the duplicate scanner replaced an older copy with a newer one, a Kobo synced
+  to the server kept both — the removed copy never went away. The device is now
+  told to drop it on the next sync. Reported by @Chronosmage-alt (#708).
+- **Uploading a new format to a book no longer creates a duplicate on very long
+  filenames.** An over-long uploaded filename could be imported as a separate book
+  instead of being added as a format to the existing one. Reported by @jrhedman
+  (#690).
 
 ## [v4.1.6] - 2026-07-07
 

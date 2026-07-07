@@ -314,7 +314,18 @@ class TaskConvert(CalibreTask):
                             command.append(parsed)
                             quotes.append(quotes_index)
                             quotes_index += 1
-            p = process_open(command, quotes, newlines=False)
+            # #724: route the converter at the user's Calibre config dir so
+            # input-format plugins (KFX Input, etc.) load. Without this,
+            # ebook-convert inherits HOME=/root/.config/calibre — not writable by
+            # the abc service user — so Calibre silently falls back to a throwaway
+            # temp config dir with no plugins registered and dies with
+            # "No plugin to handle input format: kfx". Mirrors embed_helper's
+            # do_calibre_export, which already sets HOME=/config +
+            # CALIBRE_CONFIG_DIRECTORY=/config/.config/calibre when the opt-in
+            # CWA_CALIBRE_USER_PLUGINS feature is enabled (no-op when disabled).
+            from cps.services import calibre_user_plugins
+            convert_env = calibre_user_plugins.apply_to_env(os.environ.copy())
+            p = process_open(command, quotes, convert_env, newlines=False)
         except OSError as e:
             return 1, N_("Ebook-converter failed: %(error)s", error=e)
 

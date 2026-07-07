@@ -145,3 +145,64 @@ def test_reset_helper_clears_both_percent_fields_and_bookmark():
     assert "content_source_progress_percent" in src, \
         "content-source percent must also be cleared or the ghost survives"
     assert "Bookmark" in src, "web-reader resume point must also be cleared (#683)"
+
+
+# --- #683 follow-up: the "Currently reading" tri-state must clear too --------
+# Reporter @uschi1 (2026-07-07): after v4.1.6 the ghost percentage was gone but
+# the orange "Currently reading" badge stuck on the classic book page. That
+# badge reads ub.ReadBook.read_status == STATUS_IN_PROGRESS, which the earlier
+# fix never touched (and which the custom-read-column unread path never wrote).
+
+@pytest.mark.unit
+def test_reset_clears_in_progress_marker(session):
+    session.add(ub.ReadBook(user_id=1, book_id=42,
+                            read_status=ub.ReadBook.STATUS_IN_PROGRESS))
+    session.commit()
+
+    cleared = helper.reset_reading_position(session, 1, 42)
+    session.commit()
+
+    row = session.query(ub.ReadBook).filter_by(user_id=1, book_id=42).first()
+    assert row.read_status == ub.ReadBook.STATUS_UNREAD, \
+        "'Currently reading' tri-state must clear on unread (#683 follow-up)"
+    assert cleared >= 1
+
+
+@pytest.mark.unit
+def test_reset_does_not_touch_finished_marker(session):
+    # A book explicitly FINISHED must not be flipped to UNREAD by a reset.
+    session.add(ub.ReadBook(user_id=1, book_id=42,
+                            read_status=ub.ReadBook.STATUS_FINISHED))
+    session.commit()
+
+    helper.reset_reading_position(session, 1, 42)
+    session.commit()
+
+    row = session.query(ub.ReadBook).filter_by(user_id=1, book_id=42).first()
+    assert row.read_status == ub.ReadBook.STATUS_FINISHED
+
+
+@pytest.mark.unit
+def test_reset_in_progress_scoped_to_user_and_book(session):
+    session.add(ub.ReadBook(user_id=1, book_id=42,
+                            read_status=ub.ReadBook.STATUS_IN_PROGRESS))
+    session.add(ub.ReadBook(user_id=1, book_id=99,
+                            read_status=ub.ReadBook.STATUS_IN_PROGRESS))
+    session.add(ub.ReadBook(user_id=2, book_id=42,
+                            read_status=ub.ReadBook.STATUS_IN_PROGRESS))
+    session.commit()
+
+    helper.reset_reading_position(session, 1, 42)
+    session.commit()
+
+    assert session.query(ub.ReadBook).filter_by(user_id=1, book_id=99).first(
+    ).read_status == ub.ReadBook.STATUS_IN_PROGRESS
+    assert session.query(ub.ReadBook).filter_by(user_id=2, book_id=42).first(
+    ).read_status == ub.ReadBook.STATUS_IN_PROGRESS
+
+
+@pytest.mark.unit
+def test_reset_helper_clears_in_progress_source_pin():
+    src = inspect.getsource(helper.reset_reading_position)
+    assert "STATUS_IN_PROGRESS" in src and "ReadBook" in src, \
+        "reset must fold the 'Currently reading' tri-state back to unread (#683)"

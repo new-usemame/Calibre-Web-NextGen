@@ -577,6 +577,24 @@ def reset_reading_position(session, user_id, book_id):
             bookmark.progress_percent = None
             bookmark.content_source_progress_percent = None
             cleared += 1
+    # #683 follow-up: the "Currently reading" tri-state lives ONLY in
+    # ub.ReadBook.read_status (STATUS_IN_PROGRESS) — KOReader/Kobo sync and the
+    # web-reader open write it there regardless of a configured custom read
+    # column (fork #634/#509). Clearing the percentage above is not enough: the
+    # "Currently reading" badge/shelf reads that tri-state, so leaving it at
+    # IN_PROGRESS keeps the marker on after "mark unread". This bit the reporter
+    # on a custom-read-column install, where the unread toggle flips only the
+    # custom column and never touched ub.ReadBook at all. Fold the marker back to
+    # UNREAD here so "unread" is a genuine reset everywhere. FINISHED is left
+    # alone (only IN_PROGRESS is filtered), and a device that still holds a
+    # position re-establishes it on its next sync — the device owns its state.
+    read_row = session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == uid,
+        ub.ReadBook.book_id == book_id,
+        ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
+    if read_row is not None:
+        read_row.read_status = ub.ReadBook.STATUS_UNREAD
+        cleared += 1
     return cleared
 
 

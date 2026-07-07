@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles } from 'lucide-react';
+import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles, Shield } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { BrandName } from './BrandName';
@@ -180,7 +180,13 @@ function backToClassicView() {
 function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => void }) {
   const t = useT();
   const { open, close, wrapperProps, onTriggerClick } = useMenu();
-  const avatar = useMe().data?.avatar;
+  const me = useMe().data;
+  const avatar = me?.avatar;
+  // #659/#720: admins looked for the Admin/Settings entry in the account menu (the
+  // conventional place) and only found it buried in the sidebar rail, so several
+  // switched back to the classic UI. Surface it here too, role-gated, pointing at
+  // the SPA's own /admin route (same target as the sidebar link).
+  const isAdmin = !!me?.role?.admin;
   return (
     <div className={styles.menu} {...wrapperProps}>
       <button
@@ -199,6 +205,9 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
       {open && (
         <div className={styles.panel}>
           <MenuItem icon={<User size={15} />} label={t('My account')} to="/account" onSelect={close} />
+          {isAdmin && (
+            <MenuItem icon={<Shield size={15} />} label={t('Admin')} to="/admin" onSelect={close} />
+          )}
           <MenuItem icon={<Undo2 size={15} />} label={t('Back to the classic view')} onClick={backToClassicView} onSelect={close} />
           <MenuItem icon={<LogOut size={15} />} label={t('Sign out')} danger onClick={onLogout} onSelect={close} />
         </div>

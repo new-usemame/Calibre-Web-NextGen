@@ -17,6 +17,14 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **Admins can find the Admin page in the new interface again.** In the
+  redesigned UI the Admin/Settings entry lived only in the left sidebar rail, so
+  admins who looked in the account (avatar) menu — the usual home for
+  "Settings/Admin" — saw only *My account*, *Back to the classic view* and *Sign
+  out*, and some switched back to the classic interface because they couldn't
+  find admin. The account menu now shows an **Admin** link (for admin accounts
+  only) that opens the in-app admin page. Reported through the in-app feedback
+  form (#659).
 - **Downloading a book on an iPhone no longer strands you.** In the new
   interface, tapping a format to download it used to navigate Safari away from
   the app to a page it couldn't show — leaving iPhone users stuck until they

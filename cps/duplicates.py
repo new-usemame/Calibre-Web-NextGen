@@ -1803,6 +1803,19 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                         # custom columns (Greptile #399). A whole-book cleanup reads only .id and .path.
                         deleted_book_path = book.path
 
+                        # #708: record the Kobo deletion tombstone BEFORE anything
+                        # touches kobo_synced_books. record_book_deletion reads this
+                        # book's kobo_synced_books rows to learn which users had it on
+                        # a device (so their next sync emits a DeletedEntitlement that
+                        # removes it), but migrate_user_book_data below deletes exactly
+                        # those rows — and delete_whole_book's own tombstone call runs
+                        # even later. Run in that order the tombstone is silently
+                        # skipped and the removed duplicate lingers on the Kobo forever.
+                        # record_book_deletion is idempotent per (user, uuid), so the
+                        # later calls become no-ops.
+                        from cps import kobo_sync_status
+                        kobo_sync_status.record_book_deletion(deleted_book_id, getattr(book, "uuid", None))
+
                         # D4: move the user's data on this loser (annotations,
                         # reading progress, Kobo state, shelf membership…) to
                         # the kept book BEFORE deleting — for every strategy,

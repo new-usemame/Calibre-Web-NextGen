@@ -13,6 +13,7 @@ pin that the convert subprocess now gets the same plugin-bearing env when the
 feature is enabled, and is left untouched when it is disabled.
 """
 import os
+import types
 
 import pytest
 
@@ -43,18 +44,24 @@ class _FakeProc:
 
 def _run_convert_capture_env(monkeypatch, plugins_enabled):
     from cps.tasks import convert as convert_mod
-    from cps import config
 
     if plugins_enabled:
         monkeypatch.setenv("CWA_CALIBRE_USER_PLUGINS", "1")
     else:
         monkeypatch.delenv("CWA_CALIBRE_USER_PLUGINS", raising=False)
 
-    # Skip the metadata-embed (show_metadata) branch so we go straight to the
+    # Replace convert's module-level `config` with a plain namespace holding
+    # exactly what _convert_calibre reads on the no-embed path. The real global
+    # ConfigSQL is a bare, unloaded instance in a fresh test process (CI), so
+    # monkeypatching individual attributes on it is fragile — this is robust.
+    # config_embed_metadata=False skips the show_metadata branch so we reach the
     # ebook-convert command we care about.
-    monkeypatch.setattr(config, "config_embed_metadata", False, raising=False)
-    monkeypatch.setattr(config, "config_calibre", "", raising=False)
-    monkeypatch.setattr(config, "config_converterpath", "/usr/bin/ebook-convert", raising=False)
+    fake_config = types.SimpleNamespace(
+        config_embed_metadata=False,
+        config_calibre="",
+        config_converterpath="/usr/bin/ebook-convert",
+    )
+    monkeypatch.setattr(convert_mod, "config", fake_config)
 
     captured = {}
 

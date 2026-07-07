@@ -254,7 +254,7 @@ class TaskAutoHardcoverID(CalibreTask):
         
         # Calculate confidence scores for each result
         scored_results = []
-        for result in results[:10]:  # Limit to top 10 results
+        for result in results[:50]:  # Score all hits returned (API per_page=50)
             # Get book's ISBN for matching
             book_isbn = None
             for identifier in book.identifiers:
@@ -355,11 +355,11 @@ class TaskAutoHardcoverID(CalibreTask):
             # state can't be poisoned by worker commits.
             ub_session = ub.init_db_thread()
             
-            # Prepare results for JSON storage (top 5 candidates)
+            # Prepare results for JSON storage (top 3 candidates; matches review UI)
             results_json = []
             scores_json = []
             
-            for item in scored_results[:5]:
+            for item in scored_results[:3]:
                 result = item['result']
                 results_json.append({
                     'id': str(result.id),

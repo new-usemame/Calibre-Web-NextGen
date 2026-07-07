@@ -16,6 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+- **Downloading a book on an iPhone no longer strands you.** In the new
+  interface, tapping a format to download it used to navigate Safari away from
+  the app to a page it couldn't show — leaving iPhone users stuck until they
+  force-restarted the app to get back. Downloads now open in a separate tab, so
+  the app stays put and you land right back where you were. Reported by
+  @Arjan61 (#716). Also applies to the download buttons on the edit-book screen
+  and the annotation exports.
+
 ## [v4.1.6] - 2026-07-07
 
 ### Added

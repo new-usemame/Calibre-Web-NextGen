@@ -656,7 +656,7 @@ function FormatsManager({ id }: { id: string }) {
         {book!.formats.map((f) => (
           <li key={f.format} className={styles.formatItem}>
             <span className={styles.formatName}>{f.format}</span>
-            <a className={styles.formatDownload} href={resourceUrl(f.download_url)} download>{t('Download')}</a>
+            <a className={styles.formatDownload} href={resourceUrl(f.download_url)} download target="_blank" rel="noopener">{t('Download')}</a>
             {canDelete && (
               <button className={styles.formatDelete}
                 onClick={() => {

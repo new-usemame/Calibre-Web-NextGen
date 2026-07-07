@@ -344,6 +344,15 @@ export function BookDetail() {
                 href={resourceUrl(fmt.download_url)}
                 className={styles.downloadBtn}
                 download
+                // iOS Safari ignores the `download` hint and the server serves book
+                // files with `Content-Disposition: inline` (needed for byte-range /
+                // in-browser reading), so a same-tab tap navigates the SPA away to a
+                // file the browser can't render — stranding the user on a dead page
+                // until they force-restart (#716). Opening in a new tab preserves the
+                // app tab; desktop browsers still honour `download` and don't spawn a
+                // stray tab. `noopener` keeps the download context from reaching back.
+                target="_blank"
+                rel="noopener"
               >
                 <Download size={15} />
                 {fmt.format} · {formatBytes(fmt.size_bytes)}

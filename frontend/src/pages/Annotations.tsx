@@ -52,9 +52,9 @@ export function Annotations({ id }: { id: string }) {
       </div>
 
       <div className={styles.toolbar}>
-        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.md`)}><Download size={14} aria-hidden="true" focusable={false} /> Markdown</a>
-        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.csv`)}><Download size={14} aria-hidden="true" focusable={false} /> CSV</a>
-        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.json`)}><Download size={14} aria-hidden="true" focusable={false} /> JSON</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.md`)} download target="_blank" rel="noopener"><Download size={14} aria-hidden="true" focusable={false} /> Markdown</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.csv`)} download target="_blank" rel="noopener"><Download size={14} aria-hidden="true" focusable={false} /> CSV</a>
+        <a className={styles.toolBtn} href={apiUrl(`/annotations/${id}/export.json`)} download target="_blank" rel="noopener"><Download size={14} aria-hidden="true" focusable={false} /> JSON</a>
         <a className={styles.toolBtn} href={apiUrl('/annotations/import')}><UploadIcon size={14} aria-hidden="true" focusable={false} /> {t('Import from Kobo')}</a>
       </div>
 

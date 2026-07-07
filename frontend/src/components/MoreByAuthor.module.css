@@ -1,0 +1,44 @@
+.box {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--border);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--text);
+  margin: 0 0 var(--sp-4);
+}
+
+.strip {
+  display: flex;
+  gap: var(--sp-4);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  /* Pad the scroll viewport so a card's hover-lift + focus outline isn't clipped
+     by the overflow container; negative margins cancel the padding so the
+     section's outer spacing is unchanged. Mirrors DiscoverSection. */
+  padding: var(--sp-3) var(--sp-2);
+  margin: calc(-1 * var(--sp-3)) calc(-1 * var(--sp-2)) calc(-1 * var(--sp-1));
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.strip::-webkit-scrollbar { height: 8px; }
+.strip::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--r-full);
+}
+.strip::-webkit-scrollbar-track { background: transparent; }
+
+.item {
+  flex: 0 0 132px;
+  width: 132px;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 600px) {
+  .item { flex-basis: 116px; width: 116px; }
+}

@@ -54,7 +54,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
 
   const onMerge = () => {
     if (count < 2) return;
-    if (!window.confirm(t('Merge %(n)s books into the first selected? The others are removed after their formats are copied over.', { n: count }))) return;
+    if (!window.confirm(t('Merge {n} books into the first selected? The others are removed after their formats are copied over.', { n: count }))) return;
     mergeBooks.mutate(ids, { onSuccess: () => { onChanged?.(); onClear(); } });
   };
 
@@ -118,7 +118,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
             onChange={(e) => setMeta({ ...meta, languages: e.target.value })} />
         </div>
         <button className={styles.metaApply} onClick={applyMeta} disabled={setMetadata.isPending}>
-          {setMetadata.isPending ? t('Applying…') : t('Apply to %(n)s books', { n: count })}
+          {setMetadata.isPending ? t('Applying…') : t('Apply to {n} books', { n: count })}
         </button>
       </div>
     )}

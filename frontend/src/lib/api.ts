@@ -99,6 +99,9 @@ export interface BookDetail {
   authors: EntityRef[];
   series: EntityRef | null;
   series_index: string;
+  /** Calibre rating on a 0–10 scale (half-star granularity: 9 → 4.5 stars),
+   *  or null when the book is unrated. Divide by 2 for a 0–5 star display. */
+  rating: number | null;
   cover_url: string | null;
   pubdate: string | null;
   description_html: string | null;

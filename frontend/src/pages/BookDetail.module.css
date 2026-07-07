@@ -133,6 +133,11 @@
   margin: var(--sp-1) 0 0;
 }
 
+/* Star rating row — sits under the title/author/series header block. */
+.rating {
+  margin: var(--sp-2) 0 0;
+}
+
 /* Sync-driven "currently reading" marker (fork #634) — an accent-tinted inline
    pill, distinct from the read/unread toggle. */
 .currentlyReading {

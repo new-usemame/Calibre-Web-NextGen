@@ -76,3 +76,35 @@ def test_serialize_book_detail_sanitizes_description_xss():
     assert "<img" not in out["description_html"]   # img tag escaped/neutralized
     assert "<script" not in out["description_html"]
     assert "<p>Safe</p>" in out["description_html"]
+
+
+def _detail_book(**overrides):
+    """A minimal fake Book for serialize_book_detail — all list attrs empty."""
+    base = dict(
+        id=9, title="X", series_index="1.0", has_cover=0, pubdate=None,
+        authors=[], series=[], data=[], tags=[], languages=[], publishers=[],
+        identifiers=[], comments=[],
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+@pytest.mark.unit
+def test_serialize_book_detail_rating_present():
+    """A rated book exposes its raw 0–10 Calibre rating so the UI can render
+    half-stars (9 → 4.5). Parity with the classic detail page's star block."""
+    from cps.api.serializers import serialize_book_detail
+    book = _detail_book(ratings=[SimpleNamespace(rating=9)])
+    out = serialize_book_detail(book)
+    assert out["rating"] == 9
+
+
+@pytest.mark.unit
+def test_serialize_book_detail_rating_absent_is_null():
+    """An unrated book (no ratings link, or the attr missing entirely) emits
+    rating=None rather than 0 — 0 stars and 'not rated' are different states."""
+    from cps.api.serializers import serialize_book_detail
+    # Empty ratings list.
+    assert serialize_book_detail(_detail_book(ratings=[]))["rating"] is None
+    # Attribute absent entirely (getattr fallback path).
+    assert serialize_book_detail(_detail_book())["rating"] is None

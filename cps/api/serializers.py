@@ -140,6 +140,13 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
     series = ({"id": series_list[0].id, "name": series_list[0].name}
               if series_list else None)
 
+    # Rating — Calibre stores 0–10 (half-star granularity: 9 → 4.5 stars), so
+    # expose the raw value and let the UI render halves. None when unrated.
+    # Mirrors the classic detail page's star block (detail.html:
+    # entry.ratings[0].rating). first entry only, matching the model's uniqueness.
+    ratings_list = getattr(book, "ratings", None) or []
+    rating = ratings_list[0].rating if ratings_list else None
+
     # Cover
     cover_url = f"/cover/{bid}/og" if getattr(book, "has_cover", 0) else None
 
@@ -208,6 +215,7 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
                     for a in (getattr(book, "authors", None) or [])],
         "series": series,
         "series_index": book.series_index,
+        "rating": rating,
         "cover_url": cover_url,
         "pubdate": pubdate_str,
         "description_html": description_html,

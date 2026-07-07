@@ -44,7 +44,23 @@ _("Series order (reverse)")
 _("Add tag")
 _("New tag")
 _("Remove tag")
-_("Remove tag %(name)s")
+# NB: the SPA's interpolate() uses {brace} placeholders, not gettext %(name)s —
+# a %()s msgid renders its placeholder literally (was a latent bug here + in
+# BulkBar). Keep SPA msgids on the {brace} form.
+_("Remove tag {name}")
+
+# Book detail completeness pass — star rating (parity with the classic detail
+# page) and the "More by this author" browse strip that fills the page for
+# sparse books. SPA-only strings (BookDetail.tsx / StarRating.tsx /
+# MoreByAuthor.tsx), anchored so the auto-translation job keeps them.
+_("Rated {rating} out of 5")
+_("More by {name}")
+
+# Bulk-selection toolbar (BulkBar.tsx) — previously unanchored AND written with
+# %(n)s, so they were dropped on re-extract and rendered the placeholder
+# literally in a visible confirm dialog + button. Anchored on the {brace} form.
+_("Merge {n} books into the first selected? The others are removed after their formats are copied over.")
+_("Apply to {n} books")
 
 
 # ============================================================================

@@ -16,6 +16,14 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+- **Book pages now show star ratings and more from the same author.** In the
+  redesigned interface, a book's page now displays its star rating (matching the
+  classic view), and — below the details — a "More by this author" row of other
+  books by that author, so a book page is a place to keep browsing instead of a
+  dead end. Books with no cover art or description no longer leave the page
+  looking half-empty.
+
 ### Fixed
 - **Admins can find the Admin page in the new interface again.** In the
   redesigned UI the Admin/Settings entry lived only in the left sidebar rail, so
@@ -25,6 +33,11 @@ is for things you can see or feel when running the app.
   find admin. The account menu now shows an **Admin** link (for admin accounts
   only) that opens the in-app admin page. Reported through the in-app feedback
   form (#659).
+- **The bulk-edit toolbar no longer shows a raw code placeholder.** In the new
+  interface, selecting several books and choosing merge or bulk-apply showed
+  literal text like "Merge %(n)s books…" and "Apply to %(n)s books" instead of
+  the actual count. Both now read correctly (e.g. "Merge 3 books…"). The same
+  underlying issue was corrected on the book page's tag controls.
 - **Downloading a book on an iPhone no longer strands you.** In the new
   interface, tapping a format to download it used to navigate Safari away from
   the app to a page it couldn't show — leaving iPhone users stuck until they

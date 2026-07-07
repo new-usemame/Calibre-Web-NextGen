@@ -7,6 +7,8 @@ import {
 } from '../lib/queries';
 import { Pill } from '../components/Pill';
 import { AddToShelf } from '../components/AddToShelf';
+import { StarRating } from '../components/StarRating';
+import { MoreByAuthor } from '../components/MoreByAuthor';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { BookFormat, EntityRef } from '../lib/api';
@@ -142,7 +144,7 @@ function TagEditor({ bookId, tags, canEdit }:
           <button
             type="button"
             className={styles.tagRemove}
-            aria-label={t('Remove tag %(name)s', { name: tag.name })}
+            aria-label={t('Remove tag {name}', { name: tag.name })}
             title={t('Remove tag')}
             disabled={update.isPending}
             onClick={() => removeTag(tag.name)}
@@ -262,6 +264,14 @@ export function BookDetail() {
                 {' · Book '}
                 {book.series_index}
               </p>
+            )}
+            {/* Rating — star parity with the classic detail page. Calibre stores
+                0–10 (half-star granularity); null means unrated (no stars shown,
+                not zero stars). */}
+            {book.rating != null && book.rating > 0 && (
+              <div className={styles.rating}>
+                <StarRating rating={book.rating} size={16} />
+              </div>
             )}
             {/* Passive "currently reading" marker (fork #634) — mirrors the classic
                 detail page. Sync-driven display only; the read toggle below stays a
@@ -476,6 +486,19 @@ export function BookDetail() {
           )}
         </div>
       </div>
+
+      {/* More by this author — a full-width browse strip below the two-column
+          layout. Fills the page for sparse/description-less books and turns the
+          detail page into a browse surface. Keyed on the book so switching books
+          refetches; renders nothing when the author has no other titles. */}
+      {book.authors.length > 0 && (
+        <MoreByAuthor
+          key={book.id}
+          authorId={book.authors[0].id}
+          authorName={book.authors[0].name}
+          excludeBookId={book.id}
+        />
+      )}
     </main>
   );
 }

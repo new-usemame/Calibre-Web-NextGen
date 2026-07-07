@@ -1,0 +1,32 @@
+.stars {
+  display: inline-flex;
+  gap: 2px;
+  line-height: 0;
+}
+
+.slot {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+
+/* Empty star outline (the track). */
+.base {
+  display: block;
+  color: var(--text-faint);
+}
+
+/* Left-anchored clip whose width encodes the fill fraction (0.5 → 50%). */
+.fillWrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.fill {
+  display: block;
+  color: var(--accent);
+}

@@ -27,6 +27,7 @@ def _user(**kw):
         name="maggie", email="m@example.com", kindle_mail="",
         locale="en", default_language="all", password="HASH",
         kindle_mail_subject="", kobo_only_shelves_sync=0, opds_only_shelves_sync=0,
+        ui_font_body="", ui_font_display="",
         role_admin=lambda: False, role_passwd=lambda: True,
         role_upload=lambda: False, role_edit=lambda: False,
         role_download=lambda: True, role_delete_books=lambda: False,
@@ -205,7 +206,88 @@ def test_revoke_app_password_sets_revoked():
 
 @pytest.mark.unit
 def test_profile_update_accepts_new_fields():
-    """Source-pin: update_profile handles the extended sync/subject fields."""
+    """Source-pin: update_profile handles the extended sync/subject/font fields."""
     src = inspect.getsource(__import__("cps.api.account", fromlist=["update_profile"]).update_profile)
-    for field in ("kindle_mail_subject", "kobo_only_shelves_sync", "opds_only_shelves_sync"):
+    for field in ("kindle_mail_subject", "kobo_only_shelves_sync", "opds_only_shelves_sync",
+                  "ui_font_body", "ui_font_display"):
         assert field in src
+
+
+# ── #701 UI font presets ─────────────────────────────────────────────────────
+
+def _profile_ctx(user, body):
+    """Shared harness for update_profile happy/validation paths."""
+    from cps.api import account as mod
+    mock_session = MagicMock()
+    return mod, _ctx("/api/v1/account/profile", body=body), patch.object(mod, "current_user", user), \
+        patch.object(mod, "ub", SimpleNamespace(session=mock_session, UserAppPassword=MagicMock())), \
+        patch.object(mod, "calibre_db", SimpleNamespace(speaking_language=lambda: [])), \
+        patch.object(mod, "get_available_locale", return_value=[]), \
+        patch.object(mod, "_", lambda s: s)
+
+
+@pytest.mark.unit
+def test_profile_update_valid_font_keys_persist():
+    user = _user()
+    mod, ctx, *patches = _profile_ctx(user, {"ui_font_body": "serif", "ui_font_display": "mono"})
+    with ctx:
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            resp = inspect.unwrap(mod.update_profile)()
+    assert user.ui_font_body == "serif"
+    assert user.ui_font_display == "mono"
+
+
+@pytest.mark.unit
+def test_profile_update_rejects_unknown_body_font_400():
+    """An arbitrary value (not a known preset key) must 400, not be stored —
+    this is the guard that keeps an arbitrary string out of the CSS var."""
+    user = _user()
+    mod, ctx, *patches = _profile_ctx(user, {"ui_font_body": "Arial; } body { display:none }"})
+    with ctx:
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            resp = inspect.unwrap(mod.update_profile)()
+    assert resp[1] == 400
+    assert user.ui_font_body == ""  # unchanged
+
+
+@pytest.mark.unit
+def test_profile_update_display_allowlist_is_stricter_than_body():
+    """'serif' is a valid BODY preset but not a valid DISPLAY preset (the
+    display default is already serif) — the display field must reject it."""
+    user = _user()
+    mod, ctx, *patches = _profile_ctx(user, {"ui_font_display": "serif"})
+    with ctx:
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            resp = inspect.unwrap(mod.update_profile)()
+    assert resp[1] == 400
+    assert user.ui_font_display == ""
+
+
+@pytest.mark.unit
+def test_profile_update_empty_font_clears_to_default():
+    """Empty string is valid (means 'theme default') and must persist."""
+    user = _user(ui_font_body="serif")
+    mod, ctx, *patches = _profile_ctx(user, {"ui_font_body": ""})
+    with ctx:
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            resp = inspect.unwrap(mod.update_profile)()
+    assert user.ui_font_body == ""
+
+
+@pytest.mark.unit
+def test_font_allowlists_match_frontend_ssot_keys():
+    """The backend key allowlist must stay in lock-step with the SPA preset
+    keys (frontend/src/lib/fonts.ts). If someone edits one, this catches the
+    drift that would otherwise 400-reject a valid dropdown choice."""
+    import re
+    from pathlib import Path
+    from cps.api.account import ALLOWED_UI_FONT_BODY, ALLOWED_UI_FONT_DISPLAY
+
+    fonts_ts = (Path(__file__).resolve().parents[2] / "frontend" / "src" / "lib" / "fonts.ts").read_text()
+
+    def _keys(const_name):
+        block = fonts_ts.split(const_name, 1)[1].split("];", 1)[0]
+        return set(re.findall(r"key:\s*'([^']*)'", block))
+
+    assert _keys("UI_BODY_FONTS") == set(ALLOWED_UI_FONT_BODY)
+    assert _keys("UI_DISPLAY_FONTS") == set(ALLOWED_UI_FONT_DISPLAY)

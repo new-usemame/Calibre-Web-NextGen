@@ -22,6 +22,12 @@ from ..helper import valid_password, valid_email, check_email
 from .serializers import (SIDEBAR_VISIBILITY_BITS, ORDERABLE_SIDEBAR_KEYS,
                           serialize_sidebar_visibility, serialize_sidebar_order)
 
+# #701 — allowed UI font preset KEYS. The keys (not CSS stacks) are stored;
+# the stacks live in the SPA (frontend/src/lib/fonts.ts). These sets MUST match
+# the keys in that module (UI_BODY_FONTS / UI_DISPLAY_FONTS). "" = theme default.
+ALLOWED_UI_FONT_BODY = frozenset({"", "system-sans", "serif", "mono"})
+ALLOWED_UI_FONT_DISPLAY = frozenset({"", "system-sans", "mono"})
+
 
 def _iso(dt):
     return dt.isoformat() if dt else None
@@ -66,6 +72,8 @@ def _serialize_account():
         "opds_only_shelves_sync": bool(current_user.opds_only_shelves_sync),
         "locale": current_user.locale,
         "default_language": current_user.default_language,
+        "ui_font_body": current_user.ui_font_body or "",
+        "ui_font_display": current_user.ui_font_display or "",
         "role": {
             "admin": current_user.role_admin(),
             "upload": current_user.role_upload(),
@@ -119,6 +127,16 @@ def update_profile():
             current_user.locale = data["locale"]
         if "default_language" in data and data["default_language"]:
             current_user.default_language = data["default_language"]
+        if "ui_font_body" in data:
+            val = data["ui_font_body"] or ""
+            if val not in ALLOWED_UI_FONT_BODY:
+                return _err("invalid_request", "Invalid body font option", 400)
+            current_user.ui_font_body = val
+        if "ui_font_display" in data:
+            val = data["ui_font_display"] or ""
+            if val not in ALLOWED_UI_FONT_DISPLAY:
+                return _err("invalid_request", "Invalid display font option", 400)
+            current_user.ui_font_display = val
     except Exception as ex:  # validators raise generic Exception with a message
         ub.session.rollback()
         return _err("invalid_request", str(ex), 400)

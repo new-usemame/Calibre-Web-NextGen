@@ -297,6 +297,11 @@ class User(UserBase, Base):
     preview_preset = Column(String, default="kobo_libra_color")
     preview_default_fill = Column(String, default="edge_mirror")
     preview_default_color = Column(String, nullable=True)
+    # #701 — user-selectable UI font presets (new interface). Stores a short
+    # preset key ("", "serif", "mono", "system-sans"); the CSS font stacks live
+    # only in the SPA (frontend/src/lib/fonts.ts). "" = use the theme default.
+    ui_font_body = Column(String, default="")
+    ui_font_display = Column(String, default="")
 
 
 if oauth_support:
@@ -1476,6 +1481,21 @@ def migrate_user_table(engine, _session):
     except exc.OperationalError:
         _safe_session_rollback(_session, "user.preview_default_color")
         _run_ddl_with_retry(engine, "ALTER TABLE user ADD column 'preview_default_color' String")
+
+    # #701 — user-selectable UI font presets.
+    try:
+        _session.query(exists().where(User.ui_font_body)).scalar()
+        _session.commit()
+    except exc.OperationalError:
+        _safe_session_rollback(_session, "user.ui_font_body")
+        _run_ddl_with_retry(engine, "ALTER TABLE user ADD column 'ui_font_body' String DEFAULT ''")
+
+    try:
+        _session.query(exists().where(User.ui_font_display)).scalar()
+        _session.commit()
+    except exc.OperationalError:
+        _safe_session_rollback(_session, "user.ui_font_display")
+        _run_ddl_with_retry(engine, "ALTER TABLE user ADD column 'ui_font_display' String DEFAULT ''")
 
 def migrate_oauth_provider_table(engine, _session):
     """Ensure every migration-managed column on oauthProvider exists.

@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Router, Route, Switch } from 'wouter';
 import { RouteA11y } from './lib/a11y/useRouteA11y';
 import { BASE_PREFIX } from './lib/api';
+import { bodyFontStack, displayFontStack } from './lib/fonts';
 import { useMe, useLogout } from './lib/queries';
 import { Login } from './pages/Login';
 import { MagicLink } from './pages/MagicLink';
@@ -43,6 +44,20 @@ const ROUTER_BASE = BASE_PREFIX + '/app';
 export function App() {
   const { data: me, isLoading } = useMe();
   const logout = useLogout();
+
+  // #701 — apply the user's UI font presets by overriding the design tokens
+  // (--font-body / --font-display) on the document root. The stored value is a
+  // preset key; lib/fonts.ts resolves it to a CSS stack (empty → clear the
+  // override so the theme default from tokens.css applies). Reset on logout.
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = bodyFontStack(me?.ui_font_body);
+    const display = displayFontStack(me?.ui_font_display);
+    if (body) root.style.setProperty('--font-body', body);
+    else root.style.removeProperty('--font-body');
+    if (display) root.style.setProperty('--font-display', display);
+    else root.style.removeProperty('--font-display');
+  }, [me?.ui_font_body, me?.ui_font_display]);
 
   // #609: the classic UI puts the configured instance title in <title> on every
   // page. Per-page titling + route focus is handled by <RouteA11y> below

@@ -41,6 +41,13 @@ is for things you can see or feel when running the app.
   settings from the classic interface; now you set both visibility and order
   without leaving the new UI. Requested by @Glennza1962 and @alva-seal (#585).
 
+- **Choose the interface font in the new UI.** Account settings now has **UI
+  body font** and **UI display font** pickers — pick System Sans-Serif, a
+  bookish serif, or monospace instead of the defaults. Each option previews in
+  its own font, the choice is saved to your account so it follows you across
+  devices and browsers, and "Default" always returns to the theme font.
+  Contributed by @kurtlieber (#701).
+
 ### Changed
 - **New browser-tab icon that matches the app.** The favicon is now the amber
   book mark from the refreshed interface, on the app's dark background — so the

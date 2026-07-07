@@ -48,6 +48,17 @@ is for things you can see or feel when running the app.
   inherited upstream icon.
 
 ### Fixed
+- **KOReader reading position now syncs between two devices even after a book
+  is re-uploaded or edited.** If one reader was ahead (say 80%) and the other
+  behind (67%), the second device could refuse to jump forward — a manual pull
+  just said "already synced". This happened when the two devices held slightly
+  different files for the same book (a re-download after a metadata edit, a
+  sideloaded copy, or a format the server didn't embed metadata into), so the
+  server couldn't tell they were the same book and kept each device's position
+  separate. The server now registers the fingerprint of every file it hands out
+  (not only metadata-embedded downloads) and unifies a book's reading position
+  across all of a book's known files, so the furthest position wins on every
+  device. Reported by @Glalith121 (#633).
 - **Your profile picture now shows in the new interface.** If you set a profile
   picture in the classic account settings, the new interface didn't use it — the
   account button in the top bar and the account page both showed a generic

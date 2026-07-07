@@ -1720,25 +1720,36 @@ def do_download_file(book, book_format, client, data, headers):
         else:
             download_name = book_name
 
-    # Calculate and store checksum if metadata was embedded.
-    # Skip entirely when KOReader sync is disabled — without sync the
+    # Calculate and store the checksum of the file we actually serve, so
+    # KOReader progress sync can map this device's file back to the book.
+    #
+    # This runs for EVERY served file — whether or not metadata was embedded.
+    # Registering only metadata-embedded exports orphaned any device that
+    # downloaded a raw copy (embedding disabled, format without an embed
+    # step, or an export that failed and fell back to the original): its
+    # file checksum never mapped to a book_id, so its reading position never
+    # converged with other devices' (#633). The served file — embedded or
+    # raw — is exactly what KOReader hashes, so hashing it here is correct
+    # either way.
+    #
+    # Still gated on is_koreader_sync_enabled(): without sync the
     # book_format_checksums table is never created, and writes raise
     # "no such table" errors on every save (upstream CWA #1183).
-    if metadata_was_embedded and filename and download_name:
+    if filename and download_name:
         try:
             from .progress_syncing import calculate_and_store_checksum
             from .progress_syncing.settings import is_koreader_sync_enabled
 
             if is_koreader_sync_enabled():
-                # Calculate checksum on the EXPORTED file (with embedded metadata)
-                # This is what KOReader actually downloads and calculates the checksum for
+                # The exact file handed to the client (send_from_directory
+                # below serves filename/download_name.book_format).
                 exported_file = os.path.join(filename, download_name + "." + book_format)
 
                 if os.path.exists(exported_file):
                     calculate_and_store_checksum(
                         book_id=book.id,
                         book_format=book_format,
-                        file_path=exported_file  # Use exported file with embedded metadata!
+                        file_path=exported_file
                     )
         except Exception as e:
             log.error(f"Failed to calculate/store checksum for book {book.id}: {e}")

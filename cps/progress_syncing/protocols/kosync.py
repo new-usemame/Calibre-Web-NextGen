@@ -522,6 +522,35 @@ def _mark_custom_read_column(book_id: int) -> None:
         log.error("kosync read-status: custom column write failed: %s", ex)
 
 
+def get_book_checksums(book_id):
+    """Return every checksum registered for a Calibre book_id, across all
+    formats and all algorithm versions (binary partial-MD5 and filename
+    digest).
+
+    Used to unify KOReader progress records that were stored under different
+    file checksums of the *same* book — e.g. one device downloaded a
+    metadata-embedded copy (checksum C1) while another holds a raw or
+    pre-edit copy (checksum C2). Without this union, a progress record
+    stored under C2 is invisible to a device presenting C1, so the two
+    devices never converge (#633).
+
+    Returns an empty list on any error or when book_id is falsy — the caller
+    degrades to the plain (book_id, checksum) lookup.
+    """
+    if not book_id:
+        return []
+    try:
+        from ... import calibre_db
+        from ...db import BookFormatChecksum
+        rows = calibre_db.session.query(BookFormatChecksum.checksum).filter(
+            BookFormatChecksum.book == book_id
+        ).all()
+        return [r[0] for r in rows if r[0]]
+    except Exception as e:  # pragma: no cover - defensive; DB shape varies
+        log.error("get_book_checksums failed for book %s: %s", book_id, e)
+        return []
+
+
 def get_progress_record(user_id, document_checksum, book_id) -> KOSyncProgress:
     """
     Look up and return the KOSyncProgress record associated with a user and document identifier(s).
@@ -529,15 +558,27 @@ def get_progress_record(user_id, document_checksum, book_id) -> KOSyncProgress:
     Behavior:
         Returns only the most recently updated record for the given criteria.
         Should still work with a document_checksum when no book_id is provided, and vice versa.
+        When a book_id resolves, the lookup also unifies across every other
+        checksum registered for that book, so progress stored under a
+        different device's file checksum is still found (#633).
 
     Args:
         user_id: The ID of the user
         book_id: The ID of the book in the Calibre library
         document_checksum: The checksum of the document sought
     """
+    # Keys that identify the same conceptual book: the incoming checksum, the
+    # book_id itself, and — when the book resolved — every checksum registered
+    # for it. book_id stays an int (String-column affinity matches the '42'
+    # stored form, as the existing book_id-keyed lookup relies on).
+    lookup_keys = {document_checksum, book_id}
+    if book_id:
+        lookup_keys.update(get_book_checksums(book_id))
+    lookup_keys.discard(None)
+
     progress_record = ub.session.query(KOSyncProgress).filter(
         KOSyncProgress.user_id == user_id,
-        KOSyncProgress.document.in_((book_id, document_checksum))
+        KOSyncProgress.document.in_(tuple(lookup_keys))
     ).order_by(
         desc(KOSyncProgress.timestamp)
     ).first()
@@ -808,6 +849,13 @@ def update_progress():
             progress_record.device = device
             progress_record.device_id = device_id
             progress_record.timestamp = timestamp
+            # #633 self-heal: if the book resolved to a book_id, converge the
+            # record onto the book_id key. A record first stored under a raw
+            # file checksum (book_id didn't resolve at the time) is thereby
+            # re-keyed, so every device that resolves this book shares it from
+            # now on instead of fragmenting into per-checksum orphans.
+            if book_id:
+                progress_record.document = str(book_id)
             log.debug(f"Updated kosync progress for user {user.id}, document {document}")
         else:
             # Create new record

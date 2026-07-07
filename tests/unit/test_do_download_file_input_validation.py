@@ -112,11 +112,18 @@ class TestDoDownloadFileInputValidation:
         book.path = "Author/Title (42)"
         data = MagicMock()
         data.name = "Real Filename"
+        # The post-send checksum-registration block (#633) calls
+        # is_koreader_sync_enabled(), which opens the CWA settings DB. That
+        # path is orthogonal to the input guard under test and, in the test
+        # env, hits a read-only /config and hard-exits — so mock it out to
+        # keep this test focused on the boundary-400 assertion.
         with patch.object(helper_mod, "config", MagicMock(
                 config_use_google_drive=False, config_calibre_dir="/calibre",
                 config_kepubifypath="", config_binariesdir="",
                 config_embed_metadata=False, get_book_path=lambda: "/nonexistent")), \
             patch.object(helper_mod, "log", MagicMock()), \
+            patch("cps.progress_syncing.settings.is_koreader_sync_enabled",
+                  MagicMock(return_value=False)), \
             patch.object(helper_mod, "send_from_directory", MagicMock()), \
             patch.object(helper_mod, "make_response", MagicMock()):
             try:

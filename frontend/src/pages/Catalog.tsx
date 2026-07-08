@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearch } from 'wouter';
 import { Search, ChevronLeft, SlidersHorizontal, ListChecks, Settings } from 'lucide-react';
+import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { BookCard } from '../components/BookCard';
 import { BulkBar } from '../components/BulkBar';
-import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { DiscoverSection } from '../components/DiscoverSection';
@@ -278,6 +278,11 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   const hasMore = allBooks.length < total;
   const isFirstLoad = isLoading && allBooks.length === 0;
 
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: () => setPage((p) => p + 1),
+    enabled: hasMore && !isFetching,
+  });
+
   const heading = isView ? t(VIEW_LABEL[view!]) : filtered ? (entityName ?? '…') : t('Your Library');
   const countLabel =
     total > 0
@@ -450,17 +455,13 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
           </div>
 
           {hasMore && (
-            <div className={styles.loadMore}>
-              <Button variant="ghost" onClick={() => setPage((p) => p + 1)} disabled={isFetching}>
-                {isFetching ? (
-                  <>
-                    <Spinner size={16} />
-                    {t('Loading…')}
-                  </>
-                ) : (
-                  t('Load more')
-                )}
-              </Button>
+            <div ref={sentinelRef} className={styles.loadMore}>
+              {isFetching && (
+                <>
+                  <Spinner size={16} />
+                  {t('Loading…')}
+                </>
+              )}
             </div>
           )}
         </>

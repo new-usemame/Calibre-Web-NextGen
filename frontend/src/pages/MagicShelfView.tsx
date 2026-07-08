@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
+import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { ChevronLeft, Copy, Trash2, Pencil } from 'lucide-react';
 import { useMagicShelfBooks, useDeleteMagicShelf, useDuplicateMagicShelf } from '../lib/queries';
 import { BookCard } from '../components/BookCard';
-import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
@@ -50,6 +50,10 @@ export function MagicShelfView({ id }: { id: string }) {
 
   const total = data.total;
   const hasMore = books.length < total;
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: () => setPage((p) => p + 1),
+    enabled: hasMore && !isFetching,
+  });
 
   return (
     <main className={styles.container}>
@@ -91,10 +95,8 @@ export function MagicShelfView({ id }: { id: string }) {
             ))}
           </div>
           {hasMore && (
-            <div className={styles.loadMore}>
-              <Button variant="ghost" onClick={() => setPage((p) => p + 1)} disabled={isFetching}>
-                {isFetching ? (<><Spinner size={16} /> {t('Loading…')}</>) : t('Load more')}
-              </Button>
+            <div ref={sentinelRef} className={styles.loadMore}>
+              {isFetching && (<><Spinner size={16} /> {t('Loading…')}</>)}
             </div>
           )}
         </>

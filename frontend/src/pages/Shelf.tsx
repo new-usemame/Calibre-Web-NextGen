@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
+import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import {
   ChevronLeft, Globe, Lock, Pencil, Trash2, Check, X, ArrowUpDown, ArrowUp, ArrowDown, Smartphone,
 } from 'lucide-react';
@@ -7,7 +8,6 @@ import {
   useShelf, useUpdateShelf, useDeleteShelf, useShelfMembership, useReorderShelfBooks, useMe,
 } from '../lib/queries';
 import { BookCard } from '../components/BookCard';
-import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { Book } from '../lib/api';
@@ -78,6 +78,10 @@ export function Shelf({ id }: { id: string }) {
 
   const total = data.total;
   const hasMore = books.length < total;
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: () => setPage((p) => p + 1),
+    enabled: hasMore && !isFetching,
+  });
   const canEdit = data.can_edit;
 
   const startRename = () => {
@@ -260,16 +264,12 @@ export function Shelf({ id }: { id: string }) {
           </div>
 
           {hasMore && (
-            <div className={styles.loadMore}>
-              <Button variant="ghost" onClick={() => setPage((p) => p + 1)} disabled={isFetching}>
-                {isFetching ? (
-                  <>
-                    <Spinner size={16} /> {t('Loading…')}
-                  </>
-                ) : (
-                  t('Load more')
-                )}
-              </Button>
+            <div ref={sentinelRef} className={styles.loadMore}>
+              {isFetching && (
+                <>
+                  <Spinner size={16} /> {t('Loading…')}
+                </>
+              )}
             </div>
           )}
         </>

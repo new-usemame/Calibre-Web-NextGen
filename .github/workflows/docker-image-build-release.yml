@@ -84,7 +84,7 @@ jobs:
 
       - name: GHCR Login
         if: ${{ inputs.dry_run != true }}
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}
@@ -169,7 +169,7 @@ jobs:
           echo "tag=${V}" >> "$GITHUB_OUTPUT"
 
       - name: GHCR Login
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}
@@ -261,7 +261,7 @@ jobs:
           cosign sign --yes --recursive "${BASE}@${DIGEST}"
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
         with:
           subject-name: ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}
           subject-digest: ${{ steps.publish.outputs.digest }}

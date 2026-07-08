@@ -114,7 +114,10 @@ def serialize_book_list_item(book, read=False, archived=False):
     return {
         "id": book.id,
         "title": book.title,
-        "authors": [a.name for a in book.authors] if getattr(book, "authors", None) else [],
+        # Calibre escapes commas inside a single author name as '|' in the DB
+        # ("William H. Keith, Jr." → "William H. Keith| Jr."); un-escape it so the
+        # SPA cards show a comma, not a pipe (#730). Matches web.py / api/browse.py.
+        "authors": [a.name.replace("|", ",") for a in book.authors] if getattr(book, "authors", None) else [],
         "series": series,
         "series_index": book.series_index,
         "cover_url": f"/cover/{book.id}/sm" if getattr(book, "has_cover", 0) else None,
@@ -211,7 +214,9 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
     return {
         "id": bid,
         "title": book.title,
-        "authors": [{"id": a.id, "name": a.name}
+        # Un-escape the Calibre '|' comma in author names (#730), same as the
+        # list serializer above and every classic display path.
+        "authors": [{"id": a.id, "name": a.name.replace("|", ",")}
                     for a in (getattr(book, "authors", None) or [])],
         "series": series,
         "series_index": book.series_index,

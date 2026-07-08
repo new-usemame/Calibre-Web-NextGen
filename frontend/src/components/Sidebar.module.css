@@ -301,6 +301,7 @@
   gap: var(--sp-1);
 }
 .editRow, .editRowHidden {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -308,9 +309,34 @@
   border: 1px solid rgba(255, 255, 255, .06);
   border-radius: var(--r-md);
   background: var(--surface-2);
+  cursor: grab;
+  touch-action: none;         /* let us own the gesture on touch (no scroll steal) */
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;     /* keep the row on its own layer while reordering */
+  /* transform is animated for the gap-open + FLIP settle; the actively-dragged
+     row overrides this to transition:none so it tracks the pointer 1:1. */
   transition: background var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
 .editRowHidden { opacity: .5; }
+
+/* The lifted row while a pointer drag is in progress: raised, subtly enlarged,
+   shadowed, and — crucially — no transform transition so it glues to the cursor
+   with zero lag. z-index is set inline so it floats above its neighbours. */
+.editRowDragging {
+  transition: none !important;
+  transform-origin: center;
+  cursor: grabbing;
+  background: var(--surface-3, var(--surface-2));
+  border-color: var(--accent);   /* fallback for engines without color-mix */
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .10) inset,
+    0 10px 24px rgba(0, 0, 0, .38),
+    0 2px 6px rgba(0, 0, 0, .30);
+}
+.editRowDragging .editLabel { color: var(--text); }
+
 .editHandle {
   display: inline-flex;
   padding: var(--sp-1);
@@ -321,7 +347,8 @@
   cursor: grab;
   touch-action: none;
 }
-.editHandle:hover { color: var(--text-muted); }
+.editRowDragging .editHandle { cursor: grabbing; }
+.editRow:hover .editHandle, .editRowHidden:hover .editHandle { color: var(--text-muted); }
 .editIcon { color: var(--text-muted); flex: none; }
 .editLabel {
   flex: 1;

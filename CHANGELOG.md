@@ -16,6 +16,17 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+- **Reordering your sidebar sections now feels smooth and physical.** In the
+  Customize panel (the left rail's **Customize** control), dragging a section used
+  to snap the other rows around with no sense of motion and could jitter or stick
+  at row edges. Now the row you grab lifts and tracks your pointer while the
+  others glide aside to open a gap, then it settles into its slot when you release
+  — the same on mouse, touch, and pen. Keyboard reordering (focus a section's
+  drag handle, then use the arrow keys) and hiding/restoring sections animate
+  through the same motion, and everything falls back to instant when your system
+  is set to reduce motion.
+
 ## [v4.1.7] - 2026-07-08
 
 ### Added

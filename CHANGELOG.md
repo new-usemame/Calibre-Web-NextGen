@@ -16,6 +16,16 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+- **Parts of the new interface stayed in English even when your language was
+  fully translated.** Menu items like "Table view" and "Smart shelves," and whole
+  screens such as the admin settings, cover picker, advanced search, and the book
+  editor, showed English in the redesigned interface while the classic view
+  translated them correctly. Those strings were never being collected for
+  translation, so no locale could pick them up. They are now, so they translate
+  into your language as each locale's translation is filled in. Thanks to
+  @standhaftsohnsergius for the detailed report (#719).
+
 ### Changed
 - **Reordering your sidebar sections now feels smooth and physical.** In the
   Customize panel (the left rail's **Customize** control), dragging a section used

@@ -25,8 +25,27 @@ is for things you can see or feel when running the app.
   translation, so no locale could pick them up. They are now, so they translate
   into your language as each locale's translation is filled in. Thanks to
   @standhaftsohnsergius for the detailed report (#719).
+- **Author names with a comma (like "William H. Keith, Jr.") now show the comma,
+  not a pipe.** In the redesigned interface, an author whose name contains a
+  comma appeared under book titles as "William H. Keith| Jr." — a raw `|` where
+  the comma should be. Calibre stores those commas internally as a pipe, and the
+  new interface was showing the stored form instead of the display form. Book
+  cards on the Library and author pages, and the book detail page, now render the
+  comma correctly. Reported on Discord by neontapir (#730).
+- **Automatic Hardcover matching finds the right book more often.** When
+  auto-fetching Hardcover metadata, the matcher only scored the first 10 of the
+  up-to-50 results the search returns, so a correct edition ranked lower down
+  (Hardcover puts author-in-title hits first) could be thrown away before it was
+  ever considered. It now scores the whole result set, and the manual-review
+  screen's "Top N" heading matches the candidates it actually shows. Thanks to
+  @Schmavery for the fix (#729).
 
 ### Changed
+- **Book lists load as you scroll instead of behind a "Load more" button.** The
+  Library grid, Table view, shelves, smart shelves, and advanced-search results
+  now fetch and append the next page automatically as you near the bottom, so
+  browsing a large library is one continuous scroll. Thanks to @kurtlieber for
+  the contribution (#735).
 - **Reordering your sidebar sections now feels smooth and physical.** In the
   Customize panel (the left rail's **Customize** control), dragging a section used
   to snap the other rows around with no sense of motion and could jitter or stick
@@ -48,13 +67,6 @@ is for things you can see or feel when running the app.
   looking half-empty.
 
 ### Fixed
-- **Author names with a comma (like "William H. Keith, Jr.") now show the comma,
-  not a pipe.** In the redesigned interface, an author whose name contains a
-  comma appeared under book titles as "William H. Keith| Jr." — a raw `|` where
-  the comma should be. Calibre stores those commas internally as a pipe, and the
-  new interface was showing the stored form instead of the display form. Book
-  cards on the Library and author pages, and the book detail page, now render the
-  comma correctly. Reported on Discord by neontapir (#730).
 - **Admins can find the Admin page in the new interface again.** In the
   redesigned UI the Admin/Settings entry lived only in the left sidebar rail, so
   admins who looked in the account (avatar) menu — the usual home for

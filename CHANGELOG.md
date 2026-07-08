@@ -17,6 +17,12 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **The "duplicates found" notice no longer nags about books you've archived.**
+  If you archived one book of a duplicate pair, the duplicates page correctly
+  showed nothing — but the sidebar badge and the pop-up notice kept counting it,
+  so clicking through led to an empty page and the notice came back on every
+  refresh. The count now respects the same archived and hidden books the
+  duplicates page does, so the badge and the page agree. Reported by @auspex (#737).
 - **Parts of the new interface stayed in English even when your language was
   fully translated.** Menu items like "Table view" and "Smart shelves," and whole
   screens such as the admin settings, cover picker, advanced search, and the book

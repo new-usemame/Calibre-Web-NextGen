@@ -482,34 +482,41 @@ def filter_visible_duplicate_groups(duplicate_groups, user_id=None):
     if not duplicate_groups or user_id is None:
         return duplicate_groups
 
-    result = []
-    for group in duplicate_groups:
-        raw_ids = group.get('book_ids')
-        if not raw_ids:
-            # Older cache shape without per-book ids: can't re-validate, so keep
-            # the group rather than silently drop a real duplicate.
-            result.append(group)
-            continue
-        visible = _visible_duplicate_book_ids(raw_ids, user_id)
-        visible_ids = []
-        for bid in raw_ids:
-            try:
-                ibid = int(bid)
-            except (TypeError, ValueError):
+    try:
+        result = []
+        for group in duplicate_groups:
+            raw_ids = group.get('book_ids')
+            if not raw_ids:
+                # Older cache shape without per-book ids: can't re-validate, so
+                # keep the group rather than silently drop a real duplicate.
+                result.append(group)
                 continue
-            if ibid in visible:
-                visible_ids.append(ibid)
-        if len(visible_ids) < 2:
-            # No longer a duplicate for this user (archived/hidden/deleted).
-            continue
-        if len(visible_ids) == len(raw_ids):
-            result.append(group)
-        else:
-            trimmed = dict(group)
-            trimmed['book_ids'] = visible_ids
-            trimmed['count'] = len(visible_ids)
-            result.append(trimmed)
-    return result
+            visible = _visible_duplicate_book_ids(raw_ids, user_id)
+            visible_ids = []
+            for bid in raw_ids:
+                try:
+                    ibid = int(bid)
+                except (TypeError, ValueError):
+                    continue
+                if ibid in visible:
+                    visible_ids.append(ibid)
+            if len(visible_ids) < 2:
+                # No longer a duplicate for this user (archived/hidden/deleted).
+                continue
+            if len(visible_ids) == len(raw_ids):
+                result.append(group)
+            else:
+                trimmed = dict(group)
+                trimmed['book_ids'] = visible_ids
+                trimmed['count'] = len(visible_ids)
+                result.append(trimmed)
+        return result
+    except Exception as e:
+        # Degrade to the cached groups rather than 500 the status poll — mirrors
+        # filter_dismissed_groups' resilience.
+        log.error("[cwa-duplicates] Error re-validating cached duplicate groups "
+                  "against user view: %s", str(e))
+        return duplicate_groups
 
 
 @duplicates.route("/duplicates")

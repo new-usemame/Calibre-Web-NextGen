@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'wouter';
+import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { ArrowUp, ArrowDown, Check, Columns3 } from 'lucide-react';
 import { useBooks } from '../lib/queries';
-import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
@@ -49,6 +49,10 @@ export function Table() {
 
   const total = data?.total ?? 0;
   const hasMore = rows.length < total;
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: () => setPage((p) => p + 1),
+    enabled: hasMore && !isFetching,
+  });
 
   const onSort = (col: Col) => {
     if (!col.sortAsc) return;
@@ -151,10 +155,8 @@ export function Table() {
             </table>
           </div>
           {hasMore && (
-            <div className={styles.loadMore}>
-              <Button variant="ghost" onClick={() => setPage((p) => p + 1)} disabled={isFetching}>
-                {isFetching ? (<><Spinner size={16} /> {t('Loading…')}</>) : t('Load more')}
-              </Button>
+            <div ref={sentinelRef} className={styles.loadMore}>
+              {isFetching && (<><Spinner size={16} /> {t('Loading…')}</>)}
             </div>
           )}
         </>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useId } from 'react';
 import { Search as SearchIcon, RotateCcw } from 'lucide-react';
+import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { useSearchOptions, useAdvancedSearch, useMe } from '../lib/queries';
 import { MultiSelect } from '../components/MultiSelect';
 import { BookCard } from '../components/BookCard';
@@ -92,6 +93,10 @@ export function AdvancedSearch() {
 
   const total = data?.total ?? 0;
   const hasMore = results.length < total;
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: () => setPage((p) => p + 1),
+    enabled: hasMore && !isFetching,
+  });
   const formatOptions = (options?.formats ?? []).map((f) => ({ id: f, name: f }));
 
   return (
@@ -213,10 +218,8 @@ export function AdvancedSearch() {
                 ))}
               </div>
               {hasMore && (
-                <div className={styles.loadMore}>
-                  <Button variant="ghost" onClick={() => setPage((p) => p + 1)} disabled={isFetching}>
-                    {isFetching ? (<><Spinner size={16} /> {t('Loading…')}</>) : t('Load more')}
-                  </Button>
+                <div ref={sentinelRef} className={styles.loadMore}>
+                  {isFetching && (<><Spinner size={16} /> {t('Loading…')}</>)}
                 </div>
               )}
             </>

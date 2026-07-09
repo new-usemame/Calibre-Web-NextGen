@@ -177,7 +177,9 @@ def test_feed_shelf_rejects_non_exposed_shelf_when_restricted(monkeypatch):
 
 def test_feed_magic_shelf_filters_books_with_central_opds_filter(monkeypatch):
     user = DummyUser(restricted=True)
-    shelf = types.SimpleNamespace(id=9, user_id=99, is_public=1)
+    # A real ub.MagicShelf always carries a ``name`` column (the feed is now
+    # titled after it per #750); mirror that in the mock.
+    shelf = types.SimpleNamespace(id=9, user_id=99, is_public=1, name="Restricted Magic")
     book_two = types.SimpleNamespace(id=2)
     book_three = types.SimpleNamespace(id=3)
 

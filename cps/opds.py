@@ -313,6 +313,41 @@ def get_opds_root_entries(user, allow_anonymous):
     return entries
 
 
+# Fork issue #750: leaf/detail feeds (per-author, per-series, ...) inherit the
+# title of their parent root feed. Keyed by Flask endpoint -> OPDS_ROOT_ENTRY_DEFS
+# key so the human-readable string stays defined in exactly one place.
+_OPDS_DETAIL_ENDPOINT_ROOT_KEY = {
+    'opds.feed_letter_books': 'books',
+    'opds.feed_author': 'authors',
+    'opds.feed_publisher': 'publishers',
+    'opds.feed_category': 'categories',
+    'opds.feed_series': 'series',
+    'opds.feed_ratings': 'ratings',
+    'opds.feed_format': 'formats',
+    'opds.feed_languages': 'languages',
+}
+
+
+def _opds_feed_title_for_endpoint(endpoint):
+    """Resolve a human feed title for an OPDS endpoint from the single
+    OPDS_ROOT_ENTRY_DEFS source of truth.
+
+    Returns the translated feed name (e.g. "Read Books", "Authors") for the
+    top-level and index feeds and their per-entity detail feeds, or ``None``
+    for feeds with no distinct name (the catalog root / OpenSearch descriptor),
+    so the template falls back to the bare instance name.
+    """
+    if not endpoint:
+        return None
+    for entry_def in OPDS_ROOT_ENTRY_DEFS.values():
+        if entry_def['endpoint'] == endpoint:
+            return _(entry_def['title'])
+    root_key = _OPDS_DETAIL_ENDPOINT_ROOT_KEY.get(endpoint)
+    if root_key and root_key in OPDS_ROOT_ENTRY_DEFS:
+        return _(OPDS_ROOT_ENTRY_DEFS[root_key]['title'])
+    return None
+
+
 def opds_only_selected_shelves(user=None):
     user = user or auth.current_user()
     return bool(getattr(user, 'opds_only_shelves_sync', 0))
@@ -890,7 +925,8 @@ def feed_shelf(book_id):
         except (OperationalError, InvalidRequestError) as e:
             ub.session.rollback()
             log.error_or_exception("Settings Database error: {}".format(e))
-    return render_xml_template('feed.xml', entries=result, pagination=pagination)
+    # #750: name the feed after the shelf so readers can tell shelves apart.
+    return render_xml_template('feed.xml', entries=result, pagination=pagination, feed_title=shelf.name)
 
 
 @opds.route("/opds/magicshelf/<int:shelf_id>")
@@ -927,7 +963,8 @@ def feed_magic_shelf(shelf_id):
 
     entries = [Entry(book) for book in books]
     pagination = Pagination(page, per_page, total_count)
-    return render_xml_template('feed.xml', entries=entries, pagination=pagination)
+    # #750: name the feed after the magic shelf.
+    return render_xml_template('feed.xml', entries=entries, pagination=pagination, feed_title=shelf.name)
 
 
 @opds.route("/opds/download/<book_id>/<book_format>/")
@@ -1030,7 +1067,9 @@ def feed_search(term):
         entries = calibre_db.search_query(term, config=config).filter(get_opds_book_filter()).order_by(db.Books.sort).all()
         entries_count = len(entries) if len(entries) > 0 else 1
         pagination = Pagination(1, entries_count, entries_count)
-        return render_xml_template('feed.xml', searchterm=term, entries=entries, pagination=pagination)
+        # #750: name the feed after the query (reuses the existing "Search" msgid).
+        return render_xml_template('feed.xml', searchterm=term, entries=entries, pagination=pagination,
+                                   feed_title="{}: {}".format(_('Search'), term))
     else:
         return render_xml_template('feed.xml', searchterm="")
 
@@ -1115,10 +1154,19 @@ def _opds_internal_error(_error):
     return response
 
 
-def render_xml_template(*args, **kwargs):
+def render_xml_template(*args, feed_title=None, **kwargs):
     # ToDo: return time in current timezone similar to %z
     currtime = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    xml = render_template(current_time=currtime, instance=config.config_calibre_web_title, constants=constants.sidebar_settings, *args, **kwargs)
+    # Fork issue #750: every feed used to render ``<title>`` as the bare
+    # instance name, so OPDS readers that key their feed list on the title
+    # showed a wall of identical entries. Resolve a per-feed title from the
+    # single OPDS_ROOT_ENTRY_DEFS source of truth (dynamic feeds — shelf,
+    # magic shelf, search — pass an explicit ``feed_title``). feed.xml then
+    # renders "Instance - Feed Name".
+    if feed_title is None:
+        feed_title = _opds_feed_title_for_endpoint(request.endpoint)
+    xml = render_template(current_time=currtime, instance=config.config_calibre_web_title,
+                          feed_title=feed_title, constants=constants.sidebar_settings, *args, **kwargs)
     response = make_response(xml)
     response.headers["Content-Type"] = "application/atom+xml; charset=utf-8"
     return response

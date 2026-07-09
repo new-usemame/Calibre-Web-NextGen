@@ -64,11 +64,17 @@ update NextGen:
 
 1. **Container Manager → Projekt / Project** → your `calibre-web-nextgen` project →
    **Aktion / Action → Stop**.
-2. **Container Manager → Image** → click the `ghcr.io/new-usemame/calibre-web-nextgen:latest`
-   row → **Aktion / Action → Delete**. This only clears the cached app image — if it warns
-   that it's in use, the container is already stopped, so it's safe to confirm. (Your data is
-   in the mounted folders, not here.)
-3. **Container Manager → Projekt / Project** → your project → **Aktion / Action → Build**.
+2. **Container Manager → Container** → select the `calibre-web-nextgen` container →
+   **Aktion / Action → Löschen / Delete**. Do this *before* the next step — an image can't be
+   removed while a container still uses it (even a stopped one), so deleting the image first
+   gives an "in use" error. Deleting the container is safe: your books, users and settings
+   live in the mounted folders, and the project's compose file recreates the container for you
+   in step 4.
+3. **Container Manager → Image** → click the `ghcr.io/new-usemame/calibre-web-nextgen:latest`
+   row → **Aktion / Action → Löschen / Delete**. Now that no container uses it, this succeeds
+   and clears the cached copy so the next build pulls a fresh image. (Your data is in the
+   mounted folders, not here.)
+4. **Container Manager → Projekt / Project** → your project → **Aktion / Action → Build**.
    Container Manager pulls the newest image fresh and recreates the container. Wait about
    30 seconds, then reload the page.
 

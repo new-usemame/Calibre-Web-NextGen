@@ -1017,9 +1017,18 @@
                                 <div class="meta-chip">
                                     <span class="meta-label">{{ _('KOReader Progress') }}:</span>
                                     <span class="meta-value">{{ kosync_progress|formatfloat(1) }}%</span>
-                                    {% if kosync_progress_timestamp %}
-                                        <span class="meta-value">({{ kosync_progress_timestamp|formatdate }})</span>
-                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {% if kosync_progress_created_at %}
+                                <div class="meta-chip">
+                                    <span class="meta-label" title="{{ _('When reading progress was first synced') }}">{{ _('Started reading') }}:</span>
+                                    <span class="meta-value">{{ kosync_progress_created_at|formatdate }}</span>
+                                </div>
+                            {% endif %}
+                            {% if kosync_progress_timestamp %}
+                                <div class="meta-chip">
+                                    <span class="meta-label">{{ _('Last synced') }}:</span>
+                                    <span class="meta-value">{{ kosync_progress_timestamp|formatdate }}</span>
                                 </div>
                             {% endif %}
                             {% if cc|length > 0 %}

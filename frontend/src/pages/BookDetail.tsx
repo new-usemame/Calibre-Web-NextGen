@@ -21,18 +21,20 @@ function formatBytes(bytes: number): string {
   return mb >= 0.1 ? `${mb.toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
 }
 
-function formatPubdate(pubdate: string): string {
+function formatDate(date: string, alwaysReturnFullDate = false): string {
   // Try to parse as ISO date — return just the year if it looks like a date
-  const d = new Date(pubdate);
+  const d = new Date(date);
   if (!isNaN(d.getTime())) {
-    // If the time portion is midnight UTC it's likely just a year+date, show full date
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    const day = d.getDate();
-    if (month === 0 && day === 1) return String(year);
+    if (!alwaysReturnFullDate) {
+      // If the time portion is midnight UTC it's likely just a year+date, show full date
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const day = d.getDate();
+      if (month === 0 && day === 1) return String(year);
+    }
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   }
-  return pubdate;
+  return date;
 }
 
 // Formats the in-browser reader can open. EPUB/KEPUB use the SPA's epub.js
@@ -429,10 +431,24 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{book.kosync_progress.toFixed(1)}%</dd>
               </>
             )}
+            {book.kosync_progress_created_at !== null && (
+              <>
+                <dt className={styles.metaLabel} title={t('When reading progress was first synced')}>
+                  {t('Started reading')}
+                </dt>
+                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at, true)}</dd>
+              </>
+            )}
+            {book.kosync_progress_timestamp !== null && (
+              <>
+                <dt className={styles.metaLabel}>{t('Last synced')}</dt>
+                <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp, true)}</dd>
+              </>
+            )}
             {book.pubdate && (
               <>
                 <dt className={styles.metaLabel}>{t('Published')}</dt>
-                <dd className={styles.metaValue}>{formatPubdate(book.pubdate)}</dd>
+                <dd className={styles.metaValue}>{formatDate(book.pubdate)}</dd>
               </>
             )}
             {book.languages.length > 0 && (

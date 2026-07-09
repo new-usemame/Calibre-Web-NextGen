@@ -3628,6 +3628,7 @@ def show_book(book_id):
 
         kosync_progress = None
         kosync_progress_timestamp = None
+        kosync_progress_created_at = None
         if current_user.is_authenticated:
             try:
                 kobo_state = (ub.session.query(ub.KoboReadingState)
@@ -3637,6 +3638,7 @@ def show_book(book_id):
                 if kobo_state and kobo_state.current_bookmark:
                     kosync_progress = kobo_state.current_bookmark.progress_percent
                     kosync_progress_timestamp = kobo_state.current_bookmark.last_modified
+                    kosync_progress_created_at = kobo_state.current_bookmark.created_at
             except Exception as e:
                 log.debug(f"Failed to load KOReader progress for book {book_id}: {e}")
 
@@ -3687,6 +3689,7 @@ def show_book(book_id):
                                      cwa_settings=cwa_settings,
                                      kosync_progress=kosync_progress,
                                      kosync_progress_timestamp=kosync_progress_timestamp,
+                                     kosync_progress_created_at=kosync_progress_created_at,
                                      is_hidden=is_hidden,
                                      is_favorited=is_favorited,
                                      other_users_with_kindle=other_users_with_kindle,

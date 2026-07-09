@@ -17,6 +17,13 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **Downloads failed with a server error for apps and scripts that don't send a
+  browser identifier.** Some OPDS readers, download managers, and command-line
+  tools (`curl`, scripts) omit the User-Agent header. Those requests hit a
+  500 error instead of the book — the download and OPDS-download endpoints
+  assumed the header was always present. They now handle its absence and serve
+  the file normally. Thanks to @AshayK003, who reported and fixed the same crash
+  upstream (janeczku/calibre-web#3668).
 - **Parts of the new interface stayed in English even when your language was
   fully translated.** Menu items like "Table view" and "Smart shelves," and whole
   screens such as the admin settings, cover picker, advanced search, and the book

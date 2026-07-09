@@ -17,9 +17,32 @@ def test_serialize_book_list_item_full():
         "series": "Dune Chronicles", "series_index": "1.0",
         "cover_url": "/cover/7/sm",
         "formats": ["EPUB", "PDF"],
+        "tags": [],
         "read": False,
         "archived": False,
     }
+
+
+@pytest.mark.unit
+def test_serialize_book_list_item_tags():
+    # #725: the table view's Tags column needs tag names in the list item.
+    from cps.api.serializers import serialize_book_list_item
+    book = SimpleNamespace(
+        id=9, title="T", series_index="1.0", has_cover=0,
+        authors=[], series=[], data=[],
+        tags=[SimpleNamespace(id=1, name="Science Fiction"),
+              SimpleNamespace(id=2, name="Space Opera")],
+    )
+    assert serialize_book_list_item(book)["tags"] == ["Science Fiction", "Space Opera"]
+
+
+@pytest.mark.unit
+def test_serialize_book_list_item_tags_absent_is_empty():
+    # A book with no tags relationship (or none loaded) → empty list, never None.
+    from cps.api.serializers import serialize_book_list_item
+    book = SimpleNamespace(id=10, title="U", series_index="1.0", has_cover=0,
+                           authors=[], series=[], data=[])
+    assert serialize_book_list_item(book)["tags"] == []
 
 
 @pytest.mark.unit

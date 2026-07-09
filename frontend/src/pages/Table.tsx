@@ -11,12 +11,14 @@ import { resourceUrl } from '../lib/api';
 import styles from './Table.module.css';
 
 // Column key -> the API sort tokens for ascending / descending.
-type ColKey = 'title' | 'authors' | 'series' | 'formats' | 'read';
+type ColKey = 'title' | 'authors' | 'series' | 'tags' | 'formats' | 'read';
 interface Col { key: ColKey; label: string; sortAsc?: string; sortDesc?: string; }
 const COLUMNS: Col[] = [
   { key: 'title', label: 'Title', sortAsc: 'abc', sortDesc: 'zyx' },
   { key: 'authors', label: 'Authors', sortAsc: 'authaz', sortDesc: 'authza' },
   { key: 'series', label: 'Series' },
+  // Tags has no server-side sort token, so it renders unsortable (#725).
+  { key: 'tags', label: 'Tags' },
   { key: 'formats', label: 'Formats' },
   { key: 'read', label: 'Read' },
 ];
@@ -143,6 +145,7 @@ export function Table() {
                         )}
                         {c.key === 'authors' && (b.authors || []).join(', ')}
                         {c.key === 'series' && (b.series ? `${b.series}${b.series_index ? ` #${b.series_index}` : ''}` : '—')}
+                        {c.key === 'tags' && ((b.tags || []).join(', ') || '—')}
                         {c.key === 'formats' && (b.formats || []).join(', ')}
                         {c.key === 'read' && (b.read
                           ? <Check size={15} className={styles.readYes} role="img" aria-label={t('Read')} />

@@ -16,6 +16,13 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+- **The table view can now show a Tags column.** In the redesigned interface's
+  table view, each book's tags now appear as their own column, next to Series —
+  handy when you're skimming or editing metadata and want to see genres and
+  subjects at a glance. Use the "Columns" button to hide it if you'd rather not.
+  Thanks to @mrdynamo and the original reporter (#725).
+
 ### Fixed
 - **Parts of the new interface stayed in English even when your language was
   fully translated.** Menu items like "Table view" and "Smart shelves," and whole

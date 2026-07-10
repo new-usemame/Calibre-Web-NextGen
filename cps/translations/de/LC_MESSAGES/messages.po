@@ -1865,6 +1865,7 @@ msgstr ""
 #, python-format
 msgid "This %(oauth)s account is already linked to a different user"
 msgstr ""
+"Dieses %(oauth)s-Konto ist bereits mit einem anderen Benutzer verknüpft"
 
 #: cps/oauth_bb.py:621 cps/remotelogin.py:149
 #, python-format
@@ -1986,7 +1987,7 @@ msgstr "Bücherduplikate"
 
 #: cps/opds.py:164
 msgid "Books sorted alphabetically"
-msgstr ""
+msgstr "Bücher alphabetisch sortiert"
 
 #: cps/opds.py:169 cps/render_template.py:77
 msgid "Hot Books"
@@ -1995,6 +1996,8 @@ msgstr "Beliebte Bücher"
 #: cps/opds.py:170
 msgid "Popular publications from this catalog based on Downloads."
 msgstr ""
+"Beliebte Publikationen aus dieser Bibliothek basierend auf Anzahl der "
+"Downloads."
 
 #: cps/opds.py:175 cps/render_template.py:91 cps/web.py:719
 msgid "Top Rated Books"
@@ -2002,7 +2005,7 @@ msgstr "Am besten bewertete Bücher"
 
 #: cps/opds.py:176
 msgid "Popular publications from this catalog based on Rating."
-msgstr ""
+msgstr "Beliebte Veröffentlichungen dieses Katalogs basierend auf Bewertung."
 
 #: cps/opds.py:181
 #, fuzzy
@@ -2051,7 +2054,7 @@ msgstr "Verleger"
 
 #: cps/opds.py:212
 msgid "Books ordered by publisher"
-msgstr ""
+msgstr "Bücher nach Verleger sortiert"
 
 #: cps/opds.py:217 cps/render_template.py:104 cps/spa_strings.py:317
 #: cps/templates/book_table.html:110 cps/web.py:2233
@@ -2060,7 +2063,7 @@ msgstr "Kategorien"
 
 #: cps/opds.py:218
 msgid "Books ordered by category"
-msgstr ""
+msgstr "Bücher nach Kategorie sortiert"
 
 #: cps/opds.py:223 cps/render_template.py:107 cps/spa_strings.py:176
 #: cps/templates/book_edit.html:143 cps/templates/book_table.html:111
@@ -2073,7 +2076,7 @@ msgstr "Serien"
 
 #: cps/opds.py:224
 msgid "Books ordered by series"
-msgstr ""
+msgstr "Bücher nach Serie sortiert"
 
 #: cps/opds.py:229 cps/render_template.py:117 cps/spa_strings.py:436
 #: cps/templates/book_table.html:113 cps/templates/detail.html:931
@@ -2092,7 +2095,7 @@ msgstr "Bewertungen"
 
 #: cps/opds.py:236
 msgid "Books ordered by Rating"
-msgstr ""
+msgstr "Bücher nach Bewertung sortiert"
 
 #: cps/opds.py:241 cps/render_template.py:124
 msgid "File formats"
@@ -2100,7 +2103,7 @@ msgstr "Dateiformate"
 
 #: cps/opds.py:242
 msgid "Books ordered by file formats"
-msgstr ""
+msgstr "Bücher nach Dateiformat sortiert"
 
 #: cps/opds.py:247 cps/spa_strings.py:572 cps/templates/layout.html:627
 #: cps/templates/search_form.html:88
@@ -2109,7 +2112,7 @@ msgstr "Regale"
 
 #: cps/opds.py:248
 msgid "Books organized in shelves"
-msgstr ""
+msgstr "Bücher in Regalen organisiert"
 
 #: cps/opds.py:253
 #, fuzzy
@@ -2161,6 +2164,9 @@ msgid ""
 "Duplicate scanning needs a one-time full scan before fast duplicate checks "
 "can run after imports and metadata changes. "
 msgstr ""
+"Für die Duplikatsuche ist ein einmaliger vollständiger Scan erforderlich, "
+"bevor nach Importen und Metadatenänderungen schnelle Duplikatprüfungen "
+"durchgeführt werden können."
 
 #: cps/render_template.py:74 cps/spa_strings.py:308
 msgid "Books"
@@ -5710,16 +5716,16 @@ msgstr "Dubletten-Scan abgeschlossen: %(count)s neue Gruppen"
 
 #: cps/tasks/duplicate_scan.py:90
 msgid "Building duplicate index"
-msgstr ""
+msgstr "Duplikatindex erstellen"
 
 #: cps/tasks/duplicate_scan.py:98
 #, python-format
 msgid "Building duplicate index: %(processed)s/%(total)s books"
-msgstr ""
+msgstr "Duplikatindex erstellen: %(processed)s/%(total)s Bücher"
 
 #: cps/tasks/duplicate_scan.py:104
 msgid "Building duplicate index: no books"
-msgstr ""
+msgstr "Duplikatindex erstellen: keine Bücher"
 
 #: cps/tasks/duplicate_scan.py:108
 #, fuzzy
@@ -9365,7 +9371,7 @@ msgstr "Ausgewählte löschen"
 
 #: cps/templates/duplicates.html:529
 msgid "Duplicate scanning needs a one-time full scan."
-msgstr ""
+msgstr "Für Duplikatscans ist ein einmaliger vollständiger Scan erforderlich."
 
 #: cps/templates/duplicates.html:531
 msgid ""
@@ -9373,12 +9379,18 @@ msgid ""
 "and metadata changes. Before incremental scans can run, the index needs an "
 "initial baseline."
 msgstr ""
+"CWA verwendet nun einen Duplikatindex, um Duplikatprüfungen bei Importen und "
+"Metadatenänderungen zu beschleunigen. Bevor inkrementelle Scans ausgeführt "
+"werden können, benötigt der Index eine initiale Baseline."
 
 #: cps/templates/duplicates.html:534
 msgid ""
 "Click \"Run Full Duplicate Scan\" to build it. This may take several minutes "
 "on large libraries, and you can keep using CWA while it runs."
 msgstr ""
+"Klicken Sie auf „Vollständigen Duplikatscan ausführen“, um ihn zu starten. "
+"Dies kann bei großen Bibliotheken einige Minuten dauern. Sie können CWA "
+"währenddessen weiterhin verwenden."
 
 #: cps/templates/duplicates.html:541
 #, fuzzy
@@ -9387,7 +9399,7 @@ msgstr "Duplikat-Scan"
 
 #: cps/templates/duplicates.html:542
 msgid "You can keep using CWA while it runs."
-msgstr ""
+msgstr "Sie können CWA weiterhin verwenden, während es läuft."
 
 #: cps/templates/duplicates.html:554
 #, fuzzy
@@ -9506,6 +9518,8 @@ msgid ""
 "CWA will resolve duplicate groups using the selected strategy and "
 "permanently delete duplicate books."
 msgstr ""
+"CWA wird doppelte Gruppen mithilfe der ausgewählten Strategie auflösen und "
+"doppelte Bücher endgültig löschen."
 
 #: cps/templates/duplicates.html:690
 #, fuzzy
@@ -11503,9 +11517,9 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ "        <a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
 #~ "wiki/Configuration#database-configuration\">see here</a>!"
 #~ msgstr ""
-#~ "CWA ist so konfiguriert, dass es deine Calibre-Datenbank (<code>metadata."
-#~ "db</code>-Datei) irgendwo in dem Pfad <code>/calibre-library</code> "
-#~ "sucht.\n"
+#~ "CWA ist so konfiguriert, dass es deine Calibre-Datenbank "
+#~ "(<code>metadata.db</code>-Datei) irgendwo in dem Pfad <code>/calibre-"
+#~ "library</code> sucht.\n"
 #~ "        CWA durchsucht automatisch das Verzeichnis, das du auf <code>/"
 #~ "calibre-library</code> in der docker-compose-Datei verbunden hast, um "
 #~ "eine existierende Calibre-\n"

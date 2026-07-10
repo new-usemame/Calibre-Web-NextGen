@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Catalog endpoints for /api/v1."""
+from datetime import timezone
+
 from flask import jsonify, request
 from flask_babel import get_locale
 from sqlalchemy import and_, func
@@ -274,6 +276,8 @@ def book_detail(book_id):
     # sessions have no real id, so they simply read back as not-favorited/hidden.
     favorited = hidden = False
     kosync_progress = None
+    kosync_progress_timestamp = None
+    kosync_progress_created_at = None
     if current_user.is_authenticated and not current_user.is_anonymous:
         uid = int(current_user.id)
         favorited = (ub.session.query(ub.FavoriteBook)
@@ -291,7 +295,12 @@ def book_detail(book_id):
                                   ub.KoboReadingState.book_id == book_id)
                           .first())
             if kobo_state and kobo_state.current_bookmark:
-                kosync_progress = kobo_state.current_bookmark.progress_percent
+                bm = kobo_state.current_bookmark
+                kosync_progress = bm.progress_percent
+                if bm.last_modified:
+                    kosync_progress_timestamp = bm.last_modified.replace(tzinfo=timezone.utc).isoformat()
+                if bm.created_at:
+                    kosync_progress_created_at = bm.created_at.replace(tzinfo=timezone.utc).isoformat()
         except Exception:
             log.debug("Failed to load KOReader progress for book %s", book_id, exc_info=True)
 
@@ -315,6 +324,8 @@ def book_detail(book_id):
         in_progress=in_progress,
     )
     body["kosync_progress"] = kosync_progress
+    body["kosync_progress_timestamp"] = kosync_progress_timestamp
+    body["kosync_progress_created_at"] = kosync_progress_created_at
     return jsonify(body)
 
 

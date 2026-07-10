@@ -16,6 +16,12 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+- **Book pages now show when you started reading and when your progress last
+  synced.** If you read with Kobo or KOReader, the book page now shows both
+  dates so you can see how long a book has been in progress and whether its
+  reading position is current. Thanks to @Kyraminol for the contribution (#763).
+
 ### Fixed
 - **Downloads failed with a server error for apps and scripts that don't send a
   browser identifier.** Some OPDS readers, download managers, and command-line

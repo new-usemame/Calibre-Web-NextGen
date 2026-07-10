@@ -19,6 +19,9 @@ import os
 
 import pytest
 
+
+pytestmark = pytest.mark.unit
+
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _SCRIPT = os.path.join(_REPO, "scripts", "extract_spa_strings.py")
 

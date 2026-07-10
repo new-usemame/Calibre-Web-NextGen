@@ -874,6 +874,7 @@ class KoboBookmark(Base):
 
     id = Column(Integer, primary_key=True)
     kobo_reading_state_id = Column(Integer, ForeignKey('kobo_reading_state.id'))
+    created_at = Column(DateTime)
     last_modified = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     location_source = Column(String)
     location_type = Column(String)
@@ -1104,17 +1105,25 @@ class HardcoverMatchQueue(Base):
         return f'<HardcoverMatchQueue book_id={self.book_id} title="{self.book_title}" reviewed={bool(self.reviewed)}>'
 
 
-# Updates the last_modified timestamp in the KoboReadingState table if any of its children tables are modified.
+# Updates the last_modified timestamp in the KoboReadingState table if any of its children tables are modified,
+# and adds a KoboBookmark's created_at the first time it records progress > 0 ("started reading").
 @event.listens_for(Session, 'before_flush')
 def receive_before_flush(session, flush_context, instances):
+    # Computed lazily on the first Kobo-related change so unrelated flushes don't
+    # pay for a timestamp they never use; reused across the flush once set.
+    ts = None
     for change in itertools.chain(session.new, session.dirty):
         if isinstance(change, (ReadBook, KoboStatistics, KoboBookmark)):
-            if change.kobo_reading_state:
+            if ts is None:
                 ts = (g.kobo_reading_state_lm
                       if has_request_context() and getattr(g, 'kobo_reading_state_lm', None)
                       else datetime.now(timezone.utc))
+            if change.kobo_reading_state:
                 change.kobo_reading_state.last_modified = ts
                 change.kobo_reading_state.priority_timestamp = ts
+            if isinstance(change, KoboBookmark) and not change.created_at and (change.progress_percent or 0) > 0:
+                change.created_at = ts
+
     # Maintain the last_modified_bit for the Shelf table.
     for change in itertools.chain(session.new, session.deleted):
         if isinstance(change, BookShelf):
@@ -1803,6 +1812,8 @@ def _merge_kobo_bookmark(_session, winner, loser):
         loser.current_bookmark = None
         return
     w, l = winner.current_bookmark, loser.current_bookmark
+    if l.created_at and (not w.created_at or l.created_at < w.created_at):
+        w.created_at = l.created_at
     if _loser_wins_lm(l, w):
         for attr in ("location_source", "location_type", "location_value",
                      "progress_percent", "content_source_progress_percent",
@@ -2537,6 +2548,41 @@ def migrate_annotation_decouple_source_target(engine, _session):
         raise
 
 
+def migrate_kobo_bookmark_created_at(engine, _session):
+    """Add the nullable ``created_at`` column to ``kobo_bookmark`` — the
+    "started reading" date, stamped on the first sync with progress > 0.
+    Idempotent.
+
+    Same PRAGMA-guarded shape as `migrate_annotation_device_origin`:
+    query the live SQLite catalog for the column, and treat a duplicate-column
+    error from the ADD COLUMN as a no-op. Nullable column, zero data risk.
+    """
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='kobo_bookmark'"
+        )).fetchall()
+        if not rows:
+            return
+        existing = {
+            row[1] for row in conn.execute(text(
+                "PRAGMA table_info(kobo_bookmark)"
+            )).fetchall()
+        }
+        if "created_at" in existing:
+            return
+    try:
+        _run_ddl_with_retry(engine, "ALTER TABLE kobo_bookmark ADD COLUMN created_at DATETIME")
+        log.info("[kobo_bookmark] added created_at column")
+    except exc.OperationalError as e:
+        if "duplicate column" in str(e).lower():
+            log.info(
+                "[kobo_bookmark] column already present despite "
+                "PRAGMA check; treating as idempotent"
+            )
+        else:
+            raise
+
+
 def migrate_Database(_session):
     engine = _session.bind
     add_missing_tables(engine, _session)
@@ -2552,6 +2598,7 @@ def migrate_Database(_session):
     migrate_magic_shelf_table(engine, _session)
     migrate_kobo_unique_constraints(engine, _session)
     migrate_kobo_deleted_book(engine, _session)
+    migrate_kobo_bookmark_created_at(engine, _session)
     # Must run before config_sql.load_configuration (it does — ub.init_db
     # precedes config load in cps/__init__.py) so the flipped value is live
     # the same boot.

@@ -121,6 +121,12 @@ export interface BookDetail {
   /** KOReader/Kobo synced reading progress as a percentage (0–100), or null when
    *  not synced. */
   kosync_progress: number | null;
+  /** When progress was last synced, as an ISO Date, or null when not synced. */
+  kosync_progress_timestamp: string | null;
+  /** When progress was first synced (the "started reading" date), as a
+   *  ISO date, or null when not synced or for progress that predates
+   *  this field. */
+  kosync_progress_created_at: string | null;
 }
 
 export interface BooksPage {

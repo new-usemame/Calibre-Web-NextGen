@@ -4,7 +4,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-08 20:26+0000\n"
+"POT-Creation-Date: 2026-07-10 00:59+0000\n"
 "PO-Revision-Date: 2026-04-06 17:03+0000\n"
 "Last-Translator: Manuel Drescher\n"
 "Language-Team: German\n"
@@ -136,7 +136,7 @@ msgstr ""
 msgid "Edit Users"
 msgstr "Benutzer bearbeiten"
 
-#: cps/admin.py:737 cps/opds.py:1148 cps/templates/grid.html:14
+#: cps/admin.py:737 cps/opds.py:1196 cps/templates/grid.html:14
 #: cps/templates/list.html:19
 msgid "All"
 msgstr "Alle"
@@ -534,7 +534,8 @@ msgstr ""
 msgid "Settings DB is not Writeable"
 msgstr "Einstellungsdatenbank ist nicht schreibbar"
 
-#: cps/admin.py:2094 cps/opds.py:309 cps/web.py:3102 cps/web.py:3237
+#: cps/admin.py:2094 cps/opds.py:309 cps/opds.py:344 cps/opds.py:347
+#: cps/web.py:3102 cps/web.py:3237
 msgid "title"
 msgstr "Titel"
 
@@ -1291,7 +1292,7 @@ msgstr "Profilbild erfolgreich aktualisiert."
 msgid "Calibre-Web NextGen Profile Picture Management (WIP)"
 msgstr ""
 
-#: cps/db.py:1733 cps/spa_strings.py:489 cps/templates/config_edit.html:338
+#: cps/db.py:1735 cps/spa_strings.py:489 cps/templates/config_edit.html:338
 #: cps/templates/config_view_edit.html:79
 #: cps/templates/config_view_edit.html:90 cps/templates/email_edit.html:41
 #: cps/web.py:877 cps/web.py:911 cps/web.py:956 cps/web.py:996 cps/web.py:1025
@@ -1300,35 +1301,35 @@ msgstr ""
 msgid "None"
 msgstr "Keine"
 
-#: cps/duplicates.py:486 cps/duplicates.py:497
+#: cps/duplicates.py:595 cps/duplicates.py:606
 msgid "Duplicate Books"
 msgstr "Bücherduplikate"
 
-#: cps/duplicates.py:1218
+#: cps/duplicates.py:1337
 msgid "Duplicate group already dismissed"
 msgstr "Dublettengruppe bereits verworfen"
 
-#: cps/duplicates.py:1240
+#: cps/duplicates.py:1359
 msgid "Duplicate group dismissed"
 msgstr "Duplikatgruppe verworfen"
 
-#: cps/duplicates.py:1283
+#: cps/duplicates.py:1402
 msgid "Duplicate group restored"
 msgstr "Duplikatgruppe wiederhergestellt"
 
-#: cps/duplicates.py:1285
+#: cps/duplicates.py:1404
 msgid "Duplicate group was not dismissed"
 msgstr "Dublettengruppe wurde nicht verworfen"
 
-#: cps/duplicates.py:1357
+#: cps/duplicates.py:1476
 msgid "Duplicate scan queued"
 msgstr "Duplikat-Scan in Warteschlange eingereiht"
 
-#: cps/duplicates.py:1426
+#: cps/duplicates.py:1545
 msgid "Duplicate scan completed (fallback)"
 msgstr "Dubletten-Scan abgeschlossen (Fallback)"
 
-#: cps/duplicates.py:1501
+#: cps/duplicates.py:1620
 msgid "Invalid resolution strategy"
 msgstr "Ungültige Lösungsstrategie"
 
@@ -2124,10 +2125,18 @@ msgstr "Fehler beim Laden des magischen Regals"
 msgid "description"
 msgstr "Beschreibung"
 
-#: cps/opds.py:747
+#: cps/opds.py:782
 #, python-brace-format
 msgid "{} Stars"
 msgstr "{} Sterne"
+
+#: cps/opds.py:1072 cps/search.py:53 cps/search.py:454 cps/spa_strings.py:168
+#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
+#: cps/templates/feed.xml:43 cps/templates/index.xml:12
+#: cps/templates/layout.html:313 cps/templates/layout.html:316
+#: cps/templates/search_form.html:247
+msgid "Search"
+msgstr "Suchen"
 
 #: cps/remotelogin.py:76 cps/spa_strings.py:443 cps/templates/layout.html:342
 #: cps/templates/layout.html:383 cps/templates/login.html:11
@@ -2261,14 +2270,6 @@ msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
 "strings in your language still need translating."
 msgstr ""
-
-#: cps/search.py:53 cps/search.py:454 cps/spa_strings.py:168
-#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
-#: cps/templates/feed.xml:43 cps/templates/index.xml:12
-#: cps/templates/layout.html:313 cps/templates/layout.html:316
-#: cps/templates/search_form.html:247
-msgid "Search"
-msgstr "Suchen"
 
 #: cps/search.py:204
 msgid "Published after "

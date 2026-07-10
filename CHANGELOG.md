@@ -21,6 +21,11 @@ is for things you can see or feel when running the app.
   synced.** If you read with Kobo or KOReader, the book page now shows both
   dates so you can see how long a book has been in progress and whether its
   reading position is current. Thanks to @Kyraminol for the contribution (#763).
+- **The table view can now show a Tags column.** In the redesigned interface's
+  table view, each book's tags now appear as their own column, next to Series —
+  handy when you're skimming or editing metadata and want to see genres and
+  subjects at a glance. Use the "Columns" button to hide it if you'd rather not.
+  Thanks to @mrdynamo and the original reporter (#725).
 
 ### Fixed
 - **Downloads failed with a server error for apps and scripts that don't send a
@@ -30,6 +35,19 @@ is for things you can see or feel when running the app.
   assumed the header was always present. They now handle its absence and serve
   the file normally. Thanks to @AshayK003, who reported and fixed the same crash
   upstream (janeczku/calibre-web#3668).
+- **The "duplicates found" notice no longer nags about books you've archived.**
+  If you archived one book of a duplicate pair, the duplicates page correctly
+  showed nothing — but the sidebar badge and the pop-up notice kept counting it,
+  so clicking through led to an empty page and the notice came back on every
+  refresh. The count now respects the same archived and hidden books the
+  duplicates page does, so the badge and the page agree. Reported by @auspex (#737).
+- **OPDS feeds now each show their own name instead of all reading as your
+  library's name.** In an OPDS reader, "Read Books," "Unread Books," each shelf,
+  the author and series lists, and search results all appeared with the same
+  title — your instance name — so the feed list was a wall of identical entries.
+  Every feed now shows "Instance - Feed Name" (a shelf shows its own name, a
+  search shows the query), so readers that list feeds by title can tell them
+  apart. Thanks to @chloeroform for the report (#750).
 - **Parts of the new interface stayed in English even when your language was
   fully translated.** Menu items like "Table view" and "Smart shelves," and whole
   screens such as the admin settings, cover picker, advanced search, and the book

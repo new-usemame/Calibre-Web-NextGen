@@ -122,6 +122,11 @@ def serialize_book_list_item(book, read=False, archived=False):
         "series_index": book.series_index,
         "cover_url": f"/cover/{book.id}/sm" if getattr(book, "has_cover", 0) else None,
         "formats": [d.format for d in book.data] if getattr(book, "data", None) else [],
+        # Tag names for the table view's Tags column (#725). Flat strings to match
+        # the list-item's other flat arrays (authors/formats); the detail
+        # serializer keeps {id, name} for linking. fill_indexpage already
+        # joinedload's Books.tags, so this adds no query.
+        "tags": [t.name for t in book.tags] if getattr(book, "tags", None) else [],
         "read": bool(read),
         "archived": bool(archived),
     }

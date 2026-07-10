@@ -436,6 +436,115 @@ def filter_dismissed_groups(duplicate_groups, user_id=None):
         return duplicate_groups
 
 
+def _visible_duplicate_book_ids(book_ids, user_id):
+    """Subset of ``book_ids`` still visible to ``user_id`` right now.
+
+    Applies the same per-user exclusion (archived + hidden books) the
+    duplicates page uses via ``get_common_filters`` — the single source of
+    truth for "does this book count for this user". Chunked to stay under
+    SQLite's bound-parameter limit on large groups/libraries.
+    """
+    ids = []
+    for bid in book_ids or []:
+        try:
+            ids.append(int(bid))
+        except (TypeError, ValueError):
+            continue
+    if not ids or user_id is None:
+        return set(ids)
+    visible = set()
+    for start in range(0, len(ids), 900):
+        chunk = ids[start:start + 900]
+        rows = (calibre_db.session.query(db.Books.id)
+                .filter(db.Books.id.in_(chunk))
+                .filter(get_common_filters(user_id=user_id))
+                .all())
+        visible.update(int(row[0]) for row in rows)
+    return visible
+
+
+def filter_visible_duplicate_groups(duplicate_groups, user_id=None):
+    """Re-validate cached duplicate groups against the user's current view.
+
+    The ``/duplicates/status`` badge count is served from a cache serialized at
+    scan time, so it does not reflect books the user has since ARCHIVED, HIDDEN,
+    or that were deleted. The ``/duplicates`` page re-checks every group against
+    ``get_common_filters`` and drops any that fall below two visible books (see
+    ``get_duplicate_groups_from_index``); the badge did not, so the notifier
+    kept insisting on a duplicate the page would no longer show (fork #737 —
+    archiving one of a pair left the count stuck in "limbo").
+
+    Mirror the page here: drop groups with fewer than two books still visible to
+    ``user_id`` and reflect the reduced count. With no concrete user (anonymous
+    or no request context) there is no per-user archive state to apply, so the
+    cache is returned unchanged.
+
+    Visibility is resolved with ONE query per status poll, not one per group:
+    the union of every group's book ids is resolved against the user's view in
+    a single (900-id chunked) call to ``_visible_duplicate_book_ids``, then the
+    visible set is partitioned back per group. Because visibility is per-book-id
+    (an id is visible or not, regardless of which group it belongs to), this is
+    identical to re-querying each group separately — but the notifier polls
+    every few seconds per open admin/edit tab, so one query per poll scales far
+    better than G queries per poll with the duplicate-group count.
+    """
+    if not duplicate_groups or user_id is None:
+        return duplicate_groups
+
+    try:
+        # Collect the union of every group's book ids (order-stable, de-duped)
+        # so visibility can be resolved in one query instead of one per group.
+        all_ids = []
+        seen = set()
+        for group in duplicate_groups:
+            raw_ids = group.get('book_ids')
+            if not raw_ids:
+                continue
+            for bid in raw_ids:
+                try:
+                    ibid = int(bid)
+                except (TypeError, ValueError):
+                    continue
+                if ibid not in seen:
+                    seen.add(ibid)
+                    all_ids.append(ibid)
+        visible = _visible_duplicate_book_ids(all_ids, user_id) if all_ids else set()
+
+        result = []
+        for group in duplicate_groups:
+            raw_ids = group.get('book_ids')
+            if not raw_ids:
+                # Older cache shape without per-book ids: can't re-validate, so
+                # keep the group rather than silently drop a real duplicate.
+                result.append(group)
+                continue
+            visible_ids = []
+            for bid in raw_ids:
+                try:
+                    ibid = int(bid)
+                except (TypeError, ValueError):
+                    continue
+                if ibid in visible:
+                    visible_ids.append(ibid)
+            if len(visible_ids) < 2:
+                # No longer a duplicate for this user (archived/hidden/deleted).
+                continue
+            if len(visible_ids) == len(raw_ids):
+                result.append(group)
+            else:
+                trimmed = dict(group)
+                trimmed['book_ids'] = visible_ids
+                trimmed['count'] = len(visible_ids)
+                result.append(trimmed)
+        return result
+    except Exception as e:
+        # Degrade to the cached groups rather than 500 the status poll — mirrors
+        # filter_dismissed_groups' resilience.
+        log.error("[cwa-duplicates] Error re-validating cached duplicate groups "
+                  "against user view: %s", str(e))
+        return duplicate_groups
+
+
 @duplicates.route("/duplicates")
 @login_required_if_no_ano
 @admin_or_edit_required
@@ -1094,7 +1203,17 @@ def get_duplicate_status():
                 duplicate_groups,
                 current_user.id if current_user and current_user.id else None
             )
-            
+
+            # #737: the cache is serialized at scan time, so a book the user has
+            # since archived/hidden (or that was deleted) still counts here even
+            # though the /duplicates page drops the group. Re-validate against
+            # the user's current view so the badge can't insist on a duplicate
+            # the page won't show.
+            duplicate_groups = filter_visible_duplicate_groups(
+                duplicate_groups,
+                current_user.id if current_user and current_user.id else None
+            )
+
             count = len(duplicate_groups)
             
             # Get preview of first 3 groups

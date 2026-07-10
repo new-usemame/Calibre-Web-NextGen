@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-08 20:26+0000\n"
+"POT-Creation-Date: 2026-07-10 00:59+0000\n"
 "PO-Revision-Date: 2018-02-07 02:20-0500\n"
 "Last-Translator: subdiox <subdiox@gmail.com>\n"
 "Language-Team: ja <LL@li.org>\n"
@@ -137,7 +137,7 @@ msgstr "カスタムカラムの%(column)d列目がcalibreのDBに存在しま�
 msgid "Edit Users"
 msgstr "ユーザーを編集"
 
-#: cps/admin.py:737 cps/opds.py:1148 cps/templates/grid.html:14
+#: cps/admin.py:737 cps/opds.py:1196 cps/templates/grid.html:14
 #: cps/templates/list.html:19
 msgid "All"
 msgstr "全て"
@@ -518,7 +518,8 @@ msgstr "不明なエラーが発生しました。あとで再試行してくだ
 msgid "Settings DB is not Writeable"
 msgstr "設定DBが書き込みできません"
 
-#: cps/admin.py:2094 cps/opds.py:309 cps/web.py:3102 cps/web.py:3237
+#: cps/admin.py:2094 cps/opds.py:309 cps/opds.py:344 cps/opds.py:347
+#: cps/web.py:3102 cps/web.py:3237
 #, fuzzy
 msgid "title"
 msgstr "タイトル"
@@ -1268,7 +1269,7 @@ msgstr "プロフィール画像を更新しました。"
 msgid "Calibre-Web NextGen Profile Picture Management (WIP)"
 msgstr ""
 
-#: cps/db.py:1733 cps/spa_strings.py:489 cps/templates/config_edit.html:338
+#: cps/db.py:1735 cps/spa_strings.py:489 cps/templates/config_edit.html:338
 #: cps/templates/config_view_edit.html:79
 #: cps/templates/config_view_edit.html:90 cps/templates/email_edit.html:41
 #: cps/web.py:877 cps/web.py:911 cps/web.py:956 cps/web.py:996 cps/web.py:1025
@@ -1277,38 +1278,38 @@ msgstr ""
 msgid "None"
 msgstr "なし"
 
-#: cps/duplicates.py:486 cps/duplicates.py:497
+#: cps/duplicates.py:595 cps/duplicates.py:606
 msgid "Duplicate Books"
 msgstr "重複する書籍"
 
-#: cps/duplicates.py:1218
+#: cps/duplicates.py:1337
 msgid "Duplicate group already dismissed"
 msgstr "重複グループは既に解除済みです"
 
-#: cps/duplicates.py:1240
+#: cps/duplicates.py:1359
 #, fuzzy
 msgid "Duplicate group dismissed"
 msgstr "本を削除"
 
-#: cps/duplicates.py:1283
+#: cps/duplicates.py:1402
 #, fuzzy
 msgid "Duplicate group restored"
 msgstr "本を削除"
 
-#: cps/duplicates.py:1285
+#: cps/duplicates.py:1404
 msgid "Duplicate group was not dismissed"
 msgstr "重複グループは解除されませんでした"
 
-#: cps/duplicates.py:1357
+#: cps/duplicates.py:1476
 #, fuzzy
 msgid "Duplicate scan queued"
 msgstr "結果が見つかりません"
 
-#: cps/duplicates.py:1426
+#: cps/duplicates.py:1545
 msgid "Duplicate scan completed (fallback)"
 msgstr "重複スキャンが完了しました（フォールバック）"
 
-#: cps/duplicates.py:1501
+#: cps/duplicates.py:1620
 #, fuzzy
 msgid "Invalid resolution strategy"
 msgstr "無効なロール"
@@ -2090,10 +2091,18 @@ msgstr "本棚に整理された本"
 msgid "description"
 msgstr "詳細"
 
-#: cps/opds.py:747
+#: cps/opds.py:782
 #, python-brace-format
 msgid "{} Stars"
 msgstr "星{}"
+
+#: cps/opds.py:1072 cps/search.py:53 cps/search.py:454 cps/spa_strings.py:168
+#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
+#: cps/templates/feed.xml:43 cps/templates/index.xml:12
+#: cps/templates/layout.html:313 cps/templates/layout.html:316
+#: cps/templates/search_form.html:247
+msgid "Search"
+msgstr "検索"
 
 #: cps/remotelogin.py:76 cps/spa_strings.py:443 cps/templates/layout.html:342
 #: cps/templates/layout.html:383 cps/templates/login.html:11
@@ -2227,14 +2236,6 @@ msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
 "strings in your language still need translating."
 msgstr ""
-
-#: cps/search.py:53 cps/search.py:454 cps/spa_strings.py:168
-#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
-#: cps/templates/feed.xml:43 cps/templates/index.xml:12
-#: cps/templates/layout.html:313 cps/templates/layout.html:316
-#: cps/templates/search_form.html:247
-msgid "Search"
-msgstr "検索"
 
 #: cps/search.py:204
 msgid "Published after "

@@ -478,11 +478,38 @@ def filter_visible_duplicate_groups(duplicate_groups, user_id=None):
     ``user_id`` and reflect the reduced count. With no concrete user (anonymous
     or no request context) there is no per-user archive state to apply, so the
     cache is returned unchanged.
+
+    Visibility is resolved with ONE query per status poll, not one per group:
+    the union of every group's book ids is resolved against the user's view in
+    a single (900-id chunked) call to ``_visible_duplicate_book_ids``, then the
+    visible set is partitioned back per group. Because visibility is per-book-id
+    (an id is visible or not, regardless of which group it belongs to), this is
+    identical to re-querying each group separately — but the notifier polls
+    every few seconds per open admin/edit tab, so one query per poll scales far
+    better than G queries per poll with the duplicate-group count.
     """
     if not duplicate_groups or user_id is None:
         return duplicate_groups
 
     try:
+        # Collect the union of every group's book ids (order-stable, de-duped)
+        # so visibility can be resolved in one query instead of one per group.
+        all_ids = []
+        seen = set()
+        for group in duplicate_groups:
+            raw_ids = group.get('book_ids')
+            if not raw_ids:
+                continue
+            for bid in raw_ids:
+                try:
+                    ibid = int(bid)
+                except (TypeError, ValueError):
+                    continue
+                if ibid not in seen:
+                    seen.add(ibid)
+                    all_ids.append(ibid)
+        visible = _visible_duplicate_book_ids(all_ids, user_id) if all_ids else set()
+
         result = []
         for group in duplicate_groups:
             raw_ids = group.get('book_ids')
@@ -491,7 +518,6 @@ def filter_visible_duplicate_groups(duplicate_groups, user_id=None):
                 # keep the group rather than silently drop a real duplicate.
                 result.append(group)
                 continue
-            visible = _visible_duplicate_book_ids(raw_ids, user_id)
             visible_ids = []
             for bid in raw_ids:
                 try:

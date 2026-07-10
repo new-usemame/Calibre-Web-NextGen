@@ -134,6 +134,32 @@ class TestGroupDropBehaviour:
         out = module.filter_visible_duplicate_groups(groups, user_id=9)
         assert [g["title"] for g in out] == ["B"]
 
+    def test_visibility_resolved_with_one_query_not_per_group(self):
+        """All groups' ids are resolved against the user's view in ONE visibility
+        query (on the union of every group's ids), not one query per group. The
+        notifier polls every few seconds per open admin/edit tab, so one query
+        per poll scales with the union size, not with the duplicate-group count.
+        Pins the batching so it can't silently regress to G queries per poll."""
+        module = _load()
+        calls = {"n": 0}
+        visible = {1, 2, 10, 11}
+
+        def _counting(book_ids, user_id):
+            calls["n"] += 1
+            return {int(b) for b in book_ids if int(b) in visible}
+
+        module._visible_duplicate_book_ids = _counting
+        groups = [_group(1, 2, title="A", key="KA"),
+                  _group(10, 11, title="B", key="KB"),
+                  _group(100, 101, title="C", key="KC")]  # both archived -> dropped
+        out = module.filter_visible_duplicate_groups(groups, user_id=9)
+        assert calls["n"] == 1, (
+            "visibility must be resolved once for the whole set of groups (one "
+            "query per poll), not once per group"
+        )
+        # Behaviour preserved: A and B kept, C dropped (no visible books).
+        assert [g["title"] for g in out] == ["A", "B"]
+
     def test_anonymous_user_returns_cache_unchanged(self):
         """No concrete user → no per-user archive state to apply. The cache is
         passed through untouched (and the visibility oracle is never called)."""

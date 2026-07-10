@@ -40,6 +40,14 @@ export function MagicShelfView({ id }: { id: string }) {
     else setBooks((p) => dedupAppend(p, data.items));
   }, [data, id, isPlaceholderData]);
 
+  // Infinite-scroll sentinel. Called before the conditional early returns below
+  // so the hook order stays stable across the loading→loaded transition; `data`
+  // is undefined on the first render, so guard `enabled` null-safely (#784).
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: () => setPage((p) => p + 1),
+    enabled: !!data && books.length < data.total && !isFetching,
+  });
+
   if (isLoading && !data) return <SpinnerCentered size={40} />;
   if (error || !data) {
     return <main className={styles.container}>
@@ -50,10 +58,6 @@ export function MagicShelfView({ id }: { id: string }) {
 
   const total = data.total;
   const hasMore = books.length < total;
-  const sentinelRef = useIntersectionObserver({
-    onIntersect: () => setPage((p) => p + 1),
-    enabled: hasMore && !isFetching,
-  });
 
   return (
     <main className={styles.container}>

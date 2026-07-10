@@ -64,6 +64,17 @@ export function Shelf({ id }: { id: string }) {
     }
   }, [data, id, isPlaceholderData]);
 
+  // Infinite-scroll sentinel. This hook MUST be called before any conditional
+  // early return below — Rules of Hooks require a stable hook order across
+  // renders. `data` is undefined on the first (loading) render and populated on
+  // the next, so `enabled` is guarded null-safely rather than deriving it from
+  // the post-guard `total`/`hasMore` (#784: calling it after the guards made the
+  // hook count jump loading→loaded and crashed the shelf to a blank screen).
+  const sentinelRef = useIntersectionObserver({
+    onIntersect: () => setPage((p) => p + 1),
+    enabled: !!data && books.length < data.total && !isFetching,
+  });
+
   if (isLoading && !data) return <SpinnerCentered size={40} />;
   if (error || !data) {
     return (
@@ -78,10 +89,6 @@ export function Shelf({ id }: { id: string }) {
 
   const total = data.total;
   const hasMore = books.length < total;
-  const sentinelRef = useIntersectionObserver({
-    onIntersect: () => setPage((p) => p + 1),
-    enabled: hasMore && !isFetching,
-  });
   const canEdit = data.can_edit;
 
   const startRename = () => {

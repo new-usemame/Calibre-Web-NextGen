@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **New UI: opening a shelf no longer shows a blank screen.** On v4.1.8, clicking any shelf — a manual shelf or a smart (magic) shelf — in the new UI left the page blank, and refreshing the browser did not recover it. The main book list, authors, series and other pages were unaffected. Rolling back to v4.1.7 was the only workaround. This is fixed; shelves open and list their books again. Thanks to @mrfearless and @Gauva1n for the reports (#784).
+
 ### Changed
 
 - **German interface: 19 strings that showed in English now appear in German.** The OPDS catalog descriptions (for example "Books sorted by series" and "Popular publications from this catalog based on rating") and the duplicate-scan progress messages were untranslated, so German users saw English there while the rest of the UI was translated. Filled in from pending German translations contributed upstream. Thanks to @djalexz85 and @fucx (Calibre-Web-Automated) and @ManuelDrescher (calibre-web).

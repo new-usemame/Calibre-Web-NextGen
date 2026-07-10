@@ -41,7 +41,7 @@
       href="{{url_for('opds.feed_osd')}}"
       type="application/opensearchdescription+xml"/>
   <link type="application/atom+xml" rel="search" title="{{_('Search')}}" href="{{ opds_search_url_path() }}" />
-  <title>{{instance}}</title>
+  <title>{% if feed_title %}{{ instance }} - {{ feed_title }}{% else %}{{ instance }}{% endif %}</title>
   <author>
     <name>{{instance}}</name>
     <uri>https://github.com/new-usemame/Calibre-Web-NextGen</uri>

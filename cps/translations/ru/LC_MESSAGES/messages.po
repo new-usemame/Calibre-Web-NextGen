@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-08 20:26+0000\n"
+"POT-Creation-Date: 2026-07-10 00:56+0000\n"
 "PO-Revision-Date: 2026-07-08 09:30+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
@@ -141,7 +141,7 @@ msgstr "Пользовательский столбец №%(column)d отсут
 msgid "Edit Users"
 msgstr "Редактировать пользователей"
 
-#: cps/admin.py:737 cps/opds.py:1148 cps/templates/grid.html:14
+#: cps/admin.py:737 cps/opds.py:1196 cps/templates/grid.html:14
 #: cps/templates/list.html:19
 msgid "All"
 msgstr "Все"
@@ -554,7 +554,8 @@ msgstr "Неизвестная ошибка. Пожалуйста, попроб�
 msgid "Settings DB is not Writeable"
 msgstr "База данных настроек недоступна для записи"
 
-#: cps/admin.py:2094 cps/opds.py:309 cps/web.py:3102 cps/web.py:3237
+#: cps/admin.py:2094 cps/opds.py:309 cps/opds.py:344 cps/opds.py:347
+#: cps/web.py:3102 cps/web.py:3237
 msgid "title"
 msgstr "название"
 
@@ -1320,7 +1321,7 @@ msgstr ""
 "Система управления профильными изображениями Calibre-Web NextGen (в "
 "разработке)"
 
-#: cps/db.py:1733 cps/spa_strings.py:489 cps/templates/config_edit.html:338
+#: cps/db.py:1735 cps/spa_strings.py:489 cps/templates/config_edit.html:338
 #: cps/templates/config_view_edit.html:79
 #: cps/templates/config_view_edit.html:90 cps/templates/email_edit.html:41
 #: cps/web.py:877 cps/web.py:911 cps/web.py:956 cps/web.py:996 cps/web.py:1025
@@ -2140,10 +2141,18 @@ msgstr "Книги, расставленные на умных полках"
 msgid "description"
 msgstr "описание"
 
-#: cps/opds.py:747
+#: cps/opds.py:782
 #, python-brace-format
 msgid "{} Stars"
 msgstr "{} звёзд"
+
+#: cps/opds.py:1072 cps/search.py:53 cps/search.py:454 cps/spa_strings.py:168
+#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
+#: cps/templates/feed.xml:43 cps/templates/index.xml:12
+#: cps/templates/layout.html:313 cps/templates/layout.html:316
+#: cps/templates/search_form.html:247
+msgid "Search"
+msgstr "Поиск"
 
 #: cps/remotelogin.py:76 cps/spa_strings.py:443 cps/templates/layout.html:342
 #: cps/templates/layout.html:383 cps/templates/login.html:11
@@ -2282,14 +2291,6 @@ msgid ""
 msgstr ""
 "Помогите улучшить перевод Calibre-Web NextGen на %(language)s язык - "
 "%(count)s строк на вашем языке ещё нуждаются в переводе."
-
-#: cps/search.py:53 cps/search.py:454 cps/spa_strings.py:168
-#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
-#: cps/templates/feed.xml:43 cps/templates/index.xml:12
-#: cps/templates/layout.html:313 cps/templates/layout.html:316
-#: cps/templates/search_form.html:247
-msgid "Search"
-msgstr "Поиск"
 
 #: cps/search.py:204
 msgid "Published after "

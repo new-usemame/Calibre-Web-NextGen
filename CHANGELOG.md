@@ -16,6 +16,13 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+- **The table view can now show a Tags column.** In the redesigned interface's
+  table view, each book's tags now appear as their own column, next to Series —
+  handy when you're skimming or editing metadata and want to see genres and
+  subjects at a glance. Use the "Columns" button to hide it if you'd rather not.
+  Thanks to @mrdynamo and the original reporter (#725).
+
 ### Fixed
 - **Downloads failed with a server error for apps and scripts that don't send a
   browser identifier.** Some OPDS readers, download managers, and command-line
@@ -30,6 +37,13 @@ is for things you can see or feel when running the app.
   so clicking through led to an empty page and the notice came back on every
   refresh. The count now respects the same archived and hidden books the
   duplicates page does, so the badge and the page agree. Reported by @auspex (#737).
+- **OPDS feeds now each show their own name instead of all reading as your
+  library's name.** In an OPDS reader, "Read Books," "Unread Books," each shelf,
+  the author and series lists, and search results all appeared with the same
+  title — your instance name — so the feed list was a wall of identical entries.
+  Every feed now shows "Instance - Feed Name" (a shelf shows its own name, a
+  search shows the query), so readers that list feeds by title can tell them
+  apart. Thanks to @chloeroform for the report (#750).
 - **Parts of the new interface stayed in English even when your language was
   fully translated.** Menu items like "Table view" and "Smart shelves," and whole
   screens such as the admin settings, cover picker, advanced search, and the book

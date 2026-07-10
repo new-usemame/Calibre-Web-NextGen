@@ -75,6 +75,9 @@ export interface Book {
   series_index: number | null;
   cover_url: string | null;
   formats: string[];
+  /** Tag names (#725) — powers the table view's Tags column. Absent on older
+   *  servers that predate the list-item tags field → treat as no tags. */
+  tags?: string[];
   read?: boolean;
   archived?: boolean;
 }

@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-08 20:26+0000\n"
+"POT-Creation-Date: 2026-07-10 00:56+0000\n"
 "PO-Revision-Date: 2023-07-25 11:30+0100\n"
 "Last-Translator: horus68 <https://github.com/horus68>\n"
 "Language-Team: pt-PT <>\n"
@@ -132,7 +132,7 @@ msgstr ""
 msgid "Edit Users"
 msgstr "Editar utilizadores"
 
-#: cps/admin.py:737 cps/opds.py:1148 cps/templates/grid.html:14
+#: cps/admin.py:737 cps/opds.py:1196 cps/templates/grid.html:14
 #: cps/templates/list.html:19
 msgid "All"
 msgstr "Tudo"
@@ -539,7 +539,8 @@ msgstr "Ocorreu um erro desconhecido. Por favor, tente novamente mais tarde."
 msgid "Settings DB is not Writeable"
 msgstr "Configuaração da DB não é gravável"
 
-#: cps/admin.py:2094 cps/opds.py:309 cps/web.py:3102 cps/web.py:3237
+#: cps/admin.py:2094 cps/opds.py:309 cps/opds.py:344 cps/opds.py:347
+#: cps/web.py:3102 cps/web.py:3237
 #, fuzzy
 msgid "title"
 msgstr "Título"
@@ -1283,7 +1284,7 @@ msgstr "{} utilizadores eliminados com sucesso"
 msgid "Calibre-Web NextGen Profile Picture Management (WIP)"
 msgstr ""
 
-#: cps/db.py:1733 cps/spa_strings.py:489 cps/templates/config_edit.html:338
+#: cps/db.py:1735 cps/spa_strings.py:489 cps/templates/config_edit.html:338
 #: cps/templates/config_view_edit.html:79
 #: cps/templates/config_view_edit.html:90 cps/templates/email_edit.html:41
 #: cps/web.py:877 cps/web.py:911 cps/web.py:956 cps/web.py:996 cps/web.py:1025
@@ -2106,10 +2107,18 @@ msgstr "Livros organizados em estantes"
 msgid "description"
 msgstr "Descrição"
 
-#: cps/opds.py:747
+#: cps/opds.py:782
 #, python-brace-format
 msgid "{} Stars"
 msgstr "{} Estrelas"
+
+#: cps/opds.py:1072 cps/search.py:53 cps/search.py:454 cps/spa_strings.py:168
+#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
+#: cps/templates/feed.xml:43 cps/templates/index.xml:12
+#: cps/templates/layout.html:313 cps/templates/layout.html:316
+#: cps/templates/search_form.html:247
+msgid "Search"
+msgstr "Pesquisar"
 
 #: cps/remotelogin.py:76 cps/spa_strings.py:443 cps/templates/layout.html:342
 #: cps/templates/layout.html:383 cps/templates/login.html:11
@@ -2253,14 +2262,6 @@ msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
 "strings in your language still need translating."
 msgstr ""
-
-#: cps/search.py:53 cps/search.py:454 cps/spa_strings.py:168
-#: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
-#: cps/templates/feed.xml:43 cps/templates/index.xml:12
-#: cps/templates/layout.html:313 cps/templates/layout.html:316
-#: cps/templates/search_form.html:247
-msgid "Search"
-msgstr "Pesquisar"
 
 #: cps/search.py:204
 msgid "Published after "

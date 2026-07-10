@@ -1473,6 +1473,7 @@ class CalibreDB:
             if database == Books:
                 random_query = random_query.options(
                     joinedload(Books.authors),
+                    joinedload(Books.tags),
                     joinedload(Books.data),
                     joinedload(Books.series),
                     joinedload(Books.ratings),
@@ -1495,6 +1496,7 @@ class CalibreDB:
         if database == Books:
             query = query.options(
                 joinedload(Books.authors),
+                joinedload(Books.tags),
                 joinedload(Books.data),
                 joinedload(Books.series),
                 joinedload(Books.ratings),

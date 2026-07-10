@@ -31,6 +31,13 @@ is for things you can see or feel when running the app.
   assumed the header was always present. They now handle its absence and serve
   the file normally. Thanks to @AshayK003, who reported and fixed the same crash
   upstream (janeczku/calibre-web#3668).
+- **OPDS feeds now each show their own name instead of all reading as your
+  library's name.** In an OPDS reader, "Read Books," "Unread Books," each shelf,
+  the author and series lists, and search results all appeared with the same
+  title — your instance name — so the feed list was a wall of identical entries.
+  Every feed now shows "Instance - Feed Name" (a shelf shows its own name, a
+  search shows the query), so readers that list feeds by title can tell them
+  apart. Thanks to @chloeroform for the report (#750).
 - **Parts of the new interface stayed in English even when your language was
   fully translated.** Menu items like "Table view" and "Smart shelves," and whole
   screens such as the admin settings, cover picker, advanced search, and the book

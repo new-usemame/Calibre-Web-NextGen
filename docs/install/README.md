@@ -20,8 +20,10 @@ Pick the guide that matches how you run Docker:
 | **Unraid** (Docker tab) | [unraid.md](unraid.md) |
 | **Portainer** (Stacks) | [portainer.md](portainer.md) |
 | **TrueNAS SCALE** (Apps) | [truenas.md](truenas.md) |
+| **QNAP** (Container Station) | [qnap.md](qnap.md) |
+| **Dockge** (compose stacks) | [dockge.md](dockge.md) |
 | **A terminal / `docker compose`** | [compose.md](compose.md) |
-| QNAP, Dockge, something else | not written yet — see the help links below, we'll walk you through it |
+| Something else | not listed yet — see the help links below, we'll walk you through it |
 
 Every guide covers both a **fresh install** and **switching from stock CWA**, and tells you
 how to **update** later on that platform (on most NAS GUIs a "restart" does **not** pull a new

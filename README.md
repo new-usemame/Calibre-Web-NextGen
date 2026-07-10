@@ -440,6 +440,8 @@ Without this, CWA may see different client IPs across requests and trigger Sessi
 
 Hardcover then appears in the Fetch Metadata modal.
 
+If you set the token through the `HARDCOVER_TOKEN` environment variable, the **Hardcover API Key** field in the admin UI stays empty — that field only shows a key entered through the UI, and an environment-supplied token is not echoed back into the page. The token still works; Hardcover results appearing in the Fetch Metadata modal confirm it is active.
+
 ### KOReader sync
 
 CWA has built-in KOReader progress sync; no separate kosync server is needed.

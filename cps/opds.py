@@ -936,7 +936,7 @@ def opds_download_link(book_id, book_format):
     if not auth.current_user().role_download():
         return abort(401)
     abort_unless_opds_book_exposed(book_id)
-    client = "kobo" if "Kobo" in request.headers.get('User-Agent') else ""
+    client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
     return get_download_link(book_id, book_format.lower(), client)
 
 

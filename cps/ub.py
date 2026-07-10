@@ -2553,9 +2553,12 @@ def migrate_kobo_bookmark_created_at(engine, _session):
     "started reading" date, stamped on the first sync with progress > 0.
     Idempotent.
 
-    Same PRAGMA-guarded shape as `migrate_annotation_device_origin`:
-    query the live SQLite catalog for the column, and treat a duplicate-column
-    error from the ADD COLUMN as a no-op. Nullable column, zero data risk.
+    PRAGMA-guarded like `migrate_annotation_device_origin`, but deliberately
+    two-step: the column check commits first, then the ALTER runs through
+    `_run_ddl_with_retry` (which owns its connection and retries
+    "database is locked"). The window between the two is closed by treating
+    a duplicate-column error from the ADD COLUMN as a no-op. Nullable
+    column, zero data risk.
     """
     with engine.begin() as conn:
         rows = conn.execute(text(

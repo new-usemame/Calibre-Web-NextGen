@@ -20,7 +20,7 @@ interface TopBarProps {
 /** Project support channels surfaced in the Help menu — the fork's own GitHub
  *  tracker + Discord (already shipped in the legacy admin page) + README. */
 const HELP_LINKS = {
-  issue: 'https://github.com/new-usemame/Calibre-Web-NextGen/issues/new',
+  issue: 'https://github.com/new-usemame/Calibre-Web-NextGen/issues/new/choose',
   discord: 'https://discord.gg/B8NXZmcp32',
   docs: 'https://github.com/new-usemame/Calibre-Web-NextGen#readme',
 };

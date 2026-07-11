@@ -10,7 +10,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-11 05:35+0000\n"
-"PO-Revision-Date: 2026-07-10 11:21+0300\n"
+"PO-Revision-Date: 2026-07-11 09:50+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -708,8 +708,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py:2704
 msgid "Password length has to be between 1 and 40"
@@ -2539,14 +2539,12 @@ msgid "Remove tag {name}"
 msgstr "Удалить тег {name}"
 
 #: cps/spa_strings.py:56
-#, fuzzy
 msgid "Clear rating"
-msgstr "Снять выделение"
+msgstr "Сбросить оценку"
 
 #: cps/spa_strings.py:57
-#, fuzzy
 msgid "Not rated"
-msgstr "Создано"
+msgstr "Без оценки"
 
 #: cps/spa_strings.py:58
 #, python-brace-format
@@ -3171,16 +3169,14 @@ msgid "Reading"
 msgstr "В процессе чтения"
 
 #: cps/spa_strings.py:218
-#, fuzzy
 msgid "Grid view"
-msgstr "Неверное представление"
+msgstr "Сетка"
 
 #: cps/spa_strings.py:219
 msgid "Library"
 msgstr "Библиотека"
 
 #: cps/spa_strings.py:220
-#, fuzzy
 msgid "List view"
 msgstr "Список"
 
@@ -4401,7 +4397,6 @@ msgid "Read status filter"
 msgstr "Фильтр по статусу прочтения"
 
 #: cps/spa_strings.py:532
-#, fuzzy
 msgid "Recipient(s)"
 msgstr "Получатели"
 
@@ -4896,6 +4891,8 @@ msgstr "Ваша личная цифровая библиотека"
 #: cps/spa_strings.py:648
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr ""
+"Отображается сохранённый адрес вашей читалки — измените его только для этой "
+"отправки."
 
 #: cps/spa_strings.py:649
 msgid "all rules"
@@ -6931,6 +6928,8 @@ msgid ""
 "A token from the HARDCOVER_TOKEN environment variable is currently active. "
 "It is not shown here; a key entered in this field would override it."
 msgstr ""
+"В данный момент активен токен из переменной окружения HARDCOVER_TOKEN. Он "
+"здесь не отображается; ключ, введённый в это поле, перекроет его значение."
 
 #: cps/templates/config_edit.html:289
 msgid "Google Books API Key"
@@ -6945,9 +6944,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html:295
 msgid "Allow Reverse Proxy Authentication"
@@ -7883,9 +7882,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html:181
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -7908,9 +7907,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html:192
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -11427,9 +11426,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

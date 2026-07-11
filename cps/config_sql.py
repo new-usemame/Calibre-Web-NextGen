@@ -424,8 +424,14 @@ class ConfigSQL(object):
         prefix (common copy-paste failure) is trimmed. Per-USER tokens are
         a separate, deliberate concept and are not consulted here.
         """
+        # getattr with a default: the config_hardcover_token column lives on
+        # the mapped _Settings class, so the ConfigSQL wrapper only gains the
+        # instance attribute after load(). In the ingest-processor subprocess
+        # (and other unloaded/CLI contexts) the wrapper is not loaded, so a
+        # raw column access raises AttributeError and aborts the whole fetch —
+        # fork #819. The env/file fallbacks must still resolve.
         raw = (
-            self.config_hardcover_token
+            getattr(self, "config_hardcover_token", None)
             or os.environ.get("HARDCOVER_TOKEN")
             or _read_secret_file(os.environ.get("HARDCOVER_TOKEN_FILE"))
             or ""
@@ -436,7 +442,9 @@ class ConfigSQL(object):
         """True when the active global token comes from the environment —
         lets the admin form explain why its field is empty yet Hardcover
         works (fork #743)."""
-        if (self.config_hardcover_token or "").strip():
+        # getattr default so an unloaded wrapper (ingest subprocess) cannot
+        # raise here either — fork #819.
+        if (getattr(self, "config_hardcover_token", None) or "").strip():
             return False
         return bool(
             (os.environ.get("HARDCOVER_TOKEN") or "").strip()

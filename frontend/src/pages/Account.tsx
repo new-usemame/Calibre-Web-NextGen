@@ -33,6 +33,7 @@ export function Account() {
   const [email, setEmail] = useState('');
   const [kindleMail, setKindleMail] = useState('');
   const [kindleSubject, setKindleSubject] = useState('');
+  const [mailBody, setMailBody] = useState('');
   const [koboSync, setKoboSync] = useState(false);
   const [opdsSync, setOpdsSync] = useState(false);
   const [locale, setLocale] = useState('');
@@ -60,6 +61,7 @@ export function Account() {
     setEmail(account.email);
     setKindleMail(account.kindle_mail);
     setKindleSubject(account.kindle_mail_subject);
+    setMailBody(account.mail_body_text ?? '');
     setKoboSync(account.kobo_only_shelves_sync);
     setOpdsSync(account.opds_only_shelves_sync);
     setLocale(account.locale);
@@ -84,6 +86,7 @@ export function Account() {
     updateProfile.mutate(
       {
         email, kindle_mail: kindleMail, kindle_mail_subject: kindleSubject,
+        ...(account.mail_body_text !== null ? { mail_body_text: mailBody } : {}),
         kobo_only_shelves_sync: koboSync, opds_only_shelves_sync: opdsSync,
         locale, default_language: defaultLanguage,
         ui_font_body: uiFontBody, ui_font_display: uiFontDisplay,
@@ -162,6 +165,21 @@ export function Account() {
             </div>
           </div>
         </div>
+
+        {account.mail_body_text !== null && (
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="acc-mail-body">{t('Email Message Body')}</label>
+            <textarea
+              id="acc-mail-body"
+              className={styles.input}
+              rows={4}
+              maxLength={1000}
+              value={mailBody}
+              onChange={(e) => setMailBody(e.target.value)}
+              placeholder={t('This Email has been sent via Calibre-Web NextGen.')}
+            />
+          </div>
+        )}
       </section>
 
       {/* Profile */}

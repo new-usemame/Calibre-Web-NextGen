@@ -17,17 +17,28 @@ from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
 
+
+def _detail_custom_columns():
+    """Classic-parity display definitions, degrading safely if DB metadata is unavailable."""
+    try:
+        return calibre_db.get_cc_columns(config, filter_config_custom_read=True)
+    except (AttributeError, KeyError, TypeError):
+        log.warning("Custom-column definitions unavailable for book detail", exc_info=True)
+        return []
+
 # Stateless sort map — mirrors web.py sort options without calling get_sort_function
 # (which writes per-user state and must not be called from a read-only API endpoint).
 SORT_MAP = {
     "new": [db.Books.timestamp.desc()],
     "old": [db.Books.timestamp],
-    "abc": [db.Books.sort],
-    "zyx": [db.Books.sort.desc()],
+    "abc": [func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id],
+    "zyx": [func.ng_sort_key(db.Books.sort).desc(), db.Books.sort.desc(), db.Books.id.desc()],
     "pubnew": [db.Books.pubdate.desc()],
     "pubold": [db.Books.pubdate],
-    "authaz": [db.Books.author_sort.asc(), db.Series.name, db.Books.series_index],
-    "authza": [db.Books.author_sort.desc(), db.Series.name.desc(), db.Books.series_index.desc()],
+    "authaz": [func.ng_sort_key(db.Books.author_sort), db.Books.author_sort,
+               func.ng_sort_key(db.Series.name), db.Series.name, db.Books.series_index],
+    "authza": [func.ng_sort_key(db.Books.author_sort).desc(), db.Books.author_sort.desc(),
+               func.ng_sort_key(db.Series.name).desc(), db.Series.name.desc(), db.Books.series_index.desc()],
     # Series reading order — mirrors web.py get_sort_function's seriesasc/seriesdesc.
     # Every list_books path already joins db.Series (series_join), so ordering by
     # db.Books.series_index needs no extra plumbing. Used by the new-UI series view
@@ -322,6 +333,7 @@ def book_detail(book_id):
         favorited=favorited,
         hidden=hidden,
         in_progress=in_progress,
+        custom_column_definitions=_detail_custom_columns(),
     )
     body["kosync_progress"] = kosync_progress
     body["kosync_progress_timestamp"] = kosync_progress_timestamp

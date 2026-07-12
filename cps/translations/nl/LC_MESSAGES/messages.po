@@ -11821,3 +11821,34 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"
+#: cps/templates/magic_shelf_edit.html
+msgid "In the past N days"
+msgstr "In de afgelopen N dagen"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Not in the past N days"
+msgstr "Niet in de afgelopen N dagen"
+
+#: cps/templates/config_edit.html
+msgid "Token status: not configured."
+msgstr "Tokenstatus: niet geconfigureerd."
+
+#: cps/templates/config_edit.html
+msgid "Token status: valid."
+msgstr "Tokenstatus: geldig."
+
+#: cps/templates/config_edit.html
+msgid "Token status: rejected or expired."
+msgstr "Tokenstatus: geweigerd of verlopen."
+
+#: cps/templates/config_edit.html
+msgid "Token status: present; validation is temporarily unavailable."
+msgstr "Tokenstatus: aanwezig; validatie is tijdelijk niet beschikbaar."
+
+#: cps/templates/config_edit.html
+msgid "Expiry: not provided by this token."
+msgstr "Vervaldatum: niet opgegeven door dit token."
+
+#: cps/admin.py
+msgid "Hardcover token expires"
+msgstr "Hardcover-token verloopt"

@@ -12287,3 +12287,34 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr ""
 #~ "Cliquer sur la couverture pour importer les métadonnées dans le formulaire"
+#: cps/templates/magic_shelf_edit.html
+msgid "In the past N days"
+msgstr "Au cours des N derniers jours"
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Not in the past N days"
+msgstr "Pas au cours des N derniers jours"
+
+#: cps/templates/config_edit.html
+msgid "Token status: not configured."
+msgstr "État du jeton : non configuré."
+
+#: cps/templates/config_edit.html
+msgid "Token status: valid."
+msgstr "État du jeton : valide."
+
+#: cps/templates/config_edit.html
+msgid "Token status: rejected or expired."
+msgstr "État du jeton : refusé ou expiré."
+
+#: cps/templates/config_edit.html
+msgid "Token status: present; validation is temporarily unavailable."
+msgstr "État du jeton : présent ; la validation est temporairement indisponible."
+
+#: cps/templates/config_edit.html
+msgid "Expiry: not provided by this token."
+msgstr "Expiration : non indiquée par ce jeton."
+
+#: cps/admin.py
+msgid "Hardcover token expires"
+msgstr "Le jeton Hardcover expire"

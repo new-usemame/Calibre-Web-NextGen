@@ -10641,4 +10641,35 @@ msgstr ""
 #: cps/templates/user_table.html:158
 msgid "Show Read/Unread Section"
 msgstr ""
+#: cps/templates/magic_shelf_edit.html
+msgid "In the past N days"
+msgstr ""
+
+#: cps/templates/magic_shelf_edit.html
+msgid "Not in the past N days"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Token status: not configured."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Token status: valid."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Token status: rejected or expired."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Token status: present; validation is temporarily unavailable."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Expiry: not provided by this token."
+msgstr ""
+
+#: cps/admin.py
+msgid "Hardcover token expires"
+msgstr ""
 

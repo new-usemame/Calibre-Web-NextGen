@@ -11,7 +11,7 @@ import { StarRating } from '../components/StarRating';
 import { MoreByAuthor } from '../components/MoreByAuthor';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import type { EntityRef } from '../lib/api';
+import type { CustomColumn, CustomColumnValue, EntityRef } from '../lib/api';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
@@ -36,6 +36,18 @@ function formatDate(date: string, alwaysReturnFullDate = false): string {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   }
   return date;
+}
+
+function formatCustomValue(column: CustomColumn, entry: CustomColumnValue, yes: string, no: string): string {
+  const value = entry.value;
+  if (value === null || value === undefined) return '';
+  if (column.datatype === 'bool') return value ? yes : no;
+  if (column.datatype === 'datetime' && typeof value === 'string') return formatDate(value, true);
+  if (column.datatype === 'rating' && typeof value === 'number') return `${value / 2}/5`;
+  if ((column.datatype === 'int' || column.datatype === 'float') && typeof value === 'number') {
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits: column.datatype === 'float' ? 2 : 0 }).format(value);
+  }
+  return String(value);
 }
 
 // Formats the in-browser reader can open. EPUB/KEPUB use the SPA's epub.js
@@ -525,6 +537,23 @@ export function BookDetail() {
                   {id.url
                     ? <a href={id.url} target="_blank" rel="noopener noreferrer" className={styles.metaLink}>{id.val}</a>
                     : id.val}
+                </dd>
+              </Fragment>
+            ))}
+            {(book.custom_columns ?? []).map((column) => (
+              <Fragment key={`custom-${column.id}`}>
+                <dt className={styles.metaLabel}>{column.name}</dt>
+                <dd className={styles.metaValue}>
+                  {column.datatype === 'comments' && column.values[0]?.value_html ? (
+                    <span
+                      // value_html is sanitized by the API serializer.
+                      // eslint-disable-next-line react/no-danger
+                      dangerouslySetInnerHTML={{ __html: column.values[0].value_html }}
+                    />
+                  ) : column.values
+                    .map((entry) => formatCustomValue(column, entry, t('Yes'), t('No')))
+                    .filter(Boolean)
+                    .join(', ')}
                 </dd>
               </Fragment>
             ))}

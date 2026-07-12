@@ -15,7 +15,7 @@ from flask_babel import gettext as _
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
-from .. import calibre_db, ub
+from .. import calibre_db, config, ub
 from ..cw_login import current_user
 from ..cw_babel import get_available_locale
 from ..helper import valid_password, valid_email, check_email
@@ -71,6 +71,9 @@ def _serialize_account():
         "email": current_user.email or "",
         "kindle_mail": current_user.kindle_mail or "",
         "kindle_mail_subject": current_user.kindle_mail_subject or "",
+        # Classic parity: the message body is a global mail setting, so expose
+        # it only to admins even though this form otherwise edits user fields.
+        "mail_body_text": (config.mail_body_text or "") if current_user.role_admin() else None,
         "kobo_only_shelves_sync": bool(current_user.kobo_only_shelves_sync),
         "opds_only_shelves_sync": bool(current_user.opds_only_shelves_sync),
         "locale": current_user.locale,
@@ -123,6 +126,16 @@ def update_profile():
             current_user.kindle_mail = valid_email(data.get("kindle_mail") or "")
         if "kindle_mail_subject" in data:
             current_user.kindle_mail_subject = (data.get("kindle_mail_subject") or "")[:256]
+        if "mail_body_text" in data:
+            if not current_user.role_admin():
+                return _err("forbidden", "Only administrators can change the email body", 403)
+            value = data.get("mail_body_text")
+            if value is None:
+                value = ""
+            if not isinstance(value, str):
+                return _err("invalid_request", "Email body must be text", 400)
+            config.mail_body_text = value[:1000]
+            config.save()
         if "kobo_only_shelves_sync" in data:
             current_user.kobo_only_shelves_sync = 1 if data.get("kobo_only_shelves_sync") else 0
         if "opds_only_shelves_sync" in data:

@@ -95,7 +95,13 @@ $(".char").click(function() {
     $("#all").removeClass("active");
     var character = this.innerText;
     $list.isotope({ filter: function() {
-        return this.attributes["data-id"].value.charAt(0).toUpperCase() === character;
+        var initial = this.attributes["data-id"].value.charAt(0);
+        if (initial === "ñ" || initial === "Ñ") {
+            initial = "Ñ";
+        } else {
+            initial = initial.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        }
+        return initial === character;
     }
     });
 });

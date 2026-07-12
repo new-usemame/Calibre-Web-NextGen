@@ -602,10 +602,18 @@ def db_configuration():
 @user_login_required
 @admin_required
 def configuration():
+    hardcover_status = None
+    if feature_support.get('hardcover'):
+        try:
+            hardcover_status = services.hardcover.token_status(config.resolved_hardcover_token())
+            hardcover_status["expires_label"] = _("Hardcover token expires")
+        except Exception:
+            log.debug("Unable to inspect Hardcover token status", exc_info=True)
     return render_title_template("config_edit.html",
                                  config=config,
                                  provider=oauth_bb.oauthblueprints,
                                  feature_support=feature_support,
+                                 hardcover_token_status=hardcover_status,
                                  title=_("Basic Configuration"), page="config")
 
 

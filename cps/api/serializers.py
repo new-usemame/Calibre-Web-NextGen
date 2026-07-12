@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Pure (context-free) JSON serializers for the /api/v1 surface."""
 
+from datetime import date, datetime
+
 from .. import constants
 from ..clean_html import clean_string
 from ..ui_themes import theme_slug
@@ -133,8 +135,35 @@ def serialize_book_list_item(book, read=False, archived=False):
     }
 
 
+def _serialize_custom_columns(book, definitions):
+    result = []
+    for column in definitions or []:
+        values = getattr(book, "custom_column_{}".format(column.id), None) or []
+        if not values:
+            continue
+        serialized_values = []
+        for entry in values:
+            value = getattr(entry, "value", None)
+            if isinstance(value, (datetime, date)):
+                value = value.isoformat()
+            item = {"value": value, "extra": getattr(entry, "extra", None)}
+            if column.datatype == "comments" and isinstance(value, str):
+                item["value_html"] = clean_string(value, getattr(book, "id", None))
+                item["value"] = None
+            serialized_values.append(item)
+        result.append({
+            "id": column.id,
+            "label": column.label,
+            "name": column.name,
+            "datatype": column.datatype,
+            "is_multiple": bool(column.is_multiple),
+            "values": serialized_values,
+        })
+    return result
+
+
 def serialize_book_detail(book, read=False, archived=False, favorited=False, hidden=False,
-                          in_progress=False):
+                          in_progress=False, custom_column_definitions=None):
     """Full detail serializer — pure, no Flask/DB imports.
 
     Callers must enrich each language object with a ``.language_name`` attribute
@@ -234,6 +263,7 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "languages": languages,
         "publishers": publishers,
         "identifiers": identifiers,
+        "custom_columns": _serialize_custom_columns(book, custom_column_definitions),
         "formats": formats,
         "read": bool(read),
         "archived": bool(archived),

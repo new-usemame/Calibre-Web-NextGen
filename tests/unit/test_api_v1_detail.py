@@ -130,6 +130,42 @@ def test_serialize_book_detail_no_series():
     assert out["series"] is None
 
 
+@pytest.mark.unit
+def test_serialize_pages_custom_column_and_preserve_false_zero():
+    from cps.api.serializers import serialize_book_detail
+    definitions = [
+        SimpleNamespace(id=7, label="pages", name="Pages", datatype="int", is_multiple=False),
+        SimpleNamespace(id=8, label="owned", name="Owned", datatype="bool", is_multiple=False),
+    ]
+    book = _make_book(
+        custom_column_7=[SimpleNamespace(value=0, extra=None)],
+        custom_column_8=[SimpleNamespace(value=False, extra=None)],
+    )
+    out = serialize_book_detail(book, custom_column_definitions=definitions)
+    assert out["custom_columns"][0]["values"][0]["value"] == 0
+    assert out["custom_columns"][1]["values"][0]["value"] is False
+
+
+@pytest.mark.unit
+def test_custom_columns_empty_none_and_hostile_comments():
+    from cps.api.serializers import serialize_book_detail
+    definitions = [
+        SimpleNamespace(id=7, label="pages", name="Pages", datatype="int", is_multiple=False),
+        SimpleNamespace(id=9, label="notes", name="Notes", datatype="comments", is_multiple=False),
+    ]
+    book = _make_book(
+        custom_column_7=None,
+        custom_column_9=[SimpleNamespace(value='<img src=x onerror="alert(1)"><b>Safe</b>', extra=None)],
+    )
+    out = serialize_book_detail(book, custom_column_definitions=definitions)
+    assert [c["label"] for c in out["custom_columns"]] == ["notes"]
+    value = out["custom_columns"][0]["values"][0]
+    assert value["value"] is None
+    assert "<img" not in value["value_html"]
+    assert "&lt;img" in value["value_html"]
+    assert "<b>Safe</b>" in value["value_html"]
+
+
 # ---------------------------------------------------------------------------
 # GET /api/v1/books/<id> — detail endpoint
 # ---------------------------------------------------------------------------
@@ -151,6 +187,7 @@ def test_detail_endpoint_found():
             return_value=(fake_book, STATUS_FINISHED, False),
         ), \
         patch.object(books_mod.config, "config_read_column", 0, create=True), \
+        patch.object(books_mod.calibre_db, "get_cc_columns", return_value=[]), \
         patch.object(books_mod, "current_user", SimpleNamespace(is_authenticated=False, is_anonymous=True)), \
         patch("cps.api.books.get_locale", return_value="en"), \
         patch("cps.api.books.isoLanguages.get_language_name", return_value="English"):
@@ -202,6 +239,7 @@ def test_detail_endpoint_archived_book():
             return_value=(fake_book, None, True),
         ), \
         patch.object(books_mod.config, "config_read_column", 0, create=True), \
+        patch.object(books_mod.calibre_db, "get_cc_columns", return_value=[]), \
         patch.object(books_mod, "current_user", SimpleNamespace(is_authenticated=False, is_anonymous=True)), \
         patch("cps.api.books.get_locale", return_value="en"), \
         patch("cps.api.books.isoLanguages.get_language_name", return_value="English"):

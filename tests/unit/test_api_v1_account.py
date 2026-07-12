@@ -208,9 +208,43 @@ def test_revoke_app_password_sets_revoked():
 def test_profile_update_accepts_new_fields():
     """Source-pin: update_profile handles the extended sync/subject/font fields."""
     src = inspect.getsource(__import__("cps.api.account", fromlist=["update_profile"]).update_profile)
-    for field in ("kindle_mail_subject", "kobo_only_shelves_sync", "opds_only_shelves_sync",
+    for field in ("kindle_mail_subject", "mail_body_text", "kobo_only_shelves_sync", "opds_only_shelves_sync",
                   "ui_font_body", "ui_font_display"):
         assert field in src
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("bad", [0, False, [], {}])
+def test_email_body_rejects_wrong_type_for_admin(bad):
+    from cps.api import account as mod
+    user = _user(role_admin=lambda: True)
+    fake_config = SimpleNamespace(mail_body_text="before", save=MagicMock())
+    with _ctx("/api/v1/account/profile", body={"mail_body_text": bad}):
+        with patch.object(mod, "current_user", user), patch.object(mod, "config", fake_config):
+            resp = inspect.unwrap(mod.update_profile)()
+    assert resp[1] == 400
+    assert fake_config.mail_body_text == "before"
+
+
+@pytest.mark.unit
+def test_email_body_is_admin_only_and_none_clears():
+    from cps.api import account as mod
+    fake_config = SimpleNamespace(mail_body_text="before", save=MagicMock())
+    with _ctx("/api/v1/account/profile", body={"mail_body_text": "changed"}):
+        with patch.object(mod, "current_user", _user()), patch.object(mod, "config", fake_config):
+            resp = inspect.unwrap(mod.update_profile)()
+    assert resp[1] == 403
+    assert fake_config.mail_body_text == "before"
+
+    admin = _user(role_admin=lambda: True)
+    mock_session = MagicMock()
+    with _ctx("/api/v1/account/profile", body={"mail_body_text": None}):
+        with patch.object(mod, "current_user", admin), patch.object(mod, "config", fake_config), \
+             patch.object(mod.ub, "session", mock_session), \
+             patch.object(mod, "_serialize_account", return_value={}):
+            inspect.unwrap(mod.update_profile)()
+    assert fake_config.mail_body_text == ""
+    fake_config.save.assert_called_once()
 
 
 # ── #701 UI font presets ─────────────────────────────────────────────────────

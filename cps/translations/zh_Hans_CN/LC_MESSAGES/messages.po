@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-12 17:23+0000\n"
+"POT-Creation-Date: 2026-07-12 17:40+0000\n"
 "PO-Revision-Date: 2020-09-27 22:18+0800\n"
 "Last-Translator: xlivevil <xlivevil@aliyun.com>\n"
 "Language-Team: zh_Hans_CN <LL@li.org>\n"
@@ -19,7 +19,7 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "Generated-By: Babel 2.13.1\n"
 
-#: cps/about.py:65 cps/spa_strings.py:647
+#: cps/about.py:65 cps/spa_strings.py:651
 msgid "Statistics"
 msgstr "统计"
 
@@ -114,533 +114,538 @@ msgid "Admin page"
 msgstr "管理页"
 
 #: cps/admin.py:609
+#, fuzzy
+msgid "Hardcover token expires"
+msgstr "Hardcover API token"
+
+#: cps/admin.py:617
 msgid "Basic Configuration"
 msgstr "基本配置"
 
-#: cps/admin.py:647
+#: cps/admin.py:655
 msgid "UI Configuration"
 msgstr "界面配置"
 
-#: cps/admin.py:671 cps/admin.py:1418 cps/db.py:1402 cps/search.py:153
-#: cps/web.py:736 cps/web.py:1066
+#: cps/admin.py:679 cps/admin.py:1426 cps/db.py:1408 cps/search.py:153
+#: cps/web.py:743 cps/web.py:1073
 #, python-format
 msgid "Custom Column No.%(column)d does not exist in calibre database"
 msgstr "自定义列号：%(column)d 在 Calibre 数据库中不存在"
 
-#: cps/admin.py:689 cps/templates/admin.html:55
+#: cps/admin.py:697 cps/templates/admin.html:55
 msgid "Edit Users"
 msgstr "管理用户"
 
-#: cps/admin.py:733 cps/opds.py:1308 cps/templates/grid.html:14
+#: cps/admin.py:741 cps/opds.py:1311 cps/templates/grid.html:14
 #: cps/templates/list.html:19
 msgid "All"
 msgstr "全部"
 
-#: cps/admin.py:760 cps/admin.py:2140
+#: cps/admin.py:768 cps/admin.py:2148
 msgid "User not found"
 msgstr "找不到用户"
 
-#: cps/admin.py:774
+#: cps/admin.py:782
 #, python-brace-format
 msgid "{} users deleted successfully"
 msgstr "成功删除 {} 个用户"
 
-#: cps/admin.py:797 cps/api/account.py:67
+#: cps/admin.py:805 cps/api/account.py:67
 #: cps/templates/config_view_edit.html:186 cps/templates/user_edit.html:270
 #: cps/templates/user_edit.html:292 cps/templates/user_table.html:81
 msgid "Show All"
 msgstr "显示全部"
 
-#: cps/admin.py:818 cps/admin.py:824
+#: cps/admin.py:826 cps/admin.py:832
 msgid "Malformed request"
 msgstr "格式错误的请求"
 
-#: cps/admin.py:836 cps/admin.py:3057
+#: cps/admin.py:844 cps/admin.py:3065
 msgid "Guest Name can't be changed"
 msgstr "访客名称无法更改"
 
-#: cps/admin.py:852
+#: cps/admin.py:860
 msgid "Guest can't have this role"
 msgstr "游客无法拥有此角色"
 
-#: cps/admin.py:864 cps/admin.py:2881
+#: cps/admin.py:872 cps/admin.py:2889
 msgid "No admin user remaining, can't remove admin role"
 msgstr "没有其余管理员账户，无法删除管理员角色"
 
-#: cps/admin.py:868 cps/admin.py:882
+#: cps/admin.py:876 cps/admin.py:890
 msgid "Value has to be true or false"
 msgstr "值必须为 true 或 false"
 
-#: cps/admin.py:870
+#: cps/admin.py:878
 msgid "Invalid role"
 msgstr "无效角色"
 
-#: cps/admin.py:874
+#: cps/admin.py:882
 msgid "Guest can't have this view"
 msgstr "游客无法查看此页面"
 
-#: cps/admin.py:884
+#: cps/admin.py:892
 msgid "Invalid view"
 msgstr "无效页面"
 
-#: cps/admin.py:887
+#: cps/admin.py:895
 msgid "Guest's Locale is determined automatically and can't be set"
 msgstr "无法设置游客的本地化，该项设置的值将自动检测"
 
-#: cps/admin.py:891
+#: cps/admin.py:899
 msgid "No Valid Locale Given"
 msgstr "无可用本地化"
 
-#: cps/admin.py:902
+#: cps/admin.py:910
 msgid "No Valid Book Language Given"
 msgstr "无有效书籍语言"
 
-#: cps/admin.py:904 cps/editbooks.py:673
+#: cps/admin.py:912 cps/editbooks.py:673
 msgid "Parameter not found"
 msgstr "参数未找到"
 
-#: cps/admin.py:952
+#: cps/admin.py:960
 msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
 msgstr ""
 
-#: cps/admin.py:957
+#: cps/admin.py:965
 msgid "Invalid Read Column"
 msgstr "无效的阅读栏目"
 
-#: cps/admin.py:963
+#: cps/admin.py:971
 msgid "Invalid Restricted Column"
 msgstr "无效的限制栏目"
 
-#: cps/admin.py:992 cps/admin.py:2738
+#: cps/admin.py:1000 cps/admin.py:2746
 msgid "Calibre-Web NextGen configuration updated"
 msgstr ""
 
-#: cps/admin.py:1004
+#: cps/admin.py:1012
 msgid "Do you really want to delete the Kobo Token?"
 msgstr "您确定删除 Kobo 令牌吗？"
 
-#: cps/admin.py:1006
+#: cps/admin.py:1014
 msgid "Do you really want to delete this domain?"
 msgstr "您确定要删除此域吗？"
 
-#: cps/admin.py:1008
+#: cps/admin.py:1016
 msgid "Do you really want to delete this user?"
 msgstr "您确定要删除此用户吗？"
 
-#: cps/admin.py:1010
+#: cps/admin.py:1018
 msgid "Are you sure you want to delete this shelf?"
 msgstr "您确定要删除此书架吗？"
 
-#: cps/admin.py:1012
+#: cps/admin.py:1020
 msgid "Are you sure you want to change locales of selected user(s)?"
 msgstr "您确定要修改选定用户的本地化设置吗？"
 
-#: cps/admin.py:1014
+#: cps/admin.py:1022
 msgid ""
 "Are you sure you want to change visible book languages for selected user(s)?"
 msgstr "您确定要修改选定用户的可见书籍语言吗？"
 
-#: cps/admin.py:1016
+#: cps/admin.py:1024
 msgid ""
 "Are you sure you want to change the selected role for the selected user(s)?"
 msgstr "您确定要修改选定用户的选定角色吗？"
 
-#: cps/admin.py:1018
+#: cps/admin.py:1026
 msgid ""
 "Are you sure you want to change the selected restrictions for the selected "
 "user(s)?"
 msgstr "您确定要修改选定用户的选定限制吗？"
 
-#: cps/admin.py:1020
+#: cps/admin.py:1028
 msgid ""
 "Are you sure you want to change the selected visibility restrictions for the "
 "selected user(s)?"
 msgstr "您确定要修改选定用户的选定可视化限制吗？"
 
-#: cps/admin.py:1023
+#: cps/admin.py:1031
 msgid ""
 "Are you sure you want to change shelf sync behavior for the selected user(s)?"
 msgstr "您确定要更改所选用户的书架同步行为吗？"
 
-#: cps/admin.py:1025
+#: cps/admin.py:1033
 #, fuzzy
 msgid ""
 "Are you sure you want to change OPDS shelf exposure for the selected user(s)?"
 msgstr "您确定要更改所选用户的书架同步行为吗？"
 
-#: cps/admin.py:1027
+#: cps/admin.py:1035
 msgid "Are you sure you want to change Calibre library location?"
 msgstr "您确定要更改 Calibre 库位置吗？"
 
-#: cps/admin.py:1029
+#: cps/admin.py:1037
 msgid ""
 "Calibre-Web NextGen will search for updated Covers and update Cover "
 "Thumbnails, this may take a while?"
 msgstr ""
 
-#: cps/admin.py:1032
+#: cps/admin.py:1040
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
 msgstr ""
 
-#: cps/admin.py:1271 cps/admin.py:1277 cps/admin.py:1287 cps/admin.py:1297
+#: cps/admin.py:1279 cps/admin.py:1285 cps/admin.py:1295 cps/admin.py:1305
 #: cps/templates/modal_dialogs.html:29 cps/templates/user_table.html:41
 #: cps/templates/user_table.html:58
 msgid "Deny"
 msgstr "拒绝"
 
-#: cps/admin.py:1273 cps/admin.py:1279 cps/admin.py:1289 cps/admin.py:1299
+#: cps/admin.py:1281 cps/admin.py:1287 cps/admin.py:1297 cps/admin.py:1307
 #: cps/templates/modal_dialogs.html:28 cps/templates/user_table.html:44
 #: cps/templates/user_table.html:61
 msgid "Allow"
 msgstr "允许"
 
-#: cps/admin.py:1332
+#: cps/admin.py:1340
 #, python-brace-format
 msgid "{} sync entries deleted"
 msgstr "{} 同步项目被删除"
 
-#: cps/admin.py:1352
+#: cps/admin.py:1360
 #, fuzzy, python-brace-format
 msgid "Book {} not found"
 msgstr "找不到令牌"
 
-#: cps/admin.py:1362
+#: cps/admin.py:1370
 #, python-brace-format
 msgid ""
 "Cleared sync state for book {0} (user {1}); the device will re-receive the "
 "book on next sync"
 msgstr ""
 
-#: cps/admin.py:1365
+#: cps/admin.py:1373
 #, python-brace-format
 msgid ""
 "Book {0} was not in the sync record for user {1}; last_modified bumped so "
 "the device will receive on next sync"
 msgstr ""
 
-#: cps/admin.py:1409
+#: cps/admin.py:1417
 msgid "Tag not found"
 msgstr "标签未找到"
 
-#: cps/admin.py:1427
+#: cps/admin.py:1435
 msgid "Invalid Action"
 msgstr "无效的动作"
 
-#: cps/admin.py:1554
+#: cps/admin.py:1562
 msgid "client_secrets.json Is Not Configured For Web Application"
 msgstr "client_secrets.json 未为 Web 应用程序配置"
 
-#: cps/admin.py:1711
+#: cps/admin.py:1719
 msgid "Logfile Location is not Valid, Please Enter Correct Path"
 msgstr "日志文件路径无效，请输入正确的路径"
 
-#: cps/admin.py:1717
+#: cps/admin.py:1725
 msgid "Access Logfile Location is not Valid, Please Enter Correct Path"
 msgstr "访问日志路径无效，请输入正确的路径"
 
-#: cps/admin.py:1752
+#: cps/admin.py:1760
 msgid "Please Enter a LDAP Provider, Port, DN and User Object Identifier"
 msgstr "请输入 LDAP 主机、端口、DN 和用户对象标识符"
 
-#: cps/admin.py:1758
+#: cps/admin.py:1766
 msgid "Please Enter a LDAP Service Account and Password"
 msgstr "请输入一个 LDAP 服务账号和密码 "
 
-#: cps/admin.py:1761
+#: cps/admin.py:1769
 msgid "Please Enter a LDAP Service Account"
 msgstr "请输入一个 LDAP 服务账号"
 
-#: cps/admin.py:1766
+#: cps/admin.py:1774
 #, python-format
 msgid "LDAP Group Object Filter Needs to Have One \"%s\" Format Identifier"
 msgstr "LDAP 组对象过滤器需要一个具有“%s”格式标识符"
 
-#: cps/admin.py:1768
+#: cps/admin.py:1776
 msgid "LDAP Group Object Filter Has Unmatched Parenthesis"
 msgstr "LDAP 组对象过滤器的括号不匹配"
 
-#: cps/admin.py:1772
+#: cps/admin.py:1780
 #, python-format
 msgid "LDAP User Object Filter needs to Have One \"%s\" Format Identifier"
 msgstr "LDAP 用户对象过滤器需要一个具有“%s”格式标识符"
 
-#: cps/admin.py:1774
+#: cps/admin.py:1782
 msgid "LDAP User Object Filter Has Unmatched Parenthesis"
 msgstr "LDAP 用户对象过滤器的括号不匹配"
 
-#: cps/admin.py:1781
+#: cps/admin.py:1789
 #, python-format
 msgid "LDAP Member User Filter needs to Have One \"%s\" Format Identifier"
 msgstr "LDAP 成员用户过滤器需要有一个“%s”格式标识符"
 
-#: cps/admin.py:1783
+#: cps/admin.py:1791
 msgid "LDAP Member User Filter Has Unmatched Parenthesis"
 msgstr "LDAP 成员用户过滤器中有不匹配的括号"
 
-#: cps/admin.py:1790
+#: cps/admin.py:1798
 msgid ""
 "LDAP CACertificate, Certificate or Key Location is not Valid, Please Enter "
 "Correct Path"
 msgstr "LDAP CA证书、证书或密钥位置无效，请输入正确的路径"
 
-#: cps/admin.py:1823 cps/templates/admin.html:57
+#: cps/admin.py:1831 cps/templates/admin.html:57
 msgid "Add New User"
 msgstr "添加新用户"
 
-#: cps/admin.py:1838 cps/templates/admin.html:105
+#: cps/admin.py:1846 cps/templates/admin.html:105
 #: cps/templates/broadcast_email.html:9
 msgid "Edit Email Server Settings"
 msgstr "编辑邮件服务器设置"
 
-#: cps/admin.py:1857
+#: cps/admin.py:1865
 msgid "Success! Gmail Account Verified."
 msgstr "Gmail 账户验证成功"
 
-#: cps/admin.py:1881 cps/admin.py:1884 cps/admin.py:2489 cps/admin.py:2721
-#: cps/admin.py:2838 cps/admin.py:3100 cps/editbooks.py:1148
+#: cps/admin.py:1889 cps/admin.py:1892 cps/admin.py:2497 cps/admin.py:2729
+#: cps/admin.py:2846 cps/admin.py:3108 cps/editbooks.py:1148
 #: cps/editbooks.py:2050 cps/shelf.py:148 cps/shelf.py:226 cps/shelf.py:297
 #: cps/shelf.py:332 cps/shelf.py:389 cps/shelf.py:464 cps/shelf.py:547
-#: cps/shelf.py:672 cps/tasks/convert.py:145 cps/web.py:3185
+#: cps/shelf.py:672 cps/tasks/convert.py:145 cps/web.py:3192
 #, python-format
 msgid "Oops! Database Error: %(error)s."
 msgstr "数据库错误：%(error)s"
 
-#: cps/admin.py:1891
+#: cps/admin.py:1899
 #, python-format
 msgid ""
 "Test e-mail queued for sending to %(email)s, please check Tasks for result"
 msgstr "发送给 %(email)s 的测试邮件已加入队列。请检查任务结果"
 
-#: cps/admin.py:1894
+#: cps/admin.py:1902
 #, python-format
 msgid "There was an error sending the Test e-mail: %(res)s"
 msgstr "发送测试邮件时出错：%(res)s"
 
-#: cps/admin.py:1896
+#: cps/admin.py:1904
 msgid "Please configure your e-mail address first..."
 msgstr "请先配置您的邮箱地址..."
 
-#: cps/admin.py:1898
+#: cps/admin.py:1906
 msgid "Email Server Settings updated"
 msgstr "邮件服务器设置已更新"
 
-#: cps/admin.py:1938 cps/templates/admin.html:106
+#: cps/admin.py:1946 cps/templates/admin.html:106
 #, fuzzy
 msgid "Email Your Users"
 msgstr "管理用户"
 
-#: cps/admin.py:1964
+#: cps/admin.py:1972
 #, fuzzy
 msgid ""
 "Please configure the email server under Edit Email Server Settings first."
 msgstr "请先配置 SMTP 邮箱设置..."
 
-#: cps/admin.py:1969
+#: cps/admin.py:1977
 msgid "Please enter a subject for the announcement email."
 msgstr ""
 
-#: cps/admin.py:1972
+#: cps/admin.py:1980
 msgid "Please enter a message body for the announcement email."
 msgstr ""
 
-#: cps/admin.py:1978
+#: cps/admin.py:1986
 #, fuzzy
 msgid "Please set an email address on your own account first..."
 msgstr "请先配置您的邮箱地址..."
 
-#: cps/admin.py:1991
+#: cps/admin.py:1999
 #, fuzzy
 msgid "Please select at least one recipient."
 msgstr "新密码已发送到您的邮箱"
 
-#: cps/admin.py:1997
+#: cps/admin.py:2005
 msgid "No valid recipients — nothing was sent."
 msgstr ""
 
-#: cps/admin.py:2001
+#: cps/admin.py:2009
 #, fuzzy, python-format
 msgid ""
 "Test announcement email queued to %(email)s — check Tasks for the result."
 msgstr "发送给 %(email)s 的测试邮件已加入队列。请检查任务结果"
 
-#: cps/admin.py:2005
+#: cps/admin.py:2013
 #, fuzzy, python-format
 msgid ""
 "Announcement email queued for %(num)s recipient(s) — check Tasks for "
 "delivery."
 msgstr "发送给 %(email)s 的测试邮件已加入队列。请检查任务结果"
 
-#: cps/admin.py:2007
+#: cps/admin.py:2015
 #, python-format
 msgid "%(num)s address(es) were skipped as invalid or duplicate."
 msgstr ""
 
-#: cps/admin.py:2030 cps/templates/admin.html:202
+#: cps/admin.py:2038 cps/templates/admin.html:202
 msgid "Edit Scheduled Tasks Settings"
 msgstr "编辑计划任务设置"
 
-#: cps/admin.py:2042
+#: cps/admin.py:2050
 msgid "Invalid start time for task specified"
 msgstr "指定任务的开始时间无效"
 
-#: cps/admin.py:2047
+#: cps/admin.py:2055
 msgid "Invalid duration for task specified"
 msgstr "指定任务的持续时间无效"
 
-#: cps/admin.py:2057
+#: cps/admin.py:2065
 msgid "Scheduled tasks settings updated"
 msgstr "已更新计划任务设置"
 
-#: cps/admin.py:2067 cps/admin.py:2211 cps/admin.py:3096 cps/web.py:2624
+#: cps/admin.py:2075 cps/admin.py:2219 cps/admin.py:3104 cps/web.py:2631
 msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "发生一个未知错误，请稍后再试"
 
-#: cps/admin.py:2071
+#: cps/admin.py:2079
 msgid "Settings DB is not Writeable"
 msgstr "设置数据库不可写"
 
-#: cps/admin.py:2090 cps/opds.py:316 cps/opds.py:354 cps/opds.py:357
-#: cps/web.py:3101 cps/web.py:3236
+#: cps/admin.py:2098 cps/opds.py:316 cps/opds.py:354 cps/opds.py:357
+#: cps/web.py:3108 cps/web.py:3243
 #, fuzzy
 msgid "title"
 msgstr "标题"
 
-#: cps/admin.py:2196 cps/admin.py:3088
+#: cps/admin.py:2204 cps/admin.py:3096
 #, python-format
 msgid "Edit User %(nick)s"
 msgstr "编辑用户 %(nick)s"
 
-#: cps/admin.py:2208
+#: cps/admin.py:2216
 #, python-format
 msgid "Success! Password for user %(user)s reset"
 msgstr "用户 %(user)s 的密码已重置"
 
-#: cps/admin.py:2214
+#: cps/admin.py:2222
 msgid "Oops! Please configure the SMTP mail settings."
 msgstr "请先配置 SMTP 邮箱设置..."
 
-#: cps/admin.py:2225
+#: cps/admin.py:2233
 msgid "Logfile viewer"
 msgstr "日志文件查看器"
 
-#: cps/admin.py:2301
+#: cps/admin.py:2309
 msgid "Requesting update package"
 msgstr "正在请求更新包"
 
-#: cps/admin.py:2302
+#: cps/admin.py:2310
 msgid "Downloading update package"
 msgstr "正在下载更新包"
 
-#: cps/admin.py:2303
+#: cps/admin.py:2311
 msgid "Unzipping update package"
 msgstr "正在解压更新包"
 
-#: cps/admin.py:2304
+#: cps/admin.py:2312
 msgid "Replacing files"
 msgstr "正在替换文件"
 
-#: cps/admin.py:2305
+#: cps/admin.py:2313
 msgid "Database connections are closed"
 msgstr "数据库连接已关闭"
 
-#: cps/admin.py:2306
+#: cps/admin.py:2314
 msgid "Stopping server"
 msgstr "正在停止服务器"
 
-#: cps/admin.py:2307
+#: cps/admin.py:2315
 msgid "Update finished, please press okay and reload page"
 msgstr "更新完成，请点击确定并刷新页面"
 
-#: cps/admin.py:2308 cps/admin.py:2309 cps/admin.py:2310 cps/admin.py:2311
-#: cps/admin.py:2312 cps/admin.py:2313
+#: cps/admin.py:2316 cps/admin.py:2317 cps/admin.py:2318 cps/admin.py:2319
+#: cps/admin.py:2320 cps/admin.py:2321
 msgid "Update failed:"
 msgstr "更新失败："
 
-#: cps/admin.py:2308 cps/updater.py:446 cps/updater.py:685 cps/updater.py:687
+#: cps/admin.py:2316 cps/updater.py:446 cps/updater.py:685 cps/updater.py:687
 msgid "HTTP Error"
 msgstr "HTTP 错误"
 
-#: cps/admin.py:2309 cps/updater.py:448 cps/updater.py:689
+#: cps/admin.py:2317 cps/updater.py:448 cps/updater.py:689
 msgid "Connection error"
 msgstr "连接错误"
 
-#: cps/admin.py:2310 cps/updater.py:450 cps/updater.py:691
+#: cps/admin.py:2318 cps/updater.py:450 cps/updater.py:691
 msgid "Timeout while establishing connection"
 msgstr "建立连接超时"
 
-#: cps/admin.py:2311 cps/updater.py:452 cps/updater.py:693
+#: cps/admin.py:2319 cps/updater.py:452 cps/updater.py:693
 msgid "General error"
 msgstr "一般错误"
 
-#: cps/admin.py:2312
+#: cps/admin.py:2320
 msgid "Update file could not be saved in temp dir"
 msgstr "更新文件无法保存在临时目录中"
 
-#: cps/admin.py:2313
+#: cps/admin.py:2321
 msgid "Files could not be replaced during update"
 msgstr "更新期间无法替换文件"
 
-#: cps/admin.py:2337
+#: cps/admin.py:2345
 msgid "Failed to extract at least One LDAP User"
 msgstr "未能获得任何 LDAP 用户"
 
-#: cps/admin.py:2382
+#: cps/admin.py:2390
 msgid "Failed to Create at Least One LDAP User"
 msgstr "未能创建任何 LDAP 用户"
 
-#: cps/admin.py:2395
+#: cps/admin.py:2403
 #, python-format
 msgid "Error: %(ldaperror)s"
 msgstr "错误：%(ldaperror)s"
 
-#: cps/admin.py:2399
+#: cps/admin.py:2407
 msgid "Error: No user returned in response of LDAP server"
 msgstr "错误：在 LDAP 服务器的响应中没有返回用户"
 
-#: cps/admin.py:2435
+#: cps/admin.py:2443
 msgid "At Least One LDAP User Not Found in Database"
 msgstr "数据库中没有找到任何 LDAP 用户"
 
-#: cps/admin.py:2437
+#: cps/admin.py:2445
 #, python-brace-format
 msgid "{} User Successfully Imported"
 msgstr "{} 用户被成功导入"
 
-#: cps/admin.py:2501
+#: cps/admin.py:2509
 msgid "Books path not valid"
 msgstr "书籍路径无效"
 
-#: cps/admin.py:2508
+#: cps/admin.py:2516
 msgid "DB Location is not Valid, Please Enter Correct Path"
 msgstr "数据库路径无效，请输入正确的路径"
 
-#: cps/admin.py:2533
+#: cps/admin.py:2541
 msgid "DB is not Writeable"
 msgstr "数据库不可写入"
 
-#: cps/admin.py:2546
+#: cps/admin.py:2554
 msgid "Keyfile Location is not Valid, Please Enter Correct Path"
 msgstr "密钥文件路径无效，请输入正确的路径"
 
-#: cps/admin.py:2550
+#: cps/admin.py:2558
 msgid "Certfile Location is not Valid, Please Enter Correct Path"
 msgstr "证书文件路径无效，请输入正确的路径"
 
-#: cps/admin.py:2642
+#: cps/admin.py:2650
 msgid ""
 "Auto-create users cannot be enabled without enabling reverse proxy "
 "authentication"
 msgstr "在未启用反向代理身份验证的情况下，无法启用自动创建用户"
 
-#: cps/admin.py:2645
+#: cps/admin.py:2653
 msgid "Auto-create users requires a valid reverse proxy header name"
 msgstr "自动创建用户需要有效的反向代理标头名称"
 
-#: cps/admin.py:2664 cps/admin.py:2671
+#: cps/admin.py:2672 cps/admin.py:2679
 msgid ""
 "Invalid OAuth Redirect Host format. Please include the full URL with "
 "protocol (e.g., https://your-domain.com)"
@@ -648,185 +653,185 @@ msgstr ""
 "OAuth 重定向主机格式无效。请包含带有协议的完整 URL（例如，https://your-"
 "domain.com）"
 
-#: cps/admin.py:2668
+#: cps/admin.py:2676
 msgid ""
 "OAuth Redirect Host should not include a path. Use only the base URL (e.g., "
 "https://your-domain.com)"
 msgstr ""
 "OAuth 重定向主机不应包含路径。仅使用基本 URL（例如，https://your-domain.com）"
 
-#: cps/admin.py:2704
+#: cps/admin.py:2712
 msgid "Password length has to be between 1 and 40"
 msgstr "密码长度必须在1到40之间"
 
-#: cps/admin.py:2765
+#: cps/admin.py:2773
 msgid "Database Settings updated"
 msgstr "数据库设置已更新"
 
-#: cps/admin.py:2773
+#: cps/admin.py:2781
 msgid "Database Configuration"
 msgstr "数据库配置"
 
-#: cps/admin.py:2793 cps/web.py:2593
+#: cps/admin.py:2801 cps/web.py:2600
 msgid "Oops! Please complete all fields."
 msgstr "请填写所有字段！"
 
-#: cps/admin.py:2802
+#: cps/admin.py:2810
 msgid "E-mail is not from valid domain"
 msgstr "邮箱不在有效域中"
 
-#: cps/admin.py:2810
+#: cps/admin.py:2818
 msgid "Add new user"
 msgstr "添加新用户"
 
-#: cps/admin.py:2828
+#: cps/admin.py:2836
 #, python-format
 msgid "User '%(user)s' created"
 msgstr "用户“%(user)s”已创建"
 
-#: cps/admin.py:2834
+#: cps/admin.py:2842
 msgid "Oops! An account already exists for this Email. or name."
 msgstr "使用此邮箱或用户名的账号已经存在"
 
-#: cps/admin.py:2860
+#: cps/admin.py:2868
 #, python-format
 msgid "User '%(nick)s' deleted"
 msgstr "用户“%(nick)s”已删除"
 
-#: cps/admin.py:2863
+#: cps/admin.py:2871
 msgid "Can't delete Guest User"
 msgstr "无法删除游客用户"
 
-#: cps/admin.py:2866
+#: cps/admin.py:2874
 msgid "No admin user remaining, can't delete user"
 msgstr "管理员账户不存在，无法删除用户"
 
-#: cps/admin.py:3051 cps/web.py:2916
+#: cps/admin.py:3059 cps/web.py:2923
 msgid "Email can't be empty and has to be a valid Email"
 msgstr "电子邮件地址不能为空，并且必须是有效的电子邮件"
 
-#: cps/admin.py:3092
+#: cps/admin.py:3100
 #, python-format
 msgid "User '%(nick)s' updated"
 msgstr "用户“%(nick)s”已更新"
 
-#: cps/admin.py:3157
+#: cps/admin.py:3165
 #, python-format
 msgid ""
 "Connection successful! OIDC discovery endpoint is accessible.%(endpoints)s"
 msgstr "连接成功！OIDC 发现端点可访问。%(endpoints)s"
 
-#: cps/admin.py:3162
+#: cps/admin.py:3170
 msgid ""
 "Connection failed: OIDC discovery endpoint not found (404). Check if the "
 "base URL is correct."
 msgstr "连接失败：未找到 OIDC 发现端点 (404)。请检查基本 URL 是否正确。"
 
-#: cps/admin.py:3164 cps/admin.py:3221
+#: cps/admin.py:3172 cps/admin.py:3229
 #, python-format
 msgid "Connection failed: Server returned status code %(code)s"
 msgstr "连接失败：服务器返回状态码 %(code)s"
 
-#: cps/admin.py:3166
+#: cps/admin.py:3174
 #, fuzzy
 msgid ""
 "Connection failed: Could not connect to server. Check the URL and network "
 "connectivity."
 msgstr "连接失败：无法连接到服务器。"
 
-#: cps/admin.py:3168
+#: cps/admin.py:3176
 #, fuzzy
 msgid ""
 "Connection failed: Request timed out. The server may be slow or unreachable."
 msgstr "连接失败：请求超时。"
 
-#: cps/admin.py:3170
+#: cps/admin.py:3178
 #, fuzzy
 msgid ""
 "Connection failed: Server returned invalid JSON. This may not be an OIDC "
 "endpoint."
 msgstr "连接失败：响应中的 JSON 无效。"
 
-#: cps/admin.py:3173
+#: cps/admin.py:3181
 #, fuzzy, python-format
 msgid "Connection failed: %(error)s"
 msgstr "连接错误"
 
-#: cps/admin.py:3199
+#: cps/admin.py:3207
 #, fuzzy, python-format
 msgid ""
 "Metadata is missing required OIDC fields: %(fields)s. This may not be a "
 "valid OIDC metadata endpoint."
 msgstr "元数据缺少必填字段：%(fields)s"
 
-#: cps/admin.py:3210
+#: cps/admin.py:3218
 #, fuzzy, python-format
 msgid "Metadata URL is valid! Found %(count)s OAuth endpoints."
 msgstr "元数据 URL 有效！找到 %(count)s 个端点。"
 
-#: cps/admin.py:3212
+#: cps/admin.py:3220
 #, fuzzy
 msgid " User info endpoint is available."
 msgstr "无可用发布信息"
 
-#: cps/admin.py:3214
+#: cps/admin.py:3222
 msgid ""
 " Note: User info endpoint not found - this may cause authentication issues."
 msgstr " 注意：未找到用户信息端点 - 这可能会导致身份验证问题。"
 
-#: cps/admin.py:3219
+#: cps/admin.py:3227
 msgid "Metadata URL not found (404). Please check the URL is correct."
 msgstr "未找到元数据 URL (404)。请检查 URL 是否正确。"
 
-#: cps/admin.py:3223
+#: cps/admin.py:3231
 #, fuzzy
 msgid ""
 "Connection failed: Could not connect to metadata URL. Check the URL and "
 "network connectivity."
 msgstr "连接失败：无法连接到服务器。"
 
-#: cps/admin.py:3225
+#: cps/admin.py:3233
 msgid "Connection failed: Request timed out."
 msgstr "连接失败：请求超时。"
 
-#: cps/admin.py:3227
+#: cps/admin.py:3235
 msgid "Connection failed: Invalid JSON in response."
 msgstr "连接失败：响应中的 JSON 无效。"
 
-#: cps/admin.py:3230
+#: cps/admin.py:3238
 #, fuzzy
 msgid "An unknown error occurred."
 msgstr "发生一个未知错误，请稍后再试"
 
-#: cps/admin.py:3242
+#: cps/admin.py:3250
 #, fuzzy
 msgid "Restore already in progress."
 msgstr "连接错误"
 
-#: cps/admin.py:3246
+#: cps/admin.py:3254
 msgid "Restore failed: Calibre library path is not configured."
 msgstr "还原失败：未配置 Calibre 书库路径。"
 
-#: cps/admin.py:3251
+#: cps/admin.py:3259
 #, python-format
 msgid "Restore failed: metadata.db not found at %(path)s"
 msgstr "还原失败：在 %(path)s 未找到 metadata.db"
 
-#: cps/admin.py:3256
+#: cps/admin.py:3264
 #, python-format
 msgid "Restore failed: app.db not found at %(path)s"
 msgstr "还原失败：在 %(path)s 未找到 app.db"
 
-#: cps/admin.py:3328 cps/admin.py:3371
+#: cps/admin.py:3336 cps/admin.py:3379
 #, fuzzy, python-format
 msgid "Restore failed: %(err)s"
 msgstr "连接错误"
 
-#: cps/admin.py:3348
+#: cps/admin.py:3356
 msgid "Restore completed but app.db cleanup failed. See logs for details."
 msgstr "还原已完成，但清理 app.db 失败。详情请查看日志。"
 
-#: cps/admin.py:3367
+#: cps/admin.py:3375
 #, python-format
 msgid ""
 "Restore complete. Backups and restore log saved to %(dir)s. All book-linked "
@@ -974,12 +979,12 @@ msgstr "未安装"
 msgid "Execution permissions missing"
 msgstr "缺少执行权限"
 
-#: cps/cover_picker.py:113 cps/spa_strings.py:353
+#: cps/cover_picker.py:113 cps/spa_strings.py:357
 #, fuzzy
 msgid "Back to edit metadata"
 msgstr "编辑元数据"
 
-#: cps/cover_picker.py:116 cps/spa_strings.py:103
+#: cps/cover_picker.py:116 cps/spa_strings.py:107
 #: cps/templates/book_edit.html:39
 msgid "Back to book"
 msgstr ""
@@ -1023,7 +1028,7 @@ msgstr "找不到指定的目录"
 msgid "Could not load a source image to preview."
 msgstr ""
 
-#: cps/cover_picker.py:564 cps/cover_picker.py:578 cps/spa_strings.py:400
+#: cps/cover_picker.py:564 cps/cover_picker.py:578 cps/spa_strings.py:404
 msgid "Cover save failed."
 msgstr ""
 
@@ -1181,7 +1186,7 @@ msgstr ""
 msgid "Invalid book selection."
 msgstr "无效角色"
 
-#: cps/cwa_functions.py:2225 cps/spa_strings.py:357
+#: cps/cwa_functions.py:2225 cps/spa_strings.py:361
 #, fuzzy
 msgid "Book not found."
 msgstr "找不到令牌"
@@ -1247,12 +1252,12 @@ msgstr "成功删除 {} 个用户"
 msgid "Calibre-Web NextGen Profile Picture Management (WIP)"
 msgstr ""
 
-#: cps/db.py:1770 cps/spa_strings.py:545 cps/templates/config_edit.html:341
+#: cps/db.py:1776 cps/spa_strings.py:549 cps/templates/config_edit.html:359
 #: cps/templates/config_view_edit.html:79
 #: cps/templates/config_view_edit.html:90 cps/templates/email_edit.html:41
-#: cps/web.py:879 cps/web.py:913 cps/web.py:958 cps/web.py:998 cps/web.py:1027
-#: cps/web.py:2088 cps/web.py:2125 cps/web.py:2176 cps/web.py:2208
-#: cps/web.py:2247
+#: cps/web.py:886 cps/web.py:920 cps/web.py:965 cps/web.py:1005 cps/web.py:1034
+#: cps/web.py:2095 cps/web.py:2132 cps/web.py:2183 cps/web.py:2215
+#: cps/web.py:2254
 msgid "None"
 msgstr "无"
 
@@ -1346,8 +1351,8 @@ msgstr "不能上传文件扩展名为“%(ext)s”的文件到此服务器"
 msgid "File to be uploaded must have an extension"
 msgstr "要上传的文件必须具有扩展名"
 
-#: cps/editbooks.py:931 cps/editbooks.py:1670 cps/web.py:846 cps/web.py:3366
-#: cps/web.py:3548 cps/web.py:3698
+#: cps/editbooks.py:931 cps/editbooks.py:1670 cps/web.py:853 cps/web.py:3373
+#: cps/web.py:3555 cps/web.py:3705
 msgid ""
 "Oops! Selected book is unavailable. File does not exist or is not accessible"
 msgstr "糟糕！选择书名无法打开。文件不存在或者文件不可访问"
@@ -1490,7 +1495,7 @@ msgid ""
 "google developer console"
 msgstr "回调域名尚未被校验，请在 Google 开发者控制台按步骤校验域名"
 
-#: cps/helper.py:191 cps/templates/email_edit.html:61
+#: cps/helper.py:191 cps/spa_strings.py:63 cps/templates/email_edit.html:61
 msgid "This Email has been sent via Calibre-Web NextGen."
 msgstr ""
 
@@ -1669,7 +1674,7 @@ msgstr "封面文件内容无效"
 msgid "Only jpg/jpeg files are supported as coverfile"
 msgstr "仅将 jpg、jpeg 文件作为封面文件"
 
-#: cps/helper.py:1887 cps/helper.py:2139 cps/spa_strings.py:122
+#: cps/helper.py:1887 cps/helper.py:2139 cps/spa_strings.py:126
 msgid "Cover"
 msgstr "封面"
 
@@ -1913,7 +1918,7 @@ msgstr "热门书籍"
 msgid "Popular publications from this catalog based on Downloads."
 msgstr "基于下载数的热门书籍"
 
-#: cps/opds.py:176 cps/render_template.py:91 cps/web.py:721
+#: cps/opds.py:176 cps/render_template.py:91 cps/web.py:728
 msgid "Top Rated Books"
 msgstr "最高评分书籍"
 
@@ -1939,7 +1944,7 @@ msgstr "随机书籍"
 msgid "Show Random Books"
 msgstr "显示随机书籍"
 
-#: cps/opds.py:194 cps/opds.py:195 cps/render_template.py:94 cps/web.py:1086
+#: cps/opds.py:194 cps/opds.py:195 cps/render_template.py:94 cps/web.py:1093
 msgid "Read Books"
 msgstr "已读书籍"
 
@@ -1953,11 +1958,11 @@ msgstr "当前版本"
 msgid "Books currently being read"
 msgstr "当前版本"
 
-#: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:98 cps/web.py:1089
+#: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:98 cps/web.py:1096
 msgid "Unread Books"
 msgstr "未读书籍"
 
-#: cps/opds.py:212 cps/render_template.py:110 cps/spa_strings.py:350
+#: cps/opds.py:212 cps/render_template.py:110 cps/spa_strings.py:354
 #: cps/templates/book_table.html:109 cps/templates/cwa_settings.html:334
 #: cps/templates/cwa_settings.html:336
 #: cps/templates/hardcover_review_matches.html:134
@@ -1968,8 +1973,8 @@ msgstr "作者"
 msgid "Books ordered by Author"
 msgstr "书籍按作者排序"
 
-#: cps/opds.py:218 cps/render_template.py:114 cps/spa_strings.py:567
-#: cps/templates/book_table.html:115 cps/web.py:2099
+#: cps/opds.py:218 cps/render_template.py:114 cps/spa_strings.py:571
+#: cps/templates/book_table.html:115 cps/web.py:2106
 msgid "Publishers"
 msgstr "出版社"
 
@@ -1977,8 +1982,8 @@ msgstr "出版社"
 msgid "Books ordered by publisher"
 msgstr "书籍按出版社排序"
 
-#: cps/opds.py:224 cps/render_template.py:104 cps/spa_strings.py:367
-#: cps/templates/book_table.html:110 cps/web.py:2251
+#: cps/opds.py:224 cps/render_template.py:104 cps/spa_strings.py:371
+#: cps/templates/book_table.html:110 cps/web.py:2258
 msgid "Categories"
 msgstr "分类"
 
@@ -1986,12 +1991,12 @@ msgstr "分类"
 msgid "Books ordered by category"
 msgstr "书籍按分类排序"
 
-#: cps/opds.py:230 cps/render_template.py:107 cps/spa_strings.py:212
+#: cps/opds.py:230 cps/render_template.py:107 cps/spa_strings.py:216
 #: cps/templates/book_edit.html:143 cps/templates/book_table.html:111
 #: cps/templates/cwa_settings.html:362 cps/templates/cwa_settings.html:364
 #: cps/templates/cwa_settings.html:1133
 #: cps/templates/hardcover_review_matches.html:140
-#: cps/templates/search_form.html:70 cps/web.py:2131 cps/web.py:2143
+#: cps/templates/search_form.html:70 cps/web.py:2138 cps/web.py:2150
 msgid "Series"
 msgstr "丛书"
 
@@ -1999,9 +2004,9 @@ msgstr "丛书"
 msgid "Books ordered by series"
 msgstr "书籍按丛书排序"
 
-#: cps/opds.py:236 cps/render_template.py:117 cps/spa_strings.py:488
+#: cps/opds.py:236 cps/render_template.py:117 cps/spa_strings.py:492
 #: cps/templates/book_table.html:113 cps/templates/detail.html:930
-#: cps/templates/search_form.html:108 cps/web.py:2223
+#: cps/templates/search_form.html:108 cps/web.py:2230
 msgid "Languages"
 msgstr "语言"
 
@@ -2009,7 +2014,7 @@ msgstr "语言"
 msgid "Books ordered by Languages"
 msgstr "书籍按语言排序"
 
-#: cps/opds.py:242 cps/render_template.py:121 cps/web.py:2183
+#: cps/opds.py:242 cps/render_template.py:121 cps/web.py:2190
 msgid "Ratings"
 msgstr "评分"
 
@@ -2025,7 +2030,7 @@ msgstr "文件格式"
 msgid "Books ordered by file formats"
 msgstr "书籍按文件格式排序"
 
-#: cps/opds.py:254 cps/spa_strings.py:628 cps/templates/layout.html:629
+#: cps/opds.py:254 cps/spa_strings.py:632 cps/templates/layout.html:629
 #: cps/templates/search_form.html:88
 msgid "Shelves"
 msgstr "书架列表"
@@ -2049,12 +2054,12 @@ msgstr "书架上的书"
 msgid "description"
 msgstr "简介"
 
-#: cps/opds.py:827 cps/opds.py:1293
+#: cps/opds.py:827 cps/opds.py:1294
 #, python-brace-format
 msgid "{} Stars"
 msgstr "{} 星"
 
-#: cps/opds.py:1168 cps/search.py:53 cps/search.py:454 cps/spa_strings.py:197
+#: cps/opds.py:1169 cps/search.py:53 cps/search.py:454 cps/spa_strings.py:201
 #: cps/templates/book_edit.html:338 cps/templates/cwa_epub_fixer.html:25
 #: cps/templates/feed.xml:43 cps/templates/index.xml:12
 #: cps/templates/layout.html:313 cps/templates/layout.html:316
@@ -2062,9 +2067,9 @@ msgstr "{} 星"
 msgid "Search"
 msgstr "搜索"
 
-#: cps/remotelogin.py:76 cps/spa_strings.py:499 cps/templates/layout.html:344
+#: cps/remotelogin.py:76 cps/spa_strings.py:503 cps/templates/layout.html:344
 #: cps/templates/layout.html:385 cps/templates/login.html:11
-#: cps/templates/login.html:39 cps/web.py:2697
+#: cps/templates/login.html:39 cps/web.py:2704
 msgid "Login"
 msgstr "登录"
 
@@ -2086,7 +2091,7 @@ msgid ""
 "can run after imports and metadata changes. "
 msgstr ""
 
-#: cps/render_template.py:74 cps/spa_strings.py:358
+#: cps/render_template.py:74 cps/spa_strings.py:362
 msgid "Books"
 msgstr "书籍"
 
@@ -2119,7 +2124,7 @@ msgstr "显示已读或未读状态"
 msgid "Show unread"
 msgstr "显示未读"
 
-#: cps/render_template.py:101 cps/spa_strings.py:420
+#: cps/render_template.py:101 cps/spa_strings.py:424
 msgid "Discover"
 msgstr "发现"
 
@@ -2151,7 +2156,7 @@ msgstr "显示评分栏目"
 msgid "Show File Formats Section"
 msgstr "显示文件格式栏目"
 
-#: cps/render_template.py:128 cps/web.py:1112
+#: cps/render_template.py:128 cps/web.py:1119
 msgid "Archived Books"
 msgstr "归档书籍"
 
@@ -2167,7 +2172,7 @@ msgstr ""
 msgid "Show Favorites"
 msgstr ""
 
-#: cps/render_template.py:137 cps/web.py:1905
+#: cps/render_template.py:137 cps/web.py:1912
 msgid "Books List"
 msgstr "书籍列表"
 
@@ -2175,7 +2180,7 @@ msgstr "书籍列表"
 msgid "Show Books List"
 msgstr "显示书籍列表"
 
-#: cps/render_template.py:142 cps/spa_strings.py:430
+#: cps/render_template.py:142 cps/spa_strings.py:434
 msgid "Duplicates"
 msgstr "重复书籍"
 
@@ -2468,156 +2473,170 @@ msgstr "删除所选项"
 msgid "Not rated"
 msgstr "新建或查看"
 
-#: cps/spa_strings.py:60
+#: cps/spa_strings.py:60 cps/templates/book_edit.html:220
+#: cps/templates/search_form.html:46 cps/templates/search_form.html:167
+msgid "Yes"
+msgstr "确认"
+
+#: cps/spa_strings.py:61 cps/templates/book_edit.html:221
+#: cps/templates/search_form.html:47 cps/templates/search_form.html:168
+msgid "No"
+msgstr "没有"
+
+#: cps/spa_strings.py:62 cps/templates/email_edit.html:60
+msgid "Email Message Body"
+msgstr ""
+
+#: cps/spa_strings.py:64
 #, python-brace-format
 msgid "Rated {rating} out of 5"
 msgstr ""
 
-#: cps/spa_strings.py:61
+#: cps/spa_strings.py:65
 #, fuzzy, python-brace-format
 msgid "More by {name}"
 msgstr "移除"
 
-#: cps/spa_strings.py:66
+#: cps/spa_strings.py:70
 #, python-brace-format
 msgid ""
 "Merge {n} books into the first selected? The others are removed after their "
 "formats are copied over."
 msgstr ""
 
-#: cps/spa_strings.py:67
+#: cps/spa_strings.py:71
 #, fuzzy, python-brace-format
 msgid "Apply to {n} books"
 msgstr "删除书籍"
 
-#: cps/spa_strings.py:71
+#: cps/spa_strings.py:75
 #, fuzzy
 msgid "Match condition"
 msgstr "匹配 %(action)s"
 
-#: cps/spa_strings.py:72
+#: cps/spa_strings.py:76
 #, fuzzy
 msgid "Rule field"
 msgstr "公共书架"
 
-#: cps/spa_strings.py:73
+#: cps/spa_strings.py:77
 msgid "Rule operator"
 msgstr ""
 
-#: cps/spa_strings.py:76
+#: cps/spa_strings.py:80
 msgid "Appearance"
 msgstr ""
 
-#: cps/spa_strings.py:77 cps/templates/read.html:106
+#: cps/spa_strings.py:81 cps/templates/read.html:106
 #: cps/templates/readcbr.html:102 cps/templates/user_edit.html:279
 msgid "Theme"
 msgstr "主题"
 
-#: cps/spa_strings.py:78
+#: cps/spa_strings.py:82
 msgid "System"
 msgstr ""
 
-#: cps/spa_strings.py:79 cps/spa_strings.py:162 cps/templates/read.html:108
+#: cps/spa_strings.py:83 cps/spa_strings.py:166 cps/templates/read.html:108
 #: cps/templates/readcbr.html:105
 msgid "Light"
 msgstr "浅色"
 
-#: cps/spa_strings.py:80 cps/spa_strings.py:128 cps/templates/read.html:109
+#: cps/spa_strings.py:84 cps/spa_strings.py:132 cps/templates/read.html:109
 #: cps/templates/readcbr.html:106
 msgid "Dark"
 msgstr "深色"
 
-#: cps/spa_strings.py:81 cps/spa_strings.py:210 cps/templates/read.html:110
+#: cps/spa_strings.py:85 cps/spa_strings.py:214 cps/templates/read.html:110
 msgid "Sepia"
 msgstr "棕色"
 
-#: cps/spa_strings.py:82
+#: cps/spa_strings.py:86
 msgid "High contrast"
 msgstr ""
 
-#: cps/spa_strings.py:83
+#: cps/spa_strings.py:87
 msgid "Midnight (AMOLED)"
 msgstr ""
 
-#: cps/spa_strings.py:84
+#: cps/spa_strings.py:88
 msgid "Match your device’s light or dark setting"
 msgstr ""
 
-#: cps/spa_strings.py:85
+#: cps/spa_strings.py:89
 #, fuzzy
 msgid "Theme saved."
 msgstr "文件 %(file)s 已上传"
 
-#: cps/spa_strings.py:86
+#: cps/spa_strings.py:90
 #, fuzzy
 msgid "Could not save theme."
 msgstr "无法登录：%(message)s"
 
-#: cps/spa_strings.py:95
+#: cps/spa_strings.py:99
 #, fuzzy
 msgid "Add a format"
 msgstr "添加到归档"
 
-#: cps/spa_strings.py:96
+#: cps/spa_strings.py:100
 #, fuzzy
 msgid "Add rule"
 msgstr "添加新用户"
 
-#: cps/spa_strings.py:97 cps/templates/detail.html:786
+#: cps/spa_strings.py:101 cps/templates/detail.html:786
 #: cps/templates/detail.html:997 cps/templates/detail.html:998
 #: cps/templates/detail.html:1659 cps/templates/listenmp3.html:190
 #: cps/templates/search.html:17
 msgid "Add to shelf"
 msgstr "添加到书架"
 
-#: cps/spa_strings.py:98
+#: cps/spa_strings.py:102
 msgid "Add your own"
 msgstr ""
 
-#: cps/spa_strings.py:99
+#: cps/spa_strings.py:103
 #, fuzzy
 msgid "App password label"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:100
+#: cps/spa_strings.py:104
 #, fuzzy
 msgid "App passwords"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:101 cps/templates/book_edit.html:135
+#: cps/spa_strings.py:105 cps/templates/book_edit.html:135
 #: cps/templates/book_edit.html:459 cps/templates/cwa_settings.html:1121
 #: cps/templates/search_form.html:12
 msgid "Author"
 msgstr "作者"
 
-#: cps/spa_strings.py:102
+#: cps/spa_strings.py:106
 msgid "Authors (separate with &)"
 msgstr ""
 
-#: cps/spa_strings.py:104
+#: cps/spa_strings.py:108
 #, fuzzy
 msgid "Back to sign in"
 msgstr "返回管理面板"
 
-#: cps/spa_strings.py:105 cps/templates/read.html:189
+#: cps/spa_strings.py:109 cps/templates/read.html:189
 msgid "Blue"
 msgstr ""
 
-#: cps/spa_strings.py:106
+#: cps/spa_strings.py:110
 #, fuzzy
 msgid "Book content"
 msgstr "书名"
 
-#: cps/spa_strings.py:107 cps/templates/layout.html:612
+#: cps/spa_strings.py:111 cps/templates/layout.html:612
 msgid "Browse"
 msgstr "按条件浏览"
 
-#: cps/spa_strings.py:108
+#: cps/spa_strings.py:112
 #, fuzzy
 msgid "Change password"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:109 cps/templates/book_edit.html:94
+#: cps/spa_strings.py:113 cps/templates/book_edit.html:94
 #: cps/templates/book_edit.html:378 cps/templates/book_table.html:346
 #: cps/templates/cwng_feedback_popup.html:63
 #: cps/templates/cwng_feedback_popup.html:72 cps/templates/duplicates.html:766
@@ -2628,98 +2647,98 @@ msgstr "修改密码"
 msgid "Close"
 msgstr "关闭"
 
-#: cps/spa_strings.py:110
+#: cps/spa_strings.py:114
 #, fuzzy
 msgid "Close menu"
 msgstr "关闭"
 
-#: cps/spa_strings.py:111
+#: cps/spa_strings.py:115
 #, fuzzy
 msgid "Contents"
 msgstr "简介"
 
-#: cps/spa_strings.py:112
+#: cps/spa_strings.py:116
 #, fuzzy
 msgid "Convert failed."
 msgstr "更新失败："
 
-#: cps/spa_strings.py:113
+#: cps/spa_strings.py:117
 #, fuzzy
 msgid "Convert to format"
 msgstr "书籍格式转换:"
 
-#: cps/spa_strings.py:114 cps/templates/cwa_settings.html:770
+#: cps/spa_strings.py:118 cps/templates/cwa_settings.html:770
 #: cps/templates/update_now_modal.html:36
 #: cps/templates/update_now_modal.html:45
 #: cps/templates/update_now_modal.html:63 cps/templates/user_edit.html:618
 msgid "Copy"
 msgstr ""
 
-#: cps/spa_strings.py:115
+#: cps/spa_strings.py:119
 #, fuzzy
 msgid "Could not change password."
 msgstr "修改密码"
 
-#: cps/spa_strings.py:116
+#: cps/spa_strings.py:120
 #, fuzzy
 msgid "Could not create."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:117
+#: cps/spa_strings.py:121
 #, fuzzy
 msgid "Could not fetch cover."
 msgstr "无法获取更新信息"
 
-#: cps/spa_strings.py:118
+#: cps/spa_strings.py:122
 #, fuzzy
 msgid "Could not load metadata."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:119
+#: cps/spa_strings.py:123
 #, fuzzy, python-brace-format
 msgid "Could not load the book file ({status})"
 msgstr "无法添加书籍到书架：%(sname)s"
 
-#: cps/spa_strings.py:120
+#: cps/spa_strings.py:124
 #, fuzzy
 msgid "Could not load your account."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:121
+#: cps/spa_strings.py:125
 #, fuzzy
 msgid "Could not save."
 msgstr "无法登录：%(message)s"
 
-#: cps/spa_strings.py:123
+#: cps/spa_strings.py:127
 #, fuzzy
 msgid "Cover image URL"
 msgstr "封面"
 
-#: cps/spa_strings.py:124
+#: cps/spa_strings.py:128
 #, fuzzy
 msgid "Cover update failed."
 msgstr "封面"
 
-#: cps/spa_strings.py:125 cps/templates/cover_picker.html:225
+#: cps/spa_strings.py:129 cps/templates/cover_picker.html:225
 #, fuzzy
 msgid "Cover updated."
 msgstr "封面"
 
-#: cps/spa_strings.py:126
+#: cps/spa_strings.py:130
 #, fuzzy
 msgid "Create smart shelf"
 msgstr "创建书架"
 
-#: cps/spa_strings.py:127
+#: cps/spa_strings.py:131
 msgid "Create your account"
 msgstr ""
 
-#: cps/spa_strings.py:129
+#: cps/spa_strings.py:133
 #, fuzzy
 msgid "Dark theme"
 msgstr "删除数据"
 
-#: cps/spa_strings.py:130 cps/templates/_book_organizer.html:155
+#: cps/spa_strings.py:134 cps/templates/_book_organizer.html:155
 #: cps/templates/admin.html:27 cps/templates/book_edit.html:59
 #: cps/templates/book_table.html:66 cps/templates/book_table.html:145
 #: cps/templates/book_table.html:194 cps/templates/duplicates.html:718
@@ -2729,232 +2748,232 @@ msgstr "删除数据"
 msgid "Delete"
 msgstr "删除数据"
 
-#: cps/spa_strings.py:132
+#: cps/spa_strings.py:136
 #, fuzzy
 msgid "Delete book"
 msgstr "删除书籍"
 
-#: cps/spa_strings.py:133
+#: cps/spa_strings.py:137
 #, python-brace-format
 msgid ""
 "Delete \"{title}\"? This permanently removes the book and all its files from "
 "your library. This cannot be undone."
 msgstr ""
 
-#: cps/spa_strings.py:134
+#: cps/spa_strings.py:138
 #, fuzzy
 msgid "Deleting…"
 msgstr "搜索"
 
-#: cps/spa_strings.py:135
+#: cps/spa_strings.py:139
 #, fuzzy
 msgid "Could not delete this book."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:136
+#: cps/spa_strings.py:140
 #, python-brace-format
 msgid "Delete the {fmt} file? The book stays; only this format is removed."
 msgstr ""
 
-#: cps/spa_strings.py:137
+#: cps/spa_strings.py:141
 #, fuzzy, python-brace-format
 msgid "Delete {fmt}"
 msgstr "删除格式:"
 
-#: cps/spa_strings.py:138
+#: cps/spa_strings.py:142
 #, fuzzy, python-brace-format
 msgid "Delete {n} book(s)? This cannot be undone."
 msgstr "您确定要关闭吗？"
 
-#: cps/spa_strings.py:139
+#: cps/spa_strings.py:143
 #, fuzzy
 msgid "Description contains"
 msgstr "简介"
 
-#: cps/spa_strings.py:140
+#: cps/spa_strings.py:144
 #, python-brace-format
 msgid "Deselect {title}"
 msgstr ""
 
-#: cps/spa_strings.py:141
+#: cps/spa_strings.py:145
 #, fuzzy
 msgid "Edit metadata"
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:142
+#: cps/spa_strings.py:146
 #, fuzzy, python-brace-format
 msgid "Edit {title}"
 msgstr "输入书名"
 
-#: cps/spa_strings.py:143
+#: cps/spa_strings.py:147
 #, fuzzy
 msgid "Failed to load books."
 msgstr "使用 Google 登录失败"
 
-#: cps/spa_strings.py:144
+#: cps/spa_strings.py:148
 #, fuzzy
 msgid "Failed to open the book."
 msgstr "使用 Google 登录失败"
 
-#: cps/spa_strings.py:145
+#: cps/spa_strings.py:149
 #, fuzzy
 msgid "Generate"
 msgstr "一般错误"
 
-#: cps/spa_strings.py:146 cps/templates/read.html:188
+#: cps/spa_strings.py:150 cps/templates/read.html:188
 msgid "Green"
 msgstr ""
 
-#: cps/spa_strings.py:147
+#: cps/spa_strings.py:151
 msgid "Help"
 msgstr ""
 
-#: cps/spa_strings.py:148
+#: cps/spa_strings.py:152
 msgid "Highlight color"
 msgstr ""
 
-#: cps/spa_strings.py:149 cps/templates/annotations_view.html:46
+#: cps/spa_strings.py:153 cps/templates/annotations_view.html:46
 msgid "Import from Kobo"
 msgstr ""
 
-#: cps/spa_strings.py:150
+#: cps/spa_strings.py:154
 #, fuzzy
 msgid "Interface language"
 msgstr "输入语言"
 
-#: cps/spa_strings.py:151
+#: cps/spa_strings.py:155
 #, fuzzy
 msgid "Invalid username or password."
 msgstr "请输入有效的用户名进行密码重置"
 
-#: cps/spa_strings.py:153
+#: cps/spa_strings.py:157
 msgid "UI body font"
 msgstr ""
 
-#: cps/spa_strings.py:154
+#: cps/spa_strings.py:158
 msgid "UI display font"
 msgstr ""
 
-#: cps/spa_strings.py:155
+#: cps/spa_strings.py:159
 msgid "Default (Optima / Sans-Serif)"
 msgstr ""
 
-#: cps/spa_strings.py:156
-msgid "Default (Bookish Serif)"
-msgstr ""
-
-#: cps/spa_strings.py:157
-#, fuzzy
-msgid "System Sans-Serif"
-msgstr "系统统计"
-
-#: cps/spa_strings.py:158
-#, fuzzy
-msgid "Bookish Serif"
-msgstr "书籍列表"
-
-#: cps/spa_strings.py:159
-msgid "Monospace"
-msgstr ""
-
 #: cps/spa_strings.py:160
-msgid "Label (e.g. KOReader on phone)"
+msgid "Default (Bookish Serif)"
 msgstr ""
 
 #: cps/spa_strings.py:161
 #, fuzzy
+msgid "System Sans-Serif"
+msgstr "系统统计"
+
+#: cps/spa_strings.py:162
+#, fuzzy
+msgid "Bookish Serif"
+msgstr "书籍列表"
+
+#: cps/spa_strings.py:163
+msgid "Monospace"
+msgstr ""
+
+#: cps/spa_strings.py:164
+msgid "Label (e.g. KOReader on phone)"
+msgstr ""
+
+#: cps/spa_strings.py:165
+#, fuzzy
 msgid "Languages (comma separated)"
 msgstr "可信主机（用逗号分隔）"
 
-#: cps/spa_strings.py:163
+#: cps/spa_strings.py:167
 #, fuzzy
 msgid "Light theme"
 msgstr "浅色"
 
-#: cps/spa_strings.py:164
+#: cps/spa_strings.py:168
 #, fuzzy
 msgid "Login failed."
 msgstr "更新失败："
 
-#: cps/spa_strings.py:165
+#: cps/spa_strings.py:169
 #, fuzzy
 msgid "Mark read"
 msgstr "标为已读"
 
-#: cps/spa_strings.py:166
+#: cps/spa_strings.py:170
 #, fuzzy
 msgid "Mark unread"
 msgstr "标为未读"
 
-#: cps/spa_strings.py:167 cps/templates/book_table.html:48
+#: cps/spa_strings.py:171 cps/templates/book_table.html:48
 #: cps/templates/book_table.html:175 cps/templates/duplicates.html:745
 msgid "Merge"
 msgstr "合并"
 
-#: cps/spa_strings.py:168
+#: cps/spa_strings.py:172
 #, python-brace-format
 msgid "Metadata applied to {n} book(s)."
 msgstr ""
 
-#: cps/spa_strings.py:169
+#: cps/spa_strings.py:173
 #, python-brace-format
 msgid "New password for “{label}” — copy it now, it won’t be shown again:"
 msgstr ""
 
-#: cps/spa_strings.py:170
-msgid "New passwords do not match."
-msgstr ""
-
-#: cps/spa_strings.py:171
-#, fuzzy
-msgid "No books here."
-msgstr "找不到令牌"
-
-#: cps/spa_strings.py:172
-#, fuzzy, python-brace-format
-msgid "No results for \"{q}\"."
-msgstr "结果："
-
-#: cps/spa_strings.py:173
-msgid "No suggestions"
-msgstr ""
-
 #: cps/spa_strings.py:174
-#, python-brace-format
-msgid "No {filter} books here."
+msgid "New passwords do not match."
 msgstr ""
 
 #: cps/spa_strings.py:175
 #, fuzzy
+msgid "No books here."
+msgstr "找不到令牌"
+
+#: cps/spa_strings.py:176
+#, fuzzy, python-brace-format
+msgid "No results for \"{q}\"."
+msgstr "结果："
+
+#: cps/spa_strings.py:177
+msgid "No suggestions"
+msgstr ""
+
+#: cps/spa_strings.py:178
+#, python-brace-format
+msgid "No {filter} books here."
+msgstr ""
+
+#: cps/spa_strings.py:179
+#, fuzzy
 msgid "Password changed."
 msgstr "密码"
 
-#: cps/spa_strings.py:176
+#: cps/spa_strings.py:180
 #, fuzzy
 msgid "Paste URL"
 msgstr "OAuth 基础 URL"
 
-#: cps/spa_strings.py:177
+#: cps/spa_strings.py:181
 #, fuzzy
 msgid "Private shelf"
 msgstr "创建书架"
 
-#: cps/spa_strings.py:178
+#: cps/spa_strings.py:182
 #, fuzzy
 msgid "Profile"
 msgstr "您的邮箱地址"
 
-#: cps/spa_strings.py:179
+#: cps/spa_strings.py:183
 #, fuzzy
 msgid "Profile saved."
 msgstr "文件 %(file)s 已上传"
 
-#: cps/spa_strings.py:180
+#: cps/spa_strings.py:184
 #, fuzzy
 msgid "Public shelf"
 msgstr "公共书架"
 
-#: cps/spa_strings.py:181 cps/templates/book_edit.html:159
+#: cps/spa_strings.py:185 cps/templates/book_edit.html:159
 #: cps/templates/book_edit.html:460 cps/templates/cwa_settings.html:348
 #: cps/templates/cwa_settings.html:350 cps/templates/cwa_settings.html:1139
 #: cps/templates/detail.html:1005
@@ -2963,177 +2982,177 @@ msgstr "公共书架"
 msgid "Publisher"
 msgstr "出版社"
 
-#: cps/spa_strings.py:182
+#: cps/spa_strings.py:186
 #, fuzzy
 msgid "Publishers (comma separated)"
 msgstr "可信主机（用逗号分隔）"
 
-#: cps/spa_strings.py:183 cps/templates/image.html:26
+#: cps/spa_strings.py:187 cps/templates/image.html:26
 #: cps/templates/listenmp3.html:159
 msgid "Read"
 msgstr "已读"
 
-#: cps/spa_strings.py:184
+#: cps/spa_strings.py:188
 #, fuzzy
 msgid "Reading progress"
 msgstr "任务进度"
 
-#: cps/spa_strings.py:185 cps/templates/read.html:187
+#: cps/spa_strings.py:189 cps/templates/read.html:187
 #, fuzzy
 msgid "Red"
 msgstr "已读"
 
-#: cps/spa_strings.py:186
+#: cps/spa_strings.py:190
 #, fuzzy
 msgid "Registration failed."
 msgstr "开放注册"
 
-#: cps/spa_strings.py:187
+#: cps/spa_strings.py:191
 #, fuzzy, python-brace-format
 msgid "Remove {name}"
 msgstr "移除"
 
-#: cps/spa_strings.py:188
+#: cps/spa_strings.py:192
 #, fuzzy
 msgid "Request failed."
 msgstr "连接错误"
 
-#: cps/spa_strings.py:189
+#: cps/spa_strings.py:193
 msgid "Reset"
 msgstr ""
 
-#: cps/spa_strings.py:190
+#: cps/spa_strings.py:194
 #, fuzzy
 msgid "Reset your password"
 msgstr "重置用户密码"
 
-#: cps/spa_strings.py:191
+#: cps/spa_strings.py:195
 #, fuzzy, python-brace-format
 msgid "Revoke {label}"
 msgstr "撤回"
 
-#: cps/spa_strings.py:192
+#: cps/spa_strings.py:196
 #, fuzzy
 msgid "Save changes"
 msgstr "查看更新日志"
 
-#: cps/spa_strings.py:193
+#: cps/spa_strings.py:197
 #, fuzzy
 msgid "Save failed."
 msgstr "更新失败："
 
-#: cps/spa_strings.py:194
+#: cps/spa_strings.py:198
 #, fuzzy
 msgid "Save profile"
 msgstr "%(name)s 的用户配置"
 
-#: cps/spa_strings.py:195
+#: cps/spa_strings.py:199
 #, fuzzy
 msgid "Saved."
 msgstr "保存"
 
-#: cps/spa_strings.py:196 cps/templates/shelf_order.html:33
+#: cps/spa_strings.py:200 cps/templates/shelf_order.html:33
 #, fuzzy
 msgid "Saving…"
 msgstr "搜索"
 
-#: cps/spa_strings.py:198
+#: cps/spa_strings.py:202
 #, fuzzy
 msgid "Search failed."
 msgstr "更新失败："
 
-#: cps/spa_strings.py:199
+#: cps/spa_strings.py:203
 #, fuzzy
 msgid "Search for metadata"
 msgstr "获取元数据"
 
-#: cps/spa_strings.py:200
+#: cps/spa_strings.py:204
 #, fuzzy
 msgid "Metadata providers"
 msgstr "启用的元数据提供程序"
 
-#: cps/spa_strings.py:201
+#: cps/spa_strings.py:205
 #, fuzzy
 msgid "Loading providers…"
 msgstr "加载中..."
 
-#: cps/spa_strings.py:202
+#: cps/spa_strings.py:206
 #, fuzzy
 msgid "Could not load providers."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:203
+#: cps/spa_strings.py:207
 #, fuzzy
 msgid "Could not update provider."
 msgstr "无法获取更新信息"
 
-#: cps/spa_strings.py:204
+#: cps/spa_strings.py:208
 #, python-brace-format
 msgid "{provider}: {state}"
 msgstr ""
 
-#: cps/spa_strings.py:205
+#: cps/spa_strings.py:209
 msgid "On"
 msgstr ""
 
-#: cps/spa_strings.py:206
+#: cps/spa_strings.py:210
 msgid "Off"
 msgstr ""
 
-#: cps/spa_strings.py:207 cps/templates/shelf.html:119
+#: cps/spa_strings.py:211 cps/templates/shelf.html:119
 #, fuzzy
 msgid "Search results"
 msgstr "搜索项："
 
-#: cps/spa_strings.py:208
+#: cps/spa_strings.py:212
 #, fuzzy
 msgid "Search the library"
 msgstr "搜索书库"
 
-#: cps/spa_strings.py:209
+#: cps/spa_strings.py:213
 #, fuzzy, python-brace-format
 msgid "Select {title}"
 msgstr "全选"
 
-#: cps/spa_strings.py:211
+#: cps/spa_strings.py:215
 #, fuzzy
 msgid "Sepia theme"
 msgstr "棕色"
 
-#: cps/spa_strings.py:213
+#: cps/spa_strings.py:217
 #, python-brace-format
 msgid "Series position {n}"
 msgstr ""
 
-#: cps/spa_strings.py:214
+#: cps/spa_strings.py:218
 msgid "Sign in"
 msgstr ""
 
-#: cps/spa_strings.py:215
+#: cps/spa_strings.py:219
 #, fuzzy
 msgid "Sign in failed. Please try again."
 msgstr "链接 OAuth 帐户失败。请重试。"
 
-#: cps/spa_strings.py:216
+#: cps/spa_strings.py:220
 msgid "Skip to content"
 msgstr ""
 
-#: cps/spa_strings.py:217
+#: cps/spa_strings.py:221
 #, fuzzy
 msgid "Some fields could not be saved."
 msgstr "更新文件无法保存在临时目录中"
 
-#: cps/spa_strings.py:218
+#: cps/spa_strings.py:222
 #, fuzzy
 msgid "Table of contents"
 msgstr "封面文件内容无效"
 
-#: cps/spa_strings.py:219
+#: cps/spa_strings.py:223
 #, fuzzy
 msgid "Tags (comma separated)"
 msgstr "可信主机（用逗号分隔）"
 
-#: cps/spa_strings.py:220 cps/templates/book_table.html:106
+#: cps/spa_strings.py:224 cps/templates/book_table.html:106
 #: cps/templates/config_view_edit.html:39 cps/templates/cwa_settings.html:327
 #: cps/templates/cwa_settings.html:329 cps/templates/cwa_settings.html:1115
 #: cps/templates/shelf_edit.html:8 cps/templates/tasks.html:41
@@ -3141,566 +3160,566 @@ msgstr "可信主机（用逗号分隔）"
 msgid "Title"
 msgstr "标题"
 
-#: cps/spa_strings.py:221
+#: cps/spa_strings.py:225
 #, fuzzy
 msgid "Unread"
 msgstr "未读书籍"
 
-#: cps/spa_strings.py:222
+#: cps/spa_strings.py:226
 #, fuzzy
 msgid "Update password"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:223 cps/tasks/upload.py:28 cps/templates/admin.html:22
+#: cps/spa_strings.py:227 cps/tasks/upload.py:28 cps/templates/admin.html:22
 #: cps/templates/layout.html:363 cps/templates/user_table.html:146
 msgid "Upload"
 msgstr "上传书籍"
 
-#: cps/spa_strings.py:224
+#: cps/spa_strings.py:228
 #, fuzzy
 msgid "Choose books to upload"
 msgstr "书籍格式转换:"
 
-#: cps/spa_strings.py:225
+#: cps/spa_strings.py:229
 #, fuzzy
 msgid "Upload failed."
 msgstr "上传书籍"
 
-#: cps/spa_strings.py:226
+#: cps/spa_strings.py:230
 #, fuzzy
 msgid "Upload image"
 msgstr "上传格式"
 
-#: cps/spa_strings.py:227
+#: cps/spa_strings.py:231
 #, fuzzy
 msgid "Uploading…"
 msgstr "加载中..."
 
-#: cps/spa_strings.py:228 cps/templates/read.html:186
+#: cps/spa_strings.py:232 cps/templates/read.html:186
 #, fuzzy
 msgid "Yellow"
 msgstr "允许"
 
-#: cps/spa_strings.py:229
+#: cps/spa_strings.py:233
 msgid "e.g. MOBI"
 msgstr ""
 
-#: cps/spa_strings.py:230
+#: cps/spa_strings.py:234
 #, python-brace-format
 msgid "{format} reader"
 msgstr ""
 
-#: cps/spa_strings.py:231
+#: cps/spa_strings.py:235
 #, python-brace-format
 msgid "{name} API key"
 msgstr ""
 
-#: cps/spa_strings.py:232
+#: cps/spa_strings.py:236
 #, fuzzy, python-brace-format
 msgid "{n} book(s) added to the shelf."
 msgstr "添加到书架"
 
-#: cps/spa_strings.py:233
+#: cps/spa_strings.py:237
 #, fuzzy, python-brace-format
 msgid "{n} book(s) deleted."
 msgstr "合并选中的书籍"
 
-#: cps/spa_strings.py:234
+#: cps/spa_strings.py:238
 #, fuzzy, python-brace-format
 msgid "{n} marked as read."
 msgstr "标为未读"
 
-#: cps/spa_strings.py:235
+#: cps/spa_strings.py:239
 #, fuzzy, python-brace-format
 msgid "{n} marked as unread."
 msgstr "标为未读"
 
-#: cps/spa_strings.py:236 cps/templates/_book_organizer.html:162
+#: cps/spa_strings.py:240 cps/templates/_book_organizer.html:162
 #, fuzzy, python-brace-format
 msgid "{n} selected"
 msgstr "合并选中的书籍"
 
-#: cps/spa_strings.py:237
+#: cps/spa_strings.py:241
 #, python-format, python-brace-format
 msgid "{pct}% read"
 msgstr ""
 
-#: cps/spa_strings.py:243
+#: cps/spa_strings.py:247
 msgid "What's new"
 msgstr ""
 
-#: cps/spa_strings.py:244
+#: cps/spa_strings.py:248
 #, fuzzy
 msgid "Help — new updates available"
 msgstr "更新失败："
 
-#: cps/spa_strings.py:245
+#: cps/spa_strings.py:249
 #, fuzzy
 msgid "The latest features and fixes in Calibre-Web NextGen — newest first."
 msgstr "Caliebre-Web 电子书路径"
 
-#: cps/spa_strings.py:246
+#: cps/spa_strings.py:250
 #, fuzzy, python-brace-format
 msgid "{n} update"
 msgstr "数据库设置已更新"
 
-#: cps/spa_strings.py:247
+#: cps/spa_strings.py:251
 #, fuzzy, python-brace-format
 msgid "{n} updates"
 msgstr "数据库设置已更新"
 
-#: cps/spa_strings.py:248
+#: cps/spa_strings.py:252
 msgid "No release notes yet — check back after the next update."
 msgstr ""
 
-#: cps/spa_strings.py:249
+#: cps/spa_strings.py:253
 msgid ""
 "The interface is translated into your language; these update notes are "
 "written in English."
 msgstr ""
 
-#: cps/spa_strings.py:251 cps/templates/image.html:27
+#: cps/spa_strings.py:255 cps/templates/image.html:27
 #, fuzzy
 msgid "Reading"
 msgstr "已读"
 
-#: cps/spa_strings.py:252
+#: cps/spa_strings.py:256
 #, fuzzy
 msgid "Grid view"
 msgstr "无效页面"
 
-#: cps/spa_strings.py:253
+#: cps/spa_strings.py:257
 #, fuzzy
 msgid "Library"
 msgstr "在书库"
 
-#: cps/spa_strings.py:254
+#: cps/spa_strings.py:258
 #, fuzzy
 msgid "List view"
 msgstr "列表"
 
-#: cps/spa_strings.py:255
+#: cps/spa_strings.py:259
 msgid "Sync"
 msgstr ""
 
-#: cps/spa_strings.py:256 cps/templates/layout.html:342
+#: cps/spa_strings.py:260 cps/templates/layout.html:342
 #: cps/templates/layout.html:378 cps/templates/user_edit.html:312
 #: cps/templates/user_edit.html:314
 msgid "Account"
 msgstr "账号"
 
-#: cps/spa_strings.py:257 cps/templates/admin.html:19
+#: cps/spa_strings.py:261 cps/templates/admin.html:19
 #: cps/templates/layout.html:374 cps/templates/user_table.html:144
 msgid "Admin"
 msgstr "管理权限"
 
-#: cps/spa_strings.py:258
+#: cps/spa_strings.py:262
 msgid "Under the hood"
 msgstr ""
 
-#: cps/spa_strings.py:261
+#: cps/spa_strings.py:265
 #, fuzzy
 msgid "Open your library"
 msgstr "搜索书库"
 
-#: cps/spa_strings.py:262
+#: cps/spa_strings.py:266
 #, fuzzy
 msgid "Open the table view"
 msgstr "无效页面"
 
-#: cps/spa_strings.py:263
+#: cps/spa_strings.py:267
 #, fuzzy
 msgid "Review duplicates"
 msgstr "选择重复项"
 
-#: cps/spa_strings.py:264
+#: cps/spa_strings.py:268
 #, fuzzy
 msgid "Open your shelves"
 msgstr "排除书架"
 
-#: cps/spa_strings.py:265
+#: cps/spa_strings.py:269
 #, fuzzy
 msgid "Manage sync & app passwords"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:266
+#: cps/spa_strings.py:270
 #, fuzzy
 msgid "Check your e-reader address"
 msgstr "接收书籍的电子阅读器邮箱地址"
 
-#: cps/spa_strings.py:267
+#: cps/spa_strings.py:271
 #, fuzzy
 msgid "Create an app password"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:268
+#: cps/spa_strings.py:272
 #, fuzzy
 msgid "Browse series"
 msgstr "按条件浏览"
 
-#: cps/spa_strings.py:269
+#: cps/spa_strings.py:273
 #, fuzzy
 msgid "Browse authors"
 msgstr "按条件浏览"
 
-#: cps/spa_strings.py:270
+#: cps/spa_strings.py:274
 msgid "Open Table view"
 msgstr ""
 
-#: cps/spa_strings.py:271
+#: cps/spa_strings.py:275
 #, fuzzy
 msgid "Open Admin"
 msgstr "管理权限"
 
-#: cps/spa_strings.py:272
+#: cps/spa_strings.py:276
 #, fuzzy
 msgid "Open account settings"
 msgstr "设置"
 
-#: cps/spa_strings.py:273
+#: cps/spa_strings.py:277
 #, fuzzy
 msgid "Browse Discover"
 msgstr "发现"
 
-#: cps/spa_strings.py:274
+#: cps/spa_strings.py:278
 #, fuzzy
 msgid "Explore your library"
 msgstr "搜索书库"
 
-#: cps/spa_strings.py:275
+#: cps/spa_strings.py:279
 #, fuzzy
 msgid "Go to Upload"
 msgstr "上传书籍"
 
-#: cps/spa_strings.py:277
+#: cps/spa_strings.py:281
 #, fuzzy
 msgid "Editions"
 msgstr "活动"
 
-#: cps/spa_strings.py:278 cps/templates/layout.html:335
+#: cps/spa_strings.py:282 cps/templates/layout.html:335
 #, fuzzy
 msgid "Back to New UI"
 msgstr "返回管理面板"
 
-#: cps/spa_strings.py:279
+#: cps/spa_strings.py:283
 #, fuzzy
 msgid "Back to results"
 msgstr "搜索项："
 
-#: cps/spa_strings.py:280
+#: cps/spa_strings.py:284
 msgid "No editions found for this book."
 msgstr ""
 
-#: cps/spa_strings.py:282
+#: cps/spa_strings.py:286
 #, fuzzy
 msgid "View all details"
 msgstr "书籍详情"
 
-#: cps/spa_strings.py:283
+#: cps/spa_strings.py:287
 msgid "Result details"
 msgstr ""
 
-#: cps/spa_strings.py:284 cps/templates/detail.html:1011
+#: cps/spa_strings.py:288 cps/templates/detail.html:1011
 #: cps/templates/listenmp3.html:111
 msgid "Published"
 msgstr "出版日期"
 
-#: cps/spa_strings.py:285 cps/templates/cwa_settings.html:1145
+#: cps/spa_strings.py:289 cps/templates/cwa_settings.html:1145
 #, fuzzy
 msgid "Format"
 msgstr "上传格式"
 
-#: cps/spa_strings.py:286 cps/templates/book_edit.html:462
+#: cps/spa_strings.py:290 cps/templates/book_edit.html:462
 msgid "Source"
 msgstr "源"
 
-#: cps/spa_strings.py:289
+#: cps/spa_strings.py:293
 #, fuzzy
 msgid "Customize"
 msgstr "自定义过滤器"
 
-#: cps/spa_strings.py:290
+#: cps/spa_strings.py:294
 #, fuzzy
 msgid "Customize sidebar"
 msgstr "自定义过滤器"
 
-#: cps/spa_strings.py:291
+#: cps/spa_strings.py:295
 #, fuzzy
 msgid "Customize navigation"
 msgstr "切换导航"
 
-#: cps/spa_strings.py:292 cps/templates/_book_organizer.html:164
+#: cps/spa_strings.py:296 cps/templates/_book_organizer.html:164
 msgid "Done"
 msgstr ""
 
-#: cps/spa_strings.py:293
+#: cps/spa_strings.py:297
 #, fuzzy
 msgid "Reset to default"
 msgstr "回到首页"
 
-#: cps/spa_strings.py:294
+#: cps/spa_strings.py:298
 msgid "Always shown"
 msgstr ""
 
-#: cps/spa_strings.py:295
+#: cps/spa_strings.py:299
 msgid "Editing sidebar. Reorder or hide sections, then tap Done."
 msgstr ""
 
-#: cps/spa_strings.py:296
+#: cps/spa_strings.py:300
 msgid "Editing cancelled."
 msgstr ""
 
-#: cps/spa_strings.py:297
+#: cps/spa_strings.py:301
 msgid ""
 "Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused handle."
 msgstr ""
 
-#: cps/spa_strings.py:298
+#: cps/spa_strings.py:302
 #, fuzzy
 msgid "Sidebar saved."
 msgstr "文件 %(file)s 已上传"
 
-#: cps/spa_strings.py:299
+#: cps/spa_strings.py:303
 msgid "Sidebar reset to default."
 msgstr ""
 
-#: cps/spa_strings.py:300
+#: cps/spa_strings.py:304
 #, python-brace-format
 msgid "{label} moved to position {pos} of {total}"
 msgstr ""
 
-#: cps/spa_strings.py:301
+#: cps/spa_strings.py:305
 #, python-brace-format
 msgid "Reorder {label} (position {pos} of {total}). Use arrow keys to move."
 msgstr ""
 
-#: cps/spa_strings.py:302
+#: cps/spa_strings.py:306
 #, fuzzy, python-brace-format
 msgid "Delete {label}"
 msgstr "撤回"
 
-#: cps/spa_strings.py:303
+#: cps/spa_strings.py:307
 #, fuzzy, python-brace-format
 msgid "Restore {label}"
 msgstr "撤回"
 
-#: cps/spa_strings.py:304
+#: cps/spa_strings.py:308
 #, fuzzy, python-brace-format
 msgid "{label} hidden"
 msgstr "撤回"
 
-#: cps/spa_strings.py:305
+#: cps/spa_strings.py:309
 #, fuzzy, python-brace-format
 msgid "{label} restored"
 msgstr "删除书籍"
 
-#: cps/spa_strings.py:306
+#: cps/spa_strings.py:310
 #, fuzzy
 msgid "Could not save sidebar. Please try again."
 msgstr "链接 OAuth 帐户失败。请重试。"
 
-#: cps/spa_strings.py:313
+#: cps/spa_strings.py:317
 #, fuzzy
 msgid "Refresh library"
 msgstr "搜索书库"
 
-#: cps/spa_strings.py:322
+#: cps/spa_strings.py:326
 #, fuzzy
 msgid "(replace cover)"
 msgstr "上传格式"
 
-#: cps/spa_strings.py:323
+#: cps/spa_strings.py:327
 #, fuzzy
 msgid "A few random picks from your library"
 msgstr "搜索书库"
 
-#: cps/spa_strings.py:324
+#: cps/spa_strings.py:328
 msgid ""
 "A one-time full duplicate scan is needed. Run it from CWA settings, then "
 "return here."
 msgstr ""
 
-#: cps/spa_strings.py:325 cps/templates/cover_picker.html:81
+#: cps/spa_strings.py:329 cps/templates/cover_picker.html:81
 msgid "API keys"
 msgstr ""
 
-#: cps/spa_strings.py:326
+#: cps/spa_strings.py:330
 #, fuzzy, python-brace-format
 msgid "Account: {name}"
 msgstr "账号"
 
-#: cps/spa_strings.py:327
+#: cps/spa_strings.py:331
 #, fuzzy
 msgid "Add identifier"
 msgstr "添加书号"
 
-#: cps/spa_strings.py:328 cps/templates/detail.html:700
+#: cps/spa_strings.py:332 cps/templates/detail.html:700
 #: cps/templates/detail.html:701 cps/templates/detail.html:703
 #, fuzzy
 msgid "Add to favorites"
 msgstr "添加到归档"
 
-#: cps/spa_strings.py:329
+#: cps/spa_strings.py:333
 #, fuzzy
 msgid "Admin group"
 msgstr "管理页"
 
-#: cps/spa_strings.py:330
+#: cps/spa_strings.py:334
 #, fuzzy
 msgid "Advanced"
 msgstr "高级搜索"
 
-#: cps/spa_strings.py:331
+#: cps/spa_strings.py:335
 #, fuzzy
 msgid "Advanced search"
 msgstr "高级搜索"
 
-#: cps/spa_strings.py:332
+#: cps/spa_strings.py:336
 #, fuzzy
 msgid "All shelves"
 msgstr "书架列表"
 
-#: cps/spa_strings.py:333
+#: cps/spa_strings.py:337
 msgid "Allow remote (magic-link) login"
 msgstr ""
 
-#: cps/spa_strings.py:334
+#: cps/spa_strings.py:338
 #, fuzzy
 msgid "Allowed groups (comma-separated)"
 msgstr "可信主机（用逗号分隔）"
 
-#: cps/spa_strings.py:335 cps/templates/search_form.html:44
+#: cps/spa_strings.py:339 cps/templates/search_form.html:44
 #: cps/templates/search_form.html:165
 msgid "Any"
 msgstr "任何"
 
-#: cps/spa_strings.py:336
+#: cps/spa_strings.py:340
 #, fuzzy
 msgid "Any format"
 msgstr "添加到归档"
 
-#: cps/spa_strings.py:337
+#: cps/spa_strings.py:341
 #, fuzzy
 msgid "Any language"
 msgstr "语言"
 
-#: cps/spa_strings.py:338
+#: cps/spa_strings.py:342
 #, fuzzy
 msgid "Any series"
 msgstr "输入丛书"
 
-#: cps/spa_strings.py:339
+#: cps/spa_strings.py:343
 #, fuzzy
 msgid "Any tags"
 msgstr "添加标签"
 
-#: cps/spa_strings.py:340
+#: cps/spa_strings.py:344
 #, fuzzy
 msgid "Apply selected"
 msgstr "合并选中的书籍"
 
-#: cps/spa_strings.py:341
+#: cps/spa_strings.py:345
 msgid ""
 "Apply to all selected (only filled fields change; replaces existing values):"
 msgstr ""
 
-#: cps/spa_strings.py:342 cps/templates/cover_picker.html:224
+#: cps/spa_strings.py:346 cps/templates/cover_picker.html:224
 msgid "Applying…"
 msgstr ""
 
-#: cps/spa_strings.py:343 cps/templates/book_table.html:54
+#: cps/spa_strings.py:347 cps/templates/book_table.html:54
 #: cps/templates/book_table.html:214 cps/templates/duplicates.html:660
 #, fuzzy
 msgid "Archive"
 msgstr "归档"
 
-#: cps/spa_strings.py:344 cps/templates/detail.html:712
+#: cps/spa_strings.py:348 cps/templates/detail.html:712
 #: cps/templates/listenmp3.html:167
 msgid "Archived"
 msgstr "归档"
 
-#: cps/spa_strings.py:345
+#: cps/spa_strings.py:349
 msgid "Ask in Discord"
 msgstr ""
 
-#: cps/spa_strings.py:346
+#: cps/spa_strings.py:350
 #, fuzzy
 msgid "Authentication"
 msgstr "LDAP 验证方式"
 
-#: cps/spa_strings.py:347
+#: cps/spa_strings.py:351
 #, fuzzy
 msgid "Authentication & security"
 msgstr "LDAP 验证方式"
 
-#: cps/spa_strings.py:348
+#: cps/spa_strings.py:352
 msgid "Authorised — signing you in…"
 msgstr ""
 
-#: cps/spa_strings.py:349
+#: cps/spa_strings.py:353
 #, fuzzy
 msgid "Authorize URL"
 msgstr "OAuth 基础 URL"
 
-#: cps/spa_strings.py:351
+#: cps/spa_strings.py:355
 #, fuzzy
 msgid "Auto-create users"
 msgstr "从 LDAP 自动创建用户"
 
-#: cps/spa_strings.py:352
+#: cps/spa_strings.py:356
 #, fuzzy
 msgid "Auto-create users on first login"
 msgstr "从 LDAP 自动创建用户"
 
-#: cps/spa_strings.py:354
+#: cps/spa_strings.py:358
 #, fuzzy
 msgid "Back to library"
 msgstr "搜索书库"
 
-#: cps/spa_strings.py:355
+#: cps/spa_strings.py:359
 #, fuzzy
 msgid "Back to the classic view"
 msgstr "返回管理面板"
 
-#: cps/spa_strings.py:356
+#: cps/spa_strings.py:360
 msgid "Base DN"
 msgstr ""
 
-#: cps/spa_strings.py:359
+#: cps/spa_strings.py:363
 #, fuzzy
 msgid "Books per page"
 msgstr "每页书籍数"
 
-#: cps/spa_strings.py:360 cps/templates/config_edit.html:244
+#: cps/spa_strings.py:364 cps/templates/config_edit.html:244
 #: cps/templates/cover_picker.html:114
 msgid "Border fill style"
 msgstr ""
 
-#: cps/spa_strings.py:361
+#: cps/spa_strings.py:365
 msgid "Built-in providers (leave blank to disable):"
 msgstr ""
 
-#: cps/spa_strings.py:362
+#: cps/spa_strings.py:366
 #, fuzzy
 msgid "Bulk actions"
 msgstr "活动"
 
-#: cps/spa_strings.py:363
+#: cps/spa_strings.py:367
 msgid "CA certificate path"
 msgstr ""
 
-#: cps/spa_strings.py:364
+#: cps/spa_strings.py:368
 #, fuzzy
 msgid "Can upload books"
 msgstr "使用 Google 登录失败"
 
-#: cps/spa_strings.py:365 cps/templates/admin.html:304
+#: cps/spa_strings.py:369 cps/templates/admin.html:304
 #: cps/templates/admin.html:318 cps/templates/book_edit.html:312
 #: cps/templates/book_table.html:176 cps/templates/book_table.html:195
 #: cps/templates/book_table.html:215 cps/templates/book_table.html:235
 #: cps/templates/book_table.html:255 cps/templates/book_table.html:275
 #: cps/templates/book_table.html:333 cps/templates/book_table.html:369
-#: cps/templates/config_db.html:110 cps/templates/config_edit.html:715
+#: cps/templates/config_db.html:110 cps/templates/config_edit.html:733
 #: cps/templates/config_view_edit.html:236 cps/templates/cover_picker.html:189
 #: cps/templates/cwa_convert_library.html:23
 #: cps/templates/cwa_epub_fixer.html:40 cps/templates/detail.html:1192
@@ -3716,1065 +3735,1065 @@ msgstr "使用 Google 登录失败"
 msgid "Cancel"
 msgstr "取消"
 
-#: cps/spa_strings.py:366
+#: cps/spa_strings.py:370
 #, fuzzy
 msgid "Cancel rename"
 msgstr "取消"
 
-#: cps/spa_strings.py:368
+#: cps/spa_strings.py:372
 msgid "Certificate file path"
 msgstr ""
 
-#: cps/spa_strings.py:369
+#: cps/spa_strings.py:373
 msgid "Certificate path"
 msgstr ""
 
-#: cps/spa_strings.py:370 cps/templates/book_edit.html:192
+#: cps/spa_strings.py:374 cps/templates/book_edit.html:192
 #: cps/templates/cover_picker.html:12 cps/templates/detail.html:619
 #: cps/templates/detail.html:622 cps/templates/detail.html:744
 #, fuzzy
 msgid "Change cover"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:371
+#: cps/spa_strings.py:375
 #, fuzzy
 msgid "Checking…"
 msgstr "搜索"
 
-#: cps/spa_strings.py:372
+#: cps/spa_strings.py:376
 #, fuzzy
 msgid "Choose a cover"
 msgstr "选择一个用户名"
 
-#: cps/spa_strings.py:373
+#: cps/spa_strings.py:377
 #, fuzzy
 msgid "Choose a cover image to upload"
 msgstr "书籍格式转换:"
 
-#: cps/spa_strings.py:374
+#: cps/spa_strings.py:378
 #, fuzzy
 msgid "Choose an image…"
 msgstr "选择一个用户名"
 
-#: cps/spa_strings.py:375
+#: cps/spa_strings.py:379
 #, fuzzy
 msgid "Choose fields"
 msgstr "选择邮箱地址:"
 
-#: cps/spa_strings.py:376
+#: cps/spa_strings.py:380
 #, fuzzy
 msgid "Clear selection"
 msgstr "删除所选项"
 
-#: cps/spa_strings.py:377
+#: cps/spa_strings.py:381
 #, fuzzy
 msgid "Client ID"
 msgstr "%(provider)s OAuth 客户端 Id"
 
-#: cps/spa_strings.py:378
+#: cps/spa_strings.py:382
 #, fuzzy
 msgid "Client secret"
 msgstr "%(provider)s OAuth 客户端 Secret"
 
-#: cps/spa_strings.py:379
+#: cps/spa_strings.py:383
 msgid "Client secret (leave blank to keep)"
 msgstr ""
 
-#: cps/spa_strings.py:380
+#: cps/spa_strings.py:384
 #, fuzzy
 msgid "Close reader"
 msgstr "Comic 阅读器"
 
-#: cps/spa_strings.py:381
+#: cps/spa_strings.py:385
 #, fuzzy
 msgid "Columns"
 msgstr "双栏"
 
-#: cps/spa_strings.py:382
+#: cps/spa_strings.py:386
 #, fuzzy
 msgid "Configured"
 msgstr "配置"
 
-#: cps/spa_strings.py:383
+#: cps/spa_strings.py:387
 #, fuzzy
 msgid "Confirm new password"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:384 cps/tasks/convert.py:358
+#: cps/spa_strings.py:388 cps/tasks/convert.py:358
 msgid "Convert"
 msgstr "转换"
 
-#: cps/spa_strings.py:385
+#: cps/spa_strings.py:389
 msgid "Convert before sending"
 msgstr ""
 
-#: cps/spa_strings.py:386
+#: cps/spa_strings.py:390
 #, fuzzy
 msgid "Convert from"
 msgstr "转换从："
 
-#: cps/spa_strings.py:387
+#: cps/spa_strings.py:391
 #, fuzzy
 msgid "Copied to clipboard"
 msgstr "UUID 已复制到剪贴板"
 
-#: cps/spa_strings.py:388
+#: cps/spa_strings.py:392
 msgid "Copy link"
 msgstr ""
 
-#: cps/spa_strings.py:389
+#: cps/spa_strings.py:393
 #, fuzzy
 msgid "Could not create the shelf."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:390
+#: cps/spa_strings.py:394
 #, fuzzy
 msgid "Could not load candidates."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:391
+#: cps/spa_strings.py:395
 #, fuzzy
 msgid "Could not load duplicates."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:392
+#: cps/spa_strings.py:396
 #, fuzzy
 msgid "Could not load highlights."
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:393
+#: cps/spa_strings.py:397
 #, fuzzy
 msgid "Could not load this text file."
 msgstr "无法添加书籍到书架：%(sname)s"
 
-#: cps/spa_strings.py:394
+#: cps/spa_strings.py:398
 #, fuzzy
 msgid "Could not read this comic archive."
 msgstr "无法获取更新信息"
 
-#: cps/spa_strings.py:395
+#: cps/spa_strings.py:399
 #, fuzzy
 msgid "Could not reset password."
 msgstr "修改密码"
 
-#: cps/spa_strings.py:396
+#: cps/spa_strings.py:400
 #, fuzzy
 msgid "Could not save the shelf."
 msgstr "无法登录：%(message)s"
 
-#: cps/spa_strings.py:397
+#: cps/spa_strings.py:401
 #, fuzzy
 msgid "Couldn’t start a magic link. Please try again."
 msgstr "链接 OAuth 帐户失败。请重试。"
 
-#: cps/spa_strings.py:398
+#: cps/spa_strings.py:402
 #, fuzzy
 msgid "Cover locked"
 msgstr "封面"
 
-#: cps/spa_strings.py:399
+#: cps/spa_strings.py:403
 #, fuzzy
 msgid "Cover not reachable"
 msgstr "编辑元数据"
 
-#: cps/spa_strings.py:401
+#: cps/spa_strings.py:405
 #, fuzzy
 msgid "Cover updated from the selected result."
 msgstr "封面"
 
-#: cps/spa_strings.py:402
+#: cps/spa_strings.py:406
 #, fuzzy
 msgid "Create"
 msgstr "新建或查看"
 
-#: cps/spa_strings.py:403
+#: cps/spa_strings.py:407
 #, fuzzy
 msgid "Create account"
 msgstr "创建问题"
 
-#: cps/spa_strings.py:404
+#: cps/spa_strings.py:408
 #, fuzzy
 msgid "Create an account"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:405
+#: cps/spa_strings.py:409
 msgid "Create shelf and add book"
 msgstr ""
 
-#: cps/spa_strings.py:406
+#: cps/spa_strings.py:410
 #, fuzzy
 msgid "Create user"
 msgstr "创建问题"
 
-#: cps/spa_strings.py:407
+#: cps/spa_strings.py:411
 #, fuzzy
 msgid "Creating…"
 msgstr "搜索"
 
-#: cps/spa_strings.py:408 cps/templates/cover_picker.html:178
+#: cps/spa_strings.py:412 cps/templates/cover_picker.html:178
 #, fuzzy
 msgid "Current"
 msgstr "当前版本"
 
-#: cps/spa_strings.py:409 cps/templates/cover_picker.html:23
+#: cps/spa_strings.py:413 cps/templates/cover_picker.html:23
 #, fuzzy
 msgid "Current cover"
 msgstr "当前版本"
 
-#: cps/spa_strings.py:410
+#: cps/spa_strings.py:414
 #, fuzzy
 msgid "Current password"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:411 cps/templates/detail.html:849
+#: cps/spa_strings.py:415 cps/templates/detail.html:849
 #: cps/templates/image.html:27 cps/templates/index.html:45
 #, fuzzy
 msgid "Currently reading"
 msgstr "当前版本"
 
-#: cps/spa_strings.py:412
+#: cps/spa_strings.py:416
 msgid "Custom border colour"
 msgstr ""
 
-#: cps/spa_strings.py:413
+#: cps/spa_strings.py:417
 #, fuzzy
 msgid "Default book language"
 msgstr "默认语言"
 
-#: cps/spa_strings.py:414
+#: cps/spa_strings.py:418
 #, fuzzy
 msgid "Default interface language"
 msgstr "新用户默认权限设置"
 
-#: cps/spa_strings.py:415
+#: cps/spa_strings.py:419
 #, fuzzy
 msgid "Default roles for new OAuth users:"
 msgstr "新用户默认权限设置"
 
-#: cps/spa_strings.py:416
+#: cps/spa_strings.py:420
 msgid "Defaults live in Admin → Configuration → Kobo sync."
 msgstr ""
 
-#: cps/spa_strings.py:417
+#: cps/spa_strings.py:421
 msgid "Delete this smart shelf? Your books are not affected."
 msgstr ""
 
-#: cps/spa_strings.py:418 cps/templates/book_edit.html:171
+#: cps/spa_strings.py:422 cps/templates/book_edit.html:171
 #: cps/templates/book_edit.html:461 cps/templates/cwa_settings.html:341
 #: cps/templates/cwa_settings.html:343 cps/templates/search_form.html:154
 msgid "Description"
 msgstr "简介"
 
-#: cps/spa_strings.py:419
+#: cps/spa_strings.py:423
 #, fuzzy
 msgid "Disable standard password login"
 msgstr "禁用标准登录 (用户名/密码)"
 
-#: cps/spa_strings.py:421
+#: cps/spa_strings.py:425
 #, fuzzy
 msgid "Discover picks updated."
 msgstr "封面"
 
-#: cps/spa_strings.py:422 cps/templates/cwng_feedback_popup.html:24
+#: cps/spa_strings.py:426 cps/templates/cwng_feedback_popup.html:24
 #: cps/templates/duplicates.html:618 cps/templates/layout.html:406
 #: cps/templates/layout.html:576
 msgid "Dismiss"
 msgstr "忽略"
 
-#: cps/spa_strings.py:423
+#: cps/spa_strings.py:427
 #, fuzzy
 msgid "Dismiss this group"
 msgstr "忽略此重复组"
 
-#: cps/spa_strings.py:424
+#: cps/spa_strings.py:428
 #, fuzzy
 msgid "Documentation"
 msgstr "LDAP 验证方式"
 
-#: cps/spa_strings.py:425
+#: cps/spa_strings.py:429
 msgid "Done reordering"
 msgstr ""
 
-#: cps/spa_strings.py:426 cps/templates/admin.html:24
+#: cps/spa_strings.py:430 cps/templates/admin.html:24
 #: cps/templates/detail.html:647 cps/templates/shelf.html:9
 #: cps/templates/user_table.html:147
 msgid "Download"
 msgstr "下载书籍"
 
-#: cps/spa_strings.py:427
+#: cps/spa_strings.py:431
 msgid "Drop files here, or click to choose"
 msgstr ""
 
-#: cps/spa_strings.py:428
+#: cps/spa_strings.py:432
 #, fuzzy
 msgid "Duplicate"
 msgstr "重复书籍"
 
-#: cps/spa_strings.py:429
+#: cps/spa_strings.py:433
 #, fuzzy
 msgid "Duplicate books"
 msgstr "删除书籍"
 
-#: cps/spa_strings.py:431 cps/templates/cover_picker.html:94
+#: cps/spa_strings.py:435 cps/templates/cover_picker.html:94
 msgid "E-reader preview"
 msgstr ""
 
-#: cps/spa_strings.py:432
+#: cps/spa_strings.py:436
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
 msgstr ""
 
-#: cps/spa_strings.py:433 cps/templates/admin.html:26
+#: cps/spa_strings.py:437 cps/templates/admin.html:26
 #: cps/templates/book_table.html:51 cps/templates/book_table.html:332
 #: cps/templates/duplicates.html:657 cps/templates/index.html:131
 #: cps/templates/user_table.html:131 cps/templates/user_table.html:149
 msgid "Edit"
 msgstr "编辑书籍"
 
-#: cps/spa_strings.py:434
+#: cps/spa_strings.py:438
 #, fuzzy
 msgid "Edit smart shelf"
 msgstr "编辑书架"
 
-#: cps/spa_strings.py:435 cps/templates/admin.html:15
+#: cps/spa_strings.py:439 cps/templates/admin.html:15
 #: cps/templates/register.html:14 cps/templates/user_edit.html:200
 #: cps/templates/user_table.html:135
 msgid "Email"
 msgstr "邮箱地址"
 
-#: cps/spa_strings.py:436
+#: cps/spa_strings.py:440
 #, fuzzy
 msgid "Email (SMTP) server"
 msgstr "电子邮件服务"
 
-#: cps/spa_strings.py:437
+#: cps/spa_strings.py:441
 msgid "Email (optional)"
 msgstr ""
 
-#: cps/spa_strings.py:438
+#: cps/spa_strings.py:442
 #, fuzzy
 msgid "Email claim"
 msgstr "电子邮件服务"
 
-#: cps/spa_strings.py:439
+#: cps/spa_strings.py:443
 #, fuzzy
 msgid "Email me a reset"
 msgstr "电子邮件服务"
 
-#: cps/spa_strings.py:440
+#: cps/spa_strings.py:444
 #, fuzzy
 msgid "Email settings saved."
 msgstr "邮件服务器设置已更新"
 
-#: cps/spa_strings.py:441 cps/templates/config_edit.html:208
+#: cps/spa_strings.py:445 cps/templates/config_edit.html:208
 msgid "Enable Kobo sync"
 msgstr "启用 Kobo 同步"
 
-#: cps/spa_strings.py:442 cps/templates/admin.html:80
+#: cps/spa_strings.py:446 cps/templates/admin.html:80
 #: cps/templates/email_edit.html:39
 msgid "Encryption"
 msgstr "加密"
 
-#: cps/spa_strings.py:443
+#: cps/spa_strings.py:447
 msgid "Expires in"
 msgstr ""
 
-#: cps/spa_strings.py:444
+#: cps/spa_strings.py:448
 #, fuzzy
 msgid "Expose only selected shelves over OPDS"
 msgstr "仅同步所选书架中的书籍到 Kobo"
 
-#: cps/spa_strings.py:445
+#: cps/spa_strings.py:449
 #, fuzzy
 msgid "Failed to load."
 msgstr "使用 Google 登录失败"
 
-#: cps/spa_strings.py:446 cps/templates/image.html:25
+#: cps/spa_strings.py:450 cps/templates/image.html:25
 msgid "Favorite"
 msgstr ""
 
-#: cps/spa_strings.py:447
+#: cps/spa_strings.py:451
 #, fuzzy
 msgid "Favorited"
 msgstr "热门书籍"
 
-#: cps/spa_strings.py:448
+#: cps/spa_strings.py:452
 msgid "Fetch"
 msgstr ""
 
-#: cps/spa_strings.py:449
+#: cps/spa_strings.py:453
 #, fuzzy
 msgid "Fetch metadata from web"
 msgstr "获取元数据"
 
-#: cps/spa_strings.py:450
+#: cps/spa_strings.py:454
 #, fuzzy
 msgid "Files"
 msgstr "字体大小"
 
-#: cps/spa_strings.py:451
+#: cps/spa_strings.py:455
 msgid ""
 "Files are queued for the library's ingest process and appear once imported."
 msgstr ""
 
-#: cps/spa_strings.py:452
+#: cps/spa_strings.py:456
 #, fuzzy
 msgid "Forgot password?"
 msgstr "忘记密码？"
 
-#: cps/spa_strings.py:453
+#: cps/spa_strings.py:457
 msgid "Format queued — it will appear once processed."
 msgstr ""
 
-#: cps/spa_strings.py:454
+#: cps/spa_strings.py:458
 msgid "Formats — exclude"
 msgstr ""
 
-#: cps/spa_strings.py:455
+#: cps/spa_strings.py:459
 msgid "Formats — include"
 msgstr ""
 
-#: cps/spa_strings.py:456
+#: cps/spa_strings.py:460
 #, fuzzy
 msgid "From address"
 msgstr "任务进度"
 
-#: cps/spa_strings.py:457
+#: cps/spa_strings.py:461
 msgid "Generate a new link"
 msgstr ""
 
-#: cps/spa_strings.py:458
+#: cps/spa_strings.py:462
 msgid "Give your smart shelf a name."
 msgstr ""
 
-#: cps/spa_strings.py:459
+#: cps/spa_strings.py:463
 #, fuzzy
 msgid "Go to your library"
 msgstr "搜索书库"
 
-#: cps/spa_strings.py:460
+#: cps/spa_strings.py:464
 #, fuzzy
 msgid "Group claim"
 msgstr "OAuth 管理组"
 
-#: cps/spa_strings.py:461
+#: cps/spa_strings.py:465
 #, fuzzy
 msgid "Group members field"
 msgstr "LDAP 组成员字段"
 
-#: cps/spa_strings.py:462
+#: cps/spa_strings.py:466
 #, fuzzy
 msgid "Group name"
 msgstr "LDAP 组名"
 
-#: cps/spa_strings.py:463
+#: cps/spa_strings.py:467
 #, fuzzy
 msgid "Group object filter"
 msgstr "LDAP 组对象过滤器"
 
-#: cps/spa_strings.py:464
+#: cps/spa_strings.py:468
 msgid "HTML is allowed and sanitized on display."
 msgstr ""
 
-#: cps/spa_strings.py:465
+#: cps/spa_strings.py:469
 #, fuzzy
 msgid "Header name"
 msgstr "用户名"
 
-#: cps/spa_strings.py:466
+#: cps/spa_strings.py:470
 msgid "Help & support"
 msgstr ""
 
-#: cps/spa_strings.py:467
+#: cps/spa_strings.py:471
 #, fuzzy
 msgid "Help menu"
 msgstr "关闭"
 
-#: cps/spa_strings.py:468 cps/templates/readcbr.html:173
+#: cps/spa_strings.py:472 cps/templates/readcbr.html:173
 msgid "Hide"
 msgstr "隐藏"
 
-#: cps/spa_strings.py:469
+#: cps/spa_strings.py:473
 #, fuzzy
 msgid "Hide Discover section"
 msgstr "简介"
 
-#: cps/spa_strings.py:470
+#: cps/spa_strings.py:474
 #, fuzzy
 msgid "Hide fields"
 msgstr "公共书架"
 
-#: cps/spa_strings.py:471
+#: cps/spa_strings.py:475
 #, fuzzy
 msgid "Hide password"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:472
+#: cps/spa_strings.py:476
 #, fuzzy
 msgid "Highlight"
 msgstr "高度"
 
-#: cps/spa_strings.py:473
+#: cps/spa_strings.py:477
 #, fuzzy
 msgid "Highlights"
 msgstr "高度"
 
-#: cps/spa_strings.py:474
+#: cps/spa_strings.py:478
 msgid "Icon"
 msgstr ""
 
-#: cps/spa_strings.py:475
+#: cps/spa_strings.py:479
 #, fuzzy
 msgid "Identifier type"
 msgstr "书号类型"
 
-#: cps/spa_strings.py:476
+#: cps/spa_strings.py:480
 #, fuzzy
 msgid "Identifier value"
 msgstr "书号编号"
 
-#: cps/spa_strings.py:477 cps/templates/book_edit.html:175
+#: cps/spa_strings.py:481 cps/templates/book_edit.html:175
 msgid "Identifiers"
 msgstr "书号"
 
-#: cps/spa_strings.py:478
+#: cps/spa_strings.py:482
 msgid "In your book"
 msgstr ""
 
-#: cps/spa_strings.py:479
+#: cps/spa_strings.py:483
 msgid ""
 "In-browser reading currently supports EPUB. Use download or the classic "
 "reader for other formats."
 msgstr ""
 
-#: cps/spa_strings.py:480
+#: cps/spa_strings.py:484
 msgid "Issuer / base URL"
 msgstr ""
 
-#: cps/spa_strings.py:481
+#: cps/spa_strings.py:485
 msgid "It may have moved, or it might still live in the classic interface."
 msgstr ""
 
-#: cps/spa_strings.py:482 cps/templates/detail.html:1017
+#: cps/spa_strings.py:486 cps/templates/detail.html:1017
 #, fuzzy
 msgid "KOReader Progress"
 msgstr "任务进度"
 
-#: cps/spa_strings.py:483
+#: cps/spa_strings.py:487
 #, fuzzy
 msgid "Key file path"
 msgstr "文件路径"
 
-#: cps/spa_strings.py:484
+#: cps/spa_strings.py:488
 #, fuzzy
 msgid "Key path"
 msgstr "文件路径"
 
-#: cps/spa_strings.py:485
+#: cps/spa_strings.py:489
 #, fuzzy
 msgid "Kobo sync on"
 msgstr "Kobo 同步 Token"
 
-#: cps/spa_strings.py:486
+#: cps/spa_strings.py:490
 msgid "LDAP"
 msgstr ""
 
-#: cps/spa_strings.py:487 cps/templates/book_edit.html:163
+#: cps/spa_strings.py:491 cps/templates/book_edit.html:163
 #: cps/templates/cwa_settings.html:1127 cps/templates/listenmp3.html:69
 msgid "Language"
 msgstr "语言"
 
-#: cps/spa_strings.py:489
+#: cps/spa_strings.py:493
 #, fuzzy
 msgid "Languages — include"
 msgstr "单页显示"
 
-#: cps/spa_strings.py:490
+#: cps/spa_strings.py:494
 msgid "Larger"
 msgstr ""
 
-#: cps/spa_strings.py:491
+#: cps/spa_strings.py:495
 msgid "Larger text"
 msgstr ""
 
-#: cps/spa_strings.py:492 cps/templates/detail.html:1029
+#: cps/spa_strings.py:496 cps/templates/detail.html:1029
 msgid "Last synced"
 msgstr ""
 
-#: cps/spa_strings.py:493
+#: cps/spa_strings.py:497
 #, fuzzy
 msgid "Library settings"
 msgstr "安全设置"
 
-#: cps/spa_strings.py:494
+#: cps/spa_strings.py:498
 msgid "Load more"
 msgstr ""
 
-#: cps/spa_strings.py:495
+#: cps/spa_strings.py:499
 msgid "Loading new Discover picks."
 msgstr ""
 
-#: cps/spa_strings.py:496 cps/templates/cover_picker.html:87
+#: cps/spa_strings.py:500 cps/templates/cover_picker.html:87
 #, fuzzy
 msgid "Loading…"
 msgstr "加载中..."
 
-#: cps/spa_strings.py:497 cps/templates/cover_picker.html:37
+#: cps/spa_strings.py:501 cps/templates/cover_picker.html:37
 msgid "Lock cover"
 msgstr ""
 
-#: cps/spa_strings.py:498
+#: cps/spa_strings.py:502
 #, fuzzy
 msgid "Log in with a magic link"
 msgstr "通过魔法链接登录"
 
-#: cps/spa_strings.py:500
+#: cps/spa_strings.py:504
 #, fuzzy
 msgid "Login button text"
 msgstr "登录按钮文本"
 
-#: cps/spa_strings.py:501
+#: cps/spa_strings.py:505
 #, fuzzy
 msgid "Login method"
 msgstr "更新失败："
 
-#: cps/spa_strings.py:502
+#: cps/spa_strings.py:506
 msgid "Looks good"
 msgstr ""
 
-#: cps/spa_strings.py:503
-msgid "Low-res"
-msgstr ""
-
-#: cps/spa_strings.py:504
-#, fuzzy
-msgid "Magic link QR code"
-msgstr "魔法链接远程登录"
-
-#: cps/spa_strings.py:505
-msgid "Make private"
-msgstr ""
-
-#: cps/spa_strings.py:506
-msgid "Make public"
-msgstr ""
-
 #: cps/spa_strings.py:507
-msgid "Manage admin role from OAuth group"
+msgid "Low-res"
 msgstr ""
 
 #: cps/spa_strings.py:508
 #, fuzzy
+msgid "Magic link QR code"
+msgstr "魔法链接远程登录"
+
+#: cps/spa_strings.py:509
+msgid "Make private"
+msgstr ""
+
+#: cps/spa_strings.py:510
+msgid "Make public"
+msgstr ""
+
+#: cps/spa_strings.py:511
+msgid "Manage admin role from OAuth group"
+msgstr ""
+
+#: cps/spa_strings.py:512
+#, fuzzy
 msgid "Manage shelves"
 msgstr "同步所选书架到 Kobo"
 
-#: cps/spa_strings.py:509 cps/templates/_book_organizer.html:139
+#: cps/spa_strings.py:513 cps/templates/_book_organizer.html:139
 #: cps/templates/book_table.html:60 cps/templates/book_table.html:254
 #, fuzzy
 msgid "Mark as read"
 msgstr "标为已读"
 
-#: cps/spa_strings.py:510 cps/templates/_book_organizer.html:145
+#: cps/spa_strings.py:514 cps/templates/_book_organizer.html:145
 #: cps/templates/book_table.html:63 cps/templates/book_table.html:274
 #, fuzzy
 msgid "Mark as unread"
 msgstr "标为未读"
 
-#: cps/spa_strings.py:511
+#: cps/spa_strings.py:515
 msgid "Match"
 msgstr ""
 
-#: cps/spa_strings.py:512
+#: cps/spa_strings.py:516
 msgid "Max"
 msgstr ""
 
-#: cps/spa_strings.py:513
-msgid "Max authors shown"
-msgstr ""
-
-#: cps/spa_strings.py:514
-#, fuzzy
-msgid "Maximum rating"
-msgstr "最长任务持续时间"
-
-#: cps/spa_strings.py:515
-#, fuzzy
-msgid "Member user filter"
-msgstr "LDAP 成员用户过滤器"
-
-#: cps/spa_strings.py:516
-#, fuzzy
-msgid "Metadata URL (OIDC auto-discovery)"
-msgstr "OAuth 元数据 URL (用于自动发现)"
-
 #: cps/spa_strings.py:517
-msgid "Min"
+msgid "Max authors shown"
 msgstr ""
 
 #: cps/spa_strings.py:518
 #, fuzzy
-msgid "Minimum rating"
+msgid "Maximum rating"
 msgstr "最长任务持续时间"
 
 #: cps/spa_strings.py:519
-msgid "More cover options (search providers, e-reader preview)"
-msgstr ""
+#, fuzzy
+msgid "Member user filter"
+msgstr "LDAP 成员用户过滤器"
 
 #: cps/spa_strings.py:520
 #, fuzzy
-msgid "More server configuration"
-msgstr "服务器配置"
+msgid "Metadata URL (OIDC auto-discovery)"
+msgstr "OAuth 元数据 URL (用于自动发现)"
 
 #: cps/spa_strings.py:521
-msgid "Move down"
+msgid "Min"
 msgstr ""
 
 #: cps/spa_strings.py:522
 #, fuzzy
+msgid "Minimum rating"
+msgstr "最长任务持续时间"
+
+#: cps/spa_strings.py:523
+msgid "More cover options (search providers, e-reader preview)"
+msgstr ""
+
+#: cps/spa_strings.py:524
+#, fuzzy
+msgid "More server configuration"
+msgstr "服务器配置"
+
+#: cps/spa_strings.py:525
+msgid "Move down"
+msgstr ""
+
+#: cps/spa_strings.py:526
+#, fuzzy
 msgid "Move up"
 msgstr "撤回"
 
-#: cps/spa_strings.py:523
+#: cps/spa_strings.py:527
 #, fuzzy
 msgid "My account"
 msgstr "账号"
 
-#: cps/spa_strings.py:524
+#: cps/spa_strings.py:528
 msgid "Name"
 msgstr ""
 
-#: cps/spa_strings.py:525
+#: cps/spa_strings.py:529
 msgid "Need to report an issue? Try the new"
 msgstr ""
 
-#: cps/spa_strings.py:526 cps/templates/cover_picker.html:182
+#: cps/spa_strings.py:530 cps/templates/cover_picker.html:182
 msgid "New"
-msgstr ""
-
-#: cps/spa_strings.py:527
-#, fuzzy
-msgid "New password"
-msgstr "修改密码"
-
-#: cps/spa_strings.py:528
-msgid "New shelf name"
-msgstr ""
-
-#: cps/spa_strings.py:529
-msgid "New shelf name…"
-msgstr ""
-
-#: cps/spa_strings.py:530
-msgid "New shelf…"
 msgstr ""
 
 #: cps/spa_strings.py:531
 #, fuzzy
-msgid "New smart shelf"
-msgstr "创建书架"
+msgid "New password"
+msgstr "修改密码"
 
 #: cps/spa_strings.py:532
-#, fuzzy
-msgid "New user"
-msgstr "添加新用户"
+msgid "New shelf name"
+msgstr ""
 
 #: cps/spa_strings.py:533
-#, fuzzy
-msgid "Next page"
-msgstr "下一页"
+msgid "New shelf name…"
+msgstr ""
 
 #: cps/spa_strings.py:534
-msgid "No books match this smart shelf right now."
+msgid "New shelf…"
 msgstr ""
 
 #: cps/spa_strings.py:535
 #, fuzzy
+msgid "New smart shelf"
+msgstr "创建书架"
+
+#: cps/spa_strings.py:536
+#, fuzzy
+msgid "New user"
+msgstr "添加新用户"
+
+#: cps/spa_strings.py:537
+#, fuzzy
+msgid "Next page"
+msgstr "下一页"
+
+#: cps/spa_strings.py:538
+msgid "No books match this smart shelf right now."
+msgstr ""
+
+#: cps/spa_strings.py:539
+#, fuzzy
 msgid "No books match those criteria."
 msgstr "找不到令牌"
 
-#: cps/spa_strings.py:536 cps/templates/cover_picker.html:223
+#: cps/spa_strings.py:540 cps/templates/cover_picker.html:223
 msgid "No candidates found yet. Try a different search or refresh."
 msgstr ""
 
-#: cps/spa_strings.py:537
+#: cps/spa_strings.py:541
 #, fuzzy
 msgid "No contents found."
 msgstr "找不到令牌"
 
-#: cps/spa_strings.py:538
+#: cps/spa_strings.py:542
 #, fuzzy
 msgid "No duplicate groups found."
 msgstr "无搜索结果"
 
-#: cps/spa_strings.py:539
+#: cps/spa_strings.py:543
 #, fuzzy
 msgid "No excluded tags"
 msgstr "排除标签"
 
-#: cps/spa_strings.py:540
+#: cps/spa_strings.py:544
 msgid ""
 "No highlights yet. Highlight while reading, or import from a Kobo device."
 msgstr ""
 
-#: cps/spa_strings.py:541
+#: cps/spa_strings.py:545
 msgid "No pages found in this comic."
 msgstr ""
 
-#: cps/spa_strings.py:542
+#: cps/spa_strings.py:546
 msgid "No shelves yet — create one below."
 msgstr ""
 
-#: cps/spa_strings.py:543
+#: cps/spa_strings.py:547
 msgid "No sources need a key."
 msgstr ""
 
-#: cps/spa_strings.py:544
+#: cps/spa_strings.py:548
 msgid "No tasks running."
 msgstr ""
 
-#: cps/spa_strings.py:546
+#: cps/spa_strings.py:550
 msgid "Not configured"
 msgstr ""
 
-#: cps/spa_strings.py:547
+#: cps/spa_strings.py:551
 msgid "OAuth / OpenID Connect"
 msgstr ""
 
-#: cps/spa_strings.py:548
+#: cps/spa_strings.py:552
 msgid ""
 "On another device where you’re already signed in, scan this code or open the "
 "link below to authorise this device."
 msgstr ""
 
-#: cps/spa_strings.py:549
-msgid "Open classic reader"
-msgstr ""
-
-#: cps/spa_strings.py:550
-#, fuzzy
-msgid "Open navigation"
-msgstr "切换导航"
-
-#: cps/spa_strings.py:551
-#, fuzzy
-msgid "Open reader"
-msgstr "epub 阅读器"
-
-#: cps/spa_strings.py:552
-msgid "Open the classic interface"
-msgstr ""
-
 #: cps/spa_strings.py:553
-msgid "Open the link below on your signed-in device."
+msgid "Open classic reader"
 msgstr ""
 
 #: cps/spa_strings.py:554
 #, fuzzy
+msgid "Open navigation"
+msgstr "切换导航"
+
+#: cps/spa_strings.py:555
+#, fuzzy
+msgid "Open reader"
+msgstr "epub 阅读器"
+
+#: cps/spa_strings.py:556
+msgid "Open the classic interface"
+msgstr ""
+
+#: cps/spa_strings.py:557
+msgid "Open the link below on your signed-in device."
+msgstr ""
+
+#: cps/spa_strings.py:558
+#, fuzzy
 msgid "OpenLDAP server"
 msgstr "LDAP 服务器端口"
 
-#: cps/spa_strings.py:555
+#: cps/spa_strings.py:559
 #, fuzzy
 msgid "PDF reader"
 msgstr "PDF 阅读器"
 
-#: cps/spa_strings.py:556 cps/templates/admin.html:20
+#: cps/spa_strings.py:560 cps/templates/admin.html:20
 #: cps/templates/login.html:22 cps/templates/login.html:23
 #: cps/templates/user_edit.html:211
 msgid "Password"
 msgstr "密码"
 
-#: cps/spa_strings.py:557
+#: cps/spa_strings.py:561
 msgid "Password (leave blank to keep)"
 msgstr ""
 
-#: cps/spa_strings.py:558 cps/templates/cover_picker.html:14
+#: cps/spa_strings.py:562 cps/templates/cover_picker.html:14
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
 "the cover embedded in the book itself."
 msgstr ""
 
-#: cps/spa_strings.py:559
+#: cps/spa_strings.py:563
 #, python-brace-format
 msgid "Picked up {label}. Drag to reorder, release to drop."
 msgstr ""
 
-#: cps/spa_strings.py:560 cps/templates/admin.html:123
+#: cps/spa_strings.py:564 cps/templates/admin.html:123
 msgid "Port"
 msgstr "端口"
 
-#: cps/spa_strings.py:561
+#: cps/spa_strings.py:565
 msgid "Preparing your magic link…"
 msgstr ""
 
-#: cps/spa_strings.py:562
+#: cps/spa_strings.py:566
 #, fuzzy
 msgid "Previous page"
 msgstr "上一页"
 
-#: cps/spa_strings.py:563 cps/templates/duplicates.html:545
+#: cps/spa_strings.py:567 cps/templates/duplicates.html:545
 #: cps/templates/tasks.html:17
 msgid "Progress"
 msgstr "任务进度"
 
-#: cps/spa_strings.py:564
+#: cps/spa_strings.py:568
 #, fuzzy
 msgid "Public"
 msgstr "(公共)"
 
-#: cps/spa_strings.py:565
+#: cps/spa_strings.py:569
 #, fuzzy
 msgid "Published after"
 msgstr "出版时间晚于 "
 
-#: cps/spa_strings.py:566
+#: cps/spa_strings.py:570
 #, fuzzy
 msgid "Published before"
 msgstr "出版时间早于 "
 
-#: cps/spa_strings.py:568
+#: cps/spa_strings.py:572
 #, fuzzy
 msgid "Random books shown"
 msgstr "随机书籍"
 
-#: cps/spa_strings.py:569 cps/templates/book_edit.html:167
+#: cps/spa_strings.py:573 cps/templates/book_edit.html:167
 #: cps/templates/cwa_settings.html:369 cps/templates/cwa_settings.html:371
 msgid "Rating"
 msgstr "评分"
 
-#: cps/spa_strings.py:570
+#: cps/spa_strings.py:574
 #, fuzzy
 msgid "Rating (stars)"
 msgstr "评分列表"
 
-#: cps/spa_strings.py:571
+#: cps/spa_strings.py:575
 #, fuzzy
 msgid "Read status"
 msgstr "阅读状态"
 
-#: cps/spa_strings.py:572
+#: cps/spa_strings.py:576
 #, fuzzy
 msgid "Read status filter"
 msgstr "阅读状态"
 
-#: cps/spa_strings.py:573
+#: cps/spa_strings.py:577
 msgid "Recipient(s)"
 msgstr ""
 
-#: cps/spa_strings.py:574
+#: cps/spa_strings.py:578
 msgid "Redirect host (full URL)"
 msgstr ""
 
-#: cps/spa_strings.py:575 cps/templates/cover_picker.html:152
+#: cps/spa_strings.py:579 cps/templates/cover_picker.html:152
 #: cps/templates/index.html:120
 #, fuzzy
 msgid "Refresh"
 msgstr "搜索书库"
 
-#: cps/spa_strings.py:576
+#: cps/spa_strings.py:580
 #, fuzzy
 msgid "Registering…"
 msgstr "注册"
 
-#: cps/spa_strings.py:577
+#: cps/spa_strings.py:581
 #, fuzzy
 msgid "Remember me"
 msgstr "记住我"
 
-#: cps/spa_strings.py:578 cps/templates/detail.html:700
+#: cps/spa_strings.py:582 cps/templates/detail.html:700
 #: cps/templates/detail.html:701 cps/templates/detail.html:702
 #, fuzzy
 msgid "Remove from favorites"
 msgstr "从档案还原"
 
-#: cps/spa_strings.py:579 cps/templates/detail.html:809
+#: cps/spa_strings.py:583 cps/templates/detail.html:809
 #: cps/templates/detail.html:991
 #, fuzzy
 msgid "Remove from shelf"
 msgstr "从档案还原"
 
-#: cps/spa_strings.py:580
+#: cps/spa_strings.py:584
 #, fuzzy
 msgid "Remove highlight"
 msgstr "高度"
 
-#: cps/spa_strings.py:581
+#: cps/spa_strings.py:585
 #, fuzzy
 msgid "Remove identifier"
 msgstr "添加书号"
 
-#: cps/spa_strings.py:582
+#: cps/spa_strings.py:586
 #, fuzzy
 msgid "Remove rule"
 msgstr "移除"
 
-#: cps/spa_strings.py:583
+#: cps/spa_strings.py:587
 #, fuzzy
 msgid "Rename"
 msgstr "名称"
 
-#: cps/spa_strings.py:584
+#: cps/spa_strings.py:588
 #, fuzzy
 msgid "Reorder"
 msgstr "找不到用户"
 
-#: cps/spa_strings.py:585
+#: cps/spa_strings.py:589
 msgid "Replace cover with this one?"
 msgstr ""
 
-#: cps/spa_strings.py:586
+#: cps/spa_strings.py:590
 #, fuzzy
 msgid "Replace cover?"
 msgstr "上传格式"
 
-#: cps/spa_strings.py:587
+#: cps/spa_strings.py:591
 msgid "Report Issue on Discord"
 msgstr ""
 
-#: cps/spa_strings.py:588
+#: cps/spa_strings.py:592
 msgid "Report Issue on GitHub"
 msgstr ""
 
-#: cps/spa_strings.py:589
+#: cps/spa_strings.py:593
 msgid "Require group membership"
 msgstr ""
 
-#: cps/spa_strings.py:590
+#: cps/spa_strings.py:594
 #, fuzzy, python-brace-format
 msgid "Reset password for {name}"
 msgstr "重置用户密码"
 
-#: cps/spa_strings.py:591
+#: cps/spa_strings.py:595
 #, python-brace-format
 msgid ""
 "Reset password for {name}? Their current password will stop working and a "
 "replacement will be emailed."
 msgstr ""
 
-#: cps/spa_strings.py:592
+#: cps/spa_strings.py:596
 #, fuzzy
 msgid "Reverse-proxy header login"
 msgstr "反向代理登录"
 
-#: cps/spa_strings.py:593
+#: cps/spa_strings.py:597
 #, fuzzy
 msgid "Run time"
 msgstr "运行时间"
 
-#: cps/spa_strings.py:594
+#: cps/spa_strings.py:598
 #, fuzzy
 msgid "SMTP server"
 msgstr "正在停止服务器"
 
-#: cps/spa_strings.py:595 cps/templates/email_edit.html:43
+#: cps/spa_strings.py:599 cps/templates/email_edit.html:43
 msgid "SSL/TLS"
 msgstr "SSL/TLS 协议"
 
-#: cps/spa_strings.py:596 cps/templates/email_edit.html:42
+#: cps/spa_strings.py:600 cps/templates/email_edit.html:42
 msgid "STARTTLS"
 msgstr "STARTTLS 协议"
 
-#: cps/spa_strings.py:597 cps/templates/book_edit.html:313
-#: cps/templates/config_db.html:111 cps/templates/config_edit.html:716
+#: cps/spa_strings.py:601 cps/templates/book_edit.html:313
+#: cps/templates/config_db.html:111 cps/templates/config_edit.html:734
 #: cps/templates/config_view_edit.html:237 cps/templates/email_edit.html:71
 #: cps/templates/read.html:178 cps/templates/schedule_edit.html:47
 #: cps/templates/shelf_edit.html:36 cps/templates/shelf_reorder.html:38
@@ -4782,511 +4801,511 @@ msgstr "STARTTLS 协议"
 msgid "Save"
 msgstr "保存"
 
-#: cps/spa_strings.py:598
+#: cps/spa_strings.py:602
 #, fuzzy
 msgid "Save email settings"
 msgstr "安全设置"
 
-#: cps/spa_strings.py:599
+#: cps/spa_strings.py:603
 #, fuzzy
 msgid "Save name"
 msgstr "查看更新日志"
 
-#: cps/spa_strings.py:600
+#: cps/spa_strings.py:604
 #, fuzzy
 msgid "Save security settings"
 msgstr "安全设置"
 
-#: cps/spa_strings.py:601
+#: cps/spa_strings.py:605
 #, fuzzy
 msgid "Save settings"
 msgstr "设置"
 
-#: cps/spa_strings.py:602
+#: cps/spa_strings.py:606
 msgid "Saved. Restart the server for the login changes to take effect."
 msgstr ""
 
-#: cps/spa_strings.py:603
+#: cps/spa_strings.py:607
 #, fuzzy
 msgid "Scopes"
 msgstr "OAuth 设置"
 
-#: cps/spa_strings.py:604
+#: cps/spa_strings.py:608
 #, fuzzy
 msgid "Search title, author…"
 msgstr "按书名/作者搜索"
 
-#: cps/spa_strings.py:605
+#: cps/spa_strings.py:609
 #, fuzzy
 msgid "Searching every source…"
 msgstr "搜索"
 
-#: cps/spa_strings.py:606 cps/templates/cover_picker.html:147
+#: cps/spa_strings.py:610 cps/templates/cover_picker.html:147
 #: cps/templates/cover_picker.html:222
 #, fuzzy
 msgid "Searching…"
 msgstr "搜索"
 
-#: cps/spa_strings.py:607
+#: cps/spa_strings.py:611
 #, fuzzy
 msgid "Security settings saved."
 msgstr "安全设置"
 
-#: cps/spa_strings.py:608
+#: cps/spa_strings.py:612
 msgid "See how each cover looks padded for your device"
 msgstr ""
 
-#: cps/spa_strings.py:609 cps/templates/modal_dialogs.html:98
+#: cps/spa_strings.py:613 cps/templates/modal_dialogs.html:98
 msgid "Select"
 msgstr "选择"
 
-#: cps/spa_strings.py:610
+#: cps/spa_strings.py:614
 #, fuzzy
 msgid "Select multiple"
 msgstr "创建书架"
 
-#: cps/spa_strings.py:611 cps/templates/detail.html:1191
+#: cps/spa_strings.py:615 cps/templates/detail.html:1191
 msgid "Send"
 msgstr "发送"
 
-#: cps/spa_strings.py:612
+#: cps/spa_strings.py:616
 #, fuzzy
 msgid "Send to e-reader"
 msgstr "发送到电子阅读器"
 
-#: cps/spa_strings.py:613
+#: cps/spa_strings.py:617
 #, fuzzy
 msgid "Send-to-eReader email"
 msgstr "接收书籍的电子阅读器邮箱地址"
 
-#: cps/spa_strings.py:614
+#: cps/spa_strings.py:618
 #, fuzzy
 msgid "Sending…"
 msgstr "搜索"
 
-#: cps/spa_strings.py:615
+#: cps/spa_strings.py:619
 #, fuzzy
 msgid "Series index"
 msgstr "丛书编号"
 
-#: cps/spa_strings.py:616
+#: cps/spa_strings.py:620
 #, fuzzy
 msgid "Series — include"
 msgstr "丛书编号"
 
-#: cps/spa_strings.py:617
+#: cps/spa_strings.py:621
 #, fuzzy
 msgid "Serve over HTTPS"
 msgstr "通过 HTTPS 使用"
 
-#: cps/spa_strings.py:618
+#: cps/spa_strings.py:622
 msgid "Server SSL / HTTPS"
 msgstr ""
 
-#: cps/spa_strings.py:619
+#: cps/spa_strings.py:623
 msgid "Server announcement (shown to all users)"
 msgstr ""
 
-#: cps/spa_strings.py:620
+#: cps/spa_strings.py:624
 #, fuzzy
 msgid "Server host"
 msgstr "服务器端口"
 
-#: cps/spa_strings.py:621
+#: cps/spa_strings.py:625
 msgid "Service account (DN)"
 msgstr ""
 
-#: cps/spa_strings.py:622
+#: cps/spa_strings.py:626
 #, fuzzy
 msgid "Service password"
 msgstr "修改密码"
 
-#: cps/spa_strings.py:623
+#: cps/spa_strings.py:627
 msgid "Service password (leave blank to keep)"
 msgstr ""
 
-#: cps/spa_strings.py:624
+#: cps/spa_strings.py:628
 msgid ""
 "Set a metadata URL to auto-fill the endpoints below, or enter them manually."
 msgstr ""
 
-#: cps/spa_strings.py:625
+#: cps/spa_strings.py:629
 #, fuzzy
 msgid "Settings saved."
 msgstr "设置"
 
-#: cps/spa_strings.py:626
+#: cps/spa_strings.py:630
 #, fuzzy
 msgid "Shelf name"
 msgstr "书架：%(name)s"
 
-#: cps/spa_strings.py:627
+#: cps/spa_strings.py:631
 #, fuzzy
 msgid "Shelf not found."
 msgstr "找不到用户"
 
-#: cps/spa_strings.py:629
+#: cps/spa_strings.py:633
 #, fuzzy
 msgid "Show Discover section"
 msgstr "显示出版社栏目"
 
-#: cps/spa_strings.py:630
+#: cps/spa_strings.py:634
 msgid "Show books in language"
 msgstr ""
 
-#: cps/spa_strings.py:631
+#: cps/spa_strings.py:635
 msgid "Show e-reader previews on each candidate"
 msgstr ""
 
-#: cps/spa_strings.py:632
+#: cps/spa_strings.py:636
 #, fuzzy
 msgid "Show password"
 msgstr "SMTP 密码"
 
-#: cps/spa_strings.py:633
+#: cps/spa_strings.py:637
 msgid "Shuffle picks"
 msgstr ""
 
-#: cps/spa_strings.py:634
+#: cps/spa_strings.py:638
 #, fuzzy
 msgid "Sign in with a magic link"
 msgstr "通过魔法链接登录"
 
-#: cps/spa_strings.py:635
+#: cps/spa_strings.py:639
 msgid "Sign out"
 msgstr ""
 
-#: cps/spa_strings.py:636
+#: cps/spa_strings.py:640
 msgid "Signing in…"
 msgstr ""
 
-#: cps/spa_strings.py:637
+#: cps/spa_strings.py:641
 #, fuzzy
 msgid "Site title"
 msgstr "输入书名"
 
-#: cps/spa_strings.py:638
+#: cps/spa_strings.py:642
 msgid "Smaller"
 msgstr ""
 
-#: cps/spa_strings.py:639
+#: cps/spa_strings.py:643
 msgid "Smaller text"
-msgstr ""
-
-#: cps/spa_strings.py:640
-#, fuzzy
-msgid "Smart shelf not found."
-msgstr "找不到用户"
-
-#: cps/spa_strings.py:641
-#, fuzzy
-msgid "Smart shelves"
-msgstr "书架列表"
-
-#: cps/spa_strings.py:642
-msgid "Some sources need a key for better covers"
-msgstr ""
-
-#: cps/spa_strings.py:643 cps/templates/cover_picker.html:226
-msgid "Something went wrong. Try again."
 msgstr ""
 
 #: cps/spa_strings.py:644
 #, fuzzy
+msgid "Smart shelf not found."
+msgstr "找不到用户"
+
+#: cps/spa_strings.py:645
+#, fuzzy
+msgid "Smart shelves"
+msgstr "书架列表"
+
+#: cps/spa_strings.py:646
+msgid "Some sources need a key for better covers"
+msgstr ""
+
+#: cps/spa_strings.py:647 cps/templates/cover_picker.html:226
+msgid "Something went wrong. Try again."
+msgstr ""
+
+#: cps/spa_strings.py:648
+#, fuzzy
 msgid "Sort order"
 msgstr "丛书编号"
 
-#: cps/spa_strings.py:645
+#: cps/spa_strings.py:649
 #, fuzzy
 msgid "Source details"
 msgstr "书籍详情"
 
-#: cps/spa_strings.py:646 cps/templates/detail.html:1023
+#: cps/spa_strings.py:650 cps/templates/detail.html:1023
 #, fuzzy
 msgid "Started reading"
 msgstr "已开始"
 
-#: cps/spa_strings.py:648 cps/templates/tasks.html:16
+#: cps/spa_strings.py:652 cps/templates/tasks.html:16
 msgid "Status"
 msgstr "任务状态"
 
-#: cps/spa_strings.py:649
+#: cps/spa_strings.py:653
 #, fuzzy
 msgid "Sync only selected shelves to Kobo"
 msgstr "仅同步所选书架中的书籍到 Kobo"
 
-#: cps/spa_strings.py:650
+#: cps/spa_strings.py:654
 #, fuzzy
 msgid "Table view"
 msgstr "无效页面"
 
-#: cps/spa_strings.py:651 cps/templates/book_edit.html:139
+#: cps/spa_strings.py:655 cps/templates/book_edit.html:139
 #: cps/templates/search_form.html:52
 msgid "Tags"
 msgstr "标签"
 
-#: cps/spa_strings.py:652
+#: cps/spa_strings.py:656
 msgid "Tags — exclude"
 msgstr ""
 
-#: cps/spa_strings.py:653
+#: cps/spa_strings.py:657
 msgid "Tags — include"
 msgstr ""
 
-#: cps/spa_strings.py:654 cps/templates/config_edit.html:235
+#: cps/spa_strings.py:658 cps/templates/config_edit.html:235
 #: cps/templates/cover_picker.html:104
 msgid "Target aspect ratio"
 msgstr ""
 
-#: cps/spa_strings.py:655 cps/templates/tasks.html:15
+#: cps/spa_strings.py:659 cps/templates/tasks.html:15
 msgid "Task"
 msgstr "任务信息"
 
-#: cps/spa_strings.py:656 cps/tasks_status.py:37 cps/templates/layout.html:371
+#: cps/spa_strings.py:660 cps/tasks_status.py:37 cps/templates/layout.html:371
 #: cps/templates/tasks.html:7
 msgid "Tasks"
 msgstr "任务列表"
 
-#: cps/spa_strings.py:657
+#: cps/spa_strings.py:661
 msgid "That URL is not a usable image."
 msgstr ""
 
-#: cps/spa_strings.py:658
+#: cps/spa_strings.py:662
 msgid ""
 "These open the full configuration pages. Changes there apply to the whole "
 "server."
 msgstr ""
 
-#: cps/spa_strings.py:659
+#: cps/spa_strings.py:663
 msgid "This format opens in the full-screen reader."
 msgstr ""
 
-#: cps/spa_strings.py:660
+#: cps/spa_strings.py:664
 msgid "This magic link expired. Generate a new one to try again."
 msgstr ""
 
-#: cps/spa_strings.py:661
+#: cps/spa_strings.py:665
 msgid "This page doesn't exist here."
 msgstr ""
 
-#: cps/spa_strings.py:662
+#: cps/spa_strings.py:666
 msgid "Title, author, or ISBN"
 msgstr ""
 
-#: cps/spa_strings.py:663
+#: cps/spa_strings.py:667
 msgid "Token URL"
 msgstr ""
 
-#: cps/spa_strings.py:664
+#: cps/spa_strings.py:668
 #, fuzzy
 msgid "Trust authentication header"
 msgstr "无验证"
 
-#: cps/spa_strings.py:665 cps/templates/book_table.html:57
+#: cps/spa_strings.py:669 cps/templates/book_table.html:57
 #: cps/templates/book_table.html:234
 #, fuzzy
 msgid "Unarchive"
 msgstr "归档"
 
-#: cps/spa_strings.py:666
+#: cps/spa_strings.py:670
 msgid "Unhide"
 msgstr ""
 
-#: cps/spa_strings.py:667
+#: cps/spa_strings.py:671
 msgid "Unlock the cover above to apply a new one."
 msgstr ""
 
-#: cps/spa_strings.py:668
+#: cps/spa_strings.py:672
 msgid "Unlock the cover to change it"
 msgstr ""
 
-#: cps/spa_strings.py:669
+#: cps/spa_strings.py:673
 #, fuzzy
 msgid "Untitled"
 msgstr "标题"
 
-#: cps/spa_strings.py:670 cps/templates/cover_picker.html:74
+#: cps/spa_strings.py:674 cps/templates/cover_picker.html:74
 #, fuzzy
 msgid "Upload as cover"
 msgstr "上传格式"
 
-#: cps/spa_strings.py:671
+#: cps/spa_strings.py:675
 #, fuzzy
 msgid "Upload books"
 msgstr "上传"
 
-#: cps/spa_strings.py:672
+#: cps/spa_strings.py:676
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
 msgstr ""
 
-#: cps/spa_strings.py:673 cps/templates/cover_picker.html:62
+#: cps/spa_strings.py:677 cps/templates/cover_picker.html:62
 #: cps/templates/cover_picker.html:191
 #, fuzzy
 msgid "Use this cover"
 msgstr "发现"
 
-#: cps/spa_strings.py:674 cps/templates/tasks.html:13
+#: cps/spa_strings.py:678 cps/templates/tasks.html:13
 #: cps/templates/tasks.html:42 cps/templates/tasks.html:65
 msgid "User"
 msgstr "用户名称"
 
-#: cps/spa_strings.py:675
+#: cps/spa_strings.py:679
 #, fuzzy
 msgid "User administration"
 msgstr "用户权限"
 
-#: cps/spa_strings.py:676
+#: cps/spa_strings.py:680
 #, fuzzy
 msgid "User object filter"
 msgstr "LDAP 用户对象过滤器"
 
-#: cps/spa_strings.py:677
+#: cps/spa_strings.py:681
 msgid "Userinfo URL"
 msgstr ""
 
-#: cps/spa_strings.py:678 cps/templates/admin.html:14
+#: cps/spa_strings.py:682 cps/templates/admin.html:14
 #: cps/templates/login.html:17 cps/templates/login.html:19
 #: cps/templates/register.html:9 cps/templates/user_edit.html:192
 #: cps/templates/user_table.html:134
 msgid "Username"
 msgstr "用户名"
 
-#: cps/spa_strings.py:679
+#: cps/spa_strings.py:683
 #, fuzzy
 msgid "Username claim"
 msgstr "用户名"
 
-#: cps/spa_strings.py:680
+#: cps/spa_strings.py:684
 #, fuzzy
 msgid "Versions"
 msgstr "版本"
 
-#: cps/spa_strings.py:681 cps/templates/user_table.html:148
+#: cps/spa_strings.py:685 cps/templates/user_table.html:148
 msgid "View"
 msgstr "查看书籍"
 
-#: cps/spa_strings.py:682
+#: cps/spa_strings.py:686
 #, fuzzy
 msgid "View settings"
 msgstr "设置"
 
-#: cps/spa_strings.py:683
+#: cps/spa_strings.py:687
 msgid "Waiting for you to authorise…"
 msgstr ""
 
-#: cps/spa_strings.py:684 cps/templates/cover_picker.html:40
+#: cps/spa_strings.py:688 cps/templates/cover_picker.html:40
 msgid "When locked, fetching metadata will not overwrite this cover."
 msgstr ""
 
-#: cps/spa_strings.py:685 cps/templates/detail.html:1023
+#: cps/spa_strings.py:689 cps/templates/detail.html:1023
 msgid "When reading progress was first synced"
 msgstr ""
 
-#: cps/spa_strings.py:686
+#: cps/spa_strings.py:690
 #, fuzzy
 msgid "Your Library"
 msgstr "在书库"
 
-#: cps/spa_strings.py:687
+#: cps/spa_strings.py:691
 msgid "Your browser cannot play this audio format."
 msgstr ""
 
-#: cps/spa_strings.py:688
+#: cps/spa_strings.py:692
 msgid "Your personal digital library"
 msgstr ""
 
-#: cps/spa_strings.py:689
+#: cps/spa_strings.py:693
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr ""
 
-#: cps/spa_strings.py:690
-msgid "all rules"
-msgstr ""
-
-#: cps/spa_strings.py:691
-#, fuzzy
-msgid "any rule"
-msgstr "添加新用户"
-
-#: cps/spa_strings.py:692
-#, fuzzy
-msgid "books"
-msgstr "书籍"
-
-#: cps/spa_strings.py:693
-#, fuzzy
-msgid "books match"
-msgstr "添加到书架"
-
 #: cps/spa_strings.py:694
-msgid "copies"
+msgid "all rules"
 msgstr ""
 
 #: cps/spa_strings.py:695
 #, fuzzy
+msgid "any rule"
+msgstr "添加新用户"
+
+#: cps/spa_strings.py:696
+#, fuzzy
+msgid "books"
+msgstr "书籍"
+
+#: cps/spa_strings.py:697
+#, fuzzy
+msgid "books match"
+msgstr "添加到书架"
+
+#: cps/spa_strings.py:698
+msgid "copies"
+msgstr ""
+
+#: cps/spa_strings.py:699
+#, fuzzy
 msgid "e-reader"
 msgstr "epub 阅读器"
 
-#: cps/spa_strings.py:696
+#: cps/spa_strings.py:700
 msgid "e.g. Unread sci-fi"
 msgstr ""
 
-#: cps/spa_strings.py:697
+#: cps/spa_strings.py:701
 #, fuzzy
 msgid "eReader email subject"
 msgstr "电子阅读器邮箱"
 
-#: cps/spa_strings.py:698
+#: cps/spa_strings.py:702
 msgid "or continue with"
 msgstr ""
 
-#: cps/spa_strings.py:699
+#: cps/spa_strings.py:703
 msgid "shared"
 msgstr ""
 
-#: cps/spa_strings.py:700
+#: cps/spa_strings.py:704
 msgid "to"
 msgstr ""
 
-#: cps/spa_strings.py:701
+#: cps/spa_strings.py:705
 msgid "type (isbn, amazon, doi…)"
 msgstr ""
 
-#: cps/spa_strings.py:702
+#: cps/spa_strings.py:706
 msgid "value"
 msgstr ""
 
-#: cps/spa_strings.py:703
+#: cps/spa_strings.py:707
 msgid "you"
 msgstr ""
 
-#: cps/spa_strings.py:704
+#: cps/spa_strings.py:708
 #, fuzzy, python-brace-format
 msgid "{n} found"
 msgstr "标签未找到"
 
-#: cps/spa_strings.py:705
+#: cps/spa_strings.py:709
 #, python-brace-format
 msgid "{ok} of {total} sources answered"
 msgstr ""
 
-#: cps/spa_strings.py:706
+#: cps/spa_strings.py:710
 #, fuzzy
 msgid "…or paste an image URL"
 msgstr "封面"
 
-#: cps/spa_strings.py:707
+#: cps/spa_strings.py:711
 msgid "← Back to book"
 msgstr ""
 
-#: cps/spa_strings.py:708
+#: cps/spa_strings.py:712
 #, fuzzy
 msgid "← Back to sign in"
 msgstr "返回管理面板"
 
-#: cps/spa_strings.py:709
+#: cps/spa_strings.py:713
 #, fuzzy
 msgid "← Library"
 msgstr "在书库"
@@ -5353,368 +5372,368 @@ msgstr "有新的更新。单击下面的按钮以更新到版本: %(version)s"
 msgid "No release information available"
 msgstr "无可用发布信息"
 
-#: cps/templates/index.html:33 cps/web.py:748
+#: cps/templates/index.html:33 cps/web.py:755
 msgid "Discover (Random Books)"
 msgstr "发现 (随机书籍)"
 
-#: cps/web.py:798
+#: cps/web.py:805
 msgid "Hot Books (Most Downloaded)"
 msgstr "热门书籍（最多下载）"
 
-#: cps/web.py:829
+#: cps/web.py:836
 #, python-format
 msgid "Downloaded books by %(user)s"
 msgstr "%(user)s 下载过的书籍"
 
-#: cps/web.py:862
+#: cps/web.py:869
 #, python-format
 msgid "Author: %(name)s"
 msgstr "作者：%(name)s"
 
-#: cps/web.py:898
+#: cps/web.py:905
 #, python-format
 msgid "Publisher: %(name)s"
 msgstr "出版社：%(name)s"
 
-#: cps/web.py:926
+#: cps/web.py:933
 #, python-format
 msgid "Series: %(serie)s"
 msgstr "丛书：%(serie)s"
 
-#: cps/web.py:940
+#: cps/web.py:947
 msgid "Rating: None"
 msgstr "评分：无"
 
-#: cps/web.py:949
+#: cps/web.py:956
 #, python-format
 msgid "Rating: %(rating)s stars"
 msgstr "评分：%(rating)s 星"
 
-#: cps/web.py:980
+#: cps/web.py:987
 #, python-format
 msgid "File format: %(format)s"
 msgstr "文件格式：%(format)s"
 
-#: cps/web.py:1017
+#: cps/web.py:1024
 #, python-format
 msgid "Category: %(name)s"
 msgstr "分类：%(name)s"
 
-#: cps/web.py:1046
+#: cps/web.py:1053
 #, python-format
 msgid "Language: %(name)s"
 msgstr "语言：%(name)s"
 
-#: cps/web.py:1137
+#: cps/web.py:1144
 #, fuzzy
 msgid "Favorite Books"
 msgstr "热门书籍"
 
-#: cps/templates/user_edit.html:177 cps/web.py:1161
+#: cps/templates/user_edit.html:177 cps/web.py:1168
 #, fuzzy
 msgid "Hidden Books"
 msgstr "隐藏书籍"
 
-#: cps/web.py:1227
+#: cps/web.py:1234
 #, fuzzy
 msgid "Error loading magic shelf"
 msgstr "删除书架时出错"
 
-#: cps/web.py:1252
+#: cps/web.py:1259
 #, python-format
 msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
 msgstr "魔法书架&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
 
-#: cps/web.py:1428
+#: cps/web.py:1435
 msgid "No rules provided"
 msgstr "未提供规则"
 
-#: cps/web.py:1434
+#: cps/web.py:1441
 #, fuzzy
 msgid "Invalid rules format"
 msgstr "无效的邮箱格式"
 
-#: cps/web.py:1456
+#: cps/web.py:1463
 msgid "Error processing rules"
 msgstr "处理规则时出错"
 
-#: cps/web.py:1460
+#: cps/web.py:1467
 #, fuzzy
 msgid "Invalid request"
 msgstr "无效角色"
 
-#: cps/web.py:1527
+#: cps/web.py:1534
 #, fuzzy
 msgid "Name and rules are required"
 msgstr "用户名和图像数据均为必填项。"
 
-#: cps/web.py:1530 cps/web.py:1661
+#: cps/web.py:1537 cps/web.py:1668
 msgid "Shelf name too long (max 100 characters)"
 msgstr "书架名称过长（最多 100 个字符）"
 
-#: cps/web.py:1570 cps/web.py:1705
+#: cps/web.py:1577 cps/web.py:1712
 msgid ""
 "Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
 "your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
 msgstr ""
 
-#: cps/web.py:1578
+#: cps/web.py:1585
 #, fuzzy
 msgid "Error creating shelf"
 msgstr "删除书架时出错"
 
-#: cps/templates/layout.html:648 cps/web.py:1594
+#: cps/templates/layout.html:648 cps/web.py:1601
 #, fuzzy
 msgid "Create Magic Shelf"
 msgstr "创建书架"
 
-#: cps/web.py:1654
+#: cps/web.py:1661
 msgid "Permission denied to change public status"
 msgstr "拒绝更改公开状态的权限"
 
-#: cps/web.py:1658
+#: cps/web.py:1665
 #, fuzzy
 msgid "Shelf name is required"
 msgstr "此栏必须填写"
 
-#: cps/web.py:1713
+#: cps/web.py:1720
 #, fuzzy
 msgid "Error updating shelf"
 msgstr "删除书架时出错"
 
-#: cps/web.py:1730
+#: cps/web.py:1737
 #, fuzzy
 msgid "Edit Magic Shelf"
 msgstr "编辑书架"
 
-#: cps/web.py:1747
+#: cps/web.py:1754
 #, fuzzy
 msgid "Shelf not found"
 msgstr "找不到用户"
 
-#: cps/web.py:1752
+#: cps/web.py:1759
 msgid "Permission denied"
 msgstr "没有权限"
 
-#: cps/web.py:1783
+#: cps/web.py:1790
 #, fuzzy
 msgid "Shelf duplicated successfully"
 msgstr "成功删除 {} 个用户"
 
-#: cps/web.py:1789
+#: cps/web.py:1796
 #, fuzzy
 msgid "Error duplicating shelf"
 msgstr "删除书架时出错"
 
-#: cps/templates/magic_shelf_edit.html:506 cps/web.py:1816
+#: cps/templates/magic_shelf_edit.html:506 cps/web.py:1823
 msgid ""
 "System shelves cannot be deleted. You can hide them in your user profile "
 "settings."
 msgstr "系统书架无法删除。您可以在用户资料设置中隐藏它们。"
 
-#: cps/web.py:1834
+#: cps/web.py:1841
 #, fuzzy
 msgid "Error deleting shelf"
 msgstr "删除书架时出错"
 
-#: cps/web.py:1850
+#: cps/web.py:1857
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr "您无法隐藏自己的书架。如果不想要它们，请直接删除。"
 
-#: cps/web.py:1860
+#: cps/web.py:1867
 msgid "Shelf already hidden"
 msgstr "书架已被隐藏"
 
-#: cps/web.py:1874
+#: cps/web.py:1881
 #, fuzzy
 msgid "Error hiding shelf"
 msgstr "删除书架时出错"
 
-#: cps/web.py:1888
+#: cps/web.py:1895
 msgid "Shelf was not hidden"
 msgstr "书架未被隐藏"
 
-#: cps/web.py:1897
+#: cps/web.py:1904
 #, fuzzy
 msgid "Error unhiding shelf"
 msgstr "删除书架时出错"
 
-#: cps/templates/admin.html:18 cps/web.py:2058
+#: cps/templates/admin.html:18 cps/web.py:2065
 msgid "Downloads"
 msgstr "下载次数"
 
-#: cps/web.py:2210
+#: cps/web.py:2217
 msgid "File formats list"
 msgstr "文件格式列表"
 
-#: cps/web.py:2457 cps/web.py:2495
+#: cps/web.py:2464 cps/web.py:2502
 msgid "Please configure the SMTP mail settings first..."
 msgstr "请先配置 SMTP 邮箱设置..."
 
-#: cps/web.py:2461
+#: cps/web.py:2468
 msgid "Oops! Please update your profile with a valid eReader Email."
 msgstr "请先配置您的 Kindle 邮箱"
 
-#: cps/web.py:2483
+#: cps/web.py:2490
 #, python-format
 msgid "Success! Book queued for sending to %(eReadermail)s"
 msgstr "书籍已经成功加入 %(eReadermail)s 的发送队列"
 
-#: cps/web.py:2486 cps/web.py:2563
+#: cps/web.py:2493 cps/web.py:2570
 #, python-format
 msgid "Oops! There was an error sending book: %(res)s"
 msgstr "糟糕！发送这本书籍的时候出现错误：%(res)s"
 
-#: cps/web.py:2503 cps/web.py:2513
+#: cps/web.py:2510 cps/web.py:2520
 msgid "No email addresses selected"
 msgstr "没有选择电子邮箱地址"
 
-#: cps/web.py:2534
+#: cps/web.py:2541
 #, fuzzy
 msgid "Additional email addresses are disabled for your account."
 msgstr "选择邮箱地址:"
 
-#: cps/web.py:2561
+#: cps/web.py:2568
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr "书籍已经成功加入 %(eReadermail)s 的发送队列"
 
-#: cps/web.py:2580
+#: cps/web.py:2587
 msgid "Please wait one minute to register next user"
 msgstr "请等待一分钟注册下一个用户"
 
 #: cps/templates/layout.html:345 cps/templates/layout.html:386
-#: cps/templates/login.html:48 cps/templates/register.html:17 cps/web.py:2581
-#: cps/web.py:2585 cps/web.py:2590 cps/web.py:2594 cps/web.py:2600
-#: cps/web.py:2625 cps/web.py:2629 cps/web.py:2642 cps/web.py:2645
+#: cps/templates/login.html:48 cps/templates/register.html:17 cps/web.py:2588
+#: cps/web.py:2592 cps/web.py:2597 cps/web.py:2601 cps/web.py:2607
+#: cps/web.py:2632 cps/web.py:2636 cps/web.py:2649 cps/web.py:2652
 msgid "Register"
 msgstr "注册"
 
-#: cps/web.py:2584 cps/web.py:2744
+#: cps/web.py:2591 cps/web.py:2751
 #, fuzzy
 msgid "Connection error to limiter backend, please contact your administrator"
 msgstr "邮件服务未配置，请联系网站管理员！"
 
-#: cps/web.py:2589 cps/web.py:2641
+#: cps/web.py:2596 cps/web.py:2648
 msgid ""
 "Oops! Email server is not configured, please contact your administrator."
 msgstr "邮件服务未配置，请联系网站管理员！"
 
-#: cps/web.py:2627
+#: cps/web.py:2634
 msgid "Oops! Your Email is not allowed."
 msgstr "您的电子邮件不允许注册"
 
-#: cps/web.py:2630
+#: cps/web.py:2637
 msgid "Success! Confirmation Email has been sent."
 msgstr "确认邮件已经发送到您的邮箱"
 
-#: cps/web.py:2678
+#: cps/web.py:2685
 #, fuzzy
 msgid ""
 "Authentication loop detected. If you're experiencing login issues, please "
 "contact your administrator."
 msgstr "Calibre-Web 实例未配置，请联系您的管理员！"
 
-#: cps/web.py:2718
+#: cps/web.py:2725
 #, fuzzy
 msgid ""
 "OAuth authentication is not properly configured. Please contact "
 "administrator."
 msgstr "邮件服务未配置，请联系网站管理员！"
 
-#: cps/web.py:2723 cps/web.py:2750
+#: cps/web.py:2730 cps/web.py:2757
 msgid "Cannot activate LDAP authentication"
 msgstr "无法激活 LDAP 认证"
 
-#: cps/web.py:2732
+#: cps/web.py:2739
 msgid "Standard login is disabled."
 msgstr "标准登录已禁用。"
 
-#: cps/web.py:2740
+#: cps/web.py:2747
 msgid "Please wait one minute before next login"
 msgstr "下次登录前请等待一分钟"
 
-#: cps/web.py:2758
+#: cps/web.py:2765
 msgid "Username cannot be empty"
 msgstr "用户名不能为空"
 
-#: cps/web.py:2770
+#: cps/web.py:2777
 #, python-format
 msgid "you are now logged in as: '%(nickname)s'"
 msgstr "您现在已以“%(nickname)s”身份登录"
 
-#: cps/web.py:2789
+#: cps/web.py:2796
 #, fuzzy, python-format
 msgid ""
 "Welcome! Your account has been automatically created. You are now logged in "
 "as: '%(nickname)s'"
 msgstr "您现在已以“%(nickname)s”身份登录"
 
-#: cps/web.py:2794 cps/web.py:2797
+#: cps/web.py:2801 cps/web.py:2804
 #, fuzzy
 msgid ""
 "Authentication successful, but account creation failed. Please contact your "
 "administrator."
 msgstr "Calibre-Web 实例未配置，请联系您的管理员！"
 
-#: cps/web.py:2801
+#: cps/web.py:2808
 msgid ""
 "Authentication successful, but no local account found. Please contact your "
 "administrator to create your account."
 msgstr "身份验证成功，但未找到本地帐户。请联系您的管理员以创建帐户。"
 
-#: cps/web.py:2809
+#: cps/web.py:2816
 #, python-format
 msgid ""
 "Fallback Login as: '%(nickname)s', LDAP Server not reachable, or user not "
 "known"
 msgstr "后备登录“%(nickname)s”：无法访问 LDAP 服务器，或用户未知"
 
-#: cps/web.py:2815
+#: cps/web.py:2822
 #, python-format
 msgid "Could not login: %(message)s"
 msgstr "无法登录：%(message)s"
 
-#: cps/web.py:2838 cps/web.py:2839 cps/web.py:2882
+#: cps/web.py:2845 cps/web.py:2846 cps/web.py:2889
 msgid "Wrong Username or Password"
 msgstr "用户名或密码错误"
 
-#: cps/web.py:2847
+#: cps/web.py:2854
 msgid "New Password was sent to your email address"
 msgstr "新密码已发送到您的邮箱"
 
-#: cps/web.py:2851
+#: cps/web.py:2858
 msgid "An unknown error occurred. Please try again later."
 msgstr "发生一个未知错误，请稍后再试"
 
-#: cps/web.py:2853
+#: cps/web.py:2860
 msgid "Please enter valid username to reset password"
 msgstr "请输入有效的用户名进行密码重置"
 
-#: cps/web.py:2861
+#: cps/web.py:2868
 #, python-format
 msgid "You are now logged in as: '%(nickname)s'"
 msgstr "您现在已以“%(nickname)s”身份登录"
 
-#: cps/web.py:3174
+#: cps/web.py:3181
 msgid "Success! Profile Updated"
 msgstr "资料已更新"
 
-#: cps/web.py:3180
+#: cps/web.py:3187
 msgid "Oops! An account already exists for this Email."
 msgstr "使用此邮箱的账号已经存在"
 
-#: cps/web.py:3314
+#: cps/web.py:3321
 msgid "App-password label must be 1-64 characters."
 msgstr ""
 
-#: cps/web.py:3349
+#: cps/web.py:3356
 #, python-format
 msgid "App password '%(label)s' revoked."
 msgstr ""
 
-#: cps/web.py:3561
+#: cps/web.py:3568
 #, fuzzy
 msgid "Invalid book ID."
 msgstr "无效角色"
@@ -6152,7 +6171,7 @@ msgstr "魔法链接远程登录"
 msgid "Reverse Proxy Login"
 msgstr "反向代理登录"
 
-#: cps/templates/admin.html:160 cps/templates/config_edit.html:305
+#: cps/templates/admin.html:160 cps/templates/config_edit.html:323
 msgid "Reverse Proxy Header Name"
 msgstr "反向代理头部名称"
 
@@ -6556,16 +6575,6 @@ msgstr "从 URL 获取封面（JPEG - 图片将下载并存储在数据库中）
 #: cps/templates/book_edit.html:208
 msgid "Upload Cover from Local Disk"
 msgstr "从本地磁盘上传封面"
-
-#: cps/templates/book_edit.html:220 cps/templates/search_form.html:46
-#: cps/templates/search_form.html:167
-msgid "Yes"
-msgstr "确认"
-
-#: cps/templates/book_edit.html:221 cps/templates/search_form.html:47
-#: cps/templates/search_form.html:168
-msgid "No"
-msgstr "没有"
 
 #: cps/templates/book_edit.html:286
 #, fuzzy
@@ -7001,11 +7010,11 @@ msgstr "重新连接到 Calibre 库"
 msgid "New db location is invalid, please enter valid path"
 msgstr "新数据库路径无效，请输入有效的路径"
 
-#: cps/templates/config_edit.html:6 cps/templates/config_edit.html:319
+#: cps/templates/config_edit.html:6 cps/templates/config_edit.html:337
 msgid "Use Standard Authentication"
 msgstr "使用标准认证"
 
-#: cps/templates/config_edit.html:8 cps/templates/config_edit.html:321
+#: cps/templates/config_edit.html:8 cps/templates/config_edit.html:339
 msgid "Use LDAP Authentication"
 msgstr "使用 LDAP 认证"
 
@@ -7224,11 +7233,32 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html:289
+msgid "Token status: not configured."
+msgstr ""
+
+#: cps/templates/config_edit.html:291
+msgid "Token status: valid."
+msgstr ""
+
+#: cps/templates/config_edit.html:293
+#, fuzzy
+msgid "Token status: rejected or expired."
+msgstr "令牌已过期"
+
+#: cps/templates/config_edit.html:295
+msgid "Token status: present; validation is temporarily unavailable."
+msgstr ""
+
+#: cps/templates/config_edit.html:300
+msgid "Expiry: not provided by this token."
+msgstr ""
+
+#: cps/templates/config_edit.html:307
 #, fuzzy
 msgid "Google Books API Key"
 msgstr "Goodreads API Key"
 
-#: cps/templates/config_edit.html:291
+#: cps/templates/config_edit.html:309
 msgid ""
 "Optional. Without a key, Google Books is rate-limited to ~1,000 requests / "
 "IP / day, which is easily exhausted on shared servers (HTTP 429). Free key "
@@ -7236,11 +7266,11 @@ msgid ""
 "API key."
 msgstr ""
 
-#: cps/templates/config_edit.html:295
+#: cps/templates/config_edit.html:313
 msgid "Allow Reverse Proxy Authentication"
 msgstr "允许反向代理认证方式"
 
-#: cps/templates/config_edit.html:296
+#: cps/templates/config_edit.html:314
 msgid ""
 "Trusts the \"Remote-User\" header from a reverse proxy for authentication. "
 "This is an authentication method, distinct from the HTTPS security setting "
@@ -7249,11 +7279,11 @@ msgstr ""
 "信任反向代理提供的 \"Remote-User\" 头进行身份验证。这是一种身份验证方法，不同"
 "于下方的 HTTPS 安全设置。"
 
-#: cps/templates/config_edit.html:300
+#: cps/templates/config_edit.html:318
 msgid "Use via HTTPS"
 msgstr "通过 HTTPS 使用"
 
-#: cps/templates/config_edit.html:301
+#: cps/templates/config_edit.html:319
 msgid ""
 "Enables secure cookie settings (Secure, SameSite=Lax). Enable this ONLY if "
 "you are accessing the server via HTTPS, otherwise you will be locked out."
@@ -7261,11 +7291,11 @@ msgstr ""
 "启用安全的 cookie 设置（Secure，SameSite=Lax）。请**仅当**您通过 HTTPS 访问服"
 "务器时才启用此选项，否则您将被锁定。"
 
-#: cps/templates/config_edit.html:310
+#: cps/templates/config_edit.html:328
 msgid "Auto-create users from reverse proxy"
 msgstr "从反向代理自动创建用户"
 
-#: cps/templates/config_edit.html:311
+#: cps/templates/config_edit.html:329
 msgid ""
 "Automatically create user accounts when valid reverse proxy headers are "
 "received. Only enable if your reverse proxy authentication is properly "
@@ -7274,131 +7304,131 @@ msgstr ""
 "当接收到有效的反向代理头时自动创建用户帐户。仅在您的反向代理身份验证已受到妥"
 "善保护时才启用。"
 
-#: cps/templates/config_edit.html:317
+#: cps/templates/config_edit.html:335
 msgid "Login type"
 msgstr "登录类型"
 
-#: cps/templates/config_edit.html:324
+#: cps/templates/config_edit.html:342
 msgid "Use OAuth (requires HTTPS)"
 msgstr "使用 OAuth (需要 HTTPS)"
 
-#: cps/templates/config_edit.html:331
+#: cps/templates/config_edit.html:349
 msgid "LDAP Server Host Name or IP Address"
 msgstr "LDAP 服务器主机名或 IP 地址"
 
-#: cps/templates/config_edit.html:335
+#: cps/templates/config_edit.html:353
 msgid "LDAP Server Port"
 msgstr "LDAP 服务器端口"
 
-#: cps/templates/config_edit.html:339
+#: cps/templates/config_edit.html:357
 msgid "LDAP Encryption"
 msgstr "LDAP 加密"
 
-#: cps/templates/config_edit.html:342
+#: cps/templates/config_edit.html:360
 msgid "TLS"
 msgstr "TLS 协议"
 
-#: cps/templates/config_edit.html:343
+#: cps/templates/config_edit.html:361
 msgid "SSL"
 msgstr "SSL 协议"
 
-#: cps/templates/config_edit.html:347
+#: cps/templates/config_edit.html:365
 msgid ""
 "LDAP CACertificate Path (Only needed for Client Certificate Authentication)"
 msgstr "LDAP CA证书路径 (仅用于客户端证书认证)"
 
-#: cps/templates/config_edit.html:354
+#: cps/templates/config_edit.html:372
 msgid ""
 "LDAP Certificate Path (Only needed for Client Certificate Authentication)"
 msgstr "LDAP 证书路径 (仅用于客户端证书认证)"
 
-#: cps/templates/config_edit.html:361
+#: cps/templates/config_edit.html:379
 msgid "LDAP Keyfile Path (Only needed for Client Certificate Authentication)"
 msgstr "LDAP 密钥文件路径 (仅用于客户端证书认证)"
 
-#: cps/templates/config_edit.html:370
+#: cps/templates/config_edit.html:388
 msgid "LDAP Authentication"
 msgstr "LDAP 验证方式"
 
-#: cps/templates/config_edit.html:372
+#: cps/templates/config_edit.html:390
 msgid "Anonymous"
 msgstr "匿名"
 
-#: cps/templates/config_edit.html:373
+#: cps/templates/config_edit.html:391
 msgid "Unauthenticated"
 msgstr "无验证"
 
-#: cps/templates/config_edit.html:374
+#: cps/templates/config_edit.html:392
 msgid "Simple"
 msgstr "简单"
 
-#: cps/templates/config_edit.html:379
+#: cps/templates/config_edit.html:397
 msgid "LDAP Administrator Username"
 msgstr "LDAP 管理员用户名"
 
-#: cps/templates/config_edit.html:385
+#: cps/templates/config_edit.html:403
 msgid "LDAP Administrator Password"
 msgstr "LDAP 管理员密码"
 
-#: cps/templates/config_edit.html:390
+#: cps/templates/config_edit.html:408
 msgid "LDAP Distinguished Name (DN)"
 msgstr "LDAP 专有名称（DN）"
 
-#: cps/templates/config_edit.html:394
+#: cps/templates/config_edit.html:412
 msgid "LDAP User Object Filter"
 msgstr "LDAP 用户对象过滤器"
 
-#: cps/templates/config_edit.html:399
+#: cps/templates/config_edit.html:417
 msgid "LDAP Server is OpenLDAP?"
 msgstr "LDAP 服务器为 OpenLDAP？"
 
-#: cps/templates/config_edit.html:403
+#: cps/templates/config_edit.html:421
 msgid "Auto-create users from LDAP"
 msgstr "从 LDAP 自动创建用户"
 
-#: cps/templates/config_edit.html:404
+#: cps/templates/config_edit.html:422
 msgid ""
 "Automatically create user accounts when LDAP authentication succeeds for new "
 "users. Recommended for enterprise environments."
 msgstr "当新用户通过 LDAP 身份验证时自动创建用户帐户。推荐在企业环境中使用。"
 
-#: cps/templates/config_edit.html:406
+#: cps/templates/config_edit.html:424
 msgid "Following Settings are Needed For User Import"
 msgstr "用户导入需要以下设置"
 
-#: cps/templates/config_edit.html:408
+#: cps/templates/config_edit.html:426
 msgid "LDAP Group Object Filter"
 msgstr "LDAP 组对象过滤器"
 
-#: cps/templates/config_edit.html:412
+#: cps/templates/config_edit.html:430
 msgid "LDAP Group Name"
 msgstr "LDAP 组名"
 
-#: cps/templates/config_edit.html:416
+#: cps/templates/config_edit.html:434
 msgid "LDAP Group Members Field"
 msgstr "LDAP 组成员字段"
 
-#: cps/templates/config_edit.html:420
+#: cps/templates/config_edit.html:438
 msgid "LDAP Member User Filter Detection"
 msgstr "LDAP 成员用户过滤器探测"
 
-#: cps/templates/config_edit.html:422
+#: cps/templates/config_edit.html:440
 msgid "Autodetect"
 msgstr "自动检测"
 
-#: cps/templates/config_edit.html:423
+#: cps/templates/config_edit.html:441
 msgid "Custom Filter"
 msgstr "自定义过滤器"
 
-#: cps/templates/config_edit.html:428
+#: cps/templates/config_edit.html:446
 msgid "LDAP Member User Filter"
 msgstr "LDAP 成员用户过滤器"
 
-#: cps/templates/config_edit.html:438
+#: cps/templates/config_edit.html:456
 msgid "Important:"
 msgstr "重要："
 
-#: cps/templates/config_edit.html:438
+#: cps/templates/config_edit.html:456
 msgid ""
 "OAuth authentication requires this server to be accessed via HTTPS. If you "
 "are using HTTP, login will fail."
@@ -7406,74 +7436,74 @@ msgstr ""
 "OAuth 身份验证要求此服务器通过 HTTPS 进行访问。如果您使用的是 HTTP，登录将会"
 "失败。"
 
-#: cps/templates/config_edit.html:441
+#: cps/templates/config_edit.html:459
 msgid "Generic OAuth Provider"
 msgstr "通用 OAuth 提供商"
 
-#: cps/templates/config_edit.html:445
+#: cps/templates/config_edit.html:463
 msgid "OAuth Metadata URL (for auto-discovery)"
 msgstr "OAuth 元数据 URL (用于自动发现)"
 
-#: cps/templates/config_edit.html:449
+#: cps/templates/config_edit.html:467
 #, fuzzy
 msgid "Test Metadata"
 msgstr "获取元数据"
 
-#: cps/templates/config_edit.html:452
+#: cps/templates/config_edit.html:470
 msgid "Leave empty to use manual configuration below"
 msgstr "留空以使用下面的手动配置"
 
-#: cps/templates/config_edit.html:458
+#: cps/templates/config_edit.html:476
 msgid "Use Manual Endpoint URLs (override auto-discovery)"
 msgstr "使用手动端点 URL（覆盖自动发现）"
 
-#: cps/templates/config_edit.html:459
+#: cps/templates/config_edit.html:477
 msgid ""
 "Check this to manually configure individual OAuth endpoints instead of using "
 "auto-discovery"
 msgstr "选中此项以手动配置单个 OAuth 端点，而不是使用自动发现"
 
-#: cps/templates/config_edit.html:464
+#: cps/templates/config_edit.html:482
 #, fuzzy
 msgid "Manual Endpoint Configuration"
 msgstr "手动端点配置"
 
-#: cps/templates/config_edit.html:467
+#: cps/templates/config_edit.html:485
 msgid "OAuth Base URL"
 msgstr "OAuth 基础 URL"
 
-#: cps/templates/config_edit.html:472
+#: cps/templates/config_edit.html:490
 msgid "Authorization Endpoint"
 msgstr "授权端点"
 
-#: cps/templates/config_edit.html:477
+#: cps/templates/config_edit.html:495
 #, fuzzy
 msgid "Token Endpoint"
 msgstr "令牌端点"
 
-#: cps/templates/config_edit.html:482
+#: cps/templates/config_edit.html:500
 msgid "UserInfo Endpoint"
 msgstr "用户信息端点"
 
-#: cps/templates/config_edit.html:490
+#: cps/templates/config_edit.html:508
 #, fuzzy
 msgid "Test Connection"
 msgstr "连接错误"
 
-#: cps/templates/config_edit.html:499
+#: cps/templates/config_edit.html:517
 #, fuzzy
 msgid "OAuth Scopes"
 msgstr "OAuth 设置"
 
-#: cps/templates/config_edit.html:501
+#: cps/templates/config_edit.html:519
 msgid "Space-separated list of OAuth scopes"
 msgstr "以空格分隔的 OAuth 范围列表"
 
-#: cps/templates/config_edit.html:506
+#: cps/templates/config_edit.html:524
 msgid "OAuth Redirect Host"
 msgstr "OAuth 重定向主机"
 
-#: cps/templates/config_edit.html:509
+#: cps/templates/config_edit.html:527
 msgid ""
 "Set a consistent hostname for OAuth redirects to prevent \"invalid redirect "
 "URI\" errors. Include protocol (https://). Leave empty to use automatic "
@@ -7482,7 +7512,7 @@ msgstr ""
 "为 OAuth 重定向设置一致的主机名，以防止出现“无效的重定向 URI”错误。包括协议"
 "（https://）。留空以使用自动检测。"
 
-#: cps/templates/config_edit.html:511
+#: cps/templates/config_edit.html:529
 msgid ""
 "Required if: accessing via multiple hostnames, behind reverse proxy, or "
 "getting \"invalid redirect URI\" errors."
@@ -7490,75 +7520,75 @@ msgstr ""
 "需要满足以下条件之一：通过多个主机名访问、位于反向代理之后或遇到“无效的重定"
 "向 URI”错误。"
 
-#: cps/templates/config_edit.html:516
+#: cps/templates/config_edit.html:534
 #, fuzzy
 msgid "OAuth Client Id"
 msgstr "%(provider)s OAuth 客户端 Id"
 
-#: cps/templates/config_edit.html:520
+#: cps/templates/config_edit.html:538
 #, fuzzy
 msgid "OAuth Client Secret"
 msgstr "%(provider)s OAuth 客户端 Secret"
 
-#: cps/templates/config_edit.html:525
+#: cps/templates/config_edit.html:543
 #, fuzzy
 msgid "Field Mapping Configuration"
 msgstr "查看配置"
 
-#: cps/templates/config_edit.html:527
+#: cps/templates/config_edit.html:545
 #, fuzzy
 msgid "Username Field"
 msgstr "用户名"
 
-#: cps/templates/config_edit.html:529
+#: cps/templates/config_edit.html:547
 msgid "JWT field to extract username from"
 msgstr "JWT 字段以提取用户名"
 
-#: cps/templates/config_edit.html:532
+#: cps/templates/config_edit.html:550
 #, fuzzy
 msgid "Email Field"
 msgstr "电子邮件服务"
 
-#: cps/templates/config_edit.html:534
+#: cps/templates/config_edit.html:552
 msgid "JWT field to extract email from"
 msgstr "JWT 字段以提取电子邮件"
 
-#: cps/templates/config_edit.html:537
+#: cps/templates/config_edit.html:555
 #, fuzzy
 msgid "OAuth Group Claim"
 msgstr "OAuth 管理组"
 
-#: cps/templates/config_edit.html:539
+#: cps/templates/config_edit.html:557
 msgid ""
 "OIDC claim containing group names. The claim may be a list, or a comma- or "
 "space-separated string."
 msgstr ""
 
-#: cps/templates/config_edit.html:543
+#: cps/templates/config_edit.html:561
 msgid "Require OAuth Group Membership"
 msgstr ""
 
-#: cps/templates/config_edit.html:544
+#: cps/templates/config_edit.html:562
 msgid ""
 "When enabled, Generic OAuth users must be a member of at least one allowed "
 "group before a user account is created or logged in."
 msgstr ""
 
-#: cps/templates/config_edit.html:547
+#: cps/templates/config_edit.html:565
 msgid "OAuth Allowed Groups"
 msgstr ""
 
-#: cps/templates/config_edit.html:549
+#: cps/templates/config_edit.html:567
 msgid ""
 "Comma- or space-separated OAuth groups allowed to log in via Generic OAuth. "
 "Leave empty only if group membership is not required."
 msgstr ""
 
-#: cps/templates/config_edit.html:552
+#: cps/templates/config_edit.html:570
 msgid "OAuth group for Admin"
 msgstr "OAuth 管理组"
 
-#: cps/templates/config_edit.html:554
+#: cps/templates/config_edit.html:572
 msgid ""
 "Name of the OAuth group that grants admin privileges. Leave empty to disable "
 "group-based admin management, or use the global setting in Security Settings "
@@ -7567,104 +7597,104 @@ msgstr ""
 "授予管理权限的 OAuth 组的名称。留空以禁用基于组的管理，或在“安全设置”中使用全"
 "局设置以获得更多控制。"
 
-#: cps/templates/config_edit.html:556
+#: cps/templates/config_edit.html:574
 #, fuzzy
 msgid "Default Permissions for New Generic OAuth Users"
 msgstr "新用户默认权限设置"
 
-#: cps/templates/config_edit.html:560 cps/templates/config_view_edit.html:136
+#: cps/templates/config_edit.html:578 cps/templates/config_view_edit.html:136
 #: cps/templates/user_edit.html:443
 msgid "Allow Downloads"
 msgstr "允许下载书籍"
 
-#: cps/templates/config_edit.html:564 cps/templates/config_view_edit.html:141
+#: cps/templates/config_edit.html:582 cps/templates/config_view_edit.html:141
 #: cps/templates/user_edit.html:448
 msgid "Allow eBook Viewer"
 msgstr "允许在线阅读"
 
-#: cps/templates/config_edit.html:569 cps/templates/config_view_edit.html:147
+#: cps/templates/config_edit.html:587 cps/templates/config_view_edit.html:147
 #: cps/templates/user_edit.html:454
 msgid "Allow Uploads"
 msgstr "允许上传书籍"
 
-#: cps/templates/config_edit.html:574 cps/templates/config_view_edit.html:153
+#: cps/templates/config_edit.html:592 cps/templates/config_view_edit.html:153
 #: cps/templates/user_edit.html:460
 msgid "Allow Edit"
 msgstr "允许编辑书籍"
 
-#: cps/templates/config_edit.html:578 cps/templates/config_view_edit.html:158
+#: cps/templates/config_edit.html:596 cps/templates/config_view_edit.html:158
 #: cps/templates/user_edit.html:465
 msgid "Allow Delete Books"
 msgstr "允许删除书籍"
 
-#: cps/templates/config_edit.html:582 cps/templates/config_view_edit.html:163
+#: cps/templates/config_edit.html:600 cps/templates/config_view_edit.html:163
 #: cps/templates/user_edit.html:471
 msgid "Allow Changing Password"
 msgstr "允许修改密码"
 
-#: cps/templates/config_edit.html:586 cps/templates/config_view_edit.html:168
+#: cps/templates/config_edit.html:604 cps/templates/config_view_edit.html:168
 #: cps/templates/user_edit.html:476
 msgid "Allow Editing Public Shelves"
 msgstr "允许编辑公共书架"
 
-#: cps/templates/config_edit.html:589
+#: cps/templates/config_edit.html:607
 msgid ""
 "These permissions are applied only when a new user is created via Generic "
 "OAuth. Admin group membership still grants admin privileges when OAuth group-"
 "based admin management is enabled. Existing users are not changed."
 msgstr ""
 
-#: cps/templates/config_edit.html:591
+#: cps/templates/config_edit.html:609
 msgid "Login Button Text"
 msgstr "登录按钮文本"
 
-#: cps/templates/config_edit.html:597
+#: cps/templates/config_edit.html:615
 #, python-format
 msgid "Obtain %(provider)s OAuth Credential"
 msgstr "获取 %(provider)s OAuth 凭证"
 
-#: cps/templates/config_edit.html:600
+#: cps/templates/config_edit.html:618
 #, python-format
 msgid "%(provider)s OAuth Client Id"
 msgstr "%(provider)s OAuth 客户端 Id"
 
-#: cps/templates/config_edit.html:604
+#: cps/templates/config_edit.html:622
 #, python-format
 msgid "%(provider)s OAuth Client Secret"
 msgstr "%(provider)s OAuth 客户端 Secret"
 
-#: cps/templates/config_edit.html:615
+#: cps/templates/config_edit.html:633
 msgid "External binaries"
 msgstr "扩展程序配置"
 
-#: cps/templates/config_edit.html:616
+#: cps/templates/config_edit.html:634
 #, fuzzy
 msgid "Path to Calibre Binaries"
 msgstr "Calibre 电子书转换器路径"
 
-#: cps/templates/config_edit.html:624
+#: cps/templates/config_edit.html:642
 #, fuzzy
 msgid "Calibre E-Book Converter Settings"
 msgstr "Calibre 电子书转换器设置"
 
-#: cps/templates/config_edit.html:627
+#: cps/templates/config_edit.html:645
 msgid "Path to Kepubify E-Book Converter"
 msgstr "KEpubify 电子书转换器路径"
 
-#: cps/templates/config_edit.html:635
+#: cps/templates/config_edit.html:653
 #, fuzzy
 msgid "Location of Unrar binary"
 msgstr "UnRar 程序路径"
 
-#: cps/templates/config_edit.html:646
+#: cps/templates/config_edit.html:664
 msgid "Security Settings"
 msgstr "安全设置"
 
-#: cps/templates/config_edit.html:649
+#: cps/templates/config_edit.html:667
 msgid "Disable Standard Login (Username/Password)"
 msgstr "禁用标准登录 (用户名/密码)"
 
-#: cps/templates/config_edit.html:650
+#: cps/templates/config_edit.html:668
 msgid ""
 "Hides the standard login form. Users must log in via OAuth or LDAP. Ensure "
 "you have a working alternative login method before enabling."
@@ -7672,11 +7702,11 @@ msgstr ""
 "隐藏标准登录表单。用户必须通过 OAuth 或 LDAP 登录。在启用之前，请确保您有可用"
 "的备用登录方法。"
 
-#: cps/templates/config_edit.html:654
+#: cps/templates/config_edit.html:672
 msgid "Enable OAuth Group-Based Admin Role Management"
 msgstr "启用基于 OAuth 组的管理员角色管理"
 
-#: cps/templates/config_edit.html:655
+#: cps/templates/config_edit.html:673
 msgid ""
 "When enabled, admin privileges are automatically granted or revoked based on "
 "OAuth group membership. Disable this to manually manage admin roles in the "
@@ -7686,60 +7716,60 @@ msgstr ""
 "启用后，管理员权限将根据 OAuth 组成员身份自动授予或撤销。禁用此选项可以在用户"
 "管理面板中手动管理管理员角色，以防止 OAuth 登录覆盖本地角色分配。"
 
-#: cps/templates/config_edit.html:659
+#: cps/templates/config_edit.html:677
 msgid "Limit failed login attempts"
 msgstr "限制失败的登录尝试"
 
-#: cps/templates/config_edit.html:663
+#: cps/templates/config_edit.html:681
 msgid "Configure Backend for Limiter"
 msgstr "配置限流器后端"
 
-#: cps/templates/config_edit.html:667
+#: cps/templates/config_edit.html:685
 msgid "Options for Limiter Backend"
 msgstr "限流器后端选项"
 
-#: cps/templates/config_edit.html:673
+#: cps/templates/config_edit.html:691
 msgid "Check if file extensions matches file content on upload"
 msgstr "检查上传时文件扩展名是否与文件内容匹配"
 
-#: cps/templates/config_edit.html:676
+#: cps/templates/config_edit.html:694
 #, fuzzy
 msgid "Session protection"
 msgstr "会话保护"
 
-#: cps/templates/config_edit.html:678
+#: cps/templates/config_edit.html:696
 msgid "Basic"
 msgstr "基本"
 
-#: cps/templates/config_edit.html:679
+#: cps/templates/config_edit.html:697
 msgid "Strong"
 msgstr "强"
 
-#: cps/templates/config_edit.html:684
+#: cps/templates/config_edit.html:702
 msgid "User Password policy"
 msgstr "用户密码策略"
 
-#: cps/templates/config_edit.html:688
+#: cps/templates/config_edit.html:706
 msgid "Minimum password length"
 msgstr "最小密码长度"
 
-#: cps/templates/config_edit.html:693
+#: cps/templates/config_edit.html:711
 msgid "Enforce number"
 msgstr "必须使用数字"
 
-#: cps/templates/config_edit.html:697
+#: cps/templates/config_edit.html:715
 msgid "Enforce lowercase characters"
 msgstr "必须使用小写字符"
 
-#: cps/templates/config_edit.html:701
+#: cps/templates/config_edit.html:719
 msgid "Enforce uppercase characters"
 msgstr "必须使用大写字符"
 
-#: cps/templates/config_edit.html:705
+#: cps/templates/config_edit.html:723
 msgid "Enforce characters (needed For Chinese/Japanese/Korean Characters)"
 msgstr "必须使用字符（适用于中文/日文/韩文字符）"
 
-#: cps/templates/config_edit.html:709
+#: cps/templates/config_edit.html:727
 msgid "Enforce special characters"
 msgstr "必须使用特殊字符"
 
@@ -9636,10 +9666,6 @@ msgstr "撤消 Gmail 访问权限"
 msgid "SMTP Password"
 msgstr "SMTP 密码"
 
-#: cps/templates/email_edit.html:60
-msgid "Email Message Body"
-msgstr ""
-
 #: cps/templates/email_edit.html:62
 msgid ""
 "Message included with books sent to an eReader and in test emails. Sent as "
@@ -10215,6 +10241,14 @@ msgid ""
 "Other users can view this shelf. Users with \"Edit Public Shelves\" "
 "permission can edit/delete it."
 msgstr "其他用户可以查看此书架。具有“编辑公共书架”权限的用户可以编辑/删除它。"
+
+#: cps/templates/magic_shelf_edit.html:711
+msgid "In the past N days"
+msgstr ""
+
+#: cps/templates/magic_shelf_edit.html:712
+msgid "Not in the past N days"
+msgstr ""
 
 #: cps/templates/modal_dialogs.html:6
 msgid "Select Allowed/Denied Tags"

@@ -40,6 +40,7 @@ from flask import flash, url_for, has_request_context
 from . import logger, ub, isoLanguages
 from .pagination import Pagination
 from .string_helper import strip_whitespaces
+from .unicode_collation import unicode_initial, unicode_sort_key
 
 log = logger.create()
 
@@ -81,6 +82,11 @@ def _register_sqlite_udfs(dbapi_connection, _connection_record):
         pass
     try:
         dbapi_connection.create_function("uuid4", 0, lambda: str(uuid4()))
+    except Exception:
+        pass
+    try:
+        dbapi_connection.create_function("ng_sort_key", 1, unicode_sort_key)
+        dbapi_connection.create_function("ng_initial", 1, unicode_initial)
     except Exception:
         pass
 

@@ -96,6 +96,21 @@ export interface EntityRef {
   name: string;
 }
 
+export interface CustomColumnValue {
+  value: string | number | boolean | null;
+  extra: string | number | null;
+  value_html?: string;
+}
+
+export interface CustomColumn {
+  id: number;
+  label: string;
+  name: string;
+  datatype: string;
+  is_multiple: boolean;
+  values: CustomColumnValue[];
+}
+
 export interface BookDetail {
   id: number;
   title: string;
@@ -112,6 +127,8 @@ export interface BookDetail {
   languages: EntityRef[];
   publishers: EntityRef[];
   identifiers: { type: string; val: string; url: string | null; label: string }[];
+  /** Displayable Calibre custom metadata; optional for rolling upgrades. */
+  custom_columns?: CustomColumn[];
   formats: BookFormat[];
   read: boolean;
   archived: boolean;
@@ -213,6 +230,7 @@ export interface Account {
   email: string;
   kindle_mail: string;
   kindle_mail_subject: string;
+  mail_body_text: string | null;
   kobo_only_shelves_sync: boolean;
   opds_only_shelves_sync: boolean;
   locale: string;
@@ -231,6 +249,7 @@ export interface ProfileUpdate {
   email?: string;
   kindle_mail?: string;
   kindle_mail_subject?: string;
+  mail_body_text?: string;
   kobo_only_shelves_sync?: boolean;
   opds_only_shelves_sync?: boolean;
   locale?: string;

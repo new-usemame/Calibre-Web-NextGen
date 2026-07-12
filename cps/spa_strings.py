@@ -57,6 +57,10 @@ _("Remove tag {name}")
 # MoreByAuthor.tsx), anchored so the auto-translation job keeps them.
 _("Clear rating")
 _("Not rated")
+_("Yes")
+_("No")
+_("Email Message Body")
+_("This Email has been sent via Calibre-Web NextGen.")
 _("Rated {rating} out of 5")
 _("More by {name}")
 

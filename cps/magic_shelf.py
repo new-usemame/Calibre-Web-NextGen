@@ -347,6 +347,24 @@ def build_filter_from_rule(rule, user_id=None):
     if not all([field_name, operator_name]):
         return None
 
+    # Relative date windows requested in #467. Store the duration, not a
+    # frozen date, so the shelf keeps moving without an edit or migration.
+    if operator_name in ('in_last_days', 'not_in_last_days'):
+        if field_name not in ('pubdate', 'timestamp'):
+            return None
+        if isinstance(value, bool):
+            return None
+        try:
+            days = int(value)
+        except (TypeError, ValueError):
+            return None
+        if days <= 0 or days > 36500:
+            return None
+        column = getattr(db.Books, FIELD_MAP[field_name][1])
+        threshold = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+        condition = column >= threshold
+        return ~condition if operator_name == 'not_in_last_days' else condition
+
     # Handle dynamic custom column fields (id: 'custom_column_<N>')
     if field_name and field_name.startswith('custom_column_'):
         try:

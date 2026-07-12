@@ -9,6 +9,17 @@ from uuid import uuid4
 import os
 import signal
 import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+try:  # pragma: no cover - selected by the production runtime
+    from gevent.threadpool import ThreadPool as _GeventThreadPool
+    from gevent.lock import BoundedSemaphore as _GeventBoundedSemaphore
+    _HAVE_GEVENT_POOL = True
+except ImportError:  # pragma: no cover - unit/minimal environments
+    _GeventThreadPool = None
+    _GeventBoundedSemaphore = None
+    _HAVE_GEVENT_POOL = False
 
 from .file_helper import get_temp_dir
 from .subproc_wrapper import process_open
@@ -18,6 +29,16 @@ from .constants import SUPPORTED_CALIBRE_BINARIES
 log = logger.create()
 
 DEFAULT_EMBED_TIMEOUT = 90
+_EXPORT_POOL_SIZE = 2
+if _HAVE_GEVENT_POOL:
+    _EXPORT_POOL = _GeventThreadPool(_EXPORT_POOL_SIZE)
+    _EXPORT_SLOTS = _GeventBoundedSemaphore(_EXPORT_POOL_SIZE)
+else:
+    _EXPORT_POOL = ThreadPoolExecutor(
+        max_workers=_EXPORT_POOL_SIZE,
+        thread_name_prefix="calibre-export",
+    )
+    _EXPORT_SLOTS = threading.BoundedSemaphore(_EXPORT_POOL_SIZE)
 
 
 def _embed_timeout():
@@ -49,7 +70,8 @@ def _kill_export_tree(p):
         pass
 
 
-def do_calibre_export(book_id, book_format):
+def _do_calibre_export_blocking(book_id, book_format):
+    """Run and reap one calibre export on an OS worker thread."""
     try:
         quotes = [4, 6]
         tmp_dir = get_temp_dir()
@@ -113,6 +135,37 @@ def do_calibre_export(book_id, book_format):
         # ToDo real error handling
         log.error_or_exception(ex)
         return None, None
+
+
+def do_calibre_export(book_id, book_format):
+    """Export metadata without blocking the production gevent hub.
+
+    The acquisition request remains synchronous for UI, OPDS, and Kobo
+    clients, while ``ThreadPool.apply`` yields its calling greenlet so health
+    checks and unrelated requests continue to run during a slow Calibre PDF
+    metadata rewrite.
+    """
+    if not _EXPORT_SLOTS.acquire(blocking=False):
+        log.warning(
+            "Metadata embed capacity reached for book %s (%s); "
+            "falling back to the original file",
+            book_id,
+            book_format,
+        )
+        return None, None
+    try:
+        if _HAVE_GEVENT_POOL:
+            return _EXPORT_POOL.apply(
+                _do_calibre_export_blocking,
+                args=(book_id, book_format),
+            )
+        return _EXPORT_POOL.submit(
+            _do_calibre_export_blocking,
+            book_id,
+            book_format,
+        ).result()
+    finally:
+        _EXPORT_SLOTS.release()
 
 
 def get_calibre_binarypath(binary):

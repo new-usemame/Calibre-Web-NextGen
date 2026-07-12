@@ -283,6 +283,24 @@
         {% if config.hardcover_token_from_env() %}
         <div class="help-block">{{_('A token from the HARDCOVER_TOKEN environment variable is currently active. It is not shown here; a key entered in this field would override it.')}}</div>
         {% endif %}
+        {% if hardcover_token_status %}
+        <div class="help-block" role="status">
+          {% if not hardcover_token_status.present %}
+            {{_('Token status: not configured.')}}
+          {% elif hardcover_token_status.valid == true %}
+            {{_('Token status: valid.')}}
+          {% elif hardcover_token_status.valid == false %}
+            {{_('Token status: rejected or expired.')}}
+          {% else %}
+            {{_('Token status: present; validation is temporarily unavailable.')}}
+          {% endif %}
+          {% if hardcover_token_status.expires_at %}
+            {{ hardcover_token_status.expires_label }}: {{ hardcover_token_status.expires_at|strftime }}
+          {% elif hardcover_token_status.present %}
+            {{_('Expiry: not provided by this token.')}}
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
     </div>
     <div class="form-group">

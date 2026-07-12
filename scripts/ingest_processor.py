@@ -1626,9 +1626,15 @@ class NewBookProcessor:
         """
         try:
             import sqlite3
-            # Import the centralized partial MD5 calculation function
+            # Use the centralized two-channel writer: binary partial-MD5 plus
+            # filename MD5.  New books are imported after the boot backfill,
+            # so storing only the binary channel here left KOReader clients in
+            # filename matching mode unresolved until the book was downloaded.
             sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-            from cps.progress_syncing.checksums import calculate_koreader_partial_md5, store_checksum, CHECKSUM_VERSION
+            from cps.progress_syncing.checksums import (
+                calculate_and_store_checksum,
+                CHECKSUM_VERSION,
+            )
 
             calibre_db_path = os.path.join(self.library_dir, 'metadata.db')
 
@@ -1676,23 +1682,15 @@ class NewBookProcessor:
                         print(f"[ingest-processor] WARN: File not found: {file_path}", flush=True)
                         continue
 
-                    # Generate partial MD5 checksum using centralized function
-                    checksum = calculate_koreader_partial_md5(file_path)
+                    checksum = calculate_and_store_checksum(
+                        book_id=book_id,
+                        book_format=format_ext.upper(),
+                        file_path=file_path,
+                        db_connection=con,
+                    )
 
                     if checksum:
-                        # Store using centralized manager function
-                        success = store_checksum(
-                            book_id=book_id,
-                            book_format=format_ext.upper(),
-                            checksum=checksum,
-                            version=CHECKSUM_VERSION,
-                            db_connection=con
-                        )
-
-                        if success:
-                            print(f"[ingest-processor] Generated checksum {checksum} (v{CHECKSUM_VERSION}) for {format_ext.upper()} format", flush=True)
-                        else:
-                            print(f"[ingest-processor] WARN: Failed to store checksum for {format_ext.upper()} format", flush=True)
+                        print(f"[ingest-processor] Generated checksum {checksum} (v{CHECKSUM_VERSION}) for {format_ext.upper()} format", flush=True)
                     else:
                         print(f"[ingest-processor] WARN: Failed to generate checksum for {file_path}", flush=True)
 

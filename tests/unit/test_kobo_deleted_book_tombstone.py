@@ -88,14 +88,14 @@ class TestB3SourceWiring:
             "forever (B3)."
         )
 
-    def test_handle_sync_emits_deleted_entitlement(self):
+    def test_handle_sync_emits_device_compatible_changed_entitlement(self):
         from cps.kobo import HandleSyncRequest
         src = inspect.getsource(HandleSyncRequest)
-        assert "DeletedEntitlement" in src, (
-            "HandleSyncRequest must emit DeletedEntitlement for "
-            "kobo_deleted_book rows — that's the device-side signal "
-            "to archive the local copy."
+        assert "create_deleted_book_entitlement" in src, (
+            "HandleSyncRequest must emit the archived ChangedEntitlement "
+            "shape Kobo honors for side-loaded hard deletes."
         )
+        assert '"DeletedEntitlement"' not in src
         assert "KoboDeletedBook" in src, (
             "HandleSyncRequest must query KoboDeletedBook (the "
             "tombstone table) to find books to emit DeletedEntitlement "
@@ -304,12 +304,17 @@ class TestB3SyncEmission:
         new_archived_last_modified = cursor_archive_lm
         for tombstone in pending:
             sync_results.append({
-                "DeletedEntitlement": {
+                "ChangedEntitlement": {
                     "BookEntitlement": {
                         "Id": tombstone.book_uuid,
                         "RevisionId": tombstone.book_uuid,
                         "CrossRevisionId": tombstone.book_uuid,
-                    }
+                        "IsRemoved": True,
+                    },
+                    "BookMetadata": {
+                        "EntitlementId": tombstone.book_uuid,
+                        "DownloadUrls": [],
+                    },
                 }
             })
             ta = tombstone.deleted_at
@@ -324,7 +329,7 @@ class TestB3SyncEmission:
             f"Expected 2 tombstones past cursor (uuid-2, uuid-3); "
             f"got {len(sync_results)}: {sync_results}"
         )
-        uuids = [r["DeletedEntitlement"]["BookEntitlement"]["RevisionId"]
+        uuids = [r["ChangedEntitlement"]["BookEntitlement"]["RevisionId"]
                  for r in sync_results]
         assert uuids == ["uuid-2", "uuid-3"], (
             f"Tombstones must emit in deleted_at order; got {uuids}"

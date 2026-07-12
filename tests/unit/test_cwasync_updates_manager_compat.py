@@ -14,9 +14,9 @@ cwasync plugin distributable through it:
   drift produce contradictory answers to "what version am I running?".
 
 The release-tag anchor itself is pinned by ``EXPECTED_PLUGIN_VERSION`` in
-``test_kosync_plugin_no_book_handling.py``; this file only pins the
-cross-file consistency plus the release-asset workflow that publishes the
-``cwasync.koplugin.zip`` Updates Manager downloads.
+``test_kosync_plugin_no_book_handling.py``. Dedicated-repository publishing is
+handled by ``scripts/publish-cwasync-plugin.sh`` so an unchanged plugin no
+longer appears as a new update on every CWNG application release.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwasync.koplugin"
 META_LUA = PLUGIN_DIR / "_meta.lua"
 MAIN_LUA = PLUGIN_DIR / "main.lua"
-ASSET_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "plugin-release-asset.yml"
+PUBLISH_SCRIPT = REPO_ROOT / "scripts" / "publish-cwasync-plugin.sh"
 
 VERSION_RE = re.compile(r'version\s*=\s*"([^"]+)"')
 
@@ -68,18 +68,18 @@ def test_version_is_release_tag_shaped():
     )
 
 
-def test_release_asset_workflow_publishes_plugin_zip():
-    assert ASSET_WORKFLOW.exists(), (
-        "plugin-release-asset.yml must exist — it attaches cwasync.koplugin.zip "
-        "to every GitHub release, which is the artifact Updates Manager "
-        "installs from"
-    )
-    body = ASSET_WORKFLOW.read_text()
-    assert re.search(r"^on:\s*$.*?release:\s*$.*?types:.*published", body,
-                     re.MULTILINE | re.DOTALL), \
-        "asset workflow must trigger on release published"
-    assert "cwasync.koplugin" in body and "cwasync.koplugin.zip" in body, (
-        "asset workflow must zip the cwasync.koplugin folder into "
-        "cwasync.koplugin.zip (Updates Manager expects the zip to contain the "
-        "plugin folder itself)"
+def test_dedicated_publish_script_pins_release_and_zip_contract():
+    assert PUBLISH_SCRIPT.exists()
+    body = PUBLISH_SCRIPT.read_text()
+    assert "new-usemame/cwasync.koplugin" in body
+    assert 'gh release view "$TAG" --repo new-usemame/Calibre-Web-NextGen' in body
+    assert "cwasync.koplugin.zip" in body
+    assert "--publish" in body, "publishing must require an explicit opt-in"
+
+
+def test_monorepo_no_longer_publishes_plugin_on_every_app_release():
+    old_workflow = REPO_ROOT / ".github" / "workflows" / "plugin-release-asset.yml"
+    assert not old_workflow.exists(), (
+        "an app-release-triggered plugin workflow makes Updates Manager report "
+        "unchanged plugins as updates; dedicated releases must be intentional"
     )

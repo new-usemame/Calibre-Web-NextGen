@@ -759,12 +759,12 @@ def HandleSyncRequest():
 
         sync_token.tags_last_modified = new_tags_last_modified
 
-    # Emit DeletedEntitlement tombstones for books hard-deleted from CW
+    # Emit device-compatible removal tombstones for books hard-deleted from CW.
     # (B3 fix — closes the orphan-book-on-device gap from the 2026-05-17
     # MITM capture). editbooks.delete_whole_book captures (user_id,
     # book_uuid, deleted_at) into kobo_deleted_book before tearing down
     # the metadata.db row; here we play those tombstones back to each
-    # affected device as DeletedEntitlement and advance
+    # affected device as an archived ChangedEntitlement and advance
     # archive_last_modified past the tombstone so the device sees each
     # one exactly once. Page-cap with SYNC_ITEM_LIMIT so a mass-delete
     # doesn't blow past the device's sync-response size limit.
@@ -784,12 +784,10 @@ def HandleSyncRequest():
     )
     for tombstone in pending_deletions:
         sync_results.append({
-            "DeletedEntitlement": {
-                "BookEntitlement": {
-                    "Id": tombstone.book_uuid,
-                    "RevisionId": tombstone.book_uuid,
-                    "CrossRevisionId": tombstone.book_uuid,
-                }
+            "ChangedEntitlement": {
+                "BookEntitlement": create_deleted_book_entitlement(
+                    tombstone.book_uuid, tombstone.deleted_at),
+                "BookMetadata": create_deleted_book_metadata(tombstone.book_uuid),
             }
         })
         ta = tombstone.deleted_at
@@ -939,6 +937,67 @@ def create_book_entitlement(book, archived):
         "OriginCategory": "Imported",
         "RevisionId": book_uuid,
         "Status": "Active",
+    }
+
+
+def create_deleted_book_entitlement(book_uuid, deleted_at):
+    """Build the archive-shaped entitlement Kobo firmware honors for a hard
+    delete.  A bare ``DeletedEntitlement`` removes store bookkeeping but can
+    leave a side-loaded book in My Books.  This mirrors the working live-book
+    shelf-removal shape while hiding a hard-deleted book from Archive, where it
+    could no longer be downloaded."""
+    book_uuid = str(book_uuid)
+    timestamp = convert_to_kobo_timestamp_string(deleted_at)
+    return {
+        "Accessibility": "Full",
+        "ActivePeriod": {"From": timestamp},
+        "Created": timestamp,
+        "CrossRevisionId": book_uuid,
+        "Id": book_uuid,
+        "IsRemoved": True,
+        "IsHiddenFromArchive": True,
+        "IsLocked": False,
+        "LastModified": timestamp,
+        "OriginCategory": "Imported",
+        "RevisionId": book_uuid,
+        "Status": "Active",
+    }
+
+
+def create_deleted_book_metadata(book_uuid):
+    """Return a type-complete metadata companion for a deleted entitlement.
+
+    The calibre row and file are already gone, so identity is the retained
+    UUID and DownloadUrls is intentionally empty.  Kobo receives the same key
+    types as a normal entitlement without being offered a dead download.
+    """
+    book_uuid = str(book_uuid)
+    return {
+        "Categories": ["00000000-0000-0000-0000-000000000001"],
+        "ContributorRoles": [],
+        "Contributors": None,
+        "CoverImageId": book_uuid,
+        "CrossRevisionId": book_uuid,
+        "CurrentDisplayPrice": {"CurrencyCode": "USD", "TotalAmount": 0},
+        "CurrentLoveDisplayPrice": {"TotalAmount": 0},
+        "Description": None,
+        "DownloadUrls": [],
+        "EntitlementId": book_uuid,
+        "ExternalIds": [],
+        "Genre": "00000000-0000-0000-0000-000000000001",
+        "IsEligibleForKoboLove": False,
+        "IsInternetArchive": False,
+        "IsPreOrder": False,
+        "IsSocialEnabled": True,
+        "Language": "en",
+        "PhoneticPronunciations": {},
+        "PublicationDate": None,
+        "Publisher": {"Imprint": "", "Name": None},
+        "RevisionId": book_uuid,
+        "Series": {},
+        "Subtitle": "",
+        "Title": book_uuid,
+        "WorkId": book_uuid,
     }
 
 

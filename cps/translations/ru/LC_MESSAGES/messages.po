@@ -10,7 +10,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-11 22:33+0000\n"
-"PO-Revision-Date: 2026-07-11 09:50+0300\n"
+"PO-Revision-Date: 2026-07-12 07:15+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -708,8 +708,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py:2704
 msgid "Password length has to be between 1 and 40"
@@ -2049,14 +2049,12 @@ msgid "Read Books"
 msgstr "Прочитанные книги"
 
 #: cps/opds.py:200
-#, fuzzy
 msgid "Currently Reading"
 msgstr "Читаю сейчас"
 
 #: cps/opds.py:201
-#, fuzzy
 msgid "Books currently being read"
-msgstr "Читаю сейчас"
+msgstr "Книги, читаемые сейчас"
 
 #: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:98 cps/web.py:1088
 msgid "Unread Books"
@@ -2740,28 +2738,25 @@ msgid "Delete"
 msgstr "Удалить"
 
 #: cps/spa_strings.py:111
-#, fuzzy
 msgid "Delete book"
-msgstr "Удалить книги?"
+msgstr "Удалить книгу"
 
 #: cps/spa_strings.py:112
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid ""
 "Delete \"{title}\"? This permanently removes the book and all its files from "
 "your library. This cannot be undone."
 msgstr ""
-"Это навсегда удалит {n} книг(у) из вашей библиотеки. Это действие нельзя "
-"отменить."
+"Удалить «{title}»? Это действие навсегда удалит книгу и все её файлы из "
+"вашей библиотеки. Его нельзя отменить."
 
 #: cps/spa_strings.py:113
-#, fuzzy
 msgid "Deleting…"
-msgstr "Создание…"
+msgstr "Удаление…"
 
 #: cps/spa_strings.py:114
-#, fuzzy
 msgid "Could not delete this book."
-msgstr "Не удалось создать полку."
+msgstr "Не удалось удалить эту книгу."
 
 #: cps/spa_strings.py:115
 #, python-brace-format
@@ -3033,37 +3028,33 @@ msgid "Search for metadata"
 msgstr "Искать метаданные"
 
 #: cps/spa_strings.py:179
-#, fuzzy
 msgid "Metadata providers"
-msgstr "Включённые поставщики метаданных"
+msgstr "Провайдеры метаданных"
 
 #: cps/spa_strings.py:180
-#, fuzzy
 msgid "Loading providers…"
-msgstr "Загрузка возможных вариантов…"
+msgstr "Загрузка провайдеров…"
 
 #: cps/spa_strings.py:181
-#, fuzzy
 msgid "Could not load providers."
-msgstr "Не удалось загрузить кандидатов."
+msgstr "Не удалось загрузить провайдеров."
 
 #: cps/spa_strings.py:182
-#, fuzzy
 msgid "Could not update provider."
-msgstr "Не удалось сохранить порядок."
+msgstr "Не удалось обновить провайдера."
 
 #: cps/spa_strings.py:183
 #, python-brace-format
 msgid "{provider}: {state}"
-msgstr ""
+msgstr "{provider}: {state}"
 
 #: cps/spa_strings.py:184
 msgid "On"
-msgstr ""
+msgstr "Вкл"
 
 #: cps/spa_strings.py:185
 msgid "Off"
-msgstr ""
+msgstr "Выкл"
 
 #: cps/spa_strings.py:186 cps/templates/shelf.html:119
 msgid "Search results"
@@ -3159,7 +3150,7 @@ msgstr "например, MOBI"
 #: cps/spa_strings.py:208
 #, python-brace-format
 msgid "{format} reader"
-msgstr "Ридер {format}"
+msgstr "Читалка {format}"
 
 #: cps/spa_strings.py:209
 #, python-brace-format
@@ -3287,9 +3278,8 @@ msgid "Manage sync & app passwords"
 msgstr "Управление синхронизацией и паролями приложений"
 
 #: cps/spa_strings.py:244
-#, fuzzy
 msgid "Check your e-reader address"
-msgstr "Email-адрес eReader для отправки"
+msgstr "Проверьте адрес вашей читалки"
 
 #: cps/spa_strings.py:245
 msgid "Create an app password"
@@ -3300,9 +3290,8 @@ msgid "Browse series"
 msgstr "Просмотр серий"
 
 #: cps/spa_strings.py:247
-#, fuzzy
 msgid "Browse authors"
-msgstr "Просмотр серий"
+msgstr "Просмотр авторов"
 
 #: cps/spa_strings.py:248
 msgid "Open Table view"
@@ -7021,9 +7010,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html:295
 msgid "Allow Reverse Proxy Authentication"
@@ -7959,9 +7948,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html:181
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -7984,9 +7973,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html:192
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -11503,9 +11492,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

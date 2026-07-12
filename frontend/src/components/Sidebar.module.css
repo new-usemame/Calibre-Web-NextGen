@@ -285,6 +285,40 @@
 }
 .capsuleGhost:hover { color: var(--text); background: rgba(255, 255, 255, .10); }
 
+/* Light-scheme fix: the capsule + ghost/done chrome above is drawn entirely
+   from white-alpha (fills, borders, sheens). The sidebar is --surface-1
+   (#ffffff Light / #f4ecd9 Sepia), so on those themes the buttons rendered
+   invisible light-on-light and the Customize affordance lost its shape.
+   Re-derive the chrome from dark-alpha + semantic border tokens so the button
+   shapes stay visible with real contrast. The dark family (Dark / Midnight /
+   High contrast) keeps the white-alpha glass above unchanged. */
+:root[data-theme="light"] .capsule,
+:root[data-theme="sepia"] .capsule {
+  background: linear-gradient(180deg, rgba(0, 0, 0, .05), rgba(0, 0, 0, .01));
+  border-color: var(--border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), var(--elev-1);
+}
+:root[data-theme="light"] .capsule:hover,
+:root[data-theme="sepia"] .capsule:hover {
+  background: linear-gradient(180deg, rgba(0, 0, 0, .09), rgba(0, 0, 0, .03));
+}
+/* The Done pill keeps its amber fill; swap its white ring + heavy dark sheen
+   for a solid amber ring and a light-appropriate elevation. */
+:root[data-theme="light"] .capsuleDone,
+:root[data-theme="sepia"] .capsuleDone {
+  border-color: var(--accent-press);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), var(--elev-1);
+}
+:root[data-theme="light"] .capsuleGhost,
+:root[data-theme="sepia"] .capsuleGhost {
+  border-color: var(--border-strong);
+  background: rgba(0, 0, 0, .04);
+}
+:root[data-theme="light"] .capsuleGhost:hover,
+:root[data-theme="sepia"] .capsuleGhost:hover {
+  background: rgba(0, 0, 0, .08);
+}
+
 .editHint {
   margin: 0 var(--sp-2) var(--sp-3);
   font-size: var(--fs-xs);

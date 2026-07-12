@@ -120,4 +120,61 @@ test.describe('per-user theme picker', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', resolveTheme(original));
     await expect.poll(() => page.evaluate(() => localStorage.getItem('cwng.theme'))).toBe(original);
   });
+
+  // Runs last: it mutates the shared seeded user's theme and restores it, so it
+  // must not sit between the persistence cases above (their rollback assertions
+  // are sensitive to the seeded theme they inherit).
+  test('Customize edit-mode ghost buttons keep a visible border on the light sidebar', async ({ page }) => {
+    // Regression: the Customize capsule + its edit-mode ghost/done buttons drew
+    // their chrome entirely from white-alpha (rgba(255,255,255,…) borders/fills/
+    // sheens). The sidebar surface is --surface-1 = #ffffff (Light) / #f4ecd9
+    // (Sepia), so on the light-scheme themes the buttons went invisible
+    // light-on-light and the Customize affordance lost its shape. Assert the
+    // ghost button carries a real (opaque, non-near-white) border against the
+    // light rail. Desktop only — the rail is off-canvas on mobile.
+    const vp = page.viewportSize();
+    test.skip(!!vp && vp.width < 768, 'The Customize rail is off-canvas on mobile.');
+
+    await page.goto('/app/account');
+    const picker = page.getByLabel('Theme');
+    const original = await picker.inputValue();
+
+    try {
+      if (original !== 'light') {
+        const save = page.waitForResponse((r) =>
+          r.url().includes('/api/v1/account/profile') && r.request().method() === 'POST');
+        await picker.selectOption('light');
+        expect((await save).ok()).toBeTruthy();
+      }
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+      // Enter customize/edit mode so the ghost reset/cancel buttons render.
+      await page.getByRole('button', { name: 'Customize navigation' }).click();
+      const ghost = page.getByRole('button', { name: 'Reset to default' });
+      await expect(ghost).toBeVisible();
+
+      const border = await ghost.evaluate((el) => getComputedStyle(el).borderTopColor);
+      const m = border.match(/rgba?\(([^)]+)\)/);
+      expect(m, `unexpected border-color format: ${border}`).toBeTruthy();
+      const parts = m![1].split(',').map((s) => parseFloat(s.trim()));
+      const [r, g, b] = parts;
+      const alpha = parts.length > 3 ? parts[3] : 1;
+      const avg = (r + g + b) / 3;
+      // Pre-fix: rgba(255,255,255,0.14) — near-transparent AND near-white, so it
+      // fails both guards. Post-fix (--border-strong, opaque dark) clears both.
+      expect(alpha, `ghost border too transparent to see (${border})`).toBeGreaterThanOrEqual(0.5);
+      expect(avg, `ghost border too light to be visible on the light sidebar (${border})`).toBeLessThan(200);
+
+      // Leave edit mode without persisting any reorder.
+      await page.getByRole('button', { name: 'Cancel' }).click();
+    } finally {
+      if (original !== 'light') {
+        await page.goto('/app/account');
+        const restore = page.waitForResponse((r) =>
+          r.url().includes('/api/v1/account/profile') && r.request().method() === 'POST');
+        await page.getByLabel('Theme').selectOption(original);
+        expect((await restore).ok()).toBeTruthy();
+      }
+    }
+  });
 });

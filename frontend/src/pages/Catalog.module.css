@@ -35,6 +35,10 @@
   gap: var(--sp-3);
   margin-bottom: var(--sp-5);
 }
+.viewToggle { margin-left: auto; display: flex; gap: 2px; padding: 2px; background: var(--surface-2); border-radius: var(--r-md); }
+.viewToggle button { display: grid; place-items: center; min-width: 40px; min-height: 40px; color: var(--text-muted); border-radius: var(--r-sm); }
+.viewToggle button[aria-pressed='true'] { color: var(--accent-text); background: var(--accent-soft); }
+.viewToggle button:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 
 .kindLabel {
   text-transform: uppercase;
@@ -61,6 +65,20 @@
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--sp-5);
 }
+.grid.density_comfortable { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.grid.density_compact { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-4); }
+.grid.density_dense { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--sp-3); }
+.bookList { display: flex; flex-direction: column; gap: var(--sp-2); max-width: 860px; }
+.bookListItem { display: flex; align-items: center; gap: var(--sp-3); min-height: 72px; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); color: var(--text); }
+.bookListItem:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.bookListItem:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.bookListCover { flex: 0 0 40px; width: 40px; }
+.bookListInfo { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--sp-1); }
+.bookListInfo strong, .bookListInfo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bookListInfo span { color: var(--text-muted); font-size: var(--fs-sm); }
+.bookListIndex { flex: none; color: var(--accent); font-size: var(--fs-sm); }
+.densityField { border: 0; padding: var(--sp-2) 0 0; margin: var(--sp-2) 0 0; border-top: 1px solid var(--border); }
+.densityField legend { padding: var(--sp-2) 0 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semi); }
 
 .grid > * {
   animation: fadeRise var(--dur-slow) var(--ease-out) both;
@@ -204,6 +222,14 @@
 /* Hide the "Advanced" word on narrow screens to keep the toolbar compact. */
 @media (max-width: 520px) {
   .advancedLabel { display: none; }
+}
+@media (max-width: 600px) {
+  .container { padding-inline: var(--sp-3); }
+  .grid.density_comfortable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid.density_compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid.density_dense { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); }
+  .bookList { max-width: none; }
+  .bookListIndex { font-size: var(--fs-xs); }
 }
 
 /* Read-status segmented control */

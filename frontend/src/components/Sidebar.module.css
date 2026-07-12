@@ -419,3 +419,15 @@
   .capsule, .capsuleDone, .editRow, .editRowHidden { transition: none; }
   .capsule:hover, .capsuleDone:hover { transform: none; }
 }
+.tableVisibility {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  margin: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.tableVisibility input { width: 18px; height: 18px; accent-color: var(--accent); }

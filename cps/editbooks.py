@@ -184,7 +184,11 @@ def upload():
             try:
                 final_path = _get_ingest_path(requested_file, prefix_parts=["new", current_user.id])
                 tmp_path, final_path = _save_to_ingest_atomic_rename(requested_file, final_path)
-                os.replace(tmp_path, final_path) # No manifest needed, just rename
+                with open(final_path + ".cwa.json", 'w', encoding='utf-8') as mf:
+                    json.dump({"action": "import",
+                               "original_filename": requested_file.filename},
+                              mf, ensure_ascii=False)
+                os.replace(tmp_path, final_path)
                 upload_text = N_("Upload done, processing, please wait...")
                 WorkerThread.add(current_user.name, TaskUpload(upload_text, escape(requested_file.filename)))
             except Exception as e:
@@ -2305,6 +2309,26 @@ def modify_identifiers(input_identifiers, db_identifiers, db_session):
     return changed, error
 
 
+def _refresh_format_sizes(book, book_dir):
+    """Re-stat every present format and return the changed format names.
+
+    Missing rows are ignored here so metadata reload retains its established
+    source-format error; all mutations remain session-local until its caller's
+    single locked commit.
+    """
+    changed = []
+    for data_row in book.data:
+        data_ext = (data_row.format or '').lower()
+        data_path = os.path.join(book_dir, data_row.name + '.' + data_ext)
+        if not os.path.isfile(data_path):
+            continue
+        actual_size = os.path.getsize(data_path)
+        if actual_size != data_row.uncompressed_size:
+            data_row.uncompressed_size = actual_size
+            changed.append((data_row.format or '').upper())
+    return changed
+
+
 @editbook.route("/admin/book/<int:book_id>/reload_metadata", methods=["POST"])
 @login_required_if_no_ano
 @edit_required
@@ -2355,6 +2379,7 @@ def reload_metadata_from_disk(book_id):
         chosen_data = book.data[0]
 
     book_dir = os.path.join(config.get_book_path(), book.path)
+    updated = []
     file_ext = chosen_data.format.lower()
     file_path = os.path.join(book_dir, chosen_data.name + '.' + file_ext)
     if not os.path.isfile(file_path):
@@ -2375,13 +2400,18 @@ def reload_metadata_from_disk(book_id):
                        error=_("Could not parse metadata from %(format)s file: %(err)s",
                                format=file_ext.upper(), err=str(ex))), 500
 
-    updated = []
     try:
         # Field mutations are session-local — the edit-book POST path runs
         # them unlocked too, and takes metadata_db_write_lock only around
         # the final COMMIT (the lock's contract is single-commit duration;
         # holding it across file renames would starve the ingest
         # coordinator, #192). Same for the dir move below.
+        # File size is metadata too: external conversion/replacement changes
+        # the bytes on disk without updating data.uncompressed_size. Re-stat
+        # every real format inside this same rollback/commit boundary.
+        updated.extend('format_size:' + fmt
+                       for fmt in _refresh_format_sizes(book, book_dir))
+
         # Title.
         if meta.title and meta.title != book.title:
             book.title = strip_whitespaces(meta.title)

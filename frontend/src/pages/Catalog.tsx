@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from 'wouter';
-import { ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw, UploadCloud } from 'lucide-react';
+import { ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw, UploadCloud, LayoutGrid, List } from 'lucide-react';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { BookCard } from '../components/BookCard';
+import { BookCover } from '../components/BookCover';
 import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
@@ -13,6 +14,7 @@ import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, type Book } from '../lib/api';
 import { saveCatalog, loadCatalog } from '../lib/scrollCache';
 import { usePersistentBool } from '../lib/usePersistentBool';
+import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useT } from '../lib/i18n';
 import styles from './Catalog.module.css';
 
@@ -216,6 +218,10 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   // Discover section visibility (persisted; toggled by the gear menu or its ×).
   const [discoverHidden, setDiscoverHidden] = usePersistentBool('cwng_discover_hidden_v1', false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [density, setDensity] = usePersistentChoice(
+    'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
+  const [seriesPresentation, setSeriesPresentation] = usePersistentChoice(
+    'cwng:series-presentation-v1', ['grid', 'list'] as const, 'grid');
   const settingsRef = useRef<HTMLDivElement>(null);
 
   const accKeyRef = useRef<string>(snap?.resetKey ?? '');
@@ -381,6 +387,18 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
         {/* role=status so the result count is announced when filters/search
             change it and when load-more grows it (SC 4.1.3). */}
         {countLabel && <span className={styles.count} role="status">{countLabel}</span>}
+        {isSeries && (
+          <div className={styles.viewToggle} role="group" aria-label={t('Series view')}>
+            <button type="button" onClick={() => setSeriesPresentation('grid')}
+              aria-pressed={seriesPresentation === 'grid'} aria-label={t('Grid view')}>
+              <LayoutGrid size={17} aria-hidden="true" focusable={false} />
+            </button>
+            <button type="button" onClick={() => setSeriesPresentation('list')}
+              aria-pressed={seriesPresentation === 'list'} aria-label={t('List view')}>
+              <List size={17} aria-hidden="true" focusable={false} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}
@@ -486,6 +504,16 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
                   />
                   <span>{t('Show Discover section')}</span>
                 </label>
+                <fieldset className={styles.densityField}>
+                  <legend>{t('Book density')}</legend>
+                  {(['comfortable', 'compact', 'dense'] as const).map((choice) => (
+                    <label key={choice} className={styles.settingsItem}>
+                      <input type="radio" name="book-density" value={choice}
+                        checked={density === choice} onChange={() => setDensity(choice)} />
+                      <span>{t(choice === 'comfortable' ? 'Comfortable' : choice === 'compact' ? 'Compact' : 'Dense')}</span>
+                    </label>
+                  ))}
+                </fieldset>
               </div>
             )}
           </div>
@@ -525,7 +553,30 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
         />
       ) : (
         <>
-          <div className={styles.grid}>
+          {isSeries && seriesPresentation === 'list' && !selecting ? (
+            <ul className={styles.bookList} role="list">
+              {allBooks.map((book) => (
+                <li key={book.id}>
+                  <Link href={`/book/${book.id}`} className={styles.bookListItem}
+                    aria-label={t('Open details for {title}', { title: book.title })}>
+                    <span className={styles.bookListCover}>
+                      <BookCover coverUrl={book.cover_url} title={book.title} authors={book.authors} />
+                    </span>
+                    <span className={styles.bookListInfo}>
+                      <strong>{book.title}</strong>
+                      <span>{book.authors.join(', ')}</span>
+                    </span>
+                    {book.series_index != null && (
+                      <span className={styles.bookListIndex}>
+                        {t('Book {number}', { number: Number.isInteger(book.series_index) ? book.series_index : String(book.series_index) })}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+          <div className={`${styles.grid} ${styles[`density_${density}`]}`}>
             {allBooks.map((book, i) => (
               <BookCard
                 key={book.id}
@@ -546,6 +597,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
               />
             ))}
           </div>
+          )}
 
           {hasMore && (
             <div ref={sentinelRef} className={styles.loadMore}>

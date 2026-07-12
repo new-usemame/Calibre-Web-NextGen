@@ -212,7 +212,7 @@
   justify-content: center;
   gap: var(--sp-1);
   border-radius: var(--r-md);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   text-decoration: none;

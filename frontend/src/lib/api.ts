@@ -123,6 +123,8 @@ export interface BookDetail {
   cover_url: string | null;
   pubdate: string | null;
   description_html: string | null;
+  /** Browser/watch-folder name captured before Calibre renames the import. */
+  original_filename: string | null;
   tags: EntityRef[];
   languages: EntityRef[];
   publishers: EntityRef[];

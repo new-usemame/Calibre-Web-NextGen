@@ -162,23 +162,24 @@ export function Login() {
           </form>
         )}
 
-        {/* OAuth providers */}
-        {providers.length > 0 && mode === 'login' && (
-          <div className={styles.oauth}>
-            <div className={styles.divider}><span>{t('or continue with')}</span></div>
-            {providers.map((p) => (
-              <a key={p.id} href={p.url} className={styles.oauthBtn}>{p.name}</a>
-            ))}
+        {/* Every configured passwordless/federated method shares one compact,
+            wrapping group. Provider labels come from the server's configured
+            human-facing names, never internal ids such as "generic". */}
+        {mode === 'login' && (cfg?.remote_login || providers.length > 0) && (
+          <div className={styles.loginWith} role="group" aria-label={t('Login with')}>
+            <span className={styles.loginWithLabel}>{t('Login with')}</span>
+            <div className={styles.loginWithActions}>
+              {cfg?.remote_login && (
+                <Link href="/magic-link" className={styles.loginWithBtn}>
+                  <KeyRound size={15} aria-hidden="true" focusable={false} />
+                  {t('Magic link')}
+                </Link>
+              )}
+              {providers.map((p) => (
+                <a key={p.id} href={p.url} className={styles.loginWithBtn}>{p.name}</a>
+              ))}
+            </div>
           </div>
-        )}
-
-        {/* Magic-link (remote) login — admin toggle config_remote_login. Routes to
-            the native SPA page (not the legacy /remote/login Jinja view). */}
-        {mode === 'login' && cfg?.remote_login && (
-          <Link href="/magic-link" className={styles.magicLink}>
-            <KeyRound size={15} aria-hidden="true" focusable={false} />
-            {t('Log in with a magic link')}
-          </Link>
         )}
 
         {/* Mode switches */}

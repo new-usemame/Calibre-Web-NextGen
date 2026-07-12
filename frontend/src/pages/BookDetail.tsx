@@ -131,6 +131,9 @@ function TagEditor({ bookId, tags, canEdit }:
   const update = useUpdateMetadata(bookId);
   const [adding, setAdding] = useState(false);
   const [input, setInput] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const visibleTags = expanded ? tags : tags.slice(0, 8);
+  const hasMore = tags.length > 8;
 
   const names = tags.map((tg) => tg.name);
   const apply = (next: string[]) => update.mutate({ tags: next.join(', ') });
@@ -147,19 +150,26 @@ function TagEditor({ bookId, tags, canEdit }:
   if (!canEdit) {
     if (tags.length === 0) return null;
     return (
-      <div className={styles.tags}>
-        {tags.map((tag) => (
+      <div className={styles.tags} id="book-tags">
+        {visibleTags.map((tag) => (
           <Link key={tag.id} href={`/tags/${tag.id}`} className={styles.tagLink}>
             <Pill>{tag.name}</Pill>
           </Link>
         ))}
+        {hasMore && (
+          <button type="button" className={styles.tagsDisclosure}
+            aria-expanded={expanded} aria-controls="book-tags"
+            onClick={() => setExpanded((value) => !value)}>
+            {expanded ? t('Show fewer tags') : t('Show all {count} tags', { count: tags.length })}
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={styles.tags}>
-      {tags.map((tag) => (
+    <div className={styles.tags} id="book-tags">
+      {visibleTags.map((tag) => (
         <span key={tag.id} className={styles.tagChip}>
           <Link href={`/tags/${tag.id}`} className={styles.tagChipLink}>{tag.name}</Link>
           <button
@@ -174,6 +184,13 @@ function TagEditor({ bookId, tags, canEdit }:
           </button>
         </span>
       ))}
+      {hasMore && (
+        <button type="button" className={styles.tagsDisclosure}
+          aria-expanded={expanded} aria-controls="book-tags"
+          onClick={() => setExpanded((value) => !value)}>
+          {expanded ? t('Show fewer tags') : t('Show all {count} tags', { count: tags.length })}
+        </button>
+      )}
       {adding ? (
         <span className={styles.tagAddRow}>
           <input
@@ -307,12 +324,21 @@ export function BookDetail() {
                 detail page. Sync-driven display only; the read toggle below stays a
                 2-state read/unread control. Shows the synced percent when known. */}
             {book.in_progress && (
-              <p className={styles.currentlyReading}>
-                <BookOpen size={14} aria-hidden="true" />
-                {book.kosync_progress != null
-                  ? `${t('Currently reading')} · ${Math.round(book.kosync_progress)}%`
-                  : t('Currently reading')}
-              </p>
+              <div className={styles.readProgressWrap}>
+                <p className={styles.currentlyReading}>
+                  <BookOpen size={14} aria-hidden="true" focusable={false} />
+                  {book.kosync_progress != null
+                    ? `${t('Currently reading')} · ${Math.round(book.kosync_progress)}%`
+                    : t('Currently reading')}
+                </p>
+                {book.kosync_progress != null && (
+                  <div className={styles.readProgress} role="progressbar"
+                    aria-label={t('Reading progress')} aria-valuemin={0} aria-valuemax={100}
+                    aria-valuenow={Math.round(book.kosync_progress)}>
+                    <span style={{ width: `${Math.max(0, Math.min(100, book.kosync_progress))}%` }} />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -478,6 +504,12 @@ export function BookDetail() {
 
           {/* Metadata definition list */}
           <dl className={styles.meta}>
+            {book.original_filename && (
+              <>
+                <dt className={styles.metaLabel}>{t('Imported as')}</dt>
+                <dd className={styles.metaValue}>{book.original_filename}</dd>
+              </>
+            )}
             {book.kosync_progress != null && (
               <>
                 <dt className={styles.metaLabel}>{t('KOReader Progress')}</dt>

@@ -26,6 +26,17 @@ def _detail_custom_columns():
         log.warning("Custom-column definitions unavailable for book detail", exc_info=True)
         return []
 
+
+def _original_filename(book_id):
+    """Best-effort app.db lookup. A rolling-upgrade request can arrive before
+    the auxiliary table/session is ready; book detail must still render."""
+    try:
+        row = (ub.session.query(ub.BookOriginalFilename)
+               .filter(ub.BookOriginalFilename.book_id == book_id).first())
+        return row.filename if row else None
+    except Exception:
+        return None
+
 # Stateless sort map — mirrors web.py sort options without calling get_sort_function
 # (which writes per-user state and must not be called from a read-only API endpoint).
 SORT_MAP = {
@@ -334,6 +345,7 @@ def book_detail(book_id):
         hidden=hidden,
         in_progress=in_progress,
         custom_column_definitions=_detail_custom_columns(),
+        original_filename=_original_filename(book_id),
     )
     body["kosync_progress"] = kosync_progress
     body["kosync_progress_timestamp"] = kosync_progress_timestamp

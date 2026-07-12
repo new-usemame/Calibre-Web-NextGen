@@ -88,6 +88,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     for (const e of ORDERABLE_ENTRIES) {
       if (!e.isShelvesBlock) v[e.key] = me?.sidebar?.[e.key] !== false;
     }
+    v.list = me?.sidebar?.list !== false;
     setVis(v);
     setEditMode(true);
     announce(t('Editing sidebar. Reorder or hide sections, then tap Done.'));
@@ -104,6 +105,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     setOrder([...DEFAULT_SIDEBAR_ORDER]);
     const v: Record<string, boolean> = {};
     for (const e of ORDERABLE_ENTRIES) if (!e.isShelvesBlock) v[e.key] = true;
+    v.list = true;
     setVis(v);
     announce(t('Sidebar reset to default.'));
   };
@@ -225,6 +227,12 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
               {t('Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused handle.')}
             </p>
             <SidebarEditList order={order} setOrder={setOrder} vis={vis} setVis={setVis} />
+            <label className={styles.tableVisibility}>
+              <input type="checkbox" checked={vis.list !== false}
+                onChange={(event) => setVis((current) => ({ ...current, list: event.target.checked }))} />
+              <Table2 size={16} aria-hidden="true" focusable={false} />
+              <span>{t('Show Table view')}</span>
+            </label>
           </>
         ) : (
           <>

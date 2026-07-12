@@ -1025,6 +1025,18 @@ class NewBookProcessor:
         except (sqlite3.Error, ValueError, TypeError) as e:
             print(f"[ingest-processor] WARN: could not record original "
                   f"filename for {book_ids}: {e}", flush=True)
+        finally:
+            # A browser upload's explicit import manifest has served its purpose
+            # once the add succeeded. Watch-folder imports have no sidecar.
+            manifest_path = self.filepath + ".cwa.json"
+            try:
+                if os.path.exists(manifest_path):
+                    with open(manifest_path, 'r', encoding='utf-8') as mf:
+                        manifest = json.load(mf)
+                    if manifest.get("action") == "import":
+                        os.remove(manifest_path)
+            except (OSError, ValueError, TypeError):
+                pass
 
     def backup(self, input_file, backup_type):
         output_path = None
@@ -1813,6 +1825,10 @@ def main(filepath=None):
                 with open(manifest_path, 'r', encoding='utf-8') as mf:
                     manifest = json.load(mf)
                 action = manifest.get("action")
+                if action == "import":
+                    original_filename = manifest.get("original_filename")
+                    if isinstance(original_filename, str) and original_filename:
+                        nbp.original_filename = Path(original_filename).name
                 if action == "add_format":
                     success = False
                     try:

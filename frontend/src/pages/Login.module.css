@@ -201,3 +201,24 @@
   background: var(--surface-2);
   border-color: var(--border-strong);
 }
+
+.loginWith { width: 100%; margin-top: var(--sp-3); }
+.loginWithLabel { display: block; margin-bottom: var(--sp-2); color: var(--text-muted); font-size: var(--fs-xs); text-align: center; }
+.loginWithActions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); }
+.loginWithBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-height: 40px;
+  max-width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.loginWithBtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.loginWithBtn:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }

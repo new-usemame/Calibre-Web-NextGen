@@ -16,9 +16,23 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Mobile libraries can show two, three, or four complete covers per row instead of spending the whole screen on one book.** Library View settings now offer Comfortable, Compact, and Dense layouts, remember the choice in that browser, and use more of wide desktop screens without cropping cover art. ([#835](https://github.com/new-usemame/Calibre-Web-NextGen/issues/835), [#764](https://github.com/new-usemame/Calibre-Web-NextGen/issues/764))
+- **Series pages no longer force every book into the cover grid.** A keyboard- and touch-accessible grid/list switch provides a more readable alternative and remembers the choice. ([#662](https://github.com/new-usemame/Calibre-Web-NextGen/issues/662))
+
+### Changed
+
+- **Long tag collections no longer push a book's description several screens down on mobile.** Book details now keep the cover and useful title information together, collapse tags after the first eight behind an accessible Show all control, and show synced reading position as a semantic progress bar. ([#836](https://github.com/new-usemame/Calibre-Web-NextGen/issues/836))
+- **Magic-link and SSO choices no longer stretch the login page into separate sections.** Every configured method now appears in one compact “Login with” row, including all enabled providers under their configured display names. ([#833](https://github.com/new-usemame/Calibre-Web-NextGen/issues/833))
+
 ### Fixed
 
 - **Russian and French no longer fall back to English across several new-interface menus.** Data-driven sidebar, Admin, filter, and sort labels now enter the translation catalogs just like directly translated text; Russian gains the remaining menu translations, French gains the library/search/sort translations reported in #615, and the classic database troubleshooting guide is now translatable. Credit: @standhaftsohnsergius (#844). Addresses [#719](https://github.com/new-usemame/Calibre-Web-NextGen/issues/719) and [#615](https://github.com/new-usemame/Calibre-Web-NextGen/issues/615).
+- **A hidden Table view can be restored without switching back to the classic interface.** Customize navigation now includes the same server-backed “Show book list” setting that controls the Table link. ([#837](https://github.com/new-usemame/Calibre-Web-NextGen/issues/837))
+- **The new book page shows the real imported filename again instead of losing it—or showing an internal timestamp/random staging prefix after a browser upload.** Uploads now carry the browser-selected name explicitly through ingest, and the SPA displays that stored name as “Imported as.” ([#840](https://github.com/new-usemame/Calibre-Web-NextGen/issues/840))
+- **Reloading metadata now refreshes stale EPUB/PDF/other format sizes too.** The refresh rechecks every real file on disk and persists changed sizes, so a conversion or external replacement no longer leaves an obsolete size blocking Send to eReader. ([#841](https://github.com/new-usemame/Calibre-Web-NextGen/issues/841))
+- **Shelf actions no longer push the page wider than a 375 px phone screen.** Rename, visibility, Kobo, reorder, and delete controls now wrap inside the shelf instead of creating horizontal scrolling.
 
 ## [v4.1.11] - 2026-07-12
 

@@ -9,7 +9,7 @@ import json
 import flask
 import pytest
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 
 
 def _ctx(files=None):
@@ -65,6 +65,7 @@ def test_upload_valid_file_queued():
              patch.object(mod, "_get_ingest_path", return_value="/ingest/new/book.epub"), \
              patch.object(mod, "_save_to_ingest_atomic_rename",
                           return_value=("/ingest/tmp", "/ingest/new/book.epub")), \
+             patch("builtins.open", mock_open()) as manifest_open, \
              patch.object(mod, "os") as mock_os, \
              patch.object(mod, "WorkerThread") as worker, \
              patch.object(mod, "config", SimpleNamespace(config_upload_formats="epub,pdf")):
@@ -73,6 +74,7 @@ def test_upload_valid_file_queued():
     assert body["queued"] == ["book.epub"]
     assert body["errors"] == []
     assert mock_os.replace.called and worker.add.called
+    manifest_open.assert_called_once_with("/ingest/new/book.epub.cwa.json", "w", encoding="utf-8")
 
 
 @pytest.mark.unit

@@ -3,7 +3,8 @@
    Single source of truth. Dark, bookish, cover-forward. Honors caliBlur's
    identity (deep blue-charcoal + amber) while introducing a real token layer:
    color is never hardcoded in components — they consume these vars.
-   Light/other themes later = swap this :root block, nothing else.
+   Alternate themes override this palette below; components consume only these
+   semantic tokens so the same UI structure works in every palette.
    ============================================================================ */
 
 @layer reset, base, components, utilities;
@@ -50,6 +51,17 @@
   --danger:        #e0685f;
   --danger-soft:   rgba(224, 104, 95, 0.14);
   --success:       #6cc08a;
+  --danger-border: rgba(224, 104, 95, 0.32);
+  --success-soft:  rgba(108, 192, 138, 0.13);
+  --success-border: rgba(108, 192, 138, 0.30);
+
+  /* Cover artwork is uncontrolled content. Controls over it use a deliberately
+     opaque, palette-independent backing so their contrast never depends on the
+     image below; components still consume semantic tokens, not private colors. */
+  --cover-control-bg: rgba(20, 28, 36, 0.88);
+  --cover-control-fg: #ffffff;
+  --cover-control-border: rgba(255, 255, 255, 0.72);
+  --overlay-backdrop: rgba(8, 12, 16, 0.66);
 
   /* ---- Typography (#641: the readable System sans is the default for both
           display and body — it matches the classic UI and what multiple users

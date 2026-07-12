@@ -19,33 +19,39 @@ const KNOWN: Record<string, string> = {};
 
 async function axeScan(page: Page, label: string) {
   await page.waitForLoadState('networkidle');
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-    .analyze();
+  for (const theme of ['dark', 'light'] as const) {
+    await page.evaluate((slug) => document.documentElement.setAttribute('data-theme', slug), theme);
+    // Components animate token-backed colors for --dur-fast. Scan the settled
+    // rendered state, not a transient dark→light interpolation frame.
+    await page.waitForTimeout(250);
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze();
 
-  const counts = (i: string) => results.violations.filter((v) => v.impact === i).length;
-  test.info().annotations.push({
-    type: 'axe',
-    description: `${label} — critical:${counts('critical')} serious:${counts('serious')} moderate:${counts('moderate')}`,
-  });
+    const counts = (i: string) => results.violations.filter((v) => v.impact === i).length;
+    test.info().annotations.push({
+      type: 'axe',
+      description: `${label}/${theme} — critical:${counts('critical')} serious:${counts('serious')} moderate:${counts('moderate')}`,
+    });
 
-  const failing = results.violations
-    .filter((v) => FAIL_IMPACTS.includes(v.impact || ''))
-    .filter((v) => !(v.id in KNOWN));
+    const failing = results.violations
+      .filter((v) => FAIL_IMPACTS.includes(v.impact || ''))
+      .filter((v) => !(v.id in KNOWN));
 
-  // Surface the exact offending nodes so a failure is actionable, not a mystery.
-  for (const v of failing) {
-    for (const n of v.nodes) {
-      console.log(`[a11y:${label}] ${v.id} @ ${JSON.stringify(n.target)} :: ${(n.failureSummary || '').replace(/\n/g, ' ')}`);
+    // Surface the exact offending nodes so a failure is actionable, not a mystery.
+    for (const v of failing) {
+      for (const n of v.nodes) {
+        console.log(`[a11y:${label}/${theme}] ${v.id} @ ${JSON.stringify(n.target)} :: ${(n.failureSummary || '').replace(/\n/g, ' ')}`);
+      }
     }
-  }
 
-  expect(
-    failing.map((v) => `${v.id} [${v.impact}] — ${v.help} (${v.nodes.length} node/s)`),
-    `Accessibility violations on ${label}:\n${failing
-      .map((v) => `  ${v.id} [${v.impact}]: ${v.helpUrl}`)
-      .join('\n')}`,
-  ).toEqual([]);
+    expect(
+      failing.map((v) => `${v.id} [${v.impact}] — ${v.help} (${v.nodes.length} node/s)`),
+      `Accessibility violations on ${label}/${theme}:\n${failing
+        .map((v) => `  ${v.id} [${v.impact}]: ${v.helpUrl}`)
+        .join('\n')}`,
+    ).toEqual([]);
+  }
 }
 
 const isMobile = () => (test.info().project.name === 'mobile');

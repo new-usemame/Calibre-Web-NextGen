@@ -66,8 +66,8 @@
 }
 
 .checkboxOff {
-  background: rgba(20, 28, 36, 0.7);
-  border: 2px solid #fff;
+  background: var(--cover-control-bg);
+  border: 2px solid var(--cover-control-border);
 }
 
 .info {
@@ -123,8 +123,8 @@
   height: 22px;
   padding: 0 var(--sp-2);
   border-radius: var(--r-full);
-  background: rgba(20, 28, 36, 0.82);
-  color: #fff;
+  background: var(--cover-control-bg);
+  color: var(--cover-control-fg);
   font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1;
@@ -144,9 +144,9 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-full);
-  background: rgba(20, 28, 36, 0.82);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
+  background: var(--cover-control-bg);
+  color: var(--cover-control-fg);
+  border: 1px solid var(--cover-control-border);
   box-shadow: var(--elev-1);
   display: flex;
   align-items: center;
@@ -165,7 +165,7 @@
 
 .removeBtn:hover {
   background: var(--danger);
-  color: #fff;
+  color: var(--cover-control-fg);
   border-color: var(--danger);
 }
 
@@ -179,9 +179,9 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-full);
-  background: rgba(20, 28, 36, 0.82);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
+  background: var(--cover-control-bg);
+  color: var(--cover-control-fg);
+  border: 1px solid var(--cover-control-border);
   box-shadow: var(--elev-1);
   display: flex;
   align-items: center;

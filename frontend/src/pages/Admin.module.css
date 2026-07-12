@@ -60,16 +60,21 @@
   color: var(--text-muted);
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   background: var(--surface-0, var(--bg));
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: var(--sp-2) var(--sp-3);
   color: var(--text);
   font-size: var(--fs-md);
+  font-family: var(--font-body);
 }
 
-.field input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
 
 .newActions {
   display: flex;

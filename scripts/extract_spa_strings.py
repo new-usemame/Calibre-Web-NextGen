@@ -18,8 +18,9 @@ CoverPicker, AdvancedSearch, EditBook … surfaces) were never anchored, so Russ
 (and every locale) rendered them in English despite a complete .po.
 
 This module is the single source of truth for that sync. It parses every
-``t('literal')`` call out of the frontend and every ``_('literal')`` anchor out
-of spa_strings.py, and either:
+``t('literal')`` call and every static ``label: 'literal'`` data entry out of
+the frontend, plus every ``_('literal')`` anchor out of spa_strings.py, and
+either:
 
   * ``--check`` (default): exits non-zero listing any frontend literal that is not
     anchored — this is the CI gate (tests/unit/test_spa_strings_anchored.py) that
@@ -27,8 +28,11 @@ of spa_strings.py, and either:
   * ``--write``: regenerates the AUTOGEN block in spa_strings.py so every current
     frontend literal is anchored.
 
-Only static string literals are anchored; ``t(variable)`` calls can't be resolved
-statically and are the frontend's responsibility to feed a literal msgid.
+Static ``label`` entries are included because the SPA deliberately keeps menu,
+button-grid, filter, and sort copy in data structures before rendering it with
+``t(label)``. That pattern caused the residual #719 gap even after all direct
+``t('literal')`` calls were gated. Other dynamic keys still need an explicit
+anchor.
 """
 from __future__ import annotations
 
@@ -58,6 +62,17 @@ _T_CALL = re.compile(
     r"""|`([^`$\\]*)`)\s*[,)]"""
 )
 
+# Data-driven UI copy rendered later through t(label). This intentionally keys
+# on the conventional property name rather than every TS string literal: the
+# latter would pollute the catalogs with routes, API values, CSS keys, and test
+# data. Covers both object literals (`label: 'Newest'`) and quoted keys.
+_LABEL_PROPERTY = re.compile(
+    r"""(?:\blabel\b|['\"]label['\"])\s*:\s*"""
+    r"""(?:'((?:[^'\\]|\\.)*)'"""
+    r"""|\"((?:[^\"\\]|\\.)*)\""""
+    r"""|`([^`$\\]*)`)"""
+)
+
 # JS string escapes we care about in UI copy: \' \" \\ \n \t \r and \` — map to the
 # runtime value the SPA passes to t(), which is what the msgid must equal.
 _JS_UNESCAPE = re.compile(r"\\(.)")
@@ -69,7 +84,7 @@ def _decode_js(literal: str) -> str:
 
 
 def extract_frontend_keys(frontend_src: str = FRONTEND_SRC) -> dict[str, set[str]]:
-    """Return {msgid: {relative source files}} for every static t() literal."""
+    """Return static direct and data-driven gettext keys used by the SPA."""
     keys: dict[str, set[str]] = {}
     for dirpath, _dirs, files in os.walk(frontend_src):
         for fname in files:
@@ -83,6 +98,11 @@ def extract_frontend_keys(frontend_src: str = FRONTEND_SRC) -> dict[str, set[str
                 continue
             rel = os.path.relpath(path, frontend_src)
             for match in _T_CALL.finditer(src):
+                raw = match.group(1) or match.group(2) or match.group(3)
+                if raw is None or raw == "":
+                    continue
+                keys.setdefault(_decode_js(raw), set()).add(rel)
+            for match in _LABEL_PROPERTY.finditer(src):
                 raw = match.group(1) or match.group(2) or match.group(3)
                 if raw is None or raw == "":
                     continue
@@ -120,7 +140,8 @@ def missing_anchors(
 def _render_autogen(missing: list[str]) -> str:
     lines = [
         AUTOGEN_BEGIN,
-        "# Auto-anchored SPA-only msgids — every t('literal') in frontend/src that",
+        "# Auto-anchored SPA-only msgids — every t('literal') and static label",
+        "# property in frontend/src that",
         "# is not already anchored above. Do NOT edit by hand; run",
         "#   python scripts/extract_spa_strings.py --write",
         "# after adding or removing SPA strings. The CI gate",
@@ -181,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
     missing = missing_anchors()
     if missing:
         print(
-            f"[spa_strings] {len(missing)} SPA t() literal(s) are NOT anchored in "
+            f"[spa_strings] {len(missing)} SPA translation key(s) are NOT anchored in "
             "cps/spa_strings.py — they will be dropped from messages.pot and render "
             "in English. Run: python scripts/extract_spa_strings.py --write",
             file=sys.stderr,
@@ -189,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         for key in missing:
             print(f"    {key!r}", file=sys.stderr)
         return 1
-    print("[spa_strings] OK — every SPA t() literal is anchored.")
+    print("[spa_strings] OK — every static SPA translation key is anchored.")
     return 0
 
 

@@ -360,12 +360,11 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   });
 
   const heading = isView ? t(VIEW_LABEL[view!]) : filtered ? (entityName ?? '…') : t('Your Library');
-  const countLabel =
-    total > 0
-      ? search && !filtered
-        ? `${total} result${total !== 1 ? 's' : ''} for "${search}"`
-        : `${total} book${total !== 1 ? 's' : ''}`
-      : '';
+  const countLabel = total > 0
+    ? search && !filtered
+      ? t('{count} results for "{query}"', { count: total, query: search })
+      : t('{count} books', { count: total })
+    : '';
 
   return (
     <main className={styles.container}>

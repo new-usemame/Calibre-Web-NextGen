@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Russian and French no longer fall back to English across several new-interface menus.** Data-driven sidebar, Admin, filter, and sort labels now enter the translation catalogs just like directly translated text; Russian gains the remaining menu translations, French gains the library/search/sort translations reported in #615, and the classic database troubleshooting guide is now translatable. Credit: @standhaftsohnsergius (#844). Addresses [#719](https://github.com/new-usemame/Calibre-Web-NextGen/issues/719) and [#615](https://github.com/new-usemame/Calibre-Web-NextGen/issues/615).
+
 ## [v4.1.11] - 2026-07-12
 
 ### Added

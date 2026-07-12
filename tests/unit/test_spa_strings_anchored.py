@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Gate: every SPA t('literal') is anchored in cps/spa_strings.py (issue #719).
+"""Gate: every static SPA translation key is anchored (issue #719).
 
 The React SPA translates via ``t('English source')`` resolved against a catalog
 built from the .po files (cps/api/i18n.py). But ``pybabel extract`` only scans
@@ -36,20 +36,33 @@ def _load_extractor():
 extractor = _load_extractor()
 
 
-def test_every_spa_t_literal_is_anchored():
-    """No SPA t() literal may be missing from cps/spa_strings.py.
+def test_every_static_spa_translation_key_is_anchored():
+    """No direct t() literal or data-driven label may be missing.
 
     Regenerate with: python scripts/extract_spa_strings.py --write
     """
     missing = extractor.missing_anchors()
     assert missing == [], (
-        f"{len(missing)} SPA t() literal(s) are not anchored in cps/spa_strings.py "
+        f"{len(missing)} SPA translation key(s) are not anchored in cps/spa_strings.py "
         f"and will render untranslated (issue #719). Run "
         f"`python scripts/extract_spa_strings.py --write`. Missing: {missing[:20]}"
     )
 
 
-@pytest.mark.parametrize("msgid", ["Table view", "Smart shelves"])
+@pytest.mark.parametrize(
+    "msgid",
+    [
+        "Table view",
+        "Smart shelves",
+        "Formats",
+        "Hot",
+        "Top Rated",
+        "Full user table & restrictions",
+        "Basic configuration",
+        "Database & library path",
+        "Scheduled tasks",
+    ],
+)
 def test_reporter_menu_strings_anchored(msgid):
     """The exact sidebar menu items #719 reported as untranslated stay anchored."""
     assert msgid in extractor.parse_anchored(), (
@@ -73,3 +86,10 @@ def test_extractor_finds_known_frontend_call():
     keys = extractor.extract_frontend_keys()
     assert "Table view" in keys
     assert any(f.endswith(".tsx") for f in keys["Table view"])
+
+
+@pytest.mark.parametrize("msgid", ["Formats", "Newest", "Basic configuration"])
+def test_extractor_finds_data_driven_labels(msgid):
+    """Variable-rendered labels must not escape extraction again (#719/#615)."""
+    keys = extractor.extract_frontend_keys()
+    assert msgid in keys

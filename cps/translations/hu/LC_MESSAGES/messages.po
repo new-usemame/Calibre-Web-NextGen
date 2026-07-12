@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
-"POT-Creation-Date: 2026-07-12 04:46+0000\n"
+"POT-Creation-Date: 2026-07-12 06:20+0000\n"
 "PO-Revision-Date: 2026-05-12 00:06+0200\n"
 "Last-Translator: Gabor L. <nom@il.thx>\n"
 "Language-Team: \n"
@@ -20,7 +20,7 @@ msgstr ""
 "Generated-By: Babel 2.13.1\n"
 "X-Generator: Poedit 3.9\n"
 
-#: cps/about.py:65 cps/spa_strings.py:638
+#: cps/about.py:65 cps/spa_strings.py:639
 msgid "Statistics"
 msgstr "Statisztika"
 
@@ -1295,7 +1295,7 @@ msgstr "Profilkép sikeresen frissítve."
 msgid "Calibre-Web NextGen Profile Picture Management (WIP)"
 msgstr ""
 
-#: cps/db.py:1770 cps/spa_strings.py:537 cps/templates/config_edit.html:341
+#: cps/db.py:1770 cps/spa_strings.py:538 cps/templates/config_edit.html:341
 #: cps/templates/config_view_edit.html:79
 #: cps/templates/config_view_edit.html:90 cps/templates/email_edit.html:41
 #: cps/web.py:878 cps/web.py:912 cps/web.py:957 cps/web.py:997 cps/web.py:1026
@@ -2040,7 +2040,7 @@ msgstr "Szerzők"
 msgid "Books ordered by Author"
 msgstr "Könyvek szerző szerint rendezve"
 
-#: cps/opds.py:218 cps/render_template.py:114 cps/spa_strings.py:559
+#: cps/opds.py:218 cps/render_template.py:114 cps/spa_strings.py:560
 #: cps/templates/book_table.html:115 cps/web.py:2098
 msgid "Publishers"
 msgstr "Kiadók"
@@ -2100,7 +2100,7 @@ msgstr "Fájlformátumok"
 msgid "Books ordered by file formats"
 msgstr "Könyvek sorozat szerint rendezve"
 
-#: cps/opds.py:254 cps/spa_strings.py:619 cps/templates/layout.html:629
+#: cps/opds.py:254 cps/spa_strings.py:620 cps/templates/layout.html:629
 #: cps/templates/search_form.html:88
 msgid "Shelves"
 msgstr "Polcok"
@@ -2136,7 +2136,7 @@ msgstr "{} csillag"
 msgid "Search"
 msgstr "Keresés"
 
-#: cps/remotelogin.py:76 cps/spa_strings.py:491 cps/templates/layout.html:344
+#: cps/remotelogin.py:76 cps/spa_strings.py:492 cps/templates/layout.html:344
 #: cps/templates/layout.html:385 cps/templates/login.html:11
 #: cps/templates/login.html:39 cps/web.py:2696
 msgid "Login"
@@ -2572,7 +2572,7 @@ msgstr ""
 msgid "Appearance"
 msgstr ""
 
-#: cps/spa_strings.py:75 cps/spa_strings.py:649 cps/templates/read.html:106
+#: cps/spa_strings.py:75 cps/spa_strings.py:650 cps/templates/read.html:106
 #: cps/templates/readcbr.html:102 cps/templates/user_edit.html:279
 msgid "Theme"
 msgstr "Téma"
@@ -4360,274 +4360,278 @@ msgstr "Oldalsó sáv megjelenítési beállítások"
 msgid "Loading…"
 msgstr "Betöltés…"
 
-#: cps/spa_strings.py:489 cps/templates/cover_picker.html:37
+#: cps/spa_strings.py:489
+msgid "Load more"
+msgstr ""
+
+#: cps/spa_strings.py:490 cps/templates/cover_picker.html:37
 msgid "Lock cover"
 msgstr "Borító zárolása"
 
-#: cps/spa_strings.py:490
+#: cps/spa_strings.py:491
 #, fuzzy
 msgid "Log in with a magic link"
 msgstr "Belépés varázshivatkozással"
 
-#: cps/spa_strings.py:492
+#: cps/spa_strings.py:493
 #, fuzzy
 msgid "Login button text"
 msgstr "Bejelentkezési gomb felirat"
 
-#: cps/spa_strings.py:493
+#: cps/spa_strings.py:494
 #, fuzzy
 msgid "Login method"
 msgstr "A frissítés nem sikerült:"
 
-#: cps/spa_strings.py:494
+#: cps/spa_strings.py:495
 msgid "Looks good"
 msgstr ""
 
-#: cps/spa_strings.py:495
+#: cps/spa_strings.py:496
 msgid "Low-res"
 msgstr ""
 
-#: cps/spa_strings.py:496
+#: cps/spa_strings.py:497
 #, fuzzy
 msgid "Magic link QR code"
 msgstr "Varázshivatkozás távoli belépés"
 
-#: cps/spa_strings.py:497
+#: cps/spa_strings.py:498
 msgid "Make private"
 msgstr ""
 
-#: cps/spa_strings.py:498
+#: cps/spa_strings.py:499
 msgid "Make public"
 msgstr ""
 
-#: cps/spa_strings.py:499
+#: cps/spa_strings.py:500
 msgid "Manage admin role from OAuth group"
 msgstr ""
 
-#: cps/spa_strings.py:500
+#: cps/spa_strings.py:501
 #, fuzzy
 msgid "Manage shelves"
 msgstr "Varázspolcok"
 
-#: cps/spa_strings.py:501 cps/templates/_book_organizer.html:139
+#: cps/spa_strings.py:502 cps/templates/_book_organizer.html:139
 #: cps/templates/book_table.html:60 cps/templates/book_table.html:254
 msgid "Mark as read"
 msgstr "Legyen olvasott"
 
-#: cps/spa_strings.py:502 cps/templates/_book_organizer.html:145
+#: cps/spa_strings.py:503 cps/templates/_book_organizer.html:145
 #: cps/templates/book_table.html:63 cps/templates/book_table.html:274
 msgid "Mark as unread"
 msgstr "Legyen olvasatlan"
 
-#: cps/spa_strings.py:503
+#: cps/spa_strings.py:504
 msgid "Match"
 msgstr ""
 
-#: cps/spa_strings.py:504
+#: cps/spa_strings.py:505
 msgid "Max"
 msgstr ""
 
-#: cps/spa_strings.py:505
+#: cps/spa_strings.py:506
 msgid "Max authors shown"
 msgstr ""
 
-#: cps/spa_strings.py:506
+#: cps/spa_strings.py:507
 #, fuzzy
 msgid "Maximum rating"
 msgstr "Maximális időtartam"
 
-#: cps/spa_strings.py:507
+#: cps/spa_strings.py:508
 #, fuzzy
 msgid "Member user filter"
 msgstr "LDAP tagsági felhasználói szűrő"
 
-#: cps/spa_strings.py:508
+#: cps/spa_strings.py:509
 #, fuzzy
 msgid "Metadata URL (OIDC auto-discovery)"
 msgstr "OAuth metaadat URL (automatikus felfedezéshez)"
 
-#: cps/spa_strings.py:509
+#: cps/spa_strings.py:510
 msgid "Min"
 msgstr ""
 
-#: cps/spa_strings.py:510
+#: cps/spa_strings.py:511
 #, fuzzy
 msgid "Minimum rating"
 msgstr "Maximális időtartam"
 
-#: cps/spa_strings.py:511
+#: cps/spa_strings.py:512
 msgid "More cover options (search providers, e-reader preview)"
 msgstr ""
 
-#: cps/spa_strings.py:512
+#: cps/spa_strings.py:513
 #, fuzzy
 msgid "More server configuration"
 msgstr "Szerver beállítások"
 
-#: cps/spa_strings.py:513
+#: cps/spa_strings.py:514
 msgid "Move down"
 msgstr ""
 
-#: cps/spa_strings.py:514
+#: cps/spa_strings.py:515
 #, fuzzy
 msgid "Move up"
 msgstr "Visszavonás"
 
-#: cps/spa_strings.py:515
+#: cps/spa_strings.py:516
 #, fuzzy
 msgid "My account"
 msgstr "Felhasználói fiók"
 
-#: cps/spa_strings.py:516
+#: cps/spa_strings.py:517
 msgid "Name"
 msgstr ""
 
-#: cps/spa_strings.py:517
+#: cps/spa_strings.py:518
 msgid "Need to report an issue? Try the new"
 msgstr ""
 
-#: cps/spa_strings.py:518 cps/templates/cover_picker.html:182
+#: cps/spa_strings.py:519 cps/templates/cover_picker.html:182
 msgid "New"
 msgstr "Új"
 
-#: cps/spa_strings.py:519
+#: cps/spa_strings.py:520
 #, fuzzy
 msgid "New password"
 msgstr "Új app jelszó"
 
-#: cps/spa_strings.py:520
+#: cps/spa_strings.py:521
 msgid "New shelf name"
 msgstr ""
 
-#: cps/spa_strings.py:521
+#: cps/spa_strings.py:522
 msgid "New shelf name…"
 msgstr ""
 
-#: cps/spa_strings.py:522
+#: cps/spa_strings.py:523
 msgid "New shelf…"
 msgstr ""
 
-#: cps/spa_strings.py:523
+#: cps/spa_strings.py:524
 #, fuzzy
 msgid "New smart shelf"
 msgstr "Polc létrehozása"
 
-#: cps/spa_strings.py:524
+#: cps/spa_strings.py:525
 #, fuzzy
 msgid "New user"
 msgstr "Új felhasználó hozzáadása"
 
-#: cps/spa_strings.py:525
+#: cps/spa_strings.py:526
 #, fuzzy
 msgid "Next page"
 msgstr "Következő oldal"
 
-#: cps/spa_strings.py:526
+#: cps/spa_strings.py:527
 msgid "No books match this smart shelf right now."
 msgstr ""
 
-#: cps/spa_strings.py:527
+#: cps/spa_strings.py:528
 #, fuzzy
 msgid "No books match those criteria."
 msgstr "Könyv nem található."
 
-#: cps/spa_strings.py:528 cps/templates/cover_picker.html:223
+#: cps/spa_strings.py:529 cps/templates/cover_picker.html:223
 msgid "No candidates found yet. Try a different search or refresh."
 msgstr "Még nem találhatók jelöltek. Próbáljon más keresést vagy frissítést."
 
-#: cps/spa_strings.py:529
+#: cps/spa_strings.py:530
 #, fuzzy
 msgid "No contents found."
 msgstr "Könyv nem található."
 
-#: cps/spa_strings.py:530
+#: cps/spa_strings.py:531
 #, fuzzy
 msgid "No duplicate groups found."
 msgstr "Ismétlődő csoport találva"
 
-#: cps/spa_strings.py:531
+#: cps/spa_strings.py:532
 #, fuzzy
 msgid "No excluded tags"
 msgstr "Cimkék kizárása"
 
-#: cps/spa_strings.py:532
+#: cps/spa_strings.py:533
 msgid ""
 "No highlights yet. Highlight while reading, or import from a Kobo device."
 msgstr ""
 
-#: cps/spa_strings.py:533
+#: cps/spa_strings.py:534
 msgid "No pages found in this comic."
 msgstr ""
 
-#: cps/spa_strings.py:534
+#: cps/spa_strings.py:535
 msgid "No shelves yet — create one below."
 msgstr ""
 
-#: cps/spa_strings.py:535
+#: cps/spa_strings.py:536
 msgid "No sources need a key."
 msgstr ""
 
-#: cps/spa_strings.py:536
+#: cps/spa_strings.py:537
 msgid "No tasks running."
 msgstr ""
 
-#: cps/spa_strings.py:538
+#: cps/spa_strings.py:539
 msgid "Not configured"
 msgstr ""
 
-#: cps/spa_strings.py:539
+#: cps/spa_strings.py:540
 msgid "OAuth / OpenID Connect"
 msgstr ""
 
-#: cps/spa_strings.py:540
+#: cps/spa_strings.py:541
 msgid ""
 "On another device where you’re already signed in, scan this code or open the "
 "link below to authorise this device."
 msgstr ""
 
-#: cps/spa_strings.py:541
+#: cps/spa_strings.py:542
 msgid "Open classic reader"
 msgstr ""
 
-#: cps/spa_strings.py:542
+#: cps/spa_strings.py:543
 #, fuzzy
 msgid "Open navigation"
 msgstr "Navigáció átkapcsolása"
 
-#: cps/spa_strings.py:543
+#: cps/spa_strings.py:544
 #, fuzzy
 msgid "Open reader"
 msgstr "EPUB olvasó"
 
-#: cps/spa_strings.py:544
+#: cps/spa_strings.py:545
 msgid "Open the classic interface"
 msgstr ""
 
-#: cps/spa_strings.py:545
+#: cps/spa_strings.py:546
 msgid "Open the link below on your signed-in device."
 msgstr ""
 
-#: cps/spa_strings.py:546
+#: cps/spa_strings.py:547
 #, fuzzy
 msgid "OpenLDAP server"
 msgstr "LDAP szerver port"
 
-#: cps/spa_strings.py:547
+#: cps/spa_strings.py:548
 #, fuzzy
 msgid "PDF reader"
 msgstr "PDF olvasó"
 
-#: cps/spa_strings.py:548 cps/templates/admin.html:20
+#: cps/spa_strings.py:549 cps/templates/admin.html:20
 #: cps/templates/login.html:22 cps/templates/login.html:23
 #: cps/templates/user_edit.html:211
 msgid "Password"
 msgstr "Jelszó"
 
-#: cps/spa_strings.py:549
+#: cps/spa_strings.py:550
 msgid "Password (leave blank to keep)"
 msgstr ""
 
-#: cps/spa_strings.py:550 cps/templates/cover_picker.html:14
+#: cps/spa_strings.py:551 cps/templates/cover_picker.html:14
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
 "the cover embedded in the book itself."
@@ -4635,174 +4639,174 @@ msgstr ""
 "Válassz borítót bármely támogatott forrásból, illessz be egy URL-t, tölts "
 "fel egy fájlt, vagy használd a könyvbe beágyazott borítót."
 
-#: cps/spa_strings.py:551
+#: cps/spa_strings.py:552
 #, python-brace-format
 msgid "Picked up {label}. Drag to reorder, release to drop."
 msgstr ""
 
-#: cps/spa_strings.py:552 cps/templates/admin.html:123
+#: cps/spa_strings.py:553 cps/templates/admin.html:123
 msgid "Port"
 msgstr "Port"
 
-#: cps/spa_strings.py:553
+#: cps/spa_strings.py:554
 msgid "Preparing your magic link…"
 msgstr ""
 
-#: cps/spa_strings.py:554
+#: cps/spa_strings.py:555
 #, fuzzy
 msgid "Previous page"
 msgstr "Előző oldal"
 
-#: cps/spa_strings.py:555 cps/templates/duplicates.html:545
+#: cps/spa_strings.py:556 cps/templates/duplicates.html:545
 #: cps/templates/tasks.html:17
 msgid "Progress"
 msgstr "Állapot"
 
-#: cps/spa_strings.py:556
+#: cps/spa_strings.py:557
 #, fuzzy
 msgid "Public"
 msgstr "(Nyilvános)"
 
-#: cps/spa_strings.py:557
+#: cps/spa_strings.py:558
 #, fuzzy
 msgid "Published after"
 msgstr "Kiadva ezután: "
 
-#: cps/spa_strings.py:558
+#: cps/spa_strings.py:559
 #, fuzzy
 msgid "Published before"
 msgstr "Kiadva ezelőtt: "
 
-#: cps/spa_strings.py:560
+#: cps/spa_strings.py:561
 #, fuzzy
 msgid "Random books shown"
 msgstr "Véletlenszerű könyvek"
 
-#: cps/spa_strings.py:561 cps/templates/book_edit.html:167
+#: cps/spa_strings.py:562 cps/templates/book_edit.html:167
 #: cps/templates/cwa_settings.html:369 cps/templates/cwa_settings.html:371
 msgid "Rating"
 msgstr "Értékelés"
 
-#: cps/spa_strings.py:562
+#: cps/spa_strings.py:563
 #, fuzzy
 msgid "Rating (stars)"
 msgstr "Értékelés: %(rating)s csillag"
 
-#: cps/spa_strings.py:563
+#: cps/spa_strings.py:564
 #, fuzzy
 msgid "Read status"
 msgstr "Olvasási állapot"
 
-#: cps/spa_strings.py:564
+#: cps/spa_strings.py:565
 #, fuzzy
 msgid "Read status filter"
 msgstr "Olvasási állapot"
 
-#: cps/spa_strings.py:565
+#: cps/spa_strings.py:566
 msgid "Recipient(s)"
 msgstr ""
 
-#: cps/spa_strings.py:566
+#: cps/spa_strings.py:567
 msgid "Redirect host (full URL)"
 msgstr ""
 
-#: cps/spa_strings.py:567 cps/templates/cover_picker.html:152
+#: cps/spa_strings.py:568 cps/templates/cover_picker.html:152
 #: cps/templates/index.html:120
 msgid "Refresh"
 msgstr "Frissítés"
 
-#: cps/spa_strings.py:568
+#: cps/spa_strings.py:569
 #, fuzzy
 msgid "Registering…"
 msgstr "Regisztrálás"
 
-#: cps/spa_strings.py:569
+#: cps/spa_strings.py:570
 #, fuzzy
 msgid "Remember me"
 msgstr "Emlékezz rám"
 
-#: cps/spa_strings.py:570 cps/templates/detail.html:700
+#: cps/spa_strings.py:571 cps/templates/detail.html:700
 #: cps/templates/detail.html:701 cps/templates/detail.html:702
 #, fuzzy
 msgid "Remove from favorites"
 msgstr "Levétel polcról"
 
-#: cps/spa_strings.py:571 cps/templates/detail.html:809
+#: cps/spa_strings.py:572 cps/templates/detail.html:809
 #: cps/templates/detail.html:991
 msgid "Remove from shelf"
 msgstr "Levétel polcról"
 
-#: cps/spa_strings.py:572
+#: cps/spa_strings.py:573
 #, fuzzy
 msgid "Remove highlight"
 msgstr "Magasság"
 
-#: cps/spa_strings.py:573
+#: cps/spa_strings.py:574
 #, fuzzy
 msgid "Remove identifier"
 msgstr "Azonosító hozzáadása"
 
-#: cps/spa_strings.py:574
+#: cps/spa_strings.py:575
 #, fuzzy
 msgid "Remove rule"
 msgstr "Eltávolítás"
 
-#: cps/spa_strings.py:575
+#: cps/spa_strings.py:576
 #, fuzzy
 msgid "Rename"
 msgstr "név"
 
-#: cps/spa_strings.py:576
+#: cps/spa_strings.py:577
 #, fuzzy
 msgid "Reorder"
 msgstr "Polc nem található"
 
-#: cps/spa_strings.py:577
+#: cps/spa_strings.py:578
 #, fuzzy
 msgid "Replace cover with this one?"
 msgstr "Lecseréli a borítót erre a jelöltre?"
 
-#: cps/spa_strings.py:578
+#: cps/spa_strings.py:579
 #, fuzzy
 msgid "Replace cover?"
 msgstr "Feltöltés borítóként"
 
-#: cps/spa_strings.py:579
+#: cps/spa_strings.py:580
 msgid "Report Issue on Discord"
 msgstr ""
 
-#: cps/spa_strings.py:580
+#: cps/spa_strings.py:581
 msgid "Report Issue on GitHub"
 msgstr ""
 
-#: cps/spa_strings.py:581
+#: cps/spa_strings.py:582
 msgid "Require group membership"
 msgstr ""
 
-#: cps/spa_strings.py:582
+#: cps/spa_strings.py:583
 #, fuzzy
 msgid "Reverse-proxy header login"
 msgstr "Reverse proxy belépés"
 
-#: cps/spa_strings.py:583
+#: cps/spa_strings.py:584
 #, fuzzy
 msgid "Run time"
 msgstr "Futásidő"
 
-#: cps/spa_strings.py:584
+#: cps/spa_strings.py:585
 #, fuzzy
 msgid "SMTP server"
 msgstr "Szerver leállítása"
 
-#: cps/spa_strings.py:585 cps/templates/email_edit.html:43
+#: cps/spa_strings.py:586 cps/templates/email_edit.html:43
 msgid "SSL/TLS"
 msgstr "SSL/TLS"
 
-#: cps/spa_strings.py:586 cps/templates/email_edit.html:42
+#: cps/spa_strings.py:587 cps/templates/email_edit.html:42
 msgid "STARTTLS"
 msgstr "STARTTLS"
 
-#: cps/spa_strings.py:587 cps/templates/book_edit.html:313
+#: cps/spa_strings.py:588 cps/templates/book_edit.html:313
 #: cps/templates/config_db.html:111 cps/templates/config_edit.html:716
 #: cps/templates/config_view_edit.html:237 cps/templates/email_edit.html:71
 #: cps/templates/read.html:178 cps/templates/schedule_edit.html:47
@@ -4811,516 +4815,516 @@ msgstr "STARTTLS"
 msgid "Save"
 msgstr "Mentés"
 
-#: cps/spa_strings.py:588
+#: cps/spa_strings.py:589
 #, fuzzy
 msgid "Save email settings"
 msgstr "Oldalsó sáv megjelenítési beállítások"
 
-#: cps/spa_strings.py:589
+#: cps/spa_strings.py:590
 #, fuzzy
 msgid "Save name"
 msgstr "Változásnapló megtekintése"
 
-#: cps/spa_strings.py:590
+#: cps/spa_strings.py:591
 #, fuzzy
 msgid "Save security settings"
 msgstr "Biztonsági beállítások"
 
-#: cps/spa_strings.py:591
+#: cps/spa_strings.py:592
 #, fuzzy
 msgid "Save settings"
 msgstr "Beállítások"
 
-#: cps/spa_strings.py:592
+#: cps/spa_strings.py:593
 msgid "Saved. Restart the server for the login changes to take effect."
 msgstr ""
 
-#: cps/spa_strings.py:593
+#: cps/spa_strings.py:594
 #, fuzzy
 msgid "Scopes"
 msgstr "OAuth hatókörök"
 
-#: cps/spa_strings.py:594
+#: cps/spa_strings.py:595
 #, fuzzy
 msgid "Search books"
 msgstr "Keresés"
 
-#: cps/spa_strings.py:595
+#: cps/spa_strings.py:596
 #, fuzzy
 msgid "Search title, author…"
 msgstr "Keresés cím/író alapján"
 
-#: cps/spa_strings.py:596
+#: cps/spa_strings.py:597
 #, fuzzy
 msgid "Searching every source…"
 msgstr "Keresés…"
 
-#: cps/spa_strings.py:597 cps/templates/cover_picker.html:147
+#: cps/spa_strings.py:598 cps/templates/cover_picker.html:147
 #: cps/templates/cover_picker.html:222
 msgid "Searching…"
 msgstr "Keresés…"
 
-#: cps/spa_strings.py:598
+#: cps/spa_strings.py:599
 #, fuzzy
 msgid "Security settings saved."
 msgstr "Biztonsági beállítások"
 
-#: cps/spa_strings.py:599
+#: cps/spa_strings.py:600
 #, fuzzy
 msgid "See how each cover looks padded for your device"
 msgstr "Borítók megjelenítése Kobo nézetben"
 
-#: cps/spa_strings.py:600 cps/templates/modal_dialogs.html:98
+#: cps/spa_strings.py:601 cps/templates/modal_dialogs.html:98
 msgid "Select"
 msgstr "Kiválasztás"
 
-#: cps/spa_strings.py:601
+#: cps/spa_strings.py:602
 #, fuzzy
 msgid "Select multiple"
 msgstr "Először válasszon ki könyvet"
 
-#: cps/spa_strings.py:602 cps/templates/detail.html:1191
+#: cps/spa_strings.py:603 cps/templates/detail.html:1191
 msgid "Send"
 msgstr "Küldés"
 
-#: cps/spa_strings.py:603
+#: cps/spa_strings.py:604
 #, fuzzy
 msgid "Send to e-reader"
 msgstr "Küldés e-olvasóra"
 
-#: cps/spa_strings.py:604
+#: cps/spa_strings.py:605
 #, fuzzy
 msgid "Send-to-eReader email"
 msgstr "Küldés e-olvasóra e-mail"
 
-#: cps/spa_strings.py:605
+#: cps/spa_strings.py:606
 #, fuzzy
 msgid "Sending…"
 msgstr "Keresés…"
 
-#: cps/spa_strings.py:606
+#: cps/spa_strings.py:607
 #, fuzzy
 msgid "Series index"
 msgstr "Polc nem található"
 
-#: cps/spa_strings.py:607
+#: cps/spa_strings.py:608
 #, fuzzy
 msgid "Series — include"
 msgstr "Polc nem található"
 
-#: cps/spa_strings.py:608
+#: cps/spa_strings.py:609
 #, fuzzy
 msgid "Serve over HTTPS"
 msgstr "Használat HTTPS-sel"
 
-#: cps/spa_strings.py:609
+#: cps/spa_strings.py:610
 msgid "Server SSL / HTTPS"
 msgstr ""
 
-#: cps/spa_strings.py:610
+#: cps/spa_strings.py:611
 #, fuzzy
 msgid "Server announcement (shown to all users)"
 msgstr "Szerverüzenet sáv"
 
-#: cps/spa_strings.py:611
+#: cps/spa_strings.py:612
 #, fuzzy
 msgid "Server host"
 msgstr "Szerver port"
 
-#: cps/spa_strings.py:612
+#: cps/spa_strings.py:613
 msgid "Service account (DN)"
 msgstr ""
 
-#: cps/spa_strings.py:613
+#: cps/spa_strings.py:614
 #, fuzzy
 msgid "Service password"
 msgstr "Jelszó változtatás"
 
-#: cps/spa_strings.py:614
+#: cps/spa_strings.py:615
 msgid "Service password (leave blank to keep)"
 msgstr ""
 
-#: cps/spa_strings.py:615
+#: cps/spa_strings.py:616
 msgid ""
 "Set a metadata URL to auto-fill the endpoints below, or enter them manually."
 msgstr ""
 
-#: cps/spa_strings.py:616
+#: cps/spa_strings.py:617
 #, fuzzy
 msgid "Settings saved."
 msgstr "Beállítások"
 
-#: cps/spa_strings.py:617
+#: cps/spa_strings.py:618
 #, fuzzy
 msgid "Shelf name"
 msgstr "Polc: '%(name)s'"
 
-#: cps/spa_strings.py:618
+#: cps/spa_strings.py:619
 #, fuzzy
 msgid "Shelf not found."
 msgstr "Polc nem található"
 
-#: cps/spa_strings.py:620
+#: cps/spa_strings.py:621
 #, fuzzy
 msgid "Show Discover section"
 msgstr "Kiadók mutatása"
 
-#: cps/spa_strings.py:621
+#: cps/spa_strings.py:622
 msgid "Show books in language"
 msgstr ""
 
-#: cps/spa_strings.py:622
+#: cps/spa_strings.py:623
 msgid "Show e-reader previews on each candidate"
 msgstr ""
 
-#: cps/spa_strings.py:623
+#: cps/spa_strings.py:624
 #, fuzzy
 msgid "Show password"
 msgstr "Jelszó mutatása"
 
-#: cps/spa_strings.py:624
+#: cps/spa_strings.py:625
 msgid "Shuffle picks"
 msgstr ""
 
-#: cps/spa_strings.py:625
+#: cps/spa_strings.py:626
 #, fuzzy
 msgid "Sign in with a magic link"
 msgstr "Belépés varázshivatkozással"
 
-#: cps/spa_strings.py:626
+#: cps/spa_strings.py:627
 msgid "Sign out"
 msgstr ""
 
-#: cps/spa_strings.py:627
+#: cps/spa_strings.py:628
 msgid "Signing in…"
 msgstr ""
 
-#: cps/spa_strings.py:628
+#: cps/spa_strings.py:629
 #, fuzzy
 msgid "Site title"
 msgstr "Cím bevitele"
 
-#: cps/spa_strings.py:629
+#: cps/spa_strings.py:630
 msgid "Smaller"
 msgstr ""
 
-#: cps/spa_strings.py:630
+#: cps/spa_strings.py:631
 msgid "Smaller text"
 msgstr ""
 
-#: cps/spa_strings.py:631
+#: cps/spa_strings.py:632
 #, fuzzy
 msgid "Smart shelf not found."
 msgstr "Polc nem található"
 
-#: cps/spa_strings.py:632
+#: cps/spa_strings.py:633
 #, fuzzy
 msgid "Smart shelves"
 msgstr "Polcok"
 
-#: cps/spa_strings.py:633
+#: cps/spa_strings.py:634
 msgid "Some sources need a key for better covers"
 msgstr ""
 
-#: cps/spa_strings.py:634 cps/templates/cover_picker.html:226
+#: cps/spa_strings.py:635 cps/templates/cover_picker.html:226
 msgid "Something went wrong. Try again."
 msgstr "Valami hiba történt. Próbáld újra."
 
-#: cps/spa_strings.py:635
+#: cps/spa_strings.py:636
 #, fuzzy
 msgid "Sort order"
 msgstr "Polc nem található"
 
-#: cps/spa_strings.py:636
+#: cps/spa_strings.py:637
 #, fuzzy
 msgid "Source details"
 msgstr "Könyv részletei"
 
-#: cps/spa_strings.py:637 cps/templates/detail.html:1023
+#: cps/spa_strings.py:638 cps/templates/detail.html:1023
 #, fuzzy
 msgid "Started reading"
 msgstr "Elindítva"
 
-#: cps/spa_strings.py:639 cps/templates/tasks.html:16
+#: cps/spa_strings.py:640 cps/templates/tasks.html:16
 msgid "Status"
 msgstr "Státusz"
 
-#: cps/spa_strings.py:640
+#: cps/spa_strings.py:641
 #, fuzzy
 msgid "Sync only selected shelves to Kobo"
 msgstr ""
 "Csak a kiválasztott polcokon lévő könyveket szinkronizálja Kobo eszközzel"
 
-#: cps/spa_strings.py:641
+#: cps/spa_strings.py:642
 #, fuzzy
 msgid "Table view"
 msgstr "Érvénytelen nézet"
 
-#: cps/spa_strings.py:642 cps/templates/book_edit.html:139
+#: cps/spa_strings.py:643 cps/templates/book_edit.html:139
 #: cps/templates/search_form.html:52
 msgid "Tags"
 msgstr "Címkék"
 
-#: cps/spa_strings.py:643
+#: cps/spa_strings.py:644
 msgid "Tags — exclude"
 msgstr ""
 
-#: cps/spa_strings.py:644
+#: cps/spa_strings.py:645
 msgid "Tags — include"
 msgstr ""
 
-#: cps/spa_strings.py:645 cps/templates/config_edit.html:235
+#: cps/spa_strings.py:646 cps/templates/config_edit.html:235
 #: cps/templates/cover_picker.html:104
 msgid "Target aspect ratio"
 msgstr "Cél képarány"
 
-#: cps/spa_strings.py:646 cps/templates/tasks.html:15
+#: cps/spa_strings.py:647 cps/templates/tasks.html:15
 msgid "Task"
 msgstr "Feladat"
 
-#: cps/spa_strings.py:647 cps/tasks_status.py:37 cps/templates/layout.html:371
+#: cps/spa_strings.py:648 cps/tasks_status.py:37 cps/templates/layout.html:371
 #: cps/templates/tasks.html:7
 msgid "Tasks"
 msgstr "Feladatok"
 
-#: cps/spa_strings.py:648
+#: cps/spa_strings.py:649
 msgid "That URL is not a usable image."
 msgstr ""
 
-#: cps/spa_strings.py:650
+#: cps/spa_strings.py:651
 msgid ""
 "These open the full configuration pages. Changes there apply to the whole "
 "server."
 msgstr ""
 
-#: cps/spa_strings.py:651
+#: cps/spa_strings.py:652
 msgid "This format opens in the full-screen reader."
 msgstr ""
 
-#: cps/spa_strings.py:652
+#: cps/spa_strings.py:653
 msgid "This magic link expired. Generate a new one to try again."
 msgstr ""
 
-#: cps/spa_strings.py:653
+#: cps/spa_strings.py:654
 msgid "This page doesn't exist here."
 msgstr ""
 
-#: cps/spa_strings.py:654
+#: cps/spa_strings.py:655
 msgid "Title, author, or ISBN"
 msgstr ""
 
-#: cps/spa_strings.py:655
+#: cps/spa_strings.py:656
 msgid "Token URL"
 msgstr ""
 
-#: cps/spa_strings.py:656
+#: cps/spa_strings.py:657
 #, fuzzy
 msgid "Trust authentication header"
 msgstr "Hitelesítetlen"
 
-#: cps/spa_strings.py:657 cps/templates/book_table.html:57
+#: cps/spa_strings.py:658 cps/templates/book_table.html:57
 #: cps/templates/book_table.html:234
 msgid "Unarchive"
 msgstr "Archiválás visszavonása"
 
-#: cps/spa_strings.py:658
+#: cps/spa_strings.py:659
 msgid "Unhide"
 msgstr ""
 
-#: cps/spa_strings.py:659
+#: cps/spa_strings.py:660
 msgid "Unlock the cover above to apply a new one."
 msgstr ""
 
-#: cps/spa_strings.py:660
+#: cps/spa_strings.py:661
 msgid "Unlock the cover to change it"
 msgstr ""
 
-#: cps/spa_strings.py:661
+#: cps/spa_strings.py:662
 #, fuzzy
 msgid "Untitled"
 msgstr "cím"
 
-#: cps/spa_strings.py:662 cps/templates/cover_picker.html:74
+#: cps/spa_strings.py:663 cps/templates/cover_picker.html:74
 msgid "Upload as cover"
 msgstr "Feltöltés borítóként"
 
-#: cps/spa_strings.py:663
+#: cps/spa_strings.py:664
 #, fuzzy
 msgid "Upload books"
 msgstr "Feltöltések"
 
-#: cps/spa_strings.py:664
+#: cps/spa_strings.py:665
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
 msgstr ""
 
-#: cps/spa_strings.py:665 cps/templates/cover_picker.html:62
+#: cps/spa_strings.py:666 cps/templates/cover_picker.html:62
 #: cps/templates/cover_picker.html:191
 msgid "Use this cover"
 msgstr "Használja ezt a borítót"
 
-#: cps/spa_strings.py:666 cps/templates/tasks.html:13
+#: cps/spa_strings.py:667 cps/templates/tasks.html:13
 #: cps/templates/tasks.html:42 cps/templates/tasks.html:65
 msgid "User"
 msgstr "Felhasználó"
 
-#: cps/spa_strings.py:667
+#: cps/spa_strings.py:668
 #, fuzzy
 msgid "User administration"
 msgstr "Felhasználó engedélyek"
 
-#: cps/spa_strings.py:668
+#: cps/spa_strings.py:669
 #, fuzzy
 msgid "User object filter"
 msgstr "LDAP felhasználói objektumszűrő"
 
-#: cps/spa_strings.py:669
+#: cps/spa_strings.py:670
 #, fuzzy
 msgid "Userinfo URL"
 msgstr "URL használata"
 
-#: cps/spa_strings.py:670 cps/templates/admin.html:14
+#: cps/spa_strings.py:671 cps/templates/admin.html:14
 #: cps/templates/login.html:17 cps/templates/login.html:19
 #: cps/templates/register.html:9 cps/templates/user_edit.html:192
 #: cps/templates/user_table.html:134
 msgid "Username"
 msgstr "Felhasználónév"
 
-#: cps/spa_strings.py:671
+#: cps/spa_strings.py:672
 #, fuzzy
 msgid "Username claim"
 msgstr "Felhasználónév"
 
-#: cps/spa_strings.py:672
+#: cps/spa_strings.py:673
 #, fuzzy
 msgid "Versions"
 msgstr "Verzió"
 
-#: cps/spa_strings.py:673 cps/templates/user_table.html:148
+#: cps/spa_strings.py:674 cps/templates/user_table.html:148
 msgid "View"
 msgstr "Megtekintés"
 
-#: cps/spa_strings.py:674
+#: cps/spa_strings.py:675
 #, fuzzy
 msgid "View settings"
 msgstr "Felhasználó beállítások"
 
-#: cps/spa_strings.py:675
+#: cps/spa_strings.py:676
 msgid "Waiting for you to authorise…"
 msgstr ""
 
-#: cps/spa_strings.py:676 cps/templates/cover_picker.html:40
+#: cps/spa_strings.py:677 cps/templates/cover_picker.html:40
 msgid "When locked, fetching metadata will not overwrite this cover."
 msgstr "Zárolás esetén a metaadatok lekérése nem írja felül ezt a borítót."
 
-#: cps/spa_strings.py:677 cps/templates/detail.html:1023
+#: cps/spa_strings.py:678 cps/templates/detail.html:1023
 msgid "When reading progress was first synced"
 msgstr ""
 
-#: cps/spa_strings.py:678
+#: cps/spa_strings.py:679
 #, fuzzy
 msgid "Your Library"
 msgstr "Könyvtár konvertálás"
 
-#: cps/spa_strings.py:679
+#: cps/spa_strings.py:680
 msgid "Your browser cannot play this audio format."
 msgstr ""
 
-#: cps/spa_strings.py:680
+#: cps/spa_strings.py:681
 msgid "Your personal digital library"
 msgstr ""
 
-#: cps/spa_strings.py:681
+#: cps/spa_strings.py:682
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr ""
 
-#: cps/spa_strings.py:682
+#: cps/spa_strings.py:683
 msgid "all rules"
 msgstr ""
 
-#: cps/spa_strings.py:683
+#: cps/spa_strings.py:684
 #, fuzzy
 msgid "any rule"
 msgstr "Új felhasználó hozzáadása"
 
-#: cps/spa_strings.py:684
+#: cps/spa_strings.py:685
 #, fuzzy
 msgid "books"
 msgstr "Könyvek"
 
-#: cps/spa_strings.py:685
+#: cps/spa_strings.py:686
 #, fuzzy
 msgid "books match"
 msgstr "Hozzáadás polchoz"
 
-#: cps/spa_strings.py:686
+#: cps/spa_strings.py:687
 msgid "copies"
 msgstr ""
 
-#: cps/spa_strings.py:687
+#: cps/spa_strings.py:688
 #, fuzzy
 msgid "e-reader"
 msgstr "EPUB olvasó"
 
-#: cps/spa_strings.py:688
+#: cps/spa_strings.py:689
 msgid "e.g. Unread sci-fi"
 msgstr ""
 
-#: cps/spa_strings.py:689
+#: cps/spa_strings.py:690
 #, fuzzy
 msgid "eReader email subject"
 msgstr "E-olvasó e-mail tárgya"
 
-#: cps/spa_strings.py:690
+#: cps/spa_strings.py:691
 msgid "or continue with"
 msgstr ""
 
-#: cps/spa_strings.py:691
+#: cps/spa_strings.py:692
 msgid "shared"
 msgstr ""
 
-#: cps/spa_strings.py:692
+#: cps/spa_strings.py:693
 msgid "to"
 msgstr ""
 
-#: cps/spa_strings.py:693
+#: cps/spa_strings.py:694
 msgid "type (isbn, amazon, doi…)"
 msgstr ""
 
-#: cps/spa_strings.py:694
+#: cps/spa_strings.py:695
 msgid "value"
 msgstr ""
 
-#: cps/spa_strings.py:695
+#: cps/spa_strings.py:696
 msgid "you"
 msgstr ""
 
-#: cps/spa_strings.py:696
+#: cps/spa_strings.py:697
 #, fuzzy, python-brace-format
 msgid "{n} found"
 msgstr "Címke nem található"
 
-#: cps/spa_strings.py:697
+#: cps/spa_strings.py:698
 #, python-brace-format
 msgid "{ok} of {total} sources answered"
 msgstr ""
 
-#: cps/spa_strings.py:698
+#: cps/spa_strings.py:699
 #, fuzzy
 msgid "…or paste an image URL"
 msgstr "Borítókép"
 
-#: cps/spa_strings.py:699
+#: cps/spa_strings.py:700
 msgid "← Back to book"
 msgstr ""
 
-#: cps/spa_strings.py:700
+#: cps/spa_strings.py:701
 #, fuzzy
 msgid "← Back to sign in"
 msgstr "Vissza a beállítások oldalra"
 
-#: cps/spa_strings.py:701
+#: cps/spa_strings.py:702
 #, fuzzy
 msgid "← Library"
 msgstr "Könyvtárban"

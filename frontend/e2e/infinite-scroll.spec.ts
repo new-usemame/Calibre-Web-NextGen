@@ -1,75 +1,109 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import type { Book, BooksPage } from '../src/lib/api';
 import { collectPageErrors, assertNoPageErrors } from './utils';
 
 /*
- * Infinite scrolling on the book lists (adopted from community PR #735 by
- * @kurtlieber). The old lists ended in a "Load more" button; now a sentinel at
- * the bottom auto-loads the next page as it scrolls into view.
+ * Infinite scrolling on the library grid uses a sentinel to auto-load the next
+ * page. A persistent "Load more" button is its keyboard/AT fallback when an
+ * observer is unavailable or never delivers an intersecting entry.
  *
- * Driven against the Table view: unlike the Library grid (which floats a
- * Discover carousel of extra book links above the paginated grid), the Table is
- * a single paginated list, so every book link on the page is a real row — a
- * clean count. It's one of the five surfaces the shared hook was wired into.
- *
- * This asserts the user-visible contract end-to-end: no "Load more" button
- * remains, scrolling appends the next page(s) up to the full total, it never
- * duplicates a book, and the console stays clean.
- *
- * Needs more than one page of books. CI's E2E job seeds a single book, so this
- * skips there; it runs for real against any library with >24 books (the local
- * dev container is seeded past that). A CI paginated-seed is tracked as a
- * follow-up to the SPA test-harness gap.
+ * CI only seeds one real book, so this regression test supplies both library
+ * pages at the network boundary. Authentication and the rest of the SPA remain
+ * real; only GET /api/v1/books is fulfilled here.
  */
 
 const PER_PAGE = 24;
+const TOTAL = 50;
 
-async function totalBooks(page: Page): Promise<number> {
-  const res = await page.request.get('/api/v1/books?per_page=1');
-  if (!res.ok()) return 0;
-  const body = await res.json();
-  return body.total ?? 0;
+function fakeBook(id: number): Book {
+  return {
+    id,
+    title: `Mock pagination book ${id}`,
+    authors: [`Mock author ${id}`],
+    series: null,
+    series_index: null,
+    cover_url: null,
+    formats: ['EPUB'],
+    tags: [],
+    read: false,
+    archived: false,
+  };
 }
 
-function rowHrefs(page: Page): Promise<string[]> {
-  return page.locator('table a[href*="/book/"]').evaluateAll((els) =>
-    els.map((e) => (e as HTMLAnchorElement).getAttribute('href') || ''),
-  );
+function booksPage(page: number): BooksPage {
+  const firstId = page === 1 ? 1 : PER_PAGE + 1;
+  const lastId = page === 1 ? PER_PAGE : TOTAL;
+  return {
+    items: Array.from({ length: lastId - firstId + 1 }, (_, index) => fakeBook(firstId + index)),
+    page,
+    per_page: PER_PAGE,
+    total: TOTAL,
+  };
+}
+
+function gridBookLinks(page: Page) {
+  // Quick-edit links end in /edit; each card's primary link ends in /book/<id>.
+  return page.locator('main a[href*="/book/"]:not([href$="/edit"])');
 }
 
 test.describe('library infinite scroll', () => {
-  test('scrolling appends pages up to the full total, no button, no dupes', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
+    // Keep the optional Discover links out of the book-grid count.
+    await page.addInitScript(() => localStorage.setItem('cwng_discover_hidden_v1', '1'));
+  });
+
+  test('Load more fetches the next page when IntersectionObserver never fires (#704)', async ({ page }) => {
+    await page.addInitScript(() => {
+      class NeverIntersectingObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+        takeRecords() { return []; }
+      }
+      window.IntersectionObserver = NeverIntersectingObserver as unknown as typeof IntersectionObserver;
+    });
+
+    const requestedPages: number[] = [];
+    await page.route('**/api/v1/books?**', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+
+      const url = new URL(route.request().url());
+      const pageNumber = Number(url.searchParams.get('page'));
+      if (url.pathname !== '/api/v1/books' || (pageNumber !== 1 && pageNumber !== 2)) {
+        return route.continue();
+      }
+
+      expect(url.searchParams.get('per_page')).toBe(String(PER_PAGE));
+      expect(url.searchParams.get('sort')).toBe('new');
+      requestedPages.push(pageNumber);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(booksPage(pageNumber)),
+      });
+    });
+
     const errors = collectPageErrors(page);
-    await page.goto('/app/table');
-    await expect(page.locator('table a[href*="/book/"]').first()).toBeVisible();
+    await page.goto('/app');
+    await expect(gridBookLinks(page)).toHaveCount(PER_PAGE);
 
-    const total = await totalBooks(page);
-    test.skip(total <= PER_PAGE, `library has ${total} books (≤ one page) — nothing to paginate`);
+    const loadMore = page.getByRole('button', { name: 'Load more' });
+    await expect(loadMore).toBeVisible();
+    await expect(loadMore).toBeEnabled();
+    await loadMore.focus();
+    await expect(loadMore).toBeFocused();
 
-    // The button-driven affordance is gone; loading is scroll-driven now.
-    await expect(page.getByRole('button', { name: /load more/i })).toHaveCount(0);
+    // The observer stub never invokes its callback. Page 2 is therefore only
+    // reachable through the product's manual fallback.
+    await loadMore.click();
+    await expect(gridBookLinks(page)).toHaveCount(TOTAL);
+    await expect(loadMore).toHaveCount(0);
 
-    const firstPage = await rowHrefs(page);
-    expect(firstPage.length, 'first render shows exactly one page of rows').toBe(PER_PAGE);
-
-    // Scroll repeatedly; each pass pulls the next page as the sentinel enters
-    // view. Stop when every book is loaded or we stop making progress.
-    let count = firstPage.length;
-    for (let i = 0; i < 8 && count < total; i++) {
-      // Scroll the last row into view so the sentinel below it enters the
-      // viewport, whichever ancestor actually scrolls.
-      await page.locator('table a[href*="/book/"]').last().scrollIntoViewIfNeeded();
-      await expect
-        .poll(async () => (await rowHrefs(page)).length, { timeout: 8_000 })
-        .toBeGreaterThan(count);
-      count = (await rowHrefs(page)).length;
-      // One page at a time — never overshoot the running total by more than a page.
-      expect(count).toBeLessThanOrEqual(total);
-    }
-
-    const finalHrefs = await rowHrefs(page);
-    expect(finalHrefs.length, 'every book loaded after scrolling').toBe(total);
-    expect(new Set(finalHrefs).size, 'no book row is duplicated across pages').toBe(finalHrefs.length);
-
+    const hrefs = await gridBookLinks(page).evaluateAll((links) =>
+      links.map((link) => (link as HTMLAnchorElement).getAttribute('href')),
+    );
+    expect(new Set(hrefs).size, 'all mocked books render exactly once').toBe(TOTAL);
+    expect(requestedPages, 'the button requests the second SPA library page').toEqual([1, 2]);
     assertNoPageErrors(errors);
   });
 });

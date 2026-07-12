@@ -358,8 +358,14 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   const hasMore = allBooks.length < total;
   const isFirstLoad = isLoading && allBooks.length === 0;
 
+  // The observer is a convenience, not the only way to reach another page:
+  // this same guarded action also backs the keyboard/AT-visible Load more button.
+  const loadMore = useCallback(() => {
+    if (hasMore && !isFetching) setPage((p) => p + 1);
+  }, [hasMore, isFetching]);
+
   const sentinelRef = useIntersectionObserver({
-    onIntersect: () => setPage((p) => p + 1),
+    onIntersect: loadMore,
     enabled: hasMore && !isFetching,
   });
 
@@ -562,11 +568,19 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
 
           {hasMore && (
             <div ref={sentinelRef} className={styles.loadMore}>
+              <button
+                type="button"
+                className={styles.loadMoreButton}
+                onClick={loadMore}
+                disabled={isFetching}
+              >
+                {t('Load more')}
+              </button>
               {isFetching && (
-                <>
+                <span className={styles.loadMoreStatus} role="status">
                   <Spinner size={16} />
                   {t('Loading…')}
-                </>
+                </span>
               )}
             </div>
           )}

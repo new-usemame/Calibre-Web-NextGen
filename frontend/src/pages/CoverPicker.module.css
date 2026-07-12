@@ -60,7 +60,7 @@
   background: var(--surface-3); box-shadow: var(--cover-shadow);
   display: grid; place-items: center; margin-bottom: var(--sp-3);
 }
-.currentImg { width: 100%; height: 100%; object-fit: cover; }
+.currentImg { width: 100%; height: 100%; object-fit: contain; }
 .currentFallback { color: var(--text-faint); }
 .currentMeta { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--sp-4); }
 .currentMeta strong { color: var(--text); font-size: var(--fs-base); line-height: var(--lh-snug); }
@@ -165,7 +165,7 @@
 .card:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .cardLocked { opacity: .55; cursor: not-allowed; }
 .cardImgWrap { position: relative; aspect-ratio: 2 / 3; background: var(--surface-3); display: grid; place-items: center; }
-.cardImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cardImg { width: 100%; height: 100%; object-fit: contain; display: block; }
 .cardFailed { display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); color: var(--text-faint); font-size: var(--fs-xs); text-align: center; padding: var(--sp-2); }
 .cardShimmer { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(20,28,36,.55); color: var(--accent-hover); }
 .badgeEmbedded, .badgeEreader, .badgeWarn {
@@ -231,7 +231,7 @@
 .compare figure { margin: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .compare figcaption { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); text-align: center; }
 .compareFrame { aspect-ratio: 2 / 3; border-radius: var(--r-md); overflow: hidden; background: var(--surface-3); box-shadow: var(--cover-shadow); display: grid; place-items: center; }
-.compareFrame img { width: 100%; height: 100%; object-fit: cover; }
+.compareFrame img { width: 100%; height: 100%; object-fit: contain; }
 .compareArrow { color: var(--accent); display: grid; place-items: center; }
 .compareMeta { display: flex; flex-direction: column; gap: 1px; font-size: var(--fs-xs); color: var(--text-muted); text-align: center; }
 .compareMeta strong { color: var(--text); font-size: var(--fs-sm); }

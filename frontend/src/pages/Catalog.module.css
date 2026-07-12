@@ -68,8 +68,51 @@
 
 .loadMore {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: var(--sp-3);
+  min-height: 48px;
   margin-top: var(--sp-8);
+}
+
+.loadMoreButton {
+  min-width: 120px;
+  min-height: 40px;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-3);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease);
+}
+
+.loadMoreButton:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.loadMoreButton:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 3px;
+}
+
+.loadMoreButton:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.loadMoreStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
 }
 
 /* Toolbar */

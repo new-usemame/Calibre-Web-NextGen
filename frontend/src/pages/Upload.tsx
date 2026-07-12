@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'wouter';
 import { UploadCloud, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useUploadBooks } from '../lib/queries';
@@ -11,14 +11,13 @@ import styles from './Upload.module.css';
 export function Upload() {
   const t = useT();
   const upload = useUploadBooks();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [dragover, setDragover] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const send = useCallback(
     (files: File[]) => {
-      if (files.length === 0) return;
+      if (files.length === 0 || upload.isPending) return;
       setError(null);
       setResult(null);
       upload.mutate(files, {
@@ -32,6 +31,7 @@ export function Upload() {
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragover(false);
+    if (upload.isPending) return;
     send(Array.from(e.dataTransfer.files));
   };
 
@@ -42,48 +42,43 @@ export function Upload() {
         {t("Files are queued for the library's ingest process and appear once imported.")}
       </p>
 
-      <div
+      <label
         className={dragover ? styles.dropzoneActive : styles.dropzone}
-        onDragOver={(e) => { e.preventDefault(); setDragover(true); }}
+        onDragOver={(e) => { e.preventDefault(); if (!upload.isPending) setDragover(true); }}
         onDragLeave={() => setDragover(false)}
         onDrop={onDrop}
-        onClick={() => inputRef.current?.click()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && inputRef.current?.click()}
       >
         {upload.isPending ? (
-          <Loader2 className={styles.spin} size={40} />
+          <Loader2 className={styles.spin} size={40} aria-hidden="true" focusable={false} />
         ) : (
-          <UploadCloud size={40} className={styles.dropIcon} />
+          <UploadCloud size={40} className={styles.dropIcon} aria-hidden="true" focusable={false} />
         )}
         <p className={styles.dropText}>
           {upload.isPending ? t('Uploading…') : t('Drop files here, or click to choose')}
         </p>
         <input
-          ref={inputRef}
           type="file"
           multiple
-          className={styles.hiddenInput}
+          className={styles.fileInput}
+          disabled={upload.isPending}
+          aria-label={t('Choose books to upload')}
           onChange={(e) => {
             send(Array.from(e.target.files ?? []));
             e.target.value = '';
           }}
         />
+      </label>
+
+      <div className={error ? styles.banner : styles.statusEmpty} role="alert">
+        {error && <><AlertCircle size={16} aria-hidden="true" focusable={false} /> {error}</>}
       </div>
 
-      {error && (
-        <div className={styles.banner}>
-          <AlertCircle size={16} /> {error}
-        </div>
-      )}
-
-      {result && (
-        <div className={styles.results}>
+      <div className={result ? styles.results : styles.statusEmpty} role="status" aria-live="polite">
+        {result && <>
           {result.queued.length > 0 && (
             <div className={styles.queued}>
               <p className={styles.resultHeading}>
-                <CheckCircle2 size={16} /> {result.queued.length} file
+                <CheckCircle2 size={16} aria-hidden="true" focusable={false} /> {result.queued.length} file
                 {result.queued.length !== 1 ? 's' : ''} queued for import
               </p>
               <ul>{result.queued.map((f) => <li key={f}>{f}</li>)}</ul>
@@ -92,7 +87,7 @@ export function Upload() {
           {result.errors.length > 0 && (
             <div className={styles.failed}>
               <p className={styles.resultHeading}>
-                <AlertCircle size={16} /> {result.errors.length} file
+                <AlertCircle size={16} aria-hidden="true" focusable={false} /> {result.errors.length} file
                 {result.errors.length !== 1 ? 's' : ''} rejected
               </p>
               <ul>{result.errors.map((e) => <li key={e.filename}>{e.filename} — {e.error}</li>)}</ul>
@@ -103,8 +98,8 @@ export function Upload() {
               <Link href="/"><Button variant="ghost">{t('Back to library')}</Button></Link>
             </div>
           )}
-        </div>
-      )}
+        </>}
+      </div>
     </main>
   );
 }

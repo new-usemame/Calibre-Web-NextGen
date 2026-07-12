@@ -11,9 +11,10 @@ import { StarRating } from '../components/StarRating';
 import { MoreByAuthor } from '../components/MoreByAuthor';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import type { BookFormat, EntityRef } from '../lib/api';
+import type { EntityRef } from '../lib/api';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
+import { getPrimaryReadTarget } from '../lib/readerTarget';
 import styles from './BookDetail.module.css';
 
 function formatBytes(bytes: number): string {
@@ -41,17 +42,6 @@ function formatDate(date: string, alwaysReturnFullDate = false): string {
 // reader; the rest (PDF, comics, plain text, DjVu, audiobooks) open in the
 // server's format-specific reader at read_url — so every readable format the
 // library supports is reachable from the SPA, not just EPUB.
-const SPA_READABLE = new Set(['epub', 'kepub']);
-const LEGACY_READABLE = new Set([
-  'pdf', 'txt', 'djvu', 'cbz', 'cbr', 'cbt', 'cb7',
-  'mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav',
-]);
-
-function isReadable(fmt: BookFormat): boolean {
-  const f = fmt.format.toLowerCase();
-  return SPA_READABLE.has(f) || LEGACY_READABLE.has(f);
-}
-
 interface SendPanelProps {
   formats: string[];
   pending: boolean;
@@ -237,10 +227,7 @@ export function BookDetail() {
     );
   }
 
-  const readableFormats = book.formats.filter(isReadable);
-  // Prefer EPUB (SPA reader); else the first server-readable format.
-  const hasEpub = book.formats.some((f) => SPA_READABLE.has(f.format.toLowerCase()));
-  const primaryReadable = readableFormats.find((f) => LEGACY_READABLE.has(f.format.toLowerCase())) ?? null;
+  const primaryReadTarget = getPrimaryReadTarget(book.id, book.formats.map((f) => f.format));
 
   return (
     <main className={styles.container}>
@@ -319,15 +306,8 @@ export function BookDetail() {
 
           {/* Actions */}
           <div className={styles.actions}>
-            {hasEpub ? (
-              // EPUB opens in the in-browser SPA reader (resumes saved progress).
-              <Link href={`/read/${book.id}`} className={styles.actionPrimary}>
-                {t('Read now')}
-              </Link>
-            ) : primaryReadable ? (
-              // PDF/audio/text open in the native multi-format reader; comics/
-              // DjVu fall through there to the server reader for image extraction.
-              <Link href={`/view/${book.id}/${primaryReadable.format.toLowerCase()}`} className={styles.actionPrimary}>
+            {primaryReadTarget ? (
+              <Link href={primaryReadTarget} className={styles.actionPrimary}>
                 {t('Read now')}
               </Link>
             ) : null}

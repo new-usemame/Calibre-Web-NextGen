@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Shield, Trash2, Mail, UserPlus, ChevronRight, Settings, Database, Server, Clock, FileText, Sliders, BarChart3, Files, Lock, RefreshCw } from 'lucide-react';
+import { Shield, Trash2, Mail, UserPlus, ChevronRight, Settings, Database, Server, Clock, FileText, Sliders, BarChart3, Files, Lock, RefreshCw, KeyRound } from 'lucide-react';
 import { useEffect } from 'react';
 import {
   useAdminUsers, useUpdateAdminUser, useDeleteAdminUser, useCreateAdminUser, useMe,
+  useResetAdminUserPassword,
   useAdminConfig, useUpdateAdminConfig, useMailConfig, useUpdateMailConfig,
   useSecurityConfig, useUpdateSecurityConfig,
 } from '../lib/queries';
@@ -60,6 +61,7 @@ export function Admin() {
   const updateUser = useUpdateAdminUser();
   const deleteUser = useDeleteAdminUser();
   const createUser = useCreateAdminUser();
+  const resetPassword = useResetAdminUserPassword();
   const me = useMe().data;
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -114,6 +116,15 @@ export function Admin() {
       onSuccess: () => setBanner({ ok: true, text: `Deleted ${user.name}.` }),
       onError: (err) =>
         setBanner({ ok: false, text: err instanceof ApiError ? err.message : 'Delete failed.' }),
+    });
+  };
+
+  const onResetPassword = (user: AdminUser) => {
+    if (!window.confirm(t('Reset password for {name}? Their current password will stop working and a replacement will be emailed.', { name: user.name }))) return;
+    setBanner(null);
+    resetPassword.mutate(user.id, {
+      onSuccess: (result) => setBanner({ ok: true, text: result.message }),
+      onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Could not reset password.') }),
     });
   };
 
@@ -189,10 +200,18 @@ export function Admin() {
                   )}
                 </div>
                 {!isSelf && !user.is_guest && (
-                  <button className={styles.deleteBtn} onClick={() => onDelete(user)}
-                    disabled={deleteUser.isPending} aria-label={`Delete ${user.name}`}>
-                    <Trash2 size={15} />
-                  </button>
+                  <div className={styles.userActions}>
+                    {me?.features?.mail_configured && user.email && (
+                      <button className={styles.resetBtn} onClick={() => onResetPassword(user)}
+                        disabled={resetPassword.isPending} aria-label={t('Reset password for {name}', { name: user.name })}>
+                        <KeyRound size={15} aria-hidden="true" focusable={false} />
+                      </button>
+                    )}
+                    <button className={styles.deleteBtn} onClick={() => onDelete(user)}
+                      disabled={deleteUser.isPending} aria-label={`Delete ${user.name}`}>
+                      <Trash2 size={15} aria-hidden="true" focusable={false} />
+                    </button>
+                  </div>
                 )}
               </div>
 

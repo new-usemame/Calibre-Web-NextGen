@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Shuffle, X } from 'lucide-react';
 import { BookCard } from './BookCard';
 import { Spinner } from './Spinner';
 import { useDiscover } from '../lib/queries';
 import { useT } from '../lib/i18n';
+import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './DiscoverSection.module.css';
 
 const STRIP_COUNT = 12;
@@ -13,9 +14,18 @@ const STRIP_COUNT = 12;
  *  persists the hidden state and offers a "Show Discover section" toggle). */
 export function DiscoverSection({ onClose }: { onClose: () => void }) {
   const t = useT();
+  const announce = useAnnouncer();
   const [nonce, setNonce] = useState(0);
+  const shuffled = useRef(false);
   const { data, isLoading, isFetching } = useDiscover(STRIP_COUNT, nonce);
   const books = data?.items ?? [];
+
+  useEffect(() => {
+    if (shuffled.current && !isFetching) {
+      announce(t('Discover picks updated.'));
+      shuffled.current = false;
+    }
+  }, [announce, isFetching, t]);
 
   // Empty library (or discover returned nothing): render nothing rather than an
   // empty box — there's nothing to discover.
@@ -35,7 +45,11 @@ export function DiscoverSection({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={() => setNonce((n) => n + 1)}
+            onClick={() => {
+              shuffled.current = true;
+              announce(t('Loading new Discover picks.'));
+              setNonce((n) => n + 1);
+            }}
             disabled={isFetching}
             title={t('Shuffle picks')}
             aria-label={t('Shuffle picks')}

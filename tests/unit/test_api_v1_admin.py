@@ -52,6 +52,88 @@ def test_list_users_anonymous_401():
     assert resp[1] == 401
 
 
+# ── password reset parity (#745) ────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_reset_password_requires_admin():
+    from cps.api import admin as mod
+    with _ctx("/api/v1/admin/users/2/reset-password"):
+        with patch.object(mod, "current_user", _admin(is_admin=False)):
+            resp = inspect.unwrap(mod.admin_reset_user_password)(2)
+    assert resp[1] == 403
+
+
+@pytest.mark.unit
+def test_reset_password_blocks_self_before_lookup():
+    from cps.api import admin as mod
+    with _ctx("/api/v1/admin/users/1/reset-password"):
+        with patch.object(mod, "current_user", _admin(uid=1)):
+            resp = inspect.unwrap(mod.admin_reset_user_password)(1)
+    assert resp[1] == 409
+
+
+@pytest.mark.unit
+def test_reset_password_requires_valid_email_and_mail_config():
+    from cps.api import admin as mod
+    target = _user()
+    target.email = ""
+    mock_ub = MagicMock()
+    mock_ub.session.query.return_value.filter.return_value.first.return_value = target
+    with _ctx("/api/v1/admin/users/2/reset-password"):
+        with patch.object(mod, "current_user", _admin()), patch.object(mod, "ub", mock_ub):
+            resp = inspect.unwrap(mod.admin_reset_user_password)(2)
+    assert resp[1] == 409
+    assert json.loads(resp[0].get_data())["error"]["code"] == "email_required"
+
+    target.email = "not-an-email"
+    with _ctx("/api/v1/admin/users/2/reset-password"):
+        with patch.object(mod, "current_user", _admin()), patch.object(mod, "ub", mock_ub):
+            invalid = inspect.unwrap(mod.admin_reset_user_password)(2)
+    assert invalid[1] == 409
+
+    target.email = "m@x.com"
+    with _ctx("/api/v1/admin/users/2/reset-password"):
+        with patch.object(mod, "current_user", _admin()), patch.object(mod, "ub", mock_ub), \
+             patch.object(mod.config, "get_mail_server_configured", return_value=False):
+            no_mail = inspect.unwrap(mod.admin_reset_user_password)(2)
+    assert no_mail[1] == 409
+    assert json.loads(no_mail[0].get_data())["error"]["code"] == "mail_not_configured"
+
+
+@pytest.mark.unit
+def test_reset_password_success_never_returns_password():
+    from cps.api import admin as mod
+    target = _user()
+    mock_ub = MagicMock()
+    mock_ub.session.query.return_value.filter.return_value.first.return_value = target
+    with _ctx("/api/v1/admin/users/2/reset-password"):
+        with patch.object(mod, "current_user", _admin()), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod.config, "get_mail_server_configured", return_value=True), \
+             patch.object(mod, "reset_password", return_value=(1, target.name)) as core:
+            resp, status = inspect.unwrap(mod.admin_reset_user_password)(2)
+    assert status == 202
+    payload = json.loads(resp.get_data())
+    assert payload == {"ok": True, "message": "A password reset email has been queued."}
+    assert "Temp123!" not in json.dumps(payload)
+    core.assert_called_once_with(2)
+
+
+@pytest.mark.unit
+def test_reset_password_failure_is_not_reported_as_success():
+    from cps.api import admin as mod
+    target = _user()
+    mock_ub = MagicMock()
+    mock_ub.session.query.return_value.filter.return_value.first.return_value = target
+    with _ctx("/api/v1/admin/users/2/reset-password"):
+        with patch.object(mod, "current_user", _admin()), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod.config, "get_mail_server_configured", return_value=True), \
+             patch.object(mod, "reset_password", return_value=(0, None)):
+            resp = inspect.unwrap(mod.admin_reset_user_password)(2)
+    assert resp[1] == 500
+
+
 # ── serialization ────────────────────────────────────────────────────────────
 
 @pytest.mark.unit

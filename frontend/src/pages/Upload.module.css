@@ -40,6 +40,11 @@
   background: var(--accent-soft);
 }
 
+.dropzone:focus-within, .dropzoneActive:focus-within {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 3px;
+}
+
 .dropIcon { color: var(--accent); }
 
 .dropText {
@@ -47,7 +52,17 @@
   font-size: var(--fs-md);
 }
 
-.hiddenInput { display: none; }
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 .spin { animation: spin 0.9s linear infinite; color: var(--accent); }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -62,6 +77,18 @@
   background: var(--danger-soft);
   color: var(--danger);
   font-size: var(--fs-sm);
+}
+
+.statusEmpty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .results {

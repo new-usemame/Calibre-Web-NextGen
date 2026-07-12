@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from 'wouter';
-import { Search, ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw } from 'lucide-react';
+import { ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw, UploadCloud } from 'lucide-react';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { BookCard } from '../components/BookCard';
 import { BulkBar } from '../components/BulkBar';
@@ -211,6 +211,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).
   const canEdit = !!useMe().data?.role?.edit;
+  const canUpload = !!useMe().data?.role?.upload;
 
   // Discover section visibility (persisted; toggled by the gear menu or its ×).
   const [discoverHidden, setDiscoverHidden] = usePersistentBool('cwng_discover_hidden_v1', false);
@@ -218,7 +219,6 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   const settingsRef = useRef<HTMLDivElement>(null);
 
   const accKeyRef = useRef<string>(snap?.resetKey ?? '');
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Resolve the entity's display name (for the heading) from its browse list —
   // cached when the user arrives from the browse page, a cheap fetch otherwise.
@@ -239,16 +239,6 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
     setSearchInput(urlQ);
     setSearch(urlQ);
   }, [urlQ, filtered, isView]);
-
-  // Debounce the search box (library view only).
-  useEffect(() => {
-    if (filtered) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setSearch(searchInput), 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [searchInput, filtered]);
 
   // Close the settings menu on outside-click / Escape.
   useEffect(() => {
@@ -396,20 +386,12 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
 
       {/* Toolbar */}
       <div className={styles.toolbar}>
-        {!hideLibraryControls && (
-          <div className={styles.searchWrap}>
-            <Search size={15} className={styles.searchIcon} />
-            <input
-              type="search"
-              className={styles.searchInput}
-              placeholder={t('Search title, author…')}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              aria-label={t('Search books')}
-            />
-          </div>
+        {!hideLibraryControls && canUpload && (
+          <Link href="/upload" className={styles.uploadLink}>
+            <UploadCloud size={16} aria-hidden="true" focusable={false} />
+            <span>{t('Upload books')}</span>
+          </Link>
         )}
-
         {!hideLibraryControls && (
           <Link href="/search" className={styles.advancedLink} title={t('Advanced search')}>
             <SlidersHorizontal size={15} />

@@ -1093,8 +1093,9 @@ def reset_password(user_id):
     try:
         password = generate_random_password(config.config_password_min_length)
         existing_user.password = generate_password_hash(password)
-        ub.session.commit()
+        ub.session.flush()
         send_registration_mail(existing_user.email, existing_user.name, password, True)
+        ub.session.commit()
         return 1, existing_user.name
     except Exception:
         ub.session.rollback()

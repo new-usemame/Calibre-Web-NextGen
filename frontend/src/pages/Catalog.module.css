@@ -166,7 +166,7 @@
   -webkit-appearance: none;
 }
 
-.advancedLink, .selectBtn, .selectBtnActive {
+.advancedLink, .uploadLink, .selectBtn, .selectBtnActive {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -181,10 +181,19 @@
               background var(--dur-fast) var(--ease);
 }
 
-.advancedLink:hover, .selectBtn:hover {
+.advancedLink:hover, .uploadLink:hover, .selectBtn:hover {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+.uploadLink {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+  min-height: 44px;
+}
+
+.uploadLink:hover { color: var(--on-accent); background: var(--accent-hover, var(--accent)); }
 
 .selectBtnActive {
   background: var(--accent);

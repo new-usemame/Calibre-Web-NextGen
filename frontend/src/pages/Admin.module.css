@@ -118,6 +118,23 @@
   margin-bottom: var(--sp-3);
 }
 
+.userActions { display: flex; align-items: center; gap: var(--sp-2); }
+
+.resetBtn {
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.resetBtn:hover:not(:disabled) { border-color: var(--accent); }
+.resetBtn:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
 .name {
   display: flex;
   align-items: center;

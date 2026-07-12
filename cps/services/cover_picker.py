@@ -29,6 +29,7 @@ from dataclasses import asdict
 from typing import Callable, Dict, Iterable, List, Optional
 
 from .. import logger
+from . import cover_booster
 from .cover_booster import boost_covers
 
 
@@ -89,6 +90,7 @@ def gather_cover_candidates(
     classify_failure: Callable[[Exception], tuple] = lambda exc: ("error", str(exc) or exc.__class__.__name__),
     classify_empty: Callable[[object], tuple] = lambda _p: ("empty", "No results"),
     extract_embedded: Optional[Callable[[], "ExtractedCover | None"]] = None,
+    book_isbns: Iterable[str] = (),
 ) -> tuple[List[CoverCandidate], List[ProviderStatus]]:
     """Run every enabled provider against ``query`` in parallel, post-process
     through ``cover_booster``, and return a flattened candidate list +
@@ -107,6 +109,9 @@ def gather_cover_candidates(
       * ``extract_embedded`` — zero-arg callable that returns an
         ``ExtractedCover`` or None. Lets us inject the embedded candidate
         without coupling this module to ``cover_extract``.
+      * ``book_isbns`` — the editing book's stored ISBN identifiers. These
+        can contribute an Amazon-CDN high-resolution cover independently of
+        whether the Amazon metadata provider itself is enabled.
     """
     runnable, statuses = _filter_runnable(providers, is_provider_enabled)
     candidates: List[CoverCandidate] = []
@@ -126,18 +131,38 @@ def gather_cover_candidates(
                 candidate_id="embedded",
             ))
 
-    if not runnable or not query:
+    amazon_isbn10s = _amazon_candidate_isbn10s(book_isbns)
+    if (not runnable or not query) and not amazon_isbn10s:
         return candidates, statuses
 
     started_at = {p.__id__: time.monotonic() for p in runnable}
     results_by_provider: Dict[str, list] = {}
+    amazon_urls_by_isbn10: Dict[str, str] = {}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_DEFAULT_WORKERS) as pool:
-        futures = {
-            pool.submit(p.search, query, static_cover, locale): p for p in runnable
-        }
+        futures = {}
+        if query:
+            futures.update({
+                pool.submit(p.search, query, static_cover, locale): ("provider", p)
+                for p in runnable
+            })
+        futures.update({
+            pool.submit(cover_booster._amazon_cdn_cover_for_isbn10, isbn10): ("amazon", isbn10)
+            for isbn10 in amazon_isbn10s
+        })
         for fut in concurrent.futures.as_completed(futures):
-            p = futures[fut]
+            kind, subject = futures[fut]
+            if kind == "amazon":
+                try:
+                    url = fut.result()
+                except Exception as exc:  # pragma: no cover - defensive
+                    log.debug("cover-picker Amazon CDN probe failed for %s: %s", subject, exc)
+                    continue
+                if url:
+                    amazon_urls_by_isbn10[subject] = url
+                continue
+
+            p = subject
             elapsed_ms = int((time.monotonic() - started_at.get(p.__id__, time.monotonic())) * 1000)
             try:
                 hits = fut.result() or []
@@ -182,8 +207,37 @@ def gather_cover_candidates(
             candidate_id=f"{source.get('id') or 'src'}:{record.get('id') or ''}",
         ))
 
+    existing_urls = {candidate.cover_url for candidate in candidates}
+    for isbn10 in amazon_isbn10s:
+        cover_url = amazon_urls_by_isbn10.get(isbn10)
+        if not cover_url or cover_url in existing_urls:
+            continue
+        candidates.append(CoverCandidate(
+            source_id="amazon_highres",
+            source_name="Amazon (high-res)",
+            cover_url=cover_url,
+            candidate_id=f"amazon_highres:{isbn10}",
+        ))
+        existing_urls.add(cover_url)
+
     statuses.sort(key=lambda s: s.name.lower())
     return candidates, statuses
+
+
+def _amazon_candidate_isbn10s(book_isbns: Iterable[str]) -> List[str]:
+    """Normalize stored book ISBNs for the existing Amazon-CDN probe.
+
+    The booster's flag is deliberately the single kill-switch for both its
+    provider-record upgrade and this independent picker candidate.
+    """
+    if not cover_booster._AMAZON_CDN_ENABLED:
+        return []
+    isbn10s: List[str] = []
+    for isbn in book_isbns or ():
+        isbn10 = cover_booster._to_isbn10(str(isbn or ""))
+        if isbn10 and isbn10 not in isbn10s:
+            isbn10s.append(isbn10)
+    return isbn10s
 
 
 def _filter_runnable(providers, is_provider_enabled) -> tuple[list, List[ProviderStatus]]:

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   apiGet, apiPost, apiUpload, apiPostForm, ApiError,
   navigateToLogout,
@@ -131,6 +131,7 @@ export function useDiscover(count: number, nonce: number) {
     queryKey: ['discover-strip', count, nonce],
     queryFn: () => apiGet<BooksPage>(`/api/v1/books?filter=discover&per_page=${count}`),
     staleTime: 0,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -363,6 +364,13 @@ export function useCreateAdminUser() {
   return useMutation({
     mutationFn: (v: NewUser) => apiPost<AdminUser>('/api/v1/admin/users', v),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  });
+}
+
+export function useResetAdminUserPassword() {
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiPost<{ ok: boolean; message: string }>(`/api/v1/admin/users/${id}/reset-password`),
   });
 }
 

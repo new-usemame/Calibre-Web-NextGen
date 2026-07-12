@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles, Shield } from 'lucide-react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { BrandName } from './BrandName';
 import { Avatar } from './Avatar';
@@ -222,7 +222,10 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
 export function TopBar({ userName, instanceName, onLogout, onMenu }: TopBarProps) {
   const t = useT();
   const [, setLocation] = useLocation();
-  const [q, setQ] = useState('');
+  const rawSearch = useSearch();
+  const urlQ = new URLSearchParams(rawSearch).get('q') || '';
+  const [q, setQ] = useState(urlQ);
+  useEffect(() => setQ(urlQ), [urlQ]);
   // The search bar is hidden on narrow screens; a toggle button reveals it as an
   // overlay row so mobile users can still search (Tier-3 gap).
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);

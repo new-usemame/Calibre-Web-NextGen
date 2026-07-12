@@ -203,3 +203,30 @@
   color: var(--on-accent);
   border-color: var(--accent);
 }
+
+.readNow {
+  min-height: 32px;
+  margin-top: var(--sp-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  border-radius: var(--r-md);
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.wrap:hover .readNow,
+.wrap:focus-within .readNow,
+.readNow:focus-visible { opacity: 1; }
+
+.readNow:hover,
+.readNow:focus-visible { background: var(--accent-soft); }
+
+@media (hover: none), (pointer: coarse) {
+  .readNow { min-height: 44px; opacity: 1; }
+}

@@ -28,7 +28,7 @@ async function openSidebar(page: Page) {
 }
 
 async function enterEdit(page: Page) {
-  await page.getByRole('button', { name: 'Customize sidebar' }).click();
+  await page.getByRole('button', { name: 'Customize navigation' }).click();
   // 13 orderable rows become draggable handles once edit mode is live.
   await expect(page.locator('nav li[data-key]')).toHaveCount(13);
 }

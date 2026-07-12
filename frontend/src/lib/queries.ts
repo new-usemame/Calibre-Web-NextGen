@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   apiGet, apiPost, apiUpload, apiPostForm, ApiError,
+  navigateToLogout,
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
 import { removeBookFromCache } from './scrollCache';
@@ -45,7 +46,7 @@ export function useMe() {
     queryKey: ['me'],
     queryFn: async () => {
       try {
-        return await apiGet<Me>('/api/v1/auth/me');
+        return await apiGet<Me>('/api/v1/auth/me', { auth: 'public' });
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) return null;
         throw err;
@@ -77,7 +78,7 @@ export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (vars: { username: string; password: string; remember?: boolean }) =>
-      apiPost<Me>('/api/v1/auth/login', vars),
+      apiPost<Me>('/api/v1/auth/login', vars, { auth: 'public' }),
     onSuccess: (data) => {
       queryClient.setQueryData(['me'], data);
       void queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -101,7 +102,7 @@ export type MagicLinkPoll =
 /** Start a magic-link (remote) login session: mint a token + QR for this device. */
 export function useMagicLinkStart() {
   return useMutation({
-    mutationFn: () => apiPost<MagicLinkSession>('/api/v1/auth/magic-link/start'),
+    mutationFn: () => apiPost<MagicLinkSession>('/api/v1/auth/magic-link/start', undefined, { auth: 'public' }),
   });
 }
 
@@ -112,7 +113,7 @@ export function useMagicLinkPoll() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (token: string) =>
-      apiPost<MagicLinkPoll>('/api/v1/auth/magic-link/poll', { token }),
+      apiPost<MagicLinkPoll>('/api/v1/auth/magic-link/poll', { token }, { auth: 'public' }),
     onSuccess: (data) => {
       if (data.status === 'success') {
         queryClient.setQueryData(['me'], data.user);
@@ -136,7 +137,7 @@ export function useDiscover(count: number, nonce: number) {
 export function useAuthConfig() {
   return useQuery<AuthConfig>({
     queryKey: ['auth-config'],
-    queryFn: () => apiGet<AuthConfig>('/api/v1/auth/config'),
+    queryFn: () => apiGet<AuthConfig>('/api/v1/auth/config', { auth: 'public' }),
     staleTime: Infinity,
   });
 }
@@ -144,25 +145,20 @@ export function useAuthConfig() {
 export function useRegister() {
   return useMutation({
     mutationFn: (vars: { name: string; email: string }) =>
-      apiPost<{ ok: boolean; message: string }>('/api/v1/auth/register', vars),
+      apiPost<{ ok: boolean; message: string }>('/api/v1/auth/register', vars, { auth: 'public' }),
   });
 }
 
 export function useForgotPassword() {
   return useMutation({
     mutationFn: (username: string) =>
-      apiPost<{ ok: boolean; message: string }>('/api/v1/auth/forgot', { username }),
+      apiPost<{ ok: boolean; message: string }>('/api/v1/auth/forgot', { username }, { auth: 'public' }),
   });
 }
 
 export function useLogout() {
-  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiPost('/api/v1/auth/logout'),
-    onSuccess: () => {
-      queryClient.setQueryData(['me'], null);
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
-    },
+    mutationFn: async () => navigateToLogout(),
   });
 }
 

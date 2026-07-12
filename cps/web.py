@@ -53,6 +53,7 @@ from .services.worker import WorkerThread
 from .tasks_status import render_task_status
 from .usermanagement import user_login_required
 from .string_helper import strip_whitespaces
+from .logout import cleanup_local_logout
 
 # CWA Imports
 import shutil
@@ -2885,14 +2886,7 @@ def login_post():
 @web.route('/logout')
 @user_login_required
 def logout():
-    if current_user is not None and current_user.is_authenticated:
-        if feature_support['oauth'] and (config.config_login_type == 2 or config.config_login_type == 3):
-            logout_oauth_user()
-        ub.delete_user_session(current_user.id, flask_session.get('_id', ""))
-        logout_user()
-
-    # Clear login redirect count on logout to prevent false positives
-    flask_session.pop('_login_redirect_count', None)
+    cleanup_local_logout()
 
     log.debug("User logged out")
     if config.config_anonbrowse:

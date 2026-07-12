@@ -319,11 +319,69 @@ export class ApiError extends Error {
   }
 }
 
+/** Stable signal that a protected request has already started the canonical
+ * top-level authentication transition. Callers must not inspect its body. */
+export class AuthTransitionError extends Error {
+  constructor() {
+    super('Authentication transition in progress');
+    this.name = 'AuthTransitionError';
+  }
+}
+
+let _logoutNavigationStarted = false;
+
+/** Leave the authenticated SPA through the app-owned, prefix-aware route.
+ * Never derive this destination from a failed response (open-redirect guard). */
+export function navigateToLogout(): void {
+  if (_logoutNavigationStarted || typeof window === 'undefined') return;
+  _logoutNavigationStarted = true;
+  window.location.assign(apiUrl('/logout'));
+}
+
+export interface ApiRequestOptions {
+  auth?: 'protected' | 'public';
+}
+
+function isProtected(options?: ApiRequestOptions): boolean {
+  return options?.auth !== 'public';
+}
+
+async function classifiedFetch(
+  path: string,
+  init: RequestInit,
+  options?: ApiRequestOptions,
+): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), init);
+  } catch (error) {
+    if (isProtected(options) && error instanceof TypeError) {
+      navigateToLogout();
+      throw new AuthTransitionError();
+    }
+    throw error;
+  }
+
+  // Do not inspect Location or response.url. The only navigation target is the
+  // app-owned /logout route above, regardless of what an intermediary returned.
+  const redirectedToHtml = response.redirected
+    && (response.headers.get('content-type') || '').includes('text/html');
+  if (isProtected(options)
+      && (response.type === 'opaqueredirect'
+        || response.status === 302
+        || response.status === 401
+        || redirectedToHtml)) {
+    navigateToLogout();
+    throw new AuthTransitionError();
+  }
+  return response;
+}
+
 let _csrfCache: string | null = null;
 
-export async function getCsrf(): Promise<string> {
+export async function getCsrf(options?: ApiRequestOptions): Promise<string> {
   if (_csrfCache) return _csrfCache;
-  const res = await fetch(apiUrl('/api/v1/auth/csrf'), { credentials: 'include' });
+  const res = await classifiedFetch('/api/v1/auth/csrf', { credentials: 'include' }, options);
   if (!res.ok) throw new ApiError(res.status, 'Failed to fetch CSRF token');
   const data = await res.json() as { csrf_token: string };
   _csrfCache = data.csrf_token;
@@ -334,8 +392,8 @@ function clearCsrf() {
   _csrfCache = null;
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(apiUrl(path), { credentials: 'include' });
+export async function apiGet<T>(path: string, options?: ApiRequestOptions): Promise<T> {
+  const res = await classifiedFetch(path, { credentials: 'include' }, options);
   if (!res.ok) {
     let msg = res.statusText;
     // API errors are shaped { error: { code, message } }; fall back to a bare
@@ -350,9 +408,14 @@ export async function apiGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function apiPost<T>(path: string, body?: unknown, options?: Pick<RequestInit, 'keepalive'>): Promise<T> {
+export async function apiPost<T>(
+  path: string,
+  body?: unknown,
+  requestOptions?: Pick<RequestInit, 'keepalive'> & ApiRequestOptions,
+): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> => {
-    return fetch(apiUrl(path), {
+    const { auth: _auth, ...fetchOptions } = requestOptions ?? {};
+    return classifiedFetch(path, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -360,11 +423,11 @@ export async function apiPost<T>(path: string, body?: unknown, options?: Pick<Re
         'X-CSRFToken': csrf,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      ...options,
-    });
+      ...fetchOptions,
+    }, requestOptions);
   };
 
-  let csrf = await getCsrf();
+  let csrf = await getCsrf(requestOptions);
   let res = await doPost(csrf);
 
   // A stale/invalid CSRF token is rejected app-side as an HTML 400 (the global
@@ -377,7 +440,7 @@ export async function apiPost<T>(path: string, body?: unknown, options?: Pick<Re
     && (res.headers.get('content-type') || '').includes('application/json');
   if (res.status === 400 && !isJson400) {
     clearCsrf();
-    csrf = await getCsrf();
+    csrf = await getCsrf(requestOptions);
     res = await doPost(csrf);
   }
 
@@ -402,15 +465,15 @@ export async function apiPost<T>(path: string, body?: unknown, options?: Pick<Re
 /** DELETE with the same CSRF/base-path handling as apiPost (#782 — the reader
  *  needs to remove a highlight). DELETE responses are frequently empty or 204,
  *  so this tolerates a missing body rather than throwing on res.json(). */
-export async function apiDelete<T>(path: string): Promise<T> {
+export async function apiDelete<T>(path: string, options?: ApiRequestOptions): Promise<T> {
   const doDelete = async (csrf: string): Promise<Response> =>
-    fetch(apiUrl(path), {
+    classifiedFetch(path, {
       method: 'DELETE',
       credentials: 'include',
       headers: { 'X-CSRFToken': csrf },
-    });
+    }, options);
 
-  let csrf = await getCsrf();
+  let csrf = await getCsrf(options);
   let res = await doDelete(csrf);
 
   // Same stale-CSRF replay as apiPost — a non-JSON 400 is the global HTML error
@@ -419,7 +482,7 @@ export async function apiDelete<T>(path: string): Promise<T> {
     && (res.headers.get('content-type') || '').includes('application/json');
   if (res.status === 400 && !isJson400) {
     clearCsrf();
-    csrf = await getCsrf();
+    csrf = await getCsrf(options);
     res = await doDelete(csrf);
   }
 
@@ -445,9 +508,9 @@ export async function apiDelete<T>(path: string): Promise<T> {
 
 /** PATCH with the same CSRF/base-path handling as apiPost (#782 — the reader
  *  recolors an existing highlight). Mirrors apiPost's JSON body + replay. */
-export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+export async function apiPatch<T>(path: string, body?: unknown, options?: ApiRequestOptions): Promise<T> {
   const doPatch = async (csrf: string): Promise<Response> =>
-    fetch(apiUrl(path), {
+    classifiedFetch(path, {
       method: 'PATCH',
       credentials: 'include',
       headers: {
@@ -455,16 +518,16 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
         'X-CSRFToken': csrf,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    }, options);
 
-  let csrf = await getCsrf();
+  let csrf = await getCsrf(options);
   let res = await doPatch(csrf);
 
   const isJson400 = res.status === 400
     && (res.headers.get('content-type') || '').includes('application/json');
   if (res.status === 400 && !isJson400) {
     clearCsrf();
-    csrf = await getCsrf();
+    csrf = await getCsrf(options);
     res = await doPatch(csrf);
   }
 
@@ -485,22 +548,22 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
 /** Form-encoded POST (application/x-www-form-urlencoded). Used to consume the
  *  legacy form endpoints (e.g. /metadata/search) directly, reusing their logic
  *  rather than duplicating it under /api/v1. Same CSRF-retry as apiPost. */
-export async function apiPostForm<T>(path: string, fields: Record<string, string>): Promise<T> {
+export async function apiPostForm<T>(path: string, fields: Record<string, string>, options?: ApiRequestOptions): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> =>
-    fetch(apiUrl(path), {
+    classifiedFetch(path, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf },
       body: new URLSearchParams(fields).toString(),
-    });
+    }, options);
 
-  let csrf = await getCsrf();
+  let csrf = await getCsrf(options);
   let res = await doPost(csrf);
   const isJson400 = res.status === 400
     && (res.headers.get('content-type') || '').includes('application/json');
   if (res.status === 400 && !isJson400) {
     clearCsrf();
-    csrf = await getCsrf();
+    csrf = await getCsrf(options);
     res = await doPost(csrf);
   }
   if (!res.ok) {
@@ -556,23 +619,23 @@ export function setMetadataProviderActive(id: string, value: boolean): Promise<v
 
 /** Multipart POST (file upload). Mirrors apiPost's CSRF handling, but lets the
  *  browser set the multipart Content-Type + boundary (so we must NOT set it). */
-export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+export async function apiUpload<T>(path: string, formData: FormData, options?: ApiRequestOptions): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> =>
-    fetch(apiUrl(path), {
+    classifiedFetch(path, {
       method: 'POST',
       credentials: 'include',
       headers: { 'X-CSRFToken': csrf },
       body: formData,
-    });
+    }, options);
 
-  let csrf = await getCsrf();
+  let csrf = await getCsrf(options);
   let res = await doPost(csrf);
 
   const isJson400 = res.status === 400
     && (res.headers.get('content-type') || '').includes('application/json');
   if (res.status === 400 && !isJson400) {
     clearCsrf();
-    csrf = await getCsrf();
+    csrf = await getCsrf(options);
     res = await doPost(csrf);
   }
 

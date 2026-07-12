@@ -6,6 +6,7 @@ import flask
 from unittest.mock import patch, MagicMock
 
 import cps.api.auth
+import cps.logout
 
 
 def _app():
@@ -90,12 +91,53 @@ def test_login_bad_password_401():
 
 
 @pytest.mark.unit
-def test_logout_204():
+def test_logout_204_uses_shared_cleanup():
     app = _app()
-    with patch("cps.api.auth.logout_user") as lo:
+    with patch("cps.api.auth.cleanup_local_logout") as cleanup:
         resp = app.test_client().post("/api/v1/auth/logout")
     assert resp.status_code == 204
-    assert lo.called
+    cleanup.assert_called_once_with()
+
+
+@pytest.mark.unit
+def test_shared_logout_cleanup_deletes_session_and_oauth_state():
+    app = _app()
+    user = MagicMock()
+    user.id = 73
+    user.is_authenticated = True
+    with app.test_request_context("/logout"):
+        flask.session["_id"] = "session-key"
+        flask.session["_login_redirect_count"] = 2
+        with patch("cps.logout.current_user", user), \
+             patch("cps.logout.config.config_login_type", 2, create=True), \
+             patch("cps.oauth_bb.logout_oauth_user") as oauth_logout, \
+             patch("cps.logout.ub.delete_user_session") as delete_session, \
+             patch("cps.logout.logout_user") as logout_user:
+            cps.logout.cleanup_local_logout()
+
+        oauth_logout.assert_called_once_with()
+        delete_session.assert_called_once_with(73, "session-key")
+        logout_user.assert_called_once_with()
+        assert "_login_redirect_count" not in flask.session
+
+
+@pytest.mark.unit
+def test_classic_logout_redirects_and_uses_shared_cleanup():
+    import cps.web
+
+    app = flask.Flask(__name__)
+    app.config["SECRET_KEY"] = "test"
+    app.register_blueprint(cps.web.web)
+    with app.test_request_context("/logout"):
+        with patch("cps.web.cleanup_local_logout") as cleanup, \
+             patch("cps.web.config.config_anonbrowse", False, create=True):
+            # Bypass only the authentication decorator; this directly exercises
+            # the classic route's cleanup + redirect behavior.
+            response = cps.web.logout.__wrapped__()
+
+    cleanup.assert_called_once_with()
+    assert response.status_code == 302
+    assert response.location.endswith("/login")
 
 
 # ── Regression: I1 — rate-limit decorator is present on auth_login ────────────

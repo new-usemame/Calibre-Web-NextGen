@@ -15,7 +15,9 @@ This module provides a client for interacting with Hardcover's GraphQL API to:
 - Update book status (Want to Read, Reading, Read)
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+import base64
+import json
 from os import getenv
 import requests
 
@@ -27,6 +29,44 @@ log = logger.create()
 # a local mock; production deployments leave it unset.
 GRAPHQL_ENDPOINT = getenv("HARDCOVER_API_ENDPOINT", "https://api.hardcover.app/v1/graphql")
 REQUEST_TIMEOUT = 10  # seconds
+
+
+def token_status(token):
+    """Return privacy-safe presence, validity, and JWT expiry metadata."""
+    status = {"present": False, "valid": None, "expires_at": None, "expired": None}
+    if not isinstance(token, str) or not token.strip():
+        return status
+    token = token.strip().replace("Bearer ", "", 1)
+    status["present"] = True
+
+    parts = token.split(".")
+    if len(parts) == 3:
+        try:
+            payload = parts[1] + "=" * (-len(parts[1]) % 4)
+            exp = json.loads(base64.urlsafe_b64decode(payload).decode("utf-8")).get("exp")
+            if isinstance(exp, (int, float)) and not isinstance(exp, bool):
+                expiry = datetime.fromtimestamp(exp, tz=timezone.utc)
+                status["expires_at"] = int(exp * 1000)
+                status["expired"] = expiry <= datetime.now(timezone.utc)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            pass
+
+    try:
+        response = requests.post(
+            GRAPHQL_ENDPOINT,
+            json={"query": "{ me { id } }", "variables": {}},
+            headers={"Content-Type": "application/json", "Authorization": "Bearer {}".format(token)},
+            timeout=3,
+        )
+        if response.status_code == 401:
+            status["valid"] = False
+        else:
+            response.raise_for_status()
+            body = response.json()
+            status["valid"] = not body.get("errors") and bool((body.get("data") or {}).get("me"))
+    except (requests.RequestException, ValueError):
+        status["valid"] = None
+    return status
 
 # Book Status Constants (Hardcover status IDs)
 STATUS_WANT_TO_READ = 1
@@ -609,7 +649,8 @@ class HardcoverClient:
 
     def execute(self, query, variables=None):
         payload = {"query": query, "variables": variables or {}}
-        response = requests.post(self.endpoint, json=payload, headers=self.headers)
+        response = requests.post(self.endpoint, json=payload, headers=self.headers,
+                                 timeout=REQUEST_TIMEOUT)
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:

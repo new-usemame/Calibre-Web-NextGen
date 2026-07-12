@@ -58,6 +58,8 @@
 .manage {
   display: flex;
   gap: var(--sp-2);
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .manageBtn,
@@ -70,6 +72,14 @@
   padding: var(--sp-1) var(--sp-2);
   border-radius: var(--r-sm);
   transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+@media (max-width: 420px) {
+  .container { padding-inline: var(--sp-3); }
+  .subRow, .manage { width: 100%; }
+  .manageBtn, .manageBtnDanger, .manageBtnActive { min-height: 36px; max-width: 100%; white-space: normal; }
+  .renameRow { min-width: 0; width: 100%; }
+  .renameInput { min-width: 0; flex: 1; }
 }
 
 .manageBtn:hover {

@@ -7,6 +7,7 @@ advanced-search view uses) so the structured search behaves identically across
 the legacy UI and the SPA.
 """
 from flask import jsonify, request
+from sqlalchemy import func
 
 from . import api_v1
 from .books import SORT_MAP, _row_to_item
@@ -63,8 +64,10 @@ def search_options():
     """Picker options for the advanced-search form, in the exact id shape the
     query builder expects: tags/series by row id, languages by row id (NOT
     lang_code — that's what adv_search_language filters on), formats by code."""
-    tags = (calibre_db.session.query(db.Tags).order_by(db.Tags.name).all())
-    series = (calibre_db.session.query(db.Series).order_by(db.Series.sort).all())
+    tags = (calibre_db.session.query(db.Tags)
+            .order_by(func.ng_sort_key(db.Tags.name), db.Tags.name, db.Tags.id).all())
+    series = (calibre_db.session.query(db.Series)
+              .order_by(func.ng_sort_key(db.Series.sort), db.Series.sort, db.Series.id).all())
     languages = (calibre_db.session.query(db.Languages).all())
     formats = (calibre_db.session.query(db.Data.format).distinct().order_by(db.Data.format).all())
 

@@ -215,6 +215,55 @@ def test_communicate_has_timeout():
     )
 
 
+def test_export_wait_runs_on_gevent_aware_pool():
+    """The subprocess wait must leave the gevent request hub responsive."""
+    source = (REPO_ROOT / "cps" / "embed_helper.py").read_text()
+    assert "gevent.threadpool" in source, (
+        "production exports must use gevent.threadpool; a stdlib subprocess "
+        "wait on the request greenlet freezes every HTTP request (#561)"
+    )
+    assert "_EXPORT_POOL.apply" in source, (
+        "the request wrapper must wait through gevent ThreadPool.apply so the "
+        "calling greenlet yields while calibredb is running"
+    )
+
+
+def test_export_wrapper_delegates_blocking_body(monkeypatch):
+    embed_helper = _load_embed_helper()
+    calls = []
+
+    class FakePool:
+        def apply(self, func, args=(), kwds=None):
+            calls.append((func, args, kwds))
+            return ("export-dir", "export-name")
+
+    monkeypatch.setattr(embed_helper, "_HAVE_GEVENT_POOL", True, raising=False)
+    monkeypatch.setattr(embed_helper, "_EXPORT_POOL", FakePool(), raising=False)
+
+    assert embed_helper.do_calibre_export(581, "pdf") == ("export-dir", "export-name")
+    assert calls and calls[0][0] is embed_helper._do_calibre_export_blocking
+    assert calls[0][1] == (581, "pdf")
+
+
+def test_export_pool_saturation_falls_back_without_launch(monkeypatch):
+    embed_helper = _load_embed_helper()
+
+    class FullSlots:
+        def acquire(self, blocking=False):
+            assert blocking is False
+            return False
+
+    class MustNotRunPool:
+        def apply(self, *_args, **_kwargs):
+            raise AssertionError("a saturated export pool must not queue or launch")
+
+    monkeypatch.setattr(embed_helper, "_EXPORT_SLOTS", FullSlots(), raising=False)
+    monkeypatch.setattr(embed_helper, "_HAVE_GEVENT_POOL", True, raising=False)
+    monkeypatch.setattr(embed_helper, "_EXPORT_POOL", MustNotRunPool(), raising=False)
+
+    assert embed_helper.do_calibre_export(581, "pdf") == (None, None)
+
+
 def _branch_guards_none(path, callsite_snippet, guard_snippet):
     source = (REPO_ROOT / path).read_text()
     assert callsite_snippet in source, f"expected callsite missing from {path}"

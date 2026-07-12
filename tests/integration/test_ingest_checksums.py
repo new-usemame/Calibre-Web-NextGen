@@ -18,6 +18,7 @@ import subprocess
 import sys
 import time
 import sqlite3
+import hashlib
 from pathlib import Path
 
 # Add project root to path
@@ -328,6 +329,57 @@ class TestIngestChecksumLogic:
         # This would require mocking or inspecting the ingest flow
         # Placeholder for future implementation
         pytest.skip("Requires mocking infrastructure")
+
+    def test_new_ingest_registers_binary_and_filename_channels(self, tmp_path):
+        """#627 exact lifecycle: a book imported after boot must resolve before
+        any OPDS/download chokepoint runs.  The ingest callback therefore has
+        to write both checksum channels immediately."""
+        scripts_path = project_root / "scripts"
+        sys.path.insert(0, str(scripts_path))
+        try:
+            from ingest_processor import NewBookProcessor
+        except ImportError:
+            pytest.skip("Ingest processor not importable in this environment")
+
+        library = tmp_path / "library"
+        book_dir = library / "Author" / "Book"
+        book_dir.mkdir(parents=True)
+        basename = "New Book - Reporter"
+        book_file = book_dir / f"{basename}.epub"
+        book_file.write_bytes(b"new post-boot ingest" * 1000)
+
+        db_path = library / "metadata.db"
+        conn = sqlite3.connect(db_path)
+        conn.executescript("""
+            CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, path TEXT, timestamp TEXT);
+            CREATE TABLE data (id INTEGER PRIMARY KEY, book INTEGER, format TEXT, name TEXT);
+            CREATE TABLE book_format_checksums (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book INTEGER NOT NULL,
+                format TEXT NOT NULL COLLATE NOCASE,
+                checksum TEXT NOT NULL,
+                version TEXT NOT NULL,
+                created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.execute("INSERT INTO books VALUES (7, 'New Book', 'Author/Book', '2026-07-12')")
+        conn.execute("INSERT INTO data VALUES (1, 7, 'EPUB', ?)", (basename,))
+        conn.commit()
+        conn.close()
+
+        processor = object.__new__(NewBookProcessor)
+        processor.library_dir = str(library)
+        processor.generate_book_checksums("New Book", book_id=7)
+
+        conn = sqlite3.connect(db_path)
+        rows = dict(conn.execute(
+            "SELECT version, checksum FROM book_format_checksums WHERE book=7"
+        ).fetchall())
+        conn.close()
+        assert set(rows) == {"koreader", "koreader_filename"}
+        assert rows["koreader_filename"] == hashlib.md5(
+            f"{basename}.epub".encode("utf-8")
+        ).hexdigest()
 
 
 @pytest.mark.docker_integration

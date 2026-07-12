@@ -11,7 +11,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from . import api_v1
 from .serializers import serialize_user
 from .. import ub, config, constants, limiter
-from ..cw_login import current_user, login_user, logout_user
+from ..cw_login import current_user, login_user
+from ..logout import cleanup_local_logout
 from ..helper import (
     check_username, check_email, check_valid_domain, reset_password,
     send_registration_mail, generate_random_password,
@@ -186,7 +187,7 @@ def auth_login():
 
 @api_v1.route("/auth/logout", methods=["POST"])
 def auth_logout():
-    logout_user()
+    cleanup_local_logout()
     return "", 204
 
 

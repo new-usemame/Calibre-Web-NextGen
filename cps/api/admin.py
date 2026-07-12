@@ -16,7 +16,8 @@ from .. import ub, constants, config, calibre_db
 from ..cw_login import current_user
 from ..cw_babel import get_available_locale
 from ..usermanagement import login_required_if_no_ano
-from ..helper import valid_email, check_email, check_username, valid_password, generate_password_hash
+from ..helper import (valid_email, check_email, check_username, valid_password,
+                      generate_password_hash, reset_password)
 from ..admin import _delete_user
 
 # UI-configuration fields the SPA admin form can read/write natively. Scoped to
@@ -85,6 +86,34 @@ def admin_list_users():
     items = [_serialize_user(u) for u in users
              if (u.role & constants.ROLE_ANONYMOUS) != constants.ROLE_ANONYMOUS]
     return jsonify({"items": items})
+
+
+@api_v1.route("/admin/users/<int:user_id>/reset-password", methods=["POST"])
+@login_required_if_no_ano
+def admin_reset_user_password(user_id):
+    """Generate and email a replacement password without exposing it to SPA."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    if current_user.id == user_id:
+        return _err("conflict", "Use Account settings to change your own password", 409)
+    target = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
+    if target is None:
+        return _err("not_found", "User not found", 404)
+    if target.name == "Guest" or target.role & constants.ROLE_ANONYMOUS:
+        return _err("invalid_target", "The Guest password cannot be reset", 409)
+    try:
+        target_email = valid_email(target.email or "")
+    except Exception:
+        target_email = ""
+    if not target_email:
+        return _err("email_required", "This user needs a valid email address", 409)
+    if not config.get_mail_server_configured():
+        return _err("mail_not_configured", "Configure mail before resetting passwords", 409)
+    result, _ = reset_password(user_id)
+    if result != 1:
+        return _err("reset_failed", "The password was not changed; the reset email could not be queued", 500)
+    return jsonify({"ok": True, "message": "A password reset email has been queued."}), 202
 
 
 def _ui_config_payload():

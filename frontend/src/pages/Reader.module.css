@@ -8,9 +8,33 @@
 }
 
 /* Reading-surface backgrounds (match the epub themes for a seamless frame). */
-.bg_light { background: #fbf7ee; }
-.bg_sepia { background: #f2e6cf; }
-.bg_dark { background: #15110c; }
+.bg_light {
+  background: #fbf7ee;
+  --reader-chrome: rgba(255, 255, 255, 0.96);
+  --reader-chrome-text: #2a2a2a;
+  --reader-chrome-muted: #59646f;
+  --reader-chrome-border: rgba(35, 41, 47, 0.18);
+  --reader-chrome-hover: rgba(35, 41, 47, 0.08);
+  --reader-scrim: rgba(20, 28, 36, 0.42);
+}
+.bg_sepia {
+  background: #f2e6cf;
+  --reader-chrome: rgba(242, 230, 207, 0.96);
+  --reader-chrome-text: #382d18;
+  --reader-chrome-muted: #5a4d31;
+  --reader-chrome-border: rgba(56, 45, 24, 0.20);
+  --reader-chrome-hover: rgba(56, 45, 24, 0.09);
+  --reader-scrim: rgba(56, 45, 24, 0.42);
+}
+.bg_dark {
+  background: #15110c;
+  --reader-chrome: rgba(20, 28, 36, 0.96);
+  --reader-chrome-text: #ece8e1;
+  --reader-chrome-muted: #c5cdd5;
+  --reader-chrome-border: rgba(255, 255, 255, 0.12);
+  --reader-chrome-hover: rgba(255, 255, 255, 0.08);
+  --reader-scrim: rgba(0, 0, 0, 0.50);
+}
 
 .fullCenter {
   position: fixed;
@@ -45,9 +69,9 @@
   height: 48px;
   flex-shrink: 0;
   padding: 0 var(--sp-3);
-  background: rgba(20, 28, 36, 0.92);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  color: #ece8e1;
+  background: var(--reader-chrome);
+  border-bottom: 1px solid var(--reader-chrome-border);
+  color: var(--reader-chrome-text);
 }
 
 .bookTitle {
@@ -71,7 +95,7 @@
   align-items: center;
   gap: 2px;
   padding-left: var(--sp-2);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid var(--reader-chrome-border);
 }
 
 .iconBtn, .themeActive {
@@ -81,11 +105,11 @@
   width: 34px;
   height: 34px;
   border-radius: var(--r-sm);
-  color: #c5cdd5;
+  color: var(--reader-chrome-muted);
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
-.iconBtn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.iconBtn:hover { background: var(--reader-chrome-hover); color: var(--reader-chrome-text); }
 
 .themeActive {
   background: var(--accent);
@@ -112,13 +136,13 @@
   justify-content: center;
   width: 64px;
   flex-shrink: 0;
-  color: rgba(128, 128, 128, 0.5);
+  color: var(--reader-chrome-muted);
   transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .navZone:hover {
   color: var(--accent);
-  background: rgba(128, 128, 128, 0.08);
+  background: var(--reader-chrome-hover);
 }
 
 @media (max-width: 600px) {
@@ -138,7 +162,7 @@
 .tocScrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--reader-scrim);
   z-index: var(--z-overlay);
 }
 
@@ -190,7 +214,7 @@
 .progressBar {
   height: 3px;
   flex-shrink: 0;
-  background: rgba(128, 128, 128, 0.18);
+  background: var(--reader-chrome-border);
 }
 
 .progressFill {
@@ -203,23 +227,23 @@
 .hilitePop {
   position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px; z-index: 50;
-  background: rgba(20,17,12,0.95); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 999px; padding: 8px 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  background: var(--reader-chrome); border: 1px solid var(--reader-chrome-border);
+  border-radius: 999px; padding: 8px 14px; box-shadow: var(--elev-3);
   max-width: calc(100vw - 16px);
 }
-.hiliteLabel { color: #cdc6bb; font-size: 13px; margin-right: 2px; }
+.hiliteLabel { color: var(--reader-chrome-muted); font-size: 13px; margin-right: 2px; }
 /* SC 2.5.8: 24x24 minimum target size. */
-.hiliteSwatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); cursor: pointer; }
-.hiliteSwatch:hover { border-color: #fff; }
-.hiliteCancel { color: #cdc6bb; display: inline-flex; align-items: center; margin-left: 4px; }
-.hiliteCancel:hover { color: #fff; }
+.hiliteSwatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--reader-chrome-border); cursor: pointer; }
+.hiliteSwatch:hover { border-color: var(--reader-chrome-text); }
+.hiliteCancel { color: var(--reader-chrome-muted); display: inline-flex; align-items: center; margin-left: 4px; }
+.hiliteCancel:hover { color: var(--reader-chrome-text); }
 /* #782 — clearly-labeled remove action in the edit popover (icon + text so the
  * destructive intent is unambiguous, not color/position alone). Danger-red. */
 .hiliteRemove {
   display: inline-flex; align-items: center; gap: 5px;
   margin-left: 6px; padding: 5px 11px;
-  color: #ff9a9a; font-size: 13px; line-height: 1; white-space: nowrap;
+  color: var(--danger); font-size: 13px; line-height: 1; white-space: nowrap;
   border-radius: 999px; cursor: pointer;
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
-.hiliteRemove:hover { background: rgba(255, 138, 128, 0.18); color: #ff5252; }
+.hiliteRemove:hover { background: var(--danger-soft); color: var(--danger); }

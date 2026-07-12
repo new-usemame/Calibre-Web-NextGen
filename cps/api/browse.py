@@ -16,7 +16,7 @@ def list_authors():
             .join(db.Books)
             .filter(calibre_db.common_filters())
             .group_by(text('books_authors_link.author'))
-            .order_by(db.Authors.sort)
+            .order_by(func.ng_sort_key(db.Authors.sort), db.Authors.sort, db.Authors.id)
             .all())
     items = [{"id": a.id, "name": a.name.replace("|", ","), "count": cnt} for a, cnt in rows]
     return {"items": items}
@@ -30,7 +30,7 @@ def list_series():
             .join(db.Books)
             .filter(calibre_db.common_filters())
             .group_by(text('books_series_link.series'))
-            .order_by(db.Series.sort)
+            .order_by(func.ng_sort_key(db.Series.sort), db.Series.sort, db.Series.id)
             .all())
     items = [{"id": s.id, "name": s.name, "count": cnt} for s, cnt in rows]
     return {"items": items}
@@ -44,7 +44,7 @@ def list_tags():
             .join(db.Books)
             .filter(calibre_db.common_filters())
             .group_by(db.Tags.id)
-            .order_by(db.Tags.name)
+            .order_by(func.ng_sort_key(db.Tags.name), db.Tags.name, db.Tags.id)
             .all())
     items = [{"id": t.id, "name": t.name, "count": cnt} for t, cnt in rows]
     return {"items": items}
@@ -58,7 +58,7 @@ def list_publishers():
             .join(db.Books, db.books_publishers_link.c.book == db.Books.id)
             .filter(calibre_db.common_filters())
             .group_by(db.Publishers.id)
-            .order_by(db.Publishers.sort)
+            .order_by(func.ng_sort_key(db.Publishers.sort), db.Publishers.sort, db.Publishers.id)
             .all())
     items = [{"id": p.id, "name": p.name, "count": cnt} for p, cnt in rows]
     return {"items": items}

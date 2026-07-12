@@ -24,3 +24,15 @@ test('SPA boots and serves assets under a reverse-proxy sub-path', async ({ page
   expect(bad404s, `static assets 404'd under sub-path:\n${bad404s.join('\n')}`).toEqual([]);
   assertNoPageErrors(errors);
 });
+
+test('Sign out preserves the reverse-proxy sub-path', async ({ page }) => {
+  await page.route('**/cwa/logout', (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/html',
+    body: '<title>Logout captured</title>',
+  }));
+  await page.goto('/app');
+  await page.getByRole('button', { name: /account:/i }).click();
+  await page.getByText('Sign out', { exact: true }).click();
+  await expect(page).toHaveURL(/\/cwa\/logout$/);
+});

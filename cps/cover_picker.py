@@ -81,6 +81,14 @@ def _book_query_for_search(book) -> str:
     return (title + " " + (authors[0] if authors else "")).strip()
 
 
+def _book_isbns(book) -> list[str]:
+    """Return every stored ISBN identifier for cover-source lookups."""
+    return [
+        i.val for i in (book.identifiers or [])
+        if (i.type or "").lower() in ("isbn", "isbn_10", "isbn_13") and i.val
+    ]
+
+
 def _is_provider_enabled_for_user(provider) -> bool:
     """Honor both per-user and global provider toggles, same as
     cps.search_metadata.metadata_search."""
@@ -173,6 +181,7 @@ def cover_picker_candidates(book_id):
         classify_failure=_classify_provider_failure,
         classify_empty=_classify_empty_provider,
         extract_embedded=lambda: cover_extract.extract_embedded_cover(book),
+        book_isbns=_book_isbns(book),
     )
 
     return jsonify({

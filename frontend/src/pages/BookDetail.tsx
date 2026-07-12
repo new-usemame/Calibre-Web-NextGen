@@ -11,9 +11,10 @@ import { StarRating } from '../components/StarRating';
 import { MoreByAuthor } from '../components/MoreByAuthor';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import type { BookFormat, EntityRef } from '../lib/api';
+import type { CustomColumn, CustomColumnValue, EntityRef } from '../lib/api';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
+import { getPrimaryReadTarget } from '../lib/readerTarget';
 import styles from './BookDetail.module.css';
 
 function formatBytes(bytes: number): string {
@@ -37,21 +38,22 @@ function formatDate(date: string, alwaysReturnFullDate = false): string {
   return date;
 }
 
+function formatCustomValue(column: CustomColumn, entry: CustomColumnValue, yes: string, no: string): string {
+  const value = entry.value;
+  if (value === null || value === undefined) return '';
+  if (column.datatype === 'bool') return value ? yes : no;
+  if (column.datatype === 'datetime' && typeof value === 'string') return formatDate(value, true);
+  if (column.datatype === 'rating' && typeof value === 'number') return `${value / 2}/5`;
+  if ((column.datatype === 'int' || column.datatype === 'float') && typeof value === 'number') {
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits: column.datatype === 'float' ? 2 : 0 }).format(value);
+  }
+  return String(value);
+}
+
 // Formats the in-browser reader can open. EPUB/KEPUB use the SPA's epub.js
 // reader; the rest (PDF, comics, plain text, DjVu, audiobooks) open in the
 // server's format-specific reader at read_url — so every readable format the
 // library supports is reachable from the SPA, not just EPUB.
-const SPA_READABLE = new Set(['epub', 'kepub']);
-const LEGACY_READABLE = new Set([
-  'pdf', 'txt', 'djvu', 'cbz', 'cbr', 'cbt', 'cb7',
-  'mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav',
-]);
-
-function isReadable(fmt: BookFormat): boolean {
-  const f = fmt.format.toLowerCase();
-  return SPA_READABLE.has(f) || LEGACY_READABLE.has(f);
-}
-
 interface SendPanelProps {
   formats: string[];
   pending: boolean;
@@ -129,6 +131,9 @@ function TagEditor({ bookId, tags, canEdit }:
   const update = useUpdateMetadata(bookId);
   const [adding, setAdding] = useState(false);
   const [input, setInput] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const visibleTags = expanded ? tags : tags.slice(0, 8);
+  const hasMore = tags.length > 8;
 
   const names = tags.map((tg) => tg.name);
   const apply = (next: string[]) => update.mutate({ tags: next.join(', ') });
@@ -145,19 +150,26 @@ function TagEditor({ bookId, tags, canEdit }:
   if (!canEdit) {
     if (tags.length === 0) return null;
     return (
-      <div className={styles.tags}>
-        {tags.map((tag) => (
+      <div className={styles.tags} id="book-tags">
+        {visibleTags.map((tag) => (
           <Link key={tag.id} href={`/tags/${tag.id}`} className={styles.tagLink}>
             <Pill>{tag.name}</Pill>
           </Link>
         ))}
+        {hasMore && (
+          <button type="button" className={styles.tagsDisclosure}
+            aria-expanded={expanded} aria-controls="book-tags"
+            onClick={() => setExpanded((value) => !value)}>
+            {expanded ? t('Show fewer tags') : t('Show all {count} tags', { count: tags.length })}
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={styles.tags}>
-      {tags.map((tag) => (
+    <div className={styles.tags} id="book-tags">
+      {visibleTags.map((tag) => (
         <span key={tag.id} className={styles.tagChip}>
           <Link href={`/tags/${tag.id}`} className={styles.tagChipLink}>{tag.name}</Link>
           <button
@@ -172,6 +184,13 @@ function TagEditor({ bookId, tags, canEdit }:
           </button>
         </span>
       ))}
+      {hasMore && (
+        <button type="button" className={styles.tagsDisclosure}
+          aria-expanded={expanded} aria-controls="book-tags"
+          onClick={() => setExpanded((value) => !value)}>
+          {expanded ? t('Show fewer tags') : t('Show all {count} tags', { count: tags.length })}
+        </button>
+      )}
       {adding ? (
         <span className={styles.tagAddRow}>
           <input
@@ -237,10 +256,7 @@ export function BookDetail() {
     );
   }
 
-  const readableFormats = book.formats.filter(isReadable);
-  // Prefer EPUB (SPA reader); else the first server-readable format.
-  const hasEpub = book.formats.some((f) => SPA_READABLE.has(f.format.toLowerCase()));
-  const primaryReadable = readableFormats.find((f) => LEGACY_READABLE.has(f.format.toLowerCase())) ?? null;
+  const primaryReadTarget = getPrimaryReadTarget(book.id, book.formats.map((f) => f.format));
 
   return (
     <main className={styles.container}>
@@ -308,26 +324,28 @@ export function BookDetail() {
                 detail page. Sync-driven display only; the read toggle below stays a
                 2-state read/unread control. Shows the synced percent when known. */}
             {book.in_progress && (
-              <p className={styles.currentlyReading}>
-                <BookOpen size={14} aria-hidden="true" />
-                {book.kosync_progress != null
-                  ? `${t('Currently reading')} · ${Math.round(book.kosync_progress)}%`
-                  : t('Currently reading')}
-              </p>
+              <div className={styles.readProgressWrap}>
+                <p className={styles.currentlyReading}>
+                  <BookOpen size={14} aria-hidden="true" focusable={false} />
+                  {book.kosync_progress != null
+                    ? `${t('Currently reading')} · ${Math.round(book.kosync_progress)}%`
+                    : t('Currently reading')}
+                </p>
+                {book.kosync_progress != null && (
+                  <div className={styles.readProgress} role="progressbar"
+                    aria-label={t('Reading progress')} aria-valuemin={0} aria-valuemax={100}
+                    aria-valuenow={Math.round(book.kosync_progress)}>
+                    <span style={{ width: `${Math.max(0, Math.min(100, book.kosync_progress))}%` }} />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
           {/* Actions */}
           <div className={styles.actions}>
-            {hasEpub ? (
-              // EPUB opens in the in-browser SPA reader (resumes saved progress).
-              <Link href={`/read/${book.id}`} className={styles.actionPrimary}>
-                {t('Read now')}
-              </Link>
-            ) : primaryReadable ? (
-              // PDF/audio/text open in the native multi-format reader; comics/
-              // DjVu fall through there to the server reader for image extraction.
-              <Link href={`/view/${book.id}/${primaryReadable.format.toLowerCase()}`} className={styles.actionPrimary}>
+            {primaryReadTarget ? (
+              <Link href={primaryReadTarget} className={styles.actionPrimary}>
                 {t('Read now')}
               </Link>
             ) : null}
@@ -486,6 +504,12 @@ export function BookDetail() {
 
           {/* Metadata definition list */}
           <dl className={styles.meta}>
+            {book.original_filename && (
+              <>
+                <dt className={styles.metaLabel}>{t('Imported as')}</dt>
+                <dd className={styles.metaValue}>{book.original_filename}</dd>
+              </>
+            )}
             {book.kosync_progress != null && (
               <>
                 <dt className={styles.metaLabel}>{t('KOReader Progress')}</dt>
@@ -545,6 +569,23 @@ export function BookDetail() {
                   {id.url
                     ? <a href={id.url} target="_blank" rel="noopener noreferrer" className={styles.metaLink}>{id.val}</a>
                     : id.val}
+                </dd>
+              </Fragment>
+            ))}
+            {(book.custom_columns ?? []).map((column) => (
+              <Fragment key={`custom-${column.id}`}>
+                <dt className={styles.metaLabel}>{column.name}</dt>
+                <dd className={styles.metaValue}>
+                  {column.datatype === 'comments' && column.values[0]?.value_html ? (
+                    <span
+                      // value_html is sanitized by the API serializer.
+                      // eslint-disable-next-line react/no-danger
+                      dangerouslySetInnerHTML={{ __html: column.values[0].value_html }}
+                    />
+                  ) : column.values
+                    .map((entry) => formatCustomValue(column, entry, t('Yes'), t('No')))
+                    .filter(Boolean)
+                    .join(', ')}
                 </dd>
               </Fragment>
             ))}

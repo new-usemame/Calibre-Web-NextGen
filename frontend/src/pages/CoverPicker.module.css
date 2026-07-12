@@ -28,8 +28,8 @@
   padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
   font-size: var(--fs-sm); margin-bottom: var(--sp-4);
 }
-.bannerOk { background: rgba(108,192,138,.13); color: var(--success); border: 1px solid rgba(108,192,138,.3); }
-.bannerErr { background: var(--danger-soft); color: var(--danger); border: 1px solid rgba(224,104,95,.32); }
+.bannerOk { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
+.bannerErr { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
 .bannerClose {
   margin-left: auto; background: none; border: 0; color: inherit; cursor: pointer;
   opacity: .7; display: inline-flex; padding: 2px;
@@ -167,14 +167,14 @@
 .cardImgWrap { position: relative; aspect-ratio: 2 / 3; background: var(--surface-3); display: grid; place-items: center; }
 .cardImg { width: 100%; height: 100%; object-fit: contain; display: block; }
 .cardFailed { display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); color: var(--text-faint); font-size: var(--fs-xs); text-align: center; padding: var(--sp-2); }
-.cardShimmer { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(20,28,36,.55); color: var(--accent-hover); }
+.cardShimmer { position: absolute; inset: 0; display: grid; place-items: center; background: var(--cover-control-bg); color: var(--cover-control-fg); }
 .badgeEmbedded, .badgeEreader, .badgeWarn {
   position: absolute; top: 6px; font-size: 10px; font-weight: var(--fw-semi); padding: 2px 6px; border-radius: var(--r-full);
   display: inline-flex; align-items: center; gap: 3px; backdrop-filter: blur(4px);
 }
-.badgeEmbedded { left: 6px; background: rgba(204,123,25,.92); color: var(--on-accent); }
-.badgeEreader { right: 6px; background: rgba(20,28,36,.82); color: var(--text); }
-.badgeWarn { left: 6px; bottom: 6px; top: auto; background: rgba(224,104,95,.9); color: #fff; }
+.badgeEmbedded { left: 6px; background: var(--accent); color: var(--on-accent); }
+.badgeEreader { right: 6px; background: var(--cover-control-bg); color: var(--cover-control-fg); }
+.badgeWarn { left: 6px; bottom: 6px; top: auto; background: var(--danger); color: var(--cover-control-fg); }
 .cardInfo { display: flex; flex-direction: column; gap: 1px; padding: var(--sp-2) var(--sp-3); }
 .cardSource { font-size: var(--fs-sm); color: var(--text); font-weight: var(--fw-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cardDims { font-size: var(--fs-xs); color: var(--text-faint); min-height: 1em; }
@@ -190,11 +190,11 @@
   padding: 2px 8px; border-radius: var(--r-full); background: var(--surface-3); color: var(--text-muted);
   min-width: 84px; text-align: center;
 }
-.provPill[data-status="ok"] { background: rgba(108,192,138,.16); color: var(--success); }
+.provPill[data-status="ok"] { background: var(--success-soft); color: var(--success); }
 .provPill[data-status="empty"] { background: var(--surface-3); color: var(--text-faint); }
 .provPill[data-status="error"], .provPill[data-status="blocked"] { background: var(--danger-soft); color: var(--danger); }
-.provPill[data-status="rate_limited"] { background: rgba(204,123,25,.16); color: var(--accent-hover); }
-.provPill[data-status="missing_key"] { background: rgba(204,123,25,.12); color: var(--accent-hover); }
+.provPill[data-status="rate_limited"] { background: var(--accent-soft); color: var(--accent-text); }
+.provPill[data-status="missing_key"] { background: var(--accent-soft); color: var(--accent-text); }
 .provPill[data-status="disabled"] { opacity: .6; }
 .provName { color: var(--text); flex: 0 0 auto; }
 .provCount { color: var(--text-faint); margin-left: auto; font-size: var(--fs-xs); }
@@ -212,7 +212,7 @@
 
 /* ---- confirm modal ---- */
 .overlay {
-  position: fixed; inset: 0; z-index: var(--z-overlay); background: rgba(8,12,16,.66);
+  position: fixed; inset: 0; z-index: var(--z-overlay); background: var(--overlay-backdrop);
   display: grid; place-items: center; padding: var(--sp-4); backdrop-filter: blur(3px);
   animation: cpfade var(--dur-fast) var(--ease);
 }

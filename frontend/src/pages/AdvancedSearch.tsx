@@ -128,7 +128,7 @@ export function AdvancedSearch() {
                 <button key={rs} type="button"
                   className={form.read_status === rs ? styles.segActive : styles.seg}
                   onClick={() => set('read_status', rs)}>
-                  {rs === 'all' ? t('Any') : rs[0].toUpperCase() + rs.slice(1)}
+                  {rs === 'all' ? t('Any') : t(rs === 'unread' ? 'Unread' : 'Read')}
                 </button>
               ))}
             </div>

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
-  Library, BookCopy, UploadCloud, Shield,
+  Library, BookCopy,
   Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X,
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
@@ -88,6 +88,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     for (const e of ORDERABLE_ENTRIES) {
       if (!e.isShelvesBlock) v[e.key] = me?.sidebar?.[e.key] !== false;
     }
+    v.list = me?.sidebar?.list !== false;
     setVis(v);
     setEditMode(true);
     announce(t('Editing sidebar. Reorder or hide sections, then tap Done.'));
@@ -104,6 +105,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     setOrder([...DEFAULT_SIDEBAR_ORDER]);
     const v: Record<string, boolean> = {};
     for (const e of ORDERABLE_ENTRIES) if (!e.isShelvesBlock) v[e.key] = true;
+    v.list = true;
     setVis(v);
     announce(t('Sidebar reset to default.'));
   };
@@ -202,10 +204,9 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
 
         {/* #585 v3: liquid-glass Customize capsule, pinned at the top. Tapping it
             turns the sidebar into an editable list (reorder + hide entries). */}
-        {isAuthed && (
+        {isAuthed && editMode && (
           <div className={styles.capsuleWrap}>
-            {editMode ? (
-              <div className={styles.capsuleActive} role="group" aria-label={t('Customize sidebar')}>
+              <div className={styles.capsuleActive} role="group" aria-label={t('Customize navigation')}>
                 <button type="button" ref={doneRef} className={styles.capsuleDone} onClick={saveEdit}>
                   <Check size={16} aria-hidden="true" focusable={false} />
                   <span>{t('Done')}</span>
@@ -217,12 +218,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   <X size={16} aria-hidden="true" focusable={false} />
                 </button>
               </div>
-            ) : (
-              <button type="button" ref={capsuleRef} className={styles.capsule} onClick={enterEdit} aria-label={t('Customize sidebar')}>
-                <SlidersHorizontal size={15} className={styles.capsuleIcon} aria-hidden="true" focusable={false} />
-                <span>{t('Customize')}</span>
-              </button>
-            )}
           </div>
         )}
 
@@ -232,6 +227,12 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
               {t('Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused handle.')}
             </p>
             <SidebarEditList order={order} setOrder={setOrder} vis={vis} setVis={setVis} />
+            <label className={styles.tableVisibility}>
+              <input type="checkbox" checked={vis.list !== false}
+                onChange={(event) => setVis((current) => ({ ...current, list: event.target.checked }))} />
+              <Table2 size={16} aria-hidden="true" focusable={false} />
+              <span>{t('Show Table view')}</span>
+            </label>
           </>
         ) : (
           <>
@@ -252,37 +253,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
 
             {/* Customizable region (browse-by + discovery + Shelves), in saved order. */}
             {renderOrderedRegion()}
-
-            {(canUpload || isAdmin) && (
-              <ul className={styles.list} role="list">
-                {canUpload && (
-                  <li>
-                    <Link
-                      href="/upload"
-                      className={isActive(location, '/upload', true) ? styles.itemActive : styles.item}
-                      aria-current={isActive(location, '/upload', true) ? 'page' : undefined}
-                      onClick={onNavigate}
-                    >
-                      <UploadCloud size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                      <span>{t('Upload')}</span>
-                    </Link>
-                  </li>
-                )}
-                {isAdmin && (
-                  <li>
-                    <Link
-                      href="/admin"
-                      className={isActive(location, '/admin', true) ? styles.itemActive : styles.item}
-                      aria-current={isActive(location, '/admin', true) ? 'page' : undefined}
-                      onClick={onNavigate}
-                    >
-                      <Shield size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                      <span>{t('Admin')}</span>
-                    </Link>
-                  </li>
-                )}
-              </ul>
-            )}
 
             {/* Smart shelves + power features (pinned). */}
             <ul className={styles.list} role="list">
@@ -361,6 +331,21 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                 );
               })}
             </ul>
+            {isAuthed && (
+              <div className={styles.customizeRow}>
+                <button
+                  type="button"
+                  ref={capsuleRef}
+                  className={styles.customizeBtn}
+                  onClick={enterEdit}
+                  aria-label={t('Customize navigation')}
+                  title={t('Customize navigation')}
+                >
+                  <SlidersHorizontal size={16} aria-hidden="true" focusable={false} />
+                  <span>{t('Customize navigation')}</span>
+                </button>
+              </div>
+            )}
           </>
         )}
       </nav>

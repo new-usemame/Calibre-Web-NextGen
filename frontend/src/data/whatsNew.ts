@@ -56,6 +56,99 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.11',
+    date: '2026-07-12',
+    items: [
+      {
+        title: 'Light mode — and five more themes — for the new interface',
+        body: 'The most-requested feature is here. The new interface now has a real theme picker in your account settings: choose System (which follows your device’s light/dark setting), Light, Dark, Sepia, High contrast, or Midnight for OLED screens. Your choice is saved to your account and holds across every screen, with readable contrast throughout.',
+        category: 'Account',
+        link: { to: '/account', label: 'Choose your theme' },
+      },
+      {
+        title: 'Read a book in one click from the grid',
+        body: 'Book cards now have a Read now action that opens the book straight in the reader instead of going through the details page first. It works for EPUB, PDF, comics, text and audio, and is fully keyboard- and screen-reader-accessible.',
+        category: 'Reading',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Admins can email a password reset from the new interface',
+        body: 'An admin can now reset another user’s password from their user card without switching to the classic view. The new password is generated on the server and emailed to the user — it never appears in the browser, and you can’t reset your own, the Guest, or a user without an email address.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Smart shelves that keep themselves current',
+        body: 'Smart shelf date rules can now use moving windows like “in the past 28 days” for Publication Date and Date Added, so a shelf for the last month or six months stays up to date instead of freezing a fixed date into the rule.',
+        category: 'Library',
+        link: { to: '/magic', label: 'Smart shelves' },
+      },
+      {
+        title: 'Calibre custom columns on the new book page',
+        body: 'Custom columns you set up in Calibre — such as a Pages count — now appear on the redesigned book page with the right type and formatting. Zero and “No” values show correctly instead of disappearing.',
+        category: 'Library',
+      },
+      {
+        title: 'Accented titles and names sort where you expect',
+        body: 'Accented letters like È and É now sort with their base letter across the library, search, the new interface and OPDS, instead of being stranded at the end or in a separate bucket. Spanish Ñ stays a distinct letter after N, and German ß orders as “ss”.',
+        category: 'Library',
+      },
+      {
+        title: 'A slow export no longer freezes the whole server',
+        body: 'One pathological PDF export used to make every other page hang for up to 90 seconds. Metadata exports now run in a bounded background pool, so health checks and unrelated requests stay responsive while a slow export finishes.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'An expired session sends you back to the login page',
+        body: 'Behind a reverse proxy (Authelia, OIDC, oauth2-proxy), an expired session used to leave the new interface showing a “Failed to fetch” error instead of the login page. Now it returns you to log in — and Sign out makes the top-level logout request that logs you out of your proxy too.',
+        category: 'Account',
+      },
+      {
+        title: 'See your Hardcover token’s status at a glance',
+        body: 'Basic Configuration now shows whether your Hardcover token is present, accepted, or rejected/expired — and its expiry date when the token provides one — instead of leaving you to dig through the logs.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Edit the send-to-e-reader message from your Account page',
+        body: 'Admins can now edit the server-wide send-to-e-reader email body from the redesigned Account page, which previously exposed only the recipient and subject. Non-admin accounts can’t see or change the shared template.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open Account' },
+      },
+      {
+        title: 'A tidier sidebar and one search box',
+        body: 'Upload is now a clearly labelled button in the Library toolbar instead of another sidebar row; the Customize control moved to a quiet footer spot rather than dominating the top of the rail; and the Library no longer shows two separate search boxes that did the same thing.',
+        category: 'Library',
+      },
+      {
+        title: 'Covers show in full again',
+        body: 'Covers whose artwork isn’t a standard 2:3 shape are no longer cropped to fill the card — they fit the whole image inside it, and the cover picker shows the complete artwork when you’re choosing between editions.',
+        category: 'Library',
+      },
+      {
+        title: 'Uploading books is more reliable and accessible',
+        body: 'The new interface’s upload now uses the browser’s native file control, so drag-and-drop and tap-to-choose share one reliable path, repeat uploads are blocked while one is pending, and queued or rejected results are announced to assistive technology.',
+        category: 'Library',
+      },
+      {
+        title: 'Shuffling Discover no longer makes the page jump',
+        body: 'The Discover picks now stay in place while a fresh random set loads and update in one step, so the library no longer jumps up and down when you shuffle. Screen readers are told when the shuffle starts and finishes.',
+        category: 'Library',
+      },
+      {
+        title: 'Edits show up in search right away',
+        body: 'After you change a book’s title or author in the new interface, searching now reflects the change immediately instead of still turning up the old value.',
+        category: 'Library',
+      },
+      {
+        title: 'Reach your whole library, however you browse',
+        body: 'If the grid’s automatic loading didn’t kick in you could be stranded on the first pages. There’s now a keyboard-accessible Load more button that stays available whenever more books remain.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.10',
     date: '2026-07-11',
     items: [

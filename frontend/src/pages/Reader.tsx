@@ -49,7 +49,13 @@ const LS_FONT = 'cwng.reader.font';
 
 function loadTheme(): ReaderTheme {
   const v = localStorage.getItem(LS_THEME);
-  return v === 'light' || v === 'sepia' || v === 'dark' ? v : 'dark';
+  if (v === 'light' || v === 'sepia' || v === 'dark') return v;
+  // First reader visit follows the already-resolved per-user app palette.
+  // Thereafter the reader's explicit page-theme choice remains independent.
+  const appTheme = document.documentElement.getAttribute('data-theme');
+  if (appTheme === 'light') return 'light';
+  if (appTheme === 'sepia') return 'sepia';
+  return 'dark';
 }
 function loadFont(): number {
   const v = Number(localStorage.getItem(LS_FONT));

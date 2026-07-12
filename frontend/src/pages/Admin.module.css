@@ -60,16 +60,21 @@
   color: var(--text-muted);
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   background: var(--surface-0, var(--bg));
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: var(--sp-2) var(--sp-3);
   color: var(--text);
   font-size: var(--fs-md);
+  font-family: var(--font-body);
 }
 
-.field input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
 
 .newActions {
   display: flex;
@@ -117,6 +122,23 @@
   gap: var(--sp-3);
   margin-bottom: var(--sp-3);
 }
+
+.userActions { display: flex; align-items: center; gap: var(--sp-2); }
+
+.resetBtn {
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.resetBtn:hover:not(:disabled) { border-color: var(--accent); }
+.resetBtn:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 
 .name {
   display: flex;

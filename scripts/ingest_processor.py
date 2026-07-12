@@ -1025,6 +1025,18 @@ class NewBookProcessor:
         except (sqlite3.Error, ValueError, TypeError) as e:
             print(f"[ingest-processor] WARN: could not record original "
                   f"filename for {book_ids}: {e}", flush=True)
+        finally:
+            # A browser upload's explicit import manifest has served its purpose
+            # once the add succeeded. Watch-folder imports have no sidecar.
+            manifest_path = self.filepath + ".cwa.json"
+            try:
+                if os.path.exists(manifest_path):
+                    with open(manifest_path, 'r', encoding='utf-8') as mf:
+                        manifest = json.load(mf)
+                    if manifest.get("action") == "import":
+                        os.remove(manifest_path)
+            except (OSError, ValueError, TypeError):
+                pass
 
     def backup(self, input_file, backup_type):
         output_path = None
@@ -1614,9 +1626,15 @@ class NewBookProcessor:
         """
         try:
             import sqlite3
-            # Import the centralized partial MD5 calculation function
+            # Use the centralized two-channel writer: binary partial-MD5 plus
+            # filename MD5.  New books are imported after the boot backfill,
+            # so storing only the binary channel here left KOReader clients in
+            # filename matching mode unresolved until the book was downloaded.
             sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-            from cps.progress_syncing.checksums import calculate_koreader_partial_md5, store_checksum, CHECKSUM_VERSION
+            from cps.progress_syncing.checksums import (
+                calculate_and_store_checksum,
+                CHECKSUM_VERSION,
+            )
 
             calibre_db_path = os.path.join(self.library_dir, 'metadata.db')
 
@@ -1664,23 +1682,15 @@ class NewBookProcessor:
                         print(f"[ingest-processor] WARN: File not found: {file_path}", flush=True)
                         continue
 
-                    # Generate partial MD5 checksum using centralized function
-                    checksum = calculate_koreader_partial_md5(file_path)
+                    checksum = calculate_and_store_checksum(
+                        book_id=book_id,
+                        book_format=format_ext.upper(),
+                        file_path=file_path,
+                        db_connection=con,
+                    )
 
                     if checksum:
-                        # Store using centralized manager function
-                        success = store_checksum(
-                            book_id=book_id,
-                            book_format=format_ext.upper(),
-                            checksum=checksum,
-                            version=CHECKSUM_VERSION,
-                            db_connection=con
-                        )
-
-                        if success:
-                            print(f"[ingest-processor] Generated checksum {checksum} (v{CHECKSUM_VERSION}) for {format_ext.upper()} format", flush=True)
-                        else:
-                            print(f"[ingest-processor] WARN: Failed to store checksum for {format_ext.upper()} format", flush=True)
+                        print(f"[ingest-processor] Generated checksum {checksum} (v{CHECKSUM_VERSION}) for {format_ext.upper()} format", flush=True)
                     else:
                         print(f"[ingest-processor] WARN: Failed to generate checksum for {file_path}", flush=True)
 
@@ -1813,6 +1823,10 @@ def main(filepath=None):
                 with open(manifest_path, 'r', encoding='utf-8') as mf:
                     manifest = json.load(mf)
                 action = manifest.get("action")
+                if action == "import":
+                    original_filename = manifest.get("original_filename")
+                    if isinstance(original_filename, str) and original_filename:
+                        nbp.original_filename = Path(original_filename).name
                 if action == "add_format":
                     success = False
                     try:

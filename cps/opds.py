@@ -604,11 +604,11 @@ def feed_booksindex():
 @requires_basic_auth_if_no_ano
 def feed_letter_books(book_id):
     off = request.args.get("offset") or 0
-    letter = true() if book_id == "00" else func.upper(db.Books.sort).startswith(book_id)
+    letter = true() if book_id == "00" else func.ng_initial(db.Books.sort) == book_id
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books,
                                                   letter,
-                                                  [db.Books.sort],
+                                                  [func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id],
                                                   True, config.config_read_column)
 
     return render_xml_template('feed.xml', entries=entries, pagination=pagination,
@@ -690,11 +690,11 @@ def feed_letter_author(book_id):
     if not auth.current_user().check_visibility(constants.SIDEBAR_AUTHOR):
         abort(404)
     off = request.args.get("offset") or 0
-    letter = true() if book_id == "00" else func.upper(db.Authors.sort).startswith(book_id)
+    letter = true() if book_id == "00" else func.ng_initial(db.Authors.sort) == book_id
     entries = calibre_db.session.query(db.Authors).join(db.books_authors_link).join(db.Books)\
         .filter(get_opds_restricted_common_filter()).filter(letter)\
         .group_by(text('books_authors_link.author'))\
-        .order_by(db.Authors.sort)
+        .order_by(func.ng_sort_key(db.Authors.sort), db.Authors.sort, db.Authors.id)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             entries.count())
     entries = entries.limit(config.config_books_per_page).offset(off).all()
@@ -718,7 +718,7 @@ def feed_publisherindex():
         .join(db.books_publishers_link)\
         .join(db.Books).filter(get_opds_restricted_common_filter())\
         .group_by(text('books_publishers_link.publisher'))\
-        .order_by(db.Publishers.sort)\
+        .order_by(func.ng_sort_key(db.Publishers.sort), db.Publishers.sort, db.Publishers.id)\
         .limit(config.config_books_per_page).offset(off)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             len(calibre_db.session.query(db.Publishers).all()))
@@ -745,13 +745,13 @@ def feed_letter_category(book_id):
     if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
     off = request.args.get("offset") or 0
-    letter = true() if book_id == "00" else func.upper(db.Tags.name).startswith(book_id)
+    letter = true() if book_id == "00" else func.ng_initial(db.Tags.name) == book_id
     entries = calibre_db.session.query(db.Tags)\
         .join(db.books_tags_link)\
         .join(db.Books)\
         .filter(get_opds_restricted_common_filter()).filter(letter)\
         .group_by(text('books_tags_link.tag'))\
-        .order_by(db.Tags.name)
+        .order_by(func.ng_sort_key(db.Tags.name), db.Tags.name, db.Tags.id)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             entries.count())
     entries = entries.offset(off).limit(config.config_books_per_page).all()
@@ -779,13 +779,13 @@ def feed_letter_series(book_id):
     if not auth.current_user().check_visibility(constants.SIDEBAR_SERIES):
         abort(404)
     off = request.args.get("offset") or 0
-    letter = true() if book_id == "00" else func.upper(db.Series.sort).startswith(book_id)
+    letter = true() if book_id == "00" else func.ng_initial(db.Series.sort) == book_id
     entries = calibre_db.session.query(db.Series)\
         .join(db.books_series_link)\
         .join(db.Books)\
         .filter(get_opds_restricted_common_filter()).filter(letter)\
         .group_by(text('books_series_link.series'))\
-        .order_by(db.Series.sort)
+        .order_by(func.ng_sort_key(db.Series.sort), db.Series.sort, db.Series.id)
     pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1), config.config_books_per_page,
                             entries.count())
     entries = entries.offset(off).limit(config.config_books_per_page).all()
@@ -1160,7 +1160,8 @@ def feed_search(term):
     if term:
         # Keep OPDS search filtering local to opds.py so this feature does not widen
         # the shared CalibreDB search API surface just for OPDS-only restrictions.
-        entries = calibre_db.search_query(term, config=config).filter(get_opds_book_filter()).order_by(db.Books.sort).all()
+        entries = calibre_db.search_query(term, config=config).filter(get_opds_book_filter()) \
+            .order_by(func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id).all()
         entries_count = len(entries) if len(entries) > 0 else 1
         pagination = Pagination(1, entries_count, entries_count)
         # #750: name the feed after the query (reuses the existing "Search" msgid).
@@ -1297,12 +1298,14 @@ def _dataset_display_name(data_table, book_id):
 def render_element_index(database_column, linked_table, folder):
     shift = 0
     off = int(request.args.get("offset") or 0)
-    entries = calibre_db.session.query(func.upper(func.substr(database_column, 1, 1)).label('id'), None, None)
+    initial = func.ng_initial(database_column)
+    entries = calibre_db.session.query(initial.label('id'), None, None)
     # query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
     if linked_table is not None:
         entries = entries.join(linked_table).join(db.Books)
     entries = entries.filter(get_opds_restricted_common_filter()) \
-        .group_by(func.upper(func.substr(database_column, 1, 1))).all()
+        .filter(initial.isnot(None)).filter(initial != '') \
+        .group_by(initial).order_by(func.ng_sort_key(database_column)).all()
     elements = []
     if off == 0 and entries:
         elements.append({'id': "00", 'name': _("All")})

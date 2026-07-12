@@ -63,6 +63,12 @@ def upload_books():
         try:
             final_path = _get_ingest_path(uploaded, prefix_parts=["new", current_user.id])
             tmp_path, final_path = _save_to_ingest_atomic_rename(uploaded, final_path)
+            # The watched filename is deliberately prefixed for collision-free
+            # staging. Carry the browser-selected basename explicitly so ingest
+            # never has to guess which part of that internal name is user data.
+            with open(final_path + ".cwa.json", "w", encoding="utf-8") as mf:
+                json.dump({"action": "import", "original_filename": uploaded.filename},
+                          mf, ensure_ascii=False)
             # The atomic rename into the watched ingest dir is what triggers import.
             os.replace(tmp_path, final_path)
             WorkerThread.add(current_user.name,

@@ -1,8 +1,9 @@
-import { Check, X, Pencil } from 'lucide-react';
+import { BookOpen, Check, X, Pencil } from 'lucide-react';
 import { Link } from 'wouter';
 import type { Book } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { BookCover } from './BookCover';
+import { getPrimaryReadTarget } from '../lib/readerTarget';
 import styles from './BookCard.module.css';
 
 interface BookCardProps {
@@ -41,6 +42,7 @@ export function BookCard({
   const t = useT();
   const authorStr = book.authors.join(', ');
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
+  const readTarget = getPrimaryReadTarget(book.id, book.formats);
 
   // Cover + overlay badges. All non-interactive (pointer-events: none via CSS) so
   // the single wrapping control (link or toggle button) is the only tab stop.
@@ -104,10 +106,15 @@ export function BookCard({
   // absolutely positioned over the cover by .wrap.
   return (
     <div className={styles.wrap} style={style}>
-      <Link href={`/book/${book.id}`} className={styles.card} aria-label={book.title}>
+      <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
         {cover}
         {info}
       </Link>
+      {readTarget && (
+        <Link href={readTarget} className={styles.readNow} aria-label={t('Read {title}', { title: book.title })}>
+          <BookOpen size={15} aria-hidden="true" focusable={false} /> {t('Read now')}
+        </Link>
+      )}
       {onRemove && (
         <button
           type="button"

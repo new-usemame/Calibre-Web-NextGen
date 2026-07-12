@@ -5,14 +5,15 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { App } from './App';
 import { AnnouncerProvider } from './lib/a11y/announcer';
-import { ApiError } from './lib/api';
+import { AuthTransitionError, navigateToLogout } from './lib/api';
 
-// On any 401 (expired/invalid session), drop the cached `me` to null. App.tsx
-// gates on `me`, so this routes the user straight back to the login screen
-// instead of leaving stale data on screen behind a dead session.
+// Protected wrappers normalize every auth-loss shape and start the canonical
+// top-level logout navigation. Keep the cache transition here so no stale
+// authenticated data remains visible while that navigation is pending.
 function onUnauthorized(err: unknown) {
-  if (err instanceof ApiError && err.status === 401) {
+  if (err instanceof AuthTransitionError) {
     queryClient.setQueryData(['me'], null);
+    navigateToLogout();
   }
 }
 

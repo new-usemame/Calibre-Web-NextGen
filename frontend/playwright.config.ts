@@ -6,9 +6,8 @@ import { defineConfig, devices } from '@playwright/test';
  * change can break (notes/verify/MATRIX.md): viewport (desktop + mobile),
  * default-state, and — via the E2E_SUBPATH rig — reverse-proxy sub-path.
  *
- * The SPA has a single dark theme today, so the theme axis is not yet live
- * here (it's a legacy-UI concern); add a theme dimension when tokens.css gains
- * a light/other :root block.
+ * Theme behavior and rendered light/dark colors are covered by theme.spec.ts;
+ * broad cross-route theme/viewport sweeps remain part of the live visual gate.
  *
  * Server is expected already-running:
  *   local:  cwn-local           at http://localhost:8086   (E2E_BASE_URL default)

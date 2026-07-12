@@ -161,6 +161,105 @@ def _fake_metarecord(provider_id, source_name, title, cover_url, isbn=None):
 
 @pytest.mark.unit
 class TestGatherCoverCandidates:
+    def test_amazon_highres_candidate_uses_book_isbn_when_amazon_provider_disabled(self):
+        providers = [_fake_provider("amazon", "Amazon", search_results=[])]
+        highres_url = "https://m.media-amazon.com/images/P/0441172717.01._SCRM_SL2000_.jpg"
+
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
+            patch.object(
+                picker.cover_booster,
+                "_amazon_cdn_cover_for_isbn10",
+                return_value=highres_url,
+            ) as probe,
+        ):
+            candidates, statuses = picker.gather_cover_candidates(
+                providers=providers,
+                query="Dune",
+                static_cover="generic_cover.svg",
+                locale="en",
+                book_isbns=["9780441172719"],
+                is_provider_enabled=lambda _provider: False,
+            )
+
+        assert [(candidate.source_id, candidate.source_name, candidate.cover_url)
+                for candidate in candidates] == [
+            ("amazon_highres", "Amazon (high-res)", highres_url),
+        ]
+        assert candidates[0].candidate_id == "amazon_highres:0441172717"
+        assert statuses[0].status == "disabled"
+        probe.assert_called_once_with("0441172717")
+
+    @pytest.mark.parametrize("book_isbns", [[], [""], ["not-an-isbn"], ["9791234567896"]])
+    def test_amazon_highres_candidate_skips_missing_or_unconvertible_isbn(self, book_isbns):
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_isbn10") as probe,
+        ):
+            candidates, _ = picker.gather_cover_candidates(
+                providers=[], query="", static_cover="generic_cover.svg", locale="en",
+                book_isbns=book_isbns,
+            )
+
+        assert candidates == []
+        probe.assert_not_called()
+
+    def test_amazon_highres_candidate_respects_existing_cdn_kill_switch(self):
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", False),
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_isbn10") as probe,
+        ):
+            candidates, _ = picker.gather_cover_candidates(
+                providers=[], query="", static_cover="generic_cover.svg", locale="en",
+                book_isbns=["9780441172719"],
+            )
+
+        assert candidates == []
+        probe.assert_not_called()
+
+    def test_amazon_highres_network_failure_degrades_to_other_candidates(self):
+        providers = [
+            _fake_provider("hardcover", "Hardcover", search_results=[
+                _fake_metarecord("hardcover", "Hardcover", "Dune", "https://example.com/dune.jpg"),
+            ]),
+        ]
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
+            patch.object(
+                picker.cover_booster,
+                "_amazon_cdn_cover_for_isbn10",
+                side_effect=TimeoutError("CDN unavailable"),
+            ),
+            patch.object(picker, "boost_covers", side_effect=lambda records: records),
+        ):
+            candidates, statuses = picker.gather_cover_candidates(
+                providers=providers, query="Dune", static_cover="generic_cover.svg", locale="en",
+                book_isbns=["9780441172719"],
+            )
+
+        assert [candidate.source_id for candidate in candidates] == ["hardcover"]
+        assert statuses[0].status == "ok"
+
+    def test_amazon_highres_candidate_deduplicates_existing_grid_url(self):
+        highres_url = "https://m.media-amazon.com/images/P/0441172717.01._SCRM_SL2000_.jpg"
+        providers = [
+            _fake_provider("amazon", "Amazon", search_results=[
+                _fake_metarecord("amazon", "Amazon", "Dune", highres_url),
+            ]),
+        ]
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_isbn10", return_value=highres_url),
+            patch.object(picker, "boost_covers", side_effect=lambda records: records),
+        ):
+            candidates, _ = picker.gather_cover_candidates(
+                providers=providers, query="Dune", static_cover="generic_cover.svg", locale="en",
+                book_isbns=["9780441172719"],
+            )
+
+        assert len(candidates) == 1
+        assert candidates[0].source_id == "amazon"
+
     def test_collects_from_all_enabled_providers(self):
         providers = [
             _fake_provider("alpha", "Alpha", search_results=[

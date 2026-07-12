@@ -53,6 +53,7 @@ from .services.worker import WorkerThread
 from .tasks_status import render_task_status
 from .usermanagement import user_login_required
 from .string_helper import strip_whitespaces
+from .logout import cleanup_local_logout
 
 # CWA Imports
 import shutil
@@ -522,16 +523,21 @@ def get_matching_tags():
 def generate_char_list(entries): # data_colum, db_link):
     char_list = list()
     for entry in entries:
-        upper_char = entry[0].name[0].upper()
+        upper_char = db.unicode_initial(entry[0].name)
+        if not upper_char:
+            continue
         if upper_char not in char_list:
             char_list.append(upper_char)
     return char_list
 
 
 def query_char_list(data_colum, db_link):
-    results = (calibre_db.session.query(func.upper(func.substr(data_colum, 1, 1)).label('char'))
+    results = (calibre_db.session.query(func.ng_initial(data_colum).label('char'))
             .join(db_link).join(db.Books).filter(calibre_db.common_filters())
-            .group_by(func.upper(func.substr(data_colum, 1, 1))).all())
+            .filter(func.ng_initial(data_colum).isnot(None))
+            .filter(func.ng_initial(data_colum) != '')
+            .group_by(func.ng_initial(data_colum))
+            .order_by(func.ng_sort_key(data_colum)).all())
     return results
 
 
@@ -546,17 +552,19 @@ def get_sort_function(sort_param, data):
     if sort_param == 'pubold':
         order = [db.Books.pubdate]
     if sort_param == 'abc':
-        order = [db.Books.sort]
+        order = [func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id]
     if sort_param == 'zyx':
-        order = [db.Books.sort.desc()]
+        order = [func.ng_sort_key(db.Books.sort).desc(), db.Books.sort.desc(), db.Books.id.desc()]
     if sort_param == 'new':
         order = [db.Books.timestamp.desc()]
     if sort_param == 'old':
         order = [db.Books.timestamp]
     if sort_param == 'authaz':
-        order = [db.Books.author_sort.asc(), db.Series.name, db.Books.series_index]
+        order = [func.ng_sort_key(db.Books.author_sort), db.Books.author_sort,
+                 func.ng_sort_key(db.Series.name), db.Series.name, db.Books.series_index]
     if sort_param == 'authza':
-        order = [db.Books.author_sort.desc(), db.Series.name.desc(), db.Books.series_index.desc()]
+        order = [func.ng_sort_key(db.Books.author_sort).desc(), db.Books.author_sort.desc(),
+                 func.ng_sort_key(db.Series.name).desc(), db.Series.name.desc(), db.Books.series_index.desc()]
     if sort_param == 'seriesasc':
         order = [db.Books.series_index.asc()]
     if sort_param == 'seriesdesc':
@@ -2885,14 +2893,7 @@ def login_post():
 @web.route('/logout')
 @user_login_required
 def logout():
-    if current_user is not None and current_user.is_authenticated:
-        if feature_support['oauth'] and (config.config_login_type == 2 or config.config_login_type == 3):
-            logout_oauth_user()
-        ub.delete_user_session(current_user.id, flask_session.get('_id', ""))
-        logout_user()
-
-    # Clear login redirect count on logout to prevent false positives
-    flask_session.pop('_login_redirect_count', None)
+    cleanup_local_logout()
 
     log.debug("User logged out")
     if config.config_anonbrowse:

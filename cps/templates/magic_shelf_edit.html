@@ -708,6 +708,8 @@ $(function() {
     });
 
     var operators = [
+        {type: 'in_last_days', label: {{_('In the past N days')|tojson}}, nb_inputs: 1, multiple: false, apply_to: ['date']},
+        {type: 'not_in_last_days', label: {{_('Not in the past N days')|tojson}}, nb_inputs: 1, multiple: false, apply_to: ['date']},
         {type: 'equal', optgroup: 'basic'},
         {type: 'not_equal', optgroup: 'basic'},
         {type: 'in', optgroup: 'basic'},
@@ -783,6 +785,8 @@ $(function() {
             var filterId = $rule.find('.rule-filter-container select').val();
             
             if (filterId === 'pubdate' || filterId === 'timestamp') {
+                var operator = $rule.find('.rule-operator-container select').val();
+                if (operator === 'in_last_days' || operator === 'not_in_last_days') return;
                 $input.off('blur.dateValidation').on('blur.dateValidation', function() {
                     var value = $(this).val();
                     if (value && !isValidDate(value)) {

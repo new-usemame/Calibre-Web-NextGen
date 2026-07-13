@@ -89,8 +89,11 @@ rsync -a --delete --exclude='.DS_Store' "$SOURCE/" "$tmp/repo/cwasync.koplugin/"
     cd "$tmp/repo"
     rm -f cwasync.koplugin.zip
     zip -qr cwasync.koplugin.zip cwasync.koplugin
-    unzip -Z1 cwasync.koplugin.zip | grep -qx 'cwasync.koplugin/main.lua'
-    unzip -Z1 cwasync.koplugin.zip | grep -qx 'cwasync.koplugin/_meta.lua'
+    # Read the listing once, then match — piping unzip into `grep -q` trips SIGPIPE
+    # under `set -o pipefail` (grep exits on first match, unzip dies 141) and aborts.
+    zip_listing=$(unzip -Z1 cwasync.koplugin.zip)
+    grep -qx 'cwasync.koplugin/main.lua' <<<"$zip_listing"
+    grep -qx 'cwasync.koplugin/_meta.lua' <<<"$zip_listing"
 )
 
 if ((PUBLISH == 0)); then

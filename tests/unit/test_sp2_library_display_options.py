@@ -61,6 +61,60 @@ def test_display_preferences_have_one_persistence_key_each():
     assert "cwng:browse-list-compact" in source("frontend/src/pages/BrowseList.tsx")
 
 
+def test_catalog_rows_drive_live_width_aware_page_size():
+    catalog = source("frontend/src/pages/Catalog.tsx")
+    queries = source("frontend/src/lib/queries.ts")
+    assert catalog.count("cwng:catalog-rows-v1") == 1
+    assert "ResizeObserver" in catalog
+    assert "rowsPerLoad * columnCount" in catalog
+    assert "perPage" in queries
+    assert "params.set('per_page', String(perPage))" in queries
+    assert "perPage" in queries.split("queryKey: ['books'", 1)[1].split("queryFn:", 1)[0]
+
+
+def test_discover_honors_instance_random_book_count():
+    auth = source("cps/api/auth.py")
+    api = source("frontend/src/lib/api.ts")
+    discover = source("frontend/src/components/DiscoverSection.tsx")
+    assert '"random_books": int(config.config_random_books)' in auth
+    assert "random_books: number" in api
+    assert "me?.display?.random_books" in discover
+
+
+def test_touch_read_now_actions_share_a_bottom_baseline():
+    css = source("frontend/src/components/BookCard.module.css")
+    assert ".wrap {" in css and "height: 100%;" in css
+    assert ".card, .cardSelected" in css and "flex: 1;" in css
+    assert ".readNow" in css and "margin-top: auto;" in css
+
+
+def test_spa_magic_shelf_builder_exposes_relative_date_fields():
+    builder = source("frontend/src/pages/MagicShelf.tsx")
+    for token in ("pubdate", "timestamp", "Publication Date", "Date Added",
+                  "in_last_days", "not_in_last_days"):
+        assert token in builder
+    assert "type={inputType(r)}" in builder
+
+
+def test_spa_magic_shelf_create_does_not_fetch_an_empty_id_and_mobile_rules_fit():
+    queries = source("frontend/src/lib/queries.ts")
+    css = source("frontend/src/pages/MagicShelf.module.css")
+    assert "enabled: String(id).length > 0" in queries
+    assert "@media (max-width: 600px)" in css
+    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto" in css
+    assert ".ruleRow input { grid-column: 1 / 3; width: 100%; }" in css
+
+
+def test_spa_exposes_permission_gated_reload_metadata_action():
+    detail = source("frontend/src/pages/BookDetail.tsx")
+    queries = source("frontend/src/lib/queries.ts")
+    assert "useReloadMetadata(id)" in detail
+    assert "me?.role?.edit" in detail
+    assert "t('Reload metadata from disk')" in detail
+    assert 'role="status"' in detail
+    assert "/admin/book/${id}/reload_metadata" in queries
+
+
 def test_detail_accessibility_contracts_are_semantic():
     detail = source("frontend/src/pages/BookDetail.tsx")
     assert 'role="progressbar"' in detail

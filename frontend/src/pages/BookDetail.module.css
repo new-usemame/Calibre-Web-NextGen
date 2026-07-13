@@ -141,7 +141,7 @@
 }
 
 .coverFallbackMark {
-  color: var(--accent-text);
+  color: var(--accent);
   font-family: var(--font-display);
   font-size: var(--fs-xs);
   font-weight: var(--fw-semi);
@@ -192,7 +192,7 @@
   padding: 2px 10px;
   border-radius: 999px;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: var(--fs-sm);
   font-weight: 600;
   line-height: 1.6;
@@ -306,6 +306,12 @@
   align-items: center;
   gap: var(--sp-3);
   flex-wrap: wrap;
+}
+
+.actionStatus {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
 }
 
 /* Primary "Read" link — styled like primary button */
@@ -452,7 +458,7 @@
   padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--border);
   border-radius: var(--r-full);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: var(--fs-sm);
 }
 .tagsDisclosure:hover { background: var(--accent-soft); }

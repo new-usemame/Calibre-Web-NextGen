@@ -16,6 +16,8 @@ const FIELDS = [
   { id: 'publisher', label: 'Publisher' },
   { id: 'language', label: 'Language' },
   { id: 'rating', label: 'Rating' },
+  { id: 'pubdate', label: 'Publication Date' },
+  { id: 'timestamp', label: 'Date Added' },
   { id: 'comments', label: 'Description' },
 ];
 const TEXT_OPS = [
@@ -32,6 +34,14 @@ const NUM_OPS = [
   { id: 'greater_or_equal', label: '≥' },
   { id: 'less', label: '<' },
   { id: 'less_or_equal', label: '≤' },
+];
+const DATE_OPS = [
+  { id: 'in_last_days', label: 'in the past N days' },
+  { id: 'not_in_last_days', label: 'not in the past N days' },
+  { id: 'greater_or_equal', label: 'on or after' },
+  { id: 'less_or_equal', label: 'on or before' },
+  { id: 'equal', label: 'is' },
+  { id: 'not_equal', label: 'is not' },
 ];
 
 let _rid = 0;
@@ -87,6 +97,12 @@ export function MagicShelf({ editId }: { editId?: string }) {
   }, [JSON.stringify(rules), condition]);
 
   const isNum = (id: string) => id === 'rating';
+  const isDate = (id: string) => id === 'pubdate' || id === 'timestamp';
+  const operatorsFor = (id: string) => isDate(id) ? DATE_OPS : isNum(id) ? NUM_OPS : TEXT_OPS;
+  const inputType = (rule: MagicRule) =>
+    isDate(rule.id)
+      ? (rule.operator === 'in_last_days' || rule.operator === 'not_in_last_days' ? 'number' : 'date')
+      : isNum(rule.id) ? 'number' : 'text';
   const setRule = (k: number, patch: Partial<MagicRule>) =>
     setRules((rs) => rs.map((r) => (r._k === k ? { ...r, ...patch } : r)));
 
@@ -144,12 +160,12 @@ export function MagicShelf({ editId }: { editId?: string }) {
 
       <div className={styles.rules}>
         {rules.map((r) => {
-          const ops = isNum(r.id) ? NUM_OPS : TEXT_OPS;
+          const ops = operatorsFor(r.id);
           return (
             <div key={r._k} className={styles.ruleRow}>
               <select aria-label={t('Rule field')} value={r.id} onChange={(e) => {
                 const id = e.target.value;
-                setRule(r._k, { id, operator: (isNum(id) ? NUM_OPS : TEXT_OPS)[0].id });
+                setRule(r._k, { id, operator: operatorsFor(id)[0].id, value: '' });
               }}>
                 {FIELDS.map((f) => <option key={f.id} value={f.id}>{t(f.label)}</option>)}
               </select>
@@ -157,7 +173,7 @@ export function MagicShelf({ editId }: { editId?: string }) {
                 {ops.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
               <input value={r.value} onChange={(e) => setRule(r._k, { value: e.target.value })}
-                placeholder={t('value')} type={isNum(r.id) ? 'number' : 'text'} />
+                placeholder={t('value')} type={inputType(r)} min={isDate(r.id) && inputType(r) === 'number' ? 1 : undefined} />
               <button className={styles.removeRule} onClick={() => setRules((rs) => rs.filter((x) => x._k !== r._k))}
                 disabled={rules.length === 1} aria-label={t('Remove rule')}>
                 <Trash2 size={15} aria-hidden="true" focusable={false} />

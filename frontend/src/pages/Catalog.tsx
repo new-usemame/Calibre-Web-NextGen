@@ -212,17 +212,39 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
 
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).
-  const canEdit = !!useMe().data?.role?.edit;
-  const canUpload = !!useMe().data?.role?.upload;
+  const me = useMe().data;
+  const canEdit = !!me?.role?.edit;
+  const canUpload = !!me?.role?.upload;
 
   // Discover section visibility (persisted; toggled by the gear menu or its ×).
   const [discoverHidden, setDiscoverHidden] = usePersistentBool('cwng_discover_hidden_v1', false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [density, setDensity] = usePersistentChoice(
     'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
+  const [rowsChoice, setRowsChoice] = usePersistentChoice(
+    'cwng:catalog-rows-v1', ['1', '2', '3', '4', '5', '6'] as const, '2');
+  const rowsPerLoad = Number(rowsChoice);
+  const [gridNode, setGridNode] = useState<HTMLDivElement | null>(null);
+  const fallbackPerPage = me?.display?.books_per_page && me.display.books_per_page > 0
+    ? me.display.books_per_page : 24;
+  const [columnCount, setColumnCount] = useState(() => Math.max(1, Math.ceil(fallbackPerPage / rowsPerLoad)));
+  const perPage = rowsPerLoad * columnCount;
   const [seriesPresentation, setSeriesPresentation] = usePersistentChoice(
     'cwng:series-presentation-v1', ['grid', 'list'] as const, 'grid');
   const settingsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!gridNode || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const tracks = getComputedStyle(gridNode).gridTemplateColumns.trim();
+      const next = tracks && tracks !== 'none' ? tracks.split(/\s+/).length : 1;
+      setColumnCount(Math.max(1, next));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(gridNode);
+    return () => observer.disconnect();
+  }, [gridNode, density]);
 
   const accKeyRef = useRef<string>(snap?.resetKey ?? '');
 
@@ -261,7 +283,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
     };
   }, [settingsOpen]);
 
-  const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? ''].join('|');
+  const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', perPage].join('|');
 
   // Any filter change resets paging to the first page — except on the first
   // restored mount, where the rehydrated page must survive (#578).
@@ -327,6 +349,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
 
   const { data, isLoading, isFetching, isPlaceholderData, error } = useBooks({
     page,
+    perPage,
     search,
     sort,
     readFilter,
@@ -493,7 +516,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
               <Settings size={15} />
             </button>
             {settingsOpen && (
-              <div className={styles.settingsMenu} role="menu">
+              <div className={styles.settingsMenu}>
                 <p className={styles.settingsHead}>{t('View settings')}</p>
                 <label className={styles.settingsItem}>
                   <input
@@ -511,6 +534,16 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
                       <input type="radio" name="book-density" value={choice}
                         checked={density === choice} onChange={() => setDensity(choice)} />
                       <span>{t(choice === 'comfortable' ? 'Comfortable' : choice === 'compact' ? 'Compact' : 'Dense')}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                <fieldset className={styles.densityField}>
+                  <legend>{t('Rows per load')}</legend>
+                  {(['1', '2', '3', '4', '5', '6'] as const).map((choice) => (
+                    <label key={choice} className={styles.settingsItem}>
+                      <input type="radio" name="catalog-rows" value={choice}
+                        checked={rowsChoice === choice} onChange={() => setRowsChoice(choice)} />
+                      <span>{choice}</span>
                     </label>
                   ))}
                 </fieldset>
@@ -576,7 +609,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
               ))}
             </ul>
           ) : (
-          <div className={`${styles.grid} ${styles[`density_${density}`]}`}>
+          <div ref={setGridNode} className={`${styles.grid} ${styles[`density_${density}`]}`}>
             {allBooks.map((book, i) => (
               <BookCard
                 key={book.id}

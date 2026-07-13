@@ -16,6 +16,16 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- Book grids can now load a chosen number of complete rows at any card density, Discover respects the server's random-book count, and touch-screen “Read now” actions align along the bottom of each card.
+
+### Fixed
+
+- The classic book page's favorite star now changes immediately after a click instead of waiting for a reload, because object-shaped action responses no longer crash the shared flash-message handler. ([#880](https://github.com/new-usemame/Calibre-Web-NextGen/issues/880))
+- Smart-shelf moving date windows are now available in the new interface's rule builder—not only the classic builder—with Publication Date and Date Added fields and day-based operators. ([#467](https://github.com/new-usemame/Calibre-Web-NextGen/issues/467))
+- Reload metadata now uses the same format-aware parser as upload, so PDF, FB2, comic, audio, EPUB, and KEPUB files no longer fail through an EPUB-only path; editors can also run it from the new book page. ([#877](https://github.com/new-usemame/Calibre-Web-NextGen/issues/877))
+
 ## [v4.1.12] - 2026-07-13
 
 - **Newly imported books now sync KOReader progress immediately in filename-matching mode.** A book added after server startup could report “No book found” until it was downloaded once or the server restarted, leaving progress detached from the web UI and other devices. Both document identities are now registered as part of ingest. ([#509](https://github.com/new-usemame/Calibre-Web-NextGen/issues/509), [#627](https://github.com/new-usemame/Calibre-Web-NextGen/issues/627))

@@ -65,6 +65,10 @@ export interface Me {
   avatar?: string | null;
   features?: ServerFeatures;
   instance_name?: string;
+  display?: {
+    books_per_page: number;
+    random_books: number;
+  };
 }
 
 export interface Book {

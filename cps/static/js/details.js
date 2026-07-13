@@ -21,7 +21,10 @@ function handleResponse (data) {
     $(".row-fluid.text-center").remove();
     $("#flash_danger").remove();
     $("#flash_success").remove();
-    if (!jQuery.isEmptyObject(data)) {
+    // Flash-message responses are arrays. Some detail actions (favorite in
+    // particular) return a state object; iterating that object throws and
+    // prevents the action-specific success handler from updating its icon.
+    if (Array.isArray(data) && data.length) {
         if($("#bookDetailsModal").is(":visible")) {
             data.forEach(function (item) {
                 $(".modal-header").after('<div id="flash_' + item.type +

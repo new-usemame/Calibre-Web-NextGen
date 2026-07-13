@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, Trash2 } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, Trash2, RefreshCw } from 'lucide-react';
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
-  useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook,
+  useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
 } from '../lib/queries';
 import { Pill } from '../components/Pill';
 import { AddToShelf } from '../components/AddToShelf';
@@ -235,6 +235,7 @@ export function BookDetail() {
   const toggleHidden = useToggleHidden(id);
   const sendToEreader = useSendToEreader(id);
   const deleteBook = useDeleteBook(id);
+  const reloadMetadata = useReloadMetadata(id);
   const [, navigate] = useLocation();
   const me = useMe().data;
   // The send-to-e-reader button only renders when mail is configured + the user
@@ -245,6 +246,7 @@ export function BookDetail() {
   const [sendOpen, setSendOpen] = useState(false);
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reloadMessage, setReloadMessage] = useState('');
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !book) {
@@ -431,10 +433,24 @@ export function BookDetail() {
             )}
 
             {me?.role?.edit && (
-              <Link href={`/book/${book.id}/edit`} className={styles.downloadBtn}>
-                <Pencil size={14} />
-                {t('Edit')}
-              </Link>
+              <>
+                <Link href={`/book/${book.id}/edit`} className={styles.downloadBtn}>
+                  <Pencil size={14} aria-hidden="true" focusable={false} />
+                  {t('Edit')}
+                </Link>
+                <button type="button" className={styles.downloadBtn}
+                  disabled={reloadMetadata.isPending}
+                  onClick={() => {
+                    setReloadMessage('');
+                    reloadMetadata.mutate(undefined, {
+                      onSuccess: (result) => setReloadMessage(result.message),
+                      onError: (err) => setReloadMessage(err instanceof ApiError ? err.message : t('Could not reload metadata')),
+                    });
+                  }}>
+                  <RefreshCw size={14} aria-hidden="true" focusable={false} />
+                  {reloadMetadata.isPending ? t('Reloading…') : t('Reload metadata from disk')}
+                </button>
+              </>
             )}
 
             {/* Highlights/annotations — view + export + import (Kobo). Opens the
@@ -472,6 +488,7 @@ export function BookDetail() {
               </button>
             )}
           </div>
+          <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
 
           {deleteError && (
             <p className={styles.deleteErr} role="alert">{deleteError}</p>

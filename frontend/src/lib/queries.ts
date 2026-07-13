@@ -32,6 +32,7 @@ export const ENTITY_PLURAL: Record<EntityKind, string> = {
 
 export interface BooksQuery {
   page: number;
+  perPage?: number;
   search?: string;
   sort?: string;
   readFilter?: ReadFilter;
@@ -164,10 +165,10 @@ export function useLogout() {
 }
 
 export function useBooks(q: BooksQuery) {
-  const { page, search = '', sort = 'new', readFilter = 'all', entityKind, entityId, view } = q;
+  const { page, perPage = 24, search = '', sort = 'new', readFilter = 'all', entityKind, entityId, view } = q;
   const params = new URLSearchParams();
   params.set('page', String(page));
-  params.set('per_page', '24');
+  params.set('per_page', String(perPage));
   params.set('sort', sort);
   // The API's search path is separate from entity/read filtering, so search is
   // only sent in the unfiltered library view (the UI hides the search box when
@@ -181,7 +182,7 @@ export function useBooks(q: BooksQuery) {
     params.set(entityKind, String(entityId));
   }
   return useQuery<BooksPage>({
-    queryKey: ['books', page, search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? ''],
+    queryKey: ['books', page, perPage, search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? ''],
     queryFn: () => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`),
     placeholderData: (prev) => prev,
   });
@@ -642,6 +643,24 @@ export function useDeleteBook(id: string | number) {
   });
 }
 
+export interface ReloadMetadataResult {
+  success: boolean;
+  updated_fields: string[];
+  source_format: string;
+  message: string;
+}
+
+export function useReloadMetadata(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<ReloadMetadataResult>(`/admin/book/${id}/reload_metadata`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['book', String(id)] });
+      void qc.invalidateQueries({ queryKey: ['books'] });
+    },
+  });
+}
+
 /** Delete a single format from a book (keeps the book). */
 export function useDeleteFormat(id: string | number) {
   const qc = useQueryClient();
@@ -886,6 +905,7 @@ export function useMagicShelfBooks(id: string | number, page = 1) {
   return useQuery<{ id: number; name: string; icon: string; is_owner: boolean } & BooksPage>({
     queryKey: ['magicshelf', String(id), page],
     queryFn: () => apiGet(`/api/v1/magicshelf/${id}?page=${page}`),
+    enabled: String(id).length > 0,
     // Same-shelf paging only — see useShelf (#612).
     placeholderData: (prev, prevQuery) =>
       prevQuery && String(prevQuery.queryKey[1]) === String(id) ? prev : undefined,

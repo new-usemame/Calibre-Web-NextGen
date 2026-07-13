@@ -154,6 +154,10 @@ def _me_payload(user):
     payload["features"] = _server_features()
     payload["instance_name"] = _instance_name()
     payload["avatar"] = _user_avatar(user.name)
+    payload["display"] = {
+        "books_per_page": int(config.config_books_per_page),
+        "random_books": int(config.config_random_books),
+    }
     return payload
 
 

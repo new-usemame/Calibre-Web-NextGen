@@ -92,11 +92,9 @@ def test_reload_metadata_404_when_book_missing():
     )
 
 
-def test_reload_metadata_uses_get_epub_info():
-    """Must delegate parsing to the existing ``cps.epub.get_epub_info``
-    helper — reusing the same parser the upload path already trusts
-    avoids drift between ingest-time and reload-time metadata
-    extraction."""
+def test_reload_metadata_uses_upload_format_dispatcher():
+    """Reload and upload share one dispatcher, so PDF/FB2/comics are not
+    accidentally sent through the EPUB parser (#877)."""
     src = _source()
     match = re.search(
         r"def reload_metadata_from_disk\(book_id\):.*?(?=\n\Z)",
@@ -104,10 +102,9 @@ def test_reload_metadata_uses_get_epub_info():
         re.DOTALL,
     )
     body = match.group(0)
-    assert "get_epub_info" in body, (
-        "reload_metadata_from_disk must call get_epub_info from cps.epub "
-        "so the parsing logic stays consistent with the upload path."
-    )
+    assert "uploader.process(" in body
+    assert "rar_executable=config.config_rarfile_location" in body
+    assert "from .epub import get_epub_info" not in body
 
 
 def test_reload_metadata_updates_via_existing_edit_helpers():

@@ -2366,10 +2366,10 @@ def reload_metadata_from_disk(book_id):
         return jsonify(success=False,
                        error=_("Book has no file formats on disk to reload from")), 400
 
-    # Pick the format to re-read. EPUB is the canonical metadata source
-    # for embedded metadata; if no EPUB is available, fall back to the
-    # first format and let get_epub_info attempt — for non-EPUB formats
-    # it'll fail cleanly and we surface the error.
+    # Prefer EPUB/KEPUB as the canonical embedded-metadata source, then use the
+    # first available format. Parsing itself goes through uploader.process,
+    # the upload pipeline's single dispatcher for PDF, FB2, comics, audio,
+    # EPUB and KEPUB, so reload cannot drift into EPUB-only logic (#877).
     chosen_data = None
     for d in book.data:
         if (d.format or '').upper() in ('EPUB', 'KEPUB'):
@@ -2389,10 +2389,12 @@ def reload_metadata_from_disk(book_id):
                                path=file_path)), 404
 
     try:
-        # get_epub_info also handles kepub (which IS an EPUB structurally).
-        from .epub import get_epub_info
-        meta = get_epub_info(file_path, chosen_data.name, file_ext,
-                             no_cover_processing=True)
+        meta = uploader.process(
+            file_path,
+            chosen_data.name,
+            '.' + file_ext,
+            rar_executable=config.config_rarfile_location,
+            no_cover=True)
     except Exception as ex:
         log.error_or_exception("reload_metadata: parse failed for %s: %s",
                                file_path, ex)

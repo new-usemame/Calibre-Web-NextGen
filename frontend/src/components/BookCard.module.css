@@ -2,7 +2,9 @@
    as siblings of that control (never nested inside the <a>). */
 .wrap {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 /* The single focusable control (a <Link> or a toggle <button>). */
@@ -20,6 +22,7 @@
   color: inherit;
   transition: transform var(--dur-base) var(--ease-out);
   outline: none;
+  flex: 1;
 }
 
 .coverWrap {
@@ -206,7 +209,7 @@
 
 .readNow {
   min-height: 32px;
-  margin-top: var(--sp-1);
+  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: center;

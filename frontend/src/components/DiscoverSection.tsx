@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Shuffle, X } from 'lucide-react';
 import { BookCard } from './BookCard';
 import { Spinner } from './Spinner';
-import { useDiscover } from '../lib/queries';
+import { useDiscover, useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './DiscoverSection.module.css';
@@ -17,7 +17,10 @@ export function DiscoverSection({ onClose }: { onClose: () => void }) {
   const announce = useAnnouncer();
   const [nonce, setNonce] = useState(0);
   const shuffled = useRef(false);
-  const { data, isLoading, isFetching } = useDiscover(STRIP_COUNT, nonce);
+  const me = useMe().data;
+  const configuredCount = me?.display?.random_books;
+  const count = configuredCount && configuredCount > 0 ? configuredCount : STRIP_COUNT;
+  const { data, isLoading, isFetching } = useDiscover(count, nonce);
   const books = data?.items ?? [];
 
   useEffect(() => {

@@ -76,7 +76,7 @@ def test_discover_honors_instance_random_book_count():
     auth = source("cps/api/auth.py")
     api = source("frontend/src/lib/api.ts")
     discover = source("frontend/src/components/DiscoverSection.tsx")
-    assert '"random_books": int(config.config_random_books)' in auth
+    assert 'getattr(config, "config_random_books", 4)' in auth
     assert "random_books: number" in api
     assert "me?.display?.random_books" in discover
 

@@ -155,8 +155,10 @@ def _me_payload(user):
     payload["instance_name"] = _instance_name()
     payload["avatar"] = _user_avatar(user.name)
     payload["display"] = {
-        "books_per_page": int(config.config_books_per_page),
-        "random_books": int(config.config_random_books),
+        # Some auth tests and bootstrap paths intentionally provide a minimal
+        # config object. Keep /me available there with the schema defaults.
+        "books_per_page": int(getattr(config, "config_books_per_page", 60) or 60),
+        "random_books": int(getattr(config, "config_random_books", 4) or 4),
     }
     return payload
 

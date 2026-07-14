@@ -69,6 +69,10 @@ export interface Me {
     books_per_page: number;
     random_books: number;
   };
+  /** Per-user catalog landing preferences (#498), persisted server-side. */
+  catalog?: {
+    default_filter: AdvancedSearchParams | null;
+  };
 }
 
 export interface Book {

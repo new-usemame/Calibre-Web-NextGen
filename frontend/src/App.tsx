@@ -201,7 +201,9 @@ export function App() {
           <Route path="/magic/:id">{(p) => <MagicShelfView id={p.id} />}</Route>
           <Route path="/magic">{() => <MagicShelf />}</Route>
 
-          <Route path="/">{() => <Catalog />}</Route>
+          <Route path="/">{() => me.catalog?.default_filter
+            ? <AdvancedSearch defaultFilter={me.catalog.default_filter} />
+            : <Catalog />}</Route>
 
           {/* Graceful 404 for any unmatched in-shell route (no blank page). */}
           <Route>{() => <NotFound />}</Route>

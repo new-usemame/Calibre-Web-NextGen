@@ -154,6 +154,11 @@ def _me_payload(user):
     payload["features"] = _server_features()
     payload["instance_name"] = _instance_name()
     payload["avatar"] = _user_avatar(user.name)
+    catalog_settings = (getattr(user, "view_settings", None) or {}).get("catalog", {})
+    default_filter = catalog_settings.get("default_filter") if isinstance(catalog_settings, dict) else None
+    payload["catalog"] = {
+        "default_filter": default_filter if isinstance(default_filter, dict) else None,
+    }
     payload["display"] = {
         # Some auth tests and bootstrap paths intentionally provide a minimal
         # config object. Keep /me available there with the schema defaults.

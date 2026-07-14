@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useId } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Search as SearchIcon, RotateCcw } from 'lucide-react';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { useSearchOptions, useAdvancedSearch, useMe } from '../lib/queries';
@@ -7,7 +8,7 @@ import { BookCard } from '../components/BookCard';
 import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import type { Book, AdvancedSearchParams } from '../lib/api';
+import { apiPost, type Book, type AdvancedSearchParams, type Me } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './AdvancedSearch.module.css';
 
@@ -48,12 +49,17 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
   return fresh.length ? [...prev, ...fresh] : prev;
 }
 
-export function AdvancedSearch() {
+export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSearchParams } = {}) {
   const t = useT();
-  const canEdit = !!useMe().data?.role?.edit;  // quick-edit pencil on results (#572)
+  const qc = useQueryClient();
+  const me = useMe().data;
+  const canEdit = !!me?.role?.edit;  // quick-edit pencil on results (#572)
   const { data: options } = useSearchOptions();
-  const [form, setForm] = useState<FormState>(EMPTY);
-  const [submitted, setSubmitted] = useState<AdvancedSearchParams | null>(null);
+  const initial = defaultFilter ? { ...EMPTY, ...defaultFilter } as FormState : EMPTY;
+  const [form, setForm] = useState<FormState>(initial);
+  const [submitted, setSubmitted] = useState<AdvancedSearchParams | null>(defaultFilter ?? null);
+  const [defaultSaving, setDefaultSaving] = useState(false);
+  const [defaultStatus, setDefaultStatus] = useState('');
   const [page, setPage] = useState(1);
   const [results, setResults] = useState<Book[]>([]);
   const accKeyRef = useRef<string>('');
@@ -89,6 +95,22 @@ export function AdvancedSearch() {
     setForm(EMPTY);
     setSubmitted(null);
     setResults([]);
+  };
+
+  const persistDefault = async (value: AdvancedSearchParams | null) => {
+    setDefaultSaving(true);
+    setDefaultStatus('');
+    try {
+      await apiPost('/ajax/view', { catalog: { default_filter: value } });
+      qc.setQueryData<Me | null>(['me'], (previous) => previous
+        ? { ...previous, catalog: { default_filter: value } }
+        : previous);
+      setDefaultStatus(value ? t('Default library filter saved.') : t('Default library filter cleared.'));
+    } catch {
+      setDefaultStatus(t('Could not save the default library filter.'));
+    } finally {
+      setDefaultSaving(false);
+    }
   };
 
   const total = data?.total ?? 0;
@@ -193,7 +215,20 @@ export function AdvancedSearch() {
           <Button type="button" variant="ghost" onClick={onReset}>
             <RotateCcw size={15} aria-hidden="true" focusable={false} /> {t('Reset')}
           </Button>
+          {submitted && (
+            <Button type="button" variant="ghost" disabled={defaultSaving}
+              onClick={() => { void persistDefault(submitted); }}>
+              {t('Make this my default library view')}
+            </Button>
+          )}
+          {me?.catalog?.default_filter && (
+            <Button type="button" variant="ghost" disabled={defaultSaving}
+              onClick={() => { void persistDefault(null); }}>
+              {t('Clear default')}
+            </Button>
+          )}
         </div>
+        <p role="status" aria-live="polite">{defaultStatus}</p>
       </form>
 
       {/* Results */}

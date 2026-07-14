@@ -18,6 +18,7 @@ is for things you can see or feel when running the app.
 
 ### Added
 
+- Libraries that need a standing filter—such as hiding comics by tag—can now save any advanced search as the account's default library view, with the choice following the user across devices and a one-click way to clear it. ([#498](https://github.com/new-usemame/Calibre-Web-NextGen/issues/498))
 - KOReader highlights and notes from the open book can now sync into Calibre-Web NextGen, survive concurrent updates from multiple devices, and appear in the existing Highlights list on the book page. ([#699](https://github.com/new-usemame/Calibre-Web-NextGen/issues/699))
 
 ### Changed

@@ -531,6 +531,7 @@ class TestMigrationPreservesAllUserData:
         ub.migrate_annotation_decouple_source_target(engine, session)
         ub.migrate_annotation_polymorphic_position(engine, session)
         ub.migrate_annotation_device_origin(engine, session)
+        ub.migrate_annotation_koreader_identity(engine, session)
 
         # Fresh session: ORM read must work on every row.
         s2 = session_maker()

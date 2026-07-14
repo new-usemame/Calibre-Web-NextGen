@@ -31,6 +31,12 @@ def test_best_effort_providers_default_off_but_explicit_choice_wins(provider_id)
     assert metadata_provider_enabled(provider_id, {provider_id: False}) is False
 
 
+def test_goodreads_scraper_does_not_advertise_dead_api_key_signup():
+    source = (Path(__file__).resolve().parents[2] / "cps" / "search_metadata.py").read_text()
+    registry = source.split("PROVIDER_KEY_REGISTRY = {", 1)[1].split("\n}\n", 1)[0]
+    assert '"goodreads"' not in registry
+
+
 def test_goodreads_recorded_search_and_book_fixture():
     links = Goodreads._parse_search(fixture("goodreads_search.html"))
     assert links == ["https://www.goodreads.com/book/show/4671.The_Great_Gatsby"]

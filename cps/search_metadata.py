@@ -159,12 +159,6 @@ PROVIDER_KEY_REGISTRY = {
         "signup": "https://console.cloud.google.com/apis/library/books.googleapis.com",
         "help":   "Enable 'Books API' in any Google Cloud project, then create an API key under Credentials.",
     },
-    "goodreads": {
-        "name":   "Goodreads",
-        "config": "config_goodreads_api_key",
-        "signup": "https://www.goodreads.com/api/keys",
-        "help":   "Goodreads' developer API was discontinued in 2020. Existing keys still work for legacy integrations.",
-    },
 }
 
 
@@ -244,7 +238,9 @@ def metadata_provider():
                 "active": ac,
                 "initial": ac,
                 "id": c.__id__,
-                "globally_enabled": metadata_provider_enabled(c.__id__, global_enabled),
+                # Global omission means available; best-effort defaults are a
+                # per-user/ingest opt-in, not hidden from the SPA toggle list.
+                "globally_enabled": bool(global_enabled.get(c.__id__, True)),
             }
         )
     return make_response(jsonify(provider))
@@ -273,7 +269,7 @@ def metadata_change_active_provider(prov_name):
         # Respect global disablement for preview search as well
         global_enabled = _get_global_provider_enabled_map()
         if provider is not None:
-            if metadata_provider_enabled(provider.__id__, global_enabled):
+            if bool(global_enabled.get(provider.__id__, True)):
                 try:
                     data = provider.search(new_state.get("query", ""))
                 except Exception as exc:
@@ -369,7 +365,7 @@ def metadata_search():
     runnable = {}
     for provider in cl:
         is_active = metadata_provider_enabled(provider.__id__, active)
-        is_global = metadata_provider_enabled(provider.__id__, global_enabled)
+        is_global = bool(global_enabled.get(provider.__id__, True))
         if not is_active or not is_global:
             provider_status.append({
                 "id": provider.__id__,

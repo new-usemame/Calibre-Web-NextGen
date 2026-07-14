@@ -236,6 +236,7 @@ frontend/*.js
 frontend/*.d.ts
 cps/static/app/
 .spe-verification/
+.spf-verification/
 
 # Local output from the no-argument wiki generator. The published wiki is
 # rendered into a temporary clone by scripts/sync-wiki.sh.

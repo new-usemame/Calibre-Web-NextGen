@@ -1,0 +1,1 @@
+**[Calibre-Web-NextGen](https://github.com/new-usemame/Calibre-Web-NextGen)** · a community-maintained bug-fix build of [Calibre-Web-Automated](https://github.com/crocodilestick/Calibre-Web-Automated) · [File a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md) · [Discord](https://discord.gg/B8NXZmcp32) · GPL-3.0-or-later

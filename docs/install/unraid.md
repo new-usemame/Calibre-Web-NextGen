@@ -6,6 +6,9 @@ standard Calibre-Web-Automated (CWA) image.
 **Your books, users, settings and Read checkmarks live in the appdata + library shares you
 map into the container — not in the image — so switching keeps everything and is reversible.**
 
+> **Needs hardware verification:** these Unraid labels and steps are docs-verified, but we do not
+> yet have a real Unraid walkthrough or screenshots. Please use the help links below if your screen differs.
+
 ## Switching from CWA (fastest path)
 
 If you already run CWA on Unraid, you only need to change the image it uses:

@@ -8,6 +8,9 @@ image.
 **Your books, users, settings and the Read checkmarks you've set live in the volumes you bind
 into the container — not in the image — so switching keeps everything and is reversible.**
 
+> **Needs hardware verification:** these Dockge labels and steps are docs-verified, but we do not
+> yet have a real Dockge walkthrough or screenshots. Please use the help links below if your screen differs.
+
 ## Fresh install (new stack)
 
 1. In Dockge, click **+ Compose** (new stack).

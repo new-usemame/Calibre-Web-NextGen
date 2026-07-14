@@ -7,6 +7,10 @@ from the standard Calibre-Web-Automated (CWA) image.
 mapped into the container — nothing gets converted or deleted, and you can undo the whole
 thing in one click** by starting your old container again.
 
+**Hardware verification:** the update steps below were recorded on a real DSM 7.2 Container
+Manager system by @uschi1 in [issue #527](https://github.com/new-usemame/Calibre-Web-NextGen/issues/527#issuecomment-4951503223).
+The project-creation steps still need a clean-install recording on Synology hardware.
+
 > DSM is often shown in your local language. Where a button has a German label we list both,
 > e.g. *Speicherplatz / Volume*. If yours is in another language, the menu **position** is the
 > same — match the screenshots, and use the help links at the bottom if anything looks off.
@@ -77,6 +81,14 @@ update NextGen:
 4. **Container Manager → Projekt / Project** → your project → **Aktion / Action → Build**.
    Container Manager pulls the newest image fresh and recreates the container. Wait about
    30 seconds, then reload the page.
+
+Real DSM 7.2 update flow (German interface; labels are translated in the steps above):
+
+![The NextGen and stopped CWA containers in Synology Container Manager](images/verified/synology-01-container-action.jpeg)
+
+![The old NextGen image selected before it is removed](images/verified/synology-02-image-details.jpeg)
+
+![Container Manager pulling and rebuilding the NextGen project](images/verified/synology-03-rebuild-finished.jpeg)
 
 ---
 

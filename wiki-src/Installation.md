@@ -18,12 +18,13 @@ Every guide covers both a **fresh install** and **switching from stock CWA**, an
 
 | You run Docker through… | Guide |
 |---|---|
-| **Synology** (Container Manager / DSM 7.2+) | [synology.md](https://github.com/new-usemame/Calibre-Web-NextGen/blob/main/docs/install/synology.md) |
-| **Unraid** (Docker tab) | [unraid.md](https://github.com/new-usemame/Calibre-Web-NextGen/blob/main/docs/install/unraid.md) |
-| **Portainer** (Stacks) | [portainer.md](https://github.com/new-usemame/Calibre-Web-NextGen/blob/main/docs/install/portainer.md) |
-| **TrueNAS SCALE** (Apps) | [truenas.md](https://github.com/new-usemame/Calibre-Web-NextGen/blob/main/docs/install/truenas.md) |
-| **A terminal / `docker compose`** | [compose.md](https://github.com/new-usemame/Calibre-Web-NextGen/blob/main/docs/install/compose.md) |
-| QNAP, Dockge, something else | not written yet — [open an issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [ask on Discord](https://discord.gg/B8NXZmcp32) and we'll walk you through it |
+| **Synology** (Container Manager / DSM 7.2+) | [[Install on Synology]] |
+| **Unraid** (Docker tab) | [[Install on Unraid]] |
+| **Portainer** (Stacks) | [[Install with Portainer]] |
+| **TrueNAS SCALE** (Apps) | [[Install on TrueNAS SCALE]] |
+| **QNAP** (Container Station) | [[Install on QNAP]] |
+| **Dockge** (compose stacks) | [[Install with Dockge]] |
+| **A terminal / `docker compose`** | [[Install with Docker Compose]] |
 
 ---
 

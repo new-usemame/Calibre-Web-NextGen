@@ -4,6 +4,13 @@
 - [[Home]]
 - [[Quick Start]]
 - [[Installation]]
+- [[Install on Synology]]
+- [[Install on Unraid]]
+- [[Install with Portainer]]
+- [[Install on TrueNAS SCALE]]
+- [[Install on QNAP]]
+- [[Install with Dockge]]
+- [[Install with Docker Compose]]
 - [[First Run]]
 - [[Updating]]
 

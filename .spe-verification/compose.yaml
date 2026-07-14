@@ -1,0 +1,15 @@
+services:
+  calibre-web:
+    image: ghcr.io/new-usemame/calibre-web-nextgen:latest
+    container_name: cwn-spE-calibre-web
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+    volumes:
+      - ./config:/config
+      - ./library:/calibre-library
+      - ./ingest:/cwa-book-ingest
+    ports:
+      - 8105:8083
+    restart: unless-stopped

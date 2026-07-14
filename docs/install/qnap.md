@@ -8,6 +8,9 @@ Calibre-Web-Automated (CWA) image.
 mapped into the container — nothing gets converted or deleted, and you can undo the whole
 thing** by starting your old application again.
 
+> **Needs hardware verification:** these QNAP labels and steps are docs-verified, but we do not
+> yet have a real Container Station walkthrough or screenshots. Please use the help links below if your screen differs.
+
 ## Switching from CWA? Note your current setup first
 
 1. **Container Station → Containers** (or **Applications**), open your existing CWA container →

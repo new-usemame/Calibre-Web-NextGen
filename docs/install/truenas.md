@@ -3,6 +3,9 @@
 For TrueNAS SCALE. **Your books, users, settings and Read checkmarks live in the host-path
 storage you attach to the app — not in the image — so switching keeps everything.**
 
+> **Needs hardware verification:** these TrueNAS labels and steps are docs-verified, but we do not
+> yet have a real TrueNAS walkthrough or screenshots. Please use the help links below if your screen differs.
+
 > **A note on TrueNAS versions.** SCALE changed its Apps system between releases. On
 > **ElectricEel (24.10) and newer**, Apps run on a Docker Compose backend and there's an
 > **"Install via YAML" / Custom App** flow. On older releases (Dragonfish/Cobia) the

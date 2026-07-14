@@ -14,6 +14,7 @@ Templates live in wiki-src/*.md and contain:
         {{repo:README.md#some-slug}}          -> section BODY only (no heading)
         {{repo:README.md#some-slug|heading}}  -> section rendered under an H2
                                                  heading (for multi-section pages)
+        {{repo:docs/file.md#__document__}}    -> the complete source document
 Pulling a section also pulls its nested sub-sections.
 
 Link rewriting (transcluded content only):
@@ -132,6 +133,9 @@ class RepoDoc:
         return [h for h in self.heads if h.start < end]
 
     def body(self, slug):
+        if slug == "__document__":
+            h = Heading(1, "", "__document__", -1)
+            return h, "\n".join(self.lines).strip("\n")
         if slug == "__preamble__":
             end = self.preamble_end()
             h = Heading(1, "", "__preamble__", -1)
@@ -250,6 +254,13 @@ def main():
                 for ph in doc.preamble_heads():   # a leading H1 title, if any
                     cons.add(ph.slug)
                     owner.setdefault(ph.slug, (page, False))
+                continue
+            if slug == "__document__":
+                cons = consumed.setdefault(path, set())
+                cons.add(slug)
+                for dh in doc.heads:
+                    cons.add(dh.slug)
+                    owner.setdefault(dh.slug, (page, True))
                 continue
             if slug not in doc.by_slug:
                 print(f"ERROR: {fname}: no section '#{slug}' in {path}",

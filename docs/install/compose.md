@@ -6,33 +6,22 @@ everything and is reversible.**
 
 ## Fresh install
 
-1. Create a folder and a `docker-compose.yml` in it:
-
-   ```yaml
-   services:
-     calibre-web-nextgen:
-       image: ghcr.io/new-usemame/calibre-web-nextgen:latest
-       container_name: calibre-web-nextgen
-       environment:
-         - PUID=1000
-         - PGID=1000
-         - TZ=America/New_York
-       volumes:
-         - ./config:/config
-         - ./library:/calibre-library
-         - ./ingest:/cwa-book-ingest
-       ports:
-         - 8083:8083
-       restart: unless-stopped
-   ```
-
-   Adjust the volume paths, `PUID`/`PGID` (run `id` to see yours), and `TZ`.
+1. Create a folder and save the README's [canonical Docker Compose block](../../README.md#full-docker-compose-setup)
+   as `docker-compose.yml`. That block is the single source of truth; adjust its volume paths,
+   `PUID`/`PGID` (run `id` to see yours), and `TZ`.
 2. Start it:
 
    ```bash
    docker compose up -d
    ```
 3. Open `http://<host>:8083` and log in.
+
+The screenshots below come from that exact flow on a real Docker host. The test used a fresh
+empty volume set and host port `8105`; your normal URL will use the host port in your compose file.
+
+![The real NextGen login page after a fresh-volume Docker Compose start](images/verified/01-login.jpeg)
+
+![The empty library after the documented first login](images/verified/02-empty-library.jpeg)
 
 ## Switching from stock CWA
 

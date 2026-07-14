@@ -6,6 +6,9 @@ docker-compose file you manage in the web UI).
 **Your books, users, settings and Read checkmarks live in the volumes you bind into the
 container — not in the image — so switching keeps everything and is reversible.**
 
+> **Needs hardware verification:** these Portainer labels and steps are docs-verified, but we do not
+> yet have a real Portainer walkthrough or screenshots. Please use the help links below if your screen differs.
+
 ## Fresh install (Stack)
 
 1. **Stacks → Add stack.**

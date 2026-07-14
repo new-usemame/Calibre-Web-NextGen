@@ -1,0 +1,6 @@
+2026-07-14T01:58:07Z navigated to http://127.0.0.1:8105; observed /login?next=%2F initial login screen
+2026-07-14T01:58:23Z captured 01-login.jpeg; observed login page only, page content excludes browser chrome
+2026-07-14T01:58:41Z filled documented default credentials and clicked LOGIN; observed authenticated landing at / with Books (0)
+2026-07-14T01:58:52Z captured 02-library.jpeg; observed authenticated classic landing/library with Books (0), search, sidebar, and new-UI prompt
+2026-07-14T01:59:14Z clicked genuine "Try the new UI" prompt; navigated to /app/ and observed new UI authenticated library landing
+2026-07-14T01:59:24Z captured 03-new-ui.jpeg; observed new UI library with Your Library, navigation, filters, and empty Discover area

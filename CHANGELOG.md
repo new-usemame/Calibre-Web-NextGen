@@ -18,10 +18,12 @@ is for things you can see or feel when running the app.
 
 ### Changed
 
+- The new in-browser reader now keeps font family, size, margins, line height, and page theme with your account, so your preferred reading layout follows you between browsers and the classic/new interfaces; its appearance panel is touch- and keyboard-accessible on phones and desktops.
 - Book grids can now load a chosen number of complete rows at any card density, Discover respects the server's random-book count, and touch-screen “Read now” actions align along the bottom of each card.
 
 ### Fixed
 
+- Changing one classic-reader appearance control no longer erases the user's other saved reader settings.
 - The classic book page's favorite star now changes immediately after a click instead of waiting for a reload, because object-shaped action responses no longer crash the shared flash-message handler. ([#880](https://github.com/new-usemame/Calibre-Web-NextGen/issues/880))
 - Smart-shelf moving date windows are now available in the new interface's rule builder—not only the classic builder—with Publication Date and Date Added fields and day-based operators. ([#467](https://github.com/new-usemame/Calibre-Web-NextGen/issues/467))
 - Reload metadata now uses the same format-aware parser as upload, so PDF, FB2, comic, audio, EPUB, and KEPUB files no longer fail through an EPUB-only path; editors can also run it from the new book page. ([#877](https://github.com/new-usemame/Calibre-Web-NextGen/issues/877))

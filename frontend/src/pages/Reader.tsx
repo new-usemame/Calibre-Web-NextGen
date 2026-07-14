@@ -2,14 +2,19 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'wouter';
 import ePub from 'epubjs';
 import {
-  ChevronLeft, ChevronRight, X, List, Type, Sun, Moon, Coffee, Loader2, Trash2,
+  ChevronLeft, ChevronRight, X, List, Sun, Moon, Coffee, Loader2, Trash2,
+  SlidersHorizontal,
 } from 'lucide-react';
-import { useBook, useBookmark, useSaveBookmark } from '../lib/queries';
+import {
+  type ReaderSettings, useBook, useBookmark, useReaderSettings,
+  useSaveBookmark, useSaveReaderSettings,
+} from '../lib/queries';
 import { apiPost, apiDelete, apiPatch, apiUrl, resourceUrl } from '../lib/api';
 import { EmptyState } from '../components/EmptyState';
 import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import { useT } from '../lib/i18n';
+import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Reader.module.css';
 
 // Highlight colors as ARIA/label keys (SC 1.4.1: a color must never be conveyed
@@ -47,6 +52,17 @@ const FONT_MAX = 160;
 const LS_THEME = 'cwng.reader.theme';
 const LS_FONT = 'cwng.reader.font';
 
+const THEME_TO_READER: Record<ReaderSettings['theme'], ReaderTheme> = {
+  lightTheme: 'light', sepiaTheme: 'sepia', darkTheme: 'dark', blackTheme: 'dark',
+};
+const READER_TO_THEME: Record<ReaderTheme, ReaderSettings['theme']> = {
+  light: 'lightTheme', sepia: 'sepiaTheme', dark: 'darkTheme',
+};
+const FONT_FAMILY: Record<ReaderSettings['font'], string> = {
+  default: '', Yahei: 'Microsoft YaHei, sans-serif', SimSun: 'SimSun, serif',
+  KaiTi: 'KaiTi, serif', Arial: 'Arial, sans-serif',
+};
+
 function loadTheme(): ReaderTheme {
   const v = localStorage.getItem(LS_THEME);
   if (v === 'light' || v === 'sepia' || v === 'dark') return v;
@@ -64,12 +80,16 @@ function loadFont(): number {
 
 export function Reader({ id }: { id: string }) {
   const t = useT();
+  const announce = useAnnouncer();
   const { data: book, isLoading, error } = useBook(id);
   const { data: savedBookmark, isFetched: isBookmarkFetched } = useBookmark(id, 'epub');
+  const { data: settingsData, isFetched: isSettingsFetched } = useReaderSettings();
   const saveBookmark = useSaveBookmark(id);
+  const saveSettings = useSaveReaderSettings();
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const tocRef = useRef<HTMLElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   // Edit/remove popover for an existing highlight (#782). Separate from popRef
   // (the create-color popover) so each has its own focus-trap lifecycle; the two
@@ -82,6 +102,8 @@ export function Reader({ id }: { id: string }) {
   const colorLabel = (c: HiliteColor) =>
     ({ yellow: t('Yellow'), green: t('Green'), blue: t('Blue'), red: t('Red') })[c];
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settingsSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settingsPendingRef = useRef<Partial<ReaderSettings>>({});
   const lastCfiRef = useRef<string | null>(null);
   // Hold the freshest saved CFI so it survives re-renders without re-running the effect.
   const savedCfiRef = useRef<string | null>(null);
@@ -90,8 +112,13 @@ export function Reader({ id }: { id: string }) {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, setTheme] = useState<ReaderTheme>(loadTheme);
   const [fontPct, setFontPct] = useState(loadFont);
+  const [fontFamily, setFontFamily] = useState<ReaderSettings['font']>('default');
+  const [margin, setMargin] = useState(16);
+  const [lineHeight, setLineHeight] = useState(150);
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [progress, setProgress] = useState(0);
   // Pending text selection awaiting a highlight-color choice.
   const [pendingSel, setPendingSel] = useState<{ cfiRange: string; text: string } | null>(null);
@@ -103,6 +130,7 @@ export function Reader({ id }: { id: string }) {
   // C10: the TOC drawer and highlight popovers are overlays — trap focus while
   // open, restore on close, Escape closes (hooks run unconditionally every render).
   useFocusTrap(tocRef, { onClose: () => setTocOpen(false), active: tocOpen });
+  useFocusTrap(settingsRef, { onClose: () => setSettingsOpen(false), active: settingsOpen });
   useFocusTrap(popRef, { onClose: () => setPendingSel(null), active: !!pendingSel });
   useFocusTrap(hlPopRef, { onClose: () => setActiveHl(null), active: !!activeHl });
 
@@ -180,6 +208,33 @@ export function Reader({ id }: { id: string }) {
     savedCfiRef.current = savedBookmark?.bookmark ?? savedCfiRef.current;
   }, [savedBookmark]);
 
+  useEffect(() => {
+    const settings = settingsData?.reader;
+    if (!settings) return;
+    setTheme(THEME_TO_READER[settings.theme]);
+    setFontPct(settings.fontSize);
+    setFontFamily(settings.font);
+    setMargin(settings.margin);
+    setLineHeight(settings.lineHeight);
+    // Start epub.js only on the next render, after this server snapshot has
+    // become the state captured by the rendition callbacks.
+    setSettingsHydrated(true);
+  }, [settingsData]);
+
+  const persistSetting = useCallback(<K extends keyof ReaderSettings>(key: K, value: ReaderSettings[K]) => {
+    settingsPendingRef.current = { ...settingsPendingRef.current, [key]: value };
+    if (settingsSaveTimer.current) clearTimeout(settingsSaveTimer.current);
+    settingsSaveTimer.current = setTimeout(() => {
+      const patch = settingsPendingRef.current;
+      settingsPendingRef.current = {};
+      settingsSaveTimer.current = null;
+      saveSettings.mutate(patch, {
+        onSuccess: () => announce(t('Reader settings saved.')),
+        onError: () => announce(t('Could not save reader settings.'), { assertive: true }),
+      });
+    }, 300);
+  }, [saveSettings, announce, t]);
+
   const persistCfi = useCallback(
     (cfi: string) => {
       lastCfiRef.current = cfi;
@@ -218,9 +273,34 @@ export function Reader({ id }: { id: string }) {
     } catch { /* same-origin blob content; guard regardless */ }
   }, []);
 
+  const applyTypography = useCallback(() => {
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+    rendition.themes.fontSize(`${fontPct}%`);
+    if (fontFamily === 'default') rendition.themes.font('initial');
+    else rendition.themes.font(FONT_FAMILY[fontFamily]);
+    try {
+      (rendition.getContents?.() || []).forEach((c: any) => {
+        if (!c?.document?.body) return;
+        c.document.body.style.setProperty('padding-inline', `${margin}px`, 'important');
+        c.document.body.style.setProperty('line-height', String(lineHeight / 100), 'important');
+      });
+    } catch { /* same-origin blob content; guard regardless */ }
+  }, [fontPct, fontFamily, margin, lineHeight]);
+
+  const goPrev = useCallback(() => renditionRef.current?.prev(), []);
+  const goNext = useCallback(() => renditionRef.current?.next(), []);
+
+  const handleReaderKey = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('input, select, textarea, button, [role="dialog"]')) return;
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goPrev(); }
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); goNext(); }
+  }, [goPrev, goNext]);
+
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
-    if (!epubFormat || !viewerRef.current || !isBookmarkFetched) return;
+    if (!epubFormat || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
     let cancelled = false;
     setRendered(false);
     setRenderError(null);
@@ -251,10 +331,31 @@ export function Reader({ id }: { id: string }) {
         // C10 (SC 4.1.2): epub.js renders each section into an <iframe> with no
         // title — screen readers announce "frame" with no name. Title them as
         // they render so the book content region is named.
-        rendition.on('rendered', () => {
+        rendition.on('rendered', (_section: unknown, contents: any) => {
           viewerRef.current?.querySelectorAll('iframe').forEach((f) => {
             f.setAttribute('title', t('Book content'));
           });
+          applyTheme(theme);
+          applyTypography();
+          const doc = contents?.document;
+          if (doc && !doc.documentElement.dataset.cwngReaderInput) {
+            doc.documentElement.dataset.cwngReaderInput = 'true';
+            let startX = 0;
+            let startY = 0;
+            doc.addEventListener('touchstart', (event: TouchEvent) => {
+              const touch = event.changedTouches[0];
+              if (touch) { startX = touch.clientX; startY = touch.clientY; }
+            }, { passive: true });
+            doc.addEventListener('touchend', (event: TouchEvent) => {
+              const touch = event.changedTouches[0];
+              if (!touch) return;
+              const dx = touch.clientX - startX;
+              const dy = touch.clientY - startY;
+              if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy) * 1.25) return;
+              if (dx < 0) goNext(); else goPrev();
+            }, { passive: true });
+            doc.addEventListener('keyup', handleReaderKey);
+          }
         });
 
         await rendition.display(savedCfiRef.current || undefined);
@@ -334,7 +435,7 @@ export function Reader({ id }: { id: string }) {
     };
     // Re-render only when the source changes; theme/font are applied imperatively.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epubFormat?.download_url, isBookmarkFetched]);
+  }, [epubFormat?.download_url, isBookmarkFetched, isSettingsFetched, settingsHydrated]);
 
   // Apply theme / font changes to a live rendition without rebuilding it, and
   // remember the preference across sessions.
@@ -344,22 +445,15 @@ export function Reader({ id }: { id: string }) {
   }, [theme, applyTheme]);
   useEffect(() => {
     localStorage.setItem(LS_FONT, String(fontPct));
-    renditionRef.current?.themes.fontSize(`${fontPct}%`);
-  }, [fontPct]);
+    applyTypography();
+  }, [fontPct, fontFamily, margin, lineHeight, applyTypography]);
 
-  const goPrev = useCallback(() => renditionRef.current?.prev(), []);
-  const goNext = useCallback(() => renditionRef.current?.next(), []);
-
-  // Arrow-key navigation (the iframe also forwards keys via rendition).
+  // Keyboard navigation on the outer document; rendered iframe documents are
+  // wired above so focus inside book content gets the same modality contract.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') goPrev();
-      if (e.key === 'ArrowRight') goNext();
-    };
-    document.addEventListener('keyup', onKey);
-    renditionRef.current?.on('keyup', onKey);
-    return () => document.removeEventListener('keyup', onKey);
-  }, [goPrev, goNext, rendered]);
+    document.addEventListener('keydown', handleReaderKey);
+    return () => document.removeEventListener('keydown', handleReaderKey);
+  }, [handleReaderKey]);
 
   const goToc = (href: string) => {
     const rendition = renditionRef.current;
@@ -426,19 +520,10 @@ export function Reader({ id }: { id: string }) {
             aria-label={t('Table of contents')} aria-expanded={tocOpen} title={t('Contents')}>
             <List size={19} aria-hidden="true" focusable={false} />
           </button>
-          <div className={styles.fontControls}>
-            <button className={styles.iconBtn} onClick={() => setFontPct((p) => Math.max(FONT_MIN, p - 10))} aria-label={t('Smaller text')} title={t('Smaller')}>
-              <Type size={14} aria-hidden="true" focusable={false} />
-            </button>
-            <button className={styles.iconBtn} onClick={() => setFontPct((p) => Math.min(FONT_MAX, p + 10))} aria-label={t('Larger text')} title={t('Larger')}>
-              <Type size={20} aria-hidden="true" focusable={false} />
-            </button>
-          </div>
-          <div className={styles.themeControls}>
-            <button className={theme === 'light' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('light')} aria-label={t('Light theme')} aria-pressed={theme === 'light'} title={t('Light')}><Sun size={17} aria-hidden="true" focusable={false} /></button>
-            <button className={theme === 'sepia' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('sepia')} aria-label={t('Sepia theme')} aria-pressed={theme === 'sepia'} title={t('Sepia')}><Coffee size={17} aria-hidden="true" focusable={false} /></button>
-            <button className={theme === 'dark' ? styles.themeActive : styles.iconBtn} onClick={() => setTheme('dark')} aria-label={t('Dark theme')} aria-pressed={theme === 'dark'} title={t('Dark')}><Moon size={17} aria-hidden="true" focusable={false} /></button>
-          </div>
+          <button className={styles.iconBtn} onClick={() => setSettingsOpen((o) => !o)}
+            aria-label={t('Reading appearance')} aria-expanded={settingsOpen} title={t('Reading appearance')}>
+            <SlidersHorizontal size={19} aria-hidden="true" focusable={false} />
+          </button>
         </div>
       </header>
 
@@ -447,11 +532,16 @@ export function Reader({ id }: { id: string }) {
         <>
           <div className={styles.tocScrim} onClick={() => setTocOpen(false)} aria-hidden="true" />
           <nav ref={tocRef} className={styles.toc} aria-label={t('Table of contents')} tabIndex={-1}>
-            <p className={styles.tocHeading}>{t('Contents')}</p>
+            <div className={styles.panelHeading}>
+              <p className={styles.tocHeading}>{t('Contents')}</p>
+              <button className={styles.iconBtn} onClick={() => setTocOpen(false)} aria-label={t('Close')}>
+                <X size={18} aria-hidden="true" focusable={false} />
+              </button>
+            </div>
             {toc.length === 0 ? (
               <p className={styles.tocEmpty}>{t('No contents found.')}</p>
             ) : (
-              <ul>
+              <ul role="list">
                 {toc.map((tocItem, i) => (
                   <li key={`${tocItem.href}-${i}`}>
                     <button className={styles.tocItem} onClick={() => goToc(tocItem.href)}>{tocItem.label || t('Untitled')}</button>
@@ -460,6 +550,62 @@ export function Reader({ id }: { id: string }) {
               </ul>
             )}
           </nav>
+        </>
+      )}
+
+      {settingsOpen && (
+        <>
+          <div className={styles.tocScrim} onClick={() => setSettingsOpen(false)} aria-hidden="true" />
+          <div ref={settingsRef} className={styles.settingsPanel} role="dialog" aria-modal="true"
+            aria-labelledby="reader-appearance-title" tabIndex={-1}>
+            <div className={styles.panelHeading}>
+              <h2 id="reader-appearance-title">{t('Reading appearance')}</h2>
+              <button className={styles.iconBtn} onClick={() => setSettingsOpen(false)} aria-label={t('Close')}>
+                <X size={18} aria-hidden="true" focusable={false} />
+              </button>
+            </div>
+            <fieldset className={styles.settingGroup}>
+              <legend>{t('Page theme')}</legend>
+              <div className={styles.themeChoices}>
+                {([
+                  ['light', Sun, t('Light')], ['sepia', Coffee, t('Sepia')], ['dark', Moon, t('Dark')],
+                ] as const).map(([value, Icon, label]) => (
+                  <button key={value} className={theme === value ? styles.choiceActive : styles.choice}
+                    aria-pressed={theme === value} onClick={() => {
+                      setTheme(value); persistSetting('theme', READER_TO_THEME[value]);
+                    }}>
+                    <Icon size={17} aria-hidden="true" focusable={false} /> {label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <label className={styles.settingField}>
+              <span>{t('Font family')}</span>
+              <select value={fontFamily} onChange={(e) => {
+                const value = e.target.value as ReaderSettings['font'];
+                setFontFamily(value); persistSetting('font', value);
+              }}>
+                <option value="default">{t('Book default')}</option>
+                <option value="Arial">Arial</option><option value="Yahei">Microsoft YaHei</option>
+                <option value="SimSun">SimSun</option><option value="KaiTi">KaiTi</option>
+              </select>
+            </label>
+            {([
+              ['font-size', t('Font size'), fontPct, FONT_MIN, FONT_MAX, '%', setFontPct, 'fontSize'],
+              ['page-margin', t('Page margins'), margin, 0, 80, 'px', setMargin, 'margin'],
+              ['line-height', t('Line height'), lineHeight, 100, 220, '%', setLineHeight, 'lineHeight'],
+            ] as const).map(([key, label, value, min, max, unit, setter, settingKey]) => (
+              <label key={key} className={styles.settingField} htmlFor={`reader-${key}`}>
+                <span>{label} <output>{value}{unit}</output></span>
+                <input id={`reader-${key}`} type="range" min={min} max={max} step={key === 'page-margin' ? 4 : 10}
+                  value={value} onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setter(next);
+                    persistSetting(settingKey, next as never);
+                  }} />
+              </label>
+            ))}
+          </div>
         </>
       )}
 

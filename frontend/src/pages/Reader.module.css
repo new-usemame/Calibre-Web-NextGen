@@ -182,6 +182,110 @@
   animation: slideIn var(--dur-base) var(--ease-out) both;
 }
 
+.settingsPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 92vw);
+  z-index: calc(var(--z-overlay) + 1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  overflow-y: auto;
+  padding: var(--sp-4);
+  background: var(--surface-1);
+  color: var(--text);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--elev-3);
+  animation: settingsIn var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes settingsIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.panelHeading h2 {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+}
+
+.settingGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  border: 0;
+  padding: 0;
+}
+
+.settingGroup legend,
+.settingField > span {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.themeChoices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
+}
+
+.choice,
+.choiceActive {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.choiceActive {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.settingField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.settingField > span {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.settingField select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.settingField input[type='range'] {
+  width: 100%;
+  min-height: 24px;
+  accent-color: var(--accent);
+}
+
 @keyframes slideIn {
   from { transform: translateX(-100%); }
   to { transform: translateX(0); }

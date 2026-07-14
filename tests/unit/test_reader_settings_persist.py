@@ -14,11 +14,11 @@ from cps.web import sanitize_reader_settings, _reader_setting_int
 def test_keeps_each_valid_field():
     out = sanitize_reader_settings({
         "theme": "darkTheme", "font": "Arial", "spread": "nonespread",
-        "fontSize": 150, "margin": 40, "reflow": True,
+        "fontSize": 150, "margin": 40, "lineHeight": 160, "reflow": True,
     })
     assert out == {
         "theme": "darkTheme", "font": "Arial", "spread": "nonespread",
-        "fontSize": 150, "margin": 40, "reflow": True,
+        "fontSize": 150, "margin": 40, "lineHeight": 160, "reflow": True,
     }
 
 
@@ -36,6 +36,8 @@ def test_clamps_numeric_ranges():
     assert sanitize_reader_settings({"fontSize": 10})["fontSize"] == 75
     assert sanitize_reader_settings({"margin": -10})["margin"] == 0
     assert sanitize_reader_settings({"margin": 999})["margin"] == 80
+    assert sanitize_reader_settings({"lineHeight": 50})["lineHeight"] == 100
+    assert sanitize_reader_settings({"lineHeight": 999})["lineHeight"] == 220
 
 
 def test_numeric_strings_accepted_booleans_rejected():
@@ -43,6 +45,7 @@ def test_numeric_strings_accepted_booleans_rejected():
     # A JSON `true` must not be coerced into fontSize=1 / margin=1.
     assert "fontSize" not in sanitize_reader_settings({"fontSize": True})
     assert "margin" not in sanitize_reader_settings({"margin": False})
+    assert "lineHeight" not in sanitize_reader_settings({"lineHeight": True})
 
 
 def test_reflow_coercion():

@@ -754,6 +754,31 @@ export function useSetCover(id: string | number) {
 
 // ── Reader (bookmark / progress) ─────────────────────────────────────────────
 
+export interface ReaderSettings {
+  theme: 'lightTheme' | 'sepiaTheme' | 'darkTheme' | 'blackTheme';
+  font: 'default' | 'Yahei' | 'SimSun' | 'KaiTi' | 'Arial';
+  fontSize: number;
+  margin: number;
+  lineHeight: number;
+  spread: 'spread' | 'nonespread';
+  reflow: boolean;
+}
+
+export function useReaderSettings() {
+  return useQuery<{ reader: ReaderSettings }>({
+    queryKey: ['reader-settings'],
+    queryFn: () => apiGet<{ reader: ReaderSettings }>('/api/v1/reader/settings'),
+    staleTime: 60_000,
+  });
+}
+
+export function useSaveReaderSettings() {
+  return useMutation({
+    mutationFn: (patch: Partial<ReaderSettings>) =>
+      apiPost<{ reader: ReaderSettings }>('/api/v1/reader/settings', patch),
+  });
+}
+
 export function useBookmark(bookId: string | number, format = 'epub') {
   return useQuery<{ bookmark: string | null }>({
     queryKey: ['bookmark', String(bookId), format],

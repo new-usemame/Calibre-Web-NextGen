@@ -54,6 +54,11 @@ from .tasks_status import render_task_status
 from .usermanagement import user_login_required
 from .string_helper import strip_whitespaces
 from .logout import cleanup_local_logout
+from .reader_settings import (
+    merged_reader_settings,
+    reader_setting_int as _reader_setting_int,
+    sanitize_reader_settings,
+)
 
 # CWA Imports
 import shutil
@@ -275,57 +280,6 @@ def toggle_favorite(book_id):
 # books-list view settings) so they sync per-user across devices. Anonymous
 # sessions never reach the save route (@user_login_required) and keep using
 # localStorage as before.
-_READER_THEMES = {"lightTheme", "darkTheme", "sepiaTheme", "blackTheme"}
-_READER_FONTS = {"default", "Yahei", "SimSun", "KaiTi", "Arial"}
-_READER_SPREADS = {"spread", "nonespread"}
-
-
-def _reader_setting_int(value, lo, hi):
-    """Coerce a slider value to an int clamped to [lo, hi]; None if not numeric.
-    Booleans are rejected first (isinstance(True, int) is True) so a JSON
-    ``true`` can't slip through as 1."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return max(lo, min(hi, int(value)))
-    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
-        return max(lo, min(hi, int(value.strip())))
-    return None
-
-
-def sanitize_reader_settings(payload):
-    """Reduce an arbitrary POST body to the known reader settings with safe
-    values, so a crafted payload can never store junk on the user row. Unknown
-    keys and out-of-range / ill-typed values are dropped.
-
-    SECURITY: read_book() injects this dict verbatim into a <script> via Jinja's
-    ``| safe`` (no HTML escaping). Every value stored here MUST stay a closed
-    enum, a clamped int, or a bool — never store free text, or that inject
-    becomes a stored-XSS sink.
-    """
-    if not isinstance(payload, dict):
-        return {}
-    out = {}
-    if payload.get("theme") in _READER_THEMES:
-        out["theme"] = payload["theme"]
-    if payload.get("font") in _READER_FONTS:
-        out["font"] = payload["font"]
-    if payload.get("spread") in _READER_SPREADS:
-        out["spread"] = payload["spread"]
-    font_size = _reader_setting_int(payload.get("fontSize"), 75, 200)
-    if font_size is not None:
-        out["fontSize"] = font_size
-    margin = _reader_setting_int(payload.get("margin"), 0, 80)
-    if margin is not None:
-        out["margin"] = margin
-    reflow = payload.get("reflow")
-    if isinstance(reflow, bool):
-        out["reflow"] = reflow
-    elif isinstance(reflow, str):
-        out["reflow"] = reflow.strip().lower() == "true"
-    return out
-
-
 @web.route("/ajax/readersettings", methods=['POST'])
 @user_login_required
 def save_reader_settings():
@@ -335,7 +289,8 @@ def save_reader_settings():
         payload = json.loads(request.data or b"{}")
     except (ValueError, TypeError):
         return json.dumps({"saved": False}), 400, {"Content-Type": "application/json"}
-    cleaned = sanitize_reader_settings(payload)
+    existing = (getattr(current_user, "view_settings", None) or {}).get("reader", {})
+    cleaned = merged_reader_settings(existing, payload)
     if current_user.view_settings is None:
         current_user.view_settings = {}
     current_user.view_settings["reader"] = cleaned

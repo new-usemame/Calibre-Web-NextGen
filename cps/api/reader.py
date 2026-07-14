@@ -9,11 +9,13 @@ one, resume in the other. The bookmark_key is the epub.js CFI string.
 """
 from flask import jsonify, request
 from sqlalchemy import and_
+from sqlalchemy.orm.attributes import flag_modified
 
 from . import api_v1
 from .. import ub
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
+from ..reader_settings import merged_reader_settings, resolved_reader_settings
 
 
 def _err(code, message, status):
@@ -69,3 +71,37 @@ def save_bookmark(book_id):
         ))
     ub.session_commit("Bookmark for user {} in book {} via api".format(current_user.id, book_id))
     return "", 204
+
+
+@api_v1.route("/reader/settings")
+@login_required_if_no_ano
+def get_reader_settings():
+    """Return the complete per-user appearance contract shared by both readers."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    current = (getattr(current_user, "view_settings", None) or {}).get("reader", {})
+    return jsonify({"reader": resolved_reader_settings(current)})
+
+
+@api_v1.route("/reader/settings", methods=["POST"])
+@login_required_if_no_ano
+def save_reader_settings():
+    """Merge a partial reader appearance update into User.view_settings."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _err("invalid_settings", "Reader settings must be an object", 400)
+    view_settings = dict(getattr(current_user, "view_settings", None) or {})
+    merged = merged_reader_settings(view_settings.get("reader", {}), payload)
+    view_settings["reader"] = merged
+    current_user.view_settings = view_settings
+    flag_modified(current_user, "view_settings")
+    try:
+        ub.session.commit()
+    except Exception:
+        ub.session.rollback()
+        return _err("save_failed", "Could not save reader settings", 500)
+    return jsonify({"reader": resolved_reader_settings(merged)})

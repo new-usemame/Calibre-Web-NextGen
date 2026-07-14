@@ -150,6 +150,11 @@ PROVIDER_KEY_REGISTRY = {
     "hardcover": {
         "name":   "Hardcover",
         "config": "config_hardcover_token",
+        # Optional: a ConfigSQL method that resolves the key from every
+        # supported source, not just the column. HARDCOVER_TOKEN and
+        # HARDCOVER_TOKEN_FILE are deliberately never persisted to the
+        # column, so the column alone under-reports them — fork #896.
+        "resolver": "resolved_hardcover_token",
         "signup": "https://hardcover.app/account/api",
         "help":   "Free Hardcover account; click 'API Tokens' on your profile page.",
     },
@@ -169,6 +174,20 @@ def _is_admin_user() -> bool:
         return False
 
 
+def _provider_configured(spec) -> bool:
+    """True when a provider has a usable key, from any source it supports.
+
+    Single source of truth for the Keys panel badge. A provider may name a
+    ``resolver`` — a ConfigSQL method that also consults env / secret-file
+    sources — in which case asking the raw config column would under-report
+    a key that the provider itself resolves and uses (fork #896).
+    """
+    resolver = getattr(config, spec.get("resolver") or "", None)
+    if callable(resolver):
+        return bool(resolver())
+    return bool(getattr(config, spec["config"], None))
+
+
 @meta.route("/metadata/keys")
 @user_login_required
 def metadata_keys():
@@ -180,11 +199,10 @@ def metadata_keys():
     payload = []
     can_edit = _is_admin_user()
     for pid, spec in PROVIDER_KEY_REGISTRY.items():
-        configured_value = getattr(config, spec["config"], None)
         payload.append({
             "id":         pid,
             "name":       spec["name"],
-            "configured": bool(configured_value),
+            "configured": _provider_configured(spec),
             "signup":     spec["signup"],
             "help":       spec["help"],
             "can_edit":   can_edit,
@@ -221,7 +239,11 @@ def metadata_keys_save(prov_id):
     except Exception as exc:
         log.error("Failed to save API key for %s: %s", prov_id, exc)
         return make_response(jsonify({"error": "save failed"}), 500)
-    return make_response(jsonify({"id": prov_id, "configured": bool(value)}))
+    # Ask the same resolver the read path uses: clearing the admin field
+    # while HARDCOVER_TOKEN is set leaves the provider working, so the badge
+    # this response drives must not claim otherwise — fork #896.
+    return make_response(jsonify({"id": prov_id,
+                                  "configured": _provider_configured(spec)}))
 
 
 @meta.route("/metadata/provider")

@@ -114,6 +114,23 @@ def test_classifier_does_not_read_raw_column():
     )
 
 
+def test_hardcover_key_presence_is_never_read_from_the_column():
+    """The pin above only catches a *literal* column read. #896 shipped
+    anyway because ``metadata_keys()`` reached the column through registry
+    indirection (``getattr(config, spec["config"])``). Any provider whose
+    key can come from env/file must declare a resolver, so presence is
+    asked of the resolver no matter how the column name is spelled."""
+    from cps.search_metadata import PROVIDER_KEY_REGISTRY
+
+    assert PROVIDER_KEY_REGISTRY["hardcover"].get("resolver") == (
+        "resolved_hardcover_token"
+    ), (
+        "Hardcover resolves its token from the DB, HARDCOVER_TOKEN or "
+        "HARDCOVER_TOKEN_FILE — every consumer that reports whether a key "
+        "exists must go through that resolver (issues #743, #896)."
+    )
+
+
 def test_admin_form_mentions_env_token():
     tpl = (REPO_ROOT / "cps/templates/config_edit.html").read_text(encoding="utf-8")
     assert "hardcover_token_from_env()" in tpl, (

@@ -33,6 +33,7 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- The Fetch Metadata window's Keys panel now shows Hardcover as "Configured" when the token comes from the `HARDCOVER_TOKEN` environment variable or a `HARDCOVER_TOKEN_FILE` secret, instead of claiming no key was set. Searches worked the whole time — only the badge was wrong, which made a working setup look broken. ([#896](https://github.com/new-usemame/Calibre-Web-NextGen/issues/896))
 - Hardcover auto-fetch now records what each run did, so the Stats & Activity page's Hardcover section shows the books processed and matched instead of staying blank. Runs still finished their work before, but every one of them logged "Error saving stats to database" and saved nothing. ([#876](https://github.com/new-usemame/Calibre-Web-NextGen/issues/876))
 - Changing one classic-reader appearance control no longer erases the user's other saved reader settings.
 - The classic book page's favorite star now changes immediately after a click instead of waiting for a reload, because object-shaped action responses no longer crash the shared flash-message handler. ([#880](https://github.com/new-usemame/Calibre-Web-NextGen/issues/880))

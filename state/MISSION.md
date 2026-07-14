@@ -14,14 +14,14 @@
 - [x] Dedicated `cwn-spA` stack on port 8101 live-verified with a real EPUB.
 - [x] Luna verified appearance persistence at 375px + desktop and Light + Dark; position restore intentionally excluded.
 - [x] Terra re-verified the cleaned shipped slice PASS.
-- [ ] PR-ready commit(s) pushed and PR(s) opened with evidence; no merge performed.
-- [ ] Phase-2 remainder honestly recorded; all report evidence links classified OBSERVED or ASSUMED.
+- [x] PR #889 pushed and opened with evidence; no merge performed.
+- [x] Phase-2 remainder honestly recorded; report evidence classified OBSERVED or ASSUMED.
 
 ## Current state
 
 - Phase: PR handoff
 - Branch: `org/spA`
-- Next action: commit report evidence, push, open PR, and record its link.
+- Next action: Opus boss review/merge of PR #889.
 
 ## Decisions
 

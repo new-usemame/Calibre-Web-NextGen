@@ -29,5 +29,5 @@
 
 ## PR and phase-2 gap
 
-- Appearance + independent TOC/navigation PR: **pending creation**.
+- Appearance + independent TOC/navigation PR: **[#889](https://github.com/new-usemame/Calibre-Web-NextGen/pull/889)**.
 - Phase 2 deliberately remains unimplemented until SPA and SPB coordinate the common percentage carrier, private engine locators, atomic ordered saves, uniqueness migration, validation, and restore ordering. This run does not claim cross-device position sync.

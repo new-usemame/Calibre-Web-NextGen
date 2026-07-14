@@ -76,6 +76,26 @@ class CWA_DB:
             return con, cur
 
 
+    def execute_write(self, query: str, params: tuple = ()) -> None:
+        """Runs an INSERT/UPDATE/DELETE and commits it.
+
+        Callers outside this class open their own CWA_DB, so an uncommitted
+        write would be invisible to them.
+        """
+        self.cur.execute(query, params)
+        self.con.commit()
+
+
+    def execute_read(self, query: str, params: tuple = ()) -> list:
+        """Runs a SELECT and returns every row.
+
+        Returns fetchall() rows: consumers index row-then-column
+        (``total_processed[0][0]``), which a fetchone() result would break.
+        """
+        self.cur.execute(query, params)
+        return self.cur.fetchall()
+
+
     def make_tables(self) -> tuple[list[str], list[str]]:
         """Creates the tables for the CWA DB if they don't already exist"""
         schema = []

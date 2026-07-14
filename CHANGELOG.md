@@ -33,6 +33,7 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- Hardcover auto-fetch now records what each run did, so the Stats & Activity page's Hardcover section shows the books processed and matched instead of staying blank. Runs still finished their work before, but every one of them logged "Error saving stats to database" and saved nothing. ([#876](https://github.com/new-usemame/Calibre-Web-NextGen/issues/876))
 - Changing one classic-reader appearance control no longer erases the user's other saved reader settings.
 - The classic book page's favorite star now changes immediately after a click instead of waiting for a reload, because object-shaped action responses no longer crash the shared flash-message handler. ([#880](https://github.com/new-usemame/Calibre-Web-NextGen/issues/880))
 - Smart-shelf moving date windows are now available in the new interface's rule builder—not only the classic builder—with Publication Date and Date Added fields and day-based operators. ([#467](https://github.com/new-usemame/Calibre-Web-NextGen/issues/467))

@@ -17,13 +17,14 @@ Provider interface:
 local DeviceAnnotations = {}
 
 local PROVIDERS = {
+    require("koreader_annotations_provider"),
     require("kobo_sqlite_provider"),
-    -- future: require("koreader_sdr_provider"),
 }
 
 -- First provider that reports itself usable on this device, or nil.
-function DeviceAnnotations.getProvider()
+function DeviceAnnotations.getProvider(ui, document_digest)
     for _, p in ipairs(PROVIDERS) do
+        if p.setContext then p.setContext(ui, document_digest) end
         local ok, usable = pcall(p.available)
         if ok and usable then
             return p

@@ -143,3 +143,31 @@ def test_apply_missing_id_skipped(session):
     )
     assert row is None
     assert action == "skipped"
+
+
+def test_apply_wrong_type_skipped(session):
+    row, action = apply_portable(
+        "not-an-object", user_id=9, book=_book(), session=session,
+        commit=session.commit,
+    )
+    assert row is None and action == "skipped"
+
+
+def test_apply_duplicate_is_suppressed(session):
+    payload = {
+        "annotation_id": "same", "highlighted_text": "text",
+        "position_type": "koreader_xpointer",
+        "start_xpointer": "/body/DocFragment[1]", "end_xpointer": "/body/DocFragment[2]",
+    }
+    _, first = apply_portable(payload, user_id=9, book=_book(), session=session, commit=session.commit)
+    _, second = apply_portable(payload, user_id=9, book=_book(), session=session, commit=session.commit)
+    assert (first, second) == ("created", "skipped")
+    assert session.query(ub.Annotation).count() == 1
+
+
+def test_same_annotation_id_is_scoped_by_book(session):
+    payload = {"annotation_id": "local-1", "highlighted_text": "text"}
+    apply_portable(payload, user_id=9, book=_book(), session=session, commit=session.commit)
+    other = SimpleNamespace(id=43, uuid="other")
+    apply_portable(payload, user_id=9, book=other, session=session, commit=session.commit)
+    assert session.query(ub.Annotation).filter_by(user_id=9, annotation_id="local-1").count() == 2

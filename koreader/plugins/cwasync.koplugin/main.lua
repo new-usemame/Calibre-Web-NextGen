@@ -403,8 +403,8 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                 separator = true,
             },
             {
-                text = _("Sync highlights (experimental, Kobo only)"),
-                help_text = _([[Writes highlights from the server into your Kobo's database so they show in the stock reader. A backup of KoboReader.sqlite is made before any write. Needs KOReader running on a Kobo.]]),
+                text = _("Sync KOReader highlights"),
+                help_text = _([[Uploads highlights and notes from the open KOReader document to your NextGen library. On Kobo devices, existing server-to-Nickel highlight support remains available.]]),
                 checked_func = function() return self.settings.sync_annotations end,
                 callback = function()
                     self.settings.sync_annotations = not self.settings.sync_annotations
@@ -1473,20 +1473,20 @@ function CWASync:syncAnnotations(interactive)
         return
     end
 
+    local digest = self:getDocumentDigest()
+    if not digest then return end
+
     local DeviceAnnotations = require("device_annotations")
-    local provider = DeviceAnnotations.getProvider()
+    local provider = DeviceAnnotations.getProvider(self.ui, digest)
     if not provider then
         if interactive then
             UIManager:show(InfoMessage:new{
-                text = _("Highlight sync needs KOReader running on a Kobo (KoboReader.sqlite)."),
+                text = _("Highlight sync is unavailable for this document."),
                 timeout = 3,
             })
         end
         return
     end
-
-    local digest = self:getDocumentDigest()
-    if not digest then return end
 
     local CWASyncClient = require("CWASyncClient")
     local client = CWASyncClient:new{
@@ -1512,8 +1512,15 @@ function CWASync:syncAnnotations(interactive)
                 end
             end
 
-            local localList = volume_id and provider.readAll(volume_id) or {}
+            local localList = (provider.push_all_local or volume_id)
+                and provider.readAll(volume_id) or {}
             local diff = SyncLogic.diffAnnotations(localList, remote)
+            if provider.push_all_local then
+                -- Phase 1 native KOReader provider: retries the complete local
+                -- set. Server identity/upsert makes this idempotent and avoids
+                -- trusting incomparable device clocks.
+                diff.send_to_server = localList
+            end
 
             local applied = 0
             if volume_id and #diff.apply_to_device > 0 then

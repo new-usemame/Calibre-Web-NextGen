@@ -935,6 +935,11 @@ class Annotation(Base):
     pdf_page = Column(Integer, nullable=True)         # 1-indexed PDF page number
     pdf_quad_json = Column(Text, nullable=True)       # JSON: [[x,y,w,h], ...] in PDF user-space coords
     comic_page = Column(Integer, nullable=True)       # 1-indexed comic page (CBR/CBZ)
+    # KOReader's native reflowable locator.  This is intentionally kept
+    # separate from EPUB CFI: KOReader xpointers are engine-private and are
+    # not safe to present to epub.js as CFIs.
+    start_xpointer = Column(Text, nullable=True)
+    end_xpointer = Column(Text, nullable=True)
     # Phase 2 (KOReader bridge) — opaque per-device id of the row a device last
     # wrote/saw for this annotation (e.g. the KoboReader.sqlite Bookmark.BookmarkID
     # the plugin created). Lets the plugin dedup + suppress feedback loops without
@@ -960,10 +965,14 @@ class Annotation(Base):
     __table_args__ = (
         Index('ix_annotation_user_annotation', 'user_id', 'annotation_id'),
         Index('ix_annotation_user_book', 'user_id', 'book_id'),
+        UniqueConstraint(
+            'user_id', 'book_id', 'annotation_id',
+            name='uq_annotation_user_book_annotation',
+        ),
     )
 
     _VALID_SOURCES = {"kobo", "webreader", "koreader"}
-    _VALID_POSITION_TYPES = {"cfi", "pdf_quad", "comic_page"}
+    _VALID_POSITION_TYPES = {"cfi", "pdf_quad", "comic_page", "koreader_xpointer"}
 
     @validates("source")
     def _validate_source(self, _key, value):
@@ -2622,6 +2631,38 @@ def migrate_annotation_device_origin(engine, _session):
                 raise
 
 
+def migrate_annotation_koreader_identity(engine, _session):
+    """Add KOReader-native locator columns and enforce merge identity.
+
+    The unique index makes parallel device pushes converge on one canonical
+    row.  Existing duplicates are not guessed away: aborting the transaction
+    is rollback-safe and leaves an operator-visible data repair requirement.
+    """
+    with engine.begin() as conn:
+        if not conn.execute(text(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='annotation'"
+        )).first():
+            return
+        duplicate = conn.execute(text(
+            "SELECT user_id, book_id, annotation_id, COUNT(*) AS n "
+            "FROM annotation GROUP BY user_id, book_id, annotation_id "
+            "HAVING COUNT(*) > 1 LIMIT 1"
+        )).first()
+        if duplicate:
+            raise RuntimeError(
+                "annotation identity migration found duplicate "
+                f"(user={duplicate[0]}, book={duplicate[1]}, id={duplicate[2]!r})"
+            )
+        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
+        for name in ("start_xpointer", "end_xpointer"):
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE annotation ADD COLUMN {name} TEXT"))
+        conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_annotation_user_book_annotation "
+            "ON annotation(user_id, book_id, annotation_id)"
+        ))
+
+
 def migrate_annotation_decouple_source_target(engine, _session):
     """Decouple annotation origin from sync target.
 
@@ -2790,6 +2831,7 @@ def migrate_Database(_session):
     migrate_annotation_decouple_source_target(engine, _session)
     migrate_annotation_polymorphic_position(engine, _session)
     migrate_annotation_device_origin(engine, _session)
+    migrate_annotation_koreader_identity(engine, _session)
     migrate_book_cover_preview_table(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)
 

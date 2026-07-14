@@ -153,3 +153,10 @@ def test_push_skips_rows_without_id(env):
     summary = apply_push([{"color": "yellow"}], user=user, book=_book(),
                          session=s, commit=s.commit)
     assert summary["skipped"] == 1
+
+
+@pytest.mark.parametrize("value", [None, "", {}, "wrong"])
+def test_push_rejects_non_array_annotation_collections(env, value):
+    s, user = env
+    summary = apply_push(value, user=user, book=_book(), session=s, commit=s.commit)
+    assert summary == {"created": 0, "updated": 0, "deleted": 0, "skipped": 0}

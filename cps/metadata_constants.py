@@ -22,3 +22,14 @@ DEFAULT_METADATA_PROVIDER_HIERARCHY = ["google", "openlibrary", "ibdb", "dnb", "
 # template fallback literally — the agreement is asserted in
 # tests/unit/test_metadata_autofetch_safety.py.
 DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON = '["google","openlibrary","ibdb","dnb","douban"]'
+
+# Scraper integrations whose upstream markup/anti-bot posture makes them unsuitable
+# as surprise defaults. Users must explicitly opt in through an existing provider
+# toggle; an explicit saved True/False always wins.
+DEFAULT_OFF_METADATA_PROVIDERS = frozenset({"goodreads", "bolcom"})
+
+
+def metadata_provider_enabled(provider_id, enabled_map):
+    return bool(enabled_map.get(
+        provider_id, provider_id not in DEFAULT_OFF_METADATA_PROVIDERS
+    ))

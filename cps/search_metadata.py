@@ -22,6 +22,7 @@ from cps.services.Metadata import Metadata
 from cps.services.cover_booster import boost_covers
 from . import config, constants, logger, ub, web_server
 from .usermanagement import user_login_required
+from .metadata_constants import metadata_provider_enabled
 
 
 meta = Blueprint("metadata", __name__)
@@ -236,14 +237,14 @@ def metadata_provider():
     global_enabled = _get_global_provider_enabled_map()
     provider = list()
     for c in cl:
-        ac = active.get(c.__id__, True)
+        ac = metadata_provider_enabled(c.__id__, active)
         provider.append(
             {
                 "name": c.__name__,
                 "active": ac,
                 "initial": ac,
                 "id": c.__id__,
-                "globally_enabled": bool(global_enabled.get(c.__id__, True)),
+                "globally_enabled": metadata_provider_enabled(c.__id__, global_enabled),
             }
         )
     return make_response(jsonify(provider))
@@ -272,7 +273,7 @@ def metadata_change_active_provider(prov_name):
         # Respect global disablement for preview search as well
         global_enabled = _get_global_provider_enabled_map()
         if provider is not None:
-            if bool(global_enabled.get(provider.__id__, True)):
+            if metadata_provider_enabled(provider.__id__, global_enabled):
                 try:
                     data = provider.search(new_state.get("query", ""))
                 except Exception as exc:
@@ -367,8 +368,8 @@ def metadata_search():
     # globally). This keeps modal copy stable across reload.
     runnable = {}
     for provider in cl:
-        is_active = active.get(provider.__id__, True)
-        is_global = bool(global_enabled.get(provider.__id__, True))
+        is_active = metadata_provider_enabled(provider.__id__, active)
+        is_global = metadata_provider_enabled(provider.__id__, global_enabled)
         if not is_active or not is_global:
             provider_status.append({
                 "id": provider.__id__,

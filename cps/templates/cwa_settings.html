@@ -1368,7 +1368,8 @@ document.addEventListener('DOMContentLoaded', function() {
       wrapper.classList.add('provider_enable_item');
 
       const id = `global-provider-${p.id}`;
-      const checked = (enabledMap.hasOwnProperty(p.id) ? !!enabledMap[p.id] : true);
+      const defaultOff = new Set(['goodreads', 'bolcom']);
+      const checked = (enabledMap.hasOwnProperty(p.id) ? !!enabledMap[p.id] : !defaultOff.has(p.id));
       wrapper.innerHTML = `
         <input type="checkbox" id="${id}" data-provider-id="${p.id}" ${checked ? 'checked' : ''}>
         <label for="${id}" style="margin-left: 8px;">${p.name}</label>

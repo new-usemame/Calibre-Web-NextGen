@@ -18,6 +18,10 @@ is for things you can see or feel when running the app.
 
 ### Added
 
+- **Goodreads and bol.com can now supply book metadata and covers when you opt in, without taking down metadata search when either site blocks or changes its pages.** Both best-effort providers are off by default, use hard request timeouts, and isolate upstream failures so the other enabled sources keep working. ([#303](https://github.com/new-usemame/Calibre-Web-NextGen/issues/303), [#315](https://github.com/new-usemame/Calibre-Web-NextGen/issues/315))
+
+### Added
+
 - Platform-specific install and switch guides now cover Synology, Unraid, Portainer, TrueNAS SCALE, QNAP, Dockge, and Docker Compose, with verified first-run screenshots, safer migration guidance, and matching generated-wiki pages. Contributor documentation now also explains the supported local-development workflow and pull-request quality checks. ([#527](https://github.com/new-usemame/Calibre-Web-NextGen/issues/527), [#843](https://github.com/new-usemame/Calibre-Web-NextGen/issues/843), [#765](https://github.com/new-usemame/Calibre-Web-NextGen/issues/765))
 - Book details and the sortable table now show when each book was added and last modified, restoring metadata that was only visible in the classic interface. ([#878](https://github.com/new-usemame/Calibre-Web-NextGen/issues/878))
 - Libraries that need a standing filter—such as hiding comics by tag—can now save any advanced search as the account's default library view, with the choice following the user across devices and a one-click way to clear it. ([#498](https://github.com/new-usemame/Calibre-Web-NextGen/issues/498))

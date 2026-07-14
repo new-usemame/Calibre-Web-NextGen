@@ -261,7 +261,21 @@ def test_strict_parse_propagates_parse_errors(uploader, app_ctx, corrupt_pdf):
     """RED on main: process swallowed the exception and returned
     default_meta, so the route's error handler (editbooks.py:2398-2403)
     became unreachable and an unparseable file reported success while
-    stomping the title."""
+    stomping the title.
+
+    This payload has no cross-reference table, so pypdf raises while
+    constructing PdfReader — before pdf_meta's own try/except around the
+    DocumentInfo read, which swallows metadata-read errors even under
+    strict. Propagation therefore covers files that fail to open, not
+    every conceivable parse failure. A file that opens but has an
+    unreadable DocumentInfo still returns empty fields rather than
+    guesses, so the invariant that matters for #877 — never overwrite
+    curated data with a guess — holds either way; only the error report
+    degrades to a "0 fields updated" success. If a future pypdf defers
+    this failure to metadata access, process() returns instead of
+    raising and this test fails loudly here rather than passing for the
+    wrong reason.
+    """
     with pytest.raises(Exception) as excinfo:
         uploader.process(
             corrupt_pdf, CALIBRE_DATA_STEM, ".pdf", rar_executable=None,
@@ -272,6 +286,12 @@ def test_strict_parse_propagates_parse_errors(uploader, app_ctx, corrupt_pdf):
     assert not (
         isinstance(excinfo.value, TypeError) and "strict" in str(excinfo.value)
     ), f"raised for the wrong reason: {excinfo.value!r}"
+    # Pin that the error is the PDF parse itself. Without this the test
+    # would accept any exception — a missing fixture or a refactor typo
+    # would keep it green while proving nothing about propagation.
+    assert type(excinfo.value).__module__.split(".")[0] == "pypdf", (
+        f"expected the pypdf parse error to propagate, got {excinfo.value!r}"
+    )
 
 
 # ---------------------------------------------------------------------------

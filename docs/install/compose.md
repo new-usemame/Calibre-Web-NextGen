@@ -21,7 +21,9 @@ empty volume set and host port `8105`; your normal URL will use the host port in
 
 ![The real NextGen login page after a fresh-volume Docker Compose start](images/verified/01-login.jpeg)
 
-![The empty library after the documented first login](images/verified/02-empty-library.jpeg)
+![The empty library after the documented first login](images/verified/02-library.jpeg)
+
+![The redesigned library after choosing Try the new UI](images/verified/03-new-ui.jpeg)
 
 ## Switching from stock CWA
 

@@ -28,6 +28,29 @@ from sqlalchemy import exc
 _VALID_SOURCES = {"kobo", "webreader", "koreader"}
 
 
+def validate_portable_payload(payload) -> Optional[str]:
+    """Return a validation error for fields that would make an upsert unsafe."""
+    if not isinstance(payload, dict):
+        return None  # non-object entries are deliberately counted as skipped
+    for field in ("annotation_id", "highlighted_text", "note_text", "color",
+                  "content_id", "context_string", "position_type",
+                  "start_xpointer", "end_xpointer", "device_origin_id"):
+        value = payload.get(field)
+        if value is not None and not isinstance(value, str):
+            return f"{field} must be a string or null"
+    for field in ("start_kobospan", "end_kobospan"):
+        value = payload.get(field)
+        if value is not None and not isinstance(value, str):
+            return f"{field} must be a string or null"
+    for field in ("start_offset", "end_offset"):
+        value = payload.get(field)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+            return f"{field} must be an integer or null"
+    if "hidden" in payload and not isinstance(payload.get("hidden"), bool):
+        return "hidden must be a boolean"
+    return None
+
+
 def _now():
     return datetime.now(timezone.utc)
 
@@ -60,7 +83,7 @@ def to_portable(row) -> dict:
 def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional[object], str]:
     """Upsert an Annotation from a device-pushed portable dict.
 
-    Find-or-create keyed on ``(user_id, annotation_id)``. New rows take the
+    Find-or-create keyed on ``(user_id, book_id, annotation_id)``. New rows take the
     payload's ``source`` (coerced to ``koreader`` if absent/invalid). Position
     fields are built from the KoboSpan anchors like the web-reader create path.
     ``device_origin_id`` is recorded so the next pull won't echo the row back to
@@ -95,6 +118,10 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
         )
         session.add(row)
         created = True
+    elif row.hidden and not payload.get("hidden"):
+        # A complete-list retry has no mutation clock, so it cannot prove an
+        # intentional recreation. Preserve the tombstone and every stored field.
+        return row, "skipped"
     elif payload.get("source") in _VALID_SOURCES:
         row.source = payload.get("source")
 

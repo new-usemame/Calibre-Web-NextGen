@@ -808,7 +808,9 @@ def annotations_delete(book_id, annotation_id):
     # the row has none. Idempotent (re-sets hidden=True, skips tombstones).
     try:
         from .services import annotation_sync
-        annotation_sync.dispatch_annotation_deletes([annotation_id], current_user)
+        annotation_sync.dispatch_annotation_deletes(
+            [annotation_id], current_user, book_id=book_id,
+        )
     except Exception as e:  # pragma: no cover - defensive
         log.warning("annotations: delete fan-out failed: %s", e)
     return jsonify({"status": "deleted", "annotation_id": annotation_id}), 200

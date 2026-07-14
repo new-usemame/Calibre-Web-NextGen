@@ -14,19 +14,24 @@ file pins the testable core:
 
 from __future__ import annotations
 
+import importlib
 import pytest
+from flask import Flask
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from types import SimpleNamespace
 
 from cps import ub
+from cps import calibre_db
 from cps.services.annotation_sync import (
-    register_handler, reset_registry_for_testing,
+    register_handler, reset_registry_for_testing, dispatch_annotation_deletes,
 )
 from cps.services.annotation_sync.base import AnnotationSyncTargetHandler, SyncResult
 from cps.progress_syncing.protocols.koreader_annotations import (
     build_pull_payload, apply_push,
 )
+annotation_routes = importlib.import_module("cps.progress_syncing.protocols.koreader_annotations")
+kosync_routes = importlib.import_module("cps.progress_syncing.protocols.kosync")
 
 pytestmark = pytest.mark.unit
 
@@ -148,6 +153,25 @@ def test_push_fans_out_to_enabled_target(env):
     assert tgt.target == "stub" and tgt.status == "synced"
 
 
+def test_duplicate_retry_does_not_fan_out_again(env):
+    s, user = env
+    handler = StubHandler()
+    register_handler(handler)
+    payload = {"annotation_id": "fan-once", "highlighted_text": "same"}
+    apply_push([payload], user=user, book=_book(), session=s, commit=s.commit)
+    apply_push([payload], user=user, book=_book(), session=s, commit=s.commit)
+    assert handler.pushes == ["fan-once"]
+
+
+def test_delete_fanout_is_scoped_to_book(env):
+    s, user = env
+    _seed(s, user, "shared", book_id=7)
+    _seed(s, user, "shared", book_id=8)
+    dispatch_annotation_deletes(["shared"], user, book_id=8)
+    assert s.query(ub.Annotation).filter_by(book_id=7, annotation_id="shared").one().hidden is False
+    assert s.query(ub.Annotation).filter_by(book_id=8, annotation_id="shared").one().hidden is True
+
+
 def test_push_skips_rows_without_id(env):
     s, user = env
     summary = apply_push([{"color": "yellow"}], user=user, book=_book(),
@@ -160,3 +184,86 @@ def test_push_rejects_non_array_annotation_collections(env, value):
     s, user = env
     summary = apply_push(value, user=user, book=_book(), session=s, commit=s.commit)
     assert summary == {"created": 0, "updated": 0, "deleted": 0, "skipped": 0}
+
+
+@pytest.fixture
+def wire(env, monkeypatch):
+    """Real Flask routing for KOReader's auth -> push -> pull handshake."""
+    session, user = env
+    book = _book()
+    monkeypatch.setattr(kosync_routes, "is_koreader_sync_enabled", lambda: True)
+    monkeypatch.setattr(kosync_routes, "authenticate_user", lambda: user)
+    monkeypatch.setattr(annotation_routes, "_require_kosync_enabled", lambda: None)
+    monkeypatch.setattr(annotation_routes, "authenticate_user", lambda: user)
+    monkeypatch.setattr(
+        annotation_routes, "get_book_by_checksum",
+        lambda document: (book.id, "EPUB", book.title, "book.epub", "koreader")
+        if document == "digest-699" else (None, None, None, None, None),
+    )
+    monkeypatch.setattr(calibre_db, "get_book", lambda _id: book)
+    app = Flask(__name__)
+    app.register_blueprint(kosync_routes.kosync)
+    return app.test_client(), session
+
+
+def test_exact_koreader_auth_push_pull_conflict_and_duplicate_sequence(wire):
+    client, session = wire
+
+    auth = client.get("/kosync/users/auth")
+    assert auth.status_code == 200
+
+    device_a = {"annotation_id": "device-a-1", "highlighted_text": "alpha",
+                "position_type": "koreader_xpointer", "start_xpointer": "/a"}
+    first = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-699", "annotations": [device_a],
+    })
+    assert first.status_code == 200
+    assert first.get_json()["created"] == 1
+
+    # Device B pulls A, then contributes a distinct highlight.  A is included
+    # again exactly as the phase-1 provider retries its complete local set.
+    pulled_a = client.get("/kosync/syncs/annotations/digest-699")
+    assert {a["annotation_id"] for a in pulled_a.get_json()["annotations"]} == {"device-a-1"}
+    device_b = {"annotation_id": "device-b-1", "highlighted_text": "beta",
+                "position_type": "koreader_xpointer", "start_xpointer": "/b"}
+    merged = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-699", "annotations": [device_a, device_b],
+    })
+    assert merged.status_code == 200
+    assert merged.get_json()["created"] == 1
+    assert merged.get_json()["skipped"] == 1
+
+    final = client.get("/kosync/syncs/annotations/digest-699").get_json()
+    assert final["annotation_count"] == 2
+    assert {a["annotation_id"] for a in final["annotations"]} == {"device-a-1", "device-b-1"}
+    assert session.query(ub.Annotation).count() == 2
+
+
+@pytest.mark.parametrize("payload,error", [
+    (None, "invalid_payload"),
+    ([], "invalid_payload"),
+    ({"document": "digest-699", "annotations": None}, "invalid_annotations"),
+    ({"document": "digest-699", "annotations": "wrong"}, "invalid_annotations"),
+    ({"document": "digest-699", "annotations": {}}, "invalid_annotations"),
+])
+def test_wire_push_rejects_none_empty_and_wrong_types(wire, payload, error):
+    client, _session = wire
+    response = client.put("/kosync/syncs/annotations", json=payload)
+    assert response.status_code == 400
+    assert response.get_json()["error"] == error
+
+
+def test_wire_preflights_entire_batch_before_persisting(wire):
+    client, session = wire
+    response = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-699",
+        "annotations": [
+            {"annotation_id": "must-not-partially-commit", "highlighted_text": "valid"},
+            {"annotation_id": "bad", "start_kobospan": [], "start_offset": "bad"},
+        ],
+    })
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "invalid_annotation"
+    assert session.query(ub.Annotation).filter_by(
+        annotation_id="must-not-partially-commit"
+    ).count() == 0

@@ -171,3 +171,19 @@ def test_same_annotation_id_is_scoped_by_book(session):
     other = SimpleNamespace(id=43, uuid="other")
     apply_portable(payload, user_id=9, book=other, session=session, commit=session.commit)
     assert session.query(ub.Annotation).filter_by(user_id=9, annotation_id="local-1").count() == 2
+
+
+def test_stale_complete_list_retry_cannot_resurrect_tombstone(session):
+    book = _book()
+    payload = {"annotation_id": "deleted", "highlighted_text": "original"}
+    row, _ = apply_portable(payload, user_id=9, book=book, session=session, commit=session.commit)
+    row.hidden = True
+    session.commit()
+
+    row, action = apply_portable(
+        {"annotation_id": "deleted", "highlighted_text": "stale", "hidden": False},
+        user_id=9, book=book, session=session, commit=session.commit,
+    )
+    assert action == "skipped"
+    assert row.hidden is True
+    assert row.highlighted_text == "original"

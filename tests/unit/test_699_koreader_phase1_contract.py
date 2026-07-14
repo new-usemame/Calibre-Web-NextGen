@@ -93,6 +93,37 @@ def test_two_parallel_devices_merge_without_duplicate_or_integrity_leak(tmp_path
     assert "created" in actions
 
 
+def test_two_parallel_devices_with_distinct_highlights_never_clobber(tmp_path):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'distinct.db'}", future=True,
+        connect_args={"check_same_thread": False, "timeout": 10},
+    )
+    ub.Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, future=True)
+    barrier = Barrier(2)
+    book = SimpleNamespace(id=7, uuid="book")
+
+    def device(annotation_id):
+        session = Session()
+        try:
+            barrier.wait(timeout=5)
+            return apply_portable(
+                {"annotation_id": annotation_id, "highlighted_text": annotation_id},
+                user_id=3, book=book, session=session, commit=session.commit,
+            )[1]
+        finally:
+            session.close()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        actions = list(pool.map(device, ("device-a-highlight", "device-b-highlight")))
+    with Session() as session:
+        rows = session.query(ub.Annotation).filter_by(user_id=3, book_id=7).all()
+        assert {row.annotation_id for row in rows} == {
+            "device-a-highlight", "device-b-highlight",
+        }
+    assert actions == ["created", "created"]
+
+
 def test_plugin_native_provider_and_handshake_are_wired():
     root = Path(__file__).parents[2]
     provider = (root / "koreader/plugins/cwasync.koplugin/koreader_annotations_provider.lua").read_text()

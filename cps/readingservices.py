@@ -376,7 +376,9 @@ def handle_annotations(entitlement_id):
                 if updated:
                     annotation_sync.dispatch_annotation_sync(updated, book, current_user)
                 if deleted:
-                    annotation_sync.dispatch_annotation_deletes(deleted, current_user)
+                    annotation_sync.dispatch_annotation_deletes(
+                        deleted, current_user, book_id=book.id,
+                    )
         except Exception:
             log.exception("Error processing PATCH annotations")
     # Proxy to Kobo reading services for both GET + PATCH.
@@ -418,4 +420,3 @@ def handle_unknown_reading_service_request(subpath):
     """
     # Proxy to Kobo reading services
     return proxy_to_kobo_reading_services()
-

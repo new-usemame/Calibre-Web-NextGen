@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- KOReader highlights and notes from the open book can now sync into Calibre-Web NextGen, survive concurrent updates from multiple devices, and appear in the existing Highlights list on the book page. ([#699](https://github.com/new-usemame/Calibre-Web-NextGen/issues/699))
+
 ### Changed
 
 - The new in-browser reader now keeps font family, size, margins, line height, and page theme with your account, so your preferred reading layout follows you between browsers and the classic/new interfaces; its appearance panel is touch- and keyboard-accessible on phones and desktops.

@@ -6,7 +6,7 @@ Public API:
   - register_handler(handler): plug in a new target
   - available_targets(): list registered target names
   - dispatch_annotation_sync(payload_annotations, book, user): push every annotation
-  - dispatch_annotation_deletes(deleted_ids, user): delete every annotation
+  - dispatch_annotation_deletes(deleted_ids, user, book_id): delete scoped annotations
 
 The dispatcher owns all DB persistence — Annotation rows + AnnotationSyncTarget
 rows + the status state machine. Handlers are stateless: they make remote
@@ -61,7 +61,7 @@ def _book_uuid(book):
 
 
 def _upsert_annotation(session, payload, book, user):
-    """Find-or-create Annotation row keyed on (user_id, annotation_id).
+    """Find-or-create Annotation row keyed on (user_id, book_id, annotation_id).
 
     Populates content fields AND position fields from the Kobo PATCH payload
     so subsequent CFI computation has everything it needs.  This is the
@@ -76,6 +76,7 @@ def _upsert_annotation(session, payload, book, user):
         session.query(ub.Annotation)
         .filter(
             ub.Annotation.user_id == user.id,
+            ub.Annotation.book_id == book.id,
             ub.Annotation.annotation_id == annotation_id,
         )
         .first()
@@ -244,7 +245,7 @@ def dispatch_existing_annotation_sync(annotation, book, user) -> None:
     ub.session_commit()
 
 
-def dispatch_annotation_deletes(deleted_ids, user) -> None:
+def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
     """For each annotation_id, transition non-tombstone sync_targets via
     handler.delete AND soft-delete the local Annotation row by setting
     ``hidden=True``.
@@ -258,14 +259,13 @@ def dispatch_annotation_deletes(deleted_ids, user) -> None:
     if not deleted_ids:
         return
     for annotation_id in deleted_ids:
-        ann = (
-            ub.session.query(ub.Annotation)
-            .filter(
-                ub.Annotation.user_id == user.id,
-                ub.Annotation.annotation_id == annotation_id,
-            )
-            .first()
+        query = ub.session.query(ub.Annotation).filter(
+            ub.Annotation.user_id == user.id,
+            ub.Annotation.annotation_id == annotation_id,
         )
+        if book_id is not None:
+            query = query.filter(ub.Annotation.book_id == book_id)
+        ann = query.first()
         if ann is None:
             continue
         # Push delete through any non-tombstone sync targets first.

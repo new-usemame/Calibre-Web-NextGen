@@ -78,11 +78,13 @@ def apply_push(annotations, *, user, book, session, commit) -> dict:
             payload, user_id=user.id, book=book, session=session, commit=commit,
         )
         summary[action] = summary.get(action, 0) + 1
-        if row is None:
+        if row is None or action == "skipped":
             continue
         try:
             if action == "deleted":
-                annotation_sync.dispatch_annotation_deletes([row.annotation_id], user)
+                annotation_sync.dispatch_annotation_deletes(
+                    [row.annotation_id], user, book_id=book.id,
+                )
             else:
                 annotation_sync.dispatch_existing_annotation_sync(row, book, user)
         except Exception:  # pragma: no cover - fan-out must never fail the push
@@ -152,6 +154,14 @@ def push_annotations():
     annotations = data.get("annotations")
     if not isinstance(annotations, list):
         return create_sync_response({"error": "invalid_annotations", "message": "annotations must be an array"}, 400)
+    from ...services.annotation_portable import validate_portable_payload
+    for index, payload in enumerate(annotations):
+        error = validate_portable_payload(payload)
+        if error:
+            return create_sync_response({
+                "error": "invalid_annotation",
+                "message": f"annotations[{index}]: {error}",
+            }, 400)
     summary = apply_push(
         annotations, user=user, book=book,
         session=ub.session, commit=ub.session_commit,

@@ -2656,7 +2656,11 @@ def migrate_annotation_koreader_identity(engine, _session):
         existing = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
         for name in ("start_xpointer", "end_xpointer"):
             if name not in existing:
-                conn.execute(text(f"ALTER TABLE annotation ADD COLUMN {name} TEXT"))
+                try:
+                    conn.execute(text(f"ALTER TABLE annotation ADD COLUMN {name} TEXT"))
+                except exc.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        raise
         conn.execute(text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_annotation_user_book_annotation "
             "ON annotation(user_id, book_id, annotation_id)"

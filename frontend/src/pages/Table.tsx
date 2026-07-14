@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
-import { ArrowUp, ArrowDown, Check, Columns3 } from 'lucide-react';
-import { useBooks } from '../lib/queries';
+import { ArrowUp, ArrowDown, Check, Columns3, Pencil, X } from 'lucide-react';
+import { useBooks, useMe, useUpdateMetadata } from '../lib/queries';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
@@ -31,6 +31,44 @@ function formatLibraryDate(value: string | null | undefined): string {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 }
 
+function EditableTitleCell({ book, canEdit, onSaved }: {
+  book: Book; canEdit: boolean; onSaved: (title: string) => void;
+}) {
+  const t = useT();
+  const update = useUpdateMetadata(book.id);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(book.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const cancel = () => { setValue(book.title); setEditing(false); };
+  const save = () => {
+    const title = value.trim();
+    if (!title || title === book.title) { cancel(); return; }
+    update.mutate({ title }, { onSuccess: () => { onSaved(title); setEditing(false); } });
+  };
+
+  if (!editing) return (
+    <span className={styles.titleCell}>
+      <Link href={`/book/${book.id}`} className={styles.titleLink}>{book.title}</Link>
+      {canEdit && <button type="button" className={styles.inlineEdit}
+        aria-label={t('Edit title for {title}', { title: book.title })} onClick={() => setEditing(true)}>
+        <Pencil size={14} aria-hidden="true" focusable={false} />
+      </button>}
+    </span>
+  );
+
+  return <span className={styles.inlineForm}>
+    <input ref={inputRef} value={value} aria-label={t('Title')}
+      onChange={(event) => setValue(event.target.value)}
+      onKeyDown={(event) => { if (event.key === 'Enter') save(); if (event.key === 'Escape') cancel(); }} />
+    <button type="button" onClick={save} disabled={update.isPending || !value.trim()}>{t('Save')}</button>
+    <button type="button" onClick={cancel} disabled={update.isPending} aria-label={t('Cancel title edit')}>
+      <X size={14} aria-hidden="true" focusable={false} />
+    </button>
+    {update.isError && <span role="alert">{t('Could not save title.')}</span>}
+  </span>;
+}
+
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const seen = new Set(prev.map((b) => b.id));
   const fresh = next.filter((b) => !seen.has(b.id));
@@ -41,6 +79,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
  *  visibility, infinite "load more". Replaces the legacy /table page. */
 export function Table() {
   const t = useT();
+  const canEdit = !!useMe().data?.role?.edit;
   const [sort, setSort] = useState('new');
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<Book[]>([]);
@@ -148,9 +187,9 @@ export function Table() {
                     </td>
                     {visible.map((c) => (
                       <td key={c.key}>
-                        {c.key === 'title' && (
-                          <Link href={`/book/${b.id}`} className={styles.titleLink}>{b.title}</Link>
-                        )}
+                        {c.key === 'title' && <EditableTitleCell book={b} canEdit={canEdit}
+                          onSaved={(title) => setRows((current) => current.map((row) =>
+                            row.id === b.id ? { ...row, title } : row))} />}
                         {c.key === 'authors' && (b.authors || []).join(', ')}
                         {c.key === 'series' && (b.series ? `${b.series}${b.series_index ? ` #${b.series_index}` : ''}` : '—')}
                         {c.key === 'tags' && ((b.tags || []).join(', ') || '—')}

@@ -58,6 +58,13 @@
 .coverThumbEmpty { width: 48px; height: 72px; background: var(--surface-2, var(--surface-1)); border-radius: var(--r-sm); }
 .titleLink { color: var(--text); font-weight: 600; }
 .titleLink:hover { color: var(--accent); }
+.titleCell { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.inlineEdit { display: inline-grid; place-items: center; min-width: 28px; min-height: 28px; color: var(--text-muted); border-radius: var(--r-sm); }
+.inlineEdit:hover, .inlineEdit:focus-visible { color: var(--text); background: var(--surface-2); }
+.inlineForm { display: flex; align-items: center; gap: var(--sp-1); min-width: 280px; }
+.inlineForm input { min-width: 150px; padding: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-sm); }
+.inlineForm button { min-width: 28px; min-height: 28px; padding: var(--sp-1) var(--sp-2); }
+.inlineForm [role='alert'] { color: var(--danger, #ff8d8d); }
 .readYes { color: var(--success); }
 
 .loadMore { display: flex; justify-content: center; padding: var(--sp-4); }

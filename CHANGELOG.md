@@ -24,6 +24,7 @@ is for things you can see or feel when running the app.
 
 ### Changed
 
+- Editors can now correct a book title directly in the sortable table with keyboard-friendly Save/Cancel controls, while viewers retain a read-only table. ([#783](https://github.com/new-usemame/Calibre-Web-NextGen/issues/783))
 - The new in-browser reader now keeps font family, size, margins, line height, and page theme with your account, so your preferred reading layout follows you between browsers and the classic/new interfaces; its appearance panel is touch- and keyboard-accessible on phones and desktops.
 - Book grids can now load a chosen number of complete rows at any card density, Discover respects the server's random-book count, and touch-screen “Read now” actions align along the bottom of each card.
 

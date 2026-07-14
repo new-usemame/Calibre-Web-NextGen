@@ -55,7 +55,6 @@ from .usermanagement import user_login_required
 from .string_helper import strip_whitespaces
 from .logout import cleanup_local_logout
 from .reader_settings import (
-    merged_reader_settings,
     reader_setting_int as _reader_setting_int,
     sanitize_reader_settings,
 )
@@ -277,33 +276,8 @@ def toggle_favorite(book_id):
 # margin used to live only in the one browser's localStorage, so they never
 # followed a user to their phone or another browser. We persist them under
 # view_settings['reader'] (same JSON column + flag_modified pattern as the
-# books-list view settings) so they sync per-user across devices. Anonymous
-# sessions never reach the save route (@user_login_required) and keep using
-# localStorage as before.
-@web.route("/ajax/readersettings", methods=['POST'])
-@user_login_required
-def save_reader_settings():
-    """Persist the web reader's per-user display settings so they follow the
-    user across devices instead of living only in one browser's localStorage."""
-    try:
-        payload = json.loads(request.data or b"{}")
-    except (ValueError, TypeError):
-        return json.dumps({"saved": False}), 400, {"Content-Type": "application/json"}
-    existing = (getattr(current_user, "view_settings", None) or {}).get("reader", {})
-    cleaned = merged_reader_settings(existing, payload)
-    if current_user.view_settings is None:
-        current_user.view_settings = {}
-    current_user.view_settings["reader"] = cleaned
-    try:
-        flag_modified(current_user, "view_settings")
-        ub.session.commit()
-    except Exception as exc:
-        ub.session.rollback()
-        log.error("Could not save reader settings for user %s: %s", current_user.id, exc)
-        return json.dumps({"saved": False}), 500, {"Content-Type": "application/json"}
-    return json.dumps({"saved": True, "reader": cleaned})
-
-
+# books-list view settings) so they sync per-user across devices. Persistence
+# is owned by the dedicated /api/v1/reader/settings route.
 # Per-user hidden books — fork issue #64. Hide removes the book from index
 # pages, search, OPDS feeds, and shelf listings for the calling user only;
 # /hidden lists hidden books with an unhide button. Distinct from archive
@@ -3464,10 +3438,10 @@ def read_book(book_id, book_format):
 
     if book_format.lower() in ("epub", "kepub"):
         log.debug("Start epub reader for %d (%s)", book_id, book_format.lower())
-        # Per-user reader display settings (theme/font/size/spread/reflow/margin)
+        # Per-user reader display settings (theme/font/size/spread/reflow/margin/line height)
         # so the reader boots with the user's saved choices instead of waiting
         # for a localStorage read. Anonymous users get {} and fall back to
-        # localStorage. See save_reader_settings() + reader-settings.js.
+        # localStorage. Persistence is owned by /api/v1/reader/settings.
         reader_settings = {}
         if current_user.is_authenticated:
             reader_settings = (getattr(current_user, "view_settings", None) or {}).get("reader", {}) or {}

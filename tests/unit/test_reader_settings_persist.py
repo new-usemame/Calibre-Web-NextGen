@@ -1,11 +1,13 @@
 """Per-user web-reader display settings (task #31).
 
-Reader settings (theme/font/fontSize/spread/reflow/margin) are persisted under
+Reader settings (theme/font/fontSize/spread/reflow/margin/lineHeight) are persisted under
 view_settings['reader'] so they follow a user across devices. sanitize_reader_settings()
 is the gate that keeps a crafted POST from storing junk on the user row — pin
 its whitelist + clamping. RED on main (the function doesn't exist there); GREEN
 on the branch.
 """
+from pathlib import Path
+
 import pytest
 
 from cps.web import sanitize_reader_settings, _reader_setting_int
@@ -68,3 +70,24 @@ def test_reader_setting_int_helper():
     assert _reader_setting_int("abc", 0, 80) is None
     assert _reader_setting_int(None, 0, 80) is None
     assert _reader_setting_int("40", 0, 80) == 40
+
+
+def test_classic_reader_uses_dedicated_route_and_shared_line_height():
+    root = Path(__file__).resolve().parents[2]
+    settings_js = (root / "cps/static/js/reading/reader-settings.js").read_text()
+    reader_js = (root / "cps/static/js/reading/epub.js").read_text()
+    template = (root / "cps/templates/read.html").read_text()
+
+    assert '"/api/v1/reader/settings"' in settings_js
+    assert "/ajax/readersettings" not in settings_js
+    assert "lineHeight: true" in settings_js
+    assert 'id="lineHeightFader"' in template
+    assert 'ReaderSettings.set("lineHeight"' in template
+    assert "applyReaderLineHeight" in reader_js
+
+
+def test_spa_font_range_matches_canonical_contract():
+    root = Path(__file__).resolve().parents[2]
+    reader = (root / "frontend/src/pages/Reader.tsx").read_text()
+    assert "const FONT_MIN = 75;" in reader
+    assert "const FONT_MAX = 200;" in reader

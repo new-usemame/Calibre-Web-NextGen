@@ -47,8 +47,8 @@ const THEMES: Record<ReaderTheme, { body: Record<string, string> }> = {
   dark: { body: { background: '#15110c !important', color: '#cdc6bb !important' } },
 };
 
-const FONT_MIN = 80;
-const FONT_MAX = 160;
+const FONT_MIN = 75;
+const FONT_MAX = 200;
 const LS_THEME = 'cwng.reader.theme';
 const LS_FONT = 'cwng.reader.font';
 
@@ -291,13 +291,6 @@ export function Reader({ id }: { id: string }) {
   const goPrev = useCallback(() => renditionRef.current?.prev(), []);
   const goNext = useCallback(() => renditionRef.current?.next(), []);
 
-  const handleReaderKey = useCallback((e: KeyboardEvent) => {
-    const target = e.target as HTMLElement | null;
-    if (target?.closest('input, select, textarea, button, [role="dialog"]')) return;
-    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goPrev(); }
-    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); goNext(); }
-  }, [goPrev, goNext]);
-
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
     if (!epubFormat || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
@@ -331,31 +324,12 @@ export function Reader({ id }: { id: string }) {
         // C10 (SC 4.1.2): epub.js renders each section into an <iframe> with no
         // title — screen readers announce "frame" with no name. Title them as
         // they render so the book content region is named.
-        rendition.on('rendered', (_section: unknown, contents: any) => {
+        rendition.on('rendered', () => {
           viewerRef.current?.querySelectorAll('iframe').forEach((f) => {
             f.setAttribute('title', t('Book content'));
           });
           applyTheme(theme);
           applyTypography();
-          const doc = contents?.document;
-          if (doc && !doc.documentElement.dataset.cwngReaderInput) {
-            doc.documentElement.dataset.cwngReaderInput = 'true';
-            let startX = 0;
-            let startY = 0;
-            doc.addEventListener('touchstart', (event: TouchEvent) => {
-              const touch = event.changedTouches[0];
-              if (touch) { startX = touch.clientX; startY = touch.clientY; }
-            }, { passive: true });
-            doc.addEventListener('touchend', (event: TouchEvent) => {
-              const touch = event.changedTouches[0];
-              if (!touch) return;
-              const dx = touch.clientX - startX;
-              const dy = touch.clientY - startY;
-              if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy) * 1.25) return;
-              if (dx < 0) goNext(); else goPrev();
-            }, { passive: true });
-            doc.addEventListener('keyup', handleReaderKey);
-          }
         });
 
         await rendition.display(savedCfiRef.current || undefined);
@@ -448,12 +422,16 @@ export function Reader({ id }: { id: string }) {
     applyTypography();
   }, [fontPct, fontFamily, margin, lineHeight, applyTypography]);
 
-  // Keyboard navigation on the outer document; rendered iframe documents are
-  // wired above so focus inside book content gets the same modality contract.
+  // Arrow-key navigation (the iframe also forwards keys via rendition).
   useEffect(() => {
-    document.addEventListener('keydown', handleReaderKey);
-    return () => document.removeEventListener('keydown', handleReaderKey);
-  }, [handleReaderKey]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') goPrev();
+      if (e.key === 'ArrowRight') goNext();
+    };
+    document.addEventListener('keyup', onKey);
+    renditionRef.current?.on('keyup', onKey);
+    return () => document.removeEventListener('keyup', onKey);
+  }, [goPrev, goNext, rendered]);
 
   const goToc = (href: string) => {
     const rendition = renditionRef.current;
@@ -597,7 +575,8 @@ export function Reader({ id }: { id: string }) {
             ] as const).map(([key, label, value, min, max, unit, setter, settingKey]) => (
               <label key={key} className={styles.settingField} htmlFor={`reader-${key}`}>
                 <span>{label} <output>{value}{unit}</output></span>
-                <input id={`reader-${key}`} type="range" min={min} max={max} step={key === 'page-margin' ? 4 : 10}
+                <input id={`reader-${key}`} type="range" min={min} max={max}
+                  step={key === 'page-margin' ? 4 : key === 'font-size' ? 5 : 10}
                   value={value} onChange={(e) => {
                     const next = Number(e.target.value);
                     setter(next);

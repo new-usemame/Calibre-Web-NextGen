@@ -1,14 +1,13 @@
 /* global $, calibre */
 // Per-user web-reader display settings.
 //
-// Settings (theme, font, fontSize, spread, reflow, margin) used to live only
+// Settings (theme, font, fontSize, spread, reflow, margin, lineHeight) used to live only
 // in this browser's localStorage, so they didn't follow the reader to a phone
 // or another browser. This module makes the server the source of truth for
 // signed-in users: the page is rendered with the saved settings in
 // window.calibre.readerSettings, and every change is persisted to BOTH
 // localStorage (instant, offline, anonymous fallback) AND the server
-// (debounced POST to /ajax/readersettings, signed-in only). See web.py
-// save_reader_settings() + view_settings['reader'].
+// (debounced POST to the dedicated /api/v1/reader/settings route).
 //
 // Exposes window.ReaderSettings.{get,set,isAuthenticated}. Loaded before
 // epub.js so the reader restore + the settings-modal handlers can use it.
@@ -16,7 +15,7 @@
     "use strict";
 
     var LS_PREFIX = "calibre.reader.";
-    var INT_KEYS = { fontSize: true, margin: true };
+    var INT_KEYS = { fontSize: true, margin: true, lineHeight: true };
     var BOOL_KEYS = { reflow: true };
 
     var server = (typeof calibre === "object" && calibre && calibre.readerSettings) ? calibre.readerSettings : {};
@@ -53,7 +52,7 @@
         var csrf = $("input[name='csrf_token']").val();
         var body = pending;
         pending = {};
-        $.ajax("/ajax/readersettings", {
+        $.ajax("/api/v1/reader/settings", {
             method: "post",
             contentType: "application/json",
             data: JSON.stringify(body),

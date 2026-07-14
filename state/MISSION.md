@@ -8,7 +8,7 @@
 - [x] Design drift and any phase-1 scope change recorded in `notes/org/SPA-REPORT.md`.
 - [x] Settings slice implemented and regression tested.
 - [x] Unsafe position save/restore removed; coordinated Phase 2 design delivered.
-- [x] Independent navigation/TOC/modality slice implemented and tested.
+- [x] Independent TOC accessibility slice tested; uncertain navigation enhancement removed.
 - [x] SPA strings anchored; no new dependencies; symptom-first CHANGELOG entry added.
 - [x] Reader WCAG 2.2 AA automated gates green, including six-theme reader chrome sweep.
 - [x] Dedicated `cwn-spA` stack on port 8101 live-verified with a real EPUB.

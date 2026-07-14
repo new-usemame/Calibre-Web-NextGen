@@ -107,6 +107,19 @@ var reader;
         } catch (e) { /* themes not ready yet */ }
     };
 
+    // Shared line-height preference. Apply through the rendition theme so the
+    // value follows every spine section, matching the SPA reader contract.
+    window.applyReaderLineHeight = function (percent) {
+        if (!reader || !reader.rendition || !reader.rendition.themes) {
+            return;
+        }
+        var val = parseInt(percent, 10);
+        if (isNaN(val)) { return; }
+        try {
+            reader.rendition.themes.override('line-height', String(val / 100), true);
+        } catch (e) { /* themes not ready yet */ }
+    };
+
     // Suppress the native long-press / right-click context menu inside the
     // reader so the in-app highlight popup is the affordance. Text stays
     // selectable (highlighting needs it); we only swallow `contextmenu` and the
@@ -307,6 +320,12 @@ var reader;
         let savedMargin = ReaderSettings.get("margin", null);
         if (savedMargin !== null && typeof window.applyReaderMargin === 'function') {
             window.applyReaderMargin(savedMargin);
+        }
+
+        // Line height is shared with the SPA reader.
+        let savedLineHeight = ReaderSettings.get("lineHeight", null);
+        if (savedLineHeight !== null && typeof window.applyReaderLineHeight === 'function') {
+            window.applyReaderLineHeight(savedLineHeight);
         }
 
         // Reflow

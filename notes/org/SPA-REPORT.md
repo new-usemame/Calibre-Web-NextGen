@@ -3,12 +3,12 @@
 ## Shipment state
 
 - **Appearance settings: READY.** Per-user page theme, font family, font size, page margins, and line height persist through the dedicated `/api/v1/reader/settings` store in `User.view_settings`. The SPA hydrates the complete settings snapshot before creating the rendition; the classic reader and SPA share canonical validation/partial-merge behavior.
-- **TOC and modality navigation: READY WITH ONE OBSERVABILITY LIMIT.** The TOC/focus/list improvements and client-only keyboard/touch/page controls have no position-store dependency. Luna observed a real TOC chapter activation. Its keyboard probe did not detect a canonical/text change within the same EPUB section, so keyboard page-turn effect is not claimed as independently observed by Luna; the accessible controls and automated reader flow remain green.
+- **TOC: READY. Navigation enhancement: DESCOPED.** The TOC focus/list/close improvements are client-only and independent of position storage; Luna observed a real chapter activation. The interrupted prototype's new PageUp/PageDown/Space/touch-swipe implementation did not produce a Luna-observable rendition delta, so it was removed. The pre-existing ArrowLeft/ArrowRight and page-button implementation is unchanged.
 - **Position save/restore: DESCOPED.** The unsafe KOSync-coupled prototype was removed in full. No changed production file reads/writes `KOSyncProgress`, changes `cps/progress_syncing/`, adds bookmark progress columns, or sends percentage/device/revision fields. The existing private CFI bookmark behavior is unchanged. Coordinated Phase 2 design: `notes/SPA-position-sync-DESIGN.md`.
 
 ## Verification evidence
 
-- **OBSERVED — focused backend green:** `pytest -q tests/unit/test_api_v1_reader.py tests/unit/test_reader_settings_persist.py` → **15 passed**.
+- **OBSERVED — focused backend/parity green:** settings API, sanitizer, SPA-string anchoring, classic modal, dedicated-route, line-height, and font-range checks → **35 passed**.
 - **OBSERVED — red baseline:** `origin/main` has no `/api/v1/reader/settings` route, no SPA settings query/mutation, and no `lineHeight` reader-setting contract; the new regression assertions target those missing behaviors. The interrupted session did not preserve the original failing pytest transcript, so that transcript itself is **ASSUMED**, not claimed observed.
 - **OBSERVED — production build:** `frontend/npm run build` → TypeScript + Vite success, **1,877 modules transformed**.
 - **OBSERVED — isolated live stack:** image rebuilt from `org/spA`; compose project `cwn-spa`, container `cwn-spA`, host `8101`; health returned `200 {"api":"v1","status":"ok"}`. `cwn-local`/8086 was not used.
@@ -16,8 +16,8 @@
 - **OBSERVED — broader a11y gate on 8101:** `E2E_BASE_URL=http://localhost:8101 npm run test:e2e -- a11y` → **20 passed, 9 matrix skips**. The reader-specific spec supplies authenticated reader coverage where the generic reader fixture skipped.
 - **OBSERVED — Luna real EPUB:** authenticated to `cwn-spA`, opened *The Adventures of Sherlock Holmes* (book 192); desktop changed Sepia/SimSun/160%/0px/100% and reload retained all five; a second desktop pass retained Dark/Arial/130%/24px/160%. Appearance focus entered/trapped, Escape closed, and focus restored. Dark app chrome and readable dark reader content were observed.
 - **OBSERVED — Luna mobile:** at exactly 375×667 the appearance panel measured `x=30, y=0, width=345, height=667`, entirely inside the viewport. Light/Dark passes changed all five controls; reload reopened with a persisted non-default snapshot. The real EPUB remained rendered.
-- **OBSERVED — Luna TOC:** the real chapter list opened and activating “I. A SCANDAL IN BOHEMIA” navigated to the canonical OEBPS chapter with visible text. Keyboard PageDown/Arrow probes produced no Luna-detectable canonical/text change in that state; no stronger claim is made.
-- **OBSERVED — Terra re-verification:** `notes/org/SPA-REPORT/terra/REVERIFY.md` verdict **PASS**; diff check clean, focused tests 15 passed, frontend build passed, and no release blocker identified. Terra labels non-repeated finalization details conservatively as assumed.
+- **OBSERVED — Luna TOC:** the real chapter list opened and activating “I. A SCANDAL IN BOHEMIA” navigated to the canonical OEBPS chapter with visible text. The failed experimental keyboard/touch navigation probe caused that enhancement to be removed from the PR.
+- **OBSERVED — Terra final re-verification:** `notes/org/SPA-REPORT/terra/REVERIFY.md` verdict **PASS** after resolving all three parity blockers: dedicated route ownership, classic line-height wiring, and the shared 75–200 font range. Navigation enhancement descope also passed.
 
 ## Terra F1–F5 disposition
 
@@ -29,5 +29,5 @@
 
 ## PR and phase-2 gap
 
-- Appearance + independent TOC/navigation PR: **[#889](https://github.com/new-usemame/Calibre-Web-NextGen/pull/889)**.
+- Appearance + independent TOC accessibility PR: **[#889](https://github.com/new-usemame/Calibre-Web-NextGen/pull/889)**.
 - Phase 2 deliberately remains unimplemented until SPA and SPB coordinate the common percentage carrier, private engine locators, atomic ordered saves, uniqueness migration, validation, and restore ordering. This run does not claim cross-device position sync.

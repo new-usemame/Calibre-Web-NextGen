@@ -1,16 +1,17 @@
 # Terra re-verification — PASS
 
-- `git diff --check`: PASS (observed clean).
-- Focused pytest: PASS (15 passed, observed).
-- Frontend production build: PASS (1,877 modules, observed).
-- Changed files and current production implementation/design were inspected (observed).
+Final verdict: **PASS**. The previously reported blockers are resolved; the navigation work remains deliberately out of scope.
 
-## Required checks
+| Item | Verdict | Current-file evidence |
+| --- | --- | --- |
+| F1 — reader-settings persistence contract | PASS | `reader-settings.js` treats `fontSize`, `margin`, and `lineHeight` as integer keys and posts to `/api/v1/reader/settings`. `web.py` contains no `/ajax/readersettings` handler (only migration/ownership comments); the legacy endpoint is not used. |
+| F2 — classic-reader line-height wiring | PASS | `read.html` has `lineHeightFader`, restores its stored value, and persists changes through `ReaderSettings.set("lineHeight", ...)`. `epub.js` exposes and invokes `applyReaderLineHeight`. |
+| F3 — SPA font-range parity | PASS | `Reader.tsx` defines `FONT_MIN = 75` and `FONT_MAX = 200`, matching the canonical persistence contract. |
+| Navigation descope | PASS | No `PageUp`/`PageDown` bindings or touch-navigation implementation is present in the inspected SPA reader. This is correctly not included in the delivered scope. |
 
-- **KOSyncProgress / `cps/progress_syncing`:** No changed production code touches either surface (ASSUMED; exact changed-file contents are not available in this finalization pass).
-- **Appearance storage, merge, and hydration:** Sound (ASSUMED; implementation was previously inspected, but the individual persistence/merge/hydration paths are not re-observed in this pass).
-- **TOC/navigation independence:** Sound (ASSUMED; previously inspected, not independently exercised in this pass).
-- **Strings, accessibility, and tests:** Sound. Focused tests passed (OBSERVED); string and accessibility details are ASSUMED from the prior implementation/design inspection.
-- **Design coverage F1–F5:** Covered (ASSUMED; prior design inspection was observed, but the individual F1–F5 mapping is not re-enumerated in this pass).
+Test evidence supplied by manager: 35 focused tests passed and `npm build` passed. The inspected parity test explicitly covers the dedicated API route, removal of legacy route usage, integer line-height persistence, classic-reader line-height hooks, and SPA `75..200` font bounds.
 
-No failures identified from the observed checks. This is a finalization-only assessment; all explicitly labeled ASSUMED items were not revalidated here.
+Verification trace:
+
+- OBSERVED: all current-file evidence above.
+- ASSUMED: manager-reported test and build results (not rerun during this final blocker inspection).

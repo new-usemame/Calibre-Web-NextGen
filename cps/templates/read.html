@@ -128,6 +128,14 @@
                 </div>
             </div>
 
+            <div class="rs-section">
+                <label class="rs-label" for="lineHeightFader">{{ _('Line height') }}</label>
+                <div class="rs-slider-row">
+                    <input type="range" min="100" max="220" value="150" id="lineHeightFader" step="10">
+                    <span class="rs-value" id="lineHeightValue">150%</span>
+                </div>
+            </div>
+
             <div class="rs-section font" id="font">
                 <label class="rs-label">{{_('Font')}}</label>
                 <div class="rs-buttons">
@@ -313,6 +321,20 @@
             marginFader.addEventListener("change", function () {
               if (window.applyReaderMargin) { window.applyReaderMargin(this.value); }
               ReaderSettings.set("margin", parseInt(this.value, 10));
+            });
+          }
+          var lineHeightFader = document.getElementById('lineHeightFader');
+          var lineHeightValue = document.getElementById('lineHeightValue');
+          if (lineHeightFader) {
+            var savedLineHeight = ReaderSettings.get("lineHeight", null);
+            if (savedLineHeight !== null) { lineHeightFader.value = savedLineHeight; }
+            if (lineHeightValue) { lineHeightValue.textContent = lineHeightFader.value + '%'; }
+            lineHeightFader.addEventListener("input", function () {
+              if (lineHeightValue) { lineHeightValue.textContent = this.value + '%'; }
+            });
+            lineHeightFader.addEventListener("change", function () {
+              if (window.applyReaderLineHeight) { window.applyReaderLineHeight(this.value); }
+              ReaderSettings.set("lineHeight", parseInt(this.value, 10));
             });
           }
         });

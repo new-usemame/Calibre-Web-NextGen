@@ -235,3 +235,4 @@ frontend/*.tsbuildinfo
 frontend/*.js
 frontend/*.d.ts
 cps/static/app/
+.spe-verification/

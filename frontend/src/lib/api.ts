@@ -86,6 +86,8 @@ export interface Book {
   /** Tag names (#725) — powers the table view's Tags column. Absent on older
    *  servers that predate the list-item tags field → treat as no tags. */
   tags?: string[];
+  date_added?: string | null;
+  last_modified?: string | null;
   read?: boolean;
   archived?: boolean;
 }
@@ -130,6 +132,8 @@ export interface BookDetail {
   rating: number | null;
   cover_url: string | null;
   pubdate: string | null;
+  date_added: string | null;
+  last_modified: string | null;
   description_html: string | null;
   /** Browser/watch-folder name captured before Calibre renames the import. */
   original_filename: string | null;

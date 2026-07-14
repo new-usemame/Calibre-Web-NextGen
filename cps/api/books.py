@@ -46,6 +46,8 @@ SORT_MAP = {
     "zyx": [func.ng_sort_key(db.Books.sort).desc(), db.Books.sort.desc(), db.Books.id.desc()],
     "pubnew": [db.Books.pubdate.desc()],
     "pubold": [db.Books.pubdate],
+    "modifiednew": [db.Books.last_modified.desc()],
+    "modifiedold": [db.Books.last_modified],
     "authaz": [func.ng_sort_key(db.Books.author_sort), db.Books.author_sort,
                func.ng_sort_key(db.Series.name), db.Series.name, db.Books.series_index],
     "authza": [func.ng_sort_key(db.Books.author_sort).desc(), db.Books.author_sort.desc(),

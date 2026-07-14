@@ -11,7 +11,7 @@ import { resourceUrl } from '../lib/api';
 import styles from './Table.module.css';
 
 // Column key -> the API sort tokens for ascending / descending.
-type ColKey = 'title' | 'authors' | 'series' | 'tags' | 'formats' | 'read';
+type ColKey = 'title' | 'authors' | 'series' | 'tags' | 'formats' | 'date_added' | 'last_modified' | 'read';
 interface Col { key: ColKey; label: string; sortAsc?: string; sortDesc?: string; }
 const COLUMNS: Col[] = [
   { key: 'title', label: 'Title', sortAsc: 'abc', sortDesc: 'zyx' },
@@ -20,8 +20,16 @@ const COLUMNS: Col[] = [
   // Tags has no server-side sort token, so it renders unsortable (#725).
   { key: 'tags', label: 'Tags' },
   { key: 'formats', label: 'Formats' },
+  { key: 'date_added', label: 'Date added', sortAsc: 'old', sortDesc: 'new' },
+  { key: 'last_modified', label: 'Last modified', sortAsc: 'modifiedold', sortDesc: 'modifiednew' },
   { key: 'read', label: 'Read' },
 ];
+
+function formatLibraryDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
+}
 
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const seen = new Set(prev.map((b) => b.id));
@@ -147,6 +155,8 @@ export function Table() {
                         {c.key === 'series' && (b.series ? `${b.series}${b.series_index ? ` #${b.series_index}` : ''}` : '—')}
                         {c.key === 'tags' && ((b.tags || []).join(', ') || '—')}
                         {c.key === 'formats' && (b.formats || []).join(', ')}
+                        {c.key === 'date_added' && <time dateTime={b.date_added ?? undefined}>{formatLibraryDate(b.date_added)}</time>}
+                        {c.key === 'last_modified' && <time dateTime={b.last_modified ?? undefined}>{formatLibraryDate(b.last_modified)}</time>}
                         {c.key === 'read' && (b.read
                           ? <Check size={15} className={styles.readYes} role="img" aria-label={t('Read')} />
                           : <span aria-label={t('Unread')} role="img">—</span>)}

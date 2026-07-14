@@ -112,6 +112,11 @@ def serialize_shelf(shelf, count, is_owner):
     }
 
 
+def _iso_datetime(value):
+    """Serialize optional Calibre timestamps consistently for SPA consumers."""
+    return value.isoformat() if isinstance(value, (datetime, date)) else None
+
+
 def serialize_book_list_item(book, read=False, archived=False):
     series = book.series[0].name if getattr(book, "series", None) else None
     return {
@@ -130,6 +135,8 @@ def serialize_book_list_item(book, read=False, archived=False):
         # serializer keeps {id, name} for linking. fill_indexpage already
         # joinedload's Books.tags, so this adds no query.
         "tags": [t.name for t in book.tags] if getattr(book, "tags", None) else [],
+        "date_added": _iso_datetime(getattr(book, "timestamp", None)),
+        "last_modified": _iso_datetime(getattr(book, "last_modified", None)),
         "read": bool(read),
         "archived": bool(archived),
     }
@@ -259,6 +266,8 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "rating": rating,
         "cover_url": cover_url,
         "pubdate": pubdate_str,
+        "date_added": _iso_datetime(getattr(book, "timestamp", None)),
+        "last_modified": _iso_datetime(getattr(book, "last_modified", None)),
         "description_html": description_html,
         "tags": tags,
         "languages": languages,

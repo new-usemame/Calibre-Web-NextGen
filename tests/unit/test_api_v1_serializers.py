@@ -18,6 +18,8 @@ def test_serialize_book_list_item_full():
         "cover_url": "/cover/7/sm",
         "formats": ["EPUB", "PDF"],
         "tags": [],
+        "date_added": None,
+        "last_modified": None,
         "read": False,
         "archived": False,
     }

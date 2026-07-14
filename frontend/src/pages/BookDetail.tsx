@@ -553,6 +553,18 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{formatDate(book.pubdate)}</dd>
               </>
             )}
+            {book.date_added && (
+              <>
+                <dt className={styles.metaLabel}>{t('Date added')}</dt>
+                <dd className={styles.metaValue}><time dateTime={book.date_added}>{formatDate(book.date_added, true)}</time></dd>
+              </>
+            )}
+            {book.last_modified && (
+              <>
+                <dt className={styles.metaLabel}>{t('Last modified')}</dt>
+                <dd className={styles.metaValue}><time dateTime={book.last_modified}>{formatDate(book.last_modified, true)}</time></dd>
+              </>
+            )}
             {book.languages.length > 0 && (
               <>
                 <dt className={styles.metaLabel}>{book.languages.length === 1 ? t('Language') : t('Languages')}</dt>

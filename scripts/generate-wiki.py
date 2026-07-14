@@ -29,7 +29,10 @@ a human/agent to decide where the new content belongs — the one place AI
 judgment is needed. Ordinary releases add no new sections and cost nothing.
 
 Usage:
-  generate-wiki.py --repo <repo dir> --src <wiki-src dir> --out <output dir>
+  generate-wiki.py [--repo <repo dir>] [--src <wiki-src dir>] [--out <output dir>]
+
+With no arguments, paths default to the repository root, ``wiki-src/``, and
+``wiki-generated/`` respectively.
 Exit codes: 0 ok, 1 tripwire/other error, 2 bad args.
 """
 import argparse
@@ -210,9 +213,10 @@ def make_link_rewriter(current_page, owner, docroot, repo_dir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--repo", required=True)
-    ap.add_argument("--src", required=True)
-    ap.add_argument("--out", required=True)
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ap.add_argument("--repo", default=project_root)
+    ap.add_argument("--src", default=os.path.join(project_root, "wiki-src"))
+    ap.add_argument("--out", default=os.path.join(project_root, "wiki-generated"))
     args = ap.parse_args()
 
     src_files = sorted(f for f in os.listdir(args.src) if f.endswith(".md"))

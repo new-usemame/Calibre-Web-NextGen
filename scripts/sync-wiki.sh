@@ -69,7 +69,7 @@ OUT="$TMP/out"
 CLONE="$TMP/wiki"
 
 # --- Render (tripwire lives here) -----------------------------------------
-python3 "$PROJ/scripts/generate-wiki.py" --repo "$PROJ/repo" --src "$PROJ/wiki-src" --out "$OUT"
+python3 "$PROJ/scripts/generate-wiki.py" --repo "$PROJ" --src "$PROJ/wiki-src" --out "$OUT"
 
 # --- Clone live wiki -------------------------------------------------------
 TOKEN="$(gh auth token)"

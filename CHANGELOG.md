@@ -37,7 +37,8 @@ is for things you can see or feel when running the app.
 - Changing one classic-reader appearance control no longer erases the user's other saved reader settings.
 - The classic book page's favorite star now changes immediately after a click instead of waiting for a reload, because object-shaped action responses no longer crash the shared flash-message handler. ([#880](https://github.com/new-usemame/Calibre-Web-NextGen/issues/880))
 - Smart-shelf moving date windows are now available in the new interface's rule builder—not only the classic builder—with Publication Date and Date Added fields and day-based operators. ([#467](https://github.com/new-usemame/Calibre-Web-NextGen/issues/467))
-- Reload metadata now uses the same format-aware parser as upload, so PDF, FB2, comic, audio, EPUB, and KEPUB files no longer fail through an EPUB-only path; editors can also run it from the new book page. ([#877](https://github.com/new-usemame/Calibre-Web-NextGen/issues/877))
+- Reload metadata now reads PDF, FB2, comic, audio, EPUB, and KEPUB files instead of failing through an EPUB-only path, and applies only the details a file actually contains — a book whose file carries no title or author keeps the title and authors you curated instead of being renamed after its filename. Editors can also run it from the new book page. ([#877](https://github.com/new-usemame/Calibre-Web-NextGen/issues/877))
+- Uploading a PDF now picks up the author recorded inside the file. PDFs without an XMP block — most of them — previously imported as "Unknown" even when the file said who wrote it. ([#877](https://github.com/new-usemame/Calibre-Web-NextGen/issues/877))
 
 ## [v4.1.12] - 2026-07-13
 

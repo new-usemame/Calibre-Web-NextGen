@@ -109,14 +109,32 @@ class TestReloadCoversDeferredFields:
 
 @pytest.mark.unit
 class TestAbsentFieldSafetyGates:
-    def test_author_unknown_sentinel_does_not_stomp(self):
-        """get_epub_info yields the literal 'Unknown' when the file has no
-        <dc:creator>. Passing that through handle_author_on_edit would
-        replace the book's real authors with 'Unknown'."""
+    def test_author_missing_from_the_file_does_not_stomp(self):
+        """A file with no creator must not replace the book's real authors.
+
+        This used to be pinned by grepping for a `meta.author != 'Unknown'`
+        comparison in the route. That pin was satisfied while the guard was
+        broken: 'Unknown' is localised on the upload path, so it arrived as
+        'Inconnu'/'Unbekannt' and the comparison passed for every
+        non-English user, stomping their authors (#877).
+
+        The invariant is now enforced upstream — reload parses with
+        strict=True, which reports a missing author as empty in every
+        locale — so the route needs no magic-string compare at all. This
+        pins that the landmine is not reintroduced; the behaviour itself is
+        covered against real files and real locales in
+        test_reload_metadata_strict_parse_877.py.
+        """
         body = _body()
-        assert re.search(r"meta\.author[^\n]*['\"]Unknown['\"]", body), (
-            "the author reload must exclude the get_epub_info 'Unknown' "
-            "sentinel — a file without <dc:creator> must not stomp authors"
+        assert not re.search(r"meta\.author\s*!=\s*['\"]Unknown['\"]", body), (
+            "reload must not gate authors on the literal 'Unknown': that "
+            "sentinel is translated on the upload path, so the guard silently "
+            "fails for non-English users. A strict parse reports a missing "
+            "author as empty instead."
+        )
+        assert re.search(r"strict\s*=\s*True", body), (
+            "reload must parse with strict=True so a file's absent fields "
+            "come back empty rather than guessed from the filename"
         )
 
     def test_empty_tags_do_not_wipe_curated_tags(self):

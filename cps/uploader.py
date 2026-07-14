@@ -69,27 +69,72 @@ except ImportError as e:
     use_audio_meta = False
 
 
-def process(tmp_file_path, original_file_name, original_file_extension, rar_executable, no_cover=False):
-    meta = default_meta(tmp_file_path, original_file_name, original_file_extension)
+def process(tmp_file_path, original_file_name, original_file_extension, rar_executable, no_cover=False,
+            strict=False):
+    """Extract embedded metadata from a book file.
+
+    By default this is the UPLOAD contract: a field the file does not
+    carry is guessed — the title from the filename, the author from a
+    localised 'Unknown' placeholder — and a parse failure degrades to
+    those guesses rather than rejecting the upload. That is correct when
+    creating a new book: the filename is the best available description
+    and the user reviews it in the edit form before saving.
+
+    ``strict=True`` is the RELOAD contract: report only what the file
+    actually carries. A missing field comes back empty and a parse
+    failure propagates. Callers refreshing an existing book's metadata
+    must use it — a guess there silently overwrites data a human curated,
+    and a changed title additionally renames the book's folder on disk
+    (fork #877).
+    """
+    # Every format parser falls back to the caller-supplied display name
+    # when the file carries no title of its own (pdf_meta below,
+    # epub.py:126, comic.py:183/203, audio.py:131). Handing them an empty
+    # name is what makes "the file has no title" distinguishable from
+    # "the file is titled after its filename" — with nothing to fall back
+    # to, a parser can only return what it actually read.
+    parse_name = '' if strict else original_file_name
+    meta = default_meta(tmp_file_path, parse_name, original_file_extension)
+    if strict:
+        # default_meta's author is a localised placeholder for the upload
+        # form. Strict callers want "absent", not a placeholder.
+        meta = meta._replace(author='')
     extension_upper = original_file_extension.upper()
     try:
         if ".PDF" == extension_upper:
-            meta = pdf_meta(tmp_file_path, original_file_name, original_file_extension, no_cover)
+            meta = pdf_meta(tmp_file_path, parse_name, original_file_extension, no_cover)
         elif extension_upper in [".KEPUB", ".EPUB"] and use_epub_meta is True:
-            meta = epub.get_epub_info(tmp_file_path, original_file_name, original_file_extension, no_cover)
+            meta = epub.get_epub_info(tmp_file_path, parse_name, original_file_extension, no_cover)
         elif ".FB2" == extension_upper and use_fb2_meta is True:
             meta = fb2.get_fb2_info(tmp_file_path, original_file_extension)
         elif extension_upper in ['.CBZ', '.CBT', '.CBR', ".CB7"]:
             meta = comic.get_comic_info(tmp_file_path,
-                                        original_file_name,
+                                        parse_name,
                                         original_file_extension,
                                         rar_executable,
                                         no_cover)
         elif extension_upper in [".MP3", ".OGG", ".FLAC", ".WAV", ".AAC", ".AIFF", ".ASF", ".MP4",
                                  ".M4A", ".M4B", ".OGV", ".OPUS"] and use_audio_meta:
-            meta = audio.get_audio_file_info(tmp_file_path, original_file_extension, original_file_name, no_cover)
+            meta = audio.get_audio_file_info(tmp_file_path, original_file_extension, parse_name, no_cover)
     except Exception as ex:
+        if strict:
+            raise
         log.warning('cannot parse metadata, using default: %s', ex)
+
+    if strict:
+        # A parser may report a missing field as None; normalise both
+        # fields to a plain empty string so callers can simply test for a
+        # value.
+        title = strip_whitespaces(meta.title or '')
+        author = strip_whitespaces(meta.author or '')
+        # 'Unknown' is the parsers' shared missing-author sentinel
+        # (epub.py:85, pdf_meta below). Normalising it to empty here means
+        # callers test for a value instead of comparing against a magic
+        # string — a comparison that silently fails once the string is
+        # translated.
+        if author.lower() == 'unknown':
+            author = ''
+        return meta._replace(title=title, author=author)
 
     if not strip_whitespaces(meta.title):
         meta = meta._replace(title=original_file_name)
@@ -183,7 +228,13 @@ def pdf_meta(tmp_file_path, original_file_name, original_file_extension, no_cove
         languages = xmp_info['languages']
         publisher = xmp_info['publisher']
     else:
-        author = 'Unknown'
+        # Empty, not 'Unknown': the DocumentInfo fallback below only fills
+        # fields that came back empty, so seeding this with the sentinel
+        # made the PDF's own /Author unreadable whenever it had no XMP
+        # block — which is most PDFs. `title` was always seeded '' here,
+        # which is why titles were read from DocumentInfo and authors
+        # never were (#877).
+        author = ''
         title = ''
         languages = [""]
         publisher = ""

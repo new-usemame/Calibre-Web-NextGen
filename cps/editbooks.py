@@ -2389,12 +2389,18 @@ def reload_metadata_from_disk(book_id):
                                path=file_path)), 404
 
     try:
+        # strict=True is the reload contract: apply only what the file
+        # actually carries. Without it, a file with no embedded title (the
+        # norm for PDFs) comes back titled after its own filename and
+        # silently overwrites the curated title — and renames the book's
+        # folder on disk via update_dir_structure below (#877).
         meta = uploader.process(
             file_path,
             chosen_data.name,
             '.' + file_ext,
             rar_executable=config.config_rarfile_location,
-            no_cover=True)
+            no_cover=True,
+            strict=True)
     except Exception as ex:
         log.error_or_exception("reload_metadata: parse failed for %s: %s",
                                file_path, ex)
@@ -2450,12 +2456,14 @@ def reload_metadata_from_disk(book_id):
 
         # Authors — same helper as the edit-book save path
         # (author_sort regeneration, rename handling, orphan
-        # cleanup). 'Unknown' is get_epub_info's missing-creator
-        # sentinel: a file without <dc:creator> must not stomp the
-        # book's real authors.
+        # cleanup). A strict parse reports a file with no creator as an
+        # empty author, so an absent author is simply falsy here. Do not
+        # reintroduce a comparison against the literal 'Unknown': that
+        # sentinel is localised on the upload path, so the guard passed
+        # for every non-English user and stomped their real authors (#877).
         input_authors = None
         author_value = strip_whitespaces(meta.author or '')
-        if author_value and meta.author != 'Unknown':
+        if author_value:
             input_authors, author_change = handle_author_on_edit(
                 book, author_value)
             if author_change:

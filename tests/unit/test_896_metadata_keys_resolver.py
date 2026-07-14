@@ -58,7 +58,9 @@ def _keys_payload(monkeypatch, cfg):
 
 
 def _entry(payload, pid):
-    return next(e for e in payload if e["id"] == pid)
+    entry = next((e for e in payload if e["id"] == pid), None)
+    assert entry is not None, f"provider {pid!r} missing from payload: {payload}"
+    return entry
 
 
 # --- the reported symptom -------------------------------------------------

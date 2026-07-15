@@ -116,3 +116,52 @@ def test_existing_read_row_gets_visible_progress_state_from_plugin_put(monkeypat
         assert visible.current_bookmark.progress_percent == pytest.approx(68.86)
     finally:
         session.close()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("has_bookmark", "has_statistics"),
+    ((False, True), (True, False), (False, False)),
+)
+def test_existing_partial_visible_state_is_completed(
+    monkeypatch, has_bookmark, has_statistics
+):
+    """Long-running installs may have only part of the Kobo state graph."""
+    module = _kosync_module()
+    engine = create_engine("sqlite:///:memory:")
+    ub.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+
+    try:
+        book_read = ub.ReadBook(
+            user_id=3,
+            book_id=1031,
+            read_status=ub.ReadBook.STATUS_UNREAD,
+        )
+        reading_state = ub.KoboReadingState(user_id=3, book_id=1031)
+        if has_bookmark:
+            reading_state.current_bookmark = ub.KoboBookmark(progress_percent=12.0)
+        if has_statistics:
+            reading_state.statistics = ub.KoboStatistics()
+        book_read.kobo_reading_state = reading_state
+        session.add(book_read)
+        session.commit()
+        original_state_id = reading_state.id
+
+        monkeypatch.setattr(ub, "session", session)
+        monkeypatch.setattr(module.config, "config_read_column", 0, raising=False)
+        module.update_book_read_status(
+            SimpleNamespace(id=3, name="Pocketbook"), 1031, 68.86
+        )
+        session.commit()
+
+        states = session.query(ub.KoboReadingState).filter_by(
+            user_id=3, book_id=1031
+        ).all()
+        assert len(states) == 1
+        assert states[0].id == original_state_id
+        assert states[0].current_bookmark is not None
+        assert states[0].current_bookmark.progress_percent == pytest.approx(68.86)
+        assert states[0].statistics is not None
+    finally:
+        session.close()

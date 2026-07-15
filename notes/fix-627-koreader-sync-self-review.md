@@ -7,7 +7,9 @@
   already has a `Currently reading` badge, so the badge is not the missing
   object.
 - ✅ **Verified-strong — failure-mode classification.** Class 1 (the real
-  client's full flow was not followed). The prior checksum/ingest fixes proved
+  client's full flow was not followed), reinforced by Class 3 (device-leg
+  claims were assumed) and Class 5 (the reporter's pre-existing read-state
+  shape was not mirrored). The prior checksum/ingest fixes proved
   book resolution and device transport, but not the separate
   `KoboReadingState.current_bookmark` carrier read by classic and SPA details.
 - ✅ **Verified-strong — exact regression.** With the production change
@@ -36,6 +38,10 @@
   no KOReader progress” web-visibility symptom and shares this cause. #633 is a
   different furthest-position/automatic-trigger problem; its percentage
   preservation work remains independent.
+- ✅ **Greptile P2 dispositioned.** The reviewer correctly noted that the first
+  regression covered a fully missing state but not partial legacy graphs.
+  Parametrized behavioral cases now cover missing bookmark, missing statistics,
+  and both missing while preserving the existing parent row.
 
 ## Risks and disposition
 
@@ -50,5 +56,5 @@
   setup errors occurred because the globally named `cwa-test-container` belongs
   to another concurrent worktree. The isolated KOReader unit selection is clean
   at 195/195, and the assigned `cwn-p627` live flow is clean. The foreign
-  container was not touched.
-
+  container was not touched. After the review addition, the isolated KOReader
+  unit selection is clean at 198/198.

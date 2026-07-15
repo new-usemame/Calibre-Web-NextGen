@@ -251,7 +251,7 @@ def admin_update_config():
 def admin_create_user():
     """Create a household/library user. Mirrors cps/admin.py _handle_new_user:
     same validators, same config-derived defaults (role, locale, language,
-    content restrictions, dark theme), so a user created here is indistinguishable
+    content restrictions, theme), so a user created here is indistinguishable
     from one created via the legacy admin page."""
     guard = _require_admin()
     if guard:

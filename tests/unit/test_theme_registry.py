@@ -38,11 +38,17 @@ def test_admin_theme_picker_renders_the_shared_registry_not_its_own_numbering():
     the shared registry so it cannot invent a numbering again."""
     admin_source = (REPO_ROOT / "frontend/src/pages/Admin.tsx").read_text(encoding="utf-8")
 
-    theme_select = re.search(
-        r"config_theme.*?</select>", admin_source, re.DOTALL
+    # Anchor on the <select> element itself, not on the first "config_theme"
+    # anywhere in the file — that also appears in the form-state object, from
+    # which a `.*?</select>` run would land on whichever picker happens to come
+    # next in the JSX and assert against the wrong one.
+    theme_selects = [block for block in re.findall(r"<select[\s\S]*?</select>", admin_source)
+                     if "config_theme" in block]
+    assert len(theme_selects) == 1, (
+        "expected exactly one <select> bound to config_theme, found %d — did the "
+        "admin theme picker move or get duplicated?" % len(theme_selects)
     )
-    assert theme_select, "admin theme picker not found — did config_theme move?"
-    block = theme_select.group(0)
+    block = theme_selects[0]
 
     # It must map the shared registry, and hold no hand-written <option> values.
     assert "THEMES.map" in block

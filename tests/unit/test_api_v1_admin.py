@@ -393,6 +393,55 @@ def test_create_user_seeds_theme_from_config(config_theme, expected_code):
     assert created["obj"].theme == expected_code
 
 
+def _ui_config():
+    """A config double for the SPA-editable UI settings admin_update_config writes."""
+    return SimpleNamespace(
+        config_theme=ui_themes.DEFAULT_THEME_CODE,
+        config_books_per_page=20, config_random_books=4, config_authors_max=0,
+        config_calibre_web_title="t", config_default_language="all",
+        config_default_locale="en", config_server_announcement="",
+        save=lambda: None,
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("slug, expected_code", [
+    ("light", 2),
+    ("sepia", 3),
+    ("system", 6),
+])
+def test_update_config_stores_a_valid_theme_slug_as_its_code(slug, expected_code):
+    from cps.api import admin as mod
+    cfg = _ui_config()
+    with _ctx("/api/v1/admin/config", body={"config_theme": slug}):
+        with patch.object(mod, "current_user", _admin()), \
+             patch.object(mod, "config", cfg), \
+             patch.object(mod, "get_available_locale", return_value=[]):
+            # The 200 path echoes the config payload, which enumerates locales
+            # through babel; this test is about what gets stored, so stub it.
+            resp = inspect.unwrap(mod.admin_update_config)()
+    assert cfg.config_theme == expected_code
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("bad", ["hot-pink", "", "Light", 0, 2, None, True])
+def test_update_config_rejects_a_theme_that_is_not_a_known_slug(bad):
+    """#736: the raw int is the drift vector — the pre-#736 form POSTed
+    config_theme=0 and the endpoint stored it, which then read back as dark. An
+    unknown value must 400 rather than be stored and silently resolved, so ints
+    (including the legacy 0) are rejected here alongside nonsense slugs.
+    """
+    from cps.api import admin as mod
+    cfg = _ui_config()
+    before = cfg.config_theme
+    with _ctx("/api/v1/admin/config", body={"config_theme": bad}):
+        with patch.object(mod, "current_user", _admin()), \
+             patch.object(mod, "config", cfg):
+            resp = inspect.unwrap(mod.admin_update_config)()
+    assert resp[1] == 400
+    assert cfg.config_theme == before  # nothing stored
+
+
 @pytest.mark.unit
 def test_create_user_duplicate_name_surfaces_400():
     from cps.api import admin as mod

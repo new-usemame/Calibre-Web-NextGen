@@ -339,6 +339,29 @@ def test_preferred_spa_login_rejects_off_site_next_destination(tmp_path):
         monkey.undo()
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize("bad_prefix", [
+    "//evil.example",
+    "/../evil.example",
+    "/a b",
+    '/a"><script>evil</script>',
+])
+def test_preferred_spa_login_rejects_hostile_proxy_prefix(tmp_path, bad_prefix):
+    """A trusted-prefix header still enters request.script_root. The redirect
+    must use the SPA sanitizer rather than letting url_for emit //host/app/."""
+    app, web_mod, monkey = _login_app(tmp_path)
+    try:
+        resp = _get_login(
+            _client(app), web_mod, "/login", headers=_HTML_ACCEPT,
+            environ_overrides={**_PREFER_COOKIE, "SCRIPT_NAME": bad_prefix},
+        )
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "/app/"
+        assert "evil.example" not in resp.headers["Location"]
+    finally:
+        monkey.undo()
+
+
 # ---- source pins: template gating + web.py wiring ----
 
 @pytest.mark.unit

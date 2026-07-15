@@ -252,9 +252,15 @@ def push_annotations():
     # Lua has no empty-list/empty-object distinction, so the plugin's JSON
     # encoder emits `{}` for "no annotations". A complete push is the one case
     # where an empty payload is meaningful (the user deleted their last
-    # highlight), so accept it there. A partial push with no array is still a
-    # client bug and still 400s.
-    if complete_for_source and annotations in ({}, None):
+    # highlight), so accept that exact shape there.
+    #
+    # `{}` ONLY — a null or missing `annotations` is a malformed request, not an
+    # assertion that the device has none, and reading it as an empty
+    # authoritative set would reap the whole book. That's unrecoverable: a
+    # tombstoned row is deliberately never un-hidden by a later push
+    # (apply_portable preserves tombstones), so the highlights would not come
+    # back even though the device still has them. Malformed still 400s.
+    if complete_for_source and annotations == {}:
         annotations = []
     if not isinstance(annotations, list):
         return create_sync_response({"error": "invalid_annotations", "message": "annotations must be an array"}, 400)

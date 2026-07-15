@@ -325,3 +325,43 @@ def test_wire_unknown_complete_source_cannot_reap(wire):
     assert resp.status_code == 200
     assert resp.get_json()["reconciled"] is False
     assert "kobo-row" in _live_ids(session, user)
+
+
+@pytest.mark.parametrize("annotations", [None, "missing"])
+def test_wire_complete_push_with_malformed_annotations_cannot_reap(wire, annotations):
+    """A null/absent `annotations` is a malformed request, NOT an assertion that
+    the device has none. Reading it as an empty authoritative set would reap the
+    whole book, and a reap is unrecoverable — apply_portable preserves
+    tombstones, so the rows would never come back even though the device still
+    has them. Reject, don't reap.
+    """
+    client, session, user = wire
+    _seed(session, user, "must-survive")
+
+    body = {"document": "digest-905", "complete": True, "complete_source": "koreader"}
+    if annotations is None:
+        body["annotations"] = None       # explicit null
+    # "missing" -> omit the key entirely
+
+    resp = client.put("/kosync/syncs/annotations", json=body)
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "invalid_annotations"
+    assert "must-survive" in _live_ids(session, user)
+
+
+def test_reap_is_not_undone_by_a_later_push(env):
+    """Pins WHY the malformed-payload guard above matters: a tombstone is
+    permanent by design, so a wrong reap can never be walked back."""
+    s, user = env
+    _seed(s, user, "kr-1")
+
+    apply_push([], user=user, book=_book(), session=s, commit=s.commit,
+               complete_for_source="koreader")
+    assert _live_ids(s, user) == set()
+
+    # The device still has it and pushes it again — it stays tombstoned.
+    apply_push([{"annotation_id": "kr-1", "highlighted_text": "t"}],
+               user=user, book=_book(), session=s, commit=s.commit,
+               complete_for_source="koreader")
+    assert _live_ids(s, user) == set()

@@ -76,6 +76,8 @@
 .field select:focus-visible,
 .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
 
+.fieldHint { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+
 .newActions {
   display: flex;
   align-items: center;

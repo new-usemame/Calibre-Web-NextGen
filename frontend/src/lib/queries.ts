@@ -380,7 +380,8 @@ export interface AdminConfig {
   config_books_per_page: number;
   config_random_books: number;
   config_authors_max: number;
-  config_theme: number;
+  /** ui_themes slug (e.g. "light"), not the legacy int code — see #736. */
+  config_theme: string;
   config_default_language: string;
   config_default_locale: string;
   config_server_announcement: string;

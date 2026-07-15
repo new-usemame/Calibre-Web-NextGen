@@ -18,6 +18,15 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- Admin → Theme no longer says "Settings saved." and then changes nothing. The
+  picker stored its choice in an old numbering the theme system stopped reading,
+  so "Light" always came back dark. It is now the default theme for **new
+  accounts**, it offers every theme (System, Light, Dark, Sepia, High contrast,
+  Midnight) instead of just two, and a "Light" you saved earlier is honoured
+  rather than discarded. Your own theme stays where it belongs, under Account →
+  Theme. Thanks @auspex for reporting it and pushing back when the first fix
+  missed the part you filed about.
+
 - KOReader progress now appears on both classic and new book pages even when
   the book already had a read/unread record before its first matched sync. The
   devices could exchange positions while the web page showed no “KOReader

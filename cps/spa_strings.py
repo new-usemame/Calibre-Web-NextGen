@@ -88,6 +88,8 @@ _("Midnight (AMOLED)")
 _("Match your device’s light or dark setting")
 _("Theme saved.")
 _("Could not save theme.")
+_("Default theme for new accounts")
+_("Applies to accounts created from now on. Everyone picks their own under Account → Theme.")
 
 
 # ============================================================================

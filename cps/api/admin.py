@@ -18,13 +18,19 @@ from ..cw_babel import get_available_locale
 from ..usermanagement import login_required_if_no_ano
 from ..helper import (valid_email, check_email, check_username, valid_password,
                       generate_password_hash, reset_password)
+from ..ui_themes import ALLOWED_THEME_SLUGS, config_theme_code, config_theme_slug, theme_code
 from ..admin import _delete_user
 
 # UI-configuration fields the SPA admin form can read/write natively. Scoped to
 # the safe, high-traffic display settings — the deep security config (LDAP,
 # OAuth, SMTP, SSL, external binaries) stays on the legacy pages.
+#
+# config_theme is deliberately NOT here: it travels as a slug, not a raw int
+# (see _ui_config_payload / admin_update_config). Sending it as an int is what
+# let the admin form invent its own Light=0/Dark=1 numbering and drift out of
+# sync with ui_themes.THEME_CODES — the #736 bug.
 _UI_CONFIG_INT = ("config_books_per_page", "config_random_books",
-                  "config_authors_max", "config_theme")
+                  "config_authors_max")
 _UI_CONFIG_STR = ("config_calibre_web_title", "config_default_language",
                   "config_default_locale", "config_server_announcement")
 
@@ -129,7 +135,8 @@ def _ui_config_payload():
         "config_books_per_page": config.config_books_per_page,
         "config_random_books": config.config_random_books,
         "config_authors_max": config.config_authors_max,
-        "config_theme": config.config_theme,
+        # A slug from ui_themes (the SSOT the SPA mirrors), never the raw int.
+        "config_theme": config_theme_slug(config.config_theme),
         "config_default_language": config.config_default_language,
         "config_default_locale": config.config_default_locale,
         "config_server_announcement": config.config_server_announcement or "",
@@ -222,6 +229,13 @@ def admin_update_config():
                 setattr(config, key, int(data[key]))
             except (TypeError, ValueError):
                 return _err("invalid_request", "%s must be a number" % key, 400)
+    if "config_theme" in data:
+        # Validated against the SSOT slug set, exactly like the per-account
+        # endpoint (cps/api/account.py), so an unknown theme is rejected loudly
+        # instead of being stored and silently falling back to dark on read.
+        if data["config_theme"] not in ALLOWED_THEME_SLUGS:
+            return _err("invalid_request", "Invalid theme option", 400)
+        config.config_theme = theme_code(data["config_theme"])
     for key in _UI_CONFIG_STR:
         if key in data:
             setattr(config, key, str(data[key] or ""))
@@ -280,7 +294,9 @@ def admin_create_user():
     new_user.allowed_column_value = config.config_allowed_column_value
     new_user.denied_column_value = config.config_denied_column_value
     new_user.sidebar_view = config.config_default_show
-    new_user.theme = 1  # caliBlur dark, matching _handle_new_user
+    # Inherit the instance default theme, matching _handle_new_user. The account
+    # keeps its own copy from here on — Account -> Theme edits User.theme only.
+    new_user.theme = config_theme_code(config.config_theme)
 
     try:
         ub.session.add(new_user)

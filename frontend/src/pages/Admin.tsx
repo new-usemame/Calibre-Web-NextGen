@@ -13,6 +13,7 @@ import { EmptyState } from '../components/EmptyState';
 import type { AdminUser } from '../lib/api';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
+import { THEMES, DEFAULT_THEME } from '../lib/themes';
 import styles from './Admin.module.css';
 
 // Remaining legacy server-configuration pages — these are the deep, rarely-touched
@@ -328,11 +329,14 @@ function AdminConfigForm() {
       </div>
       <div className={styles.newRow}>
         <label className={styles.field}>
-          <span>{t('Theme')}</span>
-          <select value={String(form.config_theme ?? 1)} onChange={(e) => set('config_theme', e.target.value)}>
-            <option value="0">{t('Light')}</option>
-            <option value="1">{t('Dark')}</option>
+          <span>{t('Default theme for new accounts')}</span>
+          <select value={String(form.config_theme ?? DEFAULT_THEME)}
+            onChange={(e) => set('config_theme', e.target.value)}>
+            {THEMES.map((o) => <option key={o.slug} value={o.slug}>{t(o.label)}</option>)}
           </select>
+          <p className={styles.fieldHint}>
+            {t('Applies to accounts created from now on. Everyone picks their own under Account → Theme.')}
+          </p>
         </label>
         <label className={styles.field}>
           <span>{t('Default interface language')}</span>

@@ -43,6 +43,7 @@ from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config
 from .services.worker import WorkerThread
 from .usermanagement import user_login_required
+from .ui_themes import config_theme_code
 from .cw_babel import get_available_translations, get_available_locale, get_user_locale_language
 from . import debug_info
 from .string_helper import strip_whitespaces
@@ -2790,9 +2791,10 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.sidebar_view |= constants.DETAIL_RANDOM
 
     content.role = constants.selected_roles(to_save)
-    # Force dark theme (caliBlur = 1) for new users
+    # Seed the account with the instance default theme (Admin -> Theme). The
+    # account owns its theme from here on, via Account -> Theme in the New UI.
     try:
-        content.theme = 1
+        content.theme = config_theme_code(config.config_theme)
     except Exception:
         pass
     try:

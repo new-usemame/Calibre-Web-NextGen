@@ -332,6 +332,43 @@ def test_non_string_delete_source_is_a_400_not_a_500(wire, source):
     assert _live_ids(session, user.id) == {"kr-1"}
 
 
+def test_a_bogus_delete_source_does_not_reject_a_push_that_deletes_nothing(wire):
+    """`delete_source` scopes the deletions; with none to scope it has no
+    effect, and rejecting the push over it would throw away the annotations
+    the push actually carries."""
+    client, session, user = wire
+
+    res = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-920",
+        "annotations": [{
+            "annotation_id": "kr-new", "source": "koreader",
+            "highlighted_text": "t", "color": "yellow",
+        }],
+        "deleted": [],
+        "delete_source": "not-a-source",
+    })
+
+    assert res.status_code == 200
+    assert res.get_json()["created"] == 1
+    assert _live_ids(session, user.id) == {"kr-new"}
+
+
+def test_reconciled_reports_that_deletes_were_named_not_that_rows_matched(wire):
+    """Naming an id that matches nothing is still a reconciled push."""
+    client, session, user = wire
+    _seed(session, user.id, "kr-1")
+
+    res = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-920", "annotations": [],
+        "deleted": ["never-existed"],
+    })
+
+    assert res.status_code == 200
+    assert res.get_json()["reconciled"] is True
+    assert res.get_json()["deleted"] == 0
+    assert _live_ids(session, user.id) == {"kr-1"}
+
+
 def test_no_deletes_reported_means_nothing_reconciled(wire):
     client, session, user = wire
     _seed(session, user.id, "kr-1")

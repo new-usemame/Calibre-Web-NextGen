@@ -256,13 +256,6 @@ def push_annotations():
     # push on the wire, so the server cannot tell them apart and a push-only
     # device destroyed the other devices' highlights (#920). Only the device
     # knows which it means, so only the device may say.
-    delete_source = data.get("delete_source", "koreader")
-    if not isinstance(delete_source, str) or delete_source not in _DELETABLE_SOURCES:
-        return create_sync_response({
-            "error": "invalid_delete_source",
-            "message": "delete_source must be one of: %s" % ", ".join(sorted(_DELETABLE_SOURCES)),
-        }, 400)
-
     # Lua has no empty-list/empty-object distinction, so the plugin's JSON
     # encoder emits `{}` for an empty table. Normalise both fields, which is
     # safe now that an empty set asserts nothing. A null/missing `annotations`
@@ -283,6 +276,18 @@ def push_annotations():
             "error": "invalid_deleted",
             "message": "deleted must be an array of annotation_id strings",
         }, 400)
+
+    # Only meaningful when something is being deleted. Rejecting it on a push
+    # that deletes nothing would throw away the annotations that push carries
+    # over a field with no effect.
+    delete_source = data.get("delete_source", "koreader")
+    if deleted_ids and (
+        not isinstance(delete_source, str) or delete_source not in _DELETABLE_SOURCES
+    ):
+        return create_sync_response({
+            "error": "invalid_delete_source",
+            "message": "delete_source must be one of: %s" % ", ".join(sorted(_DELETABLE_SOURCES)),
+        }, 400)
     from ...services.annotation_portable import validate_portable_payload
     for index, payload in enumerate(annotations):
         error = validate_portable_payload(payload)
@@ -298,6 +303,10 @@ def push_annotations():
         deleted_ids=deleted_ids, delete_source=delete_source,
     )
     summary["document"] = document
+    # `reconciled` means the device NAMED deletions on this push, not that any
+    # row matched — naming an id that is already hidden or unknown is a no-op
+    # and still reports reconciled with `deleted: 0`. Under #906 it meant "the
+    # client declared itself complete", which no longer exists.
     summary["reconciled"] = bool(deleted_ids)
     summary["calibre_book_id"] = book_id
     summary["matched"] = True

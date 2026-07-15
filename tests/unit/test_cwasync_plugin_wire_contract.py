@@ -41,11 +41,11 @@ PLUGIN = Path(__file__).resolve().parents[2] / "koreader" / "plugins" / "cwasync
 CLIENT_LUA = PLUGIN / "CWASyncClient.lua"
 API_JSON = PLUGIN / "api.json"
 
-# `return self.client:<method>({ key = value, ... })`
-_CALL = re.compile(
-    r"self\.client:(?P<method>\w+)\(\{(?P<body>.*?)\}\)",
-    re.DOTALL,
-)
+# `self.client:<method>({`  — the opening of the call; the body is then scanned
+# by matching braces rather than by regex. A lazy `.*?\}` would stop at the
+# first `}` of a nested table and silently miss every key after it, which is
+# the exact failure this file exists to prevent.
+_CALL_OPEN = re.compile(r"self\.client:(?P<method>\w+)\(\{")
 # a `key =` at the top level of that table constructor
 _KEY = re.compile(r"^\s*(?P<key>\w+)\s*=", re.MULTILINE)
 
@@ -54,13 +54,41 @@ def _spec():
     return json.loads(API_JSON.read_text(encoding="utf-8"))["methods"]
 
 
+def _balanced_body(source, start):
+    """The text of the table constructor opened at `start` (just past its `{`),
+    up to its matching close brace."""
+    depth, i = 1, start
+    while i < len(source) and depth:
+        if source[i] == "{":
+            depth += 1
+        elif source[i] == "}":
+            depth -= 1
+        i += 1
+    return source[start:i - 1]
+
+
+def _top_level_keys(body):
+    """`key =` names at depth 0, so a nested table's own keys aren't mistaken
+    for fields of the request body. Newlines inside nested tables are kept so
+    line-anchored matching still lines up."""
+    flat, depth = [], 0
+    for char in body:
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+        elif depth == 0 or char == "\n":
+            flat.append(char)
+    return set(_KEY.findall("".join(flat)))
+
+
 def _client_calls():
     """{method: {keys the client passes}} straight from the plugin source."""
     source = CLIENT_LUA.read_text(encoding="utf-8")
     calls = {}
-    for match in _CALL.finditer(source):
-        keys = set(_KEY.findall(match.group("body")))
-        calls.setdefault(match.group("method"), set()).update(keys)
+    for match in _CALL_OPEN.finditer(source):
+        body = _balanced_body(source, match.end())
+        calls.setdefault(match.group("method"), set()).update(_top_level_keys(body))
     return calls
 
 
@@ -72,6 +100,27 @@ def test_the_parser_actually_finds_the_calls():
         "update_progress", "get_progress", "pull_annotations", "push_annotations",
     }
     assert "annotations" in calls["push_annotations"]
+
+
+def test_a_nested_table_is_parsed_by_depth_not_by_the_first_brace():
+    """A nested table must not confuse the parser in either direction: its own
+    keys are not request fields, and keys declared after it must still be seen.
+    A line-anchored scan over the raw body reports `Accept` here, which would
+    fail this contract against an api.json that is perfectly correct."""
+    source = """
+        return self.client:push_annotations({
+            document = document,
+            headers = {
+                Accept = "application/json",
+            },
+            deleted = deleted,
+        })
+    """
+    match = _CALL_OPEN.search(source)
+    keys = _top_level_keys(_balanced_body(source, match.end()))
+
+    assert keys == {"document", "headers", "deleted"}
+    assert "Accept" not in keys, "a nested table's own key is not a request field"
 
 
 def test_push_annotations_declares_the_delete_fields():

@@ -127,8 +127,6 @@ def classic_index_redirects_to_spa():
     is NOT the SPA's own 'back to classic' marker (``cwng_feedback``), and the
     client wants HTML (not an API/OPDS machine client). Web index only — never
     books_list, authors, OPDS, Kobo, API, or login (#739 design)."""
-    if not spa_available():
-        return False
     if request.args.get("cwng_feedback"):
         return False
     return preferred_spa_html_request()

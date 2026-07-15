@@ -365,6 +365,27 @@ def enrich_response_with_book_info(response_data: Dict[str, Any], document_check
     return response_data, book_id, book_format, book_title, checksum_version
 
 
+def _ensure_visible_reading_state(book_read, user_id: int, book_id: int):
+    """Return the bookmark used by both book-detail progress displays.
+
+    ``KOSyncProgress`` is KOReader's device-to-device carrier, while the
+    classic and SPA book pages deliberately read
+    ``KoboReadingState.current_bookmark``. Existing ``ReadBook`` rows can
+    predate Kobo/KOReader state (or have a partial legacy state), so creating
+    this graph only alongside a brand-new ``ReadBook`` leaves otherwise valid
+    syncs detached from the UI (#627).
+    """
+    reading_state = book_read.kobo_reading_state
+    if reading_state is None:
+        reading_state = ub.KoboReadingState(user_id=user_id, book_id=book_id)
+        book_read.kobo_reading_state = reading_state
+    if reading_state.current_bookmark is None:
+        reading_state.current_bookmark = ub.KoboBookmark()
+    if reading_state.statistics is None:
+        reading_state.statistics = ub.KoboStatistics()
+    return reading_state.current_bookmark
+
+
 def update_book_read_status(user, book_id: int, percentage: float) -> None:
     """
     Update the user's ReadBook status based on reading progress percentage.
@@ -432,10 +453,12 @@ def update_book_read_status(user, book_id: int, percentage: float) -> None:
 
         book_read.last_modified = datetime.now(timezone.utc)
 
-        # Update KoboBookmark progress_percent if it exists
-        if book_read.kobo_reading_state and book_read.kobo_reading_state.current_bookmark:
-            book_read.kobo_reading_state.current_bookmark.progress_percent = percentage
-            book_read.kobo_reading_state.current_bookmark.last_modified = datetime.now(timezone.utc)
+        # Keep the independent book-detail/UI carrier in lockstep with the
+        # accepted KOSync position, including legacy ReadBook rows that have no
+        # KoboReadingState yet (#627).
+        bookmark = _ensure_visible_reading_state(book_read, user_id, book_id)
+        bookmark.progress_percent = percentage
+        bookmark.last_modified = datetime.now(timezone.utc)
 
     else:
         # Create new ReadBook record
@@ -454,15 +477,10 @@ def update_book_read_status(user, book_id: int, percentage: float) -> None:
             book_read.last_time_started_reading = datetime.now(timezone.utc)
             log.info(f"User {user_id} started reading book {book_id} (new entry)")
 
-        # Create associated KoboReadingState
-        kobo_reading_state = ub.KoboReadingState(
-            user_id=user_id,
-            book_id=book_id
-        )
-        kobo_reading_state.current_bookmark = ub.KoboBookmark()
-        kobo_reading_state.current_bookmark.progress_percent = percentage
-        kobo_reading_state.statistics = ub.KoboStatistics()
-        book_read.kobo_reading_state = kobo_reading_state
+        # Create the same complete visible state graph as the existing-row
+        # path. Keeping one constructor prevents the two branches drifting.
+        bookmark = _ensure_visible_reading_state(book_read, user_id, book_id)
+        bookmark.progress_percent = percentage
 
         ub.session.add(book_read)
         log.info(f"User {user_id} book {book_id} created with status {new_status} "

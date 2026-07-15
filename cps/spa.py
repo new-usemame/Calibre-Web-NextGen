@@ -131,6 +131,19 @@ def classic_index_redirects_to_spa():
         return False
     if request.args.get("cwng_feedback"):
         return False
+    return preferred_spa_html_request()
+
+
+def preferred_spa_html_request():
+    """Whether this browser should use the SPA for an HTML surface.
+
+    Unlike :func:`classic_index_redirects_to_spa`, this has no route-specific
+    ``cwng_feedback`` exception, so it can also route the anonymous login page.
+    The destination remains the app-owned SPA shell; callers must never redirect
+    directly to a user-controlled ``next`` value.
+    """
+    if not spa_available():
+        return False
     if request.cookies.get(PREFER_SPA_COOKIE) != "1":
         return False
     return bool(request.accept_mimetypes.accept_html)

@@ -41,7 +41,7 @@ from .helper import check_valid_domain, check_email, check_username, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
     edit_book_read_status, valid_password
 from .pagination import Pagination
-from .redirect import get_redirect_location
+from .redirect import get_redirect_location, is_safe_url
 from .cw_babel import get_available_locale
 from .usermanagement import login_required_if_no_ano
 from .kobo_sync_status import remove_synced_book
@@ -2644,6 +2644,20 @@ def render_login(username="", password=""):
 def login():
     if current_user is not None and current_user.is_authenticated:
         return redirect(url_for('web.index'))
+
+    # #908: the UI preference is intentionally per-browser, not per-user, so it
+    # remains readable after logout. Route an anonymous HTML browser into the
+    # SPA's logged-out tree before rendering the Classic login template.
+    if spa.preferred_spa_html_request():
+        destination = url_for("spa.spa_shell")
+        next_url = request.args.get("next", type=str)
+        # Preserve only a relative, same-origin target for the SPA's post-login
+        # resolver. Never redirect to next_url itself: the immediate destination
+        # is always our own /app shell (prefix-aware through url_for).
+        if (next_url and next_url.startswith("/") and not next_url.startswith("//")
+                and "\\" not in next_url and is_safe_url(next_url)):
+            destination = url_for("spa.spa_shell", next=next_url)
+        return redirect(destination)
 
     # Handle OAuth-only authentication mode
     if config.config_login_type == constants.LOGIN_OAUTH:

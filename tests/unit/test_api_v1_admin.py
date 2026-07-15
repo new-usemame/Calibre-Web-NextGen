@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 from cps import constants
+from cps import ui_themes
 
 
 def _ctx(path, method="POST", body=None):
@@ -237,8 +238,13 @@ def test_delete_user_last_admin_guard_surfaces_as_400():
 
 # ── user creation ─────────────────────────────────────────────────────────────
 
-def _create_config():
-    """A config double carrying the defaults _handle_new_user reads."""
+def _create_config(config_theme=ui_themes.DEFAULT_THEME_CODE):
+    """A config double carrying the defaults _handle_new_user reads.
+
+    ``config_theme`` mirrors the real Settings column: it is the instance default
+    theme a new account is seeded with, so it is a parameter here rather than a
+    constant — the seeding is behaviour worth pinning at more than one value.
+    """
     return SimpleNamespace(
         config_default_role=constants.ROLE_DOWNLOAD,
         config_default_locale="en",
@@ -246,6 +252,7 @@ def _create_config():
         config_default_show=0,
         config_allowed_tags="", config_denied_tags="",
         config_allowed_column_value="", config_denied_column_value="",
+        config_theme=config_theme,
     )
 
 
@@ -314,7 +321,7 @@ def test_create_user_valid_sets_roles_and_commits():
     assert obj.role & constants.ROLE_UPLOAD
     assert obj.role & constants.ROLE_DOWNLOAD
     assert not (obj.role & constants.ROLE_ADMIN)
-    assert obj.theme == 1  # dark default like legacy
+    assert obj.theme == ui_themes.DEFAULT_THEME_CODE  # seeded from config_theme
 
 
 @pytest.mark.unit
@@ -343,6 +350,47 @@ def test_create_user_defaults_role_when_unspecified():
             resp = inspect.unwrap(mod.admin_create_user)()
     assert resp[1] == 201
     assert created["obj"].role == constants.ROLE_DOWNLOAD  # the configured default
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("config_theme, expected_code", [
+    (2, 2),   # admin picked light -> the new account boots light
+    (3, 3),   # a non-legacy theme the pre-#736 form could not even express
+    (0, 2),   # the legacy "Light" the old form wrote raw; honour it as light
+    (99, ui_themes.DEFAULT_THEME_CODE),   # unknown code degrades to dark, never NULL
+])
+def test_create_user_seeds_theme_from_config(config_theme, expected_code):
+    """#736: a new account inherits the instance default theme.
+
+    The old code hardcoded ``theme = 1``, so an admin who set the default to
+    Light still got dark accounts and the setting drove nothing. Pinning this at
+    several values is what makes the test behavioural — an assertion against
+    dark alone stays green if the hardcode ever comes back.
+    """
+    from cps.api import admin as mod
+    mock_ub = MagicMock()
+    created = {}
+
+    class _U:
+        id = 7
+        email = None
+        kindle_mail = None
+
+        def __init__(self):
+            created["obj"] = self
+    mock_ub.User = _U
+
+    with _ctx("/api/v1/admin/users", body={"name": "ada", "password": "S3cret!pw"}):
+        with patch.object(mod, "current_user", _admin()), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod, "config", _create_config(config_theme=config_theme)), \
+             patch.object(mod, "check_username", side_effect=lambda n: n), \
+             patch.object(mod, "valid_password", side_effect=lambda p: p), \
+             patch.object(mod, "generate_password_hash", side_effect=lambda p: p):
+            resp = inspect.unwrap(mod.admin_create_user)()
+
+    assert resp[1] == 201
+    assert created["obj"].theme == expected_code
 
 
 @pytest.mark.unit

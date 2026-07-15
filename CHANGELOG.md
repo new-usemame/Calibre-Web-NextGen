@@ -18,6 +18,22 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Syncing highlights from a second KOReader device no longer wipes the
+  highlights from your first one.** Opening a book on another device could
+  silently delete every highlight the other device had made, permanently and
+  with no error — a later sync never brought them back. Deleting a highlight on
+  a device still removes it everywhere, which is what this path is for; the
+  device now says which highlights the user deleted instead of the server
+  guessing from what a sync left out. Caught before release, so no published
+  version ever shipped it (#920).
+
+- **Deleting a KOReader highlight now actually syncs.** The fix released for
+  this in v4.1.13 never reached the server: the plugin set the field, but its
+  request spec did not list it, so it was dropped before the request was sent
+  and the deleted highlight stayed in your library. Update the plugin to
+  4.1.14 (Highlight sync → the plugin ships with this release) for device
+  deletions to sync (#905, #906).
+
 - Admin → Theme no longer says "Settings saved." and then changes nothing. The
   picker stored its choice in an old numbering the theme system stopped reading,
   so "Light" always came back dark. It is now the default theme for **new

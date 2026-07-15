@@ -46,6 +46,42 @@ end
 --   * in both, remote newer  -> apply_to_device (merged)
 --   * in both, local newer   -> send_to_server (merged)
 --   * in both, equal         -> converged, emitted to neither (no feedback loop)
+-- The annotation_ids in a portable list, sorted so the stored watermark is
+-- stable across syncs.
+function SyncLogic.annotationIds(list)
+    local ids = {}
+    for _, a in ipairs(list or {}) do
+        if a.annotation_id then table.insert(ids, a.annotation_id) end
+    end
+    table.sort(ids)
+    return ids
+end
+
+-- Which annotations the user deleted on this device, given `watermark` (the ids
+-- we last pushed) and `localList` (what is live now).
+--
+-- KOReader deletes a highlight outright, leaving no tombstone, so a deletion
+-- exists only as this difference. It has to be computed HERE rather than
+-- inferred by the server from an omission: a device whose user deleted every
+-- highlight and a device that never had them push the identical empty set, and
+-- the server has no way to tell those apart — it guessed, and destroyed a
+-- second device's highlights permanently (#920). Only the device knows what it
+-- used to have.
+--
+-- Callers must only trust this when the local set was genuinely read; an empty
+-- `localList` that stands for "could not read" would delete everything.
+function SyncLogic.computeDeletions(watermark, localList)
+    local live = {}
+    for _, a in ipairs(localList or {}) do
+        if a.annotation_id then live[a.annotation_id] = true end
+    end
+    local deleted = {}
+    for _, id in ipairs(watermark or {}) do
+        if not live[id] then table.insert(deleted, id) end
+    end
+    return deleted
+end
+
 function SyncLogic.diffAnnotations(localList, remoteList)
     local function byId(list)
         local m = {}

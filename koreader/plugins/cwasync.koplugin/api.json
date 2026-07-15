@@ -50,9 +50,11 @@
             ],
             "payload" : [
                 "document",
-                "annotations"
+                "annotations",
+                "deleted",
+                "delete_source"
             ],
-            "expected_status" : [200, 401, 503]
+            "expected_status" : [200, 400, 401, 503]
         }
     }
 }

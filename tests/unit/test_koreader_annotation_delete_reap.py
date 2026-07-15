@@ -1,27 +1,27 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""KOReader device-side deletes — reconciliation of a complete push (#905).
+"""KOReader device-side deletes reach the server (#905).
 
 KOReader keeps no tombstone when a highlight is deleted: the entry simply
-disappears from ``ui.annotation.annotations``. The plugin pushes its complete
-local set (``push_all_local = true``), so a device-side delete reaches the
-server as an *omission*, and an upsert-only push cannot tell "deleted" apart
-from "not mentioned in this push" — the row survived forever (the bug @iroQuai
+disappears from ``ui.annotation.annotations``. So a device-side delete has to be
+reconstructed, or it never syncs and the row lives forever (the bug @iroQuai
 reported on #699 after v4.1.13).
 
-The fix: a push may declare itself COMPLETE for a source. When it does, the
-server reconciles — any live row for that (user, book, source) whose
-annotation_id is absent from the pushed set is soft-deleted.
+#906 reconstructed it on the SERVER: a push could declare itself ``complete``
+and the server deleted every live row of that source the push omitted. That
+inference was withdrawn in #920 — it cannot distinguish "the user deleted their
+last highlight" from "this device never had those highlights", which are the
+same push on the wire, and it destroyed a second device's highlights.
 
-These tests pin the reconciliation contract:
-  - a complete push that omits a row tombstones it (the reported bug);
-  - a push WITHOUT the completeness marker reaps nothing (a partial/retried
-    push must never destroy data);
-  - a complete koreader push never reaps kobo/webreader rows (source scoping);
-  - reaping soft-deletes (hidden=True) rather than hard-deleting, so pull still
-    hands the device a tombstone;
-  - the delete fan-out fires for reaped rows;
-  - an already-hidden row is not re-reaped (no duplicate fan-out).
+The reconstruction now happens on the DEVICE, which is the only party with the
+missing fact (what it used to have): the plugin diffs its live set against the
+watermark of ids it last pushed and NAMES the deletions in ``deleted``. The
+server obeys that list and infers nothing.
+
+This file pins the user-facing #905 requirement end to end — delete a highlight,
+it syncs — through the mechanism that replaced the reap. The authority contract
+itself (an omission never deletes) lives in
+``test_920_koreader_push_only_authority.py``.
 """
 
 from __future__ import annotations
@@ -107,30 +107,29 @@ def _live_ids(s, user, book_id=7):
 
 # --- the reported bug ------------------------------------------------------
 
-def test_complete_push_omitting_a_row_tombstones_it(env):
+def test_reported_delete_tombstones_the_row(env):
     """The #905 repro: highlight synced, deleted on device, synced again."""
     s, user = env
     _seed(s, user, "kept")
     _seed(s, user, "deleted-on-device")
 
-    # The device now only knows about "kept" — the other was deleted there.
     summary = apply_push(
         [{"annotation_id": "kept", "color": "yellow"}],
         user=user, book=_book(), session=s, commit=s.commit,
-        complete_for_source="koreader",
+        deleted_ids=["deleted-on-device"],
     )
 
     assert _live_ids(s, user) == {"kept"}
     assert summary["deleted"] == 1
 
 
-def test_reaped_row_is_soft_deleted_not_destroyed(env):
+def test_deleted_row_is_soft_deleted_not_destroyed(env):
     """Pull must still hand the device a tombstone, so the row has to survive."""
     s, user = env
     _seed(s, user, "gone")
 
     apply_push([], user=user, book=_book(), session=s, commit=s.commit,
-               complete_for_source="koreader")
+               deleted_ids=["gone"])
 
     row = s.query(ub.Annotation).filter_by(annotation_id="gone").one()
     assert row.hidden is True
@@ -139,60 +138,8 @@ def test_reaped_row_is_soft_deleted_not_destroyed(env):
     assert tomb and tomb[0]["hidden"] is True
 
 
-# --- the guardrails --------------------------------------------------------
-
-def test_push_without_completeness_marker_reaps_nothing(env):
-    """A partial or retried push must never destroy un-mentioned rows."""
-    s, user = env
-    _seed(s, user, "untouched")
-
-    apply_push([{"annotation_id": "other", "color": "red"}],
-               user=user, book=_book(), session=s, commit=s.commit)
-
-    assert "untouched" in _live_ids(s, user)
-
-
-def test_complete_koreader_push_never_reaps_other_sources(env):
-    """A KOReader sync must not delete Kobo-native or web-reader highlights."""
-    s, user = env
-    _seed(s, user, "kobo-row", source="kobo")
-    _seed(s, user, "web-row", source="webreader")
-    _seed(s, user, "koreader-row", source="koreader")
-
-    apply_push([], user=user, book=_book(), session=s, commit=s.commit,
-               complete_for_source="koreader")
-
-    assert _live_ids(s, user) == {"kobo-row", "web-row"}
-
-
-def test_complete_push_does_not_reap_other_books_or_users(env):
-    s, user = env
-    other = ub.User(name="o", email="o@e.com", role=0, password="x")
-    s.add(other); s.commit()
-    _seed(s, user, "other-book", book_id=99)
-    _seed(s, other, "other-user", book_id=7)
-
-    apply_push([], user=user, book=_book(), session=s, commit=s.commit,
-               complete_for_source="koreader")
-
-    assert _live_ids(s, user, book_id=99) == {"other-book"}
-    assert _live_ids(s, other) == {"other-user"}
-
-
-def test_already_hidden_row_is_not_reaped_again(env):
-    """No duplicate fan-out for a row that is already tombstoned."""
-    s, user = env
-    register_handler(StubHandler())
-    _seed(s, user, "already-gone", hidden=True)
-
-    summary = apply_push([], user=user, book=_book(), session=s, commit=s.commit,
-                         complete_for_source="koreader")
-
-    assert summary["deleted"] == 0
-
-
-def test_reaped_row_dispatches_delete_fanout(env):
-    """A reaped row must tell downstream targets (Hardcover) to tombstone too."""
+def test_deleted_row_dispatches_delete_fanout(env):
+    """A deleted row must tell downstream targets (Hardcover) to tombstone too."""
     s, user = env
     handler = StubHandler()
     register_handler(handler)
@@ -205,7 +152,7 @@ def test_reaped_row_dispatches_delete_fanout(env):
     s.commit()
 
     apply_push([], user=user, book=_book(), session=s, commit=s.commit,
-               complete_for_source="koreader")
+               deleted_ids=["fanout-me"])
 
     assert handler.deletes == ["r1"]
 
@@ -214,7 +161,7 @@ def test_reaped_row_dispatches_delete_fanout(env):
 
 @pytest.fixture
 def wire(env, monkeypatch):
-    """Real Flask routing, so the reap is exercised through the actual PUT the
+    """Real Flask routing, so the delete is exercised through the actual PUT the
     plugin makes (auth + blueprint + JSON shape), not just the callable."""
     import importlib
     from flask import Flask
@@ -247,8 +194,6 @@ def test_wire_reporter_sequence_highlight_then_delete_then_resync(wire):
     # 1. Highlight on the device, sync -> it shows up in CWNG.
     first = client.put("/kosync/syncs/annotations", json={
         "document": "digest-905",
-        "complete": True,
-        "complete_source": "koreader",
         "annotations": [
             {"annotation_id": "kr-1", "highlighted_text": "one", "source": "koreader"},
             {"annotation_id": "kr-2", "highlighted_text": "two", "source": "koreader"},
@@ -258,15 +203,14 @@ def test_wire_reporter_sequence_highlight_then_delete_then_resync(wire):
     assert first.get_json()["created"] == 2
     assert _live_ids(session, user) == {"kr-1", "kr-2"}
 
-    # 2. Delete kr-2 in KOReader, sync again. The device simply stops sending
-    #    it — there is no tombstone to send.
+    # 2. Delete kr-2 in KOReader, sync again. KOReader leaves no tombstone, so
+    #    the plugin reconstructs it from its watermark and names the id.
     second = client.put("/kosync/syncs/annotations", json={
         "document": "digest-905",
-        "complete": True,
-        "complete_source": "koreader",
         "annotations": [
             {"annotation_id": "kr-1", "highlighted_text": "one", "source": "koreader"},
         ],
+        "deleted": ["kr-2"],
     })
     assert second.status_code == 200
     body = second.get_json()
@@ -280,8 +224,8 @@ def test_wire_reporter_sequence_highlight_then_delete_then_resync(wire):
     assert hidden == {"kr-1": False, "kr-2": True}
 
 
-def test_wire_legacy_plugin_push_without_marker_reaps_nothing(wire):
-    """An older plugin build must never lose the user's highlights."""
+def test_wire_legacy_plugin_push_deletes_nothing(wire):
+    """An older plugin build sends no `deleted`, and must lose nothing."""
     client, session, user = wire
     _seed(session, user, "pre-existing")
 
@@ -295,50 +239,32 @@ def test_wire_legacy_plugin_push_without_marker_reaps_nothing(wire):
 
 
 def test_wire_deleting_the_last_highlight_syncs(wire):
-    """Lua encodes an empty table as {}, and this is the one push where the
-    payload is legitimately empty — it must reap, not 400."""
+    """The set legitimately goes empty. Lua encodes an empty table as {}, so
+    both shapes must be accepted rather than 400."""
     client, session, user = wire
-    _seed(session, user, "the-only-one")
 
     for empty in ({}, []):
+        _seed(session, user, "the-only-one")
         resp = client.put("/kosync/syncs/annotations", json={
             "document": "digest-905",
-            "complete": True,
-            "complete_source": "koreader",
             "annotations": empty,
+            "deleted": ["the-only-one"],
         })
         assert resp.status_code == 200, resp.get_json()
-    assert _live_ids(session, user) == set()
-
-
-def test_wire_unknown_complete_source_cannot_reap(wire):
-    """A push may only reconcile a source it owns."""
-    client, session, user = wire
-    _seed(session, user, "kobo-row", source="kobo")
-
-    resp = client.put("/kosync/syncs/annotations", json={
-        "document": "digest-905",
-        "complete": True,
-        "complete_source": "kobo",
-        "annotations": [],
-    })
-    assert resp.status_code == 200
-    assert resp.get_json()["reconciled"] is False
-    assert "kobo-row" in _live_ids(session, user)
+        assert _live_ids(session, user) == set()
+        session.query(ub.Annotation).delete()
+        session.commit()
 
 
 @pytest.mark.parametrize("annotations", [None, "missing"])
-def test_wire_complete_push_with_malformed_annotations_cannot_reap(wire, annotations):
-    """A null/absent `annotations` is a malformed request, NOT an assertion that
-    the device has none. Reading it as an empty authoritative set would reap the
-    whole book, and a reap is unrecoverable — apply_portable preserves
-    tombstones, so the rows would never come back even though the device still
-    has them. Reject, don't reap.
-    """
+def test_wire_malformed_annotations_is_rejected(wire, annotations):
+    """A null/absent `annotations` is a malformed request. It must not be read
+    as "the device has none" — the device says what it deleted, and a malformed
+    body says nothing at all."""
     client, session, user = wire
     _seed(session, user, "must-survive")
 
-    body = {"document": "digest-905", "complete": True, "complete_source": "koreader"}
+    body = {"document": "digest-905"}
     if annotations is None:
         body["annotations"] = None       # explicit null
     # "missing" -> omit the key entirely
@@ -350,18 +276,17 @@ def test_wire_complete_push_with_malformed_annotations_cannot_reap(wire, annotat
     assert "must-survive" in _live_ids(session, user)
 
 
-def test_reap_is_not_undone_by_a_later_push(env):
-    """Pins WHY the malformed-payload guard above matters: a tombstone is
-    permanent by design, so a wrong reap can never be walked back."""
+def test_delete_is_not_undone_by_a_later_push(env):
+    """Pins WHY naming deletes matters: a tombstone is permanent by design, so a
+    wrong delete can never be walked back."""
     s, user = env
     _seed(s, user, "kr-1")
 
     apply_push([], user=user, book=_book(), session=s, commit=s.commit,
-               complete_for_source="koreader")
+               deleted_ids=["kr-1"])
     assert _live_ids(s, user) == set()
 
-    # The device still has it and pushes it again — it stays tombstoned.
+    # The device pushes it again — it stays tombstoned.
     apply_push([{"annotation_id": "kr-1", "highlighted_text": "t"}],
-               user=user, book=_book(), session=s, commit=s.commit,
-               complete_for_source="koreader")
+               user=user, book=_book(), session=s, commit=s.commit)
     assert _live_ids(s, user) == set()

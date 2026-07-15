@@ -1456,6 +1456,30 @@ end
 -- KoboReader.sqlite (so stock Nickel shows them), and push device-side
 -- highlights up. Opt-in (sync_annotations) + Kobo-only (provider.available()).
 -- Verified end-to-end on real hardware per the manual checklist.
+-- The annotation_ids this device last pushed for the open document, kept in the
+-- book's own sidecar so it travels with the book and is scoped to it.
+--
+-- This is the fact only the device has: KOReader deletes a highlight outright,
+-- so without remembering what we had, "the user deleted it" and "we never had
+-- it" are indistinguishable — and the server guessing between them is what
+-- destroyed a second device's highlights (#920).
+--
+-- Losing it (fresh install, wiped sidecar) is safe by construction: an empty
+-- watermark yields no deletions, so highlights survive.
+local ANNOTATION_WATERMARK_KEY = "cwasync_pushed_annotation_ids"
+
+function CWASync:readAnnotationWatermark()
+    local doc_settings = self.ui and self.ui.doc_settings
+    if not (doc_settings and doc_settings.readSetting) then return {} end
+    return doc_settings:readSetting(ANNOTATION_WATERMARK_KEY) or {}
+end
+
+function CWASync:saveAnnotationWatermark(localList)
+    local doc_settings = self.ui and self.ui.doc_settings
+    if not (doc_settings and doc_settings.saveSetting) then return end
+    doc_settings:saveSetting(ANNOTATION_WATERMARK_KEY, SyncLogic.annotationIds(localList))
+end
+
 function CWASync:syncAnnotations(interactive)
     if not self.settings.sync_annotations then
         if interactive then
@@ -1512,8 +1536,12 @@ function CWASync:syncAnnotations(interactive)
                 end
             end
 
-            local localList = (provider.push_all_local or volume_id)
-                and provider.readAll(volume_id) or {}
+            -- Whether we can actually enumerate the device's annotations. When
+            -- we cannot, `localList` below is a placeholder, NOT an empty set —
+            -- reading it as "the user deleted everything" would destroy the
+            -- library (#920).
+            local local_set_known = (provider.push_all_local or volume_id) and true or false
+            local localList = local_set_known and provider.readAll(volume_id) or {}
             local diff = SyncLogic.diffAnnotations(localList, remote)
             if provider.push_all_local then
                 -- Phase 1 native KOReader provider: retries the complete local
@@ -1531,14 +1559,24 @@ function CWASync:syncAnnotations(interactive)
                 end
             end
 
-            -- A complete push lets the server reap what the device deleted, so
-            -- it must still go out when the local set is empty (the user removed
-            -- their last highlight) — otherwise that delete never syncs (#905).
-            local complete = provider.push_all_local and true or false
-            if #diff.send_to_server > 0 or complete then
+            -- Name the highlights the user deleted here, by diffing what we last
+            -- pushed against what is live now. The server deletes exactly what
+            -- it is told and infers nothing from an omission, so this is the
+            -- only thing that carries a device-side delete (#905) — and the
+            -- reason a second device can no longer wipe the first one's
+            -- highlights by simply opening the book (#920).
+            local deleted = local_set_known
+                and SyncLogic.computeDeletions(self:readAnnotationWatermark(), localList)
+                or {}
+            if #diff.send_to_server > 0 or #deleted > 0 then
                 client:push_annotations(self.settings.username, self.settings.password, digest,
-                    diff.send_to_server, complete,
+                    diff.send_to_server, deleted,
                     function(ok2, _body2)
+                        -- Only once the server has it: a failed push must leave
+                        -- the deletion pending, not forget it.
+                        if ok2 and local_set_known then
+                            self:saveAnnotationWatermark(localList)
+                        end
                         if interactive then
                             if ok2 then
                                 UIManager:show(InfoMessage:new{

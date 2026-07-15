@@ -109,9 +109,60 @@ local function testDiffAnnotations()
     assertTrue(findById(d.send_to_server, "both-equal") == nil, "converged row not re-pushed (no echo)")
 end
 
+-- #920: the device names its deletions, because the server cannot infer them.
+local function testComputeDeletions()
+    local function ids(list)
+        local out = {}
+        for _, v in ipairs(list) do out[#out + 1] = v end
+        table.sort(out)
+        return table.concat(out, ",")
+    end
+
+    -- The #905 case: pushed two, user deleted one.
+    assertEqual(
+        ids(SyncLogic.computeDeletions({ "a", "b" }, { { annotation_id = "a" } })),
+        "b", "an id in the watermark but not live was deleted by the user")
+
+    -- The #905 edge the reap existed for: the last highlight is gone.
+    assertEqual(
+        ids(SyncLogic.computeDeletions({ "a" }, {})),
+        "a", "deleting the last highlight is still a deletion")
+
+    -- The #920 case: a second device has an empty local set, but it never
+    -- pushed anything, so it has deleted nothing and must say so.
+    assertEqual(
+        ids(SyncLogic.computeDeletions({}, {})),
+        "", "an empty watermark yields no deletions, whatever the server holds")
+
+    -- Nothing changed.
+    assertEqual(
+        ids(SyncLogic.computeDeletions({ "a" }, { { annotation_id = "a" } })),
+        "", "a live id is not a deletion")
+
+    -- A highlight created since the last push is not a deletion.
+    assertEqual(
+        ids(SyncLogic.computeDeletions({}, { { annotation_id = "new" } })),
+        "", "a new local highlight is not a deletion")
+
+    -- Fails safe when the watermark is missing entirely (fresh install).
+    assertEqual(ids(SyncLogic.computeDeletions(nil, nil)), "",
+        "a missing watermark deletes nothing")
+end
+
+local function testAnnotationIds()
+    local sorted = SyncLogic.annotationIds({
+        { annotation_id = "b" }, { annotation_id = "a" }, { no_id = true },
+    })
+    assertEqual(table.concat(sorted, ","), "a,b",
+        "ids are sorted and entries without an id are skipped")
+    assertEqual(#SyncLogic.annotationIds(nil), 0, "nil list yields no ids")
+end
+
 testIsRemoteProgressFromThisDevice()
 testDidBookProgressChange()
 testMergeAnnotation()
 testDiffAnnotations()
+testComputeDeletions()
+testAnnotationIds()
 
 print("sync_logic tests passed")

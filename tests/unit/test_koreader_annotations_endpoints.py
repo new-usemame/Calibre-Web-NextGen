@@ -244,13 +244,25 @@ def test_exact_koreader_auth_push_pull_conflict_and_duplicate_sequence(wire):
     ([], "invalid_payload"),
     ({"document": "digest-699", "annotations": None}, "invalid_annotations"),
     ({"document": "digest-699", "annotations": "wrong"}, "invalid_annotations"),
-    ({"document": "digest-699", "annotations": {}}, "invalid_annotations"),
 ])
 def test_wire_push_rejects_none_empty_and_wrong_types(wire, payload, error):
     client, _session = wire
     response = client.put("/kosync/syncs/annotations", json=payload)
     assert response.status_code == 400
     assert response.get_json()["error"] == error
+
+
+def test_wire_push_accepts_lua_empty_table_as_an_empty_set(wire):
+    """Lua cannot tell an empty list from an empty object, so its JSON encoder
+    emits `{}` for a device with no highlights. That is a well-formed empty
+    push, and since #920 an empty set asserts nothing, so it is a no-op rather
+    than a 400."""
+    client, _session = wire
+    response = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-699", "annotations": {},
+    })
+    assert response.status_code == 200
+    assert response.get_json()["created"] == 0
 
 
 def test_wire_preflights_entire_batch_before_persisting(wire):

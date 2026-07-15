@@ -18,6 +18,13 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- KOReader progress now appears on both classic and new book pages even when
+  the book already had a read/unread record before its first matched sync. The
+  devices could exchange positions while the web page showed no “KOReader
+  Progress” entry because that existing-row path never created the separate
+  bookmark state the pages display. This is a server-side fix; no device plugin
+  update is required. Reported and carefully re-tested by @uschi1 (#627).
+
 - KOReader: deleting a highlight on your device now removes it from Calibre-Web
   NextGen too. Previously the highlight stayed in the book's highlights list
   forever, however many times you synced. Reported by @iroQuai (#905). Update the

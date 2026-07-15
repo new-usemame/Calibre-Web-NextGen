@@ -25,6 +25,13 @@ is for things you can see or feel when running the app.
   bookmark state the pages display. This is a server-side fix; no device plugin
   update is required. Reported and carefully re-tested by @uschi1 (#627).
 
+- **Signing out no longer drops a browser that prefers the New UI onto the
+  classic login page.** The anonymous login state now honors the same durable,
+  per-browser interface choice as the signed-in library, while new browsers,
+  non-HTML clients, disabled-SPA instances, and reverse-proxy subpaths keep
+  their existing behavior. Thanks to @iroQuai for reporting the logout gap
+  after the separate #807 login-label fix. ([#908](https://github.com/new-usemame/Calibre-Web-NextGen/issues/908))
+
 - KOReader: deleting a highlight on your device now removes it from Calibre-Web
   NextGen too. Previously the highlight stayed in the book's highlights list
   forever, however many times you synced. Reported by @iroQuai (#905). Update the

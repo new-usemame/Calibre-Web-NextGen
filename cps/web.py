@@ -44,6 +44,7 @@ from .pagination import Pagination
 from .redirect import get_redirect_location
 from .cw_babel import get_available_locale
 from .usermanagement import login_required_if_no_ano
+from .ui_themes import config_theme_code
 from .kobo_sync_status import remove_synced_book
 from . import magic_shelf
 from .render_template import render_title_template
@@ -2544,9 +2545,13 @@ def register_post():
         content.role = config.config_default_role
         content.locale = config.config_default_locale
         content.sidebar_view = config.config_default_show
-        # Default to configured theme for new self-registered users (fallback to caliBlur=1)
+        # Seed the instance default theme, same as the admin-created paths. Goes
+        # through config_theme_code rather than assigning the raw value: a legacy
+        # config_theme of 0 means light, but a User.theme of 0 reads back as dark,
+        # so a raw copy would hand self-registered users a different theme than
+        # admin-created ones from the same setting (#736).
         try:
-            content.theme = getattr(config, 'config_theme', 1)
+            content.theme = config_theme_code(getattr(config, 'config_theme', None))
         except Exception:
             pass
         try:

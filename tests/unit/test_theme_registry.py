@@ -1,3 +1,4 @@
+import pytest
 import re
 from pathlib import Path
 
@@ -68,3 +69,40 @@ def test_config_theme_falls_back_to_the_default_on_garbage():
     for junk in (None, "", "nonsense", object()):
         assert config_theme_slug(junk) == "dark"
         assert config_theme_code(junk) == DEFAULT_THEME_CODE
+
+
+# Every place that seeds a new account's theme from the instance default. Adding
+# a create path without adding it here is fine; assigning config_theme raw in one
+# is not — that is the bug this pins.
+THEME_SEEDING_CREATE_PATHS = (
+    ("cps/api/admin.py", "admin_create_user — the New UI admin form"),
+    ("cps/admin.py", "_handle_new_user — the classic admin form"),
+    ("cps/web.py", "register_post — public self-registration"),
+)
+
+
+@pytest.mark.parametrize("path, description", THEME_SEEDING_CREATE_PATHS)
+def test_every_create_path_normalises_config_theme_before_storing_it(path, description):
+    """#736: config_theme and User.theme disagree on exactly one value — 0 means
+    light in config_theme but reads back as dark in User.theme. So a create path
+    that copies config_theme raw gives its users a different theme than the paths
+    that normalise, from the same admin setting.
+
+    register_post did exactly that: the two admin paths were fixed to call
+    config_theme_code() while it kept `content.theme = getattr(config,
+    'config_theme', 1)`, so with an admin-saved Light a self-registered account
+    booted dark and an admin-created one booted light.
+    """
+    source = (REPO_ROOT / path).read_text(encoding="utf-8")
+
+    raw_assignments = re.findall(
+        r"^\s*(?:content|new_user|user)\.theme\s*=\s*(.+)$", source, re.MULTILINE
+    )
+    assert raw_assignments, "no theme seeding found in %s — did it move? (%s)" % (path, description)
+
+    for expr in raw_assignments:
+        assert "config_theme_code(" in expr, (
+            "%s (%s) stores a theme without normalising through config_theme_code(): "
+            "`.theme = %s`. A raw config_theme (legacy 0 = light) becomes a User.theme "
+            "of 0, which reads back as dark." % (path, description, expr.strip())
+        )

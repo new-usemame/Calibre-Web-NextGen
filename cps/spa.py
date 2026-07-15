@@ -149,6 +149,18 @@ def preferred_spa_html_request():
     return bool(request.accept_mimetypes.accept_html)
 
 
+def spa_shell_url():
+    """Return the local, prefix-aware URL for the SPA shell.
+
+    ``url_for`` includes ``request.script_root`` verbatim.  That value normally
+    comes from a trusted reverse proxy, but a malformed forwarded prefix such as
+    ``//evil.example`` would turn a redirect into a scheme-relative off-site
+    destination.  Reuse the same strict prefix sanitizer that protects the SPA
+    shell's asset and API URLs, then append the fixed app-owned route.
+    """
+    return f"{_mount_prefix()}/app/"
+
+
 def _render_shell(index_path, prefix):
     """Serve the built index.html adapted to the current mount prefix.
 

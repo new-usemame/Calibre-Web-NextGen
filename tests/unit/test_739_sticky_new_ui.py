@@ -24,7 +24,6 @@ set_cookie() test-client API, which changed signature across the supported Flask
 range (1.x–3.x).
 """
 import pathlib
-from urllib.parse import parse_qs, urlsplit
 from unittest.mock import MagicMock, patch
 
 import flask
@@ -303,9 +302,9 @@ def test_preferred_spa_login_redirect_preserves_reverse_proxy_subpath(tmp_path):
 
 
 @pytest.mark.unit
-def test_preferred_spa_login_preserves_safe_local_next_under_subpath(tmp_path):
-    """A legitimate post-login target survives the surface handoff, including
-    its reverse-proxy prefix, so the SPA can safely resume it after sign-in."""
+def test_preferred_spa_login_ignores_next_and_preserves_subpath(tmp_path):
+    """The handoff stays on the app-owned shell even when login has a ``next``
+    target; the sanitized reverse-proxy prefix is the only preserved input."""
     app, web_mod, monkey = _login_app(tmp_path)
     try:
         resp = _get_login(
@@ -313,10 +312,8 @@ def test_preferred_spa_login_preserves_safe_local_next_under_subpath(tmp_path):
             headers=_HTML_ACCEPT,
             environ_overrides={**_PREFER_COOKIE, "SCRIPT_NAME": "/cwa"},
         )
-        location = urlsplit(resp.headers["Location"])
         assert resp.status_code == 302
-        assert location.path == "/cwa/app/"
-        assert parse_qs(location.query) == {"next": ["/cwa/admin"]}
+        assert resp.headers["Location"] == "/cwa/app/"
     finally:
         monkey.undo()
 

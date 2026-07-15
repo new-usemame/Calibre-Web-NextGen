@@ -24,6 +24,7 @@ set_cookie() test-client API, which changed signature across the supported Flask
 range (1.x–3.x).
 """
 import pathlib
+from unittest.mock import MagicMock, patch
 
 import flask
 import pytest
@@ -89,6 +90,33 @@ def _sticky_app(tmp_path):
         return "CLASSIC HOME"
 
     return app, monkey
+
+
+def _login_app(tmp_path):
+    """App with the real SPA and web blueprints for anonymous /login routing.
+
+    The classic login renderer is patched at its final template boundary so the
+    tests exercise the production ``web.login`` route and all routing decisions
+    without needing a configured user database, OAuth provider, or Jinja tree.
+    """
+    import cps.web as web_mod
+
+    monkey = _seed_bundle(tmp_path)
+    app = flask.Flask(__name__)
+    app.config["SECRET_KEY"] = "test"
+    _mirror_prod_session_config(app)
+    app.register_blueprint(spa_mod.spa)
+    app.register_blueprint(web_mod.web)
+    return app, web_mod, monkey
+
+
+def _get_login(client, web_mod, *args, **kwargs):
+    anonymous = MagicMock()
+    anonymous.is_authenticated = False
+    with patch.object(web_mod, "current_user", anonymous), \
+         patch.object(web_mod, "render_login", return_value="CLASSIC LOGIN"), \
+         patch.object(web_mod.config, "config_login_type", 0, create=True):
+        return client.get(*args, **kwargs)
 
 
 def _client(app):
@@ -192,6 +220,101 @@ def test_non_html_accept_not_redirected(tmp_path):
             "/", headers={"Accept": "application/json"},
             environ_overrides=_PREFER_COOKIE)
         assert resp.status_code == 200
+    finally:
+        monkey.undo()
+
+
+# ---- anonymous login surface ------------------------------------------------
+
+@pytest.mark.unit
+def test_preferred_spa_redirects_anonymous_login_to_new_ui(tmp_path):
+    """After logout, an anonymous HTML browser that still carries the durable
+    preference must enter the SPA's logged-out tree instead of Classic login."""
+    app, web_mod, monkey = _login_app(tmp_path)
+    try:
+        resp = _get_login(
+            _client(app), web_mod, "/login", headers=_HTML_ACCEPT,
+            environ_overrides=_PREFER_COOKIE,
+        )
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "/app"
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_login_without_preference_keeps_classic_surface(tmp_path):
+    """A new/no-cookie browser keeps the existing Classic login behavior."""
+    app, web_mod, monkey = _login_app(tmp_path)
+    try:
+        resp = _get_login(_client(app), web_mod, "/login", headers=_HTML_ACCEPT)
+        assert resp.status_code == 200
+        assert resp.get_data(as_text=True) == "CLASSIC LOGIN"
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_preferred_spa_login_does_not_redirect_non_html_client(tmp_path):
+    """Machine clients carrying a shared browser cookie must not be sent HTML."""
+    app, web_mod, monkey = _login_app(tmp_path)
+    try:
+        resp = _get_login(
+            _client(app), web_mod, "/login",
+            headers={"Accept": "application/json"},
+            environ_overrides=_PREFER_COOKIE,
+        )
+        assert resp.status_code == 200
+        assert resp.get_data(as_text=True) == "CLASSIC LOGIN"
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_preferred_spa_login_stays_classic_when_spa_disabled(tmp_path):
+    """The preference cannot redirect into a disabled/unavailable SPA shell."""
+    app, web_mod, monkey = _login_app(tmp_path)
+    monkey.setenv("CWNG_SPA", "0")
+    try:
+        resp = _get_login(
+            _client(app), web_mod, "/login", headers=_HTML_ACCEPT,
+            environ_overrides=_PREFER_COOKIE,
+        )
+        assert resp.status_code == 200
+        assert resp.get_data(as_text=True) == "CLASSIC LOGIN"
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_preferred_spa_login_redirect_preserves_reverse_proxy_subpath(tmp_path):
+    """url_for must keep the mount prefix; a hardcoded /app breaks #571."""
+    app, web_mod, monkey = _login_app(tmp_path)
+    try:
+        resp = _get_login(
+            _client(app), web_mod, "/login", headers=_HTML_ACCEPT,
+            environ_overrides={**_PREFER_COOKIE, "SCRIPT_NAME": "/cwa"},
+        )
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "/cwa/app"
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_preferred_spa_login_rejects_off_site_next_destination(tmp_path):
+    """An attacker-controlled next= must never turn /login -> /app into an
+    external redirect. The fixed SPA destination contains no hostile target."""
+    app, web_mod, monkey = _login_app(tmp_path)
+    try:
+        resp = _get_login(
+            _client(app), web_mod,
+            "/login?next=https%3A%2F%2Fevil.example%2Fsteal",
+            headers=_HTML_ACCEPT, environ_overrides=_PREFER_COOKIE,
+        )
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "/app"
+        assert "evil.example" not in resp.headers["Location"]
     finally:
         monkey.undo()
 

@@ -27,7 +27,7 @@ end
 local CWASync = WidgetContainer:extend{
     name = "cwasync",
     title = _("Login to NextGen Server"),
-    version = "4.1.11",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
+    version = "4.1.14",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
 
     push_timestamp = nil,
     pull_timestamp = nil,
@@ -1531,9 +1531,13 @@ function CWASync:syncAnnotations(interactive)
                 end
             end
 
-            if #diff.send_to_server > 0 then
+            -- A complete push lets the server reap what the device deleted, so
+            -- it must still go out when the local set is empty (the user removed
+            -- their last highlight) — otherwise that delete never syncs (#905).
+            local complete = provider.push_all_local and true or false
+            if #diff.send_to_server > 0 or complete then
                 client:push_annotations(self.settings.username, self.settings.password, digest,
-                    diff.send_to_server,
+                    diff.send_to_server, complete,
                     function(ok2, _body2)
                         if interactive then
                             if ok2 then

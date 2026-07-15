@@ -35,7 +35,7 @@ SYNC_LOGIC_TEST_LUA = PLUGIN_DIR / "tests" / "sync_logic_test.lua"
 # a deliberate forcing function, not a value to read dynamically. Currently
 # 4.1.11 (latest shipped plugin tag; the release train performs future source
 # bumps when a plugin-touching release is tagged).
-EXPECTED_PLUGIN_VERSION = "4.1.11"
+EXPECTED_PLUGIN_VERSION = "4.1.14"
 
 
 def _read(path: Path) -> str:

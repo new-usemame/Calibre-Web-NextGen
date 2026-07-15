@@ -16,6 +16,13 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- KOReader: deleting a highlight on your device now removes it from Calibre-Web
+  NextGen too. Previously the highlight stayed in the book's highlights list
+  forever, however many times you synced. Reported by @iroQuai (#905). Update the
+  NextGen Progress Sync plugin on your device to pick this up.
+
 ## [v4.1.13] - 2026-07-14
 
 ### Added

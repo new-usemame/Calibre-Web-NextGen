@@ -28,6 +28,8 @@ testable logic. See notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md 
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from flask import request
 
 from ... import csrf, logger, ub
@@ -43,6 +45,14 @@ from .kosync import (
 )
 
 log = logger.create()
+
+# Sources a push may declare itself complete for. A device may only reconcile
+# the source it actually owns, so an unknown/spoofed value reaps nothing.
+_REAPABLE_SOURCES = {"koreader"}
+
+
+def _now():
+    return datetime.now(timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -64,9 +74,17 @@ def build_pull_payload(user_id: int, book_id: int, session) -> dict:
     return {"annotations": annotations, "annotation_count": len(annotations)}
 
 
-def apply_push(annotations, *, user, book, session, commit) -> dict:
+def apply_push(annotations, *, user, book, session, commit,
+               complete_for_source=None) -> dict:
     """Upsert each pushed portable annotation, fan out to enabled sync targets,
-    and return a counts summary keyed by action (created/updated/deleted/skipped)."""
+    and return a counts summary keyed by action (created/updated/deleted/skipped).
+
+    ``complete_for_source`` makes the push authoritative for one source: the
+    caller asserts ``annotations`` is the device's COMPLETE live set for this
+    book, so any live row of that source which is absent has been deleted on
+    the device and is reaped (see :func:`_reap_absent`). Left ``None``, the
+    push is treated as partial and nothing is reaped.
+    """
     from ...services.annotation_portable import apply_portable
     from ...services import annotation_sync
 
@@ -89,7 +107,74 @@ def apply_push(annotations, *, user, book, session, commit) -> dict:
                 annotation_sync.dispatch_existing_annotation_sync(row, book, user)
         except Exception:  # pragma: no cover - fan-out must never fail the push
             log.exception("koreader annotation push fan-out failed for %s", row.annotation_id)
+
+    if complete_for_source:
+        summary["deleted"] += _reap_absent(
+            annotations, user=user, book=book, session=session, commit=commit,
+            source=complete_for_source,
+        )
     return summary
+
+
+def _reap_absent(annotations, *, user, book, session, commit, source) -> int:
+    """Soft-delete rows the device no longer has.
+
+    KOReader leaves no tombstone when a highlight is deleted — the entry just
+    disappears from its annotation collection — so a device-side delete reaches
+    us as an omission from a complete push. Reconciling the pushed set against
+    the stored one is the only way to observe it (#905).
+
+    Scoped hard, because reaping is destructive-in-effect:
+      - only this ``(user, book)``;
+      - only rows of ``source`` (a KOReader sync must never reap a Kobo-native
+        or web-reader highlight — those devices push their own complete sets);
+      - only rows that are still live (an already-hidden row is left alone, so
+        the delete fan-out fires once, not on every subsequent sync).
+
+    Soft-deletes rather than deleting: pull deliberately includes hidden rows so
+    other devices can mirror the deletion locally.
+    """
+    from ...services import annotation_sync
+
+    pushed_ids = {
+        payload.get("annotation_id").strip()
+        for payload in annotations
+        if isinstance(payload, dict)
+        and isinstance(payload.get("annotation_id"), str)
+        and payload.get("annotation_id").strip()
+    }
+
+    stale = [
+        row for row in session.query(ub.Annotation).filter(
+            ub.Annotation.user_id == user.id,
+            ub.Annotation.book_id == book.id,
+            ub.Annotation.source == source,
+        ).filter(
+            (ub.Annotation.hidden.is_(None))
+            | (ub.Annotation.hidden == False)  # noqa: E712 — SQLA needs ==
+        ).all()
+        if row.annotation_id not in pushed_ids
+    ]
+    if not stale:
+        return 0
+
+    for row in stale:
+        row.hidden = True
+        row.last_synced = _now()
+    commit()
+
+    for row in stale:
+        try:
+            annotation_sync.dispatch_annotation_deletes(
+                [row.annotation_id], user, book_id=book.id,
+            )
+        except Exception:  # pragma: no cover - fan-out must never fail the push
+            log.exception("koreader annotation reap fan-out failed for %s", row.annotation_id)
+    log.debug(
+        "koreader reap: soft-deleted %d absent %s row(s) for user=%s book=%s",
+        len(stale), source, user.id, book.id,
+    )
+    return len(stale)
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +236,26 @@ def push_annotations():
         return create_sync_response({"document": document, "matched": False,
                                      "created": 0, "updated": 0, "deleted": 0, "skipped": 0})
 
+    # A plugin that pushes its complete local set says so here, which lets the
+    # server observe device-side deletions (they arrive as omissions, never as
+    # tombstones — #905). Absent/false keeps the legacy partial-push semantics,
+    # so an older plugin build reaps nothing.
+    complete_for_source = None
+    if data.get("complete") is True:
+        claimed = data.get("complete_source") or "koreader"
+        if claimed in _REAPABLE_SOURCES:
+            complete_for_source = claimed
+        else:
+            log.warning("koreader push declared complete for unsupported source %r; not reaping", claimed)
+
     annotations = data.get("annotations")
+    # Lua has no empty-list/empty-object distinction, so the plugin's JSON
+    # encoder emits `{}` for "no annotations". A complete push is the one case
+    # where an empty payload is meaningful (the user deleted their last
+    # highlight), so accept it there. A partial push with no array is still a
+    # client bug and still 400s.
+    if complete_for_source and annotations in ({}, None):
+        annotations = []
     if not isinstance(annotations, list):
         return create_sync_response({"error": "invalid_annotations", "message": "annotations must be an array"}, 400)
     from ...services.annotation_portable import validate_portable_payload
@@ -162,11 +266,14 @@ def push_annotations():
                 "error": "invalid_annotation",
                 "message": f"annotations[{index}]: {error}",
             }, 400)
+
     summary = apply_push(
         annotations, user=user, book=book,
         session=ub.session, commit=ub.session_commit,
+        complete_for_source=complete_for_source,
     )
     summary["document"] = document
+    summary["reconciled"] = complete_for_source is not None
     summary["calibre_book_id"] = book_id
     summary["matched"] = True
     return create_sync_response(summary)

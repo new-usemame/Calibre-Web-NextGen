@@ -86,7 +86,7 @@ def _sticky_app(tmp_path):
             spa_mod.clear_prefer_spa_cookie(resp)
             return resp
         if spa_mod.classic_index_redirects_to_spa():
-            return flask.redirect(flask.url_for("spa.spa_shell"))
+            return flask.redirect(spa_mod.spa_shell_url())
         return "CLASSIC HOME"
 
     return app, monkey
@@ -220,6 +220,22 @@ def test_non_html_accept_not_redirected(tmp_path):
             "/", headers={"Accept": "application/json"},
             environ_overrides=_PREFER_COOKIE)
         assert resp.status_code == 200
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_classic_index_redirect_rejects_hostile_proxy_prefix(tmp_path):
+    """The original #739 redirect shares the same forwarded-prefix boundary as
+    /login and must not turn ``//host`` into a scheme-relative redirect."""
+    app, monkey = _sticky_app(tmp_path)
+    try:
+        resp = _client(app).get(
+            "/", headers=_HTML_ACCEPT,
+            environ_overrides={**_PREFER_COOKIE, "SCRIPT_NAME": "//evil.example"},
+        )
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "/app/"
     finally:
         monkey.undo()
 

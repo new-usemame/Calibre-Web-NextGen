@@ -1329,7 +1329,7 @@ def index(page):
     # to the new UI rather than silently reverting (and re-nagging). Same
     # web-index-only scope; the helper also gates on SPA available + accepts HTML.
     if spa.classic_index_redirects_to_spa():
-        return redirect(url_for("spa.spa_shell"))
+        return redirect(spa.spa_shell_url())
 
     return render_books_list("newest", sort_param, 1, page)
 

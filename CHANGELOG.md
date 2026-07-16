@@ -16,6 +16,13 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Russian screen readers announced the reader's progress as "Прочитано: 45% r"** — a
+  stray letter left over from the English "read". It only ever reached people using a
+  screen reader, since the text is spoken rather than drawn on screen. Brazilian
+  Portuguese was already correct and is unchanged.
+
 ## [v4.1.14] - 2026-07-16
 
 ### Added

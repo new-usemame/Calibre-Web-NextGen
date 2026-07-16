@@ -15,10 +15,16 @@ four new translations but the file also contained an obsolete ``#~ msgid``
 duplicate of one of them; msgfmt rejected the file, the build kept going,
 and on teenyverse Hungarian users got the English fallback.
 
-This test runs ``msgfmt --check`` against every ``messages.po`` in the
-translations tree so a malformed .po triggers a unit-test failure long
-before CI builds the Docker image. Acts as the test-suite-side checker
-the deferred Docker build doesn't enforce.
+This test runs plain ``msgfmt`` — the exact invocation the Docker build
+uses — against every ``messages.po`` in the translations tree, so a .po
+that would be silently dropped from the image fails a unit test first.
+Acts as the test-suite-side checker the deferred Docker build doesn't
+enforce.
+
+The stricter ``msgfmt --check`` format-consistency classes are gated
+separately in ``test_i18n_format_flags.py``; that split is deliberate.
+This file answers "does the locale ship at all", that one answers "is the
+string it ships correct" (#936).
 """
 
 import glob

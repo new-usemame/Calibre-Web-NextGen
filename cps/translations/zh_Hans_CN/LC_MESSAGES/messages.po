@@ -3341,7 +3341,7 @@ msgid "{n} selected"
 msgstr ""
 
 #: cps/spa_strings.py:297
-#, python-format, python-brace-format
+#, python-brace-format
 msgid "{pct}% read"
 msgstr ""
 

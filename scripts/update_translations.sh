@@ -45,6 +45,16 @@ echo "[i] Project version: $VERSION"
     --copyright-holder="Calibre-Web Automated Contributors" \
     . || { echo "pybabel extract failed"; exit 1; }
 
+# 1b. Repair babel's mis-detected python-format flags before they fan out.
+# babel reads the literal percent in "{pct}% read" as a format spec (`% r` =
+# space-flag + `r` conversion) and flags the entry python-format on top of
+# python-brace-format. That inverts `msgfmt --check`: a translation keeping the
+# phantom spec passes, one correctly dropping it fatals — which is how a corrupt
+# Russian string reached screen-reader users (#936). Must run BEFORE msgmerge,
+# since msgmerge is what copies POT flags into every locale.
+"$PYTHON_CMD" "$SCRIPT_DIR/fix_pot_format_flags.py" "$POT" \
+    || { echo "fix_pot_format_flags failed"; exit 1; }
+
 # 2. Merge updates
 shopt -s nullglob
 for po in "$ROOT_DIR"/cps/translations/*/LC_MESSAGES/messages.po; do

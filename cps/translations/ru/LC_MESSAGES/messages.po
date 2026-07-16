@@ -3451,9 +3451,9 @@ msgid "{n} selected"
 msgstr "{n} выбрано"
 
 #: cps/spa_strings.py:297
-#, python-format, python-brace-format
+#, python-brace-format
 msgid "{pct}% read"
-msgstr "Прочитано: {pct}% r"
+msgstr "Прочитано: {pct}%"
 
 #: cps/spa_strings.py:303
 msgid "What's new"

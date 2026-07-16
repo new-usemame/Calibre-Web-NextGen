@@ -18,6 +18,16 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Automatic duplicate resolution never ran if you set a cooldown.** Turning on the
+  cooldown ("wait N minutes between automatic resolutions") stopped automatic duplicate
+  resolution from running at all, and the log reported a wait of about four hours
+  counting up rather than down. Two separate causes: the cooldown you typed was thrown
+  away and replaced with one minute, and the clock comparison mixed your local time with
+  UTC, so the wait never elapsed. If your server runs east of UTC the opposite happened —
+  the cooldown was ignored and resolution ran on every scan. Both are fixed and your
+  existing resolution history stays intact. Thanks to @jdbway, who diagnosed both causes
+  and pinpointed the exact lines in #944.
+
 - **Startup no longer sets permissions on your Calibre library twice.** Every container
   start walked the whole library once from a hardcoded list and again from `dirs.json`,
   and re-walked a folder inside `/config` that had already been covered. Each folder is

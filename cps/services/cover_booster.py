@@ -41,13 +41,15 @@ Disable globally with env CWA_COVER_BOOST=0. Tuning knobs:
 """
 from __future__ import annotations
 
-import concurrent.futures
+import functools
 import os
 import re
 from typing import Dict, Iterable, List, Optional
 from urllib.parse import quote_plus
 
 import requests
+
+from . import parallel
 
 from .. import constants, logger
 
@@ -106,22 +108,24 @@ def boost_covers(records: List[Dict]) -> List[Dict]:
     if not candidates:
         return records
 
-    workers = max(1, min(_DEFAULT_WORKERS, len(candidates)))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_boosted_cover_for, rec): rec for rec in candidates}
-        for future in concurrent.futures.as_completed(futures):
-            rec = futures[future]
-            try:
-                upgraded = future.result()
-            except Exception as exc:  # pragma: no cover - defensive
-                log.debug("cover boost: lookup failed for %r: %s", rec.get("title"), exc)
-                continue
-            if upgraded:
-                log.debug(
-                    "cover boost: %s -> %s (was %s)",
-                    rec.get("title"), upgraded, rec.get("cover"),
-                )
-                rec["cover"] = upgraded
+    # parallel.fan_out, not concurrent.futures: this runs on the request
+    # greenlet (the cover picker and metadata search both call it inline) and
+    # a stdlib as_completed() wait would block the gevent hub, freezing every
+    # other user's request for the whole boost pass. See cps/services/parallel.py
+    # and fork #954.
+    jobs = [(rec, functools.partial(_boosted_cover_for, rec)) for rec in candidates]
+    for rec, result in parallel.fan_out(jobs, max_workers=_DEFAULT_WORKERS):
+        if result.exception is not None:  # pragma: no cover - defensive
+            log.debug("cover boost: lookup failed for %r: %s",
+                      rec.get("title"), result.exception)
+            continue
+        upgraded = result.value
+        if upgraded:
+            log.debug(
+                "cover boost: %s -> %s (was %s)",
+                rec.get("title"), upgraded, rec.get("cover"),
+            )
+            rec["cover"] = upgraded
     return records
 
 

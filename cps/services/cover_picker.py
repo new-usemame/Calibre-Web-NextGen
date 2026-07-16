@@ -21,15 +21,15 @@ keys; only the surface they're presented through differs.
 """
 from __future__ import annotations
 
-import concurrent.futures
 import dataclasses
+import functools
 import os
-import time
 from dataclasses import asdict
 from typing import Callable, Dict, Iterable, List, Optional
 
 from .. import logger
 from . import cover_booster
+from . import parallel
 from .cover_booster import boost_covers
 
 
@@ -135,53 +135,56 @@ def gather_cover_candidates(
     if (not runnable or not query) and not amazon_isbn10s:
         return candidates, statuses
 
-    started_at = {p.__id__: time.monotonic() for p in runnable}
     results_by_provider: Dict[str, list] = {}
     amazon_urls_by_isbn10: Dict[str, str] = {}
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_DEFAULT_WORKERS) as pool:
-        futures = {}
-        if query:
-            futures.update({
-                pool.submit(p.search, query, static_cover, locale): ("provider", p)
-                for p in runnable
-            })
-        futures.update({
-            pool.submit(cover_booster._amazon_cdn_cover_for_isbn10, isbn10): ("amazon", isbn10)
-            for isbn10 in amazon_isbn10s
-        })
-        for fut in concurrent.futures.as_completed(futures):
-            kind, subject = futures[fut]
-            if kind == "amazon":
-                try:
-                    url = fut.result()
-                except Exception as exc:  # pragma: no cover - defensive
-                    log.debug("cover-picker Amazon CDN probe failed for %s: %s", subject, exc)
-                    continue
-                if url:
-                    amazon_urls_by_isbn10[subject] = url
-                continue
+    # Fan out through parallel.fan_out, NOT concurrent.futures: the WSGI server
+    # is gevent without monkey-patching, so a stdlib as_completed() wait blocks
+    # the hub and every other user's request hangs for the slowest provider's
+    # timeout. That was fork #954 ("Change cover" made the app unreachable).
+    jobs = []
+    if query:
+        jobs.extend(
+            (("provider", p), functools.partial(p.search, query, static_cover, locale))
+            for p in runnable
+        )
+    jobs.extend(
+        (("amazon", isbn10), functools.partial(cover_booster._amazon_cdn_cover_for_isbn10, isbn10))
+        for isbn10 in amazon_isbn10s
+    )
 
-            p = subject
-            elapsed_ms = int((time.monotonic() - started_at.get(p.__id__, time.monotonic())) * 1000)
-            try:
-                hits = fut.result() or []
-            except Exception as exc:
-                status, message = classify_failure(exc)
-                log.warning("cover-picker provider %s failed (%s) in %dms: %s",
-                            p.__class__.__name__, status, elapsed_ms, exc)
-                statuses.append(ProviderStatus(
-                    id=p.__id__, name=p.__name__, status=status,
-                    count=0, message=message, duration_ms=elapsed_ms,
-                ))
+    for (kind, subject), result in parallel.fan_out(jobs, max_workers=_DEFAULT_WORKERS):
+        if kind == "amazon":
+            if result.exception is not None:  # pragma: no cover - defensive
+                log.debug("cover-picker Amazon CDN probe failed for %s: %s",
+                          subject, result.exception)
                 continue
-            results_by_provider[p.__id__] = hits[:_DEFAULT_MAX_PER_SOURCE]
-            count = len(results_by_provider[p.__id__])
-            status, message = ("ok", "") if count else classify_empty(p)
+            if result.value:
+                amazon_urls_by_isbn10[subject] = result.value
+            continue
+
+        p = subject
+        # Stamped in the worker when this provider returned — a clock read here
+        # would give every provider in the same completion wave one identical
+        # number (fork #954 verification: 10 of 16 all reporting 5316ms).
+        elapsed_ms = result.elapsed_ms
+        if result.exception is not None:
+            status, message = classify_failure(result.exception)
+            log.warning("cover-picker provider %s failed (%s) in %dms: %s",
+                        p.__class__.__name__, status, elapsed_ms, result.exception)
             statuses.append(ProviderStatus(
                 id=p.__id__, name=p.__name__, status=status,
-                count=count, message=message, duration_ms=elapsed_ms,
+                count=0, message=message, duration_ms=elapsed_ms,
             ))
+            continue
+        hits = result.value or []
+        results_by_provider[p.__id__] = hits[:_DEFAULT_MAX_PER_SOURCE]
+        count = len(results_by_provider[p.__id__])
+        status, message = ("ok", "") if count else classify_empty(p)
+        statuses.append(ProviderStatus(
+            id=p.__id__, name=p.__name__, status=status,
+            count=count, message=message, duration_ms=elapsed_ms,
+        ))
 
     flat = []
     for hits in results_by_provider.values():

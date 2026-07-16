@@ -17,6 +17,7 @@ from werkzeug.datastructures import Authorization
 from werkzeug.security import check_password_hash
 
 from . import lm, ub, config, logger, limiter, constants, services
+from .ui_themes import config_theme_code
 
 
 log = logger.create()
@@ -130,8 +131,10 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         user.allowed_column_value = getattr(config, 'config_allowed_column_value', '')
         user.denied_column_value = getattr(config, 'config_denied_column_value', '')
         
-        # Force dark theme (light theme deprecated)
-        user.theme = 1
+        # Seed the account with the instance default theme (Admin -> Theme).
+        # This used to hardcode dark, from when light was deprecated; #845
+        # brought six themes back, so honour whatever the admin configured.
+        user.theme = config_theme_code(getattr(config, 'config_theme', None))
             
         # Kobo sync setting defaults to 0 (disabled) for new users
         user.kobo_only_shelves_sync = 0

@@ -35,7 +35,7 @@ export function DiscoverSection({ onClose }: { onClose: () => void }) {
   if (!isLoading && books.length === 0) return null;
 
   return (
-    <section className={styles.box} aria-label={t('Discover')}>
+    <section className={styles.box} aria-label={t('Discover')} data-testid="discover-section">
       <div className={styles.head}>
         <div className={styles.titleWrap}>
           <span className={styles.sparkle}><Sparkles size={18} aria-hidden="true" focusable={false} /></span>

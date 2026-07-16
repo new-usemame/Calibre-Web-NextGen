@@ -200,6 +200,11 @@ _('Description contains')
 _('Deselect {title}')
 _('Edit metadata')
 _('Edit {title}')
+# #928 — the saved default library view (#498) renders as a filtered library,
+# so the notice strip that explains the subset lives on Catalog.tsx.
+_('Showing your default library view.')
+_('Show all books')
+_('Edit default view')
 _('Failed to load books.')
 _('Failed to open the book.')
 _('Generate')

@@ -52,6 +52,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from .usermanagement import user_login_required
 
 from . import constants, logger, config, app, ub
+from .ui_themes import config_theme_code
 
 try:
     from .oauth import OAuthBackend, backend_resultcode
@@ -471,8 +472,10 @@ def register_user_from_generic_oauth(token=None):
         user.allowed_column_value = getattr(config, 'config_allowed_column_value', '')
         user.denied_column_value = getattr(config, 'config_denied_column_value', '')
         
-        # Force dark theme (light theme deprecated)
-        user.theme = 1
+        # Seed the account with the instance default theme (Admin -> Theme).
+        # This used to hardcode dark, from when light was deprecated; #845
+        # brought six themes back, so honour whatever the admin configured.
+        user.theme = config_theme_code(getattr(config, 'config_theme', None))
             
         # Kobo sync setting defaults to 0 (disabled) for new users
         user.kobo_only_shelves_sync = 0

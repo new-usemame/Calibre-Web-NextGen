@@ -14,6 +14,45 @@ from datetime import datetime
 from tabulate import tabulate
 
 
+# Settings whose stored int value is a real number, not a boolean flag.
+#
+# get_cwa_settings() coerces every int-valued setting to a bool so that the
+# 0/1 flags round-trip as True/False. Anything genuinely numeric has to opt out
+# here or it silently becomes True. These lists are consumed both here and by
+# the admin settings page in cps/cwa_functions.py; they lived as separate
+# literals in the two files until #944, where they drifted apart by exactly one
+# key and a configured 30-minute duplicate cooldown reached the scan task as
+# int(True) == 1 minute. Keep them in one place so the two readers cannot
+# disagree again.
+INTEGER_SETTINGS = [
+    'ingest_timeout_minutes',
+    'ingest_stale_temp_minutes',
+    'ingest_stale_temp_interval',
+    'auto_send_delay_minutes',
+    'hardcover_auto_fetch_batch_size',
+    'hardcover_auto_fetch_schedule_hour',
+    'duplicate_scan_hour',
+    'duplicate_scan_chunk_size',
+    'duplicate_scan_debounce_seconds',
+    'duplicate_auto_resolve_cooldown_minutes',
+    'archived_cleanup_schedule_hour',
+    'cover_download_max_mb',
+]
+
+# Settings that must stay floats rather than being coerced to bools.
+FLOAT_SETTINGS = [
+    'hardcover_auto_fetch_min_confidence',
+    'hardcover_auto_fetch_rate_limit',
+]
+
+# Settings stored as JSON strings, which must not be split on commas.
+JSON_SETTINGS = [
+    'metadata_provider_hierarchy',
+    'metadata_providers_enabled',
+    'duplicate_format_priority',
+]
+
+
 class CWA_DB:
     def __init__(self, verbose=False):
         self.verbose = verbose
@@ -607,19 +646,10 @@ class CWA_DB:
             if key not in cwa_settings:
                 cwa_settings[key] = default_value
 
-        # Define which settings should remain as integers (not converted to boolean)
-        integer_settings = ['ingest_timeout_minutes', 'ingest_stale_temp_minutes', 'ingest_stale_temp_interval', 'auto_send_delay_minutes', 'hardcover_auto_fetch_batch_size', 'hardcover_auto_fetch_schedule_hour', 'duplicate_scan_hour', 'duplicate_scan_chunk_size', 'duplicate_scan_debounce_seconds', 'archived_cleanup_schedule_hour', 'cover_download_max_mb']
-        
-        # Define which settings should remain as floats (not converted to boolean)
-        float_settings = ['hardcover_auto_fetch_min_confidence', 'hardcover_auto_fetch_rate_limit']
-        
-        # Define which settings should remain as JSON strings (not split by comma)
-        json_settings = ['metadata_provider_hierarchy', 'metadata_providers_enabled', 'duplicate_format_priority']
-
         for header in headers:
-            if isinstance(cwa_settings[header], int) and header not in integer_settings and header not in float_settings:
+            if isinstance(cwa_settings[header], int) and header not in INTEGER_SETTINGS and header not in FLOAT_SETTINGS:
                 cwa_settings[header] = bool(cwa_settings[header])
-            elif isinstance(cwa_settings[header], str) and ',' in cwa_settings[header] and header not in json_settings:
+            elif isinstance(cwa_settings[header], str) and ',' in cwa_settings[header] and header not in JSON_SETTINGS:
                 cwa_settings[header] = cwa_settings[header].split(',')
 
         return cwa_settings
@@ -644,6 +674,10 @@ class CWA_DB:
                 # Continue to next setting instead of failing completely
                 continue
         self.set_default_settings()
+        # Refresh the cached copy. Readers that hold a long-lived CWA_DB (the
+        # duplicate scan task reads cwa_db.cwa_settings) would otherwise keep
+        # serving the values loaded in __init__ for the life of the process.
+        self.cwa_settings = self.get_cwa_settings()
 
 
     def enforce_add_entry_from_log(self, log_info: dict, trigger_type: str = "auto -log"):
@@ -2580,7 +2614,15 @@ class CWA_DB:
 
     def log_duplicate_resolution(self, group_hash, group_title, group_author, kept_book_id, 
                                  deleted_book_ids, strategy, trigger_type, user_id=None, notes=None):
-        """Log a duplicate resolution to audit table"""
+        """Log a duplicate resolution to audit table.
+
+        The timestamp column is left to its schema DEFAULT CURRENT_TIMESTAMP,
+        which SQLite evaluates in UTC. Every reader must therefore compare in
+        UTC; see _cooldown_remaining_minutes in cps/tasks/duplicate_scan.py.
+        Do not switch this to a local datetime.now(): rows already on disk are
+        UTC, and a mixed table makes SELECT MAX(timestamp) return the stale UTC
+        row rather than the most recent one (#944).
+        """
         import json
         try:
             self.cur.execute("""

@@ -6,7 +6,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import func
 from flask_babel import lazy_gettext as N_
 
@@ -27,6 +27,30 @@ from cps.ub import init_db_thread
 if '/app/calibre-web-automated/scripts/' not in sys.path:
     sys.path.insert(1, '/app/calibre-web-automated/scripts/')
 from cwa_db import CWA_DB
+
+
+def _cooldown_remaining_minutes(cur, cooldown_minutes, now=None):
+    """Minutes left before auto-resolution may run again; 0.0 once it may.
+
+    cwa_duplicate_resolutions.timestamp is written by the column's schema
+    DEFAULT CURRENT_TIMESTAMP, which SQLite evaluates in UTC, so the comparison
+    is made in UTC. Comparing against a naive local datetime.now() is what broke
+    #944: west of UTC every elapsed came out negative, the cooldown never
+    expired, and auto-resolution never ran at all.
+    """
+    row = cur.execute("""
+        SELECT MAX(timestamp) FROM cwa_duplicate_resolutions
+        WHERE trigger_type='automatic'
+    """).fetchone()
+    last_resolution = row[0] if row else None
+    if not last_resolution:
+        return 0.0
+
+    last_time = datetime.fromisoformat(last_resolution).replace(tzinfo=timezone.utc)
+    now = now or datetime.now(timezone.utc)
+    elapsed = (now - last_time).total_seconds() / 60
+    remaining = cooldown_minutes - elapsed
+    return remaining if remaining > 0 else 0.0
 
 log = logger.create()
 
@@ -250,21 +274,11 @@ class TaskDuplicateScan(CalibreTask):
                         # Check cooldown period
                         if cooldown_minutes > 0:
                             try:
-                                last_resolution = cwa_db.cur.execute("""
-                                    SELECT MAX(timestamp) FROM cwa_duplicate_resolutions
-                                    WHERE trigger_type='automatic'
-                                """).fetchone()[0]
-
-                                if last_resolution:
-                                    last_time = datetime.fromisoformat(last_resolution)
-                                    now = datetime.now()
-                                    elapsed = (now - last_time).total_seconds() / 60
-
-                                    if elapsed < cooldown_minutes:
-                                        remaining = cooldown_minutes - elapsed
-                                        log.info("[cwa-duplicates] Auto-resolution skipped due to cooldown: %.1f minutes remaining",
-                                                remaining)
-                                        return
+                                remaining = _cooldown_remaining_minutes(cwa_db.cur, cooldown_minutes)
+                                if remaining > 0:
+                                    log.info("[cwa-duplicates] Auto-resolution skipped due to cooldown: %.1f minutes remaining",
+                                            remaining)
+                                    return
                             except Exception as e:
                                 log.warning("[cwa-duplicates] Cooldown check failed: %s", str(e))
 

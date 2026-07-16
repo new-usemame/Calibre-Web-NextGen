@@ -2,6 +2,10 @@ import pytest
 import re
 from pathlib import Path
 
+# CI selects with `pytest -m "smoke or unit"`, so this file was collected and then
+# deselected — the whole #736/#918 theme registry pin has never gated a PR (#921).
+pytestmark = pytest.mark.unit
+
 from cps.ui_themes import (
     ALLOWED_THEME_SLUGS,
     DEFAULT_THEME_CODE,
@@ -77,9 +81,14 @@ def test_config_theme_falls_back_to_the_default_on_garbage():
         assert config_theme_code(junk) == DEFAULT_THEME_CODE
 
 
-# Every place that seeds a new account's theme from the instance default. Adding
-# a create path without adding it here is fine; assigning config_theme raw in one
-# is not — that is the bug this pins.
+# Every place that seeds a new account's theme from the instance default.
+#
+# NOTE (#921): this list is deliberately no longer the guard. It named three of
+# the seven create paths, and "adding a create path without adding it here is
+# fine" is precisely how cps/api/auth.py shipped a raw copy while this stayed
+# green. The real guard AST-enumerates every ub.User() site and cannot be
+# out-of-date by omission — see tests/unit/test_921_theme_seeding_every_create_path.py.
+# These three are kept as a cheap, readable smoke check over the paths #918 fixed.
 THEME_SEEDING_CREATE_PATHS = (
     ("cps/api/admin.py", "admin_create_user — the New UI admin form"),
     ("cps/admin.py", "_handle_new_user — the classic admin form"),

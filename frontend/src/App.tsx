@@ -44,8 +44,11 @@ const NativeReader = lazy(() => import('./pages/NativeReader').then((m) => ({ de
 // links resolve to <prefix>/app/… rather than a prefix-less /app/….
 const ROUTER_BASE = BASE_PREFIX + '/app';
 
+// A saved default view (#498) FILTERS the library; it does not replace it with
+// the search page. Swapping the component here cost the library heading, actions
+// and Discover strip and retitled the home page "Advanced search" (#928).
 function Library({ defaultFilter }: { defaultFilter?: AdvancedSearchParams }) {
-  return defaultFilter ? <AdvancedSearch defaultFilter={defaultFilter} /> : <Catalog />;
+  return <Catalog defaultFilter={defaultFilter} />;
 }
 
 function AuthenticatedAuthLanding() {

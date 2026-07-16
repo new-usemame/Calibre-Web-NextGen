@@ -18,6 +18,41 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **New accounts ignored the default theme you picked in Admin.** Whichever theme an admin
+  chose under Admin → Theme, some new accounts still started on Dark. Which accounts
+  depended on how they signed up: people who registered themselves through the new UI got
+  it wrong only on servers upgraded from an older build, while accounts created by OAuth,
+  LDAP import, or an external/proxy login always got Dark no matter what you had set —
+  those three still carried a hardcoded default from back when Light was removed, and were
+  never updated when the six themes returned. Admin-created accounts were always fine, so
+  the same setting could produce two different results on one server. All seven ways an
+  account can be created now seed the theme you configured.
+
+- **"Change cover" made the whole server unreachable until it finished.** Opening the
+  cover picker on one book froze every other page for everyone using the server — up to
+  about 12 seconds, however long the slowest metadata source took to answer. The same
+  freeze hit the "Search metadata" button on the edit page. Measured on a test library: a
+  book page that normally answers in 30ms took 11.4 seconds while a cover search ran; it
+  now answers in well under a quarter second, and the cover search itself is no slower.
+  Thanks to @darkmatterpelican for reporting it in #954.
+
+- **Setting a default library view turned your library into the search page.** After saving
+  a default view, the library home showed the "Advanced search" form pinned above the books,
+  the page was retitled "Advanced search", and the library heading, its actions and the
+  Discover strip disappeared. Your library now stays your library — it simply shows the
+  books your default view selects, with a note saying so and a "Show all books" link to see
+  everything again. Reported by @chloeroform.
+
+- **Automatic duplicate resolution never ran if you set a cooldown.** Turning on the
+  cooldown ("wait N minutes between automatic resolutions") stopped automatic duplicate
+  resolution from running at all, and the log reported a wait of about four hours
+  counting up rather than down. Two separate causes: the cooldown you typed was thrown
+  away and replaced with one minute, and the clock comparison mixed your local time with
+  UTC, so the wait never elapsed. If your server runs east of UTC the opposite happened —
+  the cooldown was ignored and resolution ran on every scan. Both are fixed and your
+  existing resolution history stays intact. Thanks to @jdbway, who diagnosed both causes
+  and pinpointed the exact lines in #944.
+
 - **Startup no longer sets permissions on your Calibre library twice.** Every container
   start walked the whole library once from a hardcoded list and again from `dirs.json`,
   and re-walked a folder inside `/config` that had already been covered. Each folder is

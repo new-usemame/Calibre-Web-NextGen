@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-import concurrent.futures
+import functools
 import importlib
 import inspect
 import json
@@ -18,6 +18,7 @@ from flask_babel import get_locale
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 from sqlalchemy.orm.attributes import flag_modified
 
+from cps.services import parallel
 from cps.services.Metadata import Metadata
 from cps.services.cover_booster import boost_covers
 from . import config, constants, logger, ub, web_server
@@ -405,45 +406,47 @@ def metadata_search():
 
     static_cover = url_for("static", filename="generic_cover.svg")
 
-    import time
-    started_at = {pid: time.monotonic() for pid in runnable}
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_provider = {
-            executor.submit(copy_current_request_context(provider.search), query, static_cover, locale): provider
-            for provider in runnable.values()
-        }
-        for future in concurrent.futures.as_completed(future_to_provider):
-            provider = future_to_provider[future]
-            elapsed_ms = int((time.monotonic() - started_at.get(provider.__id__, time.monotonic())) * 1000)
-            try:
-                provider_results = future.result() or []
-            except Exception as exc:
-                status, message = _classify_provider_failure(exc)
-                log.warning(
-                    "Metadata provider %s failed (%s) in %dms: %s",
-                    provider.__class__.__name__, status, elapsed_ms, exc,
-                )
-                provider_status.append({
-                    "id": provider.__id__,
-                    "name": provider.__name__,
-                    "status": status,
-                    "count": 0,
-                    "message": message,
-                    "duration_ms": elapsed_ms,
-                })
-                continue
-            results.extend([asdict(x) for x in provider_results if x])
-            count = len(provider_results)
-            status, message = ("ok", "") if count else _classify_empty_provider(provider)
+    # parallel.fan_out, not concurrent.futures: gevent runs unpatched, so a
+    # stdlib as_completed() wait here blocks the hub and makes the whole app
+    # unreachable until the slowest provider answers. Same root cause as the
+    # cover picker's fork #954, reached through the "Search metadata" button.
+    jobs = [
+        (provider, functools.partial(
+            copy_current_request_context(provider.search), query, static_cover, locale))
+        for provider in runnable.values()
+    ]
+    for provider, result in parallel.fan_out(jobs, max_workers=5):
+        # Stamped in the worker when this provider returned, not read here:
+        # a consumer-side clock collapses a whole completion wave onto one
+        # identical duration (fork #954).
+        elapsed_ms = result.elapsed_ms
+        if result.exception is not None:
+            status, message = _classify_provider_failure(result.exception)
+            log.warning(
+                "Metadata provider %s failed (%s) in %dms: %s",
+                provider.__class__.__name__, status, elapsed_ms, result.exception,
+            )
             provider_status.append({
                 "id": provider.__id__,
                 "name": provider.__name__,
                 "status": status,
-                "count": count,
+                "count": 0,
                 "message": message,
                 "duration_ms": elapsed_ms,
             })
+            continue
+        provider_results = result.value or []
+        results.extend([asdict(x) for x in provider_results if x])
+        count = len(provider_results)
+        status, message = ("ok", "") if count else _classify_empty_provider(provider)
+        provider_status.append({
+            "id": provider.__id__,
+            "name": provider.__name__,
+            "status": status,
+            "count": count,
+            "message": message,
+            "duration_ms": elapsed_ms,
+        })
     # Order provider rows by the configured hierarchy (fork #405) so the modal
     # presents providers in the order the user set — the same order the ingest
     # auto-fetch obeys — with alphabetical fallback for providers not listed.

@@ -42,6 +42,10 @@ export interface BooksQuery {
   view?: DiscoveryView;
   /** SPA-only escape hatch: include this user's hidden books in Your Library. */
   showHidden?: boolean;
+  /** Off while a saved default view drives the library from the advanced-search
+   *  endpoint instead (#928) — the hook must still be called (hook order), but
+   *  firing it would spend a request whose result is discarded. */
+  enabled?: boolean;
 }
 
 export function useMe() {
@@ -169,7 +173,7 @@ export function useLogout() {
 export function useBooks(q: BooksQuery) {
   const {
     page, perPage = 24, search = '', sort = 'new', readFilter = 'all',
-    entityKind, entityId, view, showHidden = false,
+    entityKind, entityId, view, showHidden = false, enabled = true,
   } = q;
   const params = new URLSearchParams();
   params.set('page', String(page));
@@ -192,6 +196,7 @@ export function useBooks(q: BooksQuery) {
       entityKind ?? '', entityId ?? '', view ?? '', showHidden],
     queryFn: () => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`),
     placeholderData: (prev) => prev,
+    enabled,
   });
 }
 
@@ -881,10 +886,13 @@ export function useSearchOptions() {
 
 /** Run advanced search. `params` is null until the user submits, which keeps the
  *  query disabled (and the results pane empty) on first load. */
-export function useAdvancedSearch(params: AdvancedSearchParams | null, page: number) {
+/** Advanced search. `perPage` defaults to the search page's own page size; the
+ *  library passes its measured grid size when a saved default view drives it
+ *  (#928), so filtered rows fill the grid exactly like unfiltered ones. */
+export function useAdvancedSearch(params: AdvancedSearchParams | null, page: number, perPage = 24) {
   return useQuery<AdvSearchResult>({
-    queryKey: ['adv-search', params, page],
-    queryFn: () => apiPost<AdvSearchResult>('/api/v1/search/advanced', { ...params, page, per_page: 24 }),
+    queryKey: ['adv-search', params, page, perPage],
+    queryFn: () => apiPost<AdvSearchResult>('/api/v1/search/advanced', { ...params, page, per_page: perPage }),
     enabled: params !== null,
     placeholderData: (prev) => prev,
   });

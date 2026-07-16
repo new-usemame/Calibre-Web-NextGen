@@ -18,6 +18,13 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Setting a default library view turned your library into the search page.** After saving
+  a default view, the library home showed the "Advanced search" form pinned above the books,
+  the page was retitled "Advanced search", and the library heading, its actions and the
+  Discover strip disappeared. Your library now stays your library — it simply shows the
+  books your default view selects, with a note saying so and a "Show all books" link to see
+  everything again. Reported by @chloeroform.
+
 - **Automatic duplicate resolution never ran if you set a cooldown.** Turning on the
   cooldown ("wait N minutes between automatic resolutions") stopped automatic duplicate
   resolution from running at all, and the log reported a wait of about four hours

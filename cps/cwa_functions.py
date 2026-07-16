@@ -34,7 +34,7 @@ from .web import cwa_get_num_books_in_library
 
 import sys
 sys.path.insert(1, '/app/calibre-web-automated/scripts/')
-from cwa_db import CWA_DB
+from cwa_db import CWA_DB, INTEGER_SETTINGS, FLOAT_SETTINGS, JSON_SETTINGS
 from .services.background_scheduler import BackgroundScheduler, DateTrigger
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 # TaskReconnectDatabase deliberately not imported here — the post-ingest
@@ -757,9 +757,11 @@ def set_cwa_settings():
     boolean_settings = []
     string_settings = []
     list_settings = []
-    integer_settings = ['ingest_timeout_minutes', 'ingest_stale_temp_minutes', 'ingest_stale_temp_interval', 'auto_send_delay_minutes', 'hardcover_auto_fetch_batch_size', 'hardcover_auto_fetch_schedule_hour', 'duplicate_scan_hour', 'duplicate_scan_chunk_size', 'duplicate_scan_debounce_seconds', 'duplicate_auto_resolve_cooldown_minutes', 'archived_cleanup_schedule_hour', 'cover_download_max_mb']  # Special handling for integer settings
-    float_settings = ['hardcover_auto_fetch_min_confidence', 'hardcover_auto_fetch_rate_limit']  # Special handling for float settings
-    json_settings = ['metadata_provider_hierarchy', 'metadata_providers_enabled', 'duplicate_format_priority']  # Special handling for JSON settings
+    # Shared with cwa_db.get_cwa_settings(). Keeping one definition is what
+    # stops the two readers drifting apart the way they did in #944.
+    integer_settings = INTEGER_SETTINGS  # Special handling for integer settings
+    float_settings = FLOAT_SETTINGS  # Special handling for float settings
+    json_settings = JSON_SETTINGS  # Special handling for JSON settings
     skip_settings = [
         'auto_convert_ignored_formats',
         'auto_ingest_ignored_formats',

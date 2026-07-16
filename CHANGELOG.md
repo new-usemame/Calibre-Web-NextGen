@@ -18,6 +18,12 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Startup no longer sets permissions on your Calibre library twice.** Every container
+  start walked the whole library once from a hardcoded list and again from `dirs.json`,
+  and re-walked a folder inside `/config` that had already been covered. Each folder is
+  now visited once, which shortens startup on large libraries. Thanks to @chloeroform for
+  spotting it in the startup log and measuring it.
+
 - **Russian screen readers announced the reader's progress as "Прочитано: 45% r"** — a
   stray letter left over from the English "read". It only ever reached people using a
   screen reader, since the text is spoken rather than drawn on screen. Brazilian

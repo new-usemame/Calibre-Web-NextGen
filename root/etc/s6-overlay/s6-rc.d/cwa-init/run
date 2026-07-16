@@ -221,48 +221,9 @@ fi
 #  Set required permissions
 #------------------------------------------------------------------------------------------------------------------------
 
-# In addition to /config and /app/calibre-web-automated, parse required dirs from dirs.json
-declare -a requiredDirs=("/config" "/app/calibre-web-automated" "/calibre-library")
-if [ -f /app/calibre-web-automated/dirs.json ]; then
-  while IFS= read -r dir; do
-    [ -n "$dir" ] && requiredDirs+=("$dir")
-  done < <(
-    python3 - <<'PY'
-import json
-try:
-    with open('/app/calibre-web-automated/dirs.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    if isinstance(data, dict):
-        for value in data.values():
-            if isinstance(value, str):
-                print(value)
-except Exception:
-    pass
-PY
-  )
-fi
-
-dirs=$(printf ", %s" "${requiredDirs[@]}")
-dirs=${dirs:1}
-
-echo "[cwa-init] Preparing to set ownership of everything in$dirs to abc:abc..."
-
-for d in "${requiredDirs[@]}"; do
-  if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
-    case "$d" in
-      /config|/config/*|/calibre-library|/calibre-library/*|/cwa-book-ingest|/cwa-book-ingest/*)
-        echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping chown of $d"
-        continue
-        ;;
-    esac
-  fi
-  chown -R abc:abc "$d"
-  if [[ $? == 0 ]]; then
-    echo "[cwa-init] Successfully set permissions for '$d'!"
-  elif [[ $? > 0 ]]; then
-    echo "[cwa-init] Service could not successfully set permissions for '$d' (see errors above)."
-  fi
-done
+# The list (floor + dirs.json), the de-duplication, and the app-tree marker gate
+# all live in set_ownership.sh so they can be tested without a container (#874).
+bash /app/calibre-web-automated/scripts/set_ownership.sh
 
 #------------------------------------------------------------------------------------------------------------------------
 #  Qt6 / Kernel compatibility check (conditional ABI tag stripping)

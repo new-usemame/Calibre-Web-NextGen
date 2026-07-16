@@ -125,7 +125,7 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
     <main className={styles.container}>
       <h1 className={styles.title}>{t('Advanced search')}</h1>
 
-      <form className={styles.form} onSubmit={onSubmit}>
+      <form className={styles.form} onSubmit={onSubmit} data-testid="advanced-search-form">
         <div className={styles.grid}>
           <Field label={t('Title')}>
             <input className={styles.input} value={form.title} aria-label={t('Title')}

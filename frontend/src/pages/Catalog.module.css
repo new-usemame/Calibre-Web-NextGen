@@ -29,6 +29,36 @@
   color: var(--accent);
 }
 
+/* Saved default library view (#928): a quiet strip above the library heading —
+   it explains the subset without competing with the page title. Wraps rather
+   than overflowing at 375px, where the label + both actions don't fit a row. */
+.defaultFilterNotice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin-bottom: var(--sp-3);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.defaultFilterShowAll,
+.defaultFilterEdit {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.defaultFilterShowAll:hover,
+.defaultFilterEdit:hover {
+  color: var(--text);
+}
+
 .header {
   display: flex;
   align-items: baseline;

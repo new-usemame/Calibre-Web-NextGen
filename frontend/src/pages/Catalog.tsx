@@ -9,9 +9,9 @@ import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { DiscoverSection } from '../components/DiscoverSection';
-import { useBooks, useEntityList, ENTITY_PLURAL, useMe, useRenameTag } from '../lib/queries';
+import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
-import { apiPost, apiGet, ApiError, type Book } from '../lib/api';
+import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
 import { saveCatalog, loadCatalog } from '../lib/scrollCache';
 import { usePersistentBool } from '../lib/usePersistentBool';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
@@ -87,6 +87,12 @@ interface CatalogProps {
   entityId?: string | number;
   /** When set, render a fixed discovery view (hot/discover/rated/favorites/archived). */
   view?: DiscoveryView;
+  /** The user's saved default library view (#498): an advanced-search filter that
+   *  becomes the standing contents of Your Library. It scopes the LIBRARY LISTING
+   *  only — this is still the library page, with its heading, actions and Discover
+   *  strip (#928). Ignored for entity/discovery views and while a search is active,
+   *  which are explicit navigations away from the default view. */
+  defaultFilter?: AdvancedSearchParams;
 }
 
 // Merge a freshly-fetched page into the accumulator: UPSERT existing books by id
@@ -187,12 +193,16 @@ function useLibraryRefresh() {
   return { isRefreshing, message, error, refresh };
 }
 
-export function Catalog({ entityKind, entityId, view }: CatalogProps) {
+export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogProps) {
   const t = useT();
   const announce = useAnnouncer();
   const libraryRefresh = useLibraryRefresh();
   const filtered = !!entityKind;
   const isView = !!view;
+  // "Show all books" — a per-visit escape from the saved default view. A standing
+  // filter that hides books with no way out is a trap; clearing it for good stays
+  // on the Advanced-search page that set it.
+  const [showingAll, setShowingAll] = useState(false);
   const isSeries = entityKind === 'series';
   const renameTag = useRenameTag(entityId ?? '');
   const [renamingTag, setRenamingTag] = useState(false);
@@ -229,6 +239,13 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
   const [search, setSearch] = useState(() => snap?.search ?? '');
   const [sort, setSort] = useState(() => snap?.sort ?? defaultSort);
   const [readFilter, setReadFilter] = useState<ReadFilter>(() => (snap?.readFilter as ReadFilter) ?? 'all');
+
+  // Is the saved default view (#498) driving this listing? It scopes the plain
+  // library only — an entity or discovery view, or a search, is an explicit
+  // navigation out of it, and the saved filter carries no free-text field to
+  // intersect a search with anyway. Declared here because resetKey below is part
+  // of the filter identity.
+  const filterActive = !!defaultFilter && !filtered && !isView && !search && !showingAll;
 
   // Multi-select / bulk mode
   const [selecting, setSelecting] = useState(false);
@@ -311,7 +328,11 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
     };
   }, [settingsOpen]);
 
-  const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', perPage, showHidden].join('|');
+  // The saved default view is part of the filter identity: turning it on/off (or
+  // saving a different one) changes which books belong here, so the accumulator
+  // must reset rather than append the new set onto the old (#928).
+  const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', perPage, showHidden,
+    filterActive ? JSON.stringify(defaultFilter) : ''].join('|');
 
   // Any filter change resets paging to the first page — except on the first
   // restored mount, where the rehydrated page must survive (#578).
@@ -375,7 +396,8 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { data, isLoading, isFetching, isPlaceholderData, error } = useBooks({
+  // Both hooks are always called (hook order is fixed); exactly one is enabled.
+  const booksQuery = useBooks({
     page,
     perPage,
     search,
@@ -385,7 +407,16 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
     entityId,
     view,
     showHidden: !hideLibraryControls && showHidden,
+    enabled: !filterActive,
   });
+  // The read/unread control is an explicit user action, so it overrides the
+  // read_status baked into the saved filter; sort is the library's own.
+  const advParams: AdvancedSearchParams | null = filterActive
+    ? { ...defaultFilter, sort, ...(readFilter !== 'all' ? { read_status: readFilter } : {}) }
+    : null;
+  const advQuery = useAdvancedSearch(advParams, page, perPage);
+  const { data, isLoading, isFetching, isPlaceholderData, error } =
+    filterActive ? advQuery : booksQuery;
 
   // Accumulate pages; replace the accumulator whenever the filter set changes.
   // Skip placeholder data: on a filter change react-query briefly returns the
@@ -468,12 +499,27 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
     : '';
 
   return (
-    <main className={styles.container}>
+    <main className={styles.container} data-testid="catalog-page">
       {filtered && (
         <Link href={`/${ENTITY_PLURAL[entityKind!]}`} className={styles.back}>
           <ChevronLeft size={16} />
           {t('Show all {items}', { items: t(KIND_PLURAL_OPTIONS[entityKind!].label) })}
         </Link>
+      )}
+
+      {/* Say why the library is a subset, and offer the way out. Without this a
+          saved filter is indistinguishable from missing books (#928). */}
+      {filterActive && (
+        <div className={styles.defaultFilterNotice} data-testid="default-filter-notice">
+          <SlidersHorizontal size={15} aria-hidden="true" focusable={false} />
+          <span>{t('Showing your default library view.')}</span>
+          <button type="button" className={styles.defaultFilterShowAll}
+            data-testid="default-filter-show-all"
+            onClick={() => { setShowingAll(true); setPage(1); }}>
+            {t('Show all books')}
+          </button>
+          <Link href="/search" className={styles.defaultFilterEdit}>{t('Edit default view')}</Link>
+        </div>
       )}
 
       <div className={styles.header}>
@@ -502,7 +548,7 @@ export function Catalog({ entityKind, entityId, view }: CatalogProps) {
         )}
         {/* role=status so the result count is announced when filters/search
             change it and when load-more grows it (SC 4.1.3). */}
-        {countLabel && <span className={styles.count} role="status">{countLabel}</span>}
+        {countLabel && <span className={styles.count} role="status" data-testid="catalog-count">{countLabel}</span>}
         {isSeries && (
           <div className={styles.viewToggle} role="group" aria-label={t('Series view')}>
             <button type="button" onClick={() => setSeriesPresentation('grid')}

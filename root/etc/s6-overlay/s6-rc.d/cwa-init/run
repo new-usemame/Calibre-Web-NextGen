@@ -221,8 +221,8 @@ fi
 #  Set required permissions
 #------------------------------------------------------------------------------------------------------------------------
 
-# In addition to /config and /app/calibre-web-automated, parse required dirs from dirs.json
-declare -a requiredDirs=("/config" "/app/calibre-web-automated" "/calibre-library")
+# Parse required dirs from dirs.json
+declare -a requiredDirs=()
 if [ -f /app/calibre-web-automated/dirs.json ]; then
   while IFS= read -r dir; do
     [ -n "$dir" ] && requiredDirs+=("$dir")

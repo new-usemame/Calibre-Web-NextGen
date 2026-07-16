@@ -2387,6 +2387,10 @@ def ldap_import_create_user(user, user_data):
     content.denied_tags = config.config_denied_tags
     content.allowed_column_value = config.config_allowed_column_value
     content.denied_column_value = config.config_denied_column_value
+    # Seed the instance default theme (Admin -> Theme) like every other create
+    # path. Without this the column default (dark) silently wins over whatever
+    # the admin configured.
+    content.theme = config_theme_code(config.config_theme)
     ub.session.add(content)
     try:
         ub.session.commit()

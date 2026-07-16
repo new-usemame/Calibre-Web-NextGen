@@ -13,6 +13,7 @@ from .serializers import serialize_user
 from .. import ub, config, constants, limiter
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
+from ..ui_themes import config_theme_code
 from ..helper import (
     check_username, check_email, check_valid_domain, reset_password,
     send_registration_mail, generate_random_password,
@@ -348,8 +349,12 @@ def auth_register():
     content.role = config.config_default_role
     content.locale = config.config_default_locale
     content.sidebar_view = config.config_default_show
+    # Seed the account with the instance default theme (Admin -> Theme), the
+    # same as every other create path. Normalising matters: a legacy
+    # config_theme of 0 means light, but stored raw as User.theme it reads back
+    # as dark (#921).
     try:
-        content.theme = getattr(config, "config_theme", 1)
+        content.theme = config_theme_code(getattr(config, "config_theme", None))
     except Exception:
         pass
     try:

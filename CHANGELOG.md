@@ -18,6 +18,16 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **New accounts ignored the default theme you picked in Admin.** Whichever theme an admin
+  chose under Admin → Theme, some new accounts still started on Dark. Which accounts
+  depended on how they signed up: people who registered themselves through the new UI got
+  it wrong only on servers upgraded from an older build, while accounts created by OAuth,
+  LDAP import, or an external/proxy login always got Dark no matter what you had set —
+  those three still carried a hardcoded default from back when Light was removed, and were
+  never updated when the six themes returned. Admin-created accounts were always fine, so
+  the same setting could produce two different results on one server. All seven ways an
+  account can be created now seed the theme you configured.
+
 - **"Change cover" made the whole server unreachable until it finished.** Opening the
   cover picker on one book froze every other page for everyone using the server — up to
   about 12 seconds, however long the slowest metadata source took to answer. The same

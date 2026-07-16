@@ -18,6 +18,14 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **"Change cover" made the whole server unreachable until it finished.** Opening the
+  cover picker on one book froze every other page for everyone using the server — up to
+  about 12 seconds, however long the slowest metadata source took to answer. The same
+  freeze hit the "Search metadata" button on the edit page. Measured on a test library: a
+  book page that normally answers in 30ms took 11.4 seconds while a cover search ran; it
+  now answers in well under a quarter second, and the cover search itself is no slower.
+  Thanks to @darkmatterpelican for reporting it in #954.
+
 - **Setting a default library view turned your library into the search page.** After saving
   a default view, the library home showed the "Advanced search" form pinned above the books,
   the page was retitled "Advanced search", and the library heading, its actions and the

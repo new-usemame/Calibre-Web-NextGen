@@ -7,6 +7,7 @@ import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
 import type { Book } from '../lib/api';
+import { formatAuthors } from '../lib/authors';
 import { resourceUrl } from '../lib/api';
 import styles from './Table.module.css';
 
@@ -190,7 +191,7 @@ export function Table() {
                         {c.key === 'title' && <EditableTitleCell book={b} canEdit={canEdit}
                           onSaved={(title) => setRows((current) => current.map((row) =>
                             row.id === b.id ? { ...row, title } : row))} />}
-                        {c.key === 'authors' && (b.authors || []).join(', ')}
+                        {c.key === 'authors' && formatAuthors(b.authors)}
                         {c.key === 'series' && (b.series ? `${b.series}${b.series_index ? ` #${b.series_index}` : ''}` : '—')}
                         {c.key === 'tags' && ((b.tags || []).join(', ') || '—')}
                         {c.key === 'formats' && (b.formats || []).join(', ')}

@@ -9,6 +9,7 @@ import { Pill } from '../components/Pill';
 import { AddToShelf } from '../components/AddToShelf';
 import { StarRating } from '../components/StarRating';
 import { MoreByAuthor } from '../components/MoreByAuthor';
+import { AUTHOR_SEPARATOR } from '../lib/authors';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { CustomColumn, CustomColumnValue, EntityRef } from '../lib/api';
@@ -299,7 +300,7 @@ export function BookDetail() {
               <p className={styles.authors}>
                 {book.authors.map((a, i) => (
                   <span key={a.id}>
-                    {i > 0 && ', '}
+                    {i > 0 && AUTHOR_SEPARATOR}
                     <Link href={`/authors/${a.id}`} className={styles.metaLink}>{a.name}</Link>
                   </span>
                 ))}

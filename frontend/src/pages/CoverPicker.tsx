@@ -16,6 +16,7 @@ import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { ApiError, resourceUrl } from '../lib/api';
+import { formatAuthors } from '../lib/authors';
 import { useT } from '../lib/i18n';
 import styles from './CoverPicker.module.css';
 
@@ -108,7 +109,7 @@ export function CoverPicker({ id }: { id: string }) {
             </div>
             <div className={styles.currentMeta}>
               <strong>{book.title}</strong>
-              {book.authors?.length ? <span>{book.authors.map((a) => a.name).join(', ')}</span> : null}
+              {book.authors?.length ? <span>{formatAuthors(book.authors.map((a) => a.name))}</span> : null}
             </div>
 
             <button className={`${styles.lockToggle} ${locked ? styles.lockOn : ''}`} onClick={toggleLock}

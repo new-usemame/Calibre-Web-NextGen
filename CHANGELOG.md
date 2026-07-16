@@ -18,6 +18,19 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **KOReader stopped seeing new versions of the sync plugin.** If you update the
+  plugin from inside KOReader — through Updates Manager or appstore.koplugin —
+  the newest version it offered was the one from 13 July, even though three
+  plugin fixes have shipped since: highlights and notes syncing into your
+  library, highlight deletions syncing to the server, and a guard that stops a
+  device deleting highlights it never had. The plugin releases those tools read
+  had quietly stopped being published, so the fixes were in the server but never
+  reached the device. The current plugin is published now, and publishing it is
+  no longer a manual step that can be missed. If you install the plugin by
+  downloading it from your own server's KOReader page, nothing changed for you —
+  that copy was always current. Thanks to @KucharczykL for spotting it and to
+  @filiporlo for #400.
+
 - **Books with two or more authors were hard to read in the new UI.** Authors were separated
   with a comma — but an author's name can contain a comma itself ("Dumas, Alexandre"), so
   two authors came out as "Dumas, Alexandre, Maquet, Auguste" and you could not tell where

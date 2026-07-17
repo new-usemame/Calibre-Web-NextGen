@@ -158,6 +158,7 @@ test('keyboard activation opens Ko-fi and moves through link then dismiss button
     (window as Window & { __bannerOpenCalls: unknown[][] }).__bannerOpenCalls,
   )).toEqual([[SUPPORT_URL, '_blank', 'noopener,noreferrer']]);
   await expect(page.locator('[data-announcement-id]')).toHaveCount(0);
+  await expect(page.locator('main#main')).toBeFocused();
 });
 
 test('middle-click opens Ko-fi and dismisses the banner', async ({ page }) => {
@@ -190,6 +191,18 @@ test('Ko-fi X dismisses without opening or navigating', async ({ page }) => {
   )).toEqual([]);
   expect(await page.evaluate((key) => localStorage.getItem(key), KOFI_KEY)).toBe('1');
   await expect(page.locator('[data-announcement-id]')).toHaveCount(0);
+});
+
+test('keyboard dismissal of the final announcement moves focus to main', async ({ page }) => {
+  await page.evaluate((key) => localStorage.setItem(key, '1'), HELP_KEY);
+  await page.reload();
+  const dismissButton = page.getByRole('button', { name: 'Dismiss Ko-fi support message' });
+
+  await dismissButton.focus();
+  await page.keyboard.press('Enter');
+
+  await expect(page.locator('[data-announcement-id]')).toHaveCount(0);
+  await expect(page.locator('main#main')).toBeFocused();
 });
 
 test('legacy dismissal keys migrate independently without re-nagging existing users', async ({ page }) => {

@@ -113,16 +113,22 @@ export function AnnouncementBanner() {
 
   if (!announcement) return null;
 
-  const dismiss = () => {
+  const dismiss = (restoreKeyboardFocus = false) => {
+    const hasNextAnnouncement = PRIORITIZED_ANNOUNCEMENTS.some(
+      ({ id }) => id !== announcement.id && !dismissedIds.has(id),
+    );
     persistDismissal(announcement.id);
     setDismissedIds((current) => new Set(current).add(announcement.id));
+    if (restoreKeyboardFocus && !hasNextAnnouncement) {
+      requestAnimationFrame(() => document.getElementById('main')?.focus());
+    }
   };
 
   const activate = (event: ReactMouseEvent<HTMLAnchorElement>) => {
     if (announcement.clickAction !== 'open-url-and-dismiss' || !announcement.url) return;
     event.preventDefault();
     window.open(announcement.url, '_blank', 'noopener,noreferrer');
-    dismiss();
+    dismiss(event.detail === 0);
   };
 
   const activateFromAuxClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
@@ -155,7 +161,7 @@ export function AnnouncementBanner() {
       <button
         type="button"
         className={styles.close}
-        onClick={dismiss}
+        onClick={(event) => dismiss(event.detail === 0)}
         aria-label={t(announcement.dismissLabel)}
       >
         <X size={16} aria-hidden="true" focusable={false} />

@@ -18,6 +18,7 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Brazilian Portuguese now covers ~150 more of the interface.** Strings across the reader, shelves, and admin screens that still showed in English — including the "New" badge — now appear in Portuguese, and four entries that displayed the wrong text are corrected ("Shelf duplicated successfully" had been showing the message for deleting users; "Read Status" now reads "Status de leitura"). Translation work by @pedronora ([#949](https://github.com/new-usemame/Calibre-Web-NextGen/pull/949)).
 - **Russian is now fully translated.** The last 48 English strings — renaming a tag and its error messages, smart-shelf rule failures, page-not-found and page-load errors, and the Hardcover token-file notice — now appear in Russian, and a fuzzy entry on the Hardcover notice is confirmed. Translation update by @standhaftsohnsergius ([#970](https://github.com/new-usemame/Calibre-Web-NextGen/pull/970)).
 
 ## [v4.1.16] - 2026-07-17

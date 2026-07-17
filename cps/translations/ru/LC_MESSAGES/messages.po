@@ -10,7 +10,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 01:20-0400\n"
-"PO-Revision-Date: 2026-07-14 09:12+0300\n"
+"PO-Revision-Date: 2026-07-17 12:56+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -58,6 +58,8 @@ msgid ""
 "Error: Hardcover sync is disabled. Enable it in Basic Configuration or with "
 "HARDCOVER_SYNC_ENABLED."
 msgstr ""
+"Ошибка: синхронизация с Hardcover отключена. Включите её в основных "
+"настройках или с помощью переменной HARDCOVER_SYNC_ENABLED."
 
 #: cps/admin.py:254
 msgid ""
@@ -2618,60 +2620,60 @@ msgstr "Удалить тег {name}"
 #: cps/spa_strings.py:75
 #, python-brace-format
 msgid "Rename tag {name}"
-msgstr ""
+msgstr "Переименовать тег {name}"
 
 #: cps/spa_strings.py:76
 msgid "Tag name"
-msgstr ""
+msgstr "Имя тега"
 
 #: cps/api/browse.py:72 cps/spa_strings.py:77
 msgid "Tag name cannot be empty"
-msgstr ""
+msgstr "Имя тега не может быть пустым"
 
 #: cps/spa_strings.py:78
 msgid "Save tag name"
-msgstr ""
+msgstr "Сохранить имя тега"
 
 #: cps/spa_strings.py:79
 msgid "Could not rename tag"
-msgstr ""
+msgstr "Не удалось переименовать тег"
 
 #: cps/spa_strings.py:80
 #, python-brace-format
 msgid "Tag renamed to {name}"
-msgstr ""
+msgstr "Тег переименован в {name}"
 
 #: cps/api/browse.py:63 cps/spa_strings.py:81
 msgid "You must be signed in"
-msgstr ""
+msgstr "Необходимо выполнить вход"
 
 #: cps/api/browse.py:65 cps/spa_strings.py:82
 msgid "You are not allowed to edit metadata"
-msgstr ""
+msgstr "У вас нет прав на редактирование метаданных"
 
 #: cps/api/browse.py:89 cps/api/browse.py:101 cps/spa_strings.py:84
 msgid "A tag with that name already exists"
-msgstr ""
+msgstr "Тег с таким именем уже существует"
 
 #: cps/api/browse.py:69 cps/spa_strings.py:85
 msgid "Tag name must be text"
-msgstr ""
+msgstr "Имя тега должно быть текстом"
 
 #: cps/api/browse.py:74 cps/spa_strings.py:86
 msgid "Tag name cannot contain commas"
-msgstr ""
+msgstr "Имя тега не должно содержать запятые"
 
 #: cps/spa_strings.py:87
 msgid "Enter a valid tag name"
-msgstr ""
+msgstr "Введите корректное имя тега"
 
 #: cps/spa_strings.py:88
 msgid "Could not load this page"
-msgstr ""
+msgstr "Не удалось загрузить эту страницу"
 
 #: cps/spa_strings.py:89
 msgid "Page not found"
-msgstr ""
+msgstr "Страница не найдена"
 
 #: cps/spa_strings.py:95
 msgid "Clear rating"
@@ -2733,15 +2735,15 @@ msgstr "Оператор правила"
 
 #: cps/spa_strings.py:115
 msgid "Could not load smart-shelf rules."
-msgstr ""
+msgstr "Не удалось загрузить правила смарт-полки."
 
 #: cps/spa_strings.py:116
 msgid "Has Cover"
-msgstr ""
+msgstr "Есть обложка"
 
 #: cps/spa_strings.py:117
 msgid "Series Index"
-msgstr ""
+msgstr "Номер в серии"
 
 #: cps/spa_strings.py:118 cps/templates/search_form.html:42
 msgid "Read Status"
@@ -2749,7 +2751,7 @@ msgstr "Статус прочтения"
 
 #: cps/spa_strings.py:119
 msgid "Has Hardcover ID"
-msgstr ""
+msgstr "Есть ID Hardcover"
 
 #: cps/spa_strings.py:120 cps/templates/magic_shelf_edit.html:584
 msgid "In the past N days"
@@ -2761,43 +2763,43 @@ msgstr "Не за последние N дней"
 
 #: cps/spa_strings.py:122
 msgid "is before / less than"
-msgstr ""
+msgstr "до / меньше"
 
 #: cps/spa_strings.py:123
 msgid "is on or before / at most"
-msgstr ""
+msgstr "не позднее / не более"
 
 #: cps/spa_strings.py:124
 msgid "is after / greater than"
-msgstr ""
+msgstr "после / больше"
 
 #: cps/spa_strings.py:125
 msgid "is on or after / at least"
-msgstr ""
+msgstr "не ранее / не менее"
 
 #: cps/spa_strings.py:126
 msgid "is between"
-msgstr ""
+msgstr "в диапазоне"
 
 #: cps/spa_strings.py:127
 msgid "is not between"
-msgstr ""
+msgstr "вне диапазона"
 
 #: cps/spa_strings.py:128
 msgid "does not begin with"
-msgstr ""
+msgstr "не начинается с"
 
 #: cps/spa_strings.py:129
 msgid "does not end with"
-msgstr ""
+msgstr "не заканчивается на"
 
 #: cps/spa_strings.py:130
 msgid "is empty"
-msgstr ""
+msgstr "не заполнено"
 
 #: cps/spa_strings.py:131
 msgid "is not empty"
-msgstr ""
+msgstr "заполнено"
 
 #: cps/spa_strings.py:134
 msgid "Appearance"
@@ -2848,13 +2850,15 @@ msgstr "Не удалось сохранить тему."
 
 #: cps/spa_strings.py:145
 msgid "Default theme for new accounts"
-msgstr ""
+msgstr "Тема оформления по умолчанию для новых аккаунтов"
 
 #: cps/spa_strings.py:146
 msgid ""
 "Applies to accounts created from now on. Everyone picks their own under "
 "Account → Theme."
 msgstr ""
+"Применяется к аккаунтам, создаваемым с этого момента. Каждый пользователь "
+"выбирает свою тему в меню Аккаунт → Тема."
 
 #: cps/spa_strings.py:155
 msgid "Add a format"
@@ -3066,15 +3070,15 @@ msgstr "Редактировать {title}"
 
 #: cps/spa_strings.py:205
 msgid "Showing your default library view."
-msgstr ""
+msgstr "Отображается вид библиотеки по умолчанию."
 
 #: cps/spa_strings.py:206
 msgid "Show all books"
-msgstr ""
+msgstr "Показать все книги"
 
 #: cps/spa_strings.py:207
 msgid "Edit default view"
-msgstr ""
+msgstr "Редактировать вид по умолчанию"
 
 #: cps/spa_strings.py:208
 msgid "Failed to load books."
@@ -3543,7 +3547,7 @@ msgstr "Открыть вашу библиотеку"
 
 #: cps/spa_strings.py:327
 msgid "Browse tags"
-msgstr ""
+msgstr "Просмотр тегов"
 
 #: cps/spa_strings.py:328
 msgid "Open the table view"
@@ -3603,7 +3607,7 @@ msgstr "Перейти к загрузке"
 
 #: cps/spa_strings.py:342
 msgid "Open search"
-msgstr ""
+msgstr "Открыть поиск"
 
 #: cps/spa_strings.py:344
 msgid "Editions"
@@ -4848,10 +4852,12 @@ msgid ""
 "Pages marked below open in the classic view. Changes there apply to the "
 "whole server."
 msgstr ""
+"Отмеченные ниже страницы открываются в классическом интерфейсе. Внесённые "
+"там изменения применятся ко всему серверу."
 
 #: cps/spa_strings.py:661
 msgid "Opens in classic view"
-msgstr ""
+msgstr "Открывается в классическом интерфейсе"
 
 #: cps/spa_strings.py:662
 msgid "Move down"
@@ -4875,7 +4881,7 @@ msgstr "Нужно сообщить о проблеме? Попробуйте н
 
 #: cps/spa_strings.py:667
 msgid "Support us on Ko-fi!"
-msgstr ""
+msgstr "Поддержите нас на Ko-fi!"
 
 #: cps/spa_strings.py:668
 msgid "Support on Ko-fi →"
@@ -4883,15 +4889,15 @@ msgstr "Поддержать на Ko-fi →"
 
 #: cps/spa_strings.py:669
 msgid "Open Ko-fi →"
-msgstr ""
+msgstr "Открыть Ko-fi →"
 
 #: cps/spa_strings.py:670
 msgid "Dismiss help announcement"
-msgstr ""
+msgstr "Скрыть справочное объявление"
 
 #: cps/spa_strings.py:671
 msgid "Dismiss Ko-fi support message"
-msgstr ""
+msgstr "Скрыть сообщение о поддержке на Ko-fi"
 
 #: cps/spa_strings.py:672 cps/templates/cover_picker.html:182
 msgid "New"
@@ -5420,7 +5426,7 @@ msgstr "Показывать раздел «Обзор»"
 
 #: cps/spa_strings.py:797
 msgid "Show hidden books"
-msgstr ""
+msgstr "Показать скрытые книги"
 
 #: cps/spa_strings.py:806
 msgid "Show Table view"
@@ -7834,6 +7840,11 @@ msgid ""
 "detail page that drops the book out of their own index/search/OPDS without "
 "affecting other users. Recovery is via the profile page (Hidden Books link)."
 msgstr ""
+"Включено по умолчанию для новых установок; при обновлении сохраняются ранее "
+"выбранные настройки. Когда включено, каждый пользователь получает кнопку "
+"скрытия на странице сведений о книге, которая исключает книгу из его "
+"собственного каталога, поиска и OPDS, не затрагивая других пользователей. "
+"Восстановить книги можно на странице профиля (ссылка «Скрытые книги»)."
 
 #: cps/templates/config_edit.html:213
 msgid "Proxy unknown requests to Kobo Store"
@@ -7913,12 +7924,16 @@ msgstr "Включить синхронизацию с Hardcover"
 msgid ""
 "Controls Hardcover auto-fetch and reading-progress sync from one setting."
 msgstr ""
+"Управляет автоматическим получением данных из Hardcover и синхронизацией "
+"прогресса чтения с помощью одной настройки."
 
 #: cps/templates/config_edit.html:275
 msgid ""
 "Managed by HARDCOVER_SYNC_ENABLED; change the environment variable to enable "
 "or disable Hardcover sync."
 msgstr ""
+"Управляется переменной HARDCOVER_SYNC_ENABLED; измените переменную "
+"окружения, чтобы включить или отключить синхронизацию с Hardcover."
 
 #: cps/templates/config_edit.html:279
 msgid "Hardcover API Key"
@@ -7941,13 +7956,12 @@ msgstr ""
 "здесь не отображается; ключ, введённый в это поле, перекроет его значение."
 
 #: cps/templates/config_edit.html:285
-#, fuzzy
 msgid ""
 "A token from the file named by HARDCOVER_TOKEN_FILE is currently active. It "
 "is not shown here; a key entered in this field would override it."
 msgstr ""
-"В данный момент активен токен из переменной окружения HARDCOVER_TOKEN. Он "
-"здесь не отображается; ключ, введённый в это поле, перекроет его значение."
+"В данный момент активен токен из файла, указанного в HARDCOVER_TOKEN_FILE. "
+"Он здесь не отображается; ключ, введённый в это поле, перекроет его значение."
 
 #: cps/templates/config_edit.html:290
 msgid "Token status: not configured."
@@ -9295,12 +9309,16 @@ msgstr ""
 msgid ""
 "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
 msgstr ""
+"Синхронизация с Hardcover включена. Расписание ниже управляет автоматическим "
+"получением ID."
 
 #: cps/templates/cwa_settings.html:567
 msgid ""
 "Hardcover sync is disabled. Enable it once in Basic Configuration or set "
 "HARDCOVER_SYNC_ENABLED=true."
 msgstr ""
+"Синхронизация с Hardcover отключена. Включите её один раз в основных "
+"настройках или установите HARDCOVER_SYNC_ENABLED=true."
 
 #: cps/templates/cwa_settings.html:571
 msgid ""

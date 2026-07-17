@@ -37,6 +37,17 @@ echo "[i] Generating POT: $POT"
 echo "[i] Using Python: $PYTHON_CMD"
 echo "[i] Project version: $VERSION"
 
+# 0. Snapshot the committed POT before extract overwrites it, so step 1c can
+# carry its POT-Creation-Date forward. See freeze_pot_creation_date.py for why
+# that date is the thing that makes community translation PRs go CONFLICTING.
+POT_PREV=""
+if [ -f "$POT" ]; then
+    POT_PREV="$(mktemp)"
+    cp "$POT" "$POT_PREV"
+    # shellcheck disable=SC2064  # expand POT_PREV now, not at trap time
+    trap "rm -f '$POT_PREV'" EXIT
+fi
+
 # 1. Extract messages
 "${PYBABEL_CMD[@]}" extract -F "$CONFIG" -o "$POT" \
     --project="Calibre-Web Automated" \
@@ -54,6 +65,19 @@ echo "[i] Project version: $VERSION"
 # since msgmerge is what copies POT flags into every locale.
 "$PYTHON_CMD" "$SCRIPT_DIR/fix_pot_format_flags.py" "$POT" \
     || { echo "fix_pot_format_flags failed"; exit 1; }
+
+# 1c. Carry the previous POT-Creation-Date forward. babel restamps it from the
+# wall clock on every run, msgmerge fans it into all 28 locales, and the bot
+# commits it — ~99 .po commits/month for a field nothing reads. Because gettext
+# emits POT-Creation-Date and PO-Revision-Date on ADJACENT lines, that bot bump
+# collides with the PO-Revision-Date a translator's editor stamps on save: git
+# cannot split adjacent changed lines into separate hunks, so the merge
+# conflicts. That was the ONLY conflict on PR #938. Must run before the
+# msgmerge loop below, which is what copies the header into every locale.
+if [ -n "$POT_PREV" ]; then
+    "$PYTHON_CMD" "$SCRIPT_DIR/freeze_pot_creation_date.py" "$POT" "$POT_PREV" \
+        || { echo "freeze_pot_creation_date failed"; exit 1; }
+fi
 
 # 2. Merge updates
 shopt -s nullglob

@@ -24,6 +24,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
+# CI selects with -m "smoke or unit"; without this the whole file is deselected
+# and EXPECTED_PLUGIN_VERSION below — the anchor tying the plugin version to the
+# release tag — never gates anything.
+pytestmark = pytest.mark.unit
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwasync.koplugin"
 MAIN_LUA = PLUGIN_DIR / "main.lua"

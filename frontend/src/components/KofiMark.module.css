@@ -1,0 +1,16 @@
+.mark {
+  display: block;
+  overflow: visible;
+}
+
+.cup,
+.heart {
+  fill: currentColor;
+}
+
+.handle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}

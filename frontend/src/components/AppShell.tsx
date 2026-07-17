@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
-import { HelpBanner } from './HelpBanner';
+import { AnnouncementBanner } from './AnnouncementBanner';
 import { SkipLink } from './SkipLink';
 import styles from './AppShell.module.css';
 
@@ -30,7 +30,7 @@ export function AppShell({ userName, instanceName, onLogout, children }: AppShel
       {/* First focusable element on the page (SC 2.4.1). */}
       <SkipLink />
       <TopBar userName={userName} instanceName={instanceName} onLogout={onLogout} onMenu={() => setDrawerOpen(true)} />
-      <HelpBanner />
+      <AnnouncementBanner />
       <div className={styles.body}>
         <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} onNavigate={() => setDrawerOpen(false)} />
         {/* The one <main> landmark (SC 1.3.1); tabIndex=-1 lets route changes

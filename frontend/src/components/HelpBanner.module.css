@@ -5,13 +5,6 @@
   --hb-text: #d7f1ed;
   --hb-icon: #6fd8cb;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;          /* center the icon + message as a group */
-  gap: var(--sp-3);
-  /* symmetric room on both sides so the centered content isn't nudged by the
-     absolutely-positioned dismiss button */
-  padding: var(--sp-2) 52px;
   background: linear-gradient(90deg, #173842 0%, #18484a 60%, #1a4f49 100%);
   border-bottom: 1px solid var(--hb-edge);
   box-shadow: inset 3px 0 0 var(--hb-icon);
@@ -21,6 +14,29 @@
   animation: hbSlideDown var(--dur-base) var(--ease-out);
 }
 
+.bannerSurface {
+  display: flex;
+  align-items: center;
+  justify-content: center;          /* center the icon + message as a group */
+  gap: var(--sp-3);
+  width: 100%;
+  box-sizing: border-box;
+  /* symmetric room on both sides so the centered content isn't nudged by the
+     absolutely-positioned dismiss button */
+  padding: var(--sp-2) 52px;
+  color: inherit;
+}
+
+.clickableSurface {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.clickableSurface:focus-visible {
+  outline: 2px solid #dff7ff;
+  outline-offset: -3px;
+}
+
 @keyframes hbSlideDown {
   from { opacity: 0; transform: translateY(-100%); }
   to   { opacity: 1; transform: translateY(0); }
@@ -28,6 +44,22 @@
 
 .iconWrap {
   display: inline-flex;
+  flex: none;
+  color: var(--hb-icon);
+}
+
+.supportBanner {
+  --hb-text: #e9f9ff;
+  --hb-icon: #13c3ff;
+  background: linear-gradient(90deg, #07384d 0%, #08465e 58%, #06445e 100%);
+  border-bottom: none;
+  box-shadow: none;
+}
+
+.supportIconWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   color: var(--hb-icon);
 }
@@ -45,6 +77,38 @@
 .text strong {
   color: #ffffff;
   font-weight: var(--fw-semi);
+}
+
+.supportText {
+  flex-wrap: nowrap;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+
+.pitch {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.supportLink {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: 24px;
+  color: var(--hb-icon);
+  font-weight: var(--fw-semi);
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color var(--dur-fast) var(--ease), text-decoration-color var(--dur-fast) var(--ease);
+}
+
+.supportLink:hover {
+  color: #a5ecff;
+  text-decoration-color: currentColor;
 }
 
 .arrow {
@@ -76,6 +140,7 @@
   opacity: 0.75;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+  z-index: 1;
 }
 
 .close:hover {
@@ -84,7 +149,7 @@
 }
 
 @media (max-width: 600px) {
-  .banner {
+  .bannerSurface {
     gap: var(--sp-2);
     padding: var(--sp-2) 44px;
     font-size: var(--fs-xs);
@@ -93,6 +158,17 @@
   /* the icon is decorative; drop it on phones so the centered message keeps the
      most room and stays on one or two tidy lines */
   .iconWrap { display: none; }
+
+  .supportBanner .bannerSurface {
+    gap: var(--sp-2);
+    padding-left: var(--sp-3);
+    padding-right: 42px;
+  }
+
+  .supportText {
+    justify-content: flex-start;
+    flex: 1 1 auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

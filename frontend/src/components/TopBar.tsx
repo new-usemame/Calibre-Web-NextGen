@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles, Shield } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
+import { KofiMark, KOFI_URL } from './KofiMark';
 import { BrandName } from './BrandName';
 import { Avatar } from './Avatar';
 import { BASE_PREFIX } from '../lib/api';
@@ -35,6 +36,7 @@ const HELP_LINKS = {
 function useMenu() {
   const [open, setOpen] = useState(false);
   const pinnedRef = useRef(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -48,7 +50,11 @@ function useMenu() {
     const onDocPointer = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) close();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      close();
+      triggerRef.current?.focus();
+    };
     document.addEventListener('pointerdown', onDocPointer);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -70,7 +76,14 @@ function useMenu() {
     setOpen(next);
   };
 
-  return { open, close, ref, wrapperProps: { ref, onMouseEnter, onMouseLeave }, onTriggerClick };
+  return {
+    open,
+    close,
+    ref,
+    triggerRef,
+    wrapperProps: { ref, onMouseEnter, onMouseLeave },
+    onTriggerClick,
+  };
 }
 
 /** A primary glyph with a small brand sub-badge pinned bottom-right — used for the
@@ -133,11 +146,12 @@ function MenuItem({ icon, label, to, href, danger, trailing, onClick, onSelect }
 
 function HelpMenu() {
   const t = useT();
-  const { open, close, wrapperProps, onTriggerClick } = useMenu();
+  const { open, close, triggerRef, wrapperProps, onTriggerClick } = useMenu();
   const unread = useWhatsNewUnread();
   return (
     <div className={styles.menu} {...wrapperProps}>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.triggerSquare}
         aria-haspopup="true"
@@ -165,6 +179,7 @@ function HelpMenu() {
             label={t('Report Issue on Discord')} href={HELP_LINKS.discord} onSelect={close} />
           <MenuItem icon={<DiscordMark size={15} />} label={t('Ask in Discord')} href={HELP_LINKS.discord} onSelect={close} />
           <MenuItem icon={<BookOpen size={15} />} label={t('Documentation')} href={HELP_LINKS.docs} onSelect={close} />
+          <MenuItem icon={<KofiMark size={16} />} label={t('Support on Ko-fi →')} href={KOFI_URL} onSelect={close} />
         </div>
       )}
     </div>
@@ -182,7 +197,7 @@ function backToClassicView() {
 
 function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => void }) {
   const t = useT();
-  const { open, close, wrapperProps, onTriggerClick } = useMenu();
+  const { open, close, triggerRef, wrapperProps, onTriggerClick } = useMenu();
   const me = useMe().data;
   const avatar = me?.avatar;
   // #659/#720: admins looked for the Admin/Settings entry in the account menu (the
@@ -193,6 +208,7 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
   return (
     <div className={styles.menu} {...wrapperProps}>
       <button
+        ref={triggerRef}
         type="button"
         className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`}
         aria-haspopup="true"

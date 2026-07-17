@@ -167,6 +167,28 @@ test('book cards are a single tab stop (no nested tabindex)', async ({ page }) =
   await expect(page.locator('article[tabindex]')).toHaveCount(0);
 });
 
+test('clickable announcement is a link with a sibling dismiss button', async ({ page }) => {
+  await page.goto('/app');
+  await page.evaluate(() => {
+    localStorage.setItem('cwng_banner_dismissed:help-announcement-v1', '1');
+    localStorage.removeItem('cwng_banner_dismissed:kofi-support-v1');
+    localStorage.removeItem('cwng_kofi_banner_dismissed_v1');
+  });
+  await page.reload();
+
+  const banner = page.locator('[data-announcement-id="kofi-support-v1"]');
+  const link = banner.getByRole('link', { name: /Support us on Ko-fi!.*Open Ko-fi/ });
+  const dismissButton = banner.getByRole('button', { name: 'Dismiss Ko-fi support message' });
+  await expect(link).toBeVisible();
+  await expect(link.locator(
+    'a, button, input, select, textarea, [role="button"], [role="link"], [tabindex]:not([tabindex="-1"])',
+  )).toHaveCount(0);
+  await link.focus();
+  await page.keyboard.press('Tab');
+  await expect(dismissButton).toBeFocused();
+  await axeScan(page, 'announcement-kofi');
+});
+
 test('mobile: closed drawer is inert; open traps focus and Escape closes', async ({ page }) => {
   test.skip(!isMobile(), 'mobile-only');
   await page.goto('/app');

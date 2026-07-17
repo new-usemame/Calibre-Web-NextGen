@@ -1,0 +1,76 @@
+name: Publish cwasync plugin
+
+# Publishes the bundled KOReader plugin to its dedicated repository
+# (new-usemame/cwasync.koplugin) when — and only when — the plugin actually
+# changed. That repository is what KOReader's Updates Manager and
+# appstore.koplugin point at, so it going stale strands every device on an old
+# plugin (fork #400).
+#
+# This is NOT the deleted plugin-release-asset.yml. That workflow attached a zip
+# to every application release, which made Updates Manager report an update on
+# app tags that never touched the plugin. Here the script's owed-check compares
+# the plugin against what the dedicated repository already ships and skips when
+# they match, so an unchanged plugin still never surfaces as an update.
+#
+# Why a workflow instead of a runbook step: the publish used to be a manual
+# `scripts/publish-cwasync-plugin.sh --publish` tracked as prose in
+# notes/org/LEDGER.md. It was missed for v4.1.12, v4.1.13 and v4.1.14 — the
+# plugin repository sat three plugin-changing fixes behind while the release
+# notes implied it was current. A release step that depends on someone
+# remembering it is a step that gets skipped.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published CWNG tag to publish the plugin for (vX.Y.Z)"
+        required: true
+        type: string
+
+concurrency:
+  group: plugin-release-publish-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Prereleases are not a delivery channel for devices, and the script only
+    # accepts vX.Y.Z tags anyway.
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
+    steps:
+      # Constrain the tag to vX.Y.Z before it is ever used as a git ref. Only an
+      # account that can publish a release can reach this workflow, but a ref
+      # taken straight from event data is worth pinning to a shape regardless.
+      - name: Validate tag shape
+        id: tag
+        env:
+          RAW_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RAW_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'Not a vX.Y.Z release tag: %s — nothing to publish.\n' "$RAW_TAG"
+            exit 1
+          fi
+          printf 'tag=%s\n' "$RAW_TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          # The plugin is published from the released tag's source, not from
+          # whatever main happens to be when this runs.
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Publish plugin when the release owes one
+        env:
+          # GITHUB_TOKEN cannot push to another repository; the PAT can.
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          bash scripts/publish-cwasync-plugin.sh --tag "$TAG" --auto

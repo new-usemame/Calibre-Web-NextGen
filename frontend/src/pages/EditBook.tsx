@@ -12,6 +12,7 @@ import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { StarRating } from '../components/StarRating';
 import type { MetadataUpdate, MetaResult } from '../lib/api';
+import { formatAuthors } from '../lib/authors';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './EditBook.module.css';
@@ -71,7 +72,7 @@ function RatingSelector({ value, onChange }: { value: string; onChange: (value: 
 type ApplyKey = 'title' | 'authors' | 'series' | 'tags' | 'publisher' | 'rating' | 'description' | 'identifiers' | 'cover';
 const APPLY_FIELDS: { key: ApplyKey; label: string; has: (r: MetaResult) => boolean; preview: (r: MetaResult) => string }[] = [
   { key: 'title', label: 'Title', has: (r) => !!r.title, preview: (r) => r.title },
-  { key: 'authors', label: 'Authors', has: (r) => !!r.authors?.length, preview: (r) => (r.authors || []).join(', ') },
+  { key: 'authors', label: 'Authors', has: (r) => !!r.authors?.length, preview: (r) => formatAuthors(r.authors) },
   { key: 'series', label: 'Series', has: (r) => !!r.series, preview: (r) => `${r.series}${r.series_index ? ` #${r.series_index}` : ''}` },
   { key: 'tags', label: 'Tags', has: (r) => !!r.tags?.length, preview: (r) => (r.tags || []).join(', ') },
   { key: 'publisher', label: 'Publisher', has: (r) => !!r.publisher, preview: (r) => r.publisher || '' },
@@ -133,7 +134,7 @@ export function EditBook({ id }: { id: string }) {
       if (!f) return f;
       const next = { ...f };
       if (sel.has('title') && r.title) next.title = r.title;
-      if (sel.has('authors') && r.authors?.length) next.authors = r.authors.join(' & ');
+      if (sel.has('authors') && r.authors?.length) next.authors = formatAuthors(r.authors);
       if (sel.has('tags') && r.tags?.length) next.tags = r.tags.join(', ');
       if (sel.has('publisher') && r.publisher) next.publishers = r.publisher;
       if (sel.has('series') && r.series) {
@@ -484,7 +485,7 @@ function ResultRow({ r, onApply, onEditions }:
         {r.cover && <img src={r.cover} alt="" className={styles.metaCover} loading="lazy" />}
         <div className={styles.metaInfo}>
           <span className={styles.metaTitle}>{r.title}</span>
-          <span className={styles.metaAuthors}>{(r.authors || []).join(', ')}</span>
+          <span className={styles.metaAuthors}>{formatAuthors(r.authors)}</span>
           {editionMeta && <span className={styles.metaEdition}>{editionMeta}</span>}
           {r.source?.id && <span className={styles.metaSource}>{r.source.id}</span>}
         </div>
@@ -575,7 +576,7 @@ function ResultDetails({ r, onClose }: { r: MetaResult; onClose: () => void }) {
 
   const idents = Object.entries(r.identifiers || {}).filter(([, v]) => v !== '' && v != null);
   const rows = [
-    { label: t('Authors'), value: (r.authors || []).join(', ') },
+    { label: t('Authors'), value: formatAuthors(r.authors) },
     { label: t('Series'), value: r.series ? `${r.series}${r.series_index ? ` #${r.series_index}` : ''}` : '' },
     { label: t('Format'), value: r.format || '' },
     { label: t('Publisher'), value: r.publisher || '' },

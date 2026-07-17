@@ -4,6 +4,7 @@ import type { Book } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { BookCover } from './BookCover';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
+import { formatAuthors } from '../lib/authors';
 import styles from './BookCard.module.css';
 
 interface BookCardProps {
@@ -40,7 +41,7 @@ export function BookCard({
   quickEdit = false,
 }: BookCardProps) {
   const t = useT();
-  const authorStr = book.authors.join(', ');
+  const authorStr = formatAuthors(book.authors);
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
   const readTarget = getPrimaryReadTarget(book.id, book.formats);
 

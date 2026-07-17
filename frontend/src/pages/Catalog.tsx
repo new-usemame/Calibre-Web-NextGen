@@ -12,6 +12,7 @@ import { DiscoverSection } from '../components/DiscoverSection';
 import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
+import { formatAuthors } from '../lib/authors';
 import { saveCatalog, loadCatalog } from '../lib/scrollCache';
 import { usePersistentBool } from '../lib/usePersistentBool';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
@@ -749,7 +750,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                     </span>
                     <span className={styles.bookListInfo}>
                       <strong>{book.title}</strong>
-                      <span>{book.authors.join(', ')}</span>
+                      <span>{formatAuthors(book.authors)}</span>
                     </span>
                     {book.series_index != null && (
                       <span className={styles.bookListIndex}>

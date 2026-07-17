@@ -2477,39 +2477,39 @@ msgstr "Excluir Estante"
 
 #: cps/shelf.py:1057
 msgid "Name (A → Z)"
-msgstr ""
+msgstr "Nome (A → Z)"
 
 #: cps/shelf.py:1058
 msgid "Name (Z → A)"
-msgstr ""
+msgstr "Nome (Z → A)"
 
 #: cps/shelf.py:1059
 msgid "Book count (most → fewest)"
-msgstr ""
+msgstr "Quantidade de livros (maior → menor)"
 
 #: cps/shelf.py:1060
 msgid "Book count (fewest → most)"
-msgstr ""
+msgstr "Quantidade de livros (menor → maior)"
 
 #: cps/shelf.py:1061
 msgid "Created (newest → oldest)"
-msgstr ""
+msgstr "Criado (mais recente → mais antigo)"
 
 #: cps/shelf.py:1062
 msgid "Created (oldest → newest)"
-msgstr ""
+msgstr "Criado (mais antigo → mais recente)"
 
 #: cps/shelf.py:1063
 msgid "Modified (recent → oldest)"
-msgstr ""
+msgstr "Modificado (mais recente → mais antigo)"
 
 #: cps/shelf.py:1064
 msgid "Modified (oldest → recent)"
-msgstr ""
+msgstr "Modificado (mais antigo → mais recente)"
 
 #: cps/shelf.py:1065
 msgid "Manual (drag below)"
-msgstr ""
+msgstr "Manual (arraste abaixo)"
 
 #: cps/spa_strings.py:35 cps/templates/detail.html:634
 msgid "Read now"
@@ -2518,16 +2518,16 @@ msgstr "Ler agora"
 #: cps/spa_strings.py:36
 #, python-brace-format
 msgid "Open details for {title}"
-msgstr ""
+msgstr "Abrir detalhes de {title}"
 
 #: cps/spa_strings.py:37
 #, python-brace-format
 msgid "Read {title}"
-msgstr ""
+msgstr "Ler {title}"
 
 #: cps/spa_strings.py:51
 msgid "Standard (username / password)"
-msgstr ""
+msgstr "Padrão (nome de usuário / senha)"
 
 #: cps/spa_strings.py:52 cps/spa_strings.py:621
 msgid "LDAP"
@@ -2559,11 +2559,11 @@ msgstr "SSL"
 
 #: cps/spa_strings.py:63
 msgid "Series order"
-msgstr ""
+msgstr "Ordem na série"
 
 #: cps/spa_strings.py:64
 msgid "Series order (reverse)"
-msgstr ""
+msgstr "Ordem na série (decrescente)"
 
 #: cps/spa_strings.py:68 cps/templates/detail.html:965
 #: cps/templates/detail.html:966 cps/templates/detail.html:1537
@@ -2586,68 +2586,68 @@ msgstr "Remover tag {name}"
 #: cps/spa_strings.py:75
 #, python-brace-format
 msgid "Rename tag {name}"
-msgstr ""
+msgstr "Renomear tag {name}"
 
 #: cps/spa_strings.py:76
 msgid "Tag name"
-msgstr ""
+msgstr "Nome da tag"
 
 #: cps/api/browse.py:72 cps/spa_strings.py:77
 msgid "Tag name cannot be empty"
-msgstr ""
+msgstr "O nome da tag não pode ser vazio"
 
 #: cps/spa_strings.py:78
 msgid "Save tag name"
-msgstr ""
+msgstr "Salvar nome da tag"
 
 #: cps/spa_strings.py:79
 msgid "Could not rename tag"
-msgstr ""
+msgstr "Não foi possível renomear a tag"
 
 #: cps/spa_strings.py:80
 #, python-brace-format
 msgid "Tag renamed to {name}"
-msgstr ""
+msgstr "Tag renomeada para {name}"
 
 #: cps/api/browse.py:63 cps/spa_strings.py:81
 msgid "You must be signed in"
-msgstr ""
+msgstr "Você precisa estar conectado"
 
 #: cps/api/browse.py:65 cps/spa_strings.py:82
 msgid "You are not allowed to edit metadata"
-msgstr ""
+msgstr "Você não tem permissão para editar metadados"
 
 #: cps/api/browse.py:89 cps/api/browse.py:101 cps/spa_strings.py:84
 msgid "A tag with that name already exists"
-msgstr ""
+msgstr "Já existe uma tag com esse nome"
 
 #: cps/api/browse.py:69 cps/spa_strings.py:85
 msgid "Tag name must be text"
-msgstr ""
+msgstr "O nome da tag deve ser texto"
 
 #: cps/api/browse.py:74 cps/spa_strings.py:86
 msgid "Tag name cannot contain commas"
-msgstr ""
+msgstr "O nome da tag não pode conter vírgulas"
 
 #: cps/spa_strings.py:87
 msgid "Enter a valid tag name"
-msgstr ""
+msgstr "Digite um nome de tag válido"
 
 #: cps/spa_strings.py:88
 msgid "Could not load this page"
-msgstr ""
+msgstr "Não foi possível carregar esta página"
 
 #: cps/spa_strings.py:89
 msgid "Page not found"
-msgstr ""
+msgstr "Página não encontrada"
 
 #: cps/spa_strings.py:95
 msgid "Clear rating"
-msgstr ""
+msgstr "Limpar avaliação"
 
 #: cps/spa_strings.py:96
 msgid "Not rated"
-msgstr ""
+msgstr "Não avaliado"
 
 #: cps/spa_strings.py:97 cps/templates/book_edit.html:220
 #: cps/templates/search_form.html:46 cps/templates/search_form.html:167
@@ -2661,17 +2661,17 @@ msgstr "Não"
 
 #: cps/spa_strings.py:99 cps/templates/email_edit.html:60
 msgid "Email Message Body"
-msgstr ""
+msgstr "Corpo da Mensagem de Email"
 
 #: cps/spa_strings.py:101
 #, python-brace-format
 msgid "Rated {rating} out of 5"
-msgstr ""
+msgstr "Avaliado em {rating} de 5"
 
 #: cps/spa_strings.py:102
 #, python-brace-format
 msgid "More by {name}"
-msgstr ""
+msgstr "Mais de {name}"
 
 #: cps/spa_strings.py:107
 #, python-brace-format
@@ -2679,95 +2679,97 @@ msgid ""
 "Merge {n} books into the first selected? The others are removed after their "
 "formats are copied over."
 msgstr ""
+"Mesclar {n} livros no primeiro selecionado? Os demais serão removidos após "
+"seus formatos serem copiados."
 
 #: cps/spa_strings.py:108
 #, python-brace-format
 msgid "Apply to {n} books"
-msgstr ""
+msgstr "Aplicar a {n} livros"
 
 #: cps/spa_strings.py:112
 msgid "Match condition"
-msgstr ""
+msgstr "Critério de correspondência"
 
 #: cps/spa_strings.py:113
 msgid "Rule field"
-msgstr ""
+msgstr "Campo da regra"
 
 #: cps/spa_strings.py:114
 msgid "Rule operator"
-msgstr ""
+msgstr "Operador da regra"
 
 #: cps/spa_strings.py:115
 msgid "Could not load smart-shelf rules."
-msgstr ""
+msgstr "Não foi possível carregar as regras da estante inteligente."
 
 #: cps/spa_strings.py:116
 msgid "Has Cover"
-msgstr ""
+msgstr "Possui capa"
 
 #: cps/spa_strings.py:117
 msgid "Series Index"
-msgstr ""
+msgstr "Índice de séries"
 
 #: cps/spa_strings.py:118 cps/templates/search_form.html:42
 msgid "Read Status"
-msgstr "Status Lido"
+msgstr "Status de leitura"
 
 #: cps/spa_strings.py:119
 msgid "Has Hardcover ID"
-msgstr ""
+msgstr "Possui ID do Hardcover"
 
 #: cps/spa_strings.py:120 cps/templates/magic_shelf_edit.html:584
 msgid "In the past N days"
-msgstr ""
+msgstr "Nos últimos N dias"
 
 #: cps/spa_strings.py:121 cps/templates/magic_shelf_edit.html:585
 msgid "Not in the past N days"
-msgstr ""
+msgstr "Não nos últimos N dias"
 
 #: cps/spa_strings.py:122
 msgid "is before / less than"
-msgstr ""
+msgstr "antes de / menor que"
 
 #: cps/spa_strings.py:123
 msgid "is on or before / at most"
-msgstr ""
+msgstr "até a data / no máximo"
 
 #: cps/spa_strings.py:124
 msgid "is after / greater than"
-msgstr ""
+msgstr "depois de / maior que"
 
 #: cps/spa_strings.py:125
 msgid "is on or after / at least"
-msgstr ""
+msgstr "a partir de / no mínimo"
 
 #: cps/spa_strings.py:126
 msgid "is between"
-msgstr ""
+msgstr "está entre"
 
 #: cps/spa_strings.py:127
 msgid "is not between"
-msgstr ""
+msgstr "não está entre"
 
 #: cps/spa_strings.py:128
 msgid "does not begin with"
-msgstr ""
+msgstr "não começa com"
 
 #: cps/spa_strings.py:129
 msgid "does not end with"
-msgstr ""
+msgstr "não termina com"
 
 #: cps/spa_strings.py:130
 msgid "is empty"
-msgstr ""
+msgstr "está vazio"
 
 #: cps/spa_strings.py:131
 msgid "is not empty"
-msgstr ""
+msgstr "não está vazio"
 
 #: cps/spa_strings.py:134
 msgid "Appearance"
-msgstr ""
+msgstr "Aparência"
 
 #: cps/spa_strings.py:135 cps/templates/read.html:106
 #: cps/templates/readcbr.html:102 cps/templates/user_edit.html:279
@@ -2776,7 +2778,7 @@ msgstr "Tema"
 
 #: cps/spa_strings.py:136
 msgid "System"
-msgstr ""
+msgstr "Sistema"
 
 #: cps/spa_strings.py:137 cps/spa_strings.py:227 cps/templates/read.html:108
 #: cps/templates/readcbr.html:105
@@ -2794,27 +2796,27 @@ msgstr "Sépia"
 
 #: cps/spa_strings.py:140
 msgid "High contrast"
-msgstr ""
+msgstr "Alto contraste"
 
 #: cps/spa_strings.py:141
 msgid "Midnight (AMOLED)"
-msgstr ""
+msgstr "Meia-noite (AMOLED)"
 
 #: cps/spa_strings.py:142
 msgid "Match your device’s light or dark setting"
-msgstr ""
+msgstr "Igualar às configurações de luz ou escuro do seu dispositivo"
 
 #: cps/spa_strings.py:143
 msgid "Theme saved."
-msgstr ""
+msgstr "Tema salvo."
 
 #: cps/spa_strings.py:144
 msgid "Could not save theme."
-msgstr ""
+msgstr "Não foi possível salvar o tema."
 
 #: cps/spa_strings.py:145
 msgid "Default theme for new accounts"
-msgstr ""
+msgstr "Tema padrão para novas contas"
 
 #: cps/spa_strings.py:146
 msgid ""
@@ -2824,11 +2826,11 @@ msgstr ""
 
 #: cps/spa_strings.py:155
 msgid "Add a format"
-msgstr ""
+msgstr "Adicionar formato"
 
 #: cps/spa_strings.py:156
 msgid "Add rule"
-msgstr ""
+msgstr "Adicionar regra"
 
 #: cps/spa_strings.py:157 cps/templates/detail.html:786
 #: cps/templates/detail.html:997 cps/templates/detail.html:998
@@ -2857,19 +2859,19 @@ msgstr "Autor"
 
 #: cps/spa_strings.py:162
 msgid "Authors (separate with &)"
-msgstr ""
+msgstr "Autores (separar com &)"
 
 #: cps/spa_strings.py:164
 msgid "Back to sign in"
-msgstr ""
+msgstr "Voltar para fazer login"
 
 #: cps/spa_strings.py:165 cps/templates/read.html:197
 msgid "Blue"
-msgstr ""
+msgstr "Azul"
 
 #: cps/spa_strings.py:166
 msgid "Book content"
-msgstr ""
+msgstr "Conteúdo do livro"
 
 #: cps/spa_strings.py:167 cps/templates/layout.html:622
 msgid "Browse"
@@ -2877,7 +2879,7 @@ msgstr "Navegue em"
 
 #: cps/spa_strings.py:168
 msgid "Change password"
-msgstr ""
+msgstr "Alterar senha"
 
 #: cps/spa_strings.py:169 cps/templates/book_edit.html:94
 #: cps/templates/book_edit.html:378 cps/templates/book_table.html:346
@@ -2892,7 +2894,7 @@ msgstr "Fechar"
 
 #: cps/spa_strings.py:170
 msgid "Close menu"
-msgstr ""
+msgstr "Fechar menu"
 
 #: cps/spa_strings.py:171
 msgid "Contents"
@@ -2900,63 +2902,63 @@ msgstr ""
 
 #: cps/spa_strings.py:172
 msgid "Convert failed."
-msgstr ""
+msgstr "Falha na converção"
 
 #: cps/spa_strings.py:173
 msgid "Convert to format"
-msgstr ""
+msgstr "Converter para o formato"
 
 #: cps/spa_strings.py:174 cps/templates/cwa_settings.html:770
 #: cps/templates/update_now_modal.html:36
 #: cps/templates/update_now_modal.html:45
 #: cps/templates/update_now_modal.html:63 cps/templates/user_edit.html:618
 msgid "Copy"
-msgstr ""
+msgstr "Copiar"
 
 #: cps/spa_strings.py:175
 msgid "Could not change password."
-msgstr ""
+msgstr "Não foi possível alterar a senha"
 
 #: cps/spa_strings.py:176
 msgid "Could not create."
-msgstr ""
+msgstr "Não foi possível criar."
 
 #: cps/spa_strings.py:177
 msgid "Could not fetch cover."
-msgstr ""
+msgstr "Não foi possível buscar a capa."
 
 #: cps/spa_strings.py:178
 msgid "Could not load metadata."
-msgstr ""
+msgstr "Não foi possível carregar os metadados."
 
 #: cps/spa_strings.py:179
 #, python-brace-format
 msgid "Could not load the book file ({status})"
-msgstr ""
+msgstr "Não foi possível carregar o arquivo do livro ({status})"
 
 #: cps/spa_strings.py:180
 msgid "Could not load your account."
-msgstr ""
+msgstr "Não foi possível carregar sua conta."
 
 #: cps/spa_strings.py:181
 msgid "Could not save."
-msgstr ""
+msgstr "Não foi possível salvar."
 
 #: cps/spa_strings.py:183
 msgid "Cover image URL"
-msgstr ""
+msgstr "URL da imagem da capa"
 
 #: cps/spa_strings.py:184
 msgid "Cover update failed."
-msgstr ""
+msgstr "Falha ao atualizar a capa."
 
 #: cps/spa_strings.py:185 cps/templates/cover_picker.html:225
 msgid "Cover updated."
-msgstr ""
+msgstr "Capa atualizada"
 
 #: cps/spa_strings.py:186
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Criar prateleira inteligente"
 
 #: cps/spa_strings.py:187
 msgid "Create your account"
@@ -2978,14 +2980,15 @@ msgstr "Apagar"
 
 #: cps/spa_strings.py:192
 msgid "Delete book"
-msgstr ""
+msgstr "Apagar livro"
 
 #: cps/spa_strings.py:193
 #, python-brace-format
 msgid ""
 "Delete \"{title}\"? This permanently removes the book and all its files from "
 "your library. This cannot be undone."
-msgstr ""
+msgstr "Apagar \"{title}\"? Isso remove permanentemente o livro e todos os seus "
+"arquivos da sua biblioteca. Isso não pode ser desfeito."
 
 #: cps/spa_strings.py:194
 msgid "Deleting…"
@@ -2998,8 +3001,7 @@ msgstr "Não foi possível apagar este livro."
 #: cps/spa_strings.py:196
 #, python-brace-format
 msgid "Delete the {fmt} file? The book stays; only this format is removed."
-msgstr ""
-"Apagar o arquivo {fmt}? O livro permanece; apenas este formato é removido."
+msgstr "Apagar o arquivo {fmt}? O livro permanece; apenas este formato é removido."
 
 #: cps/spa_strings.py:197
 #, python-brace-format
@@ -3013,12 +3015,12 @@ msgstr "Apagar {n} livro(s)? Isso não pode ser desfeito."
 
 #: cps/spa_strings.py:199
 msgid "Description contains"
-msgstr ""
+msgstr "Descrição contém"
 
 #: cps/spa_strings.py:200
 #, python-brace-format
 msgid "Deselect {title}"
-msgstr ""
+msgstr "Desmarcar {title}"
 
 #: cps/spa_strings.py:201
 msgid "Edit metadata"
@@ -3474,7 +3476,7 @@ msgstr ""
 
 #: cps/spa_strings.py:318
 msgid "Library"
-msgstr ""
+msgstr "Biblioteca"
 
 #: cps/spa_strings.py:319
 msgid "List view"
@@ -3606,48 +3608,49 @@ msgstr "Fonte"
 
 #: cps/spa_strings.py:356
 msgid "Customize"
-msgstr ""
+msgstr "Personalizar"
 
 #: cps/spa_strings.py:357
 msgid "Customize sidebar"
-msgstr ""
+msgstr "Personalizar barra lateral"
 
 #: cps/spa_strings.py:358
 msgid "Customize navigation"
-msgstr ""
+msgstr "Personalizar navegação"
 
 #: cps/spa_strings.py:359 cps/templates/_book_organizer.html:164
 msgid "Done"
-msgstr ""
+msgstr "Feito"
 
 #: cps/spa_strings.py:360
 msgid "Reset to default"
-msgstr ""
+msgstr "Redefinir para o padrão"
 
 #: cps/spa_strings.py:361
 msgid "Always shown"
-msgstr ""
+msgstr "Mostrar sempre"
 
 #: cps/spa_strings.py:362
 msgid "Editing sidebar. Reorder or hide sections, then tap Done."
-msgstr ""
+msgstr "Editando barra lateral. Reordene ou esconda seções, depois toque em Feito."
 
 #: cps/spa_strings.py:363
 msgid "Editing cancelled."
-msgstr ""
+msgstr "Edição cancelada."
 
 #: cps/spa_strings.py:364
 msgid ""
 "Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused handle."
 msgstr ""
+"Arraste para reordenar. Toque em ✕ para esconder uma seção. As teclas de seta movem o controle focalizado."
 
 #: cps/spa_strings.py:365
 msgid "Sidebar saved."
-msgstr ""
+msgstr "Barra lateral salva."
 
 #: cps/spa_strings.py:366
 msgid "Sidebar reset to default."
-msgstr ""
+msgstr "Barra lateral redefinida para o padrão."
 
 #: cps/spa_strings.py:367
 #, python-brace-format
@@ -3685,7 +3688,7 @@ msgstr ""
 
 #: cps/spa_strings.py:380
 msgid "Refresh library"
-msgstr ""
+msgstr "Atualizar biblioteca"
 
 #: cps/spa_strings.py:390
 msgid "(replace cover)"
@@ -3751,15 +3754,15 @@ msgstr ""
 
 #: cps/spa_strings.py:404
 msgid "Advanced"
-msgstr ""
+msgstr "Avançado"
 
 #: cps/spa_strings.py:405
 msgid "Advanced search"
-msgstr ""
+msgstr "Pesquisa avançada"
 
 #: cps/spa_strings.py:407
 msgid "All shelves"
-msgstr ""
+msgstr "Todas as estantes"
 
 #: cps/spa_strings.py:408
 msgid "Allow remote (magic-link) login"
@@ -4200,11 +4203,11 @@ msgstr ""
 
 #: cps/spa_strings.py:516
 msgid "Date Added"
-msgstr ""
+msgstr "Incluído em"
 
 #: cps/spa_strings.py:517 cps/spa_strings.py:804 cps/templates/detail.html:904
 msgid "Date added"
-msgstr ""
+msgstr "Incluído em"
 
 #: cps/spa_strings.py:518
 msgid "Default (System Sans-Serif)"
@@ -4639,11 +4642,11 @@ msgstr "Idioma"
 
 #: cps/spa_strings.py:624
 msgid "Languages — include"
-msgstr ""
+msgstr "Idiomas — incluir"
 
 #: cps/spa_strings.py:625 cps/templates/detail.html:908
 msgid "Last modified"
-msgstr ""
+msgstr "Última modificação"
 
 #: cps/spa_strings.py:626 cps/templates/detail.html:1029
 msgid "Last synced"
@@ -4651,7 +4654,7 @@ msgstr "Última sincronização"
 
 #: cps/spa_strings.py:627
 msgid "Library settings"
-msgstr ""
+msgstr "Configurações da biblioteca"
 
 #: cps/spa_strings.py:628 cps/templates/read.html:132
 msgid "Line height"
@@ -4659,14 +4662,14 @@ msgstr ""
 
 #: cps/spa_strings.py:629
 msgid "Load more"
-msgstr ""
+msgstr "Carregar mais"
 
 #: cps/spa_strings.py:630 cps/templates/admin.html:300
 #: cps/templates/admin.html:332 cps/templates/config_db.html:4
 #: cps/templates/config_edit.html:4 cps/templates/cwa_settings.html:4
 #: cps/templates/read.html:74
 msgid "Loading"
-msgstr ""
+msgstr "Carregando"
 
 #: cps/spa_strings.py:631
 msgid "Loading new Discover picks."
@@ -4788,29 +4791,29 @@ msgid ""
 "whole server."
 msgstr ""
 
-#: cps/spa_strings.py:661
+#: cps/spa_strings.py:6
 msgid "Opens in classic view"
-msgstr ""
+msgstr "Abre na visualização clássica"
 
 #: cps/spa_strings.py:662
 msgid "Move down"
-msgstr ""
+msgstr "Mover para baixo"
 
 #: cps/spa_strings.py:663
 msgid "Move up"
-msgstr ""
+msgstr "Mover para cima"
 
 #: cps/spa_strings.py:664
 msgid "My account"
-msgstr ""
+msgstr "Minha conta"
 
 #: cps/spa_strings.py:665
 msgid "Name"
-msgstr ""
+msgstr "Nome"
 
 #: cps/spa_strings.py:666
 msgid "Need to report an issue? Try the new"
-msgstr ""
+msgstr "Precisa reportar um problema? Experimente o novo"
 
 #: cps/spa_strings.py:667
 msgid "Support us on Ko-fi!"
@@ -4834,43 +4837,43 @@ msgstr ""
 
 #: cps/spa_strings.py:672 cps/templates/cover_picker.html:182
 msgid "New"
-msgstr ""
+msgstr "Novo"
 
 #: cps/spa_strings.py:673
 msgid "New password"
-msgstr ""
+msgstr "Nova senha"
 
 #: cps/spa_strings.py:674
 msgid "New shelf name"
-msgstr ""
+msgstr "Novo nome da estante"
 
 #: cps/spa_strings.py:675
 msgid "New shelf name…"
-msgstr ""
+msgstr "Novo nome da estante…"
 
 #: cps/spa_strings.py:676
 msgid "New shelf…"
-msgstr ""
+msgstr "Nova estante…"
 
 #: cps/spa_strings.py:677
 msgid "New smart shelf"
-msgstr ""
+msgstr "Nova estante inteligente"
 
 #: cps/spa_strings.py:678
 msgid "New user"
-msgstr ""
+msgstr "Novo usuário"
 
 #: cps/spa_strings.py:679
 msgid "Newest"
-msgstr ""
+msgstr "Mais recente"
 
 #: cps/spa_strings.py:680
 msgid "Newest published"
-msgstr ""
+msgstr "Publicados mais recentemente"
 
 #: cps/spa_strings.py:681
 msgid "Next page"
-msgstr ""
+msgstr "Próxima página"
 
 #: cps/spa_strings.py:682
 msgid "No books match this smart shelf right now."
@@ -4937,11 +4940,11 @@ msgstr ""
 
 #: cps/spa_strings.py:699
 msgid "Oldest"
-msgstr ""
+msgstr "Mais antigo"
 
 #: cps/spa_strings.py:700
 msgid "Oldest published"
-msgstr ""
+msgstr "Publicados há mais tempo"
 
 #: cps/spa_strings.py:701
 msgid ""
@@ -5080,33 +5083,33 @@ msgstr ""
 
 #: cps/spa_strings.py:734
 msgid "Recipient(s)"
-msgstr ""
+msgstr "Destinatário(s)"
 
 #: cps/spa_strings.py:735
 msgid "Redirect host (full URL)"
-msgstr ""
+msgstr "Host de redirecionamento (URL completa)"
 
 #: cps/spa_strings.py:736 cps/templates/cover_picker.html:152
 #: cps/templates/index.html:120
 msgid "Refresh"
-msgstr ""
+msgstr "Atualizar"
 
 #: cps/spa_strings.py:737
 msgid "Registering…"
-msgstr ""
+msgstr "Registrando…"
 
 #: cps/spa_strings.py:738 cps/templates/detail.html:739
 #: cps/templates/detail.html:740
 msgid "Reload metadata from disk"
-msgstr ""
+msgstr "Recarregar metadados do disco"
 
 #: cps/spa_strings.py:739
 msgid "Reloading…"
-msgstr ""
+msgstr "Recarregando…"
 
 #: cps/spa_strings.py:740
 msgid "Remember me"
-msgstr ""
+msgstr "Lembrar de mim"
 
 #: cps/spa_strings.py:741 cps/templates/detail.html:700
 #: cps/templates/detail.html:701 cps/templates/detail.html:702
@@ -5510,15 +5513,15 @@ msgstr ""
 
 #: cps/spa_strings.py:846
 msgid "Title A–Z"
-msgstr ""
+msgstr "Título A–Z"
 
 #: cps/spa_strings.py:847
 msgid "Title Z–A"
-msgstr ""
+msgstr "Título Z–A"
 
 #: cps/spa_strings.py:848
 msgid "Title, author, or ISBN"
-msgstr ""
+msgstr "Título, autor ou ISBN"
 
 #: cps/spa_strings.py:849
 msgid "Token URL"
@@ -5543,7 +5546,7 @@ msgstr "Desarquivar"
 
 #: cps/spa_strings.py:854
 msgid "Unhide"
-msgstr ""
+msgstr "Mostrar"
 
 #: cps/spa_strings.py:855
 msgid "Unlock the cover above to apply a new one."
@@ -5555,19 +5558,19 @@ msgstr ""
 
 #: cps/spa_strings.py:857
 msgid "Untitled"
-msgstr ""
+msgstr "Sem título"
 
 #: cps/spa_strings.py:858
 msgid "Update failed."
-msgstr ""
+msgstr "Atualização falhou."
 
 #: cps/spa_strings.py:859 cps/templates/cover_picker.html:74
 msgid "Upload as cover"
-msgstr ""
+msgstr "Enviar como capa"
 
 #: cps/spa_strings.py:860
 msgid "Upload books"
-msgstr ""
+msgstr "Enviar livros"
 
 #: cps/spa_strings.py:861
 msgid ""
@@ -5618,7 +5621,7 @@ msgstr "Ver"
 
 #: cps/spa_strings.py:871
 msgid "View settings"
-msgstr ""
+msgstr "Visualizar configurações"
 
 #: cps/spa_strings.py:872
 msgid "Viewer"
@@ -6029,17 +6032,15 @@ msgstr "Usuário não encontrado"
 
 #: cps/web.py:1644
 msgid "Permission denied"
-msgstr ""
+msgstr "Permissão negada"
 
 #: cps/web.py:1675
-#, fuzzy
 msgid "Shelf duplicated successfully"
-msgstr "{} usuário(s) removidos com sucesso"
+msgstr "Estante duplicada com sucesso"
 
 #: cps/web.py:1681
-#, fuzzy
 msgid "Error duplicating shelf"
-msgstr "Erro apagando Estante"
+msgstr "Erro ao duplicar estante"
 
 #: cps/templates/magic_shelf_edit.html:506 cps/web.py:1708
 msgid ""
@@ -6538,17 +6539,15 @@ msgstr "Downloads por usuário"
 #: cps/templates/_book_organizer.html:218
 #: cps/templates/_book_organizer.html:265
 #: cps/templates/_book_organizer.html:292
-#, fuzzy
 msgid "Date added, newest first"
-msgstr "Classificar de acordo com a data do livro, o mais recente primeiro"
+msgstr "Data de inclusão, mais novos primeiro"
 
 #: cps/templates/_book_organizer.html:194
 #: cps/templates/_book_organizer.html:221
 #: cps/templates/_book_organizer.html:268
 #: cps/templates/_book_organizer.html:295
-#, fuzzy
 msgid "Date added, oldest first"
-msgstr "Classificar de acordo com a data do livro, o mais antigo primeiro"
+msgstr "Data de inclusão, mais antigos primeiro"
 
 #: cps/templates/_book_organizer.html:197
 #: cps/templates/_book_organizer.html:224

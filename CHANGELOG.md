@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.15] - 2026-07-17
+
 ### Fixed
 
 - **KOReader stopped seeing new versions of the sync plugin.** If you update the

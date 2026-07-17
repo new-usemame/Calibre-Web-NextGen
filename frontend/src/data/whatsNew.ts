@@ -56,6 +56,56 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.15',
+    date: '2026-07-17',
+    items: [
+      {
+        title: 'Changing a cover no longer freezes the server for everyone',
+        body: 'Opening the cover picker on one book used to make every other page hang for as long as the slowest metadata source took to answer — up to about twelve seconds — and the Search metadata button on the edit page did the same. Cover and metadata searches now run without holding up anyone else, and the search itself is no slower.',
+        category: 'Library',
+      },
+      {
+        title: 'Books with several authors are readable again',
+        body: 'Authors were joined with a comma, but a name can contain a comma itself, so two authors ran together as “Dumas, Alexandre, Maquet, Auguste” with no way to tell where one person ended. Authors are now separated with “&”, matching the classic interface, Calibre, and the edit box. Tags, languages, and publishers still use commas.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Your library stays your library after saving a default view',
+        body: 'Saving a default view used to replace the library home with the Advanced search form, retitle the page, and hide the library heading and Discover strip. The library now simply shows the books your default view selects, with a note saying so and a link to show all books again.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'New accounts start with the theme you chose',
+        body: 'Whichever theme an admin picked under Admin → Theme, some new accounts still started on Dark — self-registered accounts on upgraded servers, and every account created by OAuth, LDAP import, or an external login. All seven ways an account can be created now use the theme you configured.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Automatic duplicate resolution respects your cooldown',
+        body: 'Setting a cooldown between automatic resolutions stopped duplicate resolution from running at all, and the log counted the wait upward instead of down. Servers east of UTC saw the opposite — the cooldown was ignored entirely. The cooldown you type is now the one that is used, and your existing resolution history is untouched.',
+        category: 'Admin',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'KOReader offers the current sync plugin again',
+        body: 'Updating the plugin from inside KOReader kept offering the version from 13 July, so three shipped fixes — highlights and notes syncing into your library, highlight deletions reaching the server, and a guard against a device deleting highlights it never had — never arrived on the device. The current plugin is published again, and publishing it is no longer a manual step. Downloading it from your own server’s KOReader page always gave you the current copy.',
+        category: 'Sync',
+      },
+      {
+        title: 'Faster container startup on large libraries',
+        body: 'Every start walked your whole Calibre library twice to set permissions, and re-walked a folder inside /config that was already covered. Each folder is now visited once, which shortens startup the most on large libraries.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Russian reading progress reads correctly aloud',
+        body: 'Screen readers announced reading progress in Russian as “Прочитано: 45% r”, with a stray letter left over from the English wording. It only ever affected people using a screen reader, since the text is spoken rather than shown. Brazilian Portuguese was already correct.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.14',
     date: '2026-07-16',
     items: [

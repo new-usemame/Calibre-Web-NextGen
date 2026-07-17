@@ -221,8 +221,11 @@ fi
 #  Set required permissions
 #------------------------------------------------------------------------------------------------------------------------
 
-# The list (floor + dirs.json), the de-duplication, and the app-tree marker gate
-# all live in set_ownership.sh so they can be tested without a container (#874).
+# The list (floor + dirs.json) and the de-duplication live in set_ownership.sh so
+# they can be tested without a container (#874). Every listed tree is walked on
+# every start: a marker gate was built and rejected, because a marker lives in the
+# writable layer and so is absent on exactly the fresh-container start that is
+# expensive (#941 tracks not walking the app tree at all).
 bash /app/calibre-web-automated/scripts/set_ownership.sh
 
 #------------------------------------------------------------------------------------------------------------------------

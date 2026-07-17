@@ -56,6 +56,17 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.16',
+    date: '2026-07-17',
+    items: [
+      {
+        title: 'Support CWNG without hunting for a link',
+        body: 'The app can now show occasional project announcements in its top banner, starting with a Ko-fi support message. Selecting the message opens Ko-fi and dismisses it, the choice is remembered, and a permanent Support on Ko-fi link now lives in the Help menu.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.15',
     date: '2026-07-17',
     items: [

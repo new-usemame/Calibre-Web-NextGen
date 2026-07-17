@@ -58,6 +58,11 @@ from pathlib import Path
 import pytest
 
 
+# Fast Tests runs `pytest -m "smoke or unit"`. Without this marker the file is
+# collected and then silently excluded — green CI, zero coverage. That is the
+# #966 failure mode (57 dead i18n gates), and it caught this file too.
+pytestmark = pytest.mark.unit
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "freeze_pot_creation_date.py"
 UPDATE_SH = REPO_ROOT / "scripts" / "update_translations.sh"

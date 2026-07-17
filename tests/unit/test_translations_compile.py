@@ -60,6 +60,34 @@ def test_at_least_one_po_file_present():
 
 
 @pytest.mark.unit
+def test_msgfmt_is_available_when_running_in_ci():
+    """The msgfmt-backed gates are ``skipif``-guarded so a contributor
+    without gettext can still run the suite. That guard is silent by
+    design, and silence is how it failed: the workflow's apt step never
+    installed gettext, so on every CI run all 57 msgfmt-backed gates —
+    28 ``test_po_file_compiles_cleanly`` (the v4.0.47 "does the locale
+    ship at all" check), 28 ``test_po_file_passes_msgfmt_check`` and the
+    #936 red/green in ``test_i18n_format_flags.py`` — reported SKIPPED
+    while the job reported green. Two releases' worth of i18n protection
+    was decoration.
+
+    Skipping is correct on a dev laptop and wrong in CI, so assert the
+    difference instead of leaving it implicit: locally this skips, in CI
+    a missing msgfmt is a hard failure naming the step to fix. Without
+    this, re-adding gettext today does not stop the next runner-image or
+    workflow change from silently retiring the gates again.
+    """
+    if not os.environ.get("CI"):
+        pytest.skip("not CI; msgfmt is optional for local runs (brew install gettext)")
+    assert shutil.which("msgfmt") is not None, (
+        "msgfmt is missing on the CI runner, so every msgfmt-backed i18n gate "
+        "would silently SKIP and the job would still pass green.\n"
+        "Fix: add `gettext` to the 'Install system dependencies' apt-get step "
+        "in .github/workflows/tests.yml (both the Fast and Integration jobs)."
+    )
+
+
+@pytest.mark.unit
 @pytest.mark.skipif(
     shutil.which("msgfmt") is None,
     reason="msgfmt not available on this host (install gettext / brew install gettext)",

@@ -32,6 +32,11 @@ from pathlib import Path
 
 import pytest
 
+# Without this marker CI's `-m "smoke or unit"` selector deselects every test in
+# this file, so the cover-picker responsiveness regression #955 fixed would not
+# be caught by CI if it came back.
+pytestmark = pytest.mark.unit
+
 gevent = pytest.importorskip("gevent", reason="production WSGI server is gevent")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

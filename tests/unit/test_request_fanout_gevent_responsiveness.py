@@ -29,6 +29,12 @@ from pathlib import Path
 
 import pytest
 
+# Without this marker CI's `-m "smoke or unit"` selector deselects every test
+# in this file, including the AST guard below that enforces the no-stdlib-
+# concurrent.futures-on-a-request-path invariant. A guard nobody runs is not a
+# guard: a PR reintroducing a hub-blocking executor would merge green.
+pytestmark = pytest.mark.unit
+
 gevent = pytest.importorskip("gevent", reason="production WSGI server is gevent")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

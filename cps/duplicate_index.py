@@ -9,7 +9,6 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Iterable
 
 from sqlalchemy import func
@@ -471,14 +470,14 @@ def _write_duplicate_cache_groups(cwa_db, duplicate_groups, max_book_id):
     cwa_db.cur.execute(
         """
         UPDATE cwa_duplicate_cache
-        SET scan_timestamp = ?,
+        SET scan_timestamp = CURRENT_TIMESTAMP,
             duplicate_groups_json = ?,
             total_count = ?,
             scan_pending = 0,
             last_scanned_book_id = ?
         WHERE id = 1
         """,
-        (datetime.now().isoformat(), json.dumps(serialized_groups), len(serialized_groups), max_book_id),
+        (json.dumps(serialized_groups), len(serialized_groups), max_book_id),
     )
     cwa_db.con.commit()
 

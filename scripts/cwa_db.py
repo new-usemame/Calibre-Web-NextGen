@@ -2570,7 +2570,6 @@ class CWA_DB:
             max_book_id: Maximum book ID in metadata.db (optional, for incremental scanning)
         """
         import json
-        from datetime import datetime
         try:
             # Serialize duplicate groups to JSON (extract only serializable data)
             serializable_groups = []
@@ -2585,27 +2584,32 @@ class CWA_DB:
                 serializable_groups.append(serializable_group)
             
             groups_json = json.dumps(serializable_groups)
-            
+
+            # scan_timestamp is stamped with SQL CURRENT_TIMESTAMP (UTC), matching the
+            # column's schema default and cwa_duplicate_resolutions.timestamp. Never
+            # stamp datetime.now() (naive local) here: it would mix time bases in one
+            # column the same way #944 did, and any future "last scanned N min ago"
+            # reader would silently break off UTC. See #951.
             # Update cache with optional max_book_id for incremental scanning
             if max_book_id is not None:
                 self.cur.execute("""
-                    UPDATE cwa_duplicate_cache 
-                    SET scan_timestamp = ?, 
-                        duplicate_groups_json = ?, 
-                        total_count = ?, 
+                    UPDATE cwa_duplicate_cache
+                    SET scan_timestamp = CURRENT_TIMESTAMP,
+                        duplicate_groups_json = ?,
+                        total_count = ?,
                         scan_pending = 0,
                         last_scanned_book_id = ?
                     WHERE id = 1
-                """, (datetime.now().isoformat(), groups_json, total_count, max_book_id))
+                """, (groups_json, total_count, max_book_id))
             else:
                 self.cur.execute("""
-                    UPDATE cwa_duplicate_cache 
-                    SET scan_timestamp = ?, 
-                        duplicate_groups_json = ?, 
-                        total_count = ?, 
+                    UPDATE cwa_duplicate_cache
+                    SET scan_timestamp = CURRENT_TIMESTAMP,
+                        duplicate_groups_json = ?,
+                        total_count = ?,
                         scan_pending = 0
                     WHERE id = 1
-                """, (datetime.now().isoformat(), groups_json, total_count))
+                """, (groups_json, total_count))
             self.con.commit()
             return True
         except Exception as e:

@@ -204,9 +204,9 @@ class TaskDuplicateScan(CalibreTask):
                     try:
                         cwa_db.cur.execute("""
                             UPDATE cwa_duplicate_cache
-                            SET last_scanned_book_id = ?, scan_pending = 0, scan_timestamp = ?
+                            SET last_scanned_book_id = ?, scan_pending = 0, scan_timestamp = CURRENT_TIMESTAMP
                             WHERE id = 1
-                        """, (max_book_id, datetime.now().isoformat()))
+                        """, (max_book_id,))
                         cwa_db.con.commit()
                         log.info(
                             "[cwa-duplicates] Incremental scan: no candidates; cache timestamp updated "

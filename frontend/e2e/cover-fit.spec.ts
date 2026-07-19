@@ -89,6 +89,12 @@ test('detail-page cover carries a themed hairline (#987)', async ({ page }) => {
  * they skip rather than fail when the view or the seed has no cover thumbnail.
  */
 test('table-view row thumbnails carry the same hairline (#987)', async ({ page }) => {
+  // The table's 56px cover column is a desktop-width affordance — at 375px the
+  // thumbnail is present in the DOM but not presented, so the mobile project
+  // would fail on visibility rather than on the border. Assert at a width where
+  // the surface actually exists; the grid and detail cases above are the ones
+  // carrying the mobile-viewport coverage.
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/app/table');
   // Rows arrive from a client-side fetch — wait for one rather than counting
   // immediately, which would skip the assertion before the data lands.

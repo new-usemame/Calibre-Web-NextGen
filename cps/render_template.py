@@ -15,7 +15,7 @@ from sqlalchemy.sql.expression import or_
 
 from . import config, constants, logger, ub
 from .ub import User
-from .duplicate_notice import duplicate_setup_notice_file
+from .duplicate_notice import duplicate_setup_notice_dismissed
 
 # CWA specific imports
 from datetime import datetime
@@ -30,13 +30,11 @@ log = logger.create()
 
 
 def _duplicate_setup_notice_dismissed():
-    notice_file = duplicate_setup_notice_file(getattr(current_user, 'id', 'unknown'))
-    return os.path.isfile(notice_file)
+    return duplicate_setup_notice_dismissed(getattr(current_user, 'id', 'unknown'))
 
 
 def duplicate_index_setup_notification(settings, cwa_db=None):
-    notice_file = duplicate_setup_notice_file(getattr(current_user, 'id', 'unknown'))
-    if os.path.isfile(notice_file):
+    if duplicate_setup_notice_dismissed(getattr(current_user, 'id', 'unknown')):
         return False
 
     try:

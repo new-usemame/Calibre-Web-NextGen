@@ -249,10 +249,10 @@ jobs:
           tags: crocodilestick/calibre-web-automated:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
+          # than the release CDN, which intermittently 404s the Actions egress.
+          # Contributors build without it and fall back to the CDN (see Dockerfile).
           build-args: |
-            # Pull Python/kepubify from our GHCR mirror rather than the release
-            # CDN, which intermittently 404s the Actions egress. Contributors
-            # build without this and fall back to the CDN (see Dockerfile).
             PBS_SOURCE=ghcr
 
       - name: Set test UID/GID

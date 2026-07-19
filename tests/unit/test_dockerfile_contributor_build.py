@@ -212,6 +212,23 @@ def test_every_ci_image_build_pins_the_ghcr_mirror() -> None:
     )
 
 
+def test_build_args_carry_no_comment_lines() -> None:
+    """`build-args` is parsed line-by-line into KEY=VALUE.
+
+    A `# explanation` line inside the block is not a comment to the action — it
+    becomes a malformed build-arg. Keep prose above the `build-args:` key.
+    """
+    offenders: list[str] = []
+    for workflow, job, step in _image_build_steps():
+        for line in str((step.get("with") or {}).get("build-args", "")).splitlines():
+            if line.strip().startswith("#"):
+                offenders.append(f"{workflow}:{job}: {line.strip()[:50]}")
+    assert not offenders, (
+        f"Comment lines inside build-args are passed to the builder as "
+        f"build-args, not ignored: {offenders}"
+    )
+
+
 def test_builds_selecting_the_mirror_authenticate_to_ghcr() -> None:
     """A job that pins the mirror must also log in to GHCR.
 

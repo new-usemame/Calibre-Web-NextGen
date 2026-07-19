@@ -110,12 +110,12 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.arch }},mode=max
           outputs: |
             type=image,name=${{ env.REGISTRY }}/${{ steps.img.outputs.name }},push-by-digest=true,name-canonical=true,push=${{ inputs.dry_run != true }}
+          # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
+          # than the release CDN, which intermittently 404s the Actions egress.
+          # Contributors build without it and fall back to the CDN (see Dockerfile).
           build-args: |
             BUILD_DATE=${{ github.event.release.created_at || github.event.repository.updated_at }}
             VERSION=${{ steps.ver.outputs.tag }}
-            # Pull Python/kepubify from our GHCR mirror rather than the release
-            # CDN, which intermittently 404s the Actions egress. Contributors
-            # build without this and fall back to the CDN (see Dockerfile).
             PBS_SOURCE=ghcr
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

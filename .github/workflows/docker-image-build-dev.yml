@@ -153,12 +153,12 @@ jobs:
           # "Compose docker outputs" step above, which conditionally
           # includes the DockerHub image name when DOCKERHUB_PUSH_ENABLED.
           outputs: ${{ env.DOCKER_BUILD_OUTPUTS }}
+          # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
+          # than the release CDN, which intermittently 404s the Actions egress.
+          # Contributors build without it and fall back to the CDN (see Dockerfile).
           build-args: |
             BUILD_DATE=${{ github.event.repository.updated_at }}
             VERSION=DEV_BUILD-${{ env.IMAGE_TAG }}-${{ vars.CURRENT_DEV_BUILD_NUM }}
-            # Pull Python/kepubify from our GHCR mirror rather than the release
-            # CDN, which intermittently 404s the Actions egress. Contributors
-            # build without this and fall back to the CDN (see Dockerfile).
             PBS_SOURCE=ghcr
 
       # --- 4. Export Digest for Merge Job ---
@@ -275,12 +275,12 @@ jobs:
           # "Compose docker outputs" step below, which conditionally
           # includes the DockerHub image name when DOCKERHUB_PUSH_ENABLED.
           outputs: ${{ env.DOCKER_BUILD_OUTPUTS }}
+          # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
+          # than the release CDN, which intermittently 404s the Actions egress.
+          # Contributors build without it and fall back to the CDN (see Dockerfile).
           build-args: |
             BUILD_DATE=${{ github.event.repository.updated_at }}
             VERSION=DEV_BUILD-${{ env.IMAGE_TAG }}-${{ vars.CURRENT_DEV_BUILD_NUM }}
-            # Pull Python/kepubify from our GHCR mirror rather than the release
-            # CDN, which intermittently 404s the Actions egress. Contributors
-            # build without this and fall back to the CDN (see Dockerfile).
             PBS_SOURCE=ghcr
 
       # --- 4. Rotate Cache (Prevent Infinite Growth) ---

@@ -1,0 +1,104 @@
+/* Theme-token only — the fallback must render legibly in every theme even when
+   the app chrome that normally sets layout has been unmounted by the crash. */
+.wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5);
+  background: var(--bg);
+  box-sizing: border-box;
+}
+
+.card {
+  width: 100%;
+  max-width: 34rem;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: var(--sp-6);
+  box-sizing: border-box;
+}
+
+.title {
+  margin: 0 0 var(--sp-3);
+  color: var(--text);
+  font-size: var(--fs-lg);
+}
+
+.body {
+  margin: 0 0 var(--sp-5);
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px; /* WCAG 2.2 AA target size — matches the app's controls */
+  padding: 0 var(--sp-5);
+  border-radius: 8px;
+  font-size: var(--fs-base);
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.primary {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+}
+
+.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.secondary {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+}
+
+.secondary:hover {
+  background: var(--surface-2);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible,
+.summary:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.details {
+  margin-top: var(--sp-5);
+}
+
+.summary {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.pre {
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-3);
+  background: var(--surface-3);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}

@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { Router, Route, Switch } from 'wouter';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { Router, Route, Switch, useLocation } from 'wouter';
 import { RouteA11y } from './lib/a11y/useRouteA11y';
 import { BASE_PREFIX, type AdvancedSearchParams } from './lib/api';
 import { bodyFontStack, displayFontStack } from './lib/fonts';
@@ -28,6 +28,7 @@ import { WhatsNew } from './pages/WhatsNew';
 import { MagicShelf } from './pages/MagicShelf';
 import { MagicShelfView } from './pages/MagicShelfView';
 import { AppShell } from './components/AppShell';
+import { RoutedErrorBoundary } from './components/ErrorBoundary';
 import { SpinnerCentered } from './components/Spinner';
 import { I18nProvider } from './lib/i18n';
 import { usePostAuthRedirect } from './lib/authRedirect';
@@ -43,6 +44,20 @@ const NativeReader = lazy(() => import('./pages/NativeReader').then((m) => ({ de
 // path (empty at the domain root). wouter needs the full base so client-side
 // links resolve to <prefix>/app/… rather than a prefix-less /app/….
 const ROUTER_BASE = BASE_PREFIX + '/app';
+
+// #855: a render error anywhere under the router used to unmount the entire SPA,
+// leaving an empty #root — a black screen with no way back. This boundary keeps
+// the crash contained and recoverable, and clears itself when the user navigates
+// away, so a single bad route never strands the session. It sits INSIDE <Router>
+// so it can read the current location as its reset key.
+function RouteBoundary({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  return (
+    <RoutedErrorBoundary location={location} homeHref={ROUTER_BASE || '/'}>
+      {children}
+    </RoutedErrorBoundary>
+  );
+}
 
 // A saved default view (#498) FILTERS the library; it does not replace it with
 // the search page. Swapping the component here cost the library heading, actions
@@ -107,10 +122,12 @@ export function App() {
     return (
       <Router base={ROUTER_BASE}>
         <RouteA11y />
-        <Switch>
-          <Route path={AUTH_ROUTES.magicLink}>{() => <MagicLink />}</Route>
-          <Route>{() => <Login />}</Route>
-        </Switch>
+        <RouteBoundary>
+          <Switch>
+            <Route path={AUTH_ROUTES.magicLink}>{() => <MagicLink />}</Route>
+            <Route>{() => <Login />}</Route>
+          </Switch>
+        </RouteBoundary>
       </Router>
     );
   }
@@ -119,6 +136,7 @@ export function App() {
     <I18nProvider locale={me.locale}>
     <Router base={ROUTER_BASE}>
       <RouteA11y instanceName={me.instance_name} />
+      <RouteBoundary>
       <Switch>
         {/* Full-screen reader — outside the app shell (no sidebar/topbar). */}
         <Route path={SPA_ROUTES.reader}>
@@ -226,6 +244,7 @@ export function App() {
           </AppShell>
         </Route>
       </Switch>
+      </RouteBoundary>
     </Router>
     </I18nProvider>
   );

@@ -26,6 +26,8 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A page that hits an error no longer blanks the whole new UI.** If anything went wrong while a page was drawing — a smart shelf that would not open, or a reader whose files could not be fetched after an upgrade — the new UI went completely blank. There was no message and no way back, so the only escape was to close and reopen the browser. Any such error is now caught and shown as a short "Something went wrong" screen with **Reload** and **Back to library** buttons, plus the technical detail if you want to include it in a bug report. Navigating away clears it. Reported by [@monimkxl-web](https://github.com/monimkxl-web) ([#855](https://github.com/new-usemame/Calibre-Web-NextGen/issues/855)).
+
 - **Book covers no longer blend into the page.** A cover whose own artwork background happens to match your theme's background used to lose its edges and look like it was floating loose on the page. Every cover now has a thin outline in your theme's colour — in the library grid, on the book page, in the Discover and "More by this author" strips, in the table view, and in the duplicate list. Reported and originally patched by [@chloeroform](https://github.com/chloeroform) ([#987](https://github.com/new-usemame/Calibre-Web-NextGen/issues/987)).
 
 ## [v4.1.17] - 2026-07-19

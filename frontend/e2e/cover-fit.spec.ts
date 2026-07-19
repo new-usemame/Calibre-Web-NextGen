@@ -29,13 +29,15 @@ test('browse-card covers letterbox (object-fit:contain), not crop (#660)', async
  * same colour as the page has no edge of its own, so it reads as "swallowed" by
  * the page. Every cover surface now carries a hairline in the themed --border
  * token: the shared BookCover frame (browse grid, catalog, Discover strip, More
- * by this author) and the detail-page cover.
+ * by this author), the detail-page cover, and the table/duplicates thumbnails.
  *
- * Behavioral guard: the rendered frame computes a non-zero border whose colour
- * is exactly the theme's --border. RED on the pre-fix build (border-width 0px),
+ * Behavioral guard: the rendered frame computes a 1px border whose colour is
+ * exactly the theme's --border. RED on the pre-fix build (border-width 0px),
  * GREEN after. Asserting against the resolved token — rather than a literal
  * colour — keeps it honest on every theme and stops a hard-coded grey from
- * passing. Runs under both the desktop and mobile matrix projects.
+ * passing; pinning the exact 1px (rather than "non-zero") is what catches the
+ * doubled 2px edge that stacking a second border inside the frame would cause.
+ * Runs under both the desktop and mobile matrix projects.
  */
 async function borderOf(page: import('@playwright/test').Page, selector: string) {
   return page.locator(selector).first().evaluate((el) => {
@@ -60,7 +62,7 @@ test('browse-card covers carry a themed hairline, not a swallowed edge (#987)', 
 
   // The hairline lives on the BookCover frame that wraps the <img>.
   const { width, color, tokenRgb } = await borderOf(page, 'a[href*="/book/"] img >> xpath=..');
-  expect(width).not.toBe('0px');
+  expect(width).toBe('1px');
   expect(color).toBe(tokenRgb);
 });
 
@@ -77,6 +79,34 @@ test('detail-page cover carries a themed hairline (#987)', async ({ page }) => {
   const cover = page.locator('img[class*="cover"]').first();
   await expect(cover).toBeVisible();
   const { width, color, tokenRgb } = await borderOf(page, 'img[class*="cover"]');
-  expect(width).not.toBe('0px');
+  expect(width).toBe('1px');
+  expect(color).toBe(tokenRgb);
+});
+
+/*
+ * The changelog claims "every cover surface", so the row thumbnails are part of
+ * the contract too, not just the two big surfaces above. Both are seed-resilient:
+ * they skip rather than fail when the view or the seed has no cover thumbnail.
+ */
+test('table-view row thumbnails carry the same hairline (#987)', async ({ page }) => {
+  await page.goto('/app/table');
+  // Rows arrive from a client-side fetch — wait for one rather than counting
+  // immediately, which would skip the assertion before the data lands.
+  const thumb = page.locator('img[class*="coverThumb"]').first();
+  await expect(thumb).toBeVisible();
+  const { width, color, tokenRgb } = await borderOf(page, 'img[class*="coverThumb"]');
+  expect(width).toBe('1px');
+  expect(color).toBe(tokenRgb);
+});
+
+test('duplicate-list row thumbnails carry the same hairline (#987)', async ({ page }) => {
+  await page.goto('/app/duplicates');
+  // The duplicates report is genuinely empty on most seeds, so this one stays
+  // conditional — but give the client-side fetch time to land before deciding.
+  const thumb = page.locator('img[class*="cover"]').first();
+  const appeared = await thumb.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true, () => false);
+  test.skip(!appeared, 'no duplicate rows in this seed');
+  const { width, color, tokenRgb } = await borderOf(page, 'img[class*="cover"]');
+  expect(width).toBe('1px');
   expect(color).toBe(tokenRgb);
 });

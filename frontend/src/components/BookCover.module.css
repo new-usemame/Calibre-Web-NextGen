@@ -17,7 +17,10 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: var(--r-md);
+  /* No radius of its own: .wrap clips. Once .wrap has a border its rounded
+     clip is taken at the padding edge (radius r - 1px), so a child still
+     rounding at the full r leaves a 1px crescent of the frame showing through
+     at each corner. Letting the frame do the clipping keeps the corner tight. */
   display: block;
 }
 
@@ -34,7 +37,7 @@
   align-items: flex-start;
   justify-content: center;
   padding: var(--sp-3);
-  border-radius: var(--r-md);
+  /* No radius here either — .wrap clips (see .img). */
 }
 
 .fallback::before {

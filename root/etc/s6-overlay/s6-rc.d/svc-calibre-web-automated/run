@@ -1,6 +1,12 @@
 #!/usr/bin/with-contenv bash
 # shellcheck shell=bash
 
+# Entry announcement (issue #868): every s6 unit names itself before doing
+# work, so a `docker logs --timestamps` trace can attribute boot time to a
+# service. This is a longrun, so the line also repeats on each supervisor
+# restart, which is what makes a crash-loop visible.
+echo "[svc-calibre-web-automated] Starting Calibre-Web server on port ${CWA_PORT_OVERRIDE:-8083}..."
+
 export CALIBRE_DBPATH=/config
 
 exec \

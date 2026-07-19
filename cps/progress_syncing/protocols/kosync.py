@@ -845,11 +845,13 @@ def export_progress():
         # older records still carry raw file checksums, which can't be looked up in Calibre.
         # The length cap keeps an all-digit checksum (rare but possible in hex)
         # from overflowing SQLite's 64-bit INTEGER in the in_() lookup.
-        book_ids = [
+        # Dedup up-front: a user can accumulate many progress rows for the same
+        # id, and duplicate binds needlessly widen the IN() below.
+        book_ids = sorted({
             int(row.document)
             for row in progress_rows
             if _is_ascii_book_id(row.document)
-        ]
+        })
 
         calibre_books = {}
         if book_ids:
@@ -861,23 +863,33 @@ def export_progress():
             # restricted custom column, or a language filter. get_common_filters
             # is the same single-source-of-truth predicate the duplicate scanner
             # uses off the request context (current_user is not populated on this
-            # Basic-auth path).
-            calibre_query = (
-                calibre_db.session.query(Books.id, Books.title, Authors.name)
-                .select_from(Books)
-                .outerjoin(books_authors_link, Books.id == books_authors_link.c.book)
-                .outerjoin(Authors, Authors.id == books_authors_link.c.author)
-                .filter(Books.id.in_(book_ids))
-                .filter(get_common_filters(user_id=user.id))
-                .order_by(Books.id, Authors.sort)
-                .all()
-            )
-            for book_id, title, author_name in calibre_query:
-                entry = calibre_books.setdefault(
-                    book_id, {"title": title, "authors": []}
+            # Basic-auth path). strict=True makes it FAIL CLOSED — if the filter
+            # can't be built we want the enclosing except to return an error,
+            # never a silently-unrestricted dump.
+            visibility_filter = get_common_filters(user_id=user.id, strict=True)
+
+            # Chunk the id lookup so a user with a very large library (or one who
+            # has seeded many numeric progress rows) can't blow past the SQLite
+            # host's bound-parameter limit and 500 the export.
+            _CHUNK = 500
+            for start in range(0, len(book_ids), _CHUNK):
+                chunk = book_ids[start:start + _CHUNK]
+                calibre_query = (
+                    calibre_db.session.query(Books.id, Books.title, Authors.name)
+                    .select_from(Books)
+                    .outerjoin(books_authors_link, Books.id == books_authors_link.c.book)
+                    .outerjoin(Authors, Authors.id == books_authors_link.c.author)
+                    .filter(Books.id.in_(chunk))
+                    .filter(visibility_filter)
+                    .order_by(Books.id, Authors.sort)
+                    .all()
                 )
-                if author_name and author_name not in entry["authors"]:
-                    entry["authors"].append(author_name)
+                for book_id, title, author_name in calibre_query:
+                    entry = calibre_books.setdefault(
+                        book_id, {"title": title, "authors": []}
+                    )
+                    if author_name and author_name not in entry["authors"]:
+                        entry["authors"].append(author_name)
 
         def utc_isoformat(value):
             return value.replace(tzinfo=timezone.utc).isoformat() if value else None

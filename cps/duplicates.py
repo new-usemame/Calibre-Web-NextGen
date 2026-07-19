@@ -1053,10 +1053,18 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
 
 
 def get_common_filters(user_id=None, allow_show_archived=False, return_all_languages=False,
-                       allow_show_hidden=False):
+                       allow_show_hidden=False, strict=False):
     """Build common filters using either current_user or a specific user_id.
 
     Falls back to no-op filters if user context is unavailable.
+
+    ``strict`` changes that fallback for the ``user_id`` path: when the user
+    cannot be reloaded or filter construction fails, raise instead of returning
+    a permissive ``true()``. A permissive fallback is fine for a best-effort
+    duplicate scan, but a caller using this as an authorization boundary (e.g.
+    the KOSync export) must fail closed — it should surface an error rather than
+    silently drop every per-user restriction. Existing callers keep the
+    permissive default unchanged.
     """
     try:
         if user_id is None:
@@ -1070,6 +1078,8 @@ def get_common_filters(user_id=None, allow_show_archived=False, return_all_langu
     try:
         user = ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first()
         if not user:
+            if strict:
+                raise ValueError(f"get_common_filters(strict): user {user_id!r} not found")
             return true()
 
         if not allow_show_archived:
@@ -1125,6 +1135,10 @@ def get_common_filters(user_id=None, allow_show_archived=False, return_all_langu
                     pos_content_cc_filter, ~neg_content_cc_filter, archived_filter,
                     hidden_filter)
     except Exception:
+        if strict:
+            # Fail closed for authorization callers: a construction error must
+            # not silently degrade into "no restrictions".
+            raise
         return true()
 
 

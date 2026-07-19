@@ -84,6 +84,21 @@ def env(monkeypatch):
     # The export does `from ... import calibre_db`; that resolves cps.calibre_db.
     monkeypatch.setattr(cps, "calibre_db", SimpleNamespace(session=calibre_session), raising=False)
 
+    # The export calls get_common_filters(user_id=..., strict=True), which reads
+    # cps.duplicates' own ub/config globals off the request context. Wire them to
+    # the in-memory app DB and seed a REAL user row (id=1) so every test exercises
+    # the real, fail-closed visibility filter rather than a permissive fallback.
+    import cps.duplicates as dup
+    monkeypatch.setattr(dup, "ub", SimpleNamespace(
+        session=app_session, User=ub.User,
+        ArchivedBook=ub.ArchivedBook, UserHiddenBook=ub.UserHiddenBook))
+    monkeypatch.setattr(dup, "config", SimpleNamespace(config_restricted_column=0))
+    real_user = ub.User()
+    real_user.id = 1
+    real_user.name = "alice"
+    app_session.add(real_user)
+    app_session.commit()
+
     flask_app = Flask(__name__)
     flask_app.register_blueprint(module.kosync)
     state.client = flask_app.test_client()
@@ -258,27 +273,13 @@ def _seed_hidden_book(session, *, user_id, book_id):
     session.commit()
 
 
-def test_export_excludes_books_hidden_from_this_user(env, monkeypatch):
+def test_export_excludes_books_hidden_from_this_user(env):
     # SECURITY REGRESSION (#978 review): `document` is attacker-controlled —
     # update_progress stores any non-empty key verbatim — so the export's
     # Calibre enrichment query MUST apply the user's visibility filter, or a
     # restricted account can seed ids 1..N and enumerate the title + authors of
-    # books it isn't allowed to see. get_common_filters lives in cps.duplicates
-    # and reads that module's ub/db/config globals off the request context
-    # (current_user isn't populated on the Basic-auth path); wire them to the
-    # in-memory app DB and seed a real User + a UserHiddenBook.
-    import cps.duplicates as dup
-    monkeypatch.setattr(dup, "ub", SimpleNamespace(
-        session=env.app_session, User=ub.User,
-        ArchivedBook=ub.ArchivedBook, UserHiddenBook=ub.UserHiddenBook))
-    monkeypatch.setattr(dup, "config", SimpleNamespace(config_restricted_column=0))
-
-    user = ub.User()
-    user.id = 1
-    user.name = "alice"
-    env.app_session.add(user)
-    env.app_session.commit()
-
+    # books it isn't allowed to see. The env fixture already wires cps.duplicates
+    # to the in-memory app DB and seeds the real user; here we just hide one book.
     visible = _seed_book(env.calibre_session, title="Visible", authors=["A"])
     hidden = _seed_book(env.calibre_session, title="Hidden", authors=["B"])
     _seed_progress(env.app_session, document=str(visible.id), percentage=10.0)
@@ -291,6 +292,60 @@ def test_export_excludes_books_hidden_from_this_user(env, monkeypatch):
     assert titles == {"Visible"}          # the hidden book must not leak
     assert hidden.id not in ids
     assert visible.id in ids               # own visible progress still exported
+
+
+def test_visibility_filter_fails_closed_not_open(env, monkeypatch):
+    # SECURITY REGRESSION (#978 second review): get_common_filters defaults to a
+    # permissive true() when it can't build the per-user filter. As an
+    # authorization boundary the export must instead FAIL CLOSED — surface an
+    # error, never a silently-unrestricted dump. Force the filter build to raise
+    # and assert no metadata is returned.
+    import cps.duplicates as dup
+
+    def _boom(*a, **k):
+        raise RuntimeError("simulated visibility-filter failure")
+
+    monkeypatch.setattr(dup, "get_common_filters", _boom)
+
+    book = _seed_book(env.calibre_session, title="Secret", authors=["A"])
+    _seed_progress(env.app_session, document=str(book.id), percentage=10.0)
+
+    resp = env.client.get("/kosync/export")
+    assert resp.status_code != 200          # error, not a 200 dump
+    assert b"Secret" not in resp.data       # no metadata leaked on failure
+
+
+def test_get_common_filters_strict_raises_for_unknown_user(env):
+    # Unit-level pin of the fail-closed contract: strict=True must raise (not
+    # return a permissive filter) when the user can't be reloaded.
+    import cps.duplicates as dup
+
+    # known user (id=1, seeded by the fixture) builds a real filter
+    built = dup.get_common_filters(user_id=1, strict=True)
+    assert built is not None
+    # unknown user under strict must raise, not fall open to true()
+    with pytest.raises(Exception):
+        dup.get_common_filters(user_id=99999, strict=True)
+    # …and without strict it stays permissive (backwards-compatible default)
+    assert dup.get_common_filters(user_id=99999) is not None
+
+
+def test_export_chunks_large_id_set_without_bind_overflow(env):
+    # DoS/robustness (#978 second review): a user with more numeric progress rows
+    # than the SQLite bound-parameter limit must still export — the endpoint
+    # chunks the IN() lookup. Seed >500 books (one chunk) + a few more so the
+    # loop crosses a chunk boundary.
+    n = 550
+    books = [_seed_book(env.calibre_session, title=f"B{i}", authors=[f"Author {i}"])
+             for i in range(n)]
+    for b in books:
+        _seed_progress(env.app_session, document=str(b.id), percentage=1.0)
+
+    resp = env.client.get("/kosync/export")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body) == n                 # every book exported across chunks
+    assert len({r["calibre_book_id"] for r in body}) == n
 
 
 def test_non_ascii_digit_document_is_not_aliased(env):

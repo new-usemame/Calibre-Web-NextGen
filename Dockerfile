@@ -14,12 +14,63 @@ ARG PYTHON_BUILD_STANDALONE_RELEASE=20260623
 ARG CALIBRE_RELEASE=9.1.0
 ARG KEPUBIFY_RELEASE=v4.0.4
 
-# Mirror stages: our GHCR images holding build deps that otherwise come from the
-# GitHub release CDN, which intermittently 404s the Actions egress and broke every
-# build. We COPY from these instead of curling at build time. The CI ensure-mirror
-# job (scripts/ensure-python-mirror.sh) builds them from the pins above.
-FROM ghcr.io/new-usemame/pbs-cache:cpython-${PYTHON_VERSION}-${PYTHON_BUILD_STANDALONE_RELEASE} AS pbs_mirror
-FROM ghcr.io/new-usemame/pbs-cache:kepubify-${KEPUBIFY_RELEASE} AS kepubify_mirror
+# Where the Python tarball and the kepubify binary come from. Two sources, same
+# artifacts:
+#
+#   upstream (default) — download them from the public GitHub release CDN. Works
+#     for anyone with a checkout and no credentials, which is what a contributor
+#     running `docker build .` has.
+#   ghcr — COPY them from ghcr.io/new-usemame/pbs-cache, our own mirror of those
+#     exact artifacts. That CDN intermittently 404s the Actions egress and broke
+#     every image build, so CI passes PBS_SOURCE=ghcr and pulls from the same
+#     registry the base images come from. The mirror is built/refreshed by
+#     scripts/ensure-python-mirror.sh before the image build.
+#
+# The mirror is a CI reliability measure, so it must not be a hard build
+# requirement: the package is private, and making it one locked every community
+# contributor out of building the image at all (#943). BuildKit only resolves
+# stages that the selected target actually reaches, so an upstream build never
+# touches the private mirror.
+# See notes/PYTHON-BUILD-MIRROR.md.
+ARG PBS_SOURCE=upstream
+
+FROM ghcr.io/new-usemame/pbs-cache:cpython-${PYTHON_VERSION}-${PYTHON_BUILD_STANDALONE_RELEASE} AS pbs_ghcr
+FROM ghcr.io/new-usemame/pbs-cache:kepubify-${KEPUBIFY_RELEASE} AS kepubify_ghcr
+
+FROM ghcr.io/linuxserver/baseimage-ubuntu:noble AS pbs_upstream
+ARG PYTHON_VERSION
+ARG PYTHON_BUILD_STANDALONE_RELEASE
+ARG TARGETARCH
+RUN \
+  apt-get update && \
+  apt-get install -y --no-install-recommends curl ca-certificates && \
+  case "${TARGETARCH}" in \
+    amd64) pbs_arch=x86_64 ;; \
+    arm64) pbs_arch=aarch64 ;; \
+    *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+  esac && \
+  curl -fL --connect-timeout 30 --retry 8 --retry-delay 5 --retry-all-errors -o /python.tar.gz \
+    "https://github.com/astral-sh/python-build-standalone/releases/download/${PYTHON_BUILD_STANDALONE_RELEASE}/cpython-${PYTHON_VERSION}+${PYTHON_BUILD_STANDALONE_RELEASE}-${pbs_arch}-unknown-linux-gnu-install_only.tar.gz"
+
+FROM ghcr.io/linuxserver/baseimage-ubuntu:noble AS kepubify_upstream
+ARG KEPUBIFY_RELEASE
+ARG TARGETARCH
+RUN \
+  apt-get update && \
+  apt-get install -y --no-install-recommends curl ca-certificates && \
+  case "${TARGETARCH}" in \
+    amd64) kep_arch=64bit ;; \
+    arm64) kep_arch=arm64 ;; \
+    *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+  esac && \
+  curl -fL --connect-timeout 30 --retry 8 --retry-delay 5 --retry-all-errors -o /kepubify \
+    "https://github.com/pgaskin/kepubify/releases/download/${KEPUBIFY_RELEASE}/kepubify-linux-${kep_arch}" && \
+  chmod 755 /kepubify
+
+# Selector stages. Everything downstream COPYs from pbs_mirror / kepubify_mirror
+# and does not care which source won.
+FROM pbs_${PBS_SOURCE} AS pbs_mirror
+FROM kepubify_${PBS_SOURCE} AS kepubify_mirror
 
 # Simple Example Build Command:
 # docker build \
@@ -130,14 +181,11 @@ RUN \
   rm -rf /tmp/lsof*
 
 # STEP 1.5 - Install Python 3.13 from python-build-standalone.
-# We COPY the tarball from OUR OWN GHCR mirror (ghcr.io/new-usemame/pbs-cache)
-# rather than curling the GitHub release CDN during the build. That CDN
-# intermittently 404s the GitHub-Actions egress (proven: 404 for >10 min at a
-# time), which broke every image build; pulling from GHCR — the same registry
-# the base images come from — is reliable. The mirror is built/refreshed
-# automatically by scripts/ensure-python-mirror.sh (a CI job that runs before
-# the image build). To bump Python: change PYTHON_VERSION / PYTHON_BUILD_STANDALONE_RELEASE
-# above — nothing else. Full explanation: notes/PYTHON-BUILD-MIRROR.md.
+# The tarball comes from the pbs_mirror stage, which is either our GHCR mirror
+# (CI, PBS_SOURCE=ghcr) or the public release CDN (default). See the PBS_SOURCE
+# block at the top of this file. To bump Python: change PYTHON_VERSION /
+# PYTHON_BUILD_STANDALONE_RELEASE above — nothing else, both sources follow the
+# pins. Full explanation: notes/PYTHON-BUILD-MIRROR.md.
 COPY --from=pbs_mirror /python.tar.gz /tmp/python.tar.gz
 RUN \
   echo "**** install Python ${PYTHON_VERSION} from mirrored python-build-standalone ****" && \
@@ -170,8 +218,9 @@ RUN \
   /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ -r \
   /app/calibre-web-automated/requirements.txt -r /app/calibre-web-automated/optional-requirements.txt
 
-# STEP 4 - Install kepubify from our GHCR mirror (not the GitHub release CDN).
-# The mirror image ships /kepubify already mode 0755 for the build platform.
+# STEP 4 - Install kepubify from the kepubify_mirror stage (GHCR mirror in CI,
+# public release CDN by default). Either way /kepubify arrives mode 0755 for the
+# build platform.
 COPY --from=kepubify_mirror /kepubify /usr/bin/kepubify
 
 # STEP 5 - Install Calibre

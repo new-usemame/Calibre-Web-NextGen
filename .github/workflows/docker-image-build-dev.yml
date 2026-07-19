@@ -156,6 +156,10 @@ jobs:
           build-args: |
             BUILD_DATE=${{ github.event.repository.updated_at }}
             VERSION=DEV_BUILD-${{ env.IMAGE_TAG }}-${{ vars.CURRENT_DEV_BUILD_NUM }}
+            # Pull Python/kepubify from our GHCR mirror rather than the release
+            # CDN, which intermittently 404s the Actions egress. Contributors
+            # build without this and fall back to the CDN (see Dockerfile).
+            PBS_SOURCE=ghcr
 
       # --- 4. Export Digest for Merge Job ---
       - name: Export digest
@@ -274,6 +278,10 @@ jobs:
           build-args: |
             BUILD_DATE=${{ github.event.repository.updated_at }}
             VERSION=DEV_BUILD-${{ env.IMAGE_TAG }}-${{ vars.CURRENT_DEV_BUILD_NUM }}
+            # Pull Python/kepubify from our GHCR mirror rather than the release
+            # CDN, which intermittently 404s the Actions egress. Contributors
+            # build without this and fall back to the CDN (see Dockerfile).
+            PBS_SOURCE=ghcr
 
       # --- 4. Rotate Cache (Prevent Infinite Growth) ---
       - name: Move cache

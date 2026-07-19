@@ -110,6 +110,10 @@ jobs:
           build-args: |
             BUILD_DATE=${{ github.event.release.created_at || github.event.repository.updated_at }}
             VERSION=${{ steps.ver.outputs.tag }}
+            # Pull Python/kepubify from our GHCR mirror rather than the release
+            # CDN, which intermittently 404s the Actions egress. Contributors
+            # build without this and fall back to the CDN (see Dockerfile).
+            PBS_SOURCE=ghcr
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}

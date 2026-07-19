@@ -1290,34 +1290,34 @@ msgstr "Žiadne"
 msgid "Duplicate Books"
 msgstr "Zmazať knihu"
 
-#: cps/duplicates.py:1338
+#: cps/duplicates.py:1352
 msgid "Duplicate group already dismissed"
 msgstr ""
 
-#: cps/duplicates.py:1360
+#: cps/duplicates.py:1374
 #, fuzzy
 msgid "Duplicate group dismissed"
 msgstr "Zmazať knihu"
 
-#: cps/duplicates.py:1403
+#: cps/duplicates.py:1417
 #, fuzzy
 msgid "Duplicate group restored"
 msgstr "Zmazať knihu"
 
-#: cps/duplicates.py:1405
+#: cps/duplicates.py:1419
 msgid "Duplicate group was not dismissed"
 msgstr ""
 
-#: cps/duplicates.py:1477
+#: cps/duplicates.py:1491
 #, fuzzy
 msgid "Duplicate scan queued"
 msgstr "Nič sa nenašlo"
 
-#: cps/duplicates.py:1546
+#: cps/duplicates.py:1560
 msgid "Duplicate scan completed (fallback)"
 msgstr ""
 
-#: cps/duplicates.py:1621
+#: cps/duplicates.py:1635
 #, fuzzy
 msgid "Invalid resolution strategy"
 msgstr "Neplatná rola"
@@ -6230,7 +6230,7 @@ msgstr ""
 msgid "Invalid book ID."
 msgstr "Neplatná rola"
 
-#: cps/progress_syncing/protocols/kosync.py:631
+#: cps/progress_syncing/protocols/kosync.py:632
 msgid "KOReader Sync Plugin"
 msgstr ""
 

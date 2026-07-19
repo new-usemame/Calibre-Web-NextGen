@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Export all your KOReader reading progress as JSON.** A new read-only endpoint, `GET /kosync/export`, returns every book you have reading progress for — Calibre book id, title, authors, percentage, and when you started and last updated it — so you can feed your progress into another service (for example a unified media tracker). It authenticates the same way as the other KOReader sync endpoints (HTTP Basic, app passwords supported) and only ever returns your own progress, limited to books you're allowed to see. Example: `curl -u 'user:APP_PASSWORD' https://your-instance/kosync/export`. Contributed by @Kyraminol (#978).
+
 ### Fixed
 
 - **Book covers no longer blend into the page.** A cover whose own artwork background happens to match your theme's background used to lose its edges and look like it was floating loose on the page. Every cover now has a thin outline in your theme's colour — in the library grid, on the book page, in the Discover and "More by this author" strips, in the table view, and in the duplicate list. Reported and originally patched by [@chloeroform](https://github.com/chloeroform) ([#987](https://github.com/new-usemame/Calibre-Web-NextGen/issues/987)).

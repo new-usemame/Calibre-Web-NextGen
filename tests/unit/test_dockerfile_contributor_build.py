@@ -46,11 +46,26 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 
 PRIVATE_MIRROR = "ghcr.io/new-usemame/pbs-cache"
 
-# Workflows that build the shipped image and therefore must pin the mirror.
-IMAGE_BUILD_WORKFLOWS = (
-    "docker-image-build-dev.yml",
-    "docker-image-build-release.yml",
-)
+
+def _image_build_steps() -> list[tuple[str, str, dict]]:
+    """Every `docker/build-push-action` step in every workflow.
+
+    Discovered, not listed: a hand-maintained allowlist is how the `tests.yml`
+    image build was missed in the first place, which is exactly the regression
+    this module claims to prevent. Returns (workflow, job, step) triples.
+    """
+    import yaml
+
+    found: list[tuple[str, str, dict]] = []
+    for path in sorted(WORKFLOWS.glob("*.yml")) + sorted(WORKFLOWS.glob("*.yaml")):
+        data = yaml.safe_load(path.read_text()) or {}
+        for job_name, job in (data.get("jobs") or {}).items():
+            for step in (job or {}).get("steps") or []:
+                if not isinstance(step, dict):
+                    continue
+                if str(step.get("uses", "")).startswith("docker/build-push-action"):
+                    found.append((path.name, job_name, step))
+    return found
 
 
 @pytest.fixture(scope="module")
@@ -174,20 +189,64 @@ def test_upstream_fallback_produces_what_downstream_copies(dockerfile_text: str)
     )
 
 
-@pytest.mark.parametrize("workflow", IMAGE_BUILD_WORKFLOWS)
-def test_ci_image_builds_pin_the_ghcr_mirror(workflow: str) -> None:
-    """Every image-building workflow must pass PBS_SOURCE=ghcr.
+def test_every_ci_image_build_pins_the_ghcr_mirror() -> None:
+    """Every `docker/build-push-action` step must pass PBS_SOURCE=ghcr.
 
-    Dropping it does not fail the build — it silently sends CI back to the
-    release CDN that 404d the Actions egress and broke every image build. This
-    asserts one PBS_SOURCE=ghcr per build-args block so a newly added build job
-    cannot quietly ship without it.
+    Omitting it does not fail anything — it silently sends that build back to
+    the release CDN that 404d the Actions egress and broke every image build.
+    Asserted per discovered build step, so a newly added build job (or one that
+    a hand-maintained allowlist would miss) cannot quietly ship unpinned.
     """
-    text = (WORKFLOWS / workflow).read_text()
-    build_arg_blocks = text.count("build-args: |")
-    assert build_arg_blocks, f"{workflow} has no build-args block to check"
-    assert text.count("PBS_SOURCE=ghcr") == build_arg_blocks, (
-        f"{workflow} has {build_arg_blocks} build-args block(s) but "
-        f"{text.count('PBS_SOURCE=ghcr')} PBS_SOURCE=ghcr line(s). Every image "
-        f"build must pin the mirror, or it falls back to the flaky release CDN."
+    steps = _image_build_steps()
+    assert steps, "found no docker/build-push-action steps to check"
+
+    unpinned = [
+        f"{workflow}:{job}"
+        for workflow, job, step in steps
+        if "PBS_SOURCE=ghcr" not in str((step.get("with") or {}).get("build-args", ""))
+    ]
+    assert not unpinned, (
+        f"These image builds do not pin PBS_SOURCE=ghcr: {unpinned}. Each one "
+        f"silently falls back to the flaky release CDN. Add PBS_SOURCE=ghcr to "
+        f"the step's build-args."
+    )
+
+
+def test_builds_selecting_the_mirror_authenticate_to_ghcr() -> None:
+    """A job that pins the mirror must also log in to GHCR.
+
+    The package is private, so `PBS_SOURCE=ghcr` without a login fails to pull.
+    The release workflow used to skip its GHCR login on dry-runs while still
+    selecting the mirror, so `workflow_dispatch` dry-runs could never build.
+    """
+    import yaml
+
+    offenders: list[str] = []
+    for workflow, job, _step in _image_build_steps():
+        data = yaml.safe_load((WORKFLOWS / workflow).read_text()) or {}
+        steps = ((data.get("jobs") or {}).get(job) or {}).get("steps") or []
+        # `registry:` is usually `${{ env.REGISTRY }}`, so resolve workflow-level
+        # env before matching.
+        env = data.get("env") or {}
+
+        def _is_ghcr(step: dict) -> bool:
+            registry = str((step.get("with") or {}).get("registry", ""))
+            for key, value in env.items():
+                registry = registry.replace("${{ env.%s }}" % key, str(value))
+            return "ghcr.io" in registry
+
+        logins = [
+            s for s in steps
+            if isinstance(s, dict)
+            and str(s.get("uses", "")).startswith("docker/login-action")
+            and _is_ghcr(s)
+        ]
+        # A conditional login is what broke dry-runs: the build still selects
+        # the mirror, but the credentials step is skipped.
+        if not logins or all("if" in s for s in logins):
+            offenders.append(f"{workflow}:{job}")
+
+    assert not offenders, (
+        f"These jobs build with PBS_SOURCE=ghcr but have no unconditional GHCR "
+        f"login: {offenders}. The mirror is private, so the pull fails."
     )

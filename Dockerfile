@@ -30,7 +30,10 @@ ARG KEPUBIFY_RELEASE=v4.0.4
 # requirement: the package is private, and making it one locked every community
 # contributor out of building the image at all (#943). BuildKit only resolves
 # stages that the selected target actually reaches, so an upstream build never
-# touches the private mirror.
+# touches the private mirror. This needs BuildKit — the default since Docker
+# 23, and required by the `# syntax=` directive above anyway. The legacy builder
+# (DOCKER_BUILDKIT=0) evaluates every preceding stage and does not supply
+# TARGETARCH, so it cannot build this image regardless of PBS_SOURCE.
 # See notes/PYTHON-BUILD-MIRROR.md.
 ARG PBS_SOURCE=upstream
 

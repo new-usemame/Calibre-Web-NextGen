@@ -205,6 +205,7 @@ def _load_editbooks_module(delete_key_calls):
     _install_stub("cps.tasks")
     _install_stub("cps.tasks.upload", {"TaskUpload": object})
     _install_stub("cps.render_template", {"render_title_template": lambda *args, **kwargs: ""})
+    _install_stub("cps.duplicate_notice", {"duplicate_setup_notice_file": lambda user_id: "/config/cwa_duplicate_index_setup_notice_%s" % user_id})
     _install_stub("cps.redirect", {"get_redirect_location": lambda location, endpoint: location or f"/{endpoint}"})
     _install_stub("cps.file_helper", {"validate_mime_type": lambda *args, **kwargs: True})
     _install_stub("cps.cwa_functions", {"get_ingest_dir": lambda: "/ingest"})
@@ -290,6 +291,7 @@ def _load_duplicates_module(delete_key_calls):
     _install_stub("cps.admin", {"admin_required": _decorator})
     _install_stub("cps.usermanagement", {"login_required_if_no_ano": _decorator})
     _install_stub("cps.render_template", {"render_title_template": lambda *args, **kwargs: ""})
+    _install_stub("cps.duplicate_notice", {"duplicate_setup_notice_file": lambda user_id: "/config/cwa_duplicate_index_setup_notice_%s" % user_id})
     _install_stub("cps.cw_login", {"current_user": current_user})
     _install_stub(
         "cps.services.worker",

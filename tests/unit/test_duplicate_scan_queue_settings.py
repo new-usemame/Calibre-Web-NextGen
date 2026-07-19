@@ -95,6 +95,7 @@ def _load_cwa_functions(monkeypatch, request):
     )
     _install_stub("cps.admin", {"admin_required": lambda fn: fn})
     _install_stub("cps.render_template", {"render_title_template": lambda *args, **kwargs: {"template": args[0]}})
+    _install_stub("cps.duplicate_notice", {"duplicate_setup_notice_file": lambda user_id: "/config/cwa_duplicate_index_setup_notice_%s" % user_id})
     _install_stub("cps.cw_login", {"current_user": SimpleNamespace(id=7), "login_user": None, "logout_user": None})
     _install_stub("cps.web", {"cwa_get_num_books_in_library": lambda: 0})
     _install_stub("cps.services")

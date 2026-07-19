@@ -31,6 +31,8 @@ is for things you can see or feel when running the app.
 
 - **“Read now” actions now form a straight bottom row across New UI book cards on iPad and other touch devices.** Short titles reserve the same two-line space as long ones, while shelf removal and quick edit are no longer hidden behind hover on touch hardware. Desktop keeps its uncluttered hover treatment, with keyboard focus revealing the actions. Thanks @Andrew-H2O (#863).
 
+- **Dismissing the duplicate-scan setup notice no longer fails silently.** On a standard container, clicking to dismiss the one-time "run a full duplicate scan" notice returned a server error and the notice kept coming back, because the app tried to record the dismissal in a location it isn't allowed to write to. The dismissal is now stored on your config volume like other per-user settings, so it sticks and survives upgrades ([#992](https://github.com/new-usemame/Calibre-Web-NextGen/issues/992)).
+
 ## [v4.1.16] - 2026-07-17
 
 ### Added

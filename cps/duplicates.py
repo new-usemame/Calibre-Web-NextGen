@@ -25,6 +25,7 @@ from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_
 from .admin import admin_required  
 from .usermanagement import login_required_if_no_ano
 from .render_template import render_title_template
+from .duplicate_notice import duplicate_setup_notice_file
 from .cw_login import current_user
 
 import sys
@@ -1270,7 +1271,7 @@ def get_duplicate_status():
 def dismiss_duplicate_scan_setup_notice():
     """Remember that the current duplicate-index setup notice was dismissed."""
     try:
-        notice_file = f"/app/cwa_duplicate_index_setup_notice_{getattr(current_user, 'id', 'unknown')}"
+        notice_file = duplicate_setup_notice_file(getattr(current_user, 'id', 'unknown'))
         with open(notice_file, 'w') as f:
             f.write("dismissed\n")
         return jsonify({"success": True})

@@ -39,8 +39,11 @@
 
 .coverWrap { position: relative; }
 
+/* #987 — hairline so a cover whose artwork background matches the page surface
+   still has a visible edge. Matches the shared BookCover frame and EditBook. */
 .cover {
   width: 100%;
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--cover-shadow);
   display: block;

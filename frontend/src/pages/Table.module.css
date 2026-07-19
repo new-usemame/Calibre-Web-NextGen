@@ -54,7 +54,8 @@
 
 .coverCol { width: 56px; }
 /* 48x72 = true 2:3 book-cover aspect; anything narrower side-crops real covers (#608) */
-.coverThumb { width: 48px; height: 72px; object-fit: cover; border-radius: var(--r-sm); display: block; }
+/* #987 — hairline edge so a cover matching the row surface stays visible. */
+.coverThumb { width: 48px; height: 72px; object-fit: cover; border: 1px solid var(--border); border-radius: var(--r-sm); display: block; }
 .coverThumbEmpty { width: 48px; height: 72px; background: var(--surface-2, var(--surface-1)); border-radius: var(--r-sm); }
 .titleLink { color: var(--text); font-weight: 600; }
 .titleLink:hover { color: var(--accent); }

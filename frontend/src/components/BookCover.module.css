@@ -1,7 +1,13 @@
+/* #987 — a cover whose own artwork background matches the page surface has no
+   edge of its own and reads as "swallowed" by the page. The hairline gives every
+   cover a definite edge on every theme. It lives on the frame (not the <img>) so
+   the letterboxed matte from #660 is enclosed too, and so the fallback card
+   inherits one border instead of stacking a second one inside it. */
 .wrap {
   aspect-ratio: 2 / 3;
   width: 100%;
   overflow: hidden;
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--cover-shadow);
   background: var(--surface-2);
@@ -21,7 +27,8 @@
   height: 100%;
   box-sizing: border-box;
   background: var(--surface-1);
-  border: 1px solid var(--border);
+  /* No border here — .wrap owns the hairline (#987); a second one inside would
+     read as a doubled 2px edge at the same radius. */
   display: flex;
   flex-direction: column;
   align-items: flex-start;

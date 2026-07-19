@@ -23,10 +23,11 @@ const queryClient = new QueryClient({
   mutationCache: new MutationCache({ onError: onUnauthorized }),
 });
 
-// #855: the outermost net. The router-level boundary in App.tsx handles page
-// crashes (and resets on navigation); this one catches anything thrown above it
-// — the providers or the App shell itself — so no code path can leave the user
-// staring at an empty #root with no way to recover.
+// #855: last-resort render/lifecycle boundary for failures in the providers or
+// in App before the router-level boundary (App.tsx, which also resets on
+// navigation) mounts. React boundaries do not catch event-handler, async, or
+// bootstrap/module-load errors — this covers the render-time class that unmounts
+// the tree and empties #root.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary homeHref={BASE_PREFIX + '/app'}>

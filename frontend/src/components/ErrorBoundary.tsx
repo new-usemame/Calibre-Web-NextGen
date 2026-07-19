@@ -14,9 +14,26 @@
  * requests. It styles itself from theme tokens only, so it renders legibly in
  * every theme without the app chrome that may have just died.
  */
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, createRef, type ErrorInfo, type ReactNode } from 'react';
 import { useT, type TFunction } from '../lib/i18n';
 import styles from './ErrorBoundary.module.css';
+
+/**
+ * Render a thrown value as text without ever throwing again.
+ *
+ * A boundary is a JavaScript runtime seam, not a typed one: `throw null`,
+ * `throw 'oops'` and objects with a hostile `toString`/`message` getter are all
+ * legal. Since a fallback that throws puts the blank screen straight back, every
+ * read of the thrown value goes through here.
+ */
+function errorText(error: unknown): string {
+  try {
+    if (error instanceof Error && error.message) return error.message;
+    return String(error);
+  } catch {
+    return 'Unknown error';
+  }
+}
 
 interface Props {
   children: ReactNode;
@@ -32,42 +49,69 @@ interface Props {
 }
 
 interface State {
-  error: Error | null;
+  /* Tracked separately from the thrown value: `throw null` is legal, and keying
+   * the fallback off the value's truthiness would re-render the crashing subtree
+   * and loop straight back to the blank screen this exists to prevent. */
+  hasError: boolean;
+  error: unknown;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { hasError: false, error: null };
 
-  static getDerivedStateFromError(error: Error): State {
-    return { error };
+  private headingRef = createRef<HTMLHeadingElement>();
+
+  static getDerivedStateFromError(error: unknown): State {
+    return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  componentDidCatch(error: unknown, info: ErrorInfo) {
     // Keep the original diagnostics in the console. Previously the crash left
     // nothing on screen AND the user had to be talked through opening devtools
     // to tell us anything; the fallback below now surfaces the message too.
     console.error('[CWNG] Unhandled UI error:', error, info.componentStack);
+    // The crash unmounts whatever the user had focused, which would otherwise
+    // drop focus to <body> — keyboard and screen-reader users would have to hunt
+    // for the recovery controls. RouteA11y can't cover this: it reacts to route
+    // changes, and this replaces the current route in place.
+    this.headingRef.current?.focus();
   }
 
   componentDidUpdate(prev: Props) {
-    if (this.state.error && prev.resetKey !== this.props.resetKey) {
-      this.setState({ error: null });
+    if (this.state.hasError && prev.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, error: null });
     }
   }
 
   render() {
-    const { error } = this.state;
-    if (!error) return this.props.children;
+    const { hasError, error } = this.state;
+    if (!hasError) return this.props.children;
 
-    // Identity fallback: never crash the fallback over a missing translator.
-    const t = this.props.t ?? ((key: string) => key);
+    // Never let the fallback crash over a missing or misbehaving translator.
+    const t = (key: string) => {
+      try {
+        return this.props.t?.(key) || key;
+      } catch {
+        return key;
+      }
+    };
     const home = this.props.homeHref || '/';
 
     return (
-      <div className={styles.wrap} role="alert" data-testid="app-error-boundary">
+      // The fallback IS the whole page at this point, so it owns the main
+      // landmark. role="alert" stays on the one concise sentence — putting it on
+      // the container would make headings, buttons, link and disclosure a single
+      // atomic announcement.
+      <main
+        className={styles.wrap}
+        aria-labelledby="app-error-title"
+        data-testid="app-error-boundary"
+      >
         <div className={styles.card}>
-          <h1 className={styles.title}>{t('Something went wrong')}</h1>
-          <p className={styles.body}>
+          <h1 id="app-error-title" ref={this.headingRef} tabIndex={-1} className={styles.title}>
+            {t('Something went wrong')}
+          </h1>
+          <p className={styles.body} role="alert">
             {t('This page ran into an error and could not be displayed. Your library is fine — reloading usually fixes it.')}
           </p>
           <div className={styles.actions}>
@@ -84,10 +128,10 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
           <details className={styles.details}>
             <summary className={styles.summary}>{t('Technical details')}</summary>
-            <pre className={styles.pre}>{String(error?.message || error)}</pre>
+            <pre className={styles.pre}>{errorText(error)}</pre>
           </details>
         </div>
-      </div>
+      </main>
     );
   }
 }

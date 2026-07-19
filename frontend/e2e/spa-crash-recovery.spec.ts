@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { CONCRETE_THEMES } from '../src/lib/themes';
 
 /*
  * #855 regression — the SPA had NO error boundary, so any error thrown during
@@ -19,9 +20,16 @@ import { test, expect, Page } from '@playwright/test';
  * empty) and green with the boundary.
  */
 
-/** Simulate the unreachable lazy chunk. */
-async function breakReaderChunk(page: Page) {
-  await page.route('**/assets/Reader-*.js', (r) => r.abort());
+/** Simulate the unreachable lazy chunk. Returns a probe for how many times the
+ *  chunk was actually intercepted, so a test can prove the fallback it sees came
+ *  from THIS failure and not some unrelated startup error. */
+async function breakReaderChunk(page: Page): Promise<() => number> {
+  let aborted = 0;
+  await page.route('**/assets/Reader-*.js', async (r) => {
+    aborted += 1;
+    await r.abort();
+  });
+  return () => aborted;
 }
 
 async function firstBookId(page: Page): Promise<number | null> {
@@ -35,11 +43,14 @@ test.describe('#855 SPA crash containment', () => {
     const id = await firstBookId(page);
     test.skip(id === null, 'no seeded book to open in the reader');
 
-    await breakReaderChunk(page);
+    const abortCount = await breakReaderChunk(page);
     await page.goto(`/app/read/${id}`);
 
     const boundary = page.getByTestId('app-error-boundary');
     await expect(boundary).toBeVisible();
+
+    // The fallback must be caused by the chunk we broke, not by something else.
+    expect(abortCount(), 'Reader chunk was never intercepted').toBeGreaterThan(0);
 
     // The precise symptom from the report: the root must not be emptied out.
     const rootLen = await page.evaluate(
@@ -51,8 +62,35 @@ test.describe('#855 SPA crash containment', () => {
     await expect(page.getByRole('button', { name: /reload/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /back to library/i })).toBeVisible();
 
-    // Announced to assistive tech rather than silently swapping the view.
-    await expect(boundary).toHaveAttribute('role', 'alert');
+    // The concise message is the live region — not the whole container, which
+    // would announce heading + prose + both controls + disclosure as one blob.
+    await expect(boundary.locator('[role="alert"]')).toHaveCount(1);
+
+    // The crash unmounts whatever was focused; focus must land on the fallback
+    // heading so keyboard and screen-reader users are not dropped on <body>.
+    await expect(page.getByRole('heading', { name: /something went wrong/i })).toBeFocused();
+  });
+
+  test('a falsy thrown value is contained too (throw null)', async ({ page }) => {
+    const id = await firstBookId(page);
+    test.skip(id === null, 'no seeded book to open in the reader');
+
+    // `throw null` is legal JS, and a boundary that keys its fallback off the
+    // truthiness of the caught value would render the crashing subtree again and
+    // loop right back to the blank screen. Serving a chunk that throws a falsy
+    // value at module scope reproduces that exactly: the dynamic import rejects
+    // with `null`, so React hands `null` to getDerivedStateFromError.
+    await page.route('**/assets/Reader-*.js', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/javascript', body: 'throw null;' }),
+    );
+
+    await page.goto(`/app/read/${id}`);
+
+    await expect(page.getByTestId('app-error-boundary')).toBeVisible();
+    const rootLen = await page.evaluate(
+      () => document.getElementById('root')?.innerHTML.length ?? 0,
+    );
+    expect(rootLen, '#root emptied on a falsy throw').toBeGreaterThan(0);
   });
 
   test('"Back to library" escapes the broken route', async ({ page }) => {
@@ -71,7 +109,7 @@ test.describe('#855 SPA crash containment', () => {
     await expect(page.getByTestId('app-error-boundary')).toHaveCount(0);
   });
 
-  test('the fallback is legible in both themes', async ({ page }) => {
+  test('the fallback is legible in every concrete theme', async ({ page }) => {
     const id = await firstBookId(page);
     test.skip(id === null, 'no seeded book to open in the reader');
 
@@ -79,7 +117,9 @@ test.describe('#855 SPA crash containment', () => {
     await page.goto(`/app/read/${id}`);
     await expect(page.getByTestId('app-error-boundary')).toBeVisible();
 
-    for (const theme of ['dark', 'light']) {
+    // Every concrete palette, from the theme registry itself — a new theme must
+    // not be able to ship a fallback nobody can read.
+    for (const theme of CONCRETE_THEMES) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
 
       const readable = await page.evaluate(() => {

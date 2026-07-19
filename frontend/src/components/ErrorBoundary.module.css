@@ -74,6 +74,9 @@
   background: var(--surface-2);
 }
 
+/* The heading takes programmatic focus when the fallback replaces the page, so
+   it needs a visible focus indicator like any other focus target. */
+.title:focus-visible,
 .primary:focus-visible,
 .secondary:focus-visible,
 .summary:focus-visible {

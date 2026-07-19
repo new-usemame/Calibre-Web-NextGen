@@ -56,6 +56,46 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.17',
+    date: '2026-07-19',
+    items: [
+      {
+        title: 'See which series a book belongs to from the shelf',
+        body: 'Book cards in the library, in search results, and on shelves now show the series and position under the title and author, so “Dune #2” reads at a glance instead of needing the book opened. Books outside a series look exactly as before.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'The library remembers how you like it sorted',
+        body: 'Changing the Library sort or the Unread/Read filter used to snap back to the default on the next page load. Your choice is now kept in the browser and restored when you come back. Series, author, and other scoped views keep their own natural order.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Book card actions are reachable on a tablet',
+        body: 'On iPads and other touch devices, removing a book from a shelf and quick edit were hidden behind a hover that never happens, and the Read now buttons sat at different heights depending on title length. The actions are now always visible on touch hardware and line up in a straight bottom row. Desktop keeps the uncluttered hover treatment, with keyboard focus revealing the same actions.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Converting a book offers the formats that actually work',
+        body: 'The convert control on the book edit page was a free-text box, so a typo or an unsupported target failed after the job started. It now reads “Convert from EPUB to MOBI” with two dropdowns: sources are limited to what your converter can read, and the target list leaves out the format you are converting from.',
+        category: 'Library',
+      },
+      {
+        title: 'The duplicate-scan notice can be dismissed for good',
+        body: 'Dismissing the one-time “run a full duplicate scan” notice returned a server error on a standard container and the notice came straight back, because the app recorded the dismissal somewhere it is not allowed to write. It is now stored on your config volume like other per-user settings, so it stays dismissed across restarts and upgrades.',
+        category: 'Admin',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'The container starts faster and writes less to disk',
+        body: 'Every boot re-set ownership across the whole application tree — about 1,800 files — costing a few seconds to half a minute, and on some storage back-ends copying all of them into the container’s writable layer. Startup now touches only the handful of folders the app actually writes to.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.16',
     date: '2026-07-17',
     items: [

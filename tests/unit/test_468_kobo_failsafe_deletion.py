@@ -76,6 +76,10 @@ def test_reliable_empty_allowed_still_archives():
 # --------------------------------------------------------------------------
 
 def _kobo_membership_globals(get_books_side_effect=None, get_books_return=None):
+    """``get_books_return``/``side_effect`` now drive
+    ``get_book_ids_for_magic_shelf`` — the collector switched from hydrated Book
+    objects to the authoritative id list (CWA #1307). The reliability contract
+    these tests pin is unchanged."""
     config = mock.Mock()
     config.config_kobo_sync_magic_shelves = True
     shelf = mock.Mock()
@@ -84,9 +88,9 @@ def _kobo_membership_globals(get_books_side_effect=None, get_books_return=None):
     ub.session.query.return_value.filter_by.return_value.all.return_value = [shelf]
     magic_shelf = mock.Mock()
     if get_books_side_effect is not None:
-        magic_shelf.get_books_for_magic_shelf.side_effect = get_books_side_effect
+        magic_shelf.get_book_ids_for_magic_shelf.side_effect = get_books_side_effect
     else:
-        magic_shelf.get_books_for_magic_shelf.return_value = get_books_return
+        magic_shelf.get_book_ids_for_magic_shelf.return_value = get_books_return
     log = mock.Mock()
     log.isEnabledFor.return_value = False
     return {"config": config, "ub": ub, "magic_shelf": magic_shelf, "log": log,
@@ -102,10 +106,8 @@ def test_membership_unreliable_when_query_fails():
 
 
 def test_membership_reliable_on_success():
-    book = mock.Mock()
-    book.id = 42
     f = _load_func(KOBO_PY, "get_magic_shelf_book_ids_for_kobo",
-                   _kobo_membership_globals(get_books_return=([book], 1)))
+                   _kobo_membership_globals(get_books_return=([42], 1)))
     ids, reliable = f(1)
     assert ids == {42}
     assert reliable is True
@@ -117,7 +119,7 @@ def test_membership_calls_with_raise_on_error():
     glb = _kobo_membership_globals(get_books_return=([], 0))
     f = _load_func(KOBO_PY, "get_magic_shelf_book_ids_for_kobo", glb)
     f(1)
-    _, kwargs = glb["magic_shelf"].get_books_for_magic_shelf.call_args
+    _, kwargs = glb["magic_shelf"].get_book_ids_for_magic_shelf.call_args
     assert kwargs.get("raise_on_error") is True
 
 

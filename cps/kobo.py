@@ -169,8 +169,19 @@ def get_magic_shelf_book_ids_for_kobo(user_id):
     reliable = True
     for shelf in magic_shelves:
         try:
-            books, _ = magic_shelf.get_books_for_magic_shelf(
-                shelf.id, page=1, page_size=None, raise_on_error=True
+            # Ask for the ID LIST, not hydrated Book objects (CWA #1307).
+            # get_books_for_magic_shelf takes the authoritative id list and then
+            # hydrates it through a fresh CalibreDB session, silently dropping
+            # any id whose Books row that session did not return
+            # (`if bid in book_map`). On a CWA build the metadata.db is swapped
+            # underneath us by auto-ingest, so a sync landing mid-reload sees a
+            # short hydration — no exception, reliable stays True, and the
+            # dropped books fall out of allowed_book_ids and get ARCHIVED off
+            # the device. The device then re-downloads them as a fresh
+            # entitlement and the local annotations go with the old copy.
+            # The id list is the membership; hydration is presentation.
+            ids, _ = magic_shelf.get_book_ids_for_magic_shelf(
+                shelf.id, raise_on_error=True
             )
         except Exception as e:
             # A failed membership query must NOT look like "this shelf is empty"
@@ -183,8 +194,7 @@ def get_magic_shelf_book_ids_for_kobo(user_id):
                 "this round (#468)", shelf.id, e)
             reliable = False
             continue
-        for book in books:
-            book_ids.add(book.id)
+        book_ids.update(ids or ())
 
     if book_ids:
         log.debug("Kobo Sync: magic shelf allowed books: %s", len(book_ids))

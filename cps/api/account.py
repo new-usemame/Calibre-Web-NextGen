@@ -15,10 +15,11 @@ from flask_babel import gettext as _
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
-from .. import calibre_db, config, ub
+from .. import calibre_db, config, logger, ub
 from ..cw_login import current_user
 from ..cw_babel import get_available_locale
 from ..helper import valid_password, valid_email, check_email
+from ..kobo_sync_status import update_on_sync_shelfs
 from ..ui_themes import ALLOWED_THEME_SLUGS, theme_slug, theme_code
 from .serializers import (SIDEBAR_VISIBILITY_BITS, ORDERABLE_SIDEBAR_KEYS,
                           serialize_sidebar_visibility, serialize_sidebar_order)
@@ -30,6 +31,8 @@ ALLOWED_UI_FONT_BODY = frozenset({"", "system-sans", "serif", "mono"})
 # #641 — 'serif' is now a valid DISPLAY preset too: once the display default
 # flipped from bookish serif to System sans, serif has to stay reachable here.
 ALLOWED_UI_FONT_DISPLAY = frozenset({"", "system-sans", "serif", "mono"})
+
+log = logger.create()
 
 
 def _iso(dt):
@@ -113,6 +116,9 @@ def update_profile():
     if guard:
         return guard
     data = request.get_json(silent=True) or {}
+    # #866: remembered across the commit so the archive sweep below only fires
+    # on a real 0 -> 1 transition (classic /me form parity, cps/web.py).
+    kobo_shelves_was_on = bool(getattr(current_user, "kobo_only_shelves_sync", 0))
 
     try:
         if "email" in data:
@@ -167,6 +173,21 @@ def update_profile():
     except Exception as ex:
         ub.session.rollback()
         return _err("db_error", "Could not save profile: %s" % ex, 500)
+
+    # #866 (@auspex): switching "Sync only selected shelves to Kobo" off -> on
+    # has to archive everything already synced that is not on a Kobo-sync shelf,
+    # or the device keeps every book it ever pulled. The classic /me form has
+    # always done this (cps/web.py); the SPA endpoint only flipped the flag, so
+    # a user who followed the new UI kept syncing their whole library.
+    #
+    # Runs after the commit: the setting is what the user asked for and must
+    # stick even if the sweep trips, and the sweep commits per book itself.
+    if not kobo_shelves_was_on and current_user.kobo_only_shelves_sync:
+        try:
+            update_on_sync_shelfs(current_user.id)
+        except Exception as ex:
+            log.error("Could not archive previously synced books for user %s: %s",
+                      current_user.id, ex)
 
     return jsonify(_serialize_account())
 

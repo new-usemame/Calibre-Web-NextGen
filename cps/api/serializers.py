@@ -96,6 +96,11 @@ def serialize_user(user):
         "sidebar": serialize_sidebar_visibility(user),
         # Fork #585 v2: the user's saved sidebar order ([] = SPA default order).
         "sidebar_order": serialize_sidebar_order(user),
+        # Fork #866: marking a shelf "Kobo sync on" is inert until this account
+        # setting is on. The shelf page warns about that, so /me carries the
+        # flag — otherwise every shelf view would have to fetch the whole
+        # account payload (app passwords, locale + language lists) for one bool.
+        "kobo_only_shelves_sync": bool(getattr(user, "kobo_only_shelves_sync", False)),
     }
 
 

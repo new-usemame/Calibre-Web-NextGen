@@ -387,3 +387,120 @@ def test_theme_default_fonts_are_system_sans_641():
         assert val.startswith("system-ui"), f"--{var} default is not System sans: {val}"
         assert "serif" not in val.replace("sans-serif", ""), \
             f"--{var} default still carries a serif face: {val}"
+
+
+# ── #866: enabling "Sync only selected shelves to Kobo" must archive ─────────
+#
+# @auspex marked one shelf for Kobo sync and their device kept pulling all
+# 11,000 books. Half of that is discoverability (the shelf mark is inert until
+# the account setting is on — the new UI now says so on the shelf page). The
+# other half is this: the classic /me form runs
+# ``kobo_sync_status.update_on_sync_shelfs`` on the 0 -> 1 transition, which
+# archives everything already synced that is NOT on a Kobo-sync shelf so the
+# device drops it on the next sync. The SPA's profile endpoint set the flag and
+# skipped that step, so a user who followed the advice in the new UI still got
+# their whole library on the device forever.
+
+@pytest.mark.unit
+def test_enabling_kobo_only_shelves_sync_archives_previously_synced_866():
+    """0 -> 1 must trigger the archive sweep, and only after the flag commits."""
+    from cps.api import account as mod
+    user = _user(kobo_only_shelves_sync=0)
+    mock_session = MagicMock()
+    calls = []
+    with _ctx("/api/v1/account/profile", body={"kobo_only_shelves_sync": True}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", SimpleNamespace(session=mock_session)), \
+             patch.object(mod, "_serialize_account", return_value={}), \
+             patch.object(mod, "update_on_sync_shelfs",
+                          side_effect=lambda uid: calls.append(uid)):
+            mock_session.commit.side_effect = lambda: calls.append("commit")
+            mod.update_profile.__wrapped__() if hasattr(mod.update_profile, "__wrapped__") \
+                else inspect.unwrap(mod.update_profile)()
+    assert user.kobo_only_shelves_sync == 1
+    assert calls == ["commit", 1], calls
+
+
+@pytest.mark.unit
+def test_kobo_only_shelves_sync_no_archive_when_already_on_866():
+    """1 -> 1 is a no-op: re-saving the profile must not re-archive."""
+    from cps.api import account as mod
+    user = _user(kobo_only_shelves_sync=1)
+    with _ctx("/api/v1/account/profile", body={"kobo_only_shelves_sync": True}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", SimpleNamespace(session=MagicMock())), \
+             patch.object(mod, "_serialize_account", return_value={}), \
+             patch.object(mod, "update_on_sync_shelfs") as archive:
+            inspect.unwrap(mod.update_profile)()
+    assert not archive.called
+
+
+@pytest.mark.unit
+def test_kobo_only_shelves_sync_no_archive_when_turning_off_866():
+    """1 -> 0 must not archive — turning the restriction off widens the sync."""
+    from cps.api import account as mod
+    user = _user(kobo_only_shelves_sync=1)
+    with _ctx("/api/v1/account/profile", body={"kobo_only_shelves_sync": False}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", SimpleNamespace(session=MagicMock())), \
+             patch.object(mod, "_serialize_account", return_value={}), \
+             patch.object(mod, "update_on_sync_shelfs") as archive:
+            inspect.unwrap(mod.update_profile)()
+    assert user.kobo_only_shelves_sync == 0
+    assert not archive.called
+
+
+@pytest.mark.unit
+def test_kobo_only_shelves_sync_untouched_key_absent_866():
+    """A profile save that does not mention the flag must not archive."""
+    from cps.api import account as mod
+    user = _user(kobo_only_shelves_sync=0)
+    with _ctx("/api/v1/account/profile", body={"locale": "de"}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", SimpleNamespace(session=MagicMock())), \
+             patch.object(mod, "_serialize_account", return_value={}), \
+             patch.object(mod, "update_on_sync_shelfs") as archive:
+            inspect.unwrap(mod.update_profile)()
+    assert not archive.called
+
+
+@pytest.mark.unit
+def test_kobo_archive_failure_does_not_fail_the_save_866():
+    """The flag is already committed when the sweep runs; a sweep error must not
+    500 the request and leave the user thinking the setting did not save."""
+    from cps.api import account as mod
+    user = _user(kobo_only_shelves_sync=0)
+    with _ctx("/api/v1/account/profile", body={"kobo_only_shelves_sync": True}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", SimpleNamespace(session=MagicMock())), \
+             patch.object(mod, "_serialize_account", return_value={"ok": True}), \
+             patch.object(mod, "update_on_sync_shelfs", side_effect=RuntimeError("db locked")):
+            resp = inspect.unwrap(mod.update_profile)()
+    assert resp.status_code == 200
+    assert user.kobo_only_shelves_sync == 1
+
+
+@pytest.mark.unit
+def test_me_payload_exposes_kobo_only_shelves_sync_866():
+    """The shelf page needs the account flag to decide whether to warn that a
+    Kobo-sync mark is inert — /me carries it so the SPA does not have to fetch
+    the whole account (app passwords, locale lists) on every shelf view."""
+    from cps.api.serializers import serialize_user
+    user = _user(kobo_only_shelves_sync=1, check_visibility=lambda _bit: True,
+                 role_anonymous=lambda: False)
+    payload = serialize_user(user)
+    assert payload["kobo_only_shelves_sync"] is True
+
+    off = serialize_user(_user(kobo_only_shelves_sync=0,
+                               check_visibility=lambda _bit: True,
+                               role_anonymous=lambda: False))
+    assert off["kobo_only_shelves_sync"] is False
+
+
+@pytest.mark.unit
+def test_me_payload_kobo_flag_survives_missing_attribute_866():
+    """An anonymous/partial user object must not fault /me."""
+    from cps.api.serializers import serialize_user
+    bare = _user(check_visibility=lambda _bit: True, role_anonymous=lambda: False)
+    del bare.kobo_only_shelves_sync
+    assert serialize_user(bare)["kobo_only_shelves_sync"] is False

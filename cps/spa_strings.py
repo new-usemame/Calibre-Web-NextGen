@@ -925,4 +925,12 @@ _("← Back to sign in")
 _("← Library")
 _("≤")
 _("≥")
+
+# #866 — SPA-only strings for the shelf page's Kobo-sync notice.
+_("Account settings")
+_("Books that are not on a Kobo-sync shelf are then removed from the device on its next sync. They stay in your library here.")
+_("Could not update your account setting.")
+_("Saving…")
+_("Sync only my selected shelves")
+_("Your Kobo is still set to sync your whole library, so marking this shelf does nothing on its own. Switch your account to shelf-only syncing to make it take effect.")
 # ==== END AUTOGEN ====

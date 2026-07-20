@@ -63,6 +63,11 @@ export interface Me {
    *  classic profile-pictures panel, or null when the user has none. Absent on
    *  older servers → treat as null (falls back to the neutral glyph). */
   avatar?: string | null;
+  /** #866 — the account's "Sync only selected shelves to Kobo" setting. The
+   *  shelf page warns when a shelf is marked for Kobo sync while this is off,
+   *  because the mark does nothing until it is on. Absent on older servers →
+   *  stay quiet rather than warn wrongly. */
+  kobo_only_shelves_sync?: boolean;
   features?: ServerFeatures;
   instance_name?: string;
   display?: {

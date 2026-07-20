@@ -3,9 +3,11 @@ import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import {
   ChevronLeft, Globe, Lock, Pencil, Trash2, Check, X, ArrowUpDown, ArrowUp, ArrowDown, Smartphone,
+  Info,
 } from 'lucide-react';
 import {
   useShelf, useUpdateShelf, useDeleteShelf, useShelfMembership, useReorderShelfBooks, useMe,
+  useUpdateProfile,
 } from '../lib/queries';
 import { BookCard } from '../components/BookCard';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
@@ -34,6 +36,7 @@ export function Shelf({ id }: { id: string }) {
   const reorder = useReorderShelfBooks(id);
   const { remove } = useShelfMembership();
   const me = useMe().data;
+  const updateProfile = useUpdateProfile();
 
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -142,6 +145,26 @@ export function Shelf({ id }: { id: string }) {
     });
   };
 
+  // #866 (@auspex): "Kobo sync on" on a shelf does nothing while the account
+  // still syncs the whole library — the device pages through every book and
+  // never settles on the shelf. Nothing said so, so the mark looked broken.
+  // Only warn when the flag is actually known (an older server omits it) and
+  // the shelf is one of ours — a public shelf someone else marked is not synced
+  // to our device either way.
+  const koboMarkInert = Boolean(
+    me?.features?.kobo_sync && data.kobo_sync && data.is_owner
+    && me?.kobo_only_shelves_sync === false,
+  );
+
+  const enableShelfOnlySync = () => {
+    setActionError(null);
+    updateProfile.mutate({ kobo_only_shelves_sync: true }, {
+      onError: (err) => setActionError(
+        err instanceof ApiError ? err.message : t('Could not update your account setting.'),
+      ),
+    });
+  };
+
   // Move a book up/down in the loaded order, then persist the full order.
   const moveBook = (index: number, dir: -1 | 1) => {
     const next = [...books];
@@ -235,6 +258,34 @@ export function Shelf({ id }: { id: string }) {
           )}
         </div>
         {actionError && <p className={styles.actionError}>{actionError}</p>}
+
+        {koboMarkInert && (
+          <div className={styles.koboNotice} role="status">
+            <Info size={18} className={styles.koboNoticeIcon} aria-hidden="true" />
+            <div className={styles.koboNoticeBody}>
+              <p className={styles.koboNoticeText}>
+                {t('Your Kobo is still set to sync your whole library, so marking this shelf does nothing on its own. Switch your account to shelf-only syncing to make it take effect.')}
+              </p>
+              <p className={styles.koboNoticeFine}>
+                {t('Books that are not on a Kobo-sync shelf are then removed from the device on its next sync. They stay in your library here.')}
+              </p>
+              <div className={styles.koboNoticeActions}>
+                <button
+                  className={styles.koboNoticeBtn}
+                  onClick={enableShelfOnlySync}
+                  disabled={updateProfile.isPending}
+                >
+                  {updateProfile.isPending
+                    ? t('Saving…')
+                    : t('Sync only my selected shelves')}
+                </button>
+                <Link href="/account" className={styles.koboNoticeLink}>
+                  {t('Account settings')}
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {books.length === 0 && !isFetching ? (

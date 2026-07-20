@@ -170,3 +170,32 @@
 .reorderPos { width: 2ch; text-align: right; color: var(--text-muted); font-size: var(--fs-sm); }
 .reorderTitle { flex: 1; color: var(--text); font-size: var(--fs-sm); }
 .reorderControls { display: flex; gap: var(--sp-1); }
+
+/* #866 — the shelf's "Kobo sync on" mark is inert until the account setting is
+   on. Reads as guidance, not an error: info tone, inline with the header. */
+.koboNotice {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  max-width: 720px;
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-md);
+}
+.koboNoticeIcon { flex: none; color: var(--accent); margin-top: 1px; }
+.koboNoticeBody { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.koboNoticeText { color: var(--text); font-size: var(--fs-sm); margin: 0; }
+.koboNoticeFine { color: var(--text-muted); font-size: var(--fs-xs); margin: 0; }
+.koboNoticeActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.koboNoticeBtn {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: 36px;
+  font-size: var(--fs-sm);
+  color: var(--on-accent); background: var(--accent);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
+}
+.koboNoticeBtn:disabled { opacity: 0.65; cursor: default; }
+.koboNoticeLink { color: var(--accent); font-size: var(--fs-sm); text-decoration: underline; }

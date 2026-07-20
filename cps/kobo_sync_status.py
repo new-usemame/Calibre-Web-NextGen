@@ -152,8 +152,46 @@ def update_on_sync_shelfs(user_id):
     # row per shelf every time (47 rows for 2 shelves on a test account).
     already = {row[0] for row in ub.session.query(ub.ShelfArchive.uuid)
                .filter(ub.ShelfArchive.user_id == user_id).all()}
+    added = False
     for a in shelves_to_archive:
         if a.uuid in already:
             continue
         ub.session.add(ub.ShelfArchive(uuid=a.uuid, user_id=user_id))
+        added = True
+    # One commit for the user, not one per shelf. A bulk admin edit reaches this
+    # once per selected account, and on SQLite every commit is an fsync — 100
+    # users x 20 shelves used to be 2000 serial fsyncs inside one request.
+    if added:
         ub.session_commit()
+
+
+def needs_shelf_reconciliation(old_value, new_value):
+    """Is this the "sync only selected shelves to Kobo" transition that has to
+    record shelf tombstones?
+
+    Only off -> on. Turning the setting back off needs nothing: the shelves the
+    device dropped are re-sent by the next sync. Every call site that writes
+    ``User.kobo_only_shelves_sync`` asks this question, so it is answered in one
+    place — the four copies of this test are what let the SPA endpoint drift out
+    of sync in the first place (#866/#1008).
+    """
+    return not old_value and bool(new_value)
+
+
+def reconcile_shelves_safely(user_id):
+    """``update_on_sync_shelfs`` with the shared failure policy. Returns True if
+    the reconciliation completed.
+
+    The setting itself is the user's choice and has to stick even if this trips,
+    so failures are logged rather than raised. Repeating a failed run is safe —
+    ``update_on_sync_shelfs`` skips shelves it has already tombstoned.
+    """
+    try:
+        update_on_sync_shelfs(user_id)
+        return True
+    except Exception:
+        # Leave the session usable for the rest of the request: this commits, so
+        # a failure can leave the session in a state that breaks serialization.
+        ub.session.rollback()
+        log.error("Could not archive unsynced shelves for user %s", user_id, exc_info=True)
+        return False

@@ -2829,11 +2829,11 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
         current_user.default_language = to_save.get("default_language", "all")
         current_user.locale = to_save.get("locale", "en")
         old_state = current_user.kobo_only_shelves_sync
-        # 1 -> 0: nothing has to be done
-        # 0 -> 1: all synced books have to be added to archived books, + currently synced shelfs which
-        # don't have to be synced have to be removed (added to Shelf archive)
         current_user.kobo_only_shelves_sync = int(to_save.get("kobo_only_shelves_sync") == "on") or 0
-        if old_state == 0 and current_user.kobo_only_shelves_sync == 1:
+        if kobo_sync_status.needs_shelf_reconciliation(old_state,
+                                                       current_user.kobo_only_shelves_sync):
+            # Before the commit here: a failed save rolls the tombstones back
+            # with the setting, so the two cannot disagree.
             kobo_sync_status.update_on_sync_shelfs(current_user.id)
         current_user.opds_only_shelves_sync = int(to_save.get("opds_only_shelves_sync") == "on") or 0
         current_user.hardcover_token = to_save.get("hardcover_token","" ).replace("Bearer ","" ) or None

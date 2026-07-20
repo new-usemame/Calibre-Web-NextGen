@@ -19,7 +19,7 @@ from .. import calibre_db, config, logger, ub
 from ..cw_login import current_user
 from ..cw_babel import get_available_locale
 from ..helper import valid_password, valid_email, check_email
-from ..kobo_sync_status import update_on_sync_shelfs
+from ..kobo_sync_status import needs_shelf_reconciliation, reconcile_shelves_safely
 from ..ui_themes import ALLOWED_THEME_SLUGS, theme_slug, theme_code
 from .serializers import (SIDEBAR_VISIBILITY_BITS, ORDERABLE_SIDEBAR_KEYS,
                           serialize_sidebar_visibility, serialize_sidebar_order)
@@ -180,18 +180,10 @@ def update_profile():
     # (cps/web.py); the SPA endpoint only flipped the flag. Book-level removal
     # is the sync handler's job, not ours — see update_on_sync_shelfs.
     #
-    # Runs after the commit: the setting is what the user asked for and must
-    # stick even if this trips. It is idempotent (shelf rows it already wrote
-    # are skipped), so a partial run is completed by any later one.
-    if not kobo_shelves_was_on and current_user.kobo_only_shelves_sync:
-        try:
-            update_on_sync_shelfs(current_user.id)
-        except Exception:
-            # Leave the session usable for serialization/teardown — it commits
-            # per shelf, so an error can leave it in a failed state.
-            ub.session.rollback()
-            log.error("Could not archive unsynced shelves for user %s",
-                      current_user.id, exc_info=True)
+    # Runs after the commit above, which reports its own failure — the setting is
+    # what the user asked for and must stick even if the reconciliation trips.
+    if needs_shelf_reconciliation(kobo_shelves_was_on, current_user.kobo_only_shelves_sync):
+        reconcile_shelves_safely(current_user.id)
 
     return jsonify(_serialize_account())
 

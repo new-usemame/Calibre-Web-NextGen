@@ -405,6 +405,7 @@ def test_theme_default_fonts_are_system_sans_641():
 def test_enabling_kobo_only_shelves_sync_archives_previously_synced_866():
     """0 -> 1 must trigger the archive sweep, and only after the flag commits."""
     from cps.api import account as mod
+    from cps import kobo_sync_status as kss
     user = _user(kobo_only_shelves_sync=0)
     mock_session = MagicMock()
     calls = []
@@ -412,7 +413,7 @@ def test_enabling_kobo_only_shelves_sync_archives_previously_synced_866():
         with patch.object(mod, "current_user", user), \
              patch.object(mod, "ub", SimpleNamespace(session=mock_session)), \
              patch.object(mod, "_serialize_account", return_value={}), \
-             patch.object(mod, "update_on_sync_shelfs",
+             patch.object(kss, "update_on_sync_shelfs",
                           side_effect=lambda uid: calls.append(uid)):
             mock_session.commit.side_effect = lambda: calls.append("commit")
             mod.update_profile.__wrapped__() if hasattr(mod.update_profile, "__wrapped__") \
@@ -425,12 +426,13 @@ def test_enabling_kobo_only_shelves_sync_archives_previously_synced_866():
 def test_kobo_only_shelves_sync_no_archive_when_already_on_866():
     """1 -> 1 is a no-op: re-saving the profile must not re-archive."""
     from cps.api import account as mod
+    from cps import kobo_sync_status as kss
     user = _user(kobo_only_shelves_sync=1)
     with _ctx("/api/v1/account/profile", body={"kobo_only_shelves_sync": True}):
         with patch.object(mod, "current_user", user), \
              patch.object(mod, "ub", SimpleNamespace(session=MagicMock())), \
              patch.object(mod, "_serialize_account", return_value={}), \
-             patch.object(mod, "update_on_sync_shelfs") as archive:
+             patch.object(kss, "update_on_sync_shelfs") as archive:
             inspect.unwrap(mod.update_profile)()
     assert not archive.called
 
@@ -439,12 +441,13 @@ def test_kobo_only_shelves_sync_no_archive_when_already_on_866():
 def test_kobo_only_shelves_sync_no_archive_when_turning_off_866():
     """1 -> 0 must not archive — turning the restriction off widens the sync."""
     from cps.api import account as mod
+    from cps import kobo_sync_status as kss
     user = _user(kobo_only_shelves_sync=1)
     with _ctx("/api/v1/account/profile", body={"kobo_only_shelves_sync": False}):
         with patch.object(mod, "current_user", user), \
              patch.object(mod, "ub", SimpleNamespace(session=MagicMock())), \
              patch.object(mod, "_serialize_account", return_value={}), \
-             patch.object(mod, "update_on_sync_shelfs") as archive:
+             patch.object(kss, "update_on_sync_shelfs") as archive:
             inspect.unwrap(mod.update_profile)()
     assert user.kobo_only_shelves_sync == 0
     assert not archive.called
@@ -454,12 +457,13 @@ def test_kobo_only_shelves_sync_no_archive_when_turning_off_866():
 def test_kobo_only_shelves_sync_untouched_key_absent_866():
     """A profile save that does not mention the flag must not archive."""
     from cps.api import account as mod
+    from cps import kobo_sync_status as kss
     user = _user(kobo_only_shelves_sync=0)
     with _ctx("/api/v1/account/profile", body={"locale": "de"}):
         with patch.object(mod, "current_user", user), \
              patch.object(mod, "ub", SimpleNamespace(session=MagicMock())), \
              patch.object(mod, "_serialize_account", return_value={}), \
-             patch.object(mod, "update_on_sync_shelfs") as archive:
+             patch.object(kss, "update_on_sync_shelfs") as archive:
             inspect.unwrap(mod.update_profile)()
     assert not archive.called
 
@@ -469,12 +473,14 @@ def test_kobo_archive_failure_does_not_fail_the_save_866():
     """The flag is already committed when the sweep runs; a sweep error must not
     500 the request and leave the user thinking the setting did not save."""
     from cps.api import account as mod
+    from cps import kobo_sync_status as kss
     user = _user(kobo_only_shelves_sync=0)
     with _ctx("/api/v1/account/profile", body={"kobo_only_shelves_sync": True}):
         with patch.object(mod, "current_user", user), \
              patch.object(mod, "ub", SimpleNamespace(session=MagicMock())), \
              patch.object(mod, "_serialize_account", return_value={"ok": True}), \
-             patch.object(mod, "update_on_sync_shelfs", side_effect=RuntimeError("db locked")):
+             patch.object(kss, "update_on_sync_shelfs", side_effect=RuntimeError("db locked")), \
+             patch.object(kss, "ub", SimpleNamespace(session=MagicMock())):
             resp = inspect.unwrap(mod.update_profile)()
     assert resp.status_code == 200
     assert user.kobo_only_shelves_sync == 1

@@ -821,6 +821,9 @@ def table_get_default_lang():
 def edit_list_user(param):
     vals = request.form.to_dict(flat=False)
     all_user = ub.session.query(ub.User)
+    # #1009: users switched off -> on in this request, reconciled after the
+    # commit is confirmed. See the end of this function.
+    kobo_shelf_sync_users = []
     if not config.config_anonbrowse:
         all_user = all_user.filter(ub.User.role.op('&')(constants.ROLE_ANONYMOUS) != constants.ROLE_ANONYMOUS)
     # only one user is posted
@@ -853,7 +856,11 @@ def edit_list_user(param):
                 elif param == 'email':
                     user.email = check_email(vals['value'])
                 elif param == 'kobo_only_shelves_sync':
+                    old_state = user.kobo_only_shelves_sync
                     user.kobo_only_shelves_sync = int(vals['value'] == 'true')
+                    if kobo_sync_status.needs_shelf_reconciliation(old_state,
+                                                                   user.kobo_only_shelves_sync):
+                        kobo_shelf_sync_users.append(user.id)
                 elif param == 'opds_only_shelves_sync':
                     user.opds_only_shelves_sync = int(vals['value'] == 'true')
                 elif param == 'kindle_mail':
@@ -919,8 +926,26 @@ def edit_list_user(param):
                     return _("Parameter not found"), 400
         except Exception as ex:
             log.error_or_exception(ex)
+            # Drop the half-applied edits with the request. ub.session is not a
+            # request-scoped session and nothing rolls it back on teardown, so a
+            # dirty user left here is flushed by the next commit anywhere in the
+            # process — a change the admin was told (400) had failed.
+            ub.session.rollback()
             return str(ex), 400
-    ub.session_commit()
+    # Not ub.session_commit(): it swallows OperationalError/InvalidRequestError,
+    # rolls back and returns "" either way, so the caller cannot tell a saved
+    # setting from a lost one. The admin gets told, and — #1009 — the shelf
+    # reconciliation below only runs against settings that actually landed.
+    try:
+        ub.session.commit()
+    except Exception as ex:
+        ub.session.rollback()
+        log.error_or_exception(ex)
+        # Existing, already-translated msgid — app.db is the settings DB this
+        # endpoint writes, and a failed commit here means exactly that.
+        return _("Settings DB is not Writeable"), 400
+    for user_id in kobo_shelf_sync_users:
+        kobo_sync_status.reconcile_shelves_safely(user_id)
     return ""
 
 
@@ -2928,10 +2953,9 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
 
     old_state = content.kobo_only_shelves_sync
     content.kobo_only_shelves_sync = int(to_save.get("kobo_only_shelves_sync") == "on") or 0
-    # 1 -> 0: nothing has to be done
-    # 0 -> 1: all synced books have to be added to archived books, + currently synced shelfs
-    # which don't have to be synced have to be removed (added to Shelf archive)
-    if old_state == 0 and content.kobo_only_shelves_sync == 1:
+    if kobo_sync_status.needs_shelf_reconciliation(old_state, content.kobo_only_shelves_sync):
+        # Before the commit here: a failed save rolls the tombstones back with
+        # the setting, so the two cannot disagree.
         kobo_sync_status.update_on_sync_shelfs(content.id)
     content.opds_only_shelves_sync = int(to_save.get("opds_only_shelves_sync") == "on") or 0
     # Auto-send and metadata fetch settings

@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.18] - 2026-07-20
+
 ### Added
 
 - **Export all your KOReader reading progress as JSON.** A new read-only endpoint, `GET /kosync/export`, returns every book you have reading progress for — Calibre book id, title, authors, percentage, and when you started and last updated it — so you can feed your progress into another service (for example a unified media tracker). It authenticates the same way as the other KOReader sync endpoints (HTTP Basic, app passwords supported) and only ever returns your own progress, limited to books you're allowed to see. Example: `curl -u 'user:APP_PASSWORD' https://your-instance/kosync/export`. Contributed by @Kyraminol (#978).

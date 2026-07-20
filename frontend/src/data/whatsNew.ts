@@ -56,6 +56,52 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.18',
+    date: '2026-07-20',
+    items: [
+      {
+        title: 'Marking a shelf for Kobo sync now actually syncs that shelf',
+        body: 'Marking a shelf for Kobo sync did nothing on its own, and nothing said why: your account also has to be set to sync only selected shelves. The shelf page now says so where you make the mark, with a one-click switch. Turning that setting on also correctly tells the reader to let go of the books that are not on a selected shelf — they leave the device and stay in your library here.',
+        category: 'Sync',
+        link: { to: '/shelves', label: 'Open your shelves' },
+      },
+      {
+        title: 'Export your KOReader reading progress',
+        body: 'A new read-only endpoint returns every book you have reading progress for — title, authors, percentage, and when you started and last read it — so you can feed it into another service such as a media tracker. Call GET /kosync/export with your username and an app password, the same way the other KOReader sync endpoints authenticate. It only ever returns your own progress.',
+        category: 'Sync',
+        link: { to: '/account', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Book covers keep their edges',
+        body: 'A cover whose own artwork happens to match your theme background used to lose its outline and look like it was floating loose on the page. Every cover now carries a thin themed outline — in the library grid, on the book page, in the Discover and author strips, in the table view, and in the duplicate list.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'An error on one page no longer blanks the app',
+        body: 'If something went wrong while a page was drawing — a smart shelf that would not open, a reader whose files could not be fetched after an upgrade — the screen went white with no message and no way back. That is now caught and shown as a short "Something went wrong" screen with Reload and Back to library, plus the technical detail if you want it for a bug report. Navigating away clears it.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Changing a Kobo sync setting from the user list takes effect',
+        body: 'Admins can switch a user to "sync only selected shelves" from the user table as well as from that user\'s own settings page, but only the settings page told the reader to drop the collections it should no longer sync. Both routes now behave the same, for one user or several at once, and a save that fails says so instead of reporting success.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Russian is complete again',
+        body: 'A dozen strings added in recent releases had no Russian yet, so Russian readers saw them in English — the account and Kobo shelf-sync settings, the format picker and converter, and the error screen among them. All of them now read in Russian.',
+        category: 'Under the hood',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'Startup logs account for every second',
+        body: 'If your container took a long time to come up, the timestamped logs showed unexplained gaps because two startup steps never announced themselves — you could not tell whether a step was running slowly or had not started. The library-mount step and the web server now both log as they begin, so a slow boot points at a named step.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.17',
     date: '2026-07-19',
     items: [

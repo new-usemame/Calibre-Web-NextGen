@@ -43,13 +43,18 @@ def _default_book_identifiers(book):
     return identifiers
 
 
-def _default_blacklist_check(book_id):
+def _blacklist_check_for(session, book_id):
     """True if this book is blacklisted for Hardcover annotation sync."""
     from cps import ub
-    row = ub.session.query(ub.HardcoverBookBlacklist).filter(
+    row = session.query(ub.HardcoverBookBlacklist).filter(
         ub.HardcoverBookBlacklist.book_id == book_id,
     ).first()
     return bool(row and row.blacklist_annotations)
+
+
+def _default_blacklist_check(book_id):
+    from cps import ub
+    return _blacklist_check_for(ub.session, book_id)
 
 
 class HardcoverHandler(AnnotationSyncTargetHandler):
@@ -71,6 +76,25 @@ class HardcoverHandler(AnnotationSyncTargetHandler):
         self._book_identifiers_getter = book_identifiers_getter
         self._blacklist_check = blacklist_check
         self._not_found_exception = not_found_exception
+
+    def for_session(self, session):
+        """Rebind the blacklist lookup to ``session`` (see base docstring).
+
+        A caller-supplied blacklist_check is left alone — it already knows
+        where to read from, and silently replacing it would break injection.
+        """
+        from cps import ub
+        if self._blacklist_check is not _default_blacklist_check:
+            return self
+        if session is getattr(ub, "session", None):
+            return self
+        return HardcoverHandler(
+            client_factory=self._client_factory,
+            config_getter=self._config_getter,
+            book_identifiers_getter=self._book_identifiers_getter,
+            blacklist_check=lambda book_id: _blacklist_check_for(session, book_id),
+            not_found_exception=self._not_found_exception,
+        )
 
     def is_enabled(self, user) -> bool:
         if not self._config_getter():

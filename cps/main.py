@@ -101,5 +101,12 @@ def main():
         app.register_blueprint(readingservices_userstorage)
     if oauth_available:
         app.register_blueprint(oauth)
+
+    # Annotation sync-target pushes are blocking HTTPS calls; on the request
+    # greenlet they freeze the whole (unpatched-gevent) app, so hand them to
+    # the WorkerThread instead (#920).
+    from .services import annotation_sync
+    annotation_sync.enable_background_dispatch()
+
     success = web_server.start()
     sys.exit(0 if success else 1)

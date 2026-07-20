@@ -40,6 +40,17 @@ class AnnotationSyncTargetHandler(ABC):
 
     target_name: str  # e.g. 'hardcover'
 
+    def for_session(self, session):
+        """Return a handler whose local DB reads go through ``session``.
+
+        The background sync task (#920) runs on its own thread with its own
+        app.db session, and the global ``ub.session`` is not thread-safe. A
+        handler that reads nothing locally is session-agnostic, so the default
+        is to return ``self``; one that does (Hardcover reads its per-book
+        blacklist) overrides this.
+        """
+        return self
+
     @abstractmethod
     def is_enabled(self, user) -> bool:
         """True iff sync to this target is enabled globally + for this user."""

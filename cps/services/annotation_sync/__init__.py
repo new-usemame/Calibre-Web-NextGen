@@ -29,6 +29,76 @@ log = logging.getLogger(__name__)
 
 _HANDLERS: Dict[str, AnnotationSyncTargetHandler] = {}
 
+# Background dispatch seam (#920)
+# ------------------------------
+# Handlers reach third-party APIs over blocking sockets. CWNG serves requests
+# with gevent and deliberately does NOT monkey-patch (see
+# cps/services/parallel.py), so a blocking socket on a request greenlet stops
+# the WHOLE application, not just that request — measured at ~10s of frozen app
+# per annotation, which also tripped the Docker healthcheck into restarting the
+# container and blew past the KOReader plugin's 15s timeout (#920/#699).
+#
+# So the remote half of the fan-out belongs on the WorkerThread, exactly like
+# the shelf-add sync already does (cps/tasks/hardcover_sync.py). The request
+# path persists locally, marks each target ``pending`` and returns; the worker
+# performs the push/delete on its own thread with its own session.
+#
+# The seam stays OFF by default so unit tests (and any embedding that has no
+# worker) keep the synchronous behaviour. cps.main turns it on at startup.
+_REMOTE_ENQUEUE = None
+
+
+def set_remote_enqueue(fn) -> None:
+    """Install (or clear, with ``None``) the background enqueue hook.
+
+    ``fn(user, jobs)`` receives the ub.User and a list of job dicts, either
+    ``{"op": "push", "annotation": <id>, "book": <id>, "payload": {...}|None}``
+    or ``{"op": "delete", "sync_target": <id>}``.
+    """
+    global _REMOTE_ENQUEUE
+    _REMOTE_ENQUEUE = fn
+
+
+def enable_background_dispatch() -> None:
+    """Wire the WorkerThread-backed enqueue. Called once at app startup."""
+    from cps.tasks.annotation_sync import enqueue_annotation_sync
+    set_remote_enqueue(enqueue_annotation_sync)
+
+
+def _background_enqueue():
+    return _REMOTE_ENQUEUE
+
+
+def _enqueue(user, jobs, book=None) -> None:
+    """Hand queued jobs to the background worker.
+
+    A failure to enqueue must not lose the sync, so we fall back to running the
+    fan-out inline — slow, but the annotation still reaches the remote. The
+    local rows are already committed by the time we get here either way.
+    """
+    if not jobs:
+        return
+    fn = _background_enqueue()
+    if fn is None:
+        return
+    try:
+        fn(user, jobs)
+    except Exception:
+        log.exception("annotation_sync: enqueue failed; running fan-out inline")
+        run_jobs_inline(user, jobs, book=book)
+
+
+def run_jobs_inline(user, jobs, book=None) -> None:
+    """Execute queued jobs against the request-thread session (fallback path).
+
+    The caller is still holding the book it just dispatched for, so pass it
+    through rather than re-reading it out of the Calibre DB.
+    """
+    from cps import ub
+    loader = None if book is None else (lambda _book_id: book)
+    execute_jobs(ub.session, user, jobs, book_loader=loader)
+    ub.session_commit()
+
 
 def register_handler(handler: AnnotationSyncTargetHandler) -> None:
     """Register a handler. Replaces any previous handler with the same target_name."""
@@ -193,29 +263,139 @@ def _upsert_sync_target(session, annotation, target_name, result):
     return st
 
 
+def push_annotation_to_handlers(session, annotation, book, user, payload=None,
+                                handlers=None) -> None:
+    """Run the remote push for one annotation against every enabled handler and
+    persist the outcome on its AnnotationSyncTarget row.
+
+    Split out of ``dispatch_annotation_sync`` so the background worker can run
+    exactly the same fan-out against its own thread-local session (#920).
+    """
+    for handler in (handlers if handlers is not None else _registered_handlers()):
+        if not handler.is_enabled(user):
+            continue
+        handler = handler.for_session(session)
+        existing = annotation.sync_target(handler.target_name)
+        if existing is not None and existing.status == "tombstone":
+            # Terminal — never re-push a tombstoned annotation.
+            continue
+        try:
+            result = handler.push(annotation, book, user, payload=payload)
+        except Exception as exc:
+            log.exception("dispatcher: handler %s push raised", handler.target_name)
+            result = SyncResult(status="failed", error_message=str(exc))
+        _upsert_sync_target(session, annotation, handler.target_name, result)
+
+
+def delete_sync_target(session, sync_target, user) -> None:
+    """Run the remote delete for one AnnotationSyncTarget row and persist the
+    outcome. Counterpart of :func:`push_annotation_to_handlers` (#920)."""
+    if sync_target.status == "tombstone":
+        return
+    handler = _HANDLERS.get(sync_target.target)
+    if handler is None or not handler.is_enabled(user):
+        return
+    handler = handler.for_session(session)
+    try:
+        result = handler.delete(sync_target, user)
+    except Exception as exc:
+        log.exception("dispatcher: handler %s delete raised", handler.target_name)
+        result = SyncResult(status="failed", error_message=str(exc))
+    _apply_result(sync_target, result)
+
+
+def _default_book_loader(book_id):
+    from cps import calibre_db, db
+    return (
+        calibre_db.session.query(db.Books)
+        .filter(db.Books.id == book_id)
+        .first()
+    )
+
+
+def execute_jobs(session, user, jobs, book_loader=None) -> None:
+    """Run queued push/delete jobs against ``session``.
+
+    Shared by the background task and the inline fallback so both paths go
+    through identical handler semantics. One failing job never strands the
+    rest of the batch — the annotation is already persisted locally, and its
+    target row keeps the error.
+    """
+    from cps import ub
+    if book_loader is None:
+        book_loader = _default_book_loader
+    books = {}
+    for job in jobs or []:
+        op = job.get("op")
+        try:
+            if op == "push":
+                ann = (
+                    session.query(ub.Annotation)
+                    .filter(ub.Annotation.id == job.get("annotation"))
+                    .first()
+                )
+                if ann is None:
+                    continue
+                book_id = job.get("book")
+                if book_id not in books:
+                    books[book_id] = book_loader(book_id)
+                book = books[book_id]
+                if book is None:
+                    log.warning("annotation_sync: book %s gone; skipping push", book_id)
+                    continue
+                push_annotation_to_handlers(
+                    session, ann, book, user, payload=job.get("payload"),
+                )
+            elif op == "delete":
+                st = (
+                    session.query(ub.AnnotationSyncTarget)
+                    .filter(ub.AnnotationSyncTarget.id == job.get("sync_target"))
+                    .first()
+                )
+                if st is None:
+                    continue
+                delete_sync_target(session, st, user)
+            else:
+                log.warning("annotation_sync: unknown job op %r", op)
+        except Exception:
+            log.exception("annotation_sync: job %r failed", job)
+
+
+def _mark_pending(session, annotation):
+    """Put every enabled, non-terminal target for this annotation into
+    ``pending`` so the row reflects "queued, not yet pushed" while the worker
+    catches up. Returns True when at least one target is actually queued."""
+    queued = False
+    for handler in _registered_handlers():
+        existing = annotation.sync_target(handler.target_name)
+        if existing is not None and existing.status == "tombstone":
+            continue
+        _upsert_sync_target(
+            session, annotation, handler.target_name,
+            SyncResult(status="pending"),
+        )
+        queued = True
+    return queued
+
+
 def dispatch_annotation_sync(payload_annotations, book, user) -> None:
     """For each annotation in the PATCH payload, persist locally then push to each enabled handler."""
     from cps import ub
     if not payload_annotations:
         return
+    jobs = []
     for payload in payload_annotations:
         ann = _upsert_annotation(ub.session, payload, book, user)
         if ann is None:
             continue
-        for handler in _registered_handlers():
-            if not handler.is_enabled(user):
-                continue
-            existing = ann.sync_target(handler.target_name)
-            if existing is not None and existing.status == "tombstone":
-                # Terminal — never re-push a tombstoned annotation.
-                continue
-            try:
-                result = handler.push(ann, book, user, payload=payload)
-            except Exception as exc:
-                log.exception("dispatcher: handler %s push raised", handler.target_name)
-                result = SyncResult(status="failed", error_message=str(exc))
-            _upsert_sync_target(ub.session, ann, handler.target_name, result)
+        if _background_enqueue() is not None:
+            if _mark_pending(ub.session, ann):
+                jobs.append({"op": "push", "annotation": ann.id,
+                             "book": book.id, "payload": payload})
+            continue
+        push_annotation_to_handlers(ub.session, ann, book, user, payload=payload)
     ub.session_commit()
+    _enqueue(user, jobs, book=book)
 
 
 def dispatch_existing_annotation_sync(annotation, book, user) -> None:
@@ -230,19 +410,14 @@ def dispatch_existing_annotation_sync(annotation, book, user) -> None:
     from cps import ub
     if annotation is None:
         return
-    for handler in _registered_handlers():
-        if not handler.is_enabled(user):
-            continue
-        existing = annotation.sync_target(handler.target_name)
-        if existing is not None and existing.status == "tombstone":
-            continue
-        try:
-            result = handler.push(annotation, book, user)
-        except Exception as exc:
-            log.exception("dispatcher: handler %s push raised", handler.target_name)
-            result = SyncResult(status="failed", error_message=str(exc))
-        _upsert_sync_target(ub.session, annotation, handler.target_name, result)
+    jobs = []
+    if _background_enqueue() is not None:
+        if _mark_pending(ub.session, annotation):
+            jobs.append({"op": "push", "annotation": annotation.id, "book": book.id})
+    else:
+        push_annotation_to_handlers(ub.session, annotation, book, user)
     ub.session_commit()
+    _enqueue(user, jobs, book=book)
 
 
 def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
@@ -258,6 +433,7 @@ def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
     from cps import ub
     if not deleted_ids:
         return
+    jobs = []
     for annotation_id in deleted_ids:
         query = ub.session.query(ub.Annotation).filter(
             ub.Annotation.user_id == user.id,
@@ -268,19 +444,17 @@ def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
         ann = query.first()
         if ann is None:
             continue
-        # Push delete through any non-tombstone sync targets first.
+        # Push delete through any non-tombstone sync targets.
         for st in list(ann.sync_targets):
             if st.status == "tombstone":
                 continue
             handler = _HANDLERS.get(st.target)
             if handler is None or not handler.is_enabled(user):
                 continue
-            try:
-                result = handler.delete(st, user)
-            except Exception as exc:
-                log.exception("dispatcher: handler %s delete raised", handler.target_name)
-                result = SyncResult(status="failed", error_message=str(exc))
-            _apply_result(st, result)
+            if _background_enqueue() is not None:
+                jobs.append({"op": "delete", "sync_target": st.id})
+                continue
+            delete_sync_target(ub.session, st, user)
         # Soft-delete the local row regardless of sync target outcome.
         ann.hidden = True
         log.info(
@@ -288,6 +462,7 @@ def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
             annotation_id,
         )
     ub.session_commit()
+    _enqueue(user, jobs)
 
 
 # Auto-register Hardcover at import time.

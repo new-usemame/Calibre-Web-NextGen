@@ -378,6 +378,10 @@ RUN \
 # Add unrar from unrar stage
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 
+# Complete the Calibre installation so `calibre-binaries-setup` properly
+# detects that it is already installed.
+RUN find /app/calibre -maxdepth 1 -type f -exec ln -s {} /usr/bin \;
+
 # Deliberately NO global CALIBRE_CONFIG_DIRECTORY here. (A misspelled
 # CALIBRE_CONFIG_DIR lived here for a while -- Calibre ignores that name,
 # and setting the real one globally would force user-plugin loading on for

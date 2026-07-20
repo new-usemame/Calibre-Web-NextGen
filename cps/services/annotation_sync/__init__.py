@@ -361,12 +361,18 @@ def execute_jobs(session, user, jobs, book_loader=None) -> None:
             log.exception("annotation_sync: job %r failed", job)
 
 
-def _mark_pending(session, annotation):
+def _mark_pending(session, annotation, user):
     """Put every enabled, non-terminal target for this annotation into
     ``pending`` so the row reflects "queued, not yet pushed" while the worker
-    catches up. Returns True when at least one target is actually queued."""
+    catches up. Returns True when at least one target is actually queued.
+
+    Disabled handlers are skipped here exactly as they are in the fan-out — a
+    target nobody is going to push to must not leave a ``pending`` row behind.
+    """
     queued = False
     for handler in _registered_handlers():
+        if not handler.is_enabled(user):
+            continue
         existing = annotation.sync_target(handler.target_name)
         if existing is not None and existing.status == "tombstone":
             continue
@@ -389,7 +395,7 @@ def dispatch_annotation_sync(payload_annotations, book, user) -> None:
         if ann is None:
             continue
         if _background_enqueue() is not None:
-            if _mark_pending(ub.session, ann):
+            if _mark_pending(ub.session, ann, user):
                 jobs.append({"op": "push", "annotation": ann.id,
                              "book": book.id, "payload": payload})
             continue
@@ -412,7 +418,7 @@ def dispatch_existing_annotation_sync(annotation, book, user) -> None:
         return
     jobs = []
     if _background_enqueue() is not None:
-        if _mark_pending(ub.session, annotation):
+        if _mark_pending(ub.session, annotation, user):
             jobs.append({"op": "push", "annotation": annotation.id, "book": book.id})
     else:
         push_annotation_to_handlers(ub.session, annotation, book, user)

@@ -43,6 +43,7 @@ class TaskAnnotationSync(CalibreTask):
         self.jobs = list(jobs or [])
 
     def run(self, worker_thread):
+        self.log.debug("annotation_sync task: starting %d job(s)", len(self.jobs))
         if not self.jobs:
             self._handleSuccess()
             return
@@ -103,6 +104,8 @@ class TaskAnnotationSync(CalibreTask):
 
 
 def _submit(user_name, user_id, jobs):
+    logger.create().debug(
+        "annotation_sync: queueing %d remote job(s) for user %s", len(jobs), user_id)
     WorkerThread.add(user_name, TaskAnnotationSync(user_id, jobs), hidden=True)
 
 

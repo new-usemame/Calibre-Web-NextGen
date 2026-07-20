@@ -18,7 +18,7 @@ is for things you can see or feel when running the app.
 
 ### Changed
 
-- **The container starts about 12 seconds faster.** Every start ran a Calibre installation step that took roughly a fifth of the whole boot — and it ran every time, on a container that already had Calibre in it. The binaries did ship in the image; what was missing were the shortcuts that let the startup check find them, so the check failed and the install step ran again. Those shortcuts are now built into the image, the check passes, and the step finishes instantly. Nothing about how Calibre works changes, and the step still runs on its own if an image ever turns up without them. Reported and originally patched by [@chloeroform](https://github.com/chloeroform) ([#875](https://github.com/new-usemame/Calibre-Web-NextGen/issues/875), [#1014](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1014)).
+- **The container no longer re-installs Calibre on every start.** Each boot ran a Calibre installation step, on a container that already had Calibre in it — about 12 seconds of a one-minute startup on the hardware where this was reported, roughly two on a fast machine. The binaries did ship in the image; what was missing were the shortcuts that let the startup check find them, so the check failed and the install ran again. Those shortcuts are now built into the image, the check passes, and the step finishes in well under a second. Nothing about how Calibre itself works changes, and the step still repairs an image that turns up without them. Reported and originally patched by [@chloeroform](https://github.com/chloeroform) ([#875](https://github.com/new-usemame/Calibre-Web-NextGen/issues/875), [#1014](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1014)).
 
 ### Fixed
 

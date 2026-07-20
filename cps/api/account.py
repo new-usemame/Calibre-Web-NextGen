@@ -182,12 +182,19 @@ def update_profile():
     #
     # Runs after the commit: the setting is what the user asked for and must
     # stick even if the sweep trips, and the sweep commits per book itself.
+    # The sweep is idempotent — it archives only books the user's Kobo-sync
+    # shelves do not cover, and skips shelf-archive rows it already wrote — so
+    # a partial run is completed by the next one, and two concurrent requests
+    # that both see the 0 -> 1 transition cannot compound each other.
     if not kobo_shelves_was_on and current_user.kobo_only_shelves_sync:
         try:
             update_on_sync_shelfs(current_user.id)
-        except Exception as ex:
-            log.error("Could not archive previously synced books for user %s: %s",
-                      current_user.id, ex)
+        except Exception:
+            # Leave the session usable for serialization/teardown — the sweep
+            # commits per book, so an error can leave it in a failed state.
+            ub.session.rollback()
+            log.error("Could not archive previously synced books for user %s",
+                      current_user.id, exc_info=True)
 
     return jsonify(_serialize_account())
 

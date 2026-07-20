@@ -6,10 +6,12 @@
 # See CONTRIBUTORS for full list of authors.
 
 from .cw_login import current_user
-from . import ub
+from . import logger, ub
 from datetime import datetime, timezone
 from sqlalchemy.sql.expression import or_, and_, true
 # from sqlalchemy import exc
+
+log = logger.create()
 
 
 # Add the current book id to kobo_synced_books table for current user, if entry is already present,
@@ -114,15 +116,52 @@ def change_archived_books(book_id, state=None, message=None):
     return archived_book.is_archived
 
 
-# select all books which are synced by the current user and do not belong to a synced shelf and set them to archive
-# select all shelves from current user which are synced and do not belong to the "only sync" shelves
+def kobo_eligible_book_ids(user_id):
+    """Book ids the user's Kobo-sync shelves make eligible for delivery, plus
+    whether that set can be trusted.
+
+    Mirrors the sync handler's own membership arm (``HandleSyncRequest``):
+    books on a manual shelf of this user with ``kobo_sync`` set, UNION the
+    books of their kobo_sync magic shelves. ``reliable`` is False when a magic
+    shelf's membership query failed — an incomplete set must never be treated
+    as "not eligible", or a transient DB error archives books off the device
+    (fork #468).
+    """
+    rows = (ub.session.query(ub.BookShelf.book_id)
+            .join(ub.Shelf, ub.Shelf.id == ub.BookShelf.shelf)
+            .filter(ub.Shelf.user_id == user_id,
+                    ub.Shelf.kobo_sync == True)  # noqa: E712
+            .all())
+    book_ids = {row[0] for row in rows}
+    # Lazy: cps.kobo imports this module, so a top-level import would cycle.
+    from .kobo import get_magic_shelf_book_ids_for_kobo
+    magic_ids, reliable = get_magic_shelf_book_ids_for_kobo(user_id)
+    return book_ids | magic_ids, reliable
+
+
+# Archive every book this user has synced to their device that their Kobo-sync
+# shelves do NOT make eligible, and record their non-synced shelves as archived
+# so the device drops those too. Runs when "sync only selected shelves" goes
+# off -> on (classic /me form and POST /api/v1/account/profile).
 def update_on_sync_shelfs(user_id):
-    books_to_archive = (ub.session.query(ub.KoboSyncedBooks)
-                        .join(ub.BookShelf, ub.KoboSyncedBooks.book_id == ub.BookShelf.book_id, isouter=True)
-                        .join(ub.Shelf, ub.Shelf.user_id == user_id, isouter=True)
-                        .filter(or_(ub.Shelf.kobo_sync == 0, ub.Shelf.kobo_sync==None))
-                        .filter(ub.KoboSyncedBooks.user_id == user_id).all())
-    for b in books_to_archive:
+    # Fork #866/#1008: the previous query joined Shelf on user_id ALONE, never
+    # on Shelf.id == BookShelf.shelf. Any one non-kobo_sync shelf owned by the
+    # user therefore matched every synced book, so books that WERE on the
+    # Kobo-sync shelf got archived off the device — reproduced live: a book on
+    # a kobo_sync shelf was archived purely because an unrelated plain shelf
+    # existed. Decide from the eligible-id set the sync handler itself uses.
+    eligible, reliable = kobo_eligible_book_ids(user_id)
+    if not reliable:
+        log.warning("Kobo Sync: skipping the shelf-only archive sweep for user %s — "
+                    "magic-shelf membership was incomplete, archiving now could "
+                    "remove books the user selected", user_id)
+        return
+
+    synced = (ub.session.query(ub.KoboSyncedBooks)
+              .filter(ub.KoboSyncedBooks.user_id == user_id).all())
+    for b in synced:
+        if b.book_id in eligible:
+            continue
         change_archived_books(b.book_id, True)
         ub.session.query(ub.KoboSyncedBooks) \
             .filter(ub.KoboSyncedBooks.book_id == b.book_id) \
@@ -132,6 +171,12 @@ def update_on_sync_shelfs(user_id):
     # Search all shelf which are currently not synced
     shelves_to_archive = ub.session.query(ub.Shelf).filter(ub.Shelf.user_id == user_id).filter(
         ub.Shelf.kobo_sync == 0).all()
+    # Toggling the setting off and on again used to append a duplicate archive
+    # row per shelf every time (47 rows for 2 shelves on a test account).
+    already = {row[0] for row in ub.session.query(ub.ShelfArchive.uuid)
+               .filter(ub.ShelfArchive.user_id == user_id).all()}
     for a in shelves_to_archive:
+        if a.uuid in already:
+            continue
         ub.session.add(ub.ShelfArchive(uuid=a.uuid, user_id=user_id))
         ub.session_commit()

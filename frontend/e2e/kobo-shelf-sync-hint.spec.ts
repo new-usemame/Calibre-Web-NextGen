@@ -107,6 +107,7 @@ test.describe('#866 Kobo shelf-sync hint', () => {
       headers,
       data: { name: `e2e-866m-${testInfo.project.name}-${Date.now()}`, kobo_sync: true },
     });
+    expect(created.ok(), 'shelf create should succeed').toBeTruthy();
     const shelfId = ((await created.json()) as { id: number }).id;
 
     try {

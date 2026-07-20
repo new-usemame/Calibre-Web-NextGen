@@ -1,3 +1,4 @@
+import inspect
 import types
 
 from cps import app
@@ -288,3 +289,38 @@ def test_handle_new_user_sets_opds_only_shelves_sync(monkeypatch):
 
     assert content.opds_only_shelves_sync is True
     assert session.committed is True
+
+
+def test_admin_bulk_enable_kobo_only_shelves_archives_each_transition(monkeypatch):
+    users = [
+        types.SimpleNamespace(id=7, kobo_only_shelves_sync=0),
+        types.SimpleNamespace(id=8, kobo_only_shelves_sync=1),
+    ]
+    calls = []
+
+    class UserQuery:
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def all(self):
+            return users
+
+    monkeypatch.setattr(admin.ub, "session", types.SimpleNamespace(
+        query=lambda _entity: UserQuery(),
+        rollback=lambda: None,
+    ))
+    monkeypatch.setattr(admin.ub, "session_commit", lambda: calls.append("commit"))
+    monkeypatch.setattr(admin.config, "config_anonbrowse", True, raising=False)
+    monkeypatch.setattr(admin.kobo_sync_status, "update_on_sync_shelfs",
+                        lambda user_id: calls.append(user_id))
+
+    with app.test_request_context(
+        "/ajax/editlistusers/kobo_only_shelves_sync",
+        method="POST",
+        data={"pk[]": ["7", "8"], "value": "true"},
+    ):
+        response = inspect.unwrap(admin.edit_list_user)("kobo_only_shelves_sync")
+
+    assert response == ""
+    assert [user.kobo_only_shelves_sync for user in users] == [1, 1]
+    assert calls == ["commit", 7]

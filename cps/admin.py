@@ -821,6 +821,7 @@ def table_get_default_lang():
 def edit_list_user(param):
     vals = request.form.to_dict(flat=False)
     all_user = ub.session.query(ub.User)
+    kobo_shelf_sync_users = []
     if not config.config_anonbrowse:
         all_user = all_user.filter(ub.User.role.op('&')(constants.ROLE_ANONYMOUS) != constants.ROLE_ANONYMOUS)
     # only one user is posted
@@ -853,7 +854,10 @@ def edit_list_user(param):
                 elif param == 'email':
                     user.email = check_email(vals['value'])
                 elif param == 'kobo_only_shelves_sync':
+                    was_enabled = bool(user.kobo_only_shelves_sync)
                     user.kobo_only_shelves_sync = int(vals['value'] == 'true')
+                    if not was_enabled and user.kobo_only_shelves_sync:
+                        kobo_shelf_sync_users.append(user.id)
                 elif param == 'opds_only_shelves_sync':
                     user.opds_only_shelves_sync = int(vals['value'] == 'true')
                 elif param == 'kindle_mail':
@@ -921,6 +925,12 @@ def edit_list_user(param):
             log.error_or_exception(ex)
             return str(ex), 400
     ub.session_commit()
+    for user_id in kobo_shelf_sync_users:
+        try:
+            kobo_sync_status.update_on_sync_shelfs(user_id)
+        except Exception:
+            ub.session.rollback()
+            log.error("Could not archive unsynced shelves for user %s", user_id, exc_info=True)
     return ""
 
 

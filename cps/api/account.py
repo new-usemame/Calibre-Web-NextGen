@@ -175,25 +175,22 @@ def update_profile():
         return _err("db_error", "Could not save profile: %s" % ex, 500)
 
     # #866 (@auspex): switching "Sync only selected shelves to Kobo" off -> on
-    # has to archive everything already synced that is not on a Kobo-sync shelf,
-    # or the device keeps every book it ever pulled. The classic /me form has
-    # always done this (cps/web.py); the SPA endpoint only flipped the flag, so
-    # a user who followed the new UI kept syncing their whole library.
+    # has to record the user's other shelves as archived, so their device drops
+    # those collections. The classic /me form has always done this
+    # (cps/web.py); the SPA endpoint only flipped the flag. Book-level removal
+    # is the sync handler's job, not ours — see update_on_sync_shelfs.
     #
     # Runs after the commit: the setting is what the user asked for and must
-    # stick even if the sweep trips, and the sweep commits per book itself.
-    # The sweep is idempotent — it archives only books the user's Kobo-sync
-    # shelves do not cover, and skips shelf-archive rows it already wrote — so
-    # a partial run is completed by the next one, and two concurrent requests
-    # that both see the 0 -> 1 transition cannot compound each other.
+    # stick even if this trips. It is idempotent (shelf rows it already wrote
+    # are skipped), so a partial run is completed by any later one.
     if not kobo_shelves_was_on and current_user.kobo_only_shelves_sync:
         try:
             update_on_sync_shelfs(current_user.id)
         except Exception:
-            # Leave the session usable for serialization/teardown — the sweep
-            # commits per book, so an error can leave it in a failed state.
+            # Leave the session usable for serialization/teardown — it commits
+            # per shelf, so an error can leave it in a failed state.
             ub.session.rollback()
-            log.error("Could not archive previously synced books for user %s",
+            log.error("Could not archive unsynced shelves for user %s",
                       current_user.id, exc_info=True)
 
     return jsonify(_serialize_account())

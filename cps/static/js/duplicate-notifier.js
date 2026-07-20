@@ -22,6 +22,10 @@
     let pollAttempts = 0;
     let pollTimer = null;
     let pollDelayMs = POLL_INTERVAL_MS;
+    // True while we are following a scan we have already seen in flight. Used so a
+    // transient error retries instead of abandoning the scan, without letting a
+    // failed page-load fetch start polling on an otherwise quiet instance (#1288).
+    let followingScan = false;
     let lastPreviewSignature = '';
     
     /**
@@ -91,7 +95,14 @@
      * to re-arm itself (#1288).
      */
     function scheduleNextPoll() {
-        if (pollTimer || isModalActive() || pollAttempts >= POLL_MAX_ATTEMPTS) {
+        if (pollTimer) {
+            return;
+        }
+        if (pollAttempts >= POLL_MAX_ATTEMPTS) {
+            // Give up on a scan that never settles, but clear the counters as we
+            // go: a later page load or tab focus starts a clean episode instead
+            // of inheriting an exhausted one.
+            stopStatusPolling();
             return;
         }
         const delay = pollDelayMs;
@@ -110,6 +121,7 @@
         }
         pollAttempts = 0;
         pollDelayMs = POLL_INTERVAL_MS;
+        followingScan = false;
     }
 
     function isModalActive() {
@@ -179,7 +191,36 @@
 
     function handleStatusResponse(data) {
         if (!data || !data.success) {
+            // #1288: a blip while following a scan retries (bounded by the attempt
+            // cap and the backoff) rather than abandoning the scan — the old
+            // free-running interval recovered from these on its own. A failure when
+            // we were NOT following a scan leaves the instance quiet, and resets the
+            // counters so a half-spent budget can't cap the next scan.
+            if (followingScan) {
+                scheduleNextPoll();
+            } else {
+                stopStatusPolling();
+            }
             return;
+        }
+
+        // #1288: decide on polling BEFORE any early return below, so that showing
+        // the modal (or being on the duplicates page) can't drop the chain and
+        // leave a running scan unobserved until the tab is reloaded.
+        //
+        // Keep checking ONLY while a scan is genuinely in flight — `stale`
+        // mirrors the server's `scan_pending`.
+        //
+        // `needs_scan` is deliberately excluded: it means "an admin must trigger
+        // a full scan", and the server reports it alongside `stale` in that
+        // branch. Polling cannot resolve a state that waits on a human, and
+        // treating it as a reason to poll is what kept quiet instances calling
+        // /duplicates/status every 2.5s for the life of the tab.
+        if (data.stale && !data.needs_scan) {
+            followingScan = true;
+            scheduleNextPoll();
+        } else {
+            stopStatusPolling();
         }
 
         if (!window.CWADuplicateScanActive) {
@@ -198,20 +239,6 @@
             }
         }
 
-        // #1288: keep checking ONLY while a scan is genuinely in flight, so the
-        // badge picks up its result without a reload. `stale` mirrors the
-        // server's `scan_pending`.
-        //
-        // `needs_scan` is deliberately excluded: it means "an admin must trigger
-        // a full scan", and the server reports it alongside `stale` in that
-        // branch. Polling cannot resolve a state that waits on a human, and
-        // treating it as a reason to poll is what kept quiet instances calling
-        // /duplicates/status every 2.5s for the life of the tab.
-        if (data.stale && !data.needs_scan) {
-            scheduleNextPoll();
-        } else {
-            stopStatusPolling();
-        }
     }
     
     /**

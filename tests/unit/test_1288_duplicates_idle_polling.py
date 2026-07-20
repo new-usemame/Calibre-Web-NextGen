@@ -241,6 +241,81 @@ def test_no_permission_means_no_request_at_all():
     assert r["count"] == 0, f"{r['count']} requests for a user without duplicates permission"
 
 
+# --- defects caught by the cross-family review of the first cut of this fix -------
+#
+# The first version made the poll decision at the END of handleStatusResponse, after
+# the `if (isModalActive()) return;` guard. Each of these is a way the polling chain
+# could be dropped mid-scan and never restart, which the old free-running setInterval
+# did not suffer from. All three are about NOT trading the reported bug for a badge
+# that silently stops updating.
+
+
+def test_modal_open_does_not_drop_the_chain_mid_scan():
+    """A scan running while the notification modal is up must still be observed.
+
+    The old setInterval kept ticking through the modal. Returning early before the
+    scheduling decision meant one response during an open modal killed polling for
+    the life of the tab.
+    """
+    modal_then_scan = dict(_settled(count=4))  # count>0 + enabled => modal opens
+    modal_then_scan["stale"] = True
+    r = _run({
+        "elements": ELEMENTS,
+        "responses": [modal_then_scan],
+        "advance_ms": 60 * 1000,
+    })
+    assert r["count"] >= 4, (
+        f"only {r['count']} requests in a minute of scanning with the modal open — "
+        "the chain was dropped and the scan result will never land"
+    )
+
+
+def test_failed_response_does_not_poison_the_next_scan():
+    """A transient error must reset the budget, not leave it half-spent.
+
+    `pollAttempts` only reset in stopStatusPolling(); an error path that returned
+    early left the counter high, so a later scan could cap after a single request.
+    """
+    failure = {"success": False, "count": 0, "preview": [], "enabled": True}
+    # 30 stale polls, then a failure, then a fresh scan for the rest of the run.
+    responses = [_scanning()] * 30 + [failure] + [_scanning()] * 400
+    r = _run({"elements": ELEMENTS, "responses": responses, "advance_ms": 30 * 60 * 1000})
+    # After the failure the episode restarts from a clean counter, so the run as a
+    # whole must keep polling well past where a poisoned counter would have stalled.
+    assert r["count"] > 32, (
+        f"polling stalled at {r['count']} requests after a transient failure — "
+        "the attempt budget was not reset"
+    )
+
+
+def test_a_failing_endpoint_does_not_start_polling_a_quiet_instance():
+    """The retry path above must not become a new way to hammer an idle server.
+
+    If we were never following a scan, a failing /duplicates/status must leave the
+    instance quiet rather than opening a retry loop — that would reintroduce #1288
+    for anyone whose endpoint errors (misconfigured proxy, feature mid-migration).
+    """
+    failure = {"success": False, "count": 0, "preview": [], "enabled": True}
+    r = _run({"elements": ELEMENTS, "responses": [failure], "advance_ms": 60 * 60 * 1000})
+    assert r["count"] == 1, (
+        f"{r['count']} requests in an hour against a failing endpoint on an instance "
+        "that was never following a scan"
+    )
+
+
+def test_cap_is_a_bounded_episode_not_a_permanent_stop():
+    """Hitting the safety cap must clear state so a later refresh polls again."""
+    r = _run({
+        "elements": ELEMENTS,
+        "responses": [_scanning()],
+        "advance_ms": 6 * 60 * 60 * 1000,   # six hours of a wedged scan_pending
+    })
+    # Bounded: nowhere near a sustained beat over six hours...
+    assert r["count"] < 200, f"{r['count']} requests over six hours — cap not enforced"
+    # ...but the cap must not be a one-shot budget that never refills.
+    assert r["count"] >= 60, f"only {r['count']} requests — episodes never resumed"
+
+
 def test_attempt_cap_comment_matches_the_interval():
     """#1018 raised the interval and left `// ~2.5 minutes` describing ~60 minutes."""
     import re

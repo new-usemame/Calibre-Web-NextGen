@@ -8,7 +8,7 @@
     
     const STORAGE_KEY = 'cwa_duplicates_notification_shown';
     const LAST_COUNT_KEY = 'cwa_duplicates_last_count';
-    const POLL_INTERVAL_MS = 2500;
+    const POLL_INTERVAL_MS = 60 * 1000;
     const POLL_MAX_ATTEMPTS = 60; // ~2.5 minutes
     
     let currentDuplicateCount = 0;

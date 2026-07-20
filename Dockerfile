@@ -378,6 +378,30 @@ RUN \
 # Add unrar from unrar stage
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 
+# Bake Calibre's /usr/bin symlinks into the image (#875; original patch by
+# @chloeroform in #1014). The binaries themselves already ship in the image
+# (COPY --from=dependencies /app/calibre above), but the /usr/bin entry
+# points did not, so `calibredb --version` failed on a cold boot and the
+# calibre-binaries-setup s6 service ran calibre_postinstall on EVERY start --
+# ~12s of a ~60s startup. With the links present that check passes and the
+# service no-ops. The service stays in place as the fallback for images
+# where the links are missing (e.g. a non-Ubuntu base).
+#
+# The link set mirrors the entry points calibre_postinstall itself creates:
+# every executable at the top level of /app/calibre except the installer
+# itself and calibre-complete (the bash-completion helper, which upstream
+# reaches through the completion scripts rather than through PATH).
+# `test -x` resolves the symlink without executing the binary, so this stays
+# valid under cross-arch buildx where the target binary cannot run.
+#
+# Nothing else that ran at boot moves here: the Qt6 / kernel ABI check and
+# the PUID/PGID ownership pass live in the cwa-init service, which runs
+# before this one and is gated on its own sentinel.
+RUN find /app/calibre -maxdepth 1 -type f -perm -u+x \
+  ! -name 'calibre_postinstall' ! -name 'calibre-complete' \
+  -exec ln -sf {} /usr/bin/ \; && \
+  test -x /usr/bin/calibredb
+
 # Deliberately NO global CALIBRE_CONFIG_DIRECTORY here. (A misspelled
 # CALIBRE_CONFIG_DIR lived here for a while -- Calibre ignores that name,
 # and setting the real one globally would force user-plugin loading on for

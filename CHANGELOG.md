@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- **The container starts about 12 seconds faster.** Every start ran a Calibre installation step that took roughly a fifth of the whole boot — and it ran every time, on a container that already had Calibre in it. The binaries did ship in the image; what was missing were the shortcuts that let the startup check find them, so the check failed and the install step ran again. Those shortcuts are now built into the image, the check passes, and the step finishes instantly. Nothing about how Calibre works changes, and the step still runs on its own if an image ever turns up without them. Reported and originally patched by [@chloeroform](https://github.com/chloeroform) ([#875](https://github.com/new-usemame/Calibre-Web-NextGen/issues/875), [#1014](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1014)).
+
 ### Fixed
 
 - **Kobo sync no longer occasionally un-downloads books from a magic shelf and takes your highlights with them.** If you sync only selected shelves and one of them is a magic shelf, a book you already had on the device could sometimes come back with the download arrow on it; re-downloading it lost the annotations and highlights you had made. The sync was working out which books belong to a magic shelf by loading each book's full record, and if the library database happened to be mid-rewrite at that moment — which the automatic ingest does routinely — a few books quietly failed to load and were treated as "no longer on the shelf", so they were archived off the device. Shelf membership is now read from the shelf's own book list, which does not depend on the library database being readable at that instant. Reported by [@TheDarkSpock](https://github.com/TheDarkSpock) and [@bigbold1023](https://github.com/bigbold1023) ([crocodilestick/Calibre-Web-Automated#1307](https://github.com/crocodilestick/Calibre-Web-Automated/issues/1307)).

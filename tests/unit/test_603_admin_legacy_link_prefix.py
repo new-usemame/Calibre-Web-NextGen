@@ -53,8 +53,37 @@ def test_server_config_links_go_through_resource_url():
         "raw legacy <a href={href}> leaks the reverse-proxy prefix (#603)"
     assert "<Link key={href} href={href}" in src, \
         "native settings destinations must stay inside the SPA router"
-    assert "href: '/duplicates', label: 'Duplicate books', icon: Files, spa: true" in src, \
-        "Duplicate books already has a native SPA route and must not fall through to Classic (#909)"
+
+
+@pytest.mark.unit
+def test_no_server_setting_falls_through_to_classic_when_a_spa_route_exists():
+    """#909's real invariant, stated generically rather than pinned to one row.
+
+    A card may only be a Classic fall-through (no `spa: true`) when the SPA has
+    no native route for that path. #909 pinned this by asserting the literal
+    "Duplicate books" row; #1048 replaced that row (it pointed at /duplicates,
+    the exact destination the sidebar already offers, so the admin entry did
+    nothing new) with a deep link to the duplicate-detection *settings*, which
+    has no SPA page. Pinning the old literal would forbid that correct change,
+    so pin the rule instead: cross-check every Classic row against the SPA's own
+    route table.
+    """
+    src = _admin_src()
+    routes = (_FE / "lib" / "routes.ts").read_text()
+    spa_paths = set(re.findall(r":\s*'(/[^']*)'", routes))
+    assert "/duplicates" in spa_paths, "sanity: routes.ts should still own /duplicates"
+
+    block = re.search(r"const SERVER_SETTINGS[^=]*=\s*\[(.*?)\];", src, re.S)
+    assert block, "SERVER_SETTINGS array not found"
+    for entry in re.findall(r"\{[^{}]*href:[^{}]*\}", block.group(1)):
+        href = re.search(r"href:\s*'([^']+)'", entry).group(1)
+        path = href.split("#")[0].split("?")[0]
+        if "spa: true" in entry:
+            continue
+        assert path not in spa_paths, (
+            f"{path!r} has a native SPA route but this card falls through to "
+            f"Classic (#909). Mark it `spa: true` or point it somewhere else."
+        )
 
 
 @pytest.mark.unit

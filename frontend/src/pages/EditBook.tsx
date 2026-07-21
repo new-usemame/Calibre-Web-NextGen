@@ -255,7 +255,7 @@ export function EditBook({ id }: { id: string }) {
               value={form.languages} onChange={(v) => set('languages', v)}
               aria-label={t('Languages (comma separated)')} />
           </Field>
-          <Field label={t('Rating')} error={fieldErrors.rating} grow={false}>
+          <Field label={t('Rating')} error={fieldErrors.rating} grow={false} composite>
             <RatingSelector value={form.rating} onChange={(value) => set('rating', value)} />
           </Field>
         </div>
@@ -802,9 +802,10 @@ function FormatsManager({ id }: { id: string }) {
   );
 }
 
-function Field({ label, error, grow = true, children }:
-  { label: string; error?: string; grow?: boolean; children: React.ReactNode }) {
+function Field({ label, error, grow = true, composite = false, children }:
+  { label: string; error?: string; grow?: boolean; composite?: boolean; children: React.ReactNode }) {
   const errId = useId();
+  const labelId = useId();
   // SC 3.3.1: associate the error with the field (aria-invalid + aria-describedby)
   // and announce it (role=alert), rather than leaving a disconnected red string.
   const child = error && isValidElement(children)
@@ -813,11 +814,24 @@ function Field({ label, error, grow = true, children }:
         'aria-describedby': errId,
       })
     : children;
-  return (
-    <label className={grow ? styles.field : styles.fieldNarrow}>
-      <span className={styles.label}>{label}</span>
+  const body = (
+    <>
+      <span className={styles.label} id={composite ? labelId : undefined}>{label}</span>
       {child}
       {error && <span className={styles.fieldError} id={errId} role="alert">{error}</span>}
-    </label>
+    </>
   );
+  const className = grow ? styles.field : styles.fieldNarrow;
+  // A <label> forwards every click inside it to its first labellable descendant.
+  // For a composite widget that owns its own controls that forwarding is
+  // destructive: clicking a star in the rating selector also synthesised a click
+  // on its "Clear rating" button, so the rating snapped straight back to 0 and
+  // the widget looked dead (#1061). Composite fields render as a labelled group
+  // instead — same visual, no implicit activation.
+  if (composite) {
+    return (
+      <div className={className} role="group" aria-labelledby={labelId}>{body}</div>
+    );
+  }
+  return <label className={className}>{body}</label>;
 }

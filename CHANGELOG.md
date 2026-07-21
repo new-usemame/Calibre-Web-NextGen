@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Star ratings can be set again on the new UI's edit page.** Clicking a star did nothing on an unrated book, and wiped the rating on a book that already had one — so there was no way to rate a book from the editor at all. Clicking now sets the rating you aimed at (half-stars included), and it saves with the rest of the form. Reported by [@KucharczykL](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1061) ([#1061](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1061)).
+
 ### Changed
 
 - **The new UI now reads fully in Russian.** The duplicate-scan controls added in v4.1.19 and the annotation-sync task labels had no Russian translation yet, so Russian users saw those in English. They are now translated, along with a spelling correction in the Kobo delete warning. Contributed by [@standhaftsohnsergius](https://github.com/standhaftsohnsergius) ([#1058](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1058)).

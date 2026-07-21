@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useId, cloneElement, isValidElement, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search, Plus, X, MoreHorizontal, Star } from 'lucide-react';
+import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search, Plus, X, MoreHorizontal } from 'lucide-react';
 import {
   useBookMetadata, useUpdateMetadata, useBook, useMe, useDeleteFormat, useConvertFormat,
   useSetCover, useMetadataSearch, useMetadataProviders, useSetMetadataProviderActive, useAddFormat,
@@ -36,6 +36,9 @@ interface FormState {
 function RatingSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const t = useT();
   const rating = Number(value) || 0;
+  // Half stars are hard to read at a glance, so the slider carries the value as
+  // both its accessible text and a hover tooltip.
+  const valueText = rating ? t('Rated {rating} out of 5', { rating }) : t('Not rated');
   const setRating = (next: number) => onChange(next > 0 ? String(Math.max(0.5, Math.min(5, next))) : '');
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     let next: number | null = null;
@@ -53,11 +56,12 @@ function RatingSelector({ value, onChange }: { value: string; onChange: (value: 
     <div className={styles.ratingControl}>
       <div className={styles.ratingStars} role="slider" tabIndex={0}
         aria-label={t('Rating')} aria-valuemin={0} aria-valuemax={5} aria-valuenow={rating}
-        aria-valuetext={rating ? t('Rated {rating} out of 5', { rating }) : t('Not rated')}
+        aria-valuetext={valueText} title={valueText}
         onKeyDown={onKeyDown} onClick={choose}>
-        {rating ? <StarRating rating={rating * 2} size={26} /> : Array.from({ length: 5 }, (_, i) => (
-          <Star key={i} size={26} aria-hidden="true" focusable={false} />
-        ))}
+        {/* One renderer for both states. Hand-rolling the empty track here gave
+            it a different width to <StarRating>'s (no inter-star gap), so the
+            whole row re-flowed by 8px the moment a book was rated (#1064). */}
+        <StarRating rating={rating * 2} size={26} decorative />
       </div>
       <button type="button" className={styles.clearRating} onClick={() => onChange('')} disabled={!rating}>
         {t('Clear rating')}

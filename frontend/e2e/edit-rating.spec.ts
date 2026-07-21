@@ -123,4 +123,52 @@ test.describe('#1061 star rating on the edit page', () => {
     // The label text must still name the group for assistive tech.
     await expect(page.getByRole('group', { name: /rating/i })).toBeVisible();
   });
+
+  /*
+   * Fork issue #1064 — the Languages input on the same row jumped ~8px wider
+   * when the book was unrated and back again the moment a star was clicked.
+   *
+   * Root cause: the selector drew its stars two different ways. A rated book
+   * went through <StarRating>, whose track is an inline-flex with a 2px gap
+   * between the five slots; an unrated book fell back to five bare lucide
+   * <Star> glyphs laid out with no gap at all. Four missing gaps is exactly the
+   * 8px the reporter measured, and since Rating is the fixed-width sibling of a
+   * flex:1 Languages field, the whole row re-flowed on every rating change.
+   */
+  test('#1064 the row does not re-flow when the rating changes', async ({ page }) => {
+    await page.goto('/app/');
+    const id = await firstBookId(page);
+    test.skip(!id, 'seed has no books');
+
+    await page.goto(`/app/book/${id}/edit`);
+    await expect(page.locator(RATING)).toBeVisible();
+
+    const languages = page.getByLabel(/languages/i).first();
+    const widths = async () => ({
+      languages: (await languages.boundingBox())!.width,
+      stars: (await page.locator(RATING).boundingBox())!.width,
+    });
+
+    await clearRating(page);
+    const unrated = await widths();
+
+    await clickStars(page, 0.75);
+    await expect(page.locator(RATING)).toHaveAttribute('aria-valuenow', '4');
+    const rated = await widths();
+
+    // Sub-pixel drift from fractional flex distribution is fine; a whole glyph
+    // gap is not. Pre-fix this was an 8px swing in both directions.
+    expect(Math.abs(rated.stars - unrated.stars),
+      'the star track changes width between rated and unrated').toBeLessThan(1);
+    expect(Math.abs(rated.languages - unrated.languages),
+      'the Languages field re-flows when the rating changes').toBeLessThan(1);
+
+    // Half stars go through the fractional-fill path — pin that it keeps the
+    // same track width rather than only the integer case.
+    await clickStars(page, 0.45);
+    await expect(page.locator(RATING)).toHaveAttribute('aria-valuenow', '2.5');
+    const half = await widths();
+    expect(Math.abs(half.stars - unrated.stars)).toBeLessThan(1);
+    expect(Math.abs(half.languages - unrated.languages)).toBeLessThan(1);
+  });
 });

@@ -18,6 +18,7 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The edit page no longer jumps around when you rate a book.** On the new UI's edit page, the Languages field was 8 pixels wider while a book was unrated and snapped back the moment you clicked a star, so the row visibly shifted every time the rating changed. The stars now take the same space in both states. Reported by [@KucharczykL](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1064) ([#1064](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1064)).
 - **Star ratings can be set again on the new UI's edit page.** Clicking a star did nothing on an unrated book, and wiped the rating on a book that already had one — so there was no way to rate a book from the editor at all. Clicking now sets the rating you aimed at (half-stars included), and it saves with the rest of the form. Reported by [@KucharczykL](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1061) ([#1061](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1061)).
 
 ### Changed

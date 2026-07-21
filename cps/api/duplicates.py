@@ -88,9 +88,29 @@ def trigger_duplicate_scan():
 
     Unlike the legacy route this is NOT csrf-exempt — the SPA sends X-CSRFToken
     on every POST, so the endpoint keeps the standard /api/v1 protection.
+
+    Two guards the legacy route does not have, because a button in the SPA is far
+    easier to hammer than the classic page's (it re-enables as soon as the POST
+    returns, long before the scan finishes):
+
+      * single-flight — a full scan already queued or running short-circuits to an
+        idempotent 200 instead of stacking another full-library scan behind it;
+      * no synchronous fallback — the legacy path rebuilds the index inline when
+        the worker cannot take the task, and CWNG runs gevent WITHOUT
+        monkey.patch_all(), so that would freeze every other request for the
+        length of a full scan. Here that failure returns 503 and the user can
+        retry.
     """
     guard = _require_admin_or_edit()
     if guard:
         return guard
+
+    from ..cwa_functions import _duplicate_full_scan_running
+    if _duplicate_full_scan_running():
+        return jsonify({
+            "success": True, "queued": False, "already_running": True,
+            "message": "A full duplicate scan is already running.",
+        })
+
     from ..duplicates import trigger_scan as legacy_trigger_scan
-    return legacy_trigger_scan()
+    return legacy_trigger_scan(allow_sync_fallback=False)

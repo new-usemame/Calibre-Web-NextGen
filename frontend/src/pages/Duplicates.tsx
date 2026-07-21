@@ -45,7 +45,9 @@ export function Duplicates() {
         {scan.isError
           ? t('Could not start the duplicate scan.')
           : scan.isSuccess
-            ? t('Duplicate scan started. It runs in the background — this list updates when it finishes.')
+            ? scan.data?.already_running
+              ? t('A duplicate scan is already running. This list updates when it finishes.')
+              : t('Duplicate scan started. It runs in the background — this list updates when it finishes.')
             : ''}
       </p>
 

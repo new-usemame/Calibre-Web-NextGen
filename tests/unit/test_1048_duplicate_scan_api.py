@@ -83,10 +83,12 @@ def test_scan_admin_or_edit_reaches_the_legacy_trigger(admin, edit):
     """Both roles get through the guard and the legacy implementation is what runs."""
     from cps.api import duplicates as mod
     import cps.duplicates as legacy
+    import cps.cwa_functions as cwaf
     sentinel = ({"success": True, "queued": True}, 200)
     with _ctx():
         with patch.object(mod, "current_user", _user(admin=admin, edit=edit)), \
-             patch.object(legacy, "trigger_scan", lambda: sentinel) as _:
+             patch.object(cwaf, "_duplicate_full_scan_running", lambda: False), \
+             patch.object(legacy, "trigger_scan", lambda **kw: sentinel):
             resp = inspect.unwrap(mod.trigger_duplicate_scan)()
     assert resp is sentinel
 
@@ -103,8 +105,64 @@ def test_scan_endpoint_delegates_rather_than_reimplementing():
     from cps.api import duplicates as mod
     src = inspect.getsource(mod.trigger_duplicate_scan)
     assert "from ..duplicates import trigger_scan" in src
-    assert "return legacy_trigger_scan()" in src
+    assert "return legacy_trigger_scan(allow_sync_fallback=False)" in src
     assert "TaskDuplicateScan" not in src, "scan queueing must not be re-implemented here"
+
+
+# ── single-flight + no-freeze fallback (cross-family review findings) ─────────
+
+@pytest.mark.unit
+def test_second_scan_while_one_is_running_does_not_queue_another():
+    """The SPA button re-enables the moment the POST returns, long before the
+    scan finishes — without this guard, clicks stack full-library scans."""
+    from cps.api import duplicates as mod
+    import cps.duplicates as legacy
+    import cps.cwa_functions as cwaf
+    called = []
+    with _ctx():
+        with patch.object(mod, "current_user", _user()), \
+             patch.object(cwaf, "_duplicate_full_scan_running", lambda: True), \
+             patch.object(legacy, "trigger_scan", lambda **kw: called.append(kw)):
+            resp = inspect.unwrap(mod.trigger_duplicate_scan)()
+    body = _body(resp)
+    assert called == [], "a second full scan must not be queued while one is running"
+    assert body["already_running"] is True and body["queued"] is False
+    assert body["success"] is True, "repeat clicks are idempotent, not an error"
+
+
+@pytest.mark.unit
+def test_scan_is_queued_when_none_is_running():
+    from cps.api import duplicates as mod
+    import cps.duplicates as legacy
+    import cps.cwa_functions as cwaf
+    seen = {}
+    with _ctx():
+        with patch.object(mod, "current_user", _user()), \
+             patch.object(cwaf, "_duplicate_full_scan_running", lambda: False), \
+             patch.object(legacy, "trigger_scan", lambda **kw: seen.update(kw) or ("ok", 200)):
+            resp = inspect.unwrap(mod.trigger_duplicate_scan)()
+    assert resp == ("ok", 200)
+    assert seen == {"allow_sync_fallback": False}, \
+        "the API path must opt out of the inline rebuild (gevent has no monkey-patch)"
+
+
+@pytest.mark.unit
+def test_legacy_trigger_keeps_the_sync_fallback_by_default():
+    """The classic page's behaviour is unchanged — only the API opts out."""
+    import cps.duplicates as legacy
+    sig = inspect.signature(inspect.unwrap(legacy.trigger_scan))
+    assert sig.parameters["allow_sync_fallback"].default is True
+
+
+@pytest.mark.unit
+def test_disabled_fallback_returns_503_instead_of_rebuilding_inline():
+    """A worker failure must not turn one click into a whole-server freeze."""
+    import cps.duplicates as legacy
+    src = inspect.getsource(inspect.unwrap(legacy.trigger_scan))
+    guard = src.index("if not allow_sync_fallback:")
+    rebuild = src.index("rebuild_duplicate_index")
+    assert guard < rebuild, "the opt-out must short-circuit before the inline rebuild"
+    assert "503" in src[guard:rebuild]
 
 
 @pytest.mark.unit

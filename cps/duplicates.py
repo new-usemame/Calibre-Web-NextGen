@@ -1461,8 +1461,16 @@ def invalidate_cache():
 @csrf.exempt
 @login_required_if_no_ano
 @admin_or_edit_required
-def trigger_scan():
-    """Manually trigger a duplicate scan"""
+def trigger_scan(allow_sync_fallback=True):
+    """Manually trigger a duplicate scan.
+
+    `allow_sync_fallback` (#1048) controls what happens when the worker cannot
+    take the task. The classic page keeps the historical behaviour — rebuild the
+    index inline rather than fail the click. Callers on a request path that must
+    not block (the /api/v1 endpoint) pass False and get a 503 instead: CWNG runs
+    gevent WITHOUT monkey.patch_all(), so an inline full-library rebuild stalls
+    the hub and every other request with it.
+    """
     try:
         # NOTE (fork #318): we intentionally do not gate manual scan
         # triggers on the deferred follow-up marker here. That marker can
@@ -1493,6 +1501,15 @@ def trigger_scan():
                 'queued': True
             })
         except Exception as e:
+            if not allow_sync_fallback:
+                log.error("[cwa-duplicates] Failed to queue scan task and sync fallback is "
+                          "disabled for this caller: %s", str(e))
+                return jsonify({
+                    'success': False,
+                    'queued': False,
+                    'error': 'The duplicate scan could not be queued. Please try again.',
+                }), 503
+
             log.error("[cwa-duplicates] Failed to queue scan task, falling back to sync scan: %s", str(e))
             print(f"[cwa-duplicates] Failed to queue task, using fallback: {str(e)}", flush=True)
 

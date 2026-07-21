@@ -936,6 +936,7 @@ _("Your Kobo is still set to sync your whole library, so marking this shelf does
 
 # #1048 — SPA-only strings for the duplicates page's manual scan trigger and the
 # admin panel's duplicate-detection settings row.
+_("A duplicate scan is already running. This list updates when it finishes.")
 _("A one-time full duplicate scan is needed. Use “Scan for duplicates” above to run it.")
 _("Could not start the duplicate scan.")
 _("Duplicate detection settings")

@@ -1074,7 +1074,8 @@ export function useDismissDuplicate() {
  *  response only confirms it was queued — the list refreshes when it finishes. */
 export function useTriggerDuplicateScan() {
   const qc = useQueryClient();
-  return useMutation<{ success?: boolean; message?: string; task_id?: string; queued?: boolean }>({
+  return useMutation<{ success?: boolean; message?: string; task_id?: string;
+    queued?: boolean; already_running?: boolean }>({
     mutationFn: () => apiPost('/api/v1/duplicates/scan'),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['duplicates'] }),
   });

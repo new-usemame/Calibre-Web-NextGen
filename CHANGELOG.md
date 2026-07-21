@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- **The new UI now reads fully in Russian.** The duplicate-scan controls added in v4.1.19 and the annotation-sync task labels had no Russian translation yet, so Russian users saw those in English. They are now translated, along with a spelling correction in the Kobo delete warning. Contributed by [@standhaftsohnsergius](https://github.com/standhaftsohnsergius) ([#1058](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1058)).
+
 ## [v4.1.19] - 2026-07-21
 
 ### Changed

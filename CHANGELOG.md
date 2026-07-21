@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.19] - 2026-07-21
+
 ### Changed
 
 - **The new UI now reads in Brazilian Portuguese.** Around 120 strings added in recent releases had no pt-BR translation yet, so Brazilian Portuguese users saw them in English — reading progress, the cover picker, the account and profile actions, and most of the task and error messages. All of them are now translated, along with a handful of corrections to existing wording. Contributed by [@pedronora](https://github.com/pedronora) ([#1021](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1021)).

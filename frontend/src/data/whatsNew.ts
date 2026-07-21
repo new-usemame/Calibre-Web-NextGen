@@ -56,6 +56,62 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.19',
+    date: '2026-07-21',
+    items: [
+      {
+        title: 'Guests can browse again without signing in',
+        body: 'With anonymous browsing switched on, visitors were still met by a sign-in screen in the new interface and could not reach the library at all. Guests now land straight in the library, and the account menu offers them a Sign in link instead of a sign-out and an account page they could not open. Servers without anonymous browsing still require a login, exactly as before.',
+        category: 'Account',
+      },
+      {
+        title: 'KOReader highlight sync is fast again, and no longer reports a failure it did not have',
+        body: 'If you send Kobo annotations on to Hardcover, every highlight was pushed while your reader waited — around ten seconds each, during which the whole server stopped answering anyone. Books with a few highlights ran past the reader plugin\'s time limit and showed "Server push failed" for a sync that had in fact been saved. Highlights are now saved and confirmed to your device immediately, with the Hardcover half handled in the background.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo sync no longer un-downloads books from a smart shelf',
+        body: 'If you sync only selected shelves and one of them is a smart shelf, a book already on your reader could come back with the download arrow on it, and re-downloading it lost your highlights and annotations. It happened when the library database was mid-rewrite — routine during an automatic ingest — and a few books were misread as no longer being on the shelf. Shelf membership is now read in a way that does not depend on that timing.',
+        category: 'Sync',
+        link: { to: '/shelves', label: 'Open your shelves' },
+      },
+      {
+        title: 'Smart shelves now have the same Kobo sync controls as ordinary ones',
+        body: 'Marking a smart shelf for Kobo sync meant opening the rule editor and re-saving the whole shelf; the "Enable Kobo sync" button that ordinary shelves have was missing. It is now on the smart-shelf page next to Edit and Duplicate, and appears only when your server actually supports it. The page also warns you, as ordinary shelves already did, when your account is still set to sync your whole library — which quietly makes the mark do nothing.',
+        category: 'Sync',
+        link: { to: '/shelves', label: 'Open your shelves' },
+      },
+      {
+        title: 'You can start a duplicate scan from the new interface',
+        body: 'The Duplicates page had no way to start a scan: the button lived on the classic page, and the "a full scan is needed" notice pointed at a settings page that has no such button. There is now a "Scan for duplicates" button that runs the scan in the background and tells you when it is queued. The Admin panel\'s Duplicate Books row now opens the duplicate-detection settings — matching rules, scan schedule, automatic resolution — instead of repeating the sidebar link.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Russian, Ukrainian, Greek and Japanese libraries sort correctly again',
+        body: 'A recent fix that ignores accents when sorting was applying itself to every alphabet, so Й and И, Ї and І, ά and α, and が and か each collapsed into one letter in the book list, the A–Z filter and OPDS feeds. Accent folding is now limited to Latin text, and the other alphabets keep their own letters.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Open tabs no longer poll the server all day',
+        body: 'Any page left open kept asking whether duplicate books had been found — roughly 1,400 requests an hour per tab on a library where nothing was happening, filling reverse-proxy logs for no reason. The check now runs on page load, when you return to a tab, and while a scan is genuinely under way, then stops. The duplicates badge and its notification still appear on their own when a scan finishes.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Faster container startup',
+        body: 'Every boot ran a Calibre installation step on a container that already had Calibre in it — about twelve seconds of a one-minute startup on the hardware where this was reported. The binaries were always in the image; the shortcuts the startup check looks for were not, so the check failed and the install ran again. Those are now built in, and the step finishes in well under a second.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Brazilian Portuguese covers the new interface',
+        body: 'Around 120 strings added in recent releases had no pt-BR translation yet, so Brazilian Portuguese readers saw them in English — reading progress, the cover picker, the account and profile actions, and most task and error messages. All of them are now translated, along with corrections to some existing wording. Pick your language in your account settings.',
+        category: 'Under the hood',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.18',
     date: '2026-07-20',
     items: [

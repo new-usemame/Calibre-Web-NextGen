@@ -4,6 +4,23 @@
 .title { font-family: var(--font-display); font-size: var(--fs-xl); color: var(--text); }
 .count { color: var(--text-muted); font-size: var(--fs-sm); }
 
+/* #1048 — manual full-scan trigger. Pushed to the trailing edge of the header. */
+.scanBtn {
+  margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border);
+  border-radius: var(--r-md); background: var(--surface-1);
+  color: var(--text); font-size: var(--fs-sm); white-space: nowrap;
+}
+.scanBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.scanBtn:disabled { opacity: 0.6; cursor: default; }
+.spinning { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
+.status:empty { display: none; }
+.status {
+  margin: calc(var(--sp-4) * -1) 0 var(--sp-4); color: var(--text-muted); font-size: var(--fs-sm);
+}
+
 .groups { display: flex; flex-direction: column; gap: var(--sp-4); }
 .group { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--sp-4); }
 .groupHead { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }

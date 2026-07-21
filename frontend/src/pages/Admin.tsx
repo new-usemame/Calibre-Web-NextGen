@@ -30,7 +30,10 @@ const SERVER_SETTINGS: { href: string; label: string; icon: typeof Settings; spa
   { href: '/cwa-settings', label: 'CWA settings (ingest/convert)', icon: Server },
   { href: '/cwa-stats-show', label: 'Statistics dashboard', icon: BarChart3 },
   { href: '/admin/logfile', label: 'Logs', icon: FileText },
-  { href: '/duplicates', label: 'Duplicate books', icon: Files, spa: true },
+  // #1048 — this row used to link to /duplicates, i.e. the exact page the
+  // sidebar already opens. From the admin panel the useful destination is the
+  // duplicate-detection *configuration*, so it deep-links to that section.
+  { href: '/cwa-settings#duplicate-detection', label: 'Duplicate detection settings', icon: Files },
 ];
 
 // Default-role checkboxes auto-granted to new OAuth users. Keys MUST match

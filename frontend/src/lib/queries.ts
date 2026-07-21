@@ -1070,6 +1070,16 @@ export function useDismissDuplicate() {
   });
 }
 
+/** Queue a manual full duplicate scan (#1048). Runs as a background task, so the
+ *  response only confirms it was queued — the list refreshes when it finishes. */
+export function useTriggerDuplicateScan() {
+  const qc = useQueryClient();
+  return useMutation<{ success?: boolean; message?: string; task_id?: string; queued?: boolean }>({
+    mutationFn: () => apiPost('/api/v1/duplicates/scan'),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['duplicates'] }),
+  });
+}
+
 // ── Info: About / Tasks ──────────────────────────────────────────────────────
 
 export function useAbout() {

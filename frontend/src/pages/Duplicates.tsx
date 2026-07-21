@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
-import { Files, X } from 'lucide-react';
-import { useDuplicates, useDismissDuplicate } from '../lib/queries';
+import { Files, RefreshCw, X } from 'lucide-react';
+import { useDuplicates, useDismissDuplicate, useTriggerDuplicateScan } from '../lib/queries';
 import { resourceUrl } from '../lib/api';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
@@ -13,6 +13,7 @@ export function Duplicates() {
   const t = useT();
   const { data, isLoading, error } = useDuplicates();
   const dismiss = useDismissDuplicate();
+  const scan = useTriggerDuplicateScan();
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !data) {
@@ -29,10 +30,27 @@ export function Duplicates() {
         <Files size={22} className={styles.headerIcon} />
         <h1 className={styles.title}>{t('Duplicate books')}</h1>
         <span className={styles.count}>{data.items.length}</span>
+        {/* #1048 — the SPA had no way to run a scan; the classic button lives on
+            the legacy /duplicates page this route shadows. */}
+        <button type="button" className={styles.scanBtn}
+          onClick={() => scan.mutate()}
+          disabled={scan.isPending}>
+          <RefreshCw size={15} className={scan.isPending ? styles.spinning : undefined}
+            aria-hidden="true" focusable={false} />
+          <span>{scan.isPending ? t('Starting scan…') : t('Scan for duplicates')}</span>
+        </button>
       </div>
 
+      <p className={styles.status} role="status" aria-live="polite">
+        {scan.isError
+          ? t('Could not start the duplicate scan.')
+          : scan.isSuccess
+            ? t('Duplicate scan started. It runs in the background — this list updates when it finishes.')
+            : ''}
+      </p>
+
       {data.needs_scan ? (
-        <EmptyState message={t('A one-time full duplicate scan is needed. Run it from CWA settings, then return here.')} />
+        <EmptyState message={t('A one-time full duplicate scan is needed. Use “Scan for duplicates” above to run it.')} />
       ) : data.items.length === 0 ? (
         <EmptyState message={t('No duplicate groups found.')} />
       ) : (

@@ -933,4 +933,13 @@ _("Could not update your account setting.")
 _("Saving…")
 _("Sync only my selected shelves")
 _("Your Kobo is still set to sync your whole library, so marking this shelf does nothing on its own. Switch your account to shelf-only syncing to make it take effect.")
+
+# #1048 — SPA-only strings for the duplicates page's manual scan trigger and the
+# admin panel's duplicate-detection settings row.
+_("A one-time full duplicate scan is needed. Use “Scan for duplicates” above to run it.")
+_("Could not start the duplicate scan.")
+_("Duplicate detection settings")
+_("Duplicate scan started. It runs in the background — this list updates when it finishes.")
+_("Scan for duplicates")
+_("Starting scan…")
 # ==== END AUTOGEN ====

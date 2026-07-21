@@ -177,7 +177,19 @@ def _me_payload(user):
 
 @api_v1.route("/auth/me")
 def auth_me():
-    if not current_user.is_authenticated:
+    # /me is in _PUBLIC_ENDPOINTS (it has to be, or logging in would be
+    # impossible), so it bypasses the blueprint gate and must repeat the
+    # anon-browse half of that decision itself. Flask-Login's anonymous user is
+    # ub.Anonymous -- a fully populated Guest row -- but is_authenticated is
+    # False for it by definition, so an is_authenticated-only check refuses a
+    # guest that every other endpoint serves. The SPA turns that 401 into
+    # `me = null` and renders its login wall over a readable library (#1023).
+    # getattr-with-default, not attribute access: bootstrap paths and auth tests
+    # hand this module a minimal config object with no config_anonbrowse at all
+    # (same reason _me_payload defaults books_per_page/random_books). A bare
+    # access raises there, and the blueprint error handler turns that into a 500
+    # -- so the unconfigured case must fail closed to the 401, not to a fault.
+    if not current_user.is_authenticated and getattr(config, "config_anonbrowse", 0) != 1:
         return jsonify({"error": {"code": "unauthenticated", "message": "Login required"}}), 401
     return jsonify(_me_payload(current_user))
 

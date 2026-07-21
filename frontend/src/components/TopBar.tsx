@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { BookMarked, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles, Shield } from 'lucide-react';
+import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles, Shield } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { KofiMark, KOFI_URL } from './KofiMark';
@@ -7,6 +7,7 @@ import { BrandName } from './BrandName';
 import { Avatar } from './Avatar';
 import { BASE_PREFIX } from '../lib/api';
 import { useMe } from '../lib/queries';
+import { AUTH_ROUTES } from '../lib/routes';
 import { useT } from '../lib/i18n';
 import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
@@ -205,6 +206,12 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
   // switched back to the classic UI. Surface it here too, role-gated, pointing at
   // the SPA's own /admin route (same target as the sidebar link).
   const isAdmin = !!me?.role?.admin;
+  // #1023: with anonymous browsing on, /me now answers for the Guest row, so a
+  // visitor who has NOT signed in still reaches this menu. "My account" 401s for
+  // them and "Sign out" has no session to end -- offer the one action that makes
+  // sense instead. `me` being non-null no longer implies "signed in"; role
+  // .anonymous is the discriminator.
+  const isGuest = !!me?.role?.anonymous;
   return (
     <div className={styles.menu} {...wrapperProps}>
       <button
@@ -223,12 +230,18 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
       </button>
       {open && (
         <div className={styles.panel}>
-          <MenuItem icon={<User size={15} />} label={t('My account')} to="/account" onSelect={close} />
+          {!isGuest && (
+            <MenuItem icon={<User size={15} />} label={t('My account')} to="/account" onSelect={close} />
+          )}
           {isAdmin && (
             <MenuItem icon={<Shield size={15} />} label={t('Admin')} to="/admin" onSelect={close} />
           )}
           <MenuItem icon={<Undo2 size={15} />} label={t('Back to the classic view')} onClick={backToClassicView} onSelect={close} />
-          <MenuItem icon={<LogOut size={15} />} label={t('Sign out')} danger onClick={onLogout} onSelect={close} />
+          {isGuest ? (
+            <MenuItem icon={<LogIn size={15} />} label={t('Sign in')} to={AUTH_ROUTES.login} onSelect={close} />
+          ) : (
+            <MenuItem icon={<LogOut size={15} />} label={t('Sign out')} danger onClick={onLogout} onSelect={close} />
+          )}
         </div>
       )}
     </div>

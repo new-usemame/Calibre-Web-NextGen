@@ -75,6 +75,9 @@ function AuthenticatedAuthLanding() {
 export function App() {
   const { data: me, isLoading } = useMe();
   const logout = useLogout();
+  // Anonymous browsing (#1023): /me answers with the Guest identity rather than
+  // 401ing, so `me != null` means "we know who you are", not "you signed in".
+  const isGuest = !!me?.role?.anonymous;
 
   // #701 — apply the user's UI font presets by overriding the design tokens
   // (--font-body / --font-display) on the document root. The stored value is a
@@ -160,8 +163,12 @@ export function App() {
         <Route>
           <AppShell userName={me.name} instanceName={me.instance_name} onLogout={() => logout.mutate()}>
             <Switch>
-          <Route path={AUTH_ROUTES.login}>{() => <AuthenticatedAuthLanding />}</Route>
-          <Route path={AUTH_ROUTES.magicLink}>{() => <AuthenticatedAuthLanding />}</Route>
+          {/* #1023: with anonymous browsing on, `me` is populated for a visitor
+              who has not signed in, so these routes can no longer assume an
+              authenticated session. Bouncing a guest off /login would leave them
+              with no way to sign in through the SPA at all. */}
+          <Route path={AUTH_ROUTES.login}>{() => isGuest ? <Login /> : <AuthenticatedAuthLanding />}</Route>
+          <Route path={AUTH_ROUTES.magicLink}>{() => isGuest ? <MagicLink /> : <AuthenticatedAuthLanding />}</Route>
           <Route path={SPA_ROUTES.editBook}>{(p) => <EditBook id={p.id} />}</Route>
           <Route path={SPA_ROUTES.coverPicker}>{(p) => <CoverPicker id={p.id} />}</Route>
           <Route path={SPA_ROUTES.annotations}>{(p) => <Annotations id={p.id} />}</Route>

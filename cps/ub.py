@@ -381,6 +381,17 @@ class Anonymous(AnonymousUserMixin, UserBase):
         self.opds_only_shelves_sync = data.opds_only_shelves_sync
         self.hardcover_token = data.hardcover_token
         self.auto_send_enabled = data.auto_send_enabled
+        # Presentation columns live on User, not on the shared UserBase mixin,
+        # so this hand-written copy is the only thing that puts them on a guest.
+        # Omitting them made every guest-reachable path that renders the current
+        # user raise AttributeError -- cps/api/serializers.py::serialize_user and
+        # cps/api/account.py both read all three (#1023). Kept in sync by
+        # tests/unit/test_1023_anon_browse_spa_login_wall.py, which AST-derives
+        # the serializer's reads rather than trusting a hand-maintained list.
+        self.theme = data.theme
+        self.ui_font_body = data.ui_font_body
+        self.ui_font_display = data.ui_font_display
+
     def role_admin(self):
         return False
 

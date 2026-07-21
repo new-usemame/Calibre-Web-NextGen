@@ -432,17 +432,33 @@ function sessionIsGone(): Promise<boolean> {
  * from "the server is unreachable". Not following it turns that same case into
  * an inspectable opaqueredirect, so #824 stays detected while a genuine
  * transport fault stays a transport fault. */
+/** Long enough that a merely slow server still gets to answer, short enough that
+ * a hung one doesn't hold the caller's promise open. A degraded server is the
+ * condition this code runs in, so an unbounded probe would leave the request that
+ * triggered it never settling — the UI would spin instead of reporting an error,
+ * which is a worse version of the symptom being fixed. */
+const SESSION_PROBE_TIMEOUT_MS = 5000;
+
 async function probeSession(): Promise<boolean> {
   let probe: Response;
+  // AbortController rather than AbortSignal.timeout(): this ships to whatever
+  // browser the reader already has, and Safari only grew the latter in 16.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), SESSION_PROBE_TIMEOUT_MS);
   try {
     probe = await fetch(apiUrl('/api/v1/auth/me'), {
       credentials: 'include',
       redirect: 'manual',
+      signal: abort.signal,
     });
   } catch {
-    // The probe could not reach the server either. That is evidence about the
-    // network, not about the session — fail safe and keep the session.
+    // The probe could not reach the server, or ran out of time. That is evidence
+    // about the network, not about the session — fail safe and keep the session.
     return false;
+  } finally {
+    // Must clear on the success path too: the signal stays live until it fires,
+    // and aborting after the headers arrive would tear down the body read below.
+    clearTimeout(timer);
   }
   // An intermediary is intercepting authenticated requests, or the app says
   // outright that nobody is signed in.

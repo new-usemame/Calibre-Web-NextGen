@@ -986,10 +986,15 @@ export function useToggleMagicShelfKoboSync(id: string | number) {
     mutationFn: (kobo_sync: boolean) =>
       apiPost<{ id: number; kobo_sync: boolean; warning?: string }>(
         `/api/v1/magicshelf/${id}/kobo-sync`, { kobo_sync }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['magicshelves'] });
-      void qc.invalidateQueries({ queryKey: ['magicshelf', String(id)] });
-    },
+    // Awaited, not fire-and-forget: the button's disabled state tracks
+    // isPending, and its label reads the *query* cache. Returning the promise
+    // keeps the mutation pending until the refetch lands, so a second click
+    // can't compute `!data.kobo_sync` from the pre-toggle value and re-send
+    // the write it just made.
+    onSuccess: () => Promise.all([
+      qc.invalidateQueries({ queryKey: ['magicshelves'] }),
+      qc.invalidateQueries({ queryKey: ['magicshelf', String(id)] }),
+    ]),
   });
 }
 

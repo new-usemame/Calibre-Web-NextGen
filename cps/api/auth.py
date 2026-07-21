@@ -159,13 +159,6 @@ def _me_payload(user):
     login, magic-link, and /auth/me. Keeps the three sites from drifting."""
     payload = serialize_user(user)
     payload["features"] = _server_features()
-    # #866 asked the shelf views to warn when a Kobo-sync mark is inert because
-    # the account still syncs the whole library. Both views read it off useMe(),
-    # which is this payload — it was only ever emitted by /api/v1/account, so
-    # the warning never rendered anywhere. Found while wiring the smart-shelf
-    # toggle (#870).
-    payload["kobo_only_shelves_sync"] = bool(
-        getattr(user, "kobo_only_shelves_sync", 0))
     payload["instance_name"] = _instance_name()
     payload["avatar"] = _user_avatar(user.name)
     catalog_settings = (getattr(user, "view_settings", None) or {}).get("catalog", {})

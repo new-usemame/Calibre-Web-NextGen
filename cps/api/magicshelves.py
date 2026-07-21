@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from flask import jsonify, request
 from flask_babel import get_locale
 from flask_babel import gettext as _
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import SQLAlchemyError
 
 from . import api_v1
 from .books import _row_to_item
@@ -146,18 +146,30 @@ def set_magic_shelf_kobo_sync(shelf_id):
     if not config.config_kobo_sync:
         return _err("forbidden", "Kobo sync is not enabled on this server", 403)
 
-    data = request.get_json(silent=True) or {}
-    if "kobo_sync" not in data:
+    data = request.get_json(silent=True)
+    # A JSON boolean, not Python truthiness: bool("false") is True, so coercing
+    # would let {"kobo_sync": "false"} perform the opposite write. A top-level
+    # scalar body (`42`) would also raise on the membership test, so require a
+    # mapping before looking inside it.
+    if not isinstance(data, dict) or "kobo_sync" not in data:
         return _err("invalid_request", "kobo_sync is required", 400)
-    enabled = bool(data["kobo_sync"])
+    if not isinstance(data["kobo_sync"], bool):
+        return _err("invalid_request", "kobo_sync must be a boolean", 400)
+    enabled = data["kobo_sync"]
 
     shelf.kobo_sync = enabled
     shelf.last_modified = datetime.now(timezone.utc)
     try:
         ub.session.commit()
-    except (OperationalError, InvalidRequestError) as e:
+    except SQLAlchemyError:
+        # ub.session is a long-lived global session, so a commit that fails
+        # without a rollback leaves it in a pending-rollback state that breaks
+        # unrelated later requests. Catch the whole family, never just the two
+        # we happened to think of. The driver error is logged, not returned —
+        # it can carry schema and environment detail.
         ub.session.rollback()
-        return _err("db_error", "Could not update shelf: %s" % getattr(e, "orig", e), 500)
+        log.exception("magic shelf %s: kobo_sync commit failed", shelf_id)
+        return _err("db_error", "Could not update shelf", 500)
 
     body = {"id": shelf.id, "kobo_sync": enabled}
     # Mirror of the classic edit route: intent is stored, but it stays inert

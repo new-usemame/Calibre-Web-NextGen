@@ -41,6 +41,11 @@ export interface ServerFeatures {
   public_registration: boolean;
   anon_browse: boolean;
   kobo_sync: boolean;
+  /** #870 — the admin's "Sync Magic Shelves to Kobo" setting. A smart shelf's
+   *  per-shelf mark is inert while this is off, so the SPA only offers the
+   *  toggle when it can actually do something. Absent on older servers →
+   *  treat as off. */
+  kobo_sync_magic_shelves?: boolean;
 }
 
 export interface Me {

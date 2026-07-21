@@ -976,7 +976,24 @@ export function useEditMagicShelf(id: string | number) {
   });
 }
 
-export interface MagicShelfItem { id: number; name: string; icon: string; is_public: boolean; is_owner: boolean; is_system: boolean }
+/** #870 — flip only the Kobo-sync mark on a smart shelf. The classic
+ *  /magicshelf/<id>/edit route is a whole-shelf save (name + icon + rules), so
+ *  a toggle that reused it would have to round-trip the rule set and could
+ *  clobber a concurrent edit. This hits the narrow /api/v1 write instead. */
+export function useToggleMagicShelfKoboSync(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (kobo_sync: boolean) =>
+      apiPost<{ id: number; kobo_sync: boolean; warning?: string }>(
+        `/api/v1/magicshelf/${id}/kobo-sync`, { kobo_sync }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['magicshelves'] });
+      void qc.invalidateQueries({ queryKey: ['magicshelf', String(id)] });
+    },
+  });
+}
+
+export interface MagicShelfItem { id: number; name: string; icon: string; is_public: boolean; is_owner: boolean; is_system: boolean; kobo_sync?: boolean }
 
 export function useMagicShelves() {
   return useQuery<{ items: MagicShelfItem[] }>({
@@ -987,7 +1004,8 @@ export function useMagicShelves() {
 }
 
 export function useMagicShelfBooks(id: string | number, page = 1) {
-  return useQuery<{ id: number; name: string; icon: string; is_owner: boolean; is_system: boolean } & BooksPage>({
+  return useQuery<{ id: number; name: string; icon: string; is_owner: boolean; is_system: boolean;
+    kobo_sync?: boolean } & BooksPage>({
     queryKey: ['magicshelf', String(id), page],
     queryFn: () => apiGet(`/api/v1/magicshelf/${id}?page=${page}`),
     enabled: String(id).length > 0,

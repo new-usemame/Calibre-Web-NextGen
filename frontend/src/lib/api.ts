@@ -447,6 +447,11 @@ async function probeSession(): Promise<boolean> {
   // An intermediary is intercepting authenticated requests, or the app says
   // outright that nobody is signed in.
   if (probe.type === 'opaqueredirect' || probe.status === 401) return true;
+  // Any other status is an intermediary talking, not this endpoint — its own
+  // contract is 200 or 401. A proxy answering 403 or 5xx for a moment is exactly
+  // the ambiguous evidence this function exists to stop acting on, so it is not
+  // treated as proof. The user is not stranded by that: a reload re-runs the
+  // public useMe(), which renders the login tree when the session really is gone.
   if (!probe.ok) return false;
   try {
     // With anonymous browsing on, a lost session doesn't 401 — /me answers for

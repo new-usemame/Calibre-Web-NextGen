@@ -69,35 +69,47 @@ test.describe('#1067 a dropped request must not end the session', () => {
   });
 
   test('concurrent transport faults share one confirmation probe', async ({ page }) => {
-    // The confirmation must not become its own stampede: when a struggling
-    // server drops the several requests a page had in flight, it should field one
-    // probe, not one per failure.
+    // The confirmation must not become its own stampede: when a struggling server
+    // drops the several requests a page had in flight, it should field one probe,
+    // not one per failure.
+    //
+    // "Concurrent" has to be constructed rather than hoped for. Aborting each
+    // request as it arrives lets the admin page's queries fail in a staggered
+    // sequence, and sequentially-failing requests legitimately get their own
+    // probe (the session's state can change between them) — so the requests are
+    // held until several are in flight and then failed in the same tick, which is
+    // the situation single-flight actually exists for.
+    const HOLD = 3;
     let meCalls = 0;
     await page.route('**/api/v1/auth/me', (route) => {
       meCalls += 1;
       return route.continue();
     });
 
-    let failedRequests = 0;
-    await page.route('**/api/v1/admin/**', (route) => {
-      failedRequests += 1;
-      return route.abort();
+    let held: import('@playwright/test').Route[] = [];
+    let failedTogether = 0;
+    const releaseAll = async () => {
+      const batch = held;
+      held = [];
+      failedTogether += batch.length;
+      await Promise.all(batch.map((r) => r.abort().catch(() => {})));
+    };
+    await page.route('**/api/v1/books**', async (route) => {
+      held.push(route);
+      if (held.length >= HOLD) await releaseAll();
     });
-    // Registered last so it wins: the parent renders, then its sibling config
-    // queries fail together.
-    await page.route('**/api/v1/admin/users', (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [] }),
-    }));
 
-    await page.goto('/app/admin');
-    await page.waitForTimeout(2000);
+    await page.goto('/app');
+    // Release whatever accumulated if the page issued fewer than HOLD in parallel,
+    // so the test fails on its assertion rather than hanging.
+    await page.waitForTimeout(3000);
+    await releaseAll();
+    await page.waitForTimeout(1500);
 
-    expect(failedRequests, 'needs concurrent failures to be meaningful').toBeGreaterThanOrEqual(2);
-    // One bootstrap /me plus at most one shared probe. Without single-flight this
-    // is 1 + failedRequests.
-    expect(meCalls, 'concurrent failures must share one probe').toBeLessThanOrEqual(2);
+    expect(failedTogether, 'needs simultaneous failures to be meaningful').toBeGreaterThanOrEqual(2);
+    // One bootstrap /me plus one shared probe. Without single-flight this would be
+    // 1 + failedTogether.
+    expect(meCalls, 'simultaneous failures must share one probe').toBeLessThanOrEqual(2);
   });
 
   test('a route-level 401 with a live session does not sign the user out', async ({ page }) => {

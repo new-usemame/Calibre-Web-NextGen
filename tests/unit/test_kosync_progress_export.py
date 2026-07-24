@@ -119,9 +119,10 @@ def _seed_progress(session, *, user_id=1, document=CHECKSUM, percentage=45.67,
     return row
 
 
-def _seed_book(session, *, title, authors):
-    # ``authors`` items are names, or ``(name, sort)`` to pin Authors.sort
-    from cps.db import Books, Authors
+def _seed_book(session, *, title, authors, identifiers=None):
+    # ``authors`` items are names, or ``(name, sort)`` to pin Authors.sort;
+    # ``identifiers`` is a {type: value} dict landing in the identifiers table
+    from cps.db import Books, Authors, Identifiers
 
     pairs = [(a, a) if isinstance(a, str) else a for a in authors]
     now = datetime.now(timezone.utc)
@@ -129,6 +130,10 @@ def _seed_book(session, *, title, authors):
     book.authors = [Authors(name, sort) for name, sort in pairs]
     session.add(book)
     session.commit()
+    for id_type, id_val in (identifiers or {}).items():
+        session.add(Identifiers(id_val, id_type, book.id))
+    if identifiers:
+        session.commit()
     return book
 
 
@@ -168,7 +173,8 @@ def test_no_progress_returns_empty_json_array(env):
 
 def test_export_returns_the_users_progress(env):
     book = _seed_book(env.calibre_session, title="The Dispossessed",
-                      authors=["Ursula K. Le Guin"])
+                      authors=["Ursula K. Le Guin"],
+                      identifiers={"isbn": "9780061054884"})
     _seed_progress(env.app_session, document=str(book.id), percentage=45.67)
 
     resp = env.client.get("/kosync/export")
@@ -181,6 +187,7 @@ def test_export_returns_the_users_progress(env):
     assert row["percentage"] == pytest.approx(45.67)
     assert row["title"] == "The Dispossessed"
     assert row["authors"] == ["Ursula K. Le Guin"]
+    assert row["identifiers"] == {"isbn": "9780061054884"}
 
 
 def test_export_includes_started_and_modified_timestamps(env):
@@ -254,6 +261,21 @@ def test_resolvable_and_checksum_rows_coexist(env):
     assert body[0]["title"] == "Snow Crash"
 
 
+def test_identifiers_exported(env):
+    # Every identifier type is exported as a {type: value} map: values verbatim,
+    # type keys lowercased; a book without identifiers exports {}.
+    tagged = _seed_book(env.calibre_session, title="Tagged", authors=["A"],
+                        identifiers={"ISBN": "0-441-56956-0", "Goodreads": "40651883"})
+    bare = _seed_book(env.calibre_session, title="Bare", authors=["B"])
+    _seed_progress(env.app_session, document=str(tagged.id))
+    _seed_progress(env.app_session, document=str(bare.id))
+
+    rows = {r["title"]: r for r in env.client.get("/kosync/export").get_json()}
+    assert rows["Tagged"]["identifiers"] == {
+        "isbn": "0-441-56956-0", "goodreads": "40651883"}
+    assert rows["Bare"]["identifiers"] == {}
+
+
 def test_export_is_scoped_to_authenticated_user(env):
     mine = _seed_book(env.calibre_session, title="Mine", authors=["A"])
     theirs = _seed_book(env.calibre_session, title="Theirs", authors=["B"])
@@ -280,8 +302,10 @@ def test_export_excludes_books_hidden_from_this_user(env):
     # restricted account can seed ids 1..N and enumerate the title + authors of
     # books it isn't allowed to see. The env fixture already wires cps.duplicates
     # to the in-memory app DB and seeds the real user; here we just hide one book.
-    visible = _seed_book(env.calibre_session, title="Visible", authors=["A"])
-    hidden = _seed_book(env.calibre_session, title="Hidden", authors=["B"])
+    visible = _seed_book(env.calibre_session, title="Visible", authors=["A"],
+                         identifiers={"isbn": "9780000000002"})
+    hidden = _seed_book(env.calibre_session, title="Hidden", authors=["B"],
+                        identifiers={"isbn": "9780000000001"})
     _seed_progress(env.app_session, document=str(visible.id), percentage=10.0)
     _seed_progress(env.app_session, document=str(hidden.id), percentage=20.0)
     _seed_hidden_book(env.app_session, user_id=1, book_id=hidden.id)
@@ -292,6 +316,12 @@ def test_export_excludes_books_hidden_from_this_user(env):
     assert titles == {"Visible"}          # the hidden book must not leak
     assert hidden.id not in ids
     assert visible.id in ids               # own visible progress still exported
+    # identifiers are scoped to visibility-matched ids only: the visible book
+    # keeps its own, and the hidden book's identifier must surface on no row.
+    visible_row = next(r for r in body if r["calibre_book_id"] == visible.id)
+    assert visible_row["identifiers"] == {"isbn": "9780000000002"}
+    all_ident_values = {v for r in body for v in r["identifiers"].values()}
+    assert "9780000000001" not in all_ident_values
 
 
 def test_visibility_filter_fails_closed_not_open(env, monkeypatch):

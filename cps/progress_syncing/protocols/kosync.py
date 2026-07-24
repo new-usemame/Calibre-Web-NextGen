@@ -769,7 +769,8 @@ def _is_ascii_book_id(document: str) -> bool:
 @kosync.route("/kosync/export", methods=["GET"])
 def export_progress():
     """
-    Export all the authenticated user's reading progress as JSON, plus book title and authors.
+    Export all the authenticated user's reading progress as JSON,
+    plus book title, authors and identifiers.
 
     Not part of the KOReader protocol, it's meant to be a bulk read-only export
     to feed data into other services.
@@ -785,7 +786,8 @@ def export_progress():
             "last_modified": "...", # From the kosync progress timestamp
             "percentage": 45.67,
             "title": "...",
-            "authors": [...]        # [] for books without authors
+            "authors": [...],       # [] for books without authors
+            "identifiers": {...},   # {type: value} map, {} when none found
         }
 
     Timestamps are UTC, ISO 8601 with explicit offset. Rows that don't resolve
@@ -811,7 +813,7 @@ def export_progress():
 
     try:
         from ... import calibre_db
-        from ...db import Authors, books_authors_link, Books
+        from ...db import Authors, books_authors_link, Books, Identifiers
         from ...duplicates import get_common_filters
 
         progress_rows = (
@@ -884,12 +886,30 @@ def export_progress():
                     .order_by(Books.id, Authors.sort)
                     .all()
                 )
+                matched_ids = set()
                 for book_id, title, author_name in calibre_query:
+                    matched_ids.add(book_id)
                     entry = calibre_books.setdefault(
-                        book_id, {"title": title, "authors": []}
+                        book_id, {"title": title, "authors": [], "identifiers": {}}
                     )
                     if author_name and author_name not in entry["authors"]:
                         entry["authors"].append(author_name)
+
+                # SECURITY: visibility_filter is not needed since matched_ids
+                # contains already visibility filtered entries only
+                if matched_ids:
+                    identifier_rows = (
+                        calibre_db.session.query(
+                            Identifiers.book, Identifiers.type, Identifiers.val
+                        )
+                        .filter(Identifiers.book.in_(matched_ids))
+                        .all()
+                    )
+                    for book_id, identifier_type, identifier_value in identifier_rows:
+                        if identifier_type and identifier_value:
+                            calibre_books[book_id]["identifiers"][
+                                identifier_type.lower()
+                            ] = identifier_value
 
         def utc_isoformat(value):
             return value.replace(tzinfo=timezone.utc).isoformat() if value else None
@@ -911,6 +931,7 @@ def export_progress():
                     "percentage": row.percentage,
                     "authors": book["authors"],
                     "title": book["title"],
+                    "identifiers": book["identifiers"],
                 }
             )
 

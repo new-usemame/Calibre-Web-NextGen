@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Russian interface is now complete — the last two English strings are translated.** The "Support Calibre-Web NextGen" link added to the user menu in v4.1.20 was the only text left untranslated in Russian, so it showed in English next to an otherwise fully Russian menu. Russian is now the only language in the app with every string translated and nothing falling back to English. Contributed by [@standhaftsohnsergius](https://github.com/standhaftsohnsergius) ([#1088](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1088)).
+
 ## [v4.1.20] - 2026-07-24
 
 ### Added

@@ -56,6 +56,38 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.20',
+    date: '2026-07-24',
+    items: [
+      {
+        title: 'A dropped request no longer signs you out',
+        body: 'Clicking between shelves could spin and then land you on the sign-in screen, and signing back in did not hold for long — "remember me" included. Any request that failed to reach the server was taken as proof your session had expired, and the new interface then ended it for real, so one dropped request on a busy or slow server logged you out for good. It now checks whether you are still signed in before acting, and a request that simply did not get through is reported as an error.',
+        category: 'Account',
+      },
+      {
+        title: 'Star ratings can be set again on the edit page',
+        body: 'Clicking a star did nothing on an unrated book and wiped the rating on a book that already had one, so there was no way to rate a book from the editor at all. Clicking now sets the rating you aimed at, half-stars included, and it saves with the rest of the form. The row no longer shifts sideways as the rating changes, either.',
+        category: 'Library',
+      },
+      {
+        title: 'Faster startup on large libraries',
+        body: 'On a big library the container could sit for several minutes on boot before the app came up: the startup step that locates your library and settings database walked every file under /config and /calibre-library, book folders included. It now checks the usual location first and only falls back to a full scan when a database is not where it is expected, so most installs boot in seconds.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Russian and Brazilian Portuguese now cover the new interface',
+        body: 'Parts of the new interface still fell back to English for both languages — the cover picker, smart shelves, search filters, the sign-in screen and the duplicate-scan controls. Those are now translated, and several Brazilian Portuguese labels that said the wrong thing are corrected: "Book not found" no longer reads as "Token not found", and shelves are called "estante" throughout instead of switching between two words. Pick your language in your account settings.',
+        category: 'Under the hood',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'The classic interface has a way to support the project',
+        body: 'There was no link anywhere in the classic interface — only the new one had it — so anyone who wanted to chip in had to go looking. There is now a "Support Calibre-Web NextGen" entry in the user menu, in both the default and caliBlur themes.',
+        category: 'Account',
+      },
+    ],
+  },
+  {
     version: 'v4.1.19',
     date: '2026-07-21',
     items: [

@@ -36,12 +36,10 @@ class AutoLibrary:
         self.empty_appdb = "/app/calibre-web-automated/empty_library/app.db"
         self.empty_metadb = "/app/calibre-web-automated/empty_library/metadata.db"
 
-        # Canonical locations. app.db always lives at /config/app.db and the
-        # library's metadata.db at /calibre-library/metadata.db; the checks
-        # below try these first and only fall back to a full os.walk() of the
-        # (potentially very large) config/library trees when they're missing.
+        # Canonical location. app.db always lives at /config/app.db; check_for_app_db()
+        # tries it first and only falls back to a full os.walk() of /config when
+        # it's missing.
         self.DEFAULT_APPDB_PATH = f"{self.config_dir}/app.db"
-        self.DEFAULT_METADB_PATH = f"{self.library_dir}/metadata.db"
 
         # Kept non-None at all times: update_calibre_web_db() opens this with
         # sqlite3.connect(), which raises on None. check_for_app_db() realigns
@@ -70,8 +68,10 @@ class AutoLibrary:
         # None to sqlite3.connect().
         self.app_db = self.DEFAULT_APPDB_PATH
         # Fast path: the common case is app.db already at its default location.
-        # Skip the full os.walk() of config_dir when it's there (#1022).
-        if os.path.exists(self.DEFAULT_APPDB_PATH):
+        # Skip the full os.walk() of config_dir when it's there (#1022). Use
+        # isfile(), not exists(): the walk fallback only ever matched regular
+        # files, so a directory named "app.db" must not be treated as the DB.
+        if os.path.isfile(self.DEFAULT_APPDB_PATH):
             print(f"[cwa-auto-library] app.db found in default location ({self.app_db}).")
             return
         files_in_config = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.config_dir) for f in filenames]
@@ -95,22 +95,33 @@ class AutoLibrary:
     # and True if one does exist, while also updating metadb_path to the path of the found metadata.db file
     # In the case of multiple metadata.db files, the user is notified and the one with the largest filesize is chosen
     def check_for_existing_library(self) -> bool:
-        # Fast path: when metadata.db is already at the canonical mount point,
-        # use it and skip walking the whole (possibly huge) library tree. This
-        # is the line #1022 measured spending ~5 minutes on a large library.
-        # The default location is where Calibre-Web mounts from, so preferring
-        # it also resolves the "largest wins" tie in favour of the real library.
-        if os.path.exists(self.DEFAULT_METADB_PATH):
-            self.metadb_path = self.DEFAULT_METADB_PATH
-            print(f"[cwa-auto-library]: Existing library found at {self.lib_path}, mounting now...")
-            return True
-        files_in_library = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.library_dir) for f in filenames]
-        # Consider metadata.db files across subfolders, but ignore SQLite sidecars created by WAL/journal modes
+        # Find metadata.db files WITHOUT descending into the (potentially huge)
+        # per-book folder tree. A Calibre library keeps metadata.db at its root
+        # and never nests another library inside its own book folders, so once a
+        # directory yields a metadata.db we stop descending into it (topdown
+        # walk + dirnames prune). This skips exactly the deep recursion #1022
+        # measured spending ~5 minutes on a large library, while still comparing
+        # every candidate library root so "largest wins" is preserved.
+        #
+        # Contract note: because we stop at the first metadata.db down each
+        # branch, a metadata.db at the library ROOT is treated as authoritative
+        # and a library nested *below* it is not scanned. That is the location
+        # Calibre-Web actually mounts from; if your real library lives in a
+        # sub-folder, don't also leave a metadata.db at /calibre-library root.
         db_files = []
-        for f in files_in_library:
-            base = os.path.basename(f)
-            if "metadata.db" in base and not (base.endswith("-wal") or base.endswith("-shm") or base.endswith("-journal")):
-                db_files.append(f)
+        for dirpath, dirnames, filenames in os.walk(self.library_dir):
+            # Regular files only (os.walk already excludes directories here), and
+            # ignore the SQLite sidecars created by WAL/journal modes.
+            matches = [
+                f for f in filenames
+                if "metadata.db" in f
+                and not (f.endswith("-wal") or f.endswith("-shm") or f.endswith("-journal"))
+            ]
+            if matches:
+                for f in matches:
+                    db_files.append(os.path.join(dirpath, f))
+                # Don't walk this library's book sub-folders -- that's the slow part.
+                dirnames[:] = []
         if len(db_files) == 1:
             self.metadb_path = db_files[0]
             print(f"[cwa-auto-library]: Existing library found at {self.lib_path}, mounting now...")

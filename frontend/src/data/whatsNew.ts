@@ -76,7 +76,7 @@ export const WHATS_NEW: WhatsNewRelease[] = [
       },
       {
         title: 'Russian and Brazilian Portuguese now cover the new interface',
-        body: 'Parts of the new interface still fell back to English for both languages — the cover picker, smart shelves, search filters, the sign-in screen and the duplicate-scan controls. Those are now translated, and several Brazilian Portuguese labels that said the wrong thing are corrected: "Book not found" no longer reads as "Token not found", and shelves are called "estante" throughout instead of switching between two words. Pick your language in your account settings.',
+        body: 'Parts of the new interface still fell back to English for both languages — the cover picker, smart shelves, search filters, the sign-in screen and the duplicate-scan controls. Those are now translated: 106 strings for Brazilian Portuguese, plus the duplicate-scan controls and annotation-sync labels for Russian. The Brazilian Portuguese smart-shelf button now reads "estante inteligente" to match the word used for shelves elsewhere. Pick your language in your account settings.',
         category: 'Under the hood',
         link: { to: '/account', label: 'Open account settings' },
       },

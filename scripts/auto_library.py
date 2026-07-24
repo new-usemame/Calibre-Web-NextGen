@@ -32,13 +32,16 @@ class AutoLibrary:
         self.config_dir = "/config"
         self.library_dir = "/calibre-library"
         self.dirs_path = "/app/calibre-web-automated/dirs.json"
-        self.app_db = "/config/app.db"
 
         self.empty_appdb = "/app/calibre-web-automated/empty_library/app.db"
         self.empty_metadb = "/app/calibre-web-automated/empty_library/metadata.db"
 
+        self.app_db = None
         self.metadb_path = None
         self.lib_path = None
+
+        self.DEFAULT_APPDB_PATH = f"{self.config_dir}/app.db"
+        self.DEFAULT_METADB_PATH = f"{self.library_dir}/metadata.db"
 
     @property #getter
     def metadb_path(self):
@@ -55,11 +58,15 @@ class AutoLibrary:
 
     # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from /app/calibre-web-automated/empty_library/app.db and sets the permissions
     def check_for_app_db(self):
+        if os.path.exists(self.DEFAULT_APPDB_PATH):
+            self.app_db = self.DEFAULT_APPDB_PATH
+            print(f"[cwa-auto-library] app.db found in default location ({self.app_db}).")
+            return
         files_in_config = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.config_dir) for f in filenames]
         db_files = [f for f in files_in_config if "app.db" in f]
         if len(db_files) == 0:
-            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from /app/calibre-web-automated/empty_library/app.db")
-            shutil.copyfile(self.empty_appdb, f"{self.config_dir}/app.db")
+            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from {self.empty_appdb}")
+            shutil.copyfile(self.empty_appdb, self.DEFAULT_APPDB_PATH)
             try:
                 nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
                 if not nsm:
@@ -76,6 +83,10 @@ class AutoLibrary:
     # and True if one does exist, while also updating metadb_path to the path of the found metadata.db file
     # In the case of multiple metadata.db files, the user is notified and the one with the largest filesize is chosen
     def check_for_existing_library(self) -> bool: 
+        if os.path.exists(self.DEFAULT_METADB_PATH):
+            self.metadb_path = self.DEFAULT_METADB_PATH
+            print(f"[cwa-auto-library] metadb.db found in default location ({self.metadb_path}).")
+            return True
         files_in_library = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.library_dir) for f in filenames]
         # Consider metadata.db files across subfolders, but ignore SQLite sidecars created by WAL/journal modes
         db_files = []
@@ -147,7 +158,7 @@ class AutoLibrary:
     # Uses the empty metadata.db in /app/calibre-web-automated to create a new library
     def make_new_library(self):
         print("[cwa-auto-library]: No existing library found. Creating new library...")
-        shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
+        shutil.copyfile(self.empty_metadb, self.DEFAULT_METADB_PATH)
         try:
             nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
             if not nsm:

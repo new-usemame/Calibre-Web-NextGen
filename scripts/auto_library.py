@@ -32,11 +32,21 @@ class AutoLibrary:
         self.config_dir = "/config"
         self.library_dir = "/calibre-library"
         self.dirs_path = "/app/calibre-web-automated/dirs.json"
-        self.app_db = "/config/app.db"
 
         self.empty_appdb = "/app/calibre-web-automated/empty_library/app.db"
         self.empty_metadb = "/app/calibre-web-automated/empty_library/metadata.db"
 
+        # Canonical locations. app.db always lives at /config/app.db and the
+        # library's metadata.db at /calibre-library/metadata.db; the checks
+        # below try these first and only fall back to a full os.walk() of the
+        # (potentially very large) config/library trees when they're missing.
+        self.DEFAULT_APPDB_PATH = f"{self.config_dir}/app.db"
+        self.DEFAULT_METADB_PATH = f"{self.library_dir}/metadata.db"
+
+        # Kept non-None at all times: update_calibre_web_db() opens this with
+        # sqlite3.connect(), which raises on None. check_for_app_db() realigns
+        # it to DEFAULT_APPDB_PATH in every branch, but seed it here too.
+        self.app_db = self.DEFAULT_APPDB_PATH
         self.metadb_path = None
         self.lib_path = None
 
@@ -55,11 +65,20 @@ class AutoLibrary:
 
     # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from /app/calibre-web-automated/empty_library/app.db and sets the permissions
     def check_for_app_db(self):
+        # app.db always resolves to the canonical /config/app.db; keep the
+        # handle aligned in every branch so update_calibre_web_db() never hands
+        # None to sqlite3.connect().
+        self.app_db = self.DEFAULT_APPDB_PATH
+        # Fast path: the common case is app.db already at its default location.
+        # Skip the full os.walk() of config_dir when it's there (#1022).
+        if os.path.exists(self.DEFAULT_APPDB_PATH):
+            print(f"[cwa-auto-library] app.db found in default location ({self.app_db}).")
+            return
         files_in_config = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.config_dir) for f in filenames]
         db_files = [f for f in files_in_config if "app.db" in f]
         if len(db_files) == 0:
-            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from /app/calibre-web-automated/empty_library/app.db")
-            shutil.copyfile(self.empty_appdb, f"{self.config_dir}/app.db")
+            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from {self.empty_appdb}")
+            shutil.copyfile(self.empty_appdb, self.DEFAULT_APPDB_PATH)
             try:
                 nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
                 if not nsm:
@@ -75,7 +94,16 @@ class AutoLibrary:
     # Check for a metadata.db file in the given library dir and returns False if one doesn't exist
     # and True if one does exist, while also updating metadb_path to the path of the found metadata.db file
     # In the case of multiple metadata.db files, the user is notified and the one with the largest filesize is chosen
-    def check_for_existing_library(self) -> bool: 
+    def check_for_existing_library(self) -> bool:
+        # Fast path: when metadata.db is already at the canonical mount point,
+        # use it and skip walking the whole (possibly huge) library tree. This
+        # is the line #1022 measured spending ~5 minutes on a large library.
+        # The default location is where Calibre-Web mounts from, so preferring
+        # it also resolves the "largest wins" tie in favour of the real library.
+        if os.path.exists(self.DEFAULT_METADB_PATH):
+            self.metadb_path = self.DEFAULT_METADB_PATH
+            print(f"[cwa-auto-library]: Existing library found at {self.lib_path}, mounting now...")
+            return True
         files_in_library = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.library_dir) for f in filenames]
         # Consider metadata.db files across subfolders, but ignore SQLite sidecars created by WAL/journal modes
         db_files = []

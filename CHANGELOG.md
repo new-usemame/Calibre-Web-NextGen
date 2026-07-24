@@ -29,6 +29,7 @@ is for things you can see or feel when running the app.
 ### Changed
 
 - **The new UI now reads fully in Russian.** The duplicate-scan controls added in v4.1.19 and the annotation-sync task labels had no Russian translation yet, so Russian users saw those in English. They are now translated, along with a spelling correction in the Kobo delete warning. Contributed by [@standhaftsohnsergius](https://github.com/standhaftsohnsergius) ([#1058](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1058)).
+- **Brazilian Portuguese now covers the new UI, and several wrong labels are fixed.** Large parts of the new interface — the cover picker, smart shelves, search filters and the sign-in screen — had no Brazilian Portuguese translation and fell back to English. A handful of labels were worse than missing: "Book not found" read as "Token não encontrado" (Token not found), "Recently added Books" as "Livros Baixados" (Downloaded books), and "Books currently being read" as "Versão atual" (Current version). 109 more strings are translated and six incorrect ones corrected, and shelves are now called "estante" everywhere instead of switching between two words. Contributed by [@pedronora](https://github.com/pedronora) ([#1072](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1072)).
 
 ## [v4.1.19] - 2026-07-21
 

@@ -332,9 +332,9 @@ msgid "{} sync entries deleted"
 msgstr "{} entradas de sincronização deletadas"
 
 #: cps/admin.py:1392
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Book {} not found"
-msgstr "Token não encontrado"
+msgstr "Livro {} não encontrado"
 
 #: cps/admin.py:1402
 #, python-brace-format
@@ -1022,7 +1022,7 @@ msgstr ""
 #: cps/cover_picker.py:124 cps/spa_strings.py:164
 #: cps/templates/book_edit.html:39
 msgid "Back to book"
-msgstr ""
+msgstr "Voltar para o livro"
 
 #: cps/cover_picker.py:132
 #, fuzzy, python-format
@@ -1806,23 +1806,23 @@ msgstr "Configuração Kobo"
 
 #: cps/magic_shelf.py:327 cps/spa_strings.py:42
 msgid "Recently Added"
-msgstr ""
+msgstr "Adicionados recentemente"
 
 #: cps/magic_shelf.py:346 cps/spa_strings.py:43
 msgid "Highly Rated"
-msgstr ""
+msgstr "Mais bem avaliados"
 
 #: cps/magic_shelf.py:383 cps/opds.py:200 cps/spa_strings.py:44
 msgid "Currently Reading"
-msgstr ""
+msgstr "Em leitura"
 
 #: cps/magic_shelf.py:400 cps/spa_strings.py:45
 msgid "Yet to Read"
-msgstr ""
+msgstr "Não lidos"
 
 #: cps/magic_shelf.py:417 cps/spa_strings.py:46
 msgid "Recent Publications"
-msgstr ""
+msgstr "Publicações recentes"
 
 #: cps/oauth_bb.py:288
 #, python-format
@@ -1944,7 +1944,6 @@ msgid "Failed to fetch user info from Google."
 msgstr "Falha na busca de informações de usuário no Google."
 
 #: cps/oauth_bb.py:1003
-#, fuzzy
 msgid "Failed to log in with Generic OAuth."
 msgstr "Falha no login com o OAuth Genérico."
 
@@ -2013,9 +2012,8 @@ msgid "Popular publications from this catalog based on Rating."
 msgstr "Publicações populares deste catálogo baseadas em Avaliação."
 
 #: cps/opds.py:182
-#, fuzzy
 msgid "Recently added Books"
-msgstr "Livros Baixados"
+msgstr "Livros adicionados recentemente"
 
 #: cps/opds.py:183
 msgid "The latest Books"
@@ -2035,9 +2033,8 @@ msgid "Read Books"
 msgstr "Livros Lidos"
 
 #: cps/opds.py:201
-#, fuzzy
 msgid "Books currently being read"
-msgstr "Versão atual"
+msgstr "Livros sendo lidos"
 
 #: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:97 cps/web.py:1026
 msgid "Unread Books"
@@ -2845,7 +2842,7 @@ msgstr "Adicionar à estante"
 
 #: cps/spa_strings.py:159
 msgid "Add your own"
-msgstr ""
+msgstr "Adicionar a sua própria"
 
 #: cps/spa_strings.py:160
 msgid "App password label"
@@ -2966,7 +2963,8 @@ msgstr "Capa atualizada"
 
 #: cps/spa_strings.py:188
 msgid "Create smart shelf"
-msgstr "Criar prateleira inteligente"
+msgstr "Criar estante inteligente"
+
 
 #: cps/spa_strings.py:189
 msgid "Create your account"
@@ -3184,7 +3182,7 @@ msgstr ""
 
 #: cps/spa_strings.py:243
 msgid "Paste URL"
-msgstr ""
+msgstr "Colar URL"
 
 #: cps/spa_strings.py:244
 msgid "Private shelf"
@@ -3219,6 +3217,7 @@ msgstr ""
 #: cps/templates/listenmp3.html:159
 msgid "Read"
 msgstr "Lido"
+
 
 #: cps/spa_strings.py:251
 msgid "Reading progress"
@@ -3784,11 +3783,11 @@ msgstr "Todas as estantes"
 
 #: cps/spa_strings.py:412
 msgid "Allow remote (magic-link) login"
-msgstr ""
+msgstr "Permitir login remoto (link mágico)"
 
 #: cps/spa_strings.py:413
 msgid "Allowed groups (comma-separated)"
-msgstr ""
+msgstr "Grupos permitidos (separado por vírgulas)"
 
 #: cps/spa_strings.py:414 cps/templates/search_form.html:44
 #: cps/templates/search_form.html:165
@@ -3797,23 +3796,23 @@ msgstr "Qualquer"
 
 #: cps/spa_strings.py:415
 msgid "Any format"
-msgstr ""
+msgstr "Qualquer formato"
 
 #: cps/spa_strings.py:416
 msgid "Any language"
-msgstr ""
+msgstr "Qualquer idioma"
 
 #: cps/spa_strings.py:417
 msgid "Any series"
-msgstr ""
+msgstr "Qualquer série"
 
 #: cps/spa_strings.py:418
 msgid "Any tags"
-msgstr ""
+msgstr "Qualquer tag"
 
 #: cps/spa_strings.py:419
 msgid "Apply selected"
-msgstr ""
+msgstr "Aplicar seleção"
 
 #: cps/spa_strings.py:420
 msgid ""
@@ -3822,7 +3821,7 @@ msgstr ""
 
 #: cps/spa_strings.py:421 cps/templates/cover_picker.html:224
 msgid "Applying…"
-msgstr ""
+msgstr "Aplicando…"
 
 #: cps/spa_strings.py:422 cps/templates/book_table.html:54
 #: cps/templates/book_table.html:214 cps/templates/duplicates.html:660
@@ -3836,27 +3835,27 @@ msgstr "Arquivado"
 
 #: cps/spa_strings.py:424
 msgid "Ask in Discord"
-msgstr ""
+msgstr "Perguntar no Discord"
 
 #: cps/spa_strings.py:425
 msgid "Authentication"
-msgstr ""
+msgstr "Autenticação"
 
 #: cps/spa_strings.py:426
 msgid "Authentication & security"
-msgstr ""
+msgstr "Autenticação e segurança"
 
 #: cps/spa_strings.py:427
 msgid "Author A–Z"
-msgstr ""
+msgstr "Autor A-Z"
 
 #: cps/spa_strings.py:428
 msgid "Author Z–A"
-msgstr ""
+msgstr "Autor Z-A"
 
 #: cps/spa_strings.py:429
 msgid "Authorised — signing you in…"
-msgstr ""
+msgstr "Autorizado — entrando…"
 
 #: cps/spa_strings.py:430
 msgid "Authorize URL"
@@ -3868,15 +3867,15 @@ msgstr ""
 
 #: cps/spa_strings.py:433
 msgid "Auto-create users on first login"
-msgstr ""
+msgstr "Criar usuários automaticamente no primeiro login"
 
 #: cps/spa_strings.py:435
 msgid "Back to library"
-msgstr ""
+msgstr "Voltar para a biblioteca"
 
 #: cps/spa_strings.py:436
 msgid "Back to the classic view"
-msgstr ""
+msgstr "Voltar para a visualização clássica"
 
 #: cps/spa_strings.py:437
 msgid "Base DN"
@@ -3897,11 +3896,11 @@ msgstr ""
 #: cps/spa_strings.py:442
 #, python-brace-format
 msgid "Book {number}"
-msgstr ""
+msgstr "Livro {number}"
 
 #: cps/spa_strings.py:444
 msgid "Books per page"
-msgstr ""
+msgstr "Livros por página"
 
 #: cps/spa_strings.py:445 cps/templates/config_edit.html:240
 #: cps/templates/cover_picker.html:114
@@ -3922,7 +3921,7 @@ msgstr ""
 
 #: cps/spa_strings.py:449
 msgid "CWA settings (ingest/convert)"
-msgstr ""
+msgstr "Configurações do CWA (ingest/convert)"
 
 #: cps/spa_strings.py:450
 msgid "Can upload books"
@@ -3952,7 +3951,7 @@ msgstr "Cancelar"
 
 #: cps/spa_strings.py:452
 msgid "Cancel rename"
-msgstr ""
+msgstr "Cancelar renomeação"
 
 #: cps/spa_strings.py:453
 msgid "Cancel title edit"
@@ -4023,23 +4022,23 @@ msgstr ""
 
 #: cps/spa_strings.py:470
 msgid "Close reader"
-msgstr ""
+msgstr "Fechar o leitor"
 
 #: cps/spa_strings.py:471
 msgid "Columns"
-msgstr ""
+msgstr "Colunas"
 
 #: cps/spa_strings.py:472
 msgid "Comfortable"
-msgstr ""
+msgstr "Confortável"
 
 #: cps/spa_strings.py:473
 msgid "Compact"
-msgstr ""
+msgstr "Compacto"
 
 #: cps/spa_strings.py:474
 msgid "Configured"
-msgstr ""
+msgstr "Configurado"
 
 #: cps/spa_strings.py:475
 msgid "Confirm new password"
@@ -4051,15 +4050,15 @@ msgstr "Converter"
 
 #: cps/spa_strings.py:477
 msgid "Convert before sending"
-msgstr ""
+msgstr "Converter antes de enviar"
 
 #: cps/spa_strings.py:478
 msgid "Convert from"
-msgstr ""
+msgstr "Converter de"
 
 #: cps/spa_strings.py:479
 msgid "Copied to clipboard"
-msgstr ""
+msgstr "Copiado para a área de transferência"
 
 #: cps/spa_strings.py:480
 msgid "Copy link"
@@ -4067,23 +4066,24 @@ msgstr "Copiar link"
 
 #: cps/spa_strings.py:481
 msgid "Could not create shelf."
-msgstr ""
+msgstr "Não foi possível criar a estante."
+
 
 #: cps/spa_strings.py:482
 msgid "Could not create the shelf."
-msgstr ""
+msgstr "Não foi possível criar a estante."
 
 #: cps/spa_strings.py:483
 msgid "Could not delete shelf."
-msgstr ""
+msgstr "Não foi possível excluir a estante."
 
 #: cps/spa_strings.py:484
 msgid "Could not load candidates."
-msgstr ""
+msgstr "Não foi possível carregar candidatos."
 
 #: cps/spa_strings.py:485
 msgid "Could not load duplicates."
-msgstr ""
+msgstr "Não foi possível carregar duplicados."
 
 #: cps/spa_strings.py:486
 msgid "Could not load highlights."
@@ -4091,7 +4091,7 @@ msgstr "Não foi possível carregar destaques."
 
 #: cps/spa_strings.py:487
 msgid "Could not load stats."
-msgstr ""
+msgstr "Não foi possível carregar estatísticas."
 
 #: cps/spa_strings.py:488
 msgid "Could not load tasks."
@@ -4107,7 +4107,7 @@ msgstr "Não foi possível carregar usuários."
 
 #: cps/spa_strings.py:491
 msgid "Could not read this comic archive."
-msgstr ""
+msgstr "Não foi possível ler este arquivo de quadrinhos."
 
 #: cps/spa_strings.py:492 cps/templates/detail.html:738
 msgid "Could not reload metadata"
@@ -4200,7 +4200,7 @@ msgstr ""
 
 #: cps/spa_strings.py:515 cps/templates/cover_picker.html:23
 msgid "Current cover"
-msgstr ""
+msgstr "Capa atual"
 
 #: cps/spa_strings.py:516
 msgid "Current password"
@@ -4321,7 +4321,7 @@ msgstr ""
 
 #: cps/spa_strings.py:544
 msgid "Documentation"
-msgstr ""
+msgstr "Documentação"
 
 #: cps/spa_strings.py:545
 msgid "Done reordering"
@@ -4339,15 +4339,16 @@ msgstr ""
 
 #: cps/spa_strings.py:548
 msgid "Duplicate"
-msgstr ""
+msgstr "Duplicar"
 
 #: cps/spa_strings.py:549
 msgid "Duplicate books"
-msgstr ""
+msgstr "Livros duplicados"
+
 
 #: cps/spa_strings.py:551 cps/templates/cover_picker.html:94
 msgid "E-reader preview"
-msgstr ""
+msgstr "Pré-visualização no e-reader"
 
 #: cps/spa_strings.py:552
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
@@ -4487,15 +4488,15 @@ msgstr ""
 
 #: cps/spa_strings.py:584
 msgid "Formats"
-msgstr ""
+msgstr "Formatos"
 
 #: cps/spa_strings.py:585
 msgid "Formats — exclude"
-msgstr ""
+msgstr "Formatos — excluir"
 
 #: cps/spa_strings.py:586
 msgid "Formats — include"
-msgstr ""
+msgstr "Formatos — incluir"
 
 #: cps/spa_strings.py:587
 msgid "From address"
@@ -4548,11 +4549,11 @@ msgstr ""
 
 #: cps/spa_strings.py:599
 msgid "Help & support"
-msgstr ""
+msgstr "Ajuda e suporte"
 
 #: cps/spa_strings.py:600
 msgid "Help menu"
-msgstr ""
+msgstr "Menu de ajuda"
 
 #: cps/spa_strings.py:601 cps/templates/readcbr.html:173
 msgid "Hide"
@@ -4568,11 +4569,11 @@ msgstr ""
 
 #: cps/spa_strings.py:604
 msgid "Hide fields"
-msgstr ""
+msgstr "Ocultar campos"
 
 #: cps/spa_strings.py:605
 msgid "Hide password"
-msgstr ""
+msgstr "Ocultar senha"
 
 #: cps/spa_strings.py:606
 msgid "Highlight"
@@ -4699,7 +4700,7 @@ msgstr ""
 
 #: cps/spa_strings.py:637 cps/templates/cover_picker.html:37
 msgid "Lock cover"
-msgstr ""
+msgstr "Bloquear capa"
 
 #: cps/spa_strings.py:639
 msgid "Login button text"
@@ -5041,6 +5042,8 @@ msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
 "the cover embedded in the book itself."
 msgstr ""
+"Escolha uma capa de qualquer fonte que suportamos, cole um URL, envie um "
+"arquivo ou use a capa incorporada no próprio livro."
 
 #: cps/spa_strings.py:722
 #, python-brace-format
@@ -5285,7 +5288,7 @@ msgstr "Configurações de Segurança salvas."
 
 #: cps/spa_strings.py:779
 msgid "See how each cover looks padded for your device"
-msgstr ""
+msgstr "Veja como cada capa parece com espaçamento para o seu dispositivo"
 
 #: cps/spa_strings.py:780 cps/templates/modal_dialogs.html:98
 msgid "Select"
@@ -5408,7 +5411,7 @@ msgstr ""
 
 #: cps/spa_strings.py:818
 msgid "Show password"
-msgstr ""
+msgstr "Mostrar senha"
 
 #: cps/spa_strings.py:819
 msgid "Shuffle picks"
@@ -5420,15 +5423,16 @@ msgstr ""
 
 #: cps/spa_strings.py:821
 msgid "Sign out"
-msgstr ""
+msgstr "Sair"
 
 #: cps/spa_strings.py:822
 msgid "Signing in…"
-msgstr ""
+msgstr "Entrando…"
+
 
 #: cps/spa_strings.py:823
 msgid "Site title"
-msgstr ""
+msgstr "Título do site"
 
 #: cps/spa_strings.py:824
 msgid "Smart shelf not found."
@@ -5436,7 +5440,7 @@ msgstr ""
 
 #: cps/spa_strings.py:825
 msgid "Smart shelves"
-msgstr ""
+msgstr "Estantes inteligentes"
 
 #: cps/spa_strings.py:826
 msgid "Solid: average colour of the cover"
@@ -5452,7 +5456,8 @@ msgstr ""
 
 #: cps/spa_strings.py:829
 msgid "Some sources need a key for better covers"
-msgstr ""
+msgstr "Algumas fontes necessitam de uma chave para obter capas melhores"
+
 
 #: cps/spa_strings.py:830 cps/templates/cover_picker.html:226
 msgid "Something went wrong. Try again."
@@ -5460,11 +5465,11 @@ msgstr ""
 
 #: cps/spa_strings.py:831
 msgid "Sort order"
-msgstr ""
+msgstr "Ordem de classificação"
 
 #: cps/spa_strings.py:832
 msgid "Source details"
-msgstr ""
+msgstr "Detalhes da fonte"
 
 #: cps/spa_strings.py:833 cps/templates/detail.html:1023
 msgid "Started reading"
@@ -5472,7 +5477,7 @@ msgstr "Início da leitura"
 
 #: cps/spa_strings.py:835
 msgid "Statistics dashboard"
-msgstr ""
+msgstr "Dashboard de estatísticas"
 
 #: cps/spa_strings.py:836 cps/templates/tasks.html:16
 msgid "Status"
@@ -5480,15 +5485,16 @@ msgstr "Estado"
 
 #: cps/spa_strings.py:837
 msgid "Sync only selected shelves to Kobo"
-msgstr ""
+msgstr "Sincronizar apenas as estantes selecionadas com o Kobo"
+
 
 #: cps/spa_strings.py:838
 msgid "Table view"
-msgstr ""
+msgstr "Visualização em tabela"
 
 #: cps/spa_strings.py:839
 msgid "Tag"
-msgstr ""
+msgstr "Tag"
 
 #: cps/spa_strings.py:840 cps/templates/book_edit.html:139
 #: cps/templates/search_form.html:52
@@ -5497,11 +5503,13 @@ msgstr "Tags"
 
 #: cps/spa_strings.py:841
 msgid "Tags — exclude"
-msgstr ""
+msgstr "Tags — excluir"
+
 
 #: cps/spa_strings.py:842
 msgid "Tags — include"
-msgstr ""
+msgstr "Tags — incluir"
+
 
 #: cps/spa_strings.py:843 cps/templates/config_edit.html:231
 #: cps/templates/cover_picker.html:104
@@ -5519,11 +5527,11 @@ msgstr "Tarefas"
 
 #: cps/spa_strings.py:846
 msgid "Technical details"
-msgstr ""
+msgstr "Detalhes técnicos"
 
 #: cps/spa_strings.py:847
 msgid "That URL is not a usable image."
-msgstr ""
+msgstr "Esta URL não é uma imagem utilizável."
 
 #: cps/spa_strings.py:848
 msgid ""
@@ -5567,11 +5575,12 @@ msgstr "Título, autor ou ISBN"
 
 #: cps/spa_strings.py:857
 msgid "Token URL"
-msgstr ""
+msgstr "URL do token"
 
 #: cps/spa_strings.py:858
 msgid "Top Rated"
-msgstr ""
+msgstr "Melhores avaliados"
+
 
 #: cps/spa_strings.py:859
 msgid "Trust authentication header"
@@ -5596,7 +5605,7 @@ msgstr ""
 
 #: cps/spa_strings.py:864
 msgid "Unlock the cover to change it"
-msgstr ""
+msgstr "Desbloqueie a capa para alterá-la"
 
 #: cps/spa_strings.py:865
 msgid "Untitled"
@@ -5623,7 +5632,7 @@ msgstr ""
 #: cps/spa_strings.py:870 cps/templates/cover_picker.html:62
 #: cps/templates/cover_picker.html:191
 msgid "Use this cover"
-msgstr ""
+msgstr "Usar esta capa"
 
 #: cps/spa_strings.py:871 cps/templates/tasks.html:13
 #: cps/templates/tasks.html:42 cps/templates/tasks.html:65
@@ -5632,7 +5641,7 @@ msgstr "Usuário"
 
 #: cps/spa_strings.py:872
 msgid "User administration"
-msgstr ""
+msgstr "Administração de usuário"
 
 #: cps/spa_strings.py:873
 msgid "User object filter"
@@ -5675,7 +5684,8 @@ msgstr ""
 
 #: cps/spa_strings.py:882 cps/templates/cover_picker.html:40
 msgid "When locked, fetching metadata will not overwrite this cover."
-msgstr ""
+msgstr "Quando bloqueada, a busca de metadados não substituirá esta capa."
+
 
 #: cps/spa_strings.py:883 cps/templates/detail.html:1023
 msgid "When reading progress was first synced"
@@ -5793,57 +5803,58 @@ msgstr ""
 #: cps/spa_strings.py:911
 #, python-brace-format
 msgid "{count} book"
-msgstr ""
+msgstr "{count} livro"
 
 #: cps/spa_strings.py:912
 #, python-brace-format
 msgid "{count} books"
-msgstr ""
+msgstr "{count} livros"
 
 #: cps/spa_strings.py:913
 #, python-brace-format
 msgid "{count} file queued for import"
-msgstr ""
+msgstr "{count} arquivo na fila para importação"
 
 #: cps/spa_strings.py:914
 #, python-brace-format
 msgid "{count} file rejected"
-msgstr ""
+msgstr "{count} arquivo rejeitado"
 
 #: cps/spa_strings.py:915
 #, python-brace-format
 msgid "{count} files queued for import"
-msgstr ""
+msgstr "{count} arquivos na fila para importação"
 
 #: cps/spa_strings.py:916
 #, python-brace-format
 msgid "{count} files rejected"
-msgstr ""
+msgstr "{count} arquivos rejeitados"
 
 #: cps/spa_strings.py:917
 #, python-brace-format
 msgid "{count} result"
-msgstr ""
+msgstr "{count} resultado"
 
 #: cps/spa_strings.py:918
 #, python-brace-format
 msgid "{count} results"
-msgstr ""
+msgstr "{count} resultados"
 
 #: cps/spa_strings.py:919
 #, python-brace-format
 msgid "{count} results for \"{query}\""
-msgstr ""
+msgstr "{count} resultados para \"{query}\""
 
 #: cps/spa_strings.py:920
 #, python-brace-format
 msgid "{n} found"
-msgstr ""
+msgstr "{n} encontrados"
+
 
 #: cps/spa_strings.py:921
 #, python-brace-format
 msgid "{ok} of {total} sources answered"
-msgstr ""
+msgstr "{ok} de {total} fontes respondidas"
 
 #: cps/spa_strings.py:922
 msgid "…or paste an image URL"
@@ -5851,27 +5862,27 @@ msgstr ""
 
 #: cps/spa_strings.py:923
 msgid "← Back to book"
-msgstr ""
+msgstr "← Voltar para o livro"
 
 #: cps/spa_strings.py:924
 msgid "← Back to sign in"
-msgstr ""
+msgstr "← Voltar para o login"
 
 #: cps/spa_strings.py:925
 msgid "← Library"
-msgstr ""
+msgstr "← Biblioteca"
 
 #: cps/spa_strings.py:926
 msgid "≤"
-msgstr ""
+msgstr "≤"
 
 #: cps/spa_strings.py:927
 msgid "≥"
-msgstr ""
+msgstr "≥"
 
 #: cps/spa_strings.py:930
 msgid "Account settings"
-msgstr ""
+msgstr "Configurações de conta"
 
 #: cps/spa_strings.py:931
 msgid ""
@@ -6050,9 +6061,8 @@ msgid "Favorite Books"
 msgstr "Livros Favoritos"
 
 #: cps/templates/user_edit.html:177 cps/web.py:1098
-#, fuzzy
 msgid "Hidden Books"
-msgstr "Livro Escondido"
+msgstr "Livros Ocultos"
 
 #: cps/web.py:1164
 #, fuzzy
@@ -7244,7 +7254,7 @@ msgstr ""
 
 #: cps/templates/book_edit.html:352
 msgid "API Keys"
-msgstr ""
+msgstr "Chaves de API"
 
 #: cps/templates/book_edit.html:358
 msgid ""
@@ -10704,9 +10714,9 @@ msgid "Will be deleted"
 msgstr "Apagar livros selecionados"
 
 #: cps/templates/layout.html:812 cps/templates/layout.html:825
-#, fuzzy
 msgid "Formats:"
-msgstr "Formato Final"
+msgstr "Formatos:"
+
 
 #: cps/templates/layout.html:821
 msgid "Will be kept"
@@ -11846,19 +11856,19 @@ msgstr ""
 
 #: cps/templates/user_edit.html:494
 msgid "Name (A-Z)"
-msgstr ""
+msgstr "Nome (A-Z)"
 
 #: cps/templates/user_edit.html:495
 msgid "Name (Z-A)"
-msgstr ""
+msgstr "Nome (Z-A)"
 
 #: cps/templates/user_edit.html:496
 msgid "Book count (high to low)"
-msgstr ""
+msgstr "Contagem de livros (maior para menor)"
 
 #: cps/templates/user_edit.html:497
 msgid "Book count (low to high)"
-msgstr ""
+msgstr "Contagem de livros (menor para maior)"
 
 #: cps/templates/user_edit.html:498
 msgid "Created (newest first)"

@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.20] - 2026-07-24
+
 ### Added
 - **The classic interface now has a way to support the project.** There was no link anywhere in the classic UI — only the new interface had one — so anyone who wanted to chip in had to go looking for it. There is now a "Support Calibre-Web NextGen" entry in the user menu, in both the default and caliBlur themes.
 

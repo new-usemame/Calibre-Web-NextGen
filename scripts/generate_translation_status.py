@@ -68,8 +68,19 @@ def collect_stats():
         lang = po_path.parts[-3]
         po = polib.pofile(str(po_path))
         total = sum(1 for e in po if not e.obsolete)
-        translated = sum(1 for e in po if not e.obsolete and e.msgstr.strip())
         fuzzy = sum(1 for e in po if not e.obsolete and "fuzzy" in e.flags)
+        # A fuzzy entry has a non-empty msgstr, but msgfmt excludes it from the
+        # compiled .mo, so users see the untranslated English. Counting it as
+        # translated inflated the published table by 4.7-16.8 points across 27
+        # of 28 locales (Norwegian read 33% while 16.5% actually shipped) and
+        # pointed contributors at the wrong languages. `translated` must mean
+        # "reaches the user", i.e. exactly what `msgfmt --statistics` reports
+        # as translated. Same failure class as #879 and #1086.
+        translated = sum(
+            1
+            for e in po
+            if not e.obsolete and e.msgstr.strip() and "fuzzy" not in e.flags
+        )
         percent = round(100 * translated / total, 1) if total else 0.0
         stats.append((lang, LANGUAGE_NAMES.get(lang, lang), total, translated, fuzzy, percent))
     stats.sort(key=lambda r: (-r[5], r[1]))

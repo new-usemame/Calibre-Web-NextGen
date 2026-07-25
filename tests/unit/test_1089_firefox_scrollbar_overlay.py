@@ -18,7 +18,7 @@ one that is always visible while the content overflows and permanently steals
 its width from the content box. Overnight, every Firefox user got persistent
 scrollbars on the window, the sidebar and the Discover strip (#1089).
 
-Measured in Firefox 153 with overlay scrollbars enabled
+Measured in a **headed** Firefox 153 with overlay scrollbars enabled
 (``ui.useOverlayScrollbars=1``, i.e. the reporter's configuration), against the
 live SPA:
 
@@ -29,10 +29,8 @@ sidebar ``nav``                                 15 px       0 px
 Discover / MoreByAuthor ``.strip``              11 px       0 px
 ===========================================  ==========  =========
 
-The sidebar case is the sharpest illustration: it asks for
-``scrollbar-width: none`` — "do not show a scrollbar here at all" — and
-Firefox 153 gave it a 15px one anyway, because the global
-``::-webkit-scrollbar`` rule takes precedence over the standard property.
+"Gutter" there is ``offsetWidth - clientWidth``: the width the scrollbar
+permanently takes away from the content. An overlay scrollbar takes none.
 
 The fix
 -------
@@ -56,6 +54,16 @@ well, so an e2e assertion in the SPA harness (headless, Chromium) would pass
 against the bug and give a false green. The invariant below — "no ungated
 ``::-webkit-scrollbar`` rule ships in the SPA" — is what actually holds the
 fix in place, and it runs everywhere.
+
+Two traps for anyone re-verifying this by hand, both of which cost time here:
+
+* A machine set to "always show scroll bars" (macOS System Settings, and the
+  default on Windows) has no overlay scrollbars to lose, so the bug is
+  invisible on it no matter which browser you use.
+* **Headless** Firefox reports ``scrollbar-width: none`` as the *computed*
+  value for an element that declares nothing at all. Read computed scrollbar
+  properties in a headed browser or they will describe the harness rather than
+  the page.
 """
 
 import re

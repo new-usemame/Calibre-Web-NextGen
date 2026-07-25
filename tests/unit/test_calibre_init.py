@@ -28,12 +28,19 @@ def _restore_cps_modules():
     (#1105).
     """
     stubbed = ("cps", "cps.db", "cps.logger")
-    saved = {name: sys.modules.get(name) for name in stubbed}
+    # A sentinel rather than .get(), because sys.modules[name] = None is a real
+    # state — the import machinery uses it to remember a failed import — and
+    # restoring that as "absent" would not be putting things back.
+    missing = object()
+    saved = {
+        name: sys.modules.get(name, missing) if name in sys.modules else missing
+        for name in stubbed
+    }
     try:
         yield
     finally:
         for name, module in saved.items():
-            if module is None:
+            if module is missing:
                 sys.modules.pop(name, None)
             else:
                 sys.modules[name] = module

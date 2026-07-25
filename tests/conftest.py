@@ -490,9 +490,17 @@ def lane_for_path(path):
     return LANE_BY_DIRECTORY.get(relative.parts[0])
 
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(config, items):
     """
     Assign each test its CI lane, then skip tests the environment can't run.
+
+    ``tryfirst`` is load-bearing, not decoration. ``-m`` deselection happens in
+    ``_pytest.mark``'s own ``pytest_collection_modifyitems``, which carries no
+    ordering hint of its own — so without this we would be relying on pluggy
+    calling the later-registered conftest first. That happens to hold, but if it
+    ever stopped, every lane assigned below would land after the deselection
+    that reads it and ~970 tests would go quiet again with a green board.
 
     Lane assignment (#1105) has to happen here rather than in each test file:
     `-m` selection is opt-in, so an unmarked file is silently deselected and

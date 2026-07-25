@@ -15,6 +15,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
+# Drives a real container via the cwa_container fixture, so it belongs to the
+# Integration job, not the Fast Tests gate. It sat at tests/ root with no
+# marker, where the fast gate deselected it and the integration job's explicit
+# tests/docker/ tests/integration/ paths never named it — it ran nowhere (#1105).
+pytestmark = pytest.mark.docker_integration
+
 
 def test_simple_epub_ingest(cwa_container, ingest_folder, library_folder):
     """

@@ -39,13 +39,11 @@ _NEVER_RAN = (
     "written, never run, and never known to be wrong. " + TRIAGE_ISSUE
 )
 
-_MAYBE_REAL_BUG = (
-    "get_language_name('ger') returns 'Unknown' and logs 'Missing translation "
-    "for language name: ger'. Unlike the rest of this file that may be a real "
-    "user-visible bug (a book catalogued 'ger' rather than 'deu' showing as "
-    "Unknown) rather than test rot — confirm against a container built from "
-    "main, where translations are compiled, before changing either side. "
-    + TRIAGE_ISSUE
+_REAL_BUG = (
+    "not test rot — the product is wrong. LANGUAGE_NAMES is keyed on ISO "
+    "639-2/T ('deu', 'fra') and holds no 639-2/B variant, so get_language_name "
+    "returns 'Unknown' for 'ger' and logs an ERROR per lookup. These tests are "
+    "correct and should go green by fixing the lookup, not by changing them. #1109"
 )
 
 #: node id -> why it is skipped. Every reason must name an issue.
@@ -88,8 +86,8 @@ QUARANTINED = {
     "tests/unit/test_oauth_session.py::TestOAuthLogic::test_google_logged_in_aborts": _NEVER_RAN,
     "tests/unit/test_oauth_session.py::TestOAuthLogic::test_register_user_uses_manual_session": _NEVER_RAN,
 
-    # --- may be a real bug; check the container first (3) -------------------
-    "tests/smoke/test_iso_languages_locale_smoke.py::test_get_language_name_resolves_with_composite_locale_string": _MAYBE_REAL_BUG,
-    "tests/smoke/test_iso_languages_locale_smoke.py::test_get_language_name_resolves_with_locale_object": _MAYBE_REAL_BUG,
-    "tests/smoke/test_iso_languages_locale_smoke.py::test_get_language_name_resolves_with_string_locale": _MAYBE_REAL_BUG,
+    # --- a real product bug; the tests are right, the lookup is wrong (3) ---
+    "tests/smoke/test_iso_languages_locale_smoke.py::test_get_language_name_resolves_with_composite_locale_string": _REAL_BUG,
+    "tests/smoke/test_iso_languages_locale_smoke.py::test_get_language_name_resolves_with_locale_object": _REAL_BUG,
+    "tests/smoke/test_iso_languages_locale_smoke.py::test_get_language_name_resolves_with_string_locale": _REAL_BUG,
 }

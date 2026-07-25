@@ -30,6 +30,13 @@ import sys
 
 import pytest
 
+#: Declared explicitly rather than inherited from the directory. This module is
+#: the guard for the directory-lane mechanism, so it must not depend on that
+#: mechanism to be selected — if the lane assignment regressed, an inherited
+#: marker would take these tests down with it and the regression would report
+#: nothing at all.
+pytestmark = pytest.mark.unit
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from conftest import LANE_BY_DIRECTORY, LANE_MARKERS, lane_for_path  # noqa: E402
@@ -84,6 +91,23 @@ def test_every_test_directory_has_a_lane_or_a_stated_reason():
     )
 
 
+def test_no_test_file_sits_at_the_tests_root():
+    """A file directly under tests/ inherits no directory, so it has no lane.
+
+    `tests/test_simple_ingest.py` lived here: the fast gate deselected it for
+    having no marker, and the Integration job names `tests/docker/` and
+    `tests/integration/` explicitly, so it never named it either. It ran in no
+    job at all — the same hole as #1105, one level up, and invisible to the
+    directory check above.
+    """
+    stray = sorted(path.name for path in TESTS.glob("test_*.py"))
+    assert not stray, (
+        "tests/%s sit at the tests/ root, where no directory implies a lane and "
+        "no CI job's paths reach them. Move each into the directory for the job "
+        "that should run it (#1105)" % stray
+    )
+
+
 def test_fast_gate_selects_the_lanes_conftest_assigns():
     expression = _fast_gate_marker_expression()
     selected = set(re.findall(r"[a-z_]+", expression)) - {"or", "and", "not"}
@@ -128,14 +152,50 @@ def test_lane_is_derived_from_the_directory(path, expected):
 
 
 def test_a_declared_lane_is_never_overridden_by_the_directory():
-    """The two deliberately-slow files under tests/unit/ must stay out."""
-    for relative in SLOW_LANE_OPT_OUTS:
-        source = (REPO / relative).read_text(encoding="utf-8")
-        declared = set(re.findall(r"pytest\.mark\.([a-z_]+)", source))
-        assert declared & LANE_MARKERS, relative
-    # conftest skips the directory lane whenever any lane marker is declared,
-    # which is what keeps the two files above from being pulled into the gate.
-    assert LANE_MARKERS >= {"integration", "slow", "docker_integration"}
+    """The deliberately-slow files under tests/unit/ must stay out of the gate.
+
+    Asserted by collecting them under the gate's real selector rather than by
+    reading their source: a hook changed to add the directory lane
+    unconditionally would still leave the source text saying `integration`, so
+    a source-level check would pass while the files quietly joined Fast Tests.
+    """
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", *sorted(SLOW_LANE_OPT_OUTS),
+         "-m", _fast_gate_marker_expression(),
+         "--collect-only", "-q", "--no-header", "-p", "no:cacheprovider"],
+        cwd=REPO, capture_output=True, text=True, timeout=300,
+        env={**__import__("os").environ, "PYTHONPATH": str(REPO)},
+    )
+    assert "deselected" in result.stdout, (
+        "files that declare a slower lane were pulled into the Fast Tests gate "
+        "by their directory — a declared lane must win (#1105):\n%s"
+        % result.stdout[-2000:]
+    )
+
+
+def test_capability_markers_do_not_imply_a_fast_lane():
+    """`requires_docker`/`requires_calibre` say what a test needs, not how fast.
+
+    They are not in LANE_MARKERS, so a fast-lane file carrying only one of them
+    would be auto-marked `unit` and would execute in Fast Tests on a runner that
+    satisfies the requirement — without anyone having claimed it is a fast,
+    isolated unit test. No file does this today; this keeps it that way.
+    """
+    capability_markers = {"requires_docker", "requires_calibre"}
+    offenders = {}
+    for directory in LANE_BY_DIRECTORY:
+        for path in sorted((TESTS / directory).glob("test_*.py")):
+            declared = set(re.findall(
+                r"pytest\.mark\.([a-z_]+)", path.read_text(encoding="utf-8")))
+            if declared & capability_markers and not declared & LANE_MARKERS:
+                offenders[str(path.relative_to(REPO))] = sorted(
+                    declared & capability_markers)
+
+    assert not offenders, (
+        "these files declare an environment requirement but no lane, so the "
+        "directory would classify them as fast unit tests: %r. Declare the lane "
+        "the test actually belongs to (#1105)" % offenders
+    )
 
 
 def test_every_quarantined_test_names_an_issue():

@@ -29,8 +29,9 @@
 /* Legacy fallback only — mirrors DiscoverSection. See #1089: an engine that
    honours these pseudo-elements swaps the strip's overlay scrollbar for an
    always-visible classic one, so they are scoped to engines that lack the
-   standard `scrollbar-width`/`scrollbar-color` properties set above. */
-@supports not (scrollbar-width: thin) {
+   standard `scrollbar-width`/`scrollbar-color` properties set above. Tests both,
+   because Safari shipped them two releases apart (18.2 / 26.2). */
+@supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
   .strip::-webkit-scrollbar { height: 8px; }
   .strip::-webkit-scrollbar-thumb {
     background: var(--border-strong);

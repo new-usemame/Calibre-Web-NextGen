@@ -73,11 +73,18 @@
      So the webkit block is scoped to engines that lack the standard properties.
      The query keys off the feature rather than the engine on purpose — whichever
      engine adopts `::-webkit-scrollbar` next stays correct without another fix,
-     and older Chrome/Safari keep exactly the styling they have today. */
+     and older Chrome/Safari keep exactly the styling they have today.
+
+     The query tests BOTH standard properties, not just `scrollbar-width`. They
+     did not ship together: Safari added `scrollbar-width` in 18.2 but
+     `scrollbar-color` only in 26.2. Guarding on width alone would drop the
+     legacy styling for that whole Safari range while its replacement was only
+     half-supported, leaving default light scrollbars on this dark UI. An engine
+     must support the pair to be trusted with the standards-only path. */
   * { scrollbar-width: thin; }
   html { scrollbar-color: var(--surface-3) transparent; }
 
-  @supports not (scrollbar-width: thin) {
+  @supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
     ::-webkit-scrollbar { width: 11px; height: 11px; }
     ::-webkit-scrollbar-thumb {
       background: var(--surface-3);

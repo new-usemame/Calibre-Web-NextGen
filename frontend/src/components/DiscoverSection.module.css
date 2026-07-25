@@ -126,8 +126,9 @@
    this strip in every current engine; an engine that also honours the webkit
    pseudo-elements would swap the strip's overlay scrollbar for an always-visible
    classic one (#1089), so this is scoped to engines without the standard
-   properties. */
-@supports not (scrollbar-width: thin) {
+   properties. Tests both properties because Safari shipped `scrollbar-width` in
+   18.2 and `scrollbar-color` only in 26.2 — see the note in styles/global.css. */
+@supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
   .strip::-webkit-scrollbar { height: 8px; }
   .strip::-webkit-scrollbar-thumb {
     background: var(--border-strong);

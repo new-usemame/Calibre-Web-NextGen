@@ -250,26 +250,35 @@ def test_unmatched_count_does_not_miscount_a_non_array(wire, logs):
     assert "not an array: dict" in out
 
 
-@pytest.mark.parametrize("payload,error,fragment", [
+@pytest.mark.parametrize("payload,expected", [
+    (["not", "an", "object"],
+     {"error": "invalid_payload", "message": "JSON object required"}),
+    ({"document": "bad:document", "annotations": []},
+     {"error": 2004, "message": "Invalid document field"}),
+    ({"document": DIGEST, "annotations": 1},
+     {"error": "invalid_annotations", "message": "annotations must be an array"}),
     ({"document": DIGEST, "annotations": {}, "deleted": [123],
-      "delete_source": "koreader"}, "invalid_deleted", "array of annotation_id"),
+      "delete_source": "koreader"},
+     {"error": "invalid_deleted",
+      "message": "deleted must be an array of annotation_id strings"}),
     ({"document": DIGEST, "annotations": [], "deleted": ["a"],
-      "delete_source": "kobo"}, "invalid_delete_source", "must be one of"),
-    ({"document": DIGEST, "annotations": [{"annotation_id": "x",
-                                           "highlighted_text": 5}]},
-     "invalid_annotation", "annotations[0]"),
+      "delete_source": "kobo"},
+     {"error": "invalid_delete_source",
+      "message": "delete_source must be one of: koreader"}),
+    ({"document": DIGEST,
+      "annotations": [{"annotation_id": "x", "highlighted_text": 5}]},
+     {"error": "invalid_annotation",
+      "message": "annotations[0]: highlighted_text must be a string or null"}),
 ])
-def test_rejection_bodies_are_unchanged_by_the_helper(wire, payload, error, fragment):
+def test_rejection_bodies_are_unchanged_by_the_helper(wire, payload, expected):
     """`_reject()` replaced inline `create_sync_response({...}, 400)` calls at
-    five sites. Pin the payload itself, not just the status — otherwise the
-    helper could drop `message` and every logging assertion would still pass."""
+    six sites. Pin the whole body, not the status and not a substring: a
+    logging-only assertion would still pass if the helper dropped `message`,
+    and a substring would still pass if the wording inverted its meaning."""
     client, _s, _u = wire
     r = client.put("/kosync/syncs/annotations", json=payload)
     assert r.status_code == 400
-    body = r.get_json()
-    assert body["error"] == error
-    assert fragment in body["message"]
-    assert set(body) == {"error", "message"}
+    assert r.get_json() == expected
 
 
 def test_skipped_annotations_are_logged_as_dropped(wire, logs):
@@ -309,9 +318,12 @@ def test_successful_push_logs_the_counts(wire, logs):
     assert str(user.id) in out
 
 
-def test_successful_delete_logs_the_named_ids(wire, logs):
+def test_successful_delete_logs_its_counts(wire, logs):
     """The delete path is the one @iroQuai's device exercises; it needs its own
-    line so a report can be settled from the log alone."""
+    line so a report can be settled from the log alone. Deliberately the counts
+    and not the ids: naming every deleted id on a successful sync is log volume
+    with no diagnostic gain, and the ids are logged in the one case where they
+    matter (they matched nothing — see below)."""
     client, s, user = wire
     _seed(s, user.id, "koreader-obs-del")
     r = client.put("/kosync/syncs/annotations", json={

@@ -222,7 +222,11 @@ def _describe_count(value):
     """
     if isinstance(value, list):
         return str(len(value))
-    if value is None:
+    if value is None or value == {}:
+        # Lua has no empty-list/empty-object distinction, so the plugin's JSON
+        # encoder emits `{}` for an empty table and the handler below accepts it
+        # as an empty set. Calling that "not an array" would flag the single
+        # most common shape KOReader actually sends.
         return "0"
     return "0 (not an array: %s)" % type(value).__name__
 

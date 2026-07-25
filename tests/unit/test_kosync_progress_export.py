@@ -19,7 +19,7 @@ from types import SimpleNamespace
 
 import pytest
 from flask import Flask
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -276,6 +276,36 @@ def test_identifiers_exported(env):
     assert rows["Bare"]["identifiers"] == {}
 
 
+def test_identifier_types_differing_only_beyond_ascii_case_both_survive(env):
+    # The identifiers table is UNIQUE(book, type) under SQLite's NOCASE
+    # collation, which folds ASCII A-Z and nothing else — so one book may hold
+    # both "K" (U+212A KELVIN SIGN) and "k". Python's str.lower() folds the
+    # Kelvin sign onto ASCII "k" too, which would collapse the two onto one JSON
+    # key and silently drop a value, with no ORDER BY deciding the survivor.
+    # Keys are ASCII-lowercased so the map matches what the DB keeps distinct.
+    kelvin = "K"
+    assert kelvin.lower() == "k"           # the fold this test exists to prevent
+    book = _seed_book(env.calibre_session, title="Kelvin", authors=["A"],
+                      identifiers={kelvin: "kelvin-id", "k": "ascii-k-id"})
+    _seed_progress(env.app_session, document=str(book.id))
+
+    identifiers = env.client.get("/kosync/export").get_json()[0]["identifiers"]
+    assert identifiers == {kelvin: "kelvin-id", "k": "ascii-k-id"}
+
+
+def test_author_name_comma_is_unescaped(env):
+    # Calibre escapes a comma inside a single author name as "|", so
+    # "William H. Keith, Jr." is stored as "William H. Keith| Jr.". #730/#732
+    # fixed this fork-wide; the export must hand out the display form too, or an
+    # ingesting service matches against a name no catalogue has.
+    book = _seed_book(env.calibre_session, title="Fade Out",
+                      authors=["William H. Keith| Jr."])
+    _seed_progress(env.app_session, document=str(book.id))
+
+    assert env.client.get("/kosync/export").get_json()[0]["authors"] == [
+        "William H. Keith, Jr."]
+
+
 def test_export_is_scoped_to_authenticated_user(env):
     mine = _seed_book(env.calibre_session, title="Mine", authors=["A"])
     theirs = _seed_book(env.calibre_session, title="Theirs", authors=["B"])
@@ -365,17 +395,36 @@ def test_export_chunks_large_id_set_without_bind_overflow(env):
     # than the SQLite bound-parameter limit must still export — the endpoint
     # chunks the IN() lookup. Seed >500 books (one chunk) + a few more so the
     # loop crosses a chunk boundary.
+    # The identifiers lookup added in #1092 has to chunk for the same reason.
+    # Two independent ways it can regress, so both are pinned: running that
+    # query once after the loop strands every earlier chunk's identifiers
+    # (caught by the first/last assertions), while accumulating its id set
+    # across chunks keeps the output correct and silently grows the IN() until
+    # it overflows on a real library (caught by the bind-count listener).
     n = 550
-    books = [_seed_book(env.calibre_session, title=f"B{i}", authors=[f"Author {i}"])
+    books = [_seed_book(env.calibre_session, title=f"B{i}", authors=[f"Author {i}"],
+                        identifiers=({"isbn": f"id-{i}"} if i in (0, n - 1) else None))
              for i in range(n)]
     for b in books:
         _seed_progress(env.app_session, document=str(b.id), percentage=1.0)
+
+    identifier_binds = []
+
+    @event.listens_for(env.calibre_session.get_bind(), "before_cursor_execute")
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        if "identifiers" in statement.lower():
+            identifier_binds.append(len(parameters or ()))
 
     resp = env.client.get("/kosync/export")
     assert resp.status_code == 200
     body = resp.get_json()
     assert len(body) == n                 # every book exported across chunks
     assert len({r["calibre_book_id"] for r in body}) == n
+    rows = {r["calibre_book_id"]: r for r in body}
+    assert rows[books[0].id]["identifiers"] == {"isbn": "id-0"}          # chunk 1
+    assert rows[books[-1].id]["identifiers"] == {"isbn": f"id-{n - 1}"}  # chunk 2
+    assert identifier_binds, "the identifiers lookup never ran"
+    assert max(identifier_binds) <= 500   # bounded per chunk, never accumulated
 
 
 def test_non_ascii_digit_document_is_not_aliased(env):

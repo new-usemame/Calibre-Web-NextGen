@@ -16,6 +16,14 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **The reading-progress export now includes each book's identifiers, so an external tracker can match on ISBN instead of guessing from the title.** `GET /kosync/export` previously handed out only title and author, which is ambiguous for reissues, translations and common titles, and left the receiving service to guess. Every exported book now carries an `identifiers` map holding whatever Calibre has for it (ISBN, Goodreads, Amazon, and any custom types), or an empty map when the book has none. Contributed by [@Kyraminol](https://github.com/Kyraminol) ([#1092](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1092)).
+
+### Fixed
+
+- **Author names in the reading-progress export no longer come out with a stray `|` where a comma belongs.** An author stored in Calibre as "William H. Keith, Jr." was exported as "William H. Keith| Jr.", because Calibre escapes a comma inside a single author name and `GET /kosync/export` handed the stored form out unchanged. Any service ingesting the export was matching against a name no catalogue lists. The rest of the app already un-escaped it; the export now does too.
+
 ### Changed
 
 - **The Russian interface is now complete — the last two English strings are translated.** The "Support Calibre-Web NextGen" link added to the user menu in v4.1.20 was the only text left untranslated in Russian, so it showed in English next to an otherwise fully Russian menu. Russian is now the only language in the app with every string translated and nothing falling back to English. Contributed by [@standhaftsohnsergius](https://github.com/standhaftsohnsergius) ([#1088](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1088)).

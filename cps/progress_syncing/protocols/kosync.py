@@ -765,6 +765,24 @@ def _is_ascii_book_id(document: str) -> bool:
     return document.isascii() and document.isdecimal() and len(document) <= 18
 
 
+_ASCII_LOWER = {codepoint: codepoint + 32 for codepoint in range(ord("A"), ord("Z") + 1)}
+
+
+def _nocase_key(identifier_type: str) -> str:
+    """
+    Lowercase an identifier type the way SQLite's NOCASE collation does.
+
+    Calibre's ``identifiers`` table is ``UNIQUE(book, type)`` under NOCASE, which
+    folds ASCII A-Z and nothing else. Python's ``str.lower()`` also folds
+    non-ASCII — U+212A KELVIN SIGN lowercases to ``"k"`` — so one book can hold
+    both ``"K"`` and ``"k"`` legally while ``str.lower()`` collapses them onto a
+    single JSON key and drops one value, with no ``ORDER BY`` deciding which one
+    survives. Folding ASCII-only keeps the key space in step with the uniqueness
+    the database actually enforces.
+    """
+    return identifier_type.translate(_ASCII_LOWER)
+
+
 @csrf.exempt
 @kosync.route("/kosync/export", methods=["GET"])
 def export_progress():
@@ -789,6 +807,11 @@ def export_progress():
             "authors": [...],       # [] for books without authors
             "identifiers": {...},   # {type: value} map, {} when none found
         }
+
+    Author names are handed out in display form, with Calibre's escaped "|"
+    turned back into the comma it stands for. Identifier values are verbatim;
+    their type keys are ASCII-lowercased, matching the NOCASE collation the
+    ``identifiers`` table is unique under.
 
     Timestamps are UTC, ISO 8601 with explicit offset. Rows that don't resolve
     to a Calibre library book (checksum-keyed records that never converged after
@@ -892,8 +915,16 @@ def export_progress():
                     entry = calibre_books.setdefault(
                         book_id, {"title": title, "authors": [], "identifiers": {}}
                     )
-                    if author_name and author_name not in entry["authors"]:
-                        entry["authors"].append(author_name)
+                    if author_name:
+                        # Calibre escapes a comma inside a single author name as
+                        # "|", so "William H. Keith, Jr." is stored as
+                        # "William H. Keith| Jr.". Every other serializing path
+                        # un-escapes it before handing the name out (#730/#732);
+                        # this export predates that sweep, and a raw "|" defeats
+                        # the title/author matching an ingesting service does.
+                        display_name = author_name.replace("|", ",")
+                        if display_name not in entry["authors"]:
+                            entry["authors"].append(display_name)
 
                 # SECURITY: visibility_filter is not needed since matched_ids
                 # contains already visibility filtered entries only
@@ -908,7 +939,7 @@ def export_progress():
                     for book_id, identifier_type, identifier_value in identifier_rows:
                         if identifier_type and identifier_value:
                             calibre_books[book_id]["identifiers"][
-                                identifier_type.lower()
+                                _nocase_key(identifier_type)
                             ] = identifier_value
 
         def utc_isoformat(value):

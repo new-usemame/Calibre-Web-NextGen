@@ -818,8 +818,8 @@ def export_progress():
 
     Author names are handed out in display form, with Calibre's escaped "|"
     turned back into the comma it stands for. Identifier values are verbatim;
-    their type keys are ASCII-lowercased, matching the NOCASE collation the
-    ``identifiers`` table is unique under.
+    their type keys are ASCII-lowercased, which keeps two types the library
+    stores separately from collapsing onto one key.
 
     Timestamps are UTC, ISO 8601 with explicit offset. Rows that don't resolve
     to a Calibre library book (checksum-keyed records that never converged after

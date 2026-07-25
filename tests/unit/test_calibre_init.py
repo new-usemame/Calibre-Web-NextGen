@@ -10,6 +10,34 @@ import types
 import importlib.util
 from pathlib import Path
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _restore_cps_modules():
+    """Put sys.modules back the way we found it.
+
+    This module fakes the whole ``cps`` package so ``cps/calibre_init.py`` can
+    be loaded without the real one. Left in place, that stub answers every
+    later ``from cps import ...`` in the same worker process with
+    ``ImportError: cannot import name '...' from 'cps' (unknown location)``,
+    which lands on whichever unrelated file happens to run next.
+
+    It went unnoticed because this file carried no lane marker, so the Fast
+    Tests gate deselected it and it never shared a process with anything
+    (#1105).
+    """
+    stubbed = ("cps", "cps.db", "cps.logger")
+    saved = {name: sys.modules.get(name) for name in stubbed}
+    try:
+        yield
+    finally:
+        for name, module in saved.items():
+            if module is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module
+
 
 def _load_calibre_init():
     class DummyCalibreDB:

@@ -209,6 +209,24 @@ def _loggable(value, limit=80):
     return text if len(text) <= limit else text[:limit] + "...'"
 
 
+def _describe_count(value):
+    """How many entries the device sent, for a value that has NOT been shape-
+    checked yet.
+
+    The unmatched-book reply is returned *before* the ``annotations`` /
+    ``deleted`` validation runs, so this sees whatever JSON carried — a scalar,
+    a bool, an object. A bare ``len()`` there turns a request that has always
+    answered 200 into a 500, and counting a dict's keys reports "2
+    annotation(s)" for something that is not an annotation array at all. Report
+    a count only for a real array, and name the shape otherwise.
+    """
+    if isinstance(value, list):
+        return str(len(value))
+    if value is None:
+        return "0"
+    return "0 (not an array: %s)" % type(value).__name__
+
+
 def _reject(user, document, error, message, status=400):
     """Refuse a device push, and say so in the log.
 
@@ -290,7 +308,8 @@ def push_annotations():
             "KOReader annotation push: user=%s document=%s matched NO book — "
             "%s annotation(s) and %s delete(s) were NOT saved",
             user.id, _loggable(document),
-            len(data.get("annotations") or ()), len(data.get("deleted") or ()),
+            _describe_count(data.get("annotations")),
+            _describe_count(data.get("deleted")),
         )
         return create_sync_response({"document": document, "matched": False,
                                      "created": 0, "updated": 0, "deleted": 0, "skipped": 0})

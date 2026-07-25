@@ -208,6 +208,70 @@ def test_unknown_document_logs_that_nothing_was_saved(wire, logs):
     assert "ffffffffffffffffffffffffffffffff" in out
 
 
+UNMATCHED_BODY = {
+    "document": "ffffffffffffffffffffffffffffffff", "matched": False,
+    "created": 0, "updated": 0, "deleted": 0, "skipped": 0,
+}
+
+
+@pytest.mark.parametrize("payload", [
+    {"annotations": 1},                      # truthy scalar
+    {"annotations": True},                   # bool is not a container
+    {"annotations": [], "deleted": True},
+    {"annotations": {"a": 1, "b": 2}},       # dict: countable, but not an array
+    {"annotations": "text"},
+    {},                                      # both fields absent
+])
+def test_unmatched_book_never_500s_on_an_unvalidated_shape(wire, logs, payload):
+    """The unmatched-book reply is returned BEFORE annotations/deleted are
+    shape-checked, so it sees whatever JSON carried. It has always answered 200
+    for these; a diagnostic count that calls len() on them turns that into a
+    500. Found by cross-family review of this change and confirmed on the wire
+    (`{"annotations": 1}` -> TypeError: object of type 'int' has no len())."""
+    client, _s, _u = wire
+    r = client.put("/kosync/syncs/annotations", json={
+        "document": "ffffffffffffffffffffffffffffffff", **payload,
+    })
+    assert r.status_code == 200, f"{payload} regressed to {r.status_code}"
+    assert r.get_json() == UNMATCHED_BODY
+    assert _lines(logs, logging.WARNING), "still has to say nothing was saved"
+
+
+def test_unmatched_count_does_not_miscount_a_non_array(wire, logs):
+    """A dict has a len(), so it counts without raising — and would report
+    "2 annotation(s)" for something that is not an annotation array."""
+    client, _s, _u = wire
+    client.put("/kosync/syncs/annotations", json={
+        "document": "ffffffffffffffffffffffffffffffff",
+        "annotations": {"a": 1, "b": 2},
+    })
+    out = " | ".join(_lines(logs, logging.WARNING))
+    assert "2 annotation(s)" not in out, f"miscounted a non-array: {out!r}"
+    assert "not an array: dict" in out
+
+
+@pytest.mark.parametrize("payload,error,fragment", [
+    ({"document": DIGEST, "annotations": {}, "deleted": [123],
+      "delete_source": "koreader"}, "invalid_deleted", "array of annotation_id"),
+    ({"document": DIGEST, "annotations": [], "deleted": ["a"],
+      "delete_source": "kobo"}, "invalid_delete_source", "must be one of"),
+    ({"document": DIGEST, "annotations": [{"annotation_id": "x",
+                                           "highlighted_text": 5}]},
+     "invalid_annotation", "annotations[0]"),
+])
+def test_rejection_bodies_are_unchanged_by_the_helper(wire, payload, error, fragment):
+    """`_reject()` replaced inline `create_sync_response({...}, 400)` calls at
+    five sites. Pin the payload itself, not just the status — otherwise the
+    helper could drop `message` and every logging assertion would still pass."""
+    client, _s, _u = wire
+    r = client.put("/kosync/syncs/annotations", json=payload)
+    assert r.status_code == 400
+    body = r.get_json()
+    assert body["error"] == error
+    assert fragment in body["message"]
+    assert set(body) == {"error", "message"}
+
+
 def test_skipped_annotations_are_logged_as_dropped(wire, logs):
     """HTTP 200 + skipped:N — the highlight never lands and the device still
     says "synced". Silently losing a user's highlight must leave a trace."""

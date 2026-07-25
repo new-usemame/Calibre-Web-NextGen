@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.21] - 2026-07-25
+
 ### Added
 
 - **The reading-progress export now includes each book's identifiers, so an external tracker can match on ISBN instead of guessing from the title.** `GET /kosync/export` previously handed out only title and author, which is ambiguous for reissues, translations and common titles, and left the receiving service to guess. Every exported book now carries an `identifiers` map holding whatever Calibre has for it (ISBN, Goodreads, Amazon, and any custom types), or an empty map when the book has none. Contributed by [@Kyraminol](https://github.com/Kyraminol) ([#1092](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1092)).

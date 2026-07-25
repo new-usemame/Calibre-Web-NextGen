@@ -56,6 +56,64 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.21',
+    date: '2026-07-25',
+    items: [
+      {
+        title: 'Guests can open and read books again',
+        body: 'On a server with anonymous browsing turned on, a visitor who clicked "Read" got an error page in the classic view and was bounced back to the home page in the new one — no book, no explanation. Guests can now open a book and read it with the default appearance, while signed-in readers keep their saved theme, font and position.',
+        category: 'Reading',
+      },
+      {
+        title: 'Books you email to your e-reader now keep your place',
+        body: 'If you send books with "Send to Reader" rather than downloading them, KOReader had no way to tell that the copy on your device was the one in your library, so your reading position never synced back. Emailed books are now registered the same way downloaded ones are, and progress syncs from the first page you read.',
+        category: 'Sync',
+      },
+      {
+        title: 'The quick tag box on a book page suggests tags you already use',
+        body: 'Adding a tag from a book page offered no suggestions, so it was easy to type "sci-fi" onto one book and "Sci-Fi" onto the next and end up with two tags where you meant one. The field now completes against the tags already in your library as you type.',
+        category: 'Library',
+      },
+      {
+        title: 'On a phone, the Edit button no longer covers "Read now"',
+        body: 'On a narrow screen the pencil sat on top of the button beneath it, clipping the label to "Read no…" and making it awkward to hit the one you wanted. The controls on a book cover now lay out so both stay readable and tappable.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Your reading-progress export now identifies books properly',
+        body: 'The export that external trackers read gave out only title and author, which is ambiguous for reissues, translations and common titles, and it wrote names like "William H. Keith| Jr." with a stray bar where a comma belongs. Each exported book now carries whatever identifiers Calibre holds for it — ISBN, Goodreads, Amazon and any custom types — and author names come out as they are written.',
+        category: 'Sync',
+      },
+      {
+        title: 'Search engines are told to stay out of your library',
+        body: 'The address crawlers check for a crawling policy pointed at a file that had never existed, so every install answered "not found" and a public instance was free to be indexed, book pages included. Every install now serves a real policy asking well-behaved crawlers to keep out.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Firefox no longer draws permanent scrollbars down the page',
+        body: 'Firefox 153 changed how it treats one of the scrollbar rules the app was using, and the effect landed the day people updated: bars that used to fade away became fixed, always on, and squeezed the content beside them. Both interfaces now describe scrollbars the standard way, so Firefox goes back to its own fading bars.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The home-screen icon on iPhone and iPad is the app icon again',
+        body: 'Adding the library to an iOS home screen gave you a thumbnail of whichever page you happened to be on, because every page offered iOS an icon file it cannot use there. The correctly sized icon had been sitting unused in the app the whole time; it is now what iOS picks up, on the new interface and behind a reverse proxy on a sub-path alike.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'When highlight sync fails, the server now says why',
+        body: 'KOReader tells you "Server push failed" and nothing more, and the server was writing nothing at all — a rejected push, a book it could not match and a highlight it declined to store all left the log empty, and two of those even answered "success". Every highlight sync now leaves a line naming the book and what happened to it, so the answer is in your container logs.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Russian is now completely translated',
+        body: 'One link added to the user menu in the last release was the only English text left in an otherwise fully Russian interface. Russian is now the one language in the app with every string translated and nothing falling back to English.',
+        category: 'Under the hood',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.20',
     date: '2026-07-24',
     items: [

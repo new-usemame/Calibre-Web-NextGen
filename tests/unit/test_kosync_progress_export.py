@@ -278,11 +278,13 @@ def test_identifiers_exported(env):
 
 def test_identifier_types_differing_only_beyond_ascii_case_both_survive(env):
     # The identifiers table is UNIQUE(book, type) under SQLite's NOCASE
-    # collation, which folds ASCII A-Z and nothing else — so one book may hold
-    # both "K" (U+212A KELVIN SIGN) and "k". Python's str.lower() folds the
-    # Kelvin sign onto ASCII "k" too, which would collapse the two onto one JSON
-    # key and silently drop a value, with no ORDER BY deciding the survivor.
-    # Keys are ASCII-lowercased so the map matches what the DB keeps distinct.
+    # collation, which folds ASCII A-Z and nothing else, so one book may hold
+    # U+212A KELVIN SIGN and ASCII "k" as two distinct types. Python's
+    # str.lower() folds the Kelvin sign onto ASCII "k" as well, which would
+    # collapse the two onto one JSON key and silently drop a value, with no
+    # ORDER BY deciding the survivor. Keys are ASCII-lowercased instead, so the
+    # map keeps whatever the database kept distinct. The literal below is the
+    # Kelvin sign, not an ASCII K -- the assert on the next line pins that.
     kelvin = "K"
     assert kelvin.lower() == "k"           # the fold this test exists to prevent
     book = _seed_book(env.calibre_session, title="Kelvin", authors=["A"],
@@ -304,6 +306,19 @@ def test_author_name_comma_is_unescaped(env):
 
     assert env.client.get("/kosync/export").get_json()[0]["authors"] == [
         "William H. Keith, Jr."]
+
+
+def test_two_authors_that_share_a_display_form_both_survive(env):
+    # Un-escaping happens on the way out, not before the dedup check, so two
+    # author rows the library keeps apart stay apart. Calibre's own write path
+    # escapes commas, so this needs externally edited metadata to occur — but
+    # the endpoint used to return both names and must not start dropping one.
+    book = _seed_book(env.calibre_session, title="Two",
+                      authors=[("A|B", "sort-1"), ("A,B", "sort-2")])
+    _seed_progress(env.app_session, document=str(book.id))
+
+    assert env.client.get("/kosync/export").get_json()[0]["authors"] == [
+        "A,B", "A,B"]
 
 
 def test_export_is_scoped_to_authenticated_user(env):

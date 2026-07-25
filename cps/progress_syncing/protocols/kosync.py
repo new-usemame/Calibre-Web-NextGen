@@ -779,10 +779,11 @@ def _nocase_key(identifier_type: str) -> str:
     same range is enough: any two types sharing a key are NOCASE-equal, and
     NOCASE-equal types cannot both exist on a book.
 
-    Python's ``str.lower()`` is not enough. It also folds non-ASCII — U+212A
-    KELVIN SIGN lowercases to ``"k"`` — so a book can hold both ``"K"`` and
-    ``"k"`` legally while ``str.lower()`` collapses them onto one key and drops
-    a value, with no ``ORDER BY`` deciding which survives.
+    Python's ``str.lower()`` is not enough. It also folds non-ASCII: U+212A
+    KELVIN SIGN lowercases to ASCII ``"k"``. A book can legally carry both that
+    code point and ASCII ``"k"`` as separate types, and ``str.lower()`` would
+    collapse them onto one key and drop a value, with no ``ORDER BY`` deciding
+    which survives.
 
     This is finer than NOCASE at embedded NUL, where SQLite compares only up to
     the NUL. That is the safe direction: it distinguishes types the database
@@ -923,16 +924,10 @@ def export_progress():
                     entry = calibre_books.setdefault(
                         book_id, {"title": title, "authors": [], "identifiers": {}}
                     )
-                    if author_name:
-                        # Calibre escapes a comma inside a single author name as
-                        # "|", so "William H. Keith, Jr." is stored as
-                        # "William H. Keith| Jr.". Every other serializing path
-                        # un-escapes it before handing the name out (#730/#732);
-                        # this export predates that sweep, and a raw "|" defeats
-                        # the title/author matching an ingesting service does.
-                        display_name = author_name.replace("|", ",")
-                        if display_name not in entry["authors"]:
-                            entry["authors"].append(display_name)
+                    # Names are accumulated as stored and un-escaped on the way
+                    # out, so two rows the library keeps apart stay apart here.
+                    if author_name and author_name not in entry["authors"]:
+                        entry["authors"].append(author_name)
 
                 # SECURITY: visibility_filter is not needed since matched_ids
                 # contains already visibility filtered entries only
@@ -968,7 +963,13 @@ def export_progress():
                     "created_at": utc_isoformat(row.created_at),
                     "last_modified": utc_isoformat(row.timestamp),
                     "percentage": row.percentage,
-                    "authors": book["authors"],
+                    # Calibre escapes a comma inside a single author name as
+                    # "|", so "William H. Keith, Jr." is stored as
+                    # "William H. Keith| Jr.". Every other serializing path
+                    # un-escapes it before handing the name out (#730/#732);
+                    # this export predates that sweep, and a raw "|" defeats the
+                    # author matching an ingesting service does.
+                    "authors": [name.replace("|", ",") for name in book["authors"]],
                     "title": book["title"],
                     "identifiers": book["identifiers"],
                 }

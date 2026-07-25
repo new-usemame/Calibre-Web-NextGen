@@ -107,6 +107,72 @@ test.describe('expired authenticated session (#824)', () => {
   });
 });
 
+/** #1074 narrowed the "session gone" verdict so a visitor who was never signed
+ *  in is not logged out for the 401s that anonymous browsing answers by design.
+ *  The narrowing keys off having observed an authenticated /auth/me — which
+ *  App's bootstrap read supplies on a page load, but NOT on a sign-in that
+ *  happens inside an already-booted app: useLogin seeds the me-cache directly,
+ *  so the app flips to the authenticated tree and starts issuing protected
+ *  calls a full round trip before the invalidation refetch answers.
+ *
+ *  A session that dies inside that window is a real loss, and it must still be
+ *  classified as one. Everything here is route-mocked so the case is exact and
+ *  needs no server-side anonymous-browsing config: /auth/me answers 200-with-
+ *  Guest (the #1023 shape anonymous browsing produces), which is the only shape
+ *  where the narrowing applies at all — a 401 probe is still an unconditional
+ *  "gone" (api.ts probeSession). */
+test('session lost right after an in-app sign-in still navigates to logout (#1074)', async ({ page }) => {
+  await page.context().clearCookies();
+  const navigationCount = await holdLogoutNavigation(page);
+
+  const guestBody = JSON.stringify({
+    id: 2, name: 'Guest', locale: 'en', theme: 'dark', role: { anonymous: true, viewer: true },
+  });
+
+  let meCalls = 0;
+  await page.route('**/api/v1/auth/me', async (route) => {
+    meCalls += 1;
+    // Bootstrap: nobody is signed in, so the login tree renders.
+    if (meCalls === 1) {
+      return route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'unauthenticated', message: 'Login required' } }),
+      });
+    }
+    // Every later read — the post-login invalidation refetch and the probe —
+    // reports Guest: the session died between the sign-in and this answer. The
+    // refetch is held open so the protected call below lands inside the window
+    // rather than after it, which is the whole point of the test.
+    if (meCalls === 2) await new Promise((resolve) => setTimeout(resolve, 3000));
+    return route.fulfill({ status: 200, contentType: 'application/json', body: guestBody });
+  });
+
+  await page.route('**/api/v1/auth/login', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      id: 1, name: 'e2e', locale: 'en', theme: 'dark', role: { admin: true, viewer: true, download: true },
+    }),
+  }));
+
+  // The first protected call the authenticated tree makes, answered as the
+  // dead session would answer it.
+  await page.route('**/api/v1/books?**', (route) => route.fulfill({
+    status: 401,
+    contentType: 'application/json',
+    body: JSON.stringify({ error: { code: 'unauthenticated', message: 'Login required' } }),
+  }));
+
+  await page.goto('/app');
+  await page.locator('input[autocomplete="username"]').fill('e2e');
+  await page.locator('input[autocomplete="current-password"]').fill('e2e');
+  await page.getByRole('button', { name: /sign in/i }).click();
+
+  await expect(page).toHaveURL(/\/logout$/);
+  expect(navigationCount()).toBe(1);
+});
+
 test.describe('public authentication guards', () => {
   test('login 401 remains invalid credentials and does not navigate', async ({ page }) => {
     await page.context().clearCookies();

@@ -91,6 +91,13 @@ export function useLogin() {
     mutationFn: (vars: { username: string; password: string; remember?: boolean }) =>
       apiPost<Me>('/api/v1/auth/login', vars, { auth: 'public' }),
     onSuccess: (data) => {
+      // Seeding the me-cache flips the app to the authenticated tree straight
+      // away, so protected calls can fire before the invalidation below has
+      // refetched /auth/me. Note the identity from the payload we are seeding
+      // with, or a session that dies inside that window looks to the classifier
+      // like a guest who was never signed in and escapes the expiry path
+      // (#824/#1067) that #1074 narrowed.
+      noteSessionIdentity(!!data.role?.anonymous);
       queryClient.setQueryData(['me'], data);
       void queryClient.invalidateQueries({ queryKey: ['me'] });
     },
@@ -127,6 +134,9 @@ export function useMagicLinkPoll() {
       apiPost<MagicLinkPoll>('/api/v1/auth/magic-link/poll', { token }, { auth: 'public' }),
     onSuccess: (data) => {
       if (data.status === 'success') {
+        // Same seeding window as useLogin above — record the identity we are
+        // seeding with so an expiry during it is still classified as a loss.
+        noteSessionIdentity(!!data.user.role?.anonymous);
         queryClient.setQueryData(['me'], data.user);
         void queryClient.invalidateQueries({ queryKey: ['me'] });
       }

@@ -209,17 +209,25 @@ export function Reader({ id }: { id: string }) {
   }, [savedBookmark]);
 
   useEffect(() => {
+    // Wait for the query to settle, not for it to succeed. A guest has no
+    // server-side reader settings — /api/v1/reader/settings answers 401 for an
+    // anonymous user by design — so gating hydration on a payload left the
+    // guest's reader waiting forever behind the render guard below (#1074).
+    // Settled-with-nothing is a real answer: boot on the defaults already in
+    // state, which is what the guest reader is supposed to use.
+    if (!isSettingsFetched) return;
     const settings = settingsData?.reader;
-    if (!settings) return;
-    setTheme(THEME_TO_READER[settings.theme]);
-    setFontPct(settings.fontSize);
-    setFontFamily(settings.font);
-    setMargin(settings.margin);
-    setLineHeight(settings.lineHeight);
+    if (settings) {
+      setTheme(THEME_TO_READER[settings.theme]);
+      setFontPct(settings.fontSize);
+      setFontFamily(settings.font);
+      setMargin(settings.margin);
+      setLineHeight(settings.lineHeight);
+    }
     // Start epub.js only on the next render, after this server snapshot has
     // become the state captured by the rendition callbacks.
     setSettingsHydrated(true);
-  }, [settingsData]);
+  }, [settingsData, isSettingsFetched]);
 
   const persistSetting = useCallback(<K extends keyof ReaderSettings>(key: K, value: ReaderSettings[K]) => {
     settingsPendingRef.current = { ...settingsPendingRef.current, [key]: value };

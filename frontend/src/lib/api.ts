@@ -400,6 +400,24 @@ function isProtected(options?: ApiRequestOptions): boolean {
 
 let _sessionProbeInFlight: Promise<boolean> | null = null;
 
+/** Whether this browser has held a real (non-anonymous) session since the app
+ * booted. Only a session that once existed can be lost, and the remedy for a
+ * lost one (navigating to /logout) is destructive — so it must never be spent
+ * on a visitor who simply never signed in. */
+let _heldAuthenticatedSession = false;
+
+/** Record who the server says we are, from any /auth/me read.
+ *
+ * #1074: with anonymous browsing on, a guest is a legitimate steady state, not
+ * a failure. The reader asks for a bookmark and reader settings, both of which
+ * answer 401 for a guest by design — and the probe below then found `anonymous`
+ * on /me and reported the session gone, so opening any book navigated the guest
+ * straight to /logout. Knowing whether we ever held a session is what separates
+ * "signed out underneath us" from "was never signed in". */
+export function noteSessionIdentity(isAnonymous: boolean): void {
+  if (!isAnonymous) _heldAuthenticatedSession = true;
+}
+
 /** Ask the one endpoint that can answer "is this browser still signed in?"
  * authoritatively, and treat anything less than a positive answer as "still
  * signed in".
@@ -473,7 +491,15 @@ async function probeSession(): Promise<boolean> {
     // With anonymous browsing on, a lost session doesn't 401 — /me answers for
     // the Guest row instead (#1023), so `role.anonymous` is the discriminator.
     const me = await probe.json() as { role?: { anonymous?: boolean } };
-    return !!me.role?.anonymous;
+    if (!me.role?.anonymous) {
+      _heldAuthenticatedSession = true;
+      return false;
+    }
+    // Anonymous now. That is a LOSS only if there was a session to lose (#1074):
+    // a guest who never signed in is in their normal state, and logging them out
+    // would bounce them off the page they just opened. A session that really did
+    // expire is still caught, because its bootstrap /me was authenticated.
+    return _heldAuthenticatedSession;
   } catch {
     return false;
   }

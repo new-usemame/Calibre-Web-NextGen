@@ -22,6 +22,8 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Guests can open and read books again.** On a server with anonymous browsing enabled, a visitor who clicked "Read" got an error page in the classic view and was bounced back to the home page in the new interface — no book, no explanation. Three separate faults stacked up on that one click: the classic reader crashed before it could render, the new interface mistook "this visitor is a guest" for "this visitor's session expired" and signed them out, and the reader then waited forever for personal settings a guest never has. All three are fixed, and a guest now reads with the default appearance while signed-in readers keep their saved theme, font and position. Reported by [@bentsea](https://github.com/bentsea) ([#1074](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1074)).
+
 - **Author names in the reading-progress export no longer come out with a stray `|` where a comma belongs.** An author stored in Calibre as "William H. Keith, Jr." was exported as "William H. Keith| Jr.", because Calibre escapes a comma inside a single author name and `GET /kosync/export` handed the stored form out unchanged. Any service ingesting the export was matching against a name no catalogue lists. The rest of the app already un-escaped it; the export now does too.
 
 ### Changed

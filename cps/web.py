@@ -2727,7 +2727,6 @@ def login_post():
                 # Track failed login attempt
                 try:
                     from scripts.cwa_db import CWA_DB
-                    import json
                     cwa_db = CWA_DB()
                     cwa_db.log_activity(
                         user_id=None,
@@ -2771,7 +2770,6 @@ def login_post():
                 # Track failed login attempt
                 try:
                     from scripts.cwa_db import CWA_DB
-                    import json
                     cwa_db = CWA_DB()
                     cwa_db.log_activity(
                         user_id=None,
@@ -3332,8 +3330,7 @@ def read_book(book_id, book_format):
     if current_user.is_authenticated:
         try:
             from scripts.cwa_db import CWA_DB
-            import json
-            
+
             # Detect source of book discovery
             source = request.args.get('from', 'direct')
             referer = request.headers.get('Referer', '')

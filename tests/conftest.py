@@ -437,9 +437,74 @@ def pytest_configure(config):
     )
 
 
+# ---------------------------------------------------------------------------
+# CI lane assignment (#1105)
+# ---------------------------------------------------------------------------
+#
+# The Fast Tests gate selects tests with `-m "smoke or unit"`. Marker selection
+# is opt-in, so a file under tests/unit/ that forgets `@pytest.mark.unit` is
+# collected and then silently deselected — it runs in no CI job at all. That is
+# not a visible failure: the gate stays green while the test never executes.
+# 118 of 434 files under tests/unit/ had drifted that way, hiding 937 tests,
+# including regression guards for shipped fixes.
+#
+# Deriving the lane from the directory makes it structurally impossible for a
+# new file to be born invisible — a test's location already states its lane.
+
+TESTS_ROOT = Path(__file__).resolve().parent
+
+if str(TESTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TESTS_ROOT))
+
+from quarantine import QUARANTINED  # noqa: E402  (needs TESTS_ROOT on sys.path)
+
+#: Directory under tests/ -> the lane marker its tests belong to.
+LANE_BY_DIRECTORY = {
+    "unit": "unit",
+    "smoke": "smoke",
+}
+
+#: A test declaring one of these has already chosen its lane; the directory
+#: must not override it. This is what keeps the two deliberately-slow files
+#: under tests/unit/ out of the fast gate.
+LANE_MARKERS = frozenset({
+    "smoke", "unit", "integration", "e2e",
+    "docker", "docker_integration", "docker_e2e", "slow",
+})
+
+
+def lane_for_path(path):
+    """Return the lane marker implied by a test file's directory, or None.
+
+    Only the directories in LANE_BY_DIRECTORY imply a lane. Anything outside
+    tests/ (or in an unmapped subdirectory) returns None and is left alone.
+    """
+    if path is None:
+        return None
+    try:
+        relative = Path(str(path)).resolve().relative_to(TESTS_ROOT)
+    except ValueError:
+        return None
+    if not relative.parts:
+        return None
+    return LANE_BY_DIRECTORY.get(relative.parts[0])
+
+
+@pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(config, items):
     """
-    Automatically skip tests based on environment.
+    Assign each test its CI lane, then skip tests the environment can't run.
+
+    ``tryfirst`` is load-bearing, not decoration. ``-m`` deselection happens in
+    ``_pytest.mark``'s own ``pytest_collection_modifyitems``, which carries no
+    ordering hint of its own — so without this we would be relying on pluggy
+    calling the later-registered conftest first. That happens to hold, but if it
+    ever stopped, every lane assigned below would land after the deselection
+    that reads it and ~970 tests would go quiet again with a green board.
+
+    Lane assignment (#1105) has to happen here rather than in each test file:
+    `-m` selection is opt-in, so an unmarked file is silently deselected and
+    never runs. A test that declares its own lane marker is left untouched.
 
     Skip Docker tests if not in Docker environment.
     Skip Calibre tests if Calibre tools not installed.
@@ -447,6 +512,18 @@ def pytest_collection_modifyitems(config, items):
     """
     import shutil
     import os
+
+    for item in items:
+        if not LANE_MARKERS.intersection(marker.name for marker in item.iter_markers()):
+            lane = lane_for_path(
+                getattr(item, "path", None) or getattr(item, "fspath", None)
+            )
+            if lane:
+                item.add_marker(getattr(pytest.mark, lane))
+
+        quarantine_reason = QUARANTINED.get(item.nodeid)
+        if quarantine_reason:
+            item.add_marker(pytest.mark.skip(reason="quarantined: " + quarantine_reason))
 
     skip_docker = pytest.mark.skip(reason="Not running in Docker environment")
     skip_calibre = pytest.mark.skip(reason="Calibre tools not installed")

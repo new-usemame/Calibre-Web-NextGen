@@ -29,13 +29,27 @@ PERSISTENT = [
 ]
 
 
+#: The container element itself. Anchoring on the bare class name would also
+#: match the ``.cwa-toast-stack`` CSS rules in layout.html's <style> block,
+#: which sit ~200 lines above the markup — that made the ordering assertions
+#: below compare against the wrong offset and report inline flashes as being
+#: inside the stack when they are not (#1105).
+STACK_OPEN_TAG = '<div class="cwa-toast-stack">'
+
+
+def _stack_offset(src):
+    at = src.find(STACK_OPEN_TAG)
+    assert at != -1, (
+        "persistent toasts need a %s container so they stack instead of "
+        "overlapping — a CSS rule mentioning the class is not the container"
+        % STACK_OPEN_TAG
+    )
+    return at
+
+
 def test_persistent_toasts_live_in_a_stack_container():
     src = LAYOUT.read_text()
-    assert "cwa-toast-stack" in src, (
-        "persistent toasts need a .cwa-toast-stack container so they stack "
-        "instead of overlapping"
-    )
-    stack_at = src.index("cwa-toast-stack")
+    stack_at = _stack_offset(src)
     for cat in PERSISTENT:
         marker = 'message[0] == "%s"' % cat
         assert marker in src, "toast category missing: " + cat
@@ -48,7 +62,7 @@ def test_inline_flashes_stay_outside_the_floating_stack():
     """error/success flashes belong inline at the top, not in the floating
     toast stack — only the persistent .alert-cwa popups stack."""
     src = LAYOUT.read_text()
-    stack_at = src.index("cwa-toast-stack")
+    stack_at = _stack_offset(src)
     for cat in ("error", "success"):
         marker = 'message[0] == "%s"' % cat
         assert marker in src

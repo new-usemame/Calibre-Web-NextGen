@@ -34,9 +34,36 @@ import re
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
+#: The glyph as it is written in the CSS (glyphicon sort-by-attributes).
+LEGACY_GLYPH = r"\e155"
+
+#: One CSS rule block: selector text, then declarations up to the closing brace.
+#: Both runs exclude braces, so the match cannot span a nested block.
+_RULE_BLOCK = re.compile(r"([^{}]+)\{([^{}]*)\}")
+
 
 def _read(*parts):
     return REPO.joinpath(*parts).read_text(encoding="utf-8")
+
+
+def _glyph_rule_selectors(css):
+    """Return the selector of every rule block whose declarations use the glyph.
+
+    The block is matched first and its body tested in Python, which keeps the
+    scan linear. Folding the glyph into the pattern instead — the old
+    ``[^{}]*\\e155[^{}]*`` — makes it quadratic per block: for each of the
+    thousands of blocks that do *not* contain the glyph, the engine retries
+    every split point between the two runs before it can fail, and the leading
+    ``[^{}]+`` replays that from many starting offsets. On the 708 KB
+    caliBlur.css that ran past six minutes, so the test blew CI's 120s timeout
+    rather than reporting anything (#1084).
+    """
+    selectors = []
+    for match in _RULE_BLOCK.finditer(css):
+        if LEGACY_GLYPH not in match.group(2):
+            continue
+        selectors.append(match.group(1).strip().splitlines()[-1].strip())
+    return selectors
 
 
 def test_reorder_route_uses_new_body_class():
@@ -62,11 +89,38 @@ def test_mainjs_upload_gates_follow_rename():
     )
 
 
+def test_glyph_scan_finds_the_rule_and_ignores_its_neighbours():
+    """The scan must pick the glyph block out of ordinary surrounding rules.
+
+    Without this, a scan that silently matched nothing would leave
+    ``test_legacy_glyph_rule_stays_scoped_to_old_class`` vacuously green and
+    the #320 guard would be gone with no failing test to say so.
+    """
+    css = "\n".join([
+        "body.other > div { color: #fff; }",
+        "@media (min-width: 900px) {",
+        "  body.shelforder > div.container-fluid > div.col-sm-10:before {",
+        '    content: "\\e155";',
+        "    font-size: 6vw;",
+        "  }",
+        "}",
+        'body.shelfreorder .cover:before { content: "\\e156"; }',
+    ])
+
+    assert _glyph_rule_selectors(css) == [
+        "body.shelforder > div.container-fluid > div.col-sm-10:before"
+    ], "the scan must return the nested glyph block's own selector, and only it"
+
+
 def test_legacy_glyph_rule_stays_scoped_to_old_class():
-    css = _read("cps", "static", "css", "caliBlur.css")
-    # Find every rule block whose declarations include the \e155 glyph.
-    for match in re.finditer(r"([^{}]+)\{([^{}]*\\e155[^{}]*)\}", css):
-        selector = match.group(1).strip().splitlines()[-1].strip()
+    selectors = _glyph_rule_selectors(_read("cps", "static", "css", "caliBlur.css"))
+
+    assert selectors, (
+        "no caliBlur rule uses the \\e155 sort glyph any more — either the rule "
+        "was deleted (in which case delete this guard too) or the scan has "
+        "drifted and is no longer looking at the right thing (#320)"
+    )
+    for selector in selectors:
         assert "shelforder" in selector and "shelfreorder" not in selector, (
             "the caliBlur \\e155 sort-glyph rule must stay keyed to the legacy "
             "body.shelforder class only — the redesigned grid page "

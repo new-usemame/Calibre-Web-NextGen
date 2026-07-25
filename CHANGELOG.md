@@ -30,6 +30,12 @@ is for things you can see or feel when running the app.
 
 - **Firefox no longer draws permanent scrollbars down the side of the page.** Firefox 153 changed how it treats one of the scrollbar rules the app was using, and the effect landed the day people updated: bars that used to fade away when you stopped scrolling became fixed, always-on, and squeezed the content beside them. In the new interface that hit the sidebar and the Discover row; the classic theme had the same thing on both columns of every page. Both are fixed — the app now describes scrollbars using the standard properties, so Firefox goes back to its own fading scrollbars, and the slim dark styling is unchanged in other browsers. Reported by [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1089) ([#1089](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1089)).
 
+- **Adding the library to an iPhone or iPad home screen now gives you the app icon instead of a screenshot of the page.** Every page offered iOS an `.ico` file as its home-screen icon, and described it as a size that file does not contain. iOS cannot use an `.ico` there, so it gave up and used a thumbnail of whatever page you happened to be on. The correctly sized icon had been sitting in the app unused the whole time; every page now points at it, and the same fix applies to the new interface and to servers running behind a reverse proxy on a sub-path.
+
+### Removed
+
+- **The two leftover app icons that nothing used are gone.** `cps/static/icon.png` and `icon.svg` were the icons used before `favicon.ico` replaced them, and nothing had pointed at them since. They were still being shipped in every release, so every download carried about 29 KB of files no browser ever asked for. Reported by [@chloeroform](https://github.com/chloeroform) ([#1095](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1095)).
+
 ### Changed
 
 - **The Russian interface is now complete — the last two English strings are translated.** The "Support Calibre-Web NextGen" link added to the user menu in v4.1.20 was the only text left untranslated in Russian, so it showed in English next to an otherwise fully Russian menu. Russian is now the only language in the app with every string translated and nothing falling back to English. Contributed by [@standhaftsohnsergius](https://github.com/standhaftsohnsergius) ([#1088](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1088)).

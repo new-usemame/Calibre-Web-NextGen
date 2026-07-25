@@ -179,7 +179,7 @@ def _render_shell(index_path, prefix):
     static = prefix + "/static"
     inject = (
         '<link rel="icon" href="%s/favicon.ico">'
-        '<link rel="apple-touch-icon" sizes="140x140" href="%s/favicon.ico">'
+        '<link rel="apple-touch-icon" sizes="180x180" href="%s/img/apple-touch-icon.png">'
         '<script>window.__CWNG_PREFIX__=%s;</script>'
     ) % (static, static, json.dumps(prefix))
     html = html.replace("</head>", inject + "</head>", 1)

@@ -26,12 +26,18 @@
   scrollbar-color: var(--border-strong) transparent;
 }
 
-.strip::-webkit-scrollbar { height: 8px; }
-.strip::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: var(--r-full);
+/* Legacy fallback only — mirrors DiscoverSection. See #1089: an engine that
+   honours these pseudo-elements swaps the strip's overlay scrollbar for an
+   always-visible classic one, so they are scoped to engines that lack the
+   standard `scrollbar-width`/`scrollbar-color` properties set above. */
+@supports not (scrollbar-width: thin) {
+  .strip::-webkit-scrollbar { height: 8px; }
+  .strip::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: var(--r-full);
+  }
+  .strip::-webkit-scrollbar-track { background: transparent; }
 }
-.strip::-webkit-scrollbar-track { background: transparent; }
 
 .item {
   flex: 0 0 132px;

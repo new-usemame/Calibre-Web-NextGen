@@ -122,12 +122,19 @@
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
-.strip::-webkit-scrollbar { height: 8px; }
-.strip::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: var(--r-full);
+/* Legacy fallback only. `scrollbar-width`/`scrollbar-color` above already theme
+   this strip in every current engine; an engine that also honours the webkit
+   pseudo-elements would swap the strip's overlay scrollbar for an always-visible
+   classic one (#1089), so this is scoped to engines without the standard
+   properties. */
+@supports not (scrollbar-width: thin) {
+  .strip::-webkit-scrollbar { height: 8px; }
+  .strip::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: var(--r-full);
+  }
+  .strip::-webkit-scrollbar-track { background: transparent; }
 }
-.strip::-webkit-scrollbar-track { background: transparent; }
 
 .item {
   flex: 0 0 132px;

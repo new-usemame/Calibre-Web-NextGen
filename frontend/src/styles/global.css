@@ -55,15 +55,38 @@
 
   ::selection { background: var(--accent-soft); color: var(--text); }
 
-  /* Dark, slim scrollbars to match the theme (webkit). */
-  ::-webkit-scrollbar { width: 11px; height: 11px; }
-  ::-webkit-scrollbar-thumb {
-    background: var(--surface-3);
-    border-radius: var(--r-full);
-    border: 3px solid transparent;
-    background-clip: padding-box;
+  /* Dark, slim scrollbars to match the theme.
+
+     `scrollbar-width` / `scrollbar-color` are the standard properties, and they
+     are what every current engine reads (Firefox 64+, Chrome/Edge 121+, Safari
+     18.2+). They leave a scroller on its platform-native behaviour, so macOS and
+     Android keep the overlay scrollbars that fade out when idle and take no
+     layout space.
+
+     `::-webkit-scrollbar` is the legacy, pre-standard mechanism. An engine that
+     honours it demotes the scroller to a *classic* scrollbar: always visible
+     while the content overflows, and permanently stealing its width from the
+     content box. Firefox ignored these rules for years; Firefox 153 started
+     honouring them, and every Firefox user grew persistent scrollbars on the
+     window, the sidebar and the Discover strip overnight (#1089).
+
+     So the webkit block is scoped to engines that lack the standard properties.
+     The query keys off the feature rather than the engine on purpose — whichever
+     engine adopts `::-webkit-scrollbar` next stays correct without another fix,
+     and older Chrome/Safari keep exactly the styling they have today. */
+  * { scrollbar-width: thin; }
+  html { scrollbar-color: var(--surface-3) transparent; }
+
+  @supports not (scrollbar-width: thin) {
+    ::-webkit-scrollbar { width: 11px; height: 11px; }
+    ::-webkit-scrollbar-thumb {
+      background: var(--surface-3);
+      border-radius: var(--r-full);
+      border: 3px solid transparent;
+      background-clip: padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); background-clip: padding-box; }
   }
-  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); background-clip: padding-box; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }

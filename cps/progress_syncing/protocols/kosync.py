@@ -770,15 +770,23 @@ _ASCII_LOWER = {codepoint: codepoint + 32 for codepoint in range(ord("A"), ord("
 
 def _nocase_key(identifier_type: str) -> str:
     """
-    Lowercase an identifier type the way SQLite's NOCASE collation does.
+    Fold an identifier type to its export key, folding ASCII A-Z and nothing else.
 
-    Calibre's ``identifiers`` table is ``UNIQUE(book, type)`` under NOCASE, which
-    folds ASCII A-Z and nothing else. Python's ``str.lower()`` also folds
-    non-ASCII — U+212A KELVIN SIGN lowercases to ``"k"`` — so one book can hold
-    both ``"K"`` and ``"k"`` legally while ``str.lower()`` collapses them onto a
-    single JSON key and drops one value, with no ``ORDER BY`` deciding which one
-    survives. Folding ASCII-only keeps the key space in step with the uniqueness
-    the database actually enforces.
+    The invariant this has to hold is that two identifier types which can
+    coexist on one book never collide on the same key, or the export silently
+    drops a value. Calibre's ``identifiers`` table is ``UNIQUE(book, type)``
+    under SQLite's NOCASE collation, which folds ASCII A-Z only, so folding the
+    same range is enough: any two types sharing a key are NOCASE-equal, and
+    NOCASE-equal types cannot both exist on a book.
+
+    Python's ``str.lower()`` is not enough. It also folds non-ASCII — U+212A
+    KELVIN SIGN lowercases to ``"k"`` — so a book can hold both ``"K"`` and
+    ``"k"`` legally while ``str.lower()`` collapses them onto one key and drops
+    a value, with no ``ORDER BY`` deciding which survives.
+
+    This is finer than NOCASE at embedded NUL, where SQLite compares only up to
+    the NUL. That is the safe direction: it distinguishes types the database
+    already refuses to store side by side, so it can never merge two rows.
     """
     return identifier_type.translate(_ASCII_LOWER)
 

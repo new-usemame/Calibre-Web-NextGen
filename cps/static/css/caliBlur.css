@@ -1707,6 +1707,27 @@ app-loading-container {
    standard `#books_rand` / `.book` styling caliBlur already defines, so it
    renders consistently once shown. Reported by @chloeroform. */
 
+/* Scrollbars — standard properties first, legacy webkit as a guarded fallback.
+
+   `body` above already sets `scrollbar-color`, which is inherited, so these
+   scrollers pick the theme colour up. `scrollbar-width` is NOT inherited, so
+   each scroller has to ask for `thin` itself — otherwise it falls back to the
+   platform default width.
+
+   The `::-webkit-scrollbar` rules below were inert in Firefox until 153 started
+   honouring them. An engine that honours them demotes the scroller from an
+   overlay scrollbar (fades when idle, no layout space) to a classic one that is
+   always visible and permanently steals its width — measured at 15px on both
+   columns of every caliBlur page in Firefox 153 (#1089). They are therefore
+   scoped to engines lacking the standard properties. The query tests BOTH,
+   because Safari shipped `scrollbar-width` in 18.2 and `scrollbar-color` only in
+   26.2; see the fuller note in frontend/src/styles/global.css. */
+#main-nav + #scnd-nav, #main-nav + .col-sm-2, .navbar-collapse.collapse, body > div.container-fluid > div.row-fluid > div.col-sm-2, body > div.container-fluid > div > div.col-sm-10, #description, #meta-info, .book-meta {
+    scrollbar-width: thin;
+}
+
+@supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
+
 #main-nav + #scnd-nav::-webkit-scrollbar, #main-nav + .col-sm-2::-webkit-scrollbar, .navbar-collapse.collapse::-webkit-scrollbar, body > div.container-fluid > div.row-fluid > div.col-sm-2::-webkit-scrollbar, body > div.container-fluid > div > div.col-sm-10::-webkit-scrollbar {
     width: 14px;
     max-height: calc(100% - 60px)
@@ -1753,6 +1774,9 @@ app-loading-container {
 ::-webkit-scrollbar-corner {
     background: 0 0
 }
+
+}
+/* end @supports not ((scrollbar-width: thin) and (scrollbar-color: …)) — #1089 */
 
 .pace .pace-activity {
     border: 2px solid transparent;

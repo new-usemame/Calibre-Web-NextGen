@@ -80,7 +80,31 @@ from pathlib import Path
 import pytest
 
 
-SPA_SRC = Path(__file__).resolve().parents[2] / "frontend" / "src"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SPA_SRC = REPO_ROOT / "frontend" / "src"
+CLASSIC_CSS = REPO_ROOT / "cps" / "static" / "css"
+
+# Both UIs shipped the same bug. Measured in headed Firefox 153 with overlay
+# scrollbars, the classic caliBlur theme grew a 15px always-visible scrollbar on
+# *both* columns of every page, exactly as the SPA did — so the fix and this pin
+# cover both surfaces. Only shipping the SPA half would have made the changelog
+# entry ("Firefox no longer draws a permanent scrollbar…") an over-claim for
+# anyone on the classic theme.
+#
+# Two deliberate exclusions, so this list is a decision and not an oversight:
+#
+# * ``css/libs/`` — vendored third-party stylesheets (the SoundManager audio bar,
+#   the PDF viewer). Not ours to restyle, and their scrollers are inside narrow
+#   widgets rather than the page chrome.
+# * ``kthoom.css`` — its ``.disabled-scrollbar::-webkit-scrollbar`` rule sets
+#   ``display: none`` and is paired with ``scrollbar-width: none``. An engine
+#   honouring it *hides* the scrollbar, which is the intent and is what the
+#   standard property already did. There is no overlay-to-classic demotion to
+#   undo, so guarding it would be noise.
+SCANNED_ROOTS = [
+    (SPA_SRC, lambda p: True),
+    (CLASSIC_CSS, lambda p: p.name == "caliBlur.css"),
+]
 
 # The only ``@supports`` condition that makes a legacy webkit block safe.
 #
@@ -101,8 +125,12 @@ WEBKIT_SCROLLBAR = "::-webkit-scrollbar"
 
 
 def _css_files():
-    assert SPA_SRC.is_dir(), f"SPA source tree missing at {SPA_SRC}"
-    return sorted(SPA_SRC.rglob("*.css"))
+    files = []
+    for root, keep in SCANNED_ROOTS:
+        assert root.is_dir(), f"stylesheet tree missing at {root}"
+        files.extend(sorted(p for p in root.rglob("*.css") if keep(p)))
+    assert files, "no stylesheets found to scan"
+    return files
 
 
 def _skip_string(text, i):
@@ -345,20 +373,39 @@ def test_scan_helper_ignores_the_pseudo_element_in_a_supports_prelude():
 
 
 @pytest.mark.parametrize(
-    "relpath",
+    "path",
     [
-        "styles/global.css",
-        "components/DiscoverSection.module.css",
-        "components/MoreByAuthor.module.css",
+        SPA_SRC / "styles/global.css",
+        SPA_SRC / "components/DiscoverSection.module.css",
+        SPA_SRC / "components/MoreByAuthor.module.css",
+        CLASSIC_CSS / "caliBlur.css",
     ],
+    ids=lambda p: p.name,
 )
-def test_themed_scrollbars_still_expressed_via_standard_properties(relpath):
+def test_themed_scrollbars_still_expressed_via_standard_properties(path):
     """The fix must preserve the intent, not just delete the styling.
 
     Every surface that used to theme its scrollbar must still do so through the
     standard properties, otherwise #1089 gets "fixed" by shipping default
     light-grey scrollbars on a dark theme.
     """
-    css = (SPA_SRC / relpath).read_text()
-    assert "scrollbar-width:" in css, f"{relpath} lost its scrollbar-width declaration"
-    assert "scrollbar-color:" in css, f"{relpath} lost its scrollbar-color declaration"
+    css = path.read_text()
+    assert "scrollbar-width:" in css, f"{path.name} lost its scrollbar-width declaration"
+    assert "scrollbar-color:" in css, f"{path.name} lost its scrollbar-color declaration"
+
+
+def test_classic_columns_ask_for_a_thin_scrollbar_themselves():
+    """`scrollbar-color` is inherited from `body`; `scrollbar-width` is not.
+
+    caliBlur's page columns are the scrollers that grew the 15px bar in Firefox
+    153. Once the webkit rules stop applying to them they need their own
+    `scrollbar-width`, or they fall back to the platform's default width and the
+    theme looks wrong in a different way.
+    """
+    css = (CLASSIC_CSS / "caliBlur.css").read_text()
+    for selector in ("div.col-sm-2", "div.col-sm-10", "#description", "#meta-info"):
+        assert re.search(
+            re.escape(selector) + r"[^{}]*\{[^{}]*scrollbar-width\s*:\s*thin",
+            css,
+            re.DOTALL,
+        ), f"caliBlur scroller {selector} has no scrollbar-width: thin declaration"

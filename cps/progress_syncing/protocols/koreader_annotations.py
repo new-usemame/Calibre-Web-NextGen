@@ -196,6 +196,37 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _loggable(value, limit=80):
+    """Render a device-supplied value safe to put in a log line.
+
+    The rejection paths below log the field they refused, and by definition
+    that field failed validation — a `document` containing a newline would
+    otherwise let a device forge log lines, which is exactly the surface a
+    reporter and we both read to diagnose a sync. ``repr`` escapes the
+    separators and the cap keeps one bad push from flooding the log.
+    """
+    text = repr(value)
+    return text if len(text) <= limit else text[:limit] + "...'"
+
+
+def _reject(user, document, error, message, status=400):
+    """Refuse a device push, and say so in the log.
+
+    KOReader shows the user one bit — "Server push failed" — and the plugin has
+    only the HTTP status to go on, so it can never report *which* field the
+    server objected to. The server log is the sole diagnostic surface for a
+    highlight-sync report, and it used to be empty for every path below: #920
+    took three wrong diagnoses and ten days of the reporter's testing precisely
+    because a rejected push left no trace to send us. Every rejection returns
+    through here so that can't regress to silence one branch at a time.
+    """
+    log.info(
+        "KOReader annotation push rejected: user=%s document=%s error=%s (%s)",
+        getattr(user, "id", "?"), _loggable(document), error, message,
+    )
+    return create_sync_response({"error": error, "message": message}, status)
+
+
 @csrf.exempt
 @kosync.route("/kosync/syncs/annotations/<document>", methods=["GET"])
 def pull_annotations(document: str):
@@ -207,17 +238,27 @@ def pull_annotations(document: str):
     if not user:
         return create_sync_response({"error": ERROR_UNAUTHORIZED_USER, "message": "Unauthorized"}, 401)
     if not is_valid_key_field(document):
-        return create_sync_response({"error": ERROR_DOCUMENT_FIELD_MISSING, "message": "Invalid document field"}, 400)
+        return _reject(user, document, ERROR_DOCUMENT_FIELD_MISSING, "Invalid document field")
 
     book_id, _fmt, _title, _path, _ver = get_book_by_checksum(document)
     if not book_id:
         # Unknown book: empty set, not an error (the device may have a book the
-        # server doesn't know yet).
+        # server doesn't know yet). Logged because from the device's side this
+        # is indistinguishable from "the server has no highlights for me", and
+        # it is the usual shape of a book that was never checksum-registered.
+        log.info(
+            "KOReader annotation pull: user=%s document=%s no matching book "
+            "(returning empty set)", user.id, _loggable(document),
+        )
         return create_sync_response({"document": document, "annotations": [], "annotation_count": 0})
 
     payload = build_pull_payload(user.id, book_id, ub.session)
     payload["document"] = document
     payload["calibre_book_id"] = book_id
+    log.info(
+        "KOReader annotation pull: user=%s book=%s document=%s annotations=%s",
+        user.id, book_id, _loggable(document), payload.get("annotation_count", 0),
+    )
     return create_sync_response(payload)
 
 
@@ -234,21 +275,34 @@ def push_annotations():
 
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return create_sync_response({"error": "invalid_payload", "message": "JSON object required"}, 400)
+        return _reject(user, "?", "invalid_payload", "JSON object required")
     document = data.get("document")
     if not is_valid_key_field(document):
-        return create_sync_response({"error": ERROR_DOCUMENT_FIELD_MISSING, "message": "Invalid document field"}, 400)
+        return _reject(user, document, ERROR_DOCUMENT_FIELD_MISSING, "Invalid document field")
+
+    def _unmatched():
+        # HTTP 200 with `matched: false`, so the device reports the sync as a
+        # success to the user while the server saved nothing at all. That is a
+        # book the library has no checksum registered for — the most common
+        # cause of "my highlights sync but never show up" — and it has to be
+        # loud, because the device itself will never mention it.
+        log.warning(
+            "KOReader annotation push: user=%s document=%s matched NO book — "
+            "%s annotation(s) and %s delete(s) were NOT saved",
+            user.id, _loggable(document),
+            len(data.get("annotations") or ()), len(data.get("deleted") or ()),
+        )
+        return create_sync_response({"document": document, "matched": False,
+                                     "created": 0, "updated": 0, "deleted": 0, "skipped": 0})
 
     book_id, _fmt, _title, _path, _ver = get_book_by_checksum(document)
     if not book_id:
-        return create_sync_response({"document": document, "matched": False,
-                                     "created": 0, "updated": 0, "deleted": 0, "skipped": 0})
+        return _unmatched()
 
     from ... import calibre_db
     book = calibre_db.get_book(book_id)
     if book is None:
-        return create_sync_response({"document": document, "matched": False,
-                                     "created": 0, "updated": 0, "deleted": 0, "skipped": 0})
+        return _unmatched()
 
     # Deletions are named, never inferred. `complete` (#906) is accepted and
     # ignored: it asked the server to reap every live row the push omitted, but
@@ -264,7 +318,8 @@ def push_annotations():
     if annotations == {}:
         annotations = []
     if not isinstance(annotations, list):
-        return create_sync_response({"error": "invalid_annotations", "message": "annotations must be an array"}, 400)
+        return _reject(user, document, "invalid_annotations",
+                       "annotations must be an array")
 
     deleted_ids = data.get("deleted")
     if deleted_ids == {} or deleted_ids is None:
@@ -272,10 +327,8 @@ def push_annotations():
     if not isinstance(deleted_ids, list) or any(
         not isinstance(aid, str) or not aid.strip() for aid in deleted_ids
     ):
-        return create_sync_response({
-            "error": "invalid_deleted",
-            "message": "deleted must be an array of annotation_id strings",
-        }, 400)
+        return _reject(user, document, "invalid_deleted",
+                       "deleted must be an array of annotation_id strings")
 
     # Only meaningful when something is being deleted. Rejecting it on a push
     # that deletes nothing would throw away the annotations that push carries
@@ -284,18 +337,16 @@ def push_annotations():
     if deleted_ids and (
         not isinstance(delete_source, str) or delete_source not in _DELETABLE_SOURCES
     ):
-        return create_sync_response({
-            "error": "invalid_delete_source",
-            "message": "delete_source must be one of: %s" % ", ".join(sorted(_DELETABLE_SOURCES)),
-        }, 400)
+        return _reject(
+            user, document, "invalid_delete_source",
+            "delete_source must be one of: %s" % ", ".join(sorted(_DELETABLE_SOURCES)),
+        )
     from ...services.annotation_portable import validate_portable_payload
     for index, payload in enumerate(annotations):
         error = validate_portable_payload(payload)
         if error:
-            return create_sync_response({
-                "error": "invalid_annotation",
-                "message": f"annotations[{index}]: {error}",
-            }, 400)
+            return _reject(user, document, "invalid_annotation",
+                           f"annotations[{index}]: {error}")
 
     summary = apply_push(
         annotations, user=user, book=book,
@@ -310,4 +361,32 @@ def push_annotations():
     summary["reconciled"] = bool(deleted_ids)
     summary["calibre_book_id"] = book_id
     summary["matched"] = True
+    log.info(
+        "KOReader annotation push: user=%s book=%s document=%s "
+        "created=%s updated=%s deleted=%s skipped=%s (pushed=%s named_deletes=%s)",
+        user.id, book_id, _loggable(document),
+        summary.get("created", 0), summary.get("updated", 0),
+        summary.get("deleted", 0), summary.get("skipped", 0),
+        len(annotations), len(deleted_ids),
+    )
+    if summary.get("skipped"):
+        # A skipped annotation is one the server declined to store while still
+        # answering 200, so the device tells the user it synced and the
+        # highlight is simply gone. Never let that be invisible.
+        log.warning(
+            "KOReader annotation push: user=%s book=%s document=%s skipped %s of "
+            "%s pushed annotation(s) — they were NOT stored",
+            user.id, book_id, _loggable(document), summary["skipped"], len(annotations),
+        )
+    if deleted_ids and not summary.get("deleted"):
+        # The device named deletions and none matched a live row. Either they
+        # were already tombstoned (benign, a repeat sync) or the device's ids
+        # don't correspond to anything the server holds for this book — which
+        # is the "deleting on the device does nothing" report.
+        log.info(
+            "KOReader annotation push: user=%s book=%s document=%s named %s "
+            "delete(s) that matched no live %s row: %s",
+            user.id, book_id, _loggable(document), len(deleted_ids), delete_source,
+            ", ".join(_loggable(a) for a in sorted(deleted_ids)[:10]),
+        )
     return create_sync_response(summary)

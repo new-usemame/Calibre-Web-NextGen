@@ -14,7 +14,7 @@ a pure no-op even if something ever does scan this path.
 
 Run:
   CWN_TEST_PW=... [CWN_TEST_USER=cwng84test] \
-    /Users/acoundou/.pyenv/versions/3.12.7/bin/python3 scripts/manual/measure_cover_grid.py
+    /Users/<user>/.pyenv/versions/3.12.7/bin/python3 scripts/manual/measure_cover_grid.py
 
 Requires: `playwright install webkit chromium` on the host.
 """

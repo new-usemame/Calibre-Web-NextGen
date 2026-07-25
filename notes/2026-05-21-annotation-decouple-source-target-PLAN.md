@@ -61,7 +61,7 @@
 
 Run:
 ```bash
-cd /Users/acoundou/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
+cd /Users/<user>/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
 git status
 git branch --show-current
 ```
@@ -84,7 +84,7 @@ Expected: SQLAlchemy 1.4.x and Flask 2.x or later versions print without error.
 
 Run:
 ```bash
-cd /Users/acoundou/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
+cd /Users/<user>/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
 python3 -m pytest tests/unit/test_annotation_backup.py tests/unit/test_annotations_data_endpoint.py tests/unit/test_annotations_import_endpoint.py tests/unit/test_annotations_view_export.py tests/unit/test_kobo_annotation_sync_h1_schema.py -v 2>&1 | tail -30
 ```
 Expected: All tests pass. Any failures here mean the worktree starts in a bad state — investigate before continuing.
@@ -200,7 +200,7 @@ def test_annotation_sync_target_fk_cascade(in_memory_session):
 
 Run:
 ```bash
-cd /Users/acoundou/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
+cd /Users/<user>/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
 python3 -m pytest tests/unit/test_annotation_schema.py -v 2>&1 | tail -20
 ```
 Expected: FAIL with `AttributeError: module 'cps.ub' has no attribute 'AnnotationSyncTarget'` or similar.
@@ -415,7 +415,7 @@ Expected: All 8 tests pass (4 sync_target + 4 annotation tests).
 
 Run:
 ```bash
-cd /Users/acoundou/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
+cd /Users/<user>/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
 git add cps/ub.py tests/unit/test_annotation_schema.py
 git -c user.name='new-usemame' -c user.email='248195428+new-usemame@users.noreply.github.com' commit -m "feat(annotation): rename KoboAnnotationSync->Annotation, add AnnotationSyncTarget model
 
@@ -3040,7 +3040,7 @@ git -c user.name='new-usemame' -c user.email='248195428+new-usemame@users.norepl
 
 Run:
 ```bash
-cd /Users/acoundou/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
+cd /Users/<user>/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
 docker compose -f local-dev/docker-compose.local.yml down
 docker compose -f local-dev/docker-compose.local.yml build
 docker compose -f local-dev/docker-compose.local.yml up -d
@@ -3184,7 +3184,7 @@ git -c user.name='new-usemame' -c user.email='248195428+new-usemame@users.norepl
 
 Run:
 ```bash
-cd /Users/acoundou/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
+cd /Users/<user>/Other\ Projects/Calibre-Web-NextGen/repo/.claude/worktrees/BetterIntegrationOrganization
 python3 -m pytest tests/unit/ tests/integration/ -v 2>&1 | tail -30
 ```
 Expected: All passing. Note total pass count.

@@ -12,7 +12,7 @@ because her ``settings`` row predated the default change. This migration
 fixes that for everyone migrating from stock calibre-web (default
 ``Calibre-Web``) or from CWA (default ``Calibre-Web Automated``) while
 leaving anyone who picked a custom title (``Maggie's Library``,
-``Coundou Family Library``, etc.) untouched.
+``Sample Family Library``, etc.) untouched.
 
 Behavior under test:
 - ``should_migrate`` matches the two legacy defaults regardless of
@@ -106,7 +106,7 @@ def test_should_migrate_recognizes_legacy(title):
         "Calibre-Web NextGen",          # already on new brand
         "calibre-web nextgen",
         "Maggie's Library",
-        "Coundou Family Library",
+        "Sample Family Library",
         "CWA",                          # acronym alone is not the legacy default
         "Calibre-Web Automated v2",     # customized suffix
         "My Calibre-Web",               # customized prefix

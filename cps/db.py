@@ -827,9 +827,26 @@ class CalibreDB:
     # assignments are now scoped to the assigning thread instead of leaking to
     # every other one.
 
+    @property
+    def _local(self):
+        """Thread-local override slot, created on demand.
+
+        Built lazily rather than only in ``__init__`` because instances reach
+        this property without ``__init__`` having run — ``order_authors`` and
+        friends are exercised via ``CalibreDB.__new__(CalibreDB)`` to avoid
+        needing a Flask app. A property that raises AttributeError on a
+        partially constructed instance would be a worse contract than the
+        plain attribute it replaced.
+        """
+        local = self.__dict__.get("_session_local")
+        if local is None:
+            local = threading.local()
+            self.__dict__["_session_local"] = local
+        return local
+
     def _peek_session(self):
         """The thread's current session, or None. Never creates one."""
-        local = self._session_local
+        local = self._local
         if getattr(local, "override_set", False):
             return local.override
         factory = type(self).session_factory
@@ -843,12 +860,13 @@ class CalibreDB:
         return factory()
 
     def _clear_session_override(self):
-        self._session_local.override = None
-        self._session_local.override_set = False
+        local = self._local
+        local.override = None
+        local.override_set = False
 
     @property
     def session(self):
-        local = self._session_local
+        local = self._local
         if getattr(local, "override_set", False):
             return local.override
         factory = type(self).session_factory
@@ -863,7 +881,7 @@ class CalibreDB:
             fresh = False
         session = factory()
         if fresh:
-            session.expire_on_commit = self._expire_on_commit
+            session.expire_on_commit = getattr(self, "_expire_on_commit", True)
         return session
 
     @session.setter
@@ -881,8 +899,22 @@ class CalibreDB:
                 except Exception:
                     pass
             return
-        self._session_local.override = value
-        self._session_local.override_set = True
+        local = self._local
+        local.override = value
+        local.override_set = True
+
+    @session.deleter
+    def session(self):
+        """Drop this thread's override and go back to the registry.
+
+        Needed because ``session`` used to be a plain instance attribute:
+        ``mock.patch.object(calibre_db, "session", ...)`` records that it was
+        absent from ``__dict__`` and restores by deleting it. Without a
+        deleter every such patch raises on exit. Unlike assigning ``None``
+        this does not remove the thread's Session — it only stops overriding
+        how it is looked up.
+        """
+        self._clear_session_override()
 
     def init_db(self, expire_on_commit=True):
         if self._init:

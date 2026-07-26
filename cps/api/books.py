@@ -6,6 +6,7 @@ from datetime import timezone
 from flask import jsonify, request
 from flask_babel import get_locale
 from sqlalchemy import and_, func, or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.functions import coalesce
 
 from . import api_v1
@@ -39,10 +40,21 @@ def _visible_hot_book_ids(book_ids):
 
 
 def _detail_custom_columns():
-    """Classic-parity display definitions, degrading safely if DB metadata is unavailable."""
+    """Classic-parity display definitions, degrading safely if DB metadata is unavailable.
+
+    ``SQLAlchemyError`` is the case that actually happens in production: the
+    calibre metadata DB is reachable but its schema is not (a library that is
+    still being written, a wrong/renamed library path, a mid-migration
+    ``custom_columns``), and the query raises ``OperationalError``. The
+    non-DB errors below cover the reconnect window, where ``calibre_db.session``
+    can be absent rather than merely unreadable.
+
+    Custom columns are supplementary to a book's detail payload, so an
+    unreadable definition table must not take the whole page down with a 500.
+    """
     try:
         return calibre_db.get_cc_columns(config, filter_config_custom_read=True)
-    except (AttributeError, KeyError, TypeError):
+    except (SQLAlchemyError, AttributeError, KeyError, TypeError):
         log.warning("Custom-column definitions unavailable for book detail", exc_info=True)
         return []
 

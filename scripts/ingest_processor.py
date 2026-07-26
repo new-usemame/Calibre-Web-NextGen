@@ -31,6 +31,12 @@ from pathlib import Path
 # the lazy load hasn't happened yet (or fails in a test environment).
 _calibre_plugins = None
 _CPS_ROOT = "/app/calibre-web-automated"
+
+# Anchor for the shared conversion budget (#1094). Bound at import so it
+# tracks the same span the service's `timeout` wrapper is measuring, rather
+# than restarting per conversion stage. Monotonic, so a clock change during a
+# long conversion can't hand back a budget that never expires.
+_PROCESS_START_MONOTONIC = time.monotonic()
 from contextlib import contextmanager as _contextmanager
 
 
@@ -425,16 +431,41 @@ def conversion_deadline_seconds():
     rather than losing it (#1094) — instead of a SIGTERM that kills us first.
     Absent or unparseable means no deadline, which is the right default for a
     direct invocation with no supervisor holding a stopwatch.
+
+    OverflowError is caught alongside the parse errors: float('inf') parses
+    cleanly and only fails at int(), and an unbounded deadline is exactly the
+    case where we must not raise out of the caller's timeout= argument.
     """
     raw = os.environ.get("CWA_CONVERSION_DEADLINE_SECONDS")
     if not raw:
         return None
     try:
         value = int(float(raw))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         print(f"[ingest-processor] WARN: ignoring unparseable CWA_CONVERSION_DEADLINE_SECONDS={raw!r}", flush=True)
         return None
     return value if value > 0 else None
+
+
+def conversion_budget_remaining():
+    """Seconds left of the whole-process conversion budget, or None if unbounded.
+
+    The budget is one shared allowance, not a fresh timeout per subprocess.
+    A kepub ingest of a non-EPUB runs two conversions back to back, and giving
+    each the full deadline would let them add up to more than the watchdog
+    allows — the second would still be running when SIGTERM arrives, which is
+    the book-losing failure #1094 is about. Anchoring to process start also
+    matches what the outer `timeout` is actually measuring.
+
+    A budget that is already spent returns a small positive value rather than
+    zero or a negative: subprocess.run() treats that as an immediate
+    TimeoutExpired, which routes into the ordinary conversion-failure handler
+    and imports the original, instead of raising ValueError from a negative.
+    """
+    total = conversion_deadline_seconds()
+    if total is None:
+        return None
+    return max(0.1, total - (time.monotonic() - _PROCESS_START_MONOTONIC))
 
 
 def failed_backup_dir() -> str:
@@ -1117,7 +1148,7 @@ class NewBookProcessor:
         try:
             t_convert_book_start = time.time()
             subprocess.run(['ebook-convert', self.filepath, target_filepath], env=self.calibre_env, check=True,
-                           timeout=conversion_deadline_seconds())
+                           timeout=conversion_budget_remaining())
             t_convert_book_end = time.time()
             time_book_conversion = t_convert_book_end - t_convert_book_start
             print(f"\n[ingest-processor]: END_CON: Conversion of {self.filename} complete in {time_book_conversion:.2f} seconds.\n", flush=True)
@@ -1195,7 +1226,7 @@ class NewBookProcessor:
             target_filepath = f"{self.tmp_conversion_dir}{converted_filepath.stem}.kepub"
             try:
                 subprocess.run(['kepubify', '--inplace', '--calibre', '--output', self.tmp_conversion_dir, converted_filepath], check=True,
-                               timeout=conversion_deadline_seconds())
+                               timeout=conversion_budget_remaining())
                 if self.cwa_settings['auto_backup_conversions']:
                     self.backup(self.filepath, backup_type="converted")
 

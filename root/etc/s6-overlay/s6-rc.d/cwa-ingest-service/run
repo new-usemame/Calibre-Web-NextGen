@@ -244,12 +244,19 @@ run_processor_with_timeout() {
         # for backing up and importing the original after the deadline fires.
         # `timeout 0` means "no limit", so there is nothing to sit inside of.
         if [ "$safety_timeout" -gt 0 ] 2>/dev/null; then
+                # Reserve ~10% for backing up and importing the original after
+                # the deadline fires, with a 30s floor so the reserve is useful
+                # at ordinary timeouts. The reserve is then capped at a fifth of
+                # the budget so it can never swallow the conversion window: a
+                # flat floor applied to a small timeout used to invert the two
+                # (a 31s timeout left 1s to convert while 30s left 23s), which
+                # is a cliff rather than a margin. Capping keeps the deadline
+                # monotonic in the timeout across the whole range.
+                local max_margin=$(( safety_timeout / 5 ))
+                [ "$max_margin" -lt 1 ] && max_margin=1
                 local margin=$(( safety_timeout / 10 ))
                 [ "$margin" -lt 30 ] && margin=30
-                # A flat 30s floor can meet or exceed a very small safety
-                # timeout, which would leave no headroom at all; fall back to a
-                # proportional margin so there is always room to recover.
-                [ "$margin" -ge "$safety_timeout" ] && margin=$(( (safety_timeout / 5) + 1 ))
+                [ "$margin" -gt "$max_margin" ] && margin=$max_margin
                 export CWA_CONVERSION_DEADLINE_SECONDS=$(( safety_timeout - margin ))
         else
                 unset CWA_CONVERSION_DEADLINE_SECONDS

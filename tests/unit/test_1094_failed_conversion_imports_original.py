@@ -40,11 +40,25 @@ Pinned behaviour:
      reason this issue is about.
   8. A failed kepub conversion backs up the original as well as any
      intermediate epub, so the failed folder holds the file the user dropped.
+  9. The conversion deadline is ONE shared budget across both stages, not a
+     fresh timeout per subprocess. A kepub ingest of a non-EPUB converts twice
+     inside one hard timeout; two full deadlines could add up to more than the
+     watchdog allowed, leaving the second conversion running when SIGTERM
+     arrived — re-opening this very bug at the DEFAULT timeout setting.
+ 10. The deadline is monotonic in the hard timeout. A flat 30s reserve applied
+     to a small timeout inverted the two (a 31s timeout left 1s to convert
+     while a 30s timeout left 23s); the reserve is now capped so conversion
+     always keeps the majority of the budget.
+
+Findings 9 and 10, plus the OverflowError on a non-finite env value, came from
+the cross-family review of PR #1157. The converter-child cleanup finding from
+the same review is tracked separately in #1161.
 """
 
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -62,6 +76,7 @@ import ingest_processor  # noqa: E402
 INGEST_SERVICE_RUN = (
     REPO_ROOT / "root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run"
 )
+INGEST_PROCESSOR_PATH = REPO_ROOT / "scripts/ingest_processor.py"
 
 
 def _shell_function_body(text, name):
@@ -273,7 +288,11 @@ class TestConversionDeadline:
         nbp = _conversion_processor(tmp_path)
         ok, out = nbp.convert_book()
 
-        assert captured.get("timeout") == 1234
+        # The converter receives what is LEFT of the budget, not the raw total,
+        # so two stages can't each spend the whole thing. In a unit test almost
+        # nothing has elapsed, so it lands just under the total.
+        assert captured.get("timeout") == pytest.approx(1234, abs=60)
+        assert captured.get("timeout") <= 1234
         assert (ok, out) == (False, ""), (
             "a deadline overrun must be reported as an ordinary conversion "
             "failure so main() imports the original"
@@ -304,6 +323,134 @@ class TestConversionDeadline:
             "`timeout 0` means no hard limit, so there is no envelope to sit "
             "inside and no deadline should be imposed"
         )
+
+
+class TestConversionBudgetIsSharedAcrossStages:
+    """A kepub ingest of a non-EPUB converts twice, back to back, inside ONE
+    hard timeout. Giving each stage a fresh full deadline let the two add up to
+    more than the watchdog allowed, so the second was still running when
+    SIGTERM arrived — the exact book-losing failure #1094 is about, reachable
+    at the DEFAULT timeout. The budget is therefore one shared allowance
+    anchored to process start, not a per-subprocess timeout."""
+
+    def test_second_stage_gets_less_than_the_first(self, monkeypatch):
+        monkeypatch.setenv("CWA_CONVERSION_DEADLINE_SECONDS", "600")
+        first = ingest_processor.conversion_budget_remaining()
+        # Simulate the first conversion having burned real time. Anchored to
+        # now, not to the import-time value: the suite's own runtime counts
+        # against a budget that is deliberately measuring wall clock.
+        monkeypatch.setattr(ingest_processor, "_PROCESS_START_MONOTONIC",
+                            time.monotonic() - 400)
+        second = ingest_processor.conversion_budget_remaining()
+
+        assert second < first, "the second stage must not get a fresh full budget"
+        assert second == pytest.approx(200, abs=5), (
+            "after 400s of a 600s budget, ~200s must remain"
+        )
+
+    def test_two_stages_cannot_outlast_the_hard_timeout(self, monkeypatch):
+        """The property that actually protects the book: whatever the stages
+        spend, the total stays inside the budget the watchdog sits outside."""
+        monkeypatch.setenv("CWA_CONVERSION_DEADLINE_SECONDS", "600")
+        for elapsed in (0, 100, 300, 599):
+            monkeypatch.setattr(
+                ingest_processor, "_PROCESS_START_MONOTONIC",
+                time.monotonic() - elapsed
+            )
+            remaining = ingest_processor.conversion_budget_remaining()
+            assert elapsed + remaining <= 600 + 1, (
+                f"at {elapsed}s elapsed, a {remaining}s grant would overrun the budget"
+            )
+
+    def test_exhausted_budget_is_positive_not_negative(self, monkeypatch):
+        """subprocess.run() raises ValueError on a negative timeout, which
+        would escape the conversion-failure handlers and drop the book. An
+        exhausted budget must instead expire immediately as a TimeoutExpired."""
+        monkeypatch.setenv("CWA_CONVERSION_DEADLINE_SECONDS", "600")
+        monkeypatch.setattr(ingest_processor, "_PROCESS_START_MONOTONIC",
+                            time.monotonic() - 9000)
+        remaining = ingest_processor.conversion_budget_remaining()
+        assert remaining > 0
+        assert remaining < 1
+
+    def test_no_budget_when_unbounded(self, monkeypatch):
+        monkeypatch.delenv("CWA_CONVERSION_DEADLINE_SECONDS", raising=False)
+        assert ingest_processor.conversion_budget_remaining() is None
+
+    @pytest.mark.parametrize("raw", ["inf", "Infinity", "1e309", "-inf"])
+    def test_non_finite_env_is_ignored_not_raised(self, monkeypatch, raw):
+        """float('inf') parses cleanly and only fails at int(), raising
+        OverflowError — which is neither TypeError nor ValueError. Uncaught, it
+        escaped from the `timeout=` argument before subprocess.run() was even
+        called, bypassing the conversion-failure handlers entirely."""
+        monkeypatch.setenv("CWA_CONVERSION_DEADLINE_SECONDS", raw)
+        assert ingest_processor.conversion_deadline_seconds() is None
+        assert ingest_processor.conversion_budget_remaining() is None
+
+    def test_kepubify_also_receives_the_shared_budget(self):
+        """Both converters must draw on the same allowance; a source-pin here
+        because the two callsites are what the sharing property depends on."""
+        source = INGEST_PROCESSOR_PATH.read_text()
+        assert source.count("timeout=conversion_budget_remaining()") == 2, (
+            "both ebook-convert and kepubify must use the shared budget, not "
+            "a fresh per-subprocess deadline"
+        )
+        assert "timeout=conversion_deadline_seconds()" not in source, (
+            "the raw total must not be handed to a subprocess — that is the "
+            "per-stage deadline this class exists to prevent"
+        )
+
+
+class TestShellDeadlineArithmetic:
+    """Derivation runs in the real service script, so it is executed here
+    rather than eyeballed. A flat 30s reserve applied to a small timeout used
+    to invert the two limits — a 31s timeout left 1s to convert while a 30s
+    timeout left 23s — a cliff rather than a margin."""
+
+    @staticmethod
+    def _derive(safety_timeout):
+        """Run the real derivation block out of the shipped script."""
+        body = _shell_function_body(INGEST_SERVICE_RUN.read_text(),
+                                    "run_processor_with_timeout")
+        lines = body.splitlines()
+        start = next(i for i, l in enumerate(lines)
+                     if 'safety_timeout" -gt 0' in l)
+        end = next(i for i in range(start, len(lines))
+                   if lines[i].strip() == "fi")
+        block = "\n".join(lines[start:end + 1]).replace("local ", "")
+        script = f'safety_timeout={safety_timeout}\n{block}\necho "${{CWA_CONVERSION_DEADLINE_SECONDS:-unset}}"'
+        out = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+        assert out.returncode == 0, out.stderr
+        return out.stdout.strip()
+
+    def test_deadline_is_monotonic_in_the_hard_timeout(self):
+        previous = -1
+        for safety_timeout in (2, 5, 10, 29, 30, 31, 35, 45, 60, 120, 300, 900, 2700):
+            value = int(self._derive(safety_timeout))
+            assert value >= previous, (
+                f"raising the hard timeout to {safety_timeout}s SHRANK the "
+                f"conversion deadline to {value}s (was {previous}s) — a cliff"
+            )
+            previous = value
+
+    @pytest.mark.parametrize("safety_timeout", [30, 31, 45, 60, 120, 900, 2700])
+    def test_conversion_always_gets_the_majority_of_the_budget(self, safety_timeout):
+        """The reserve is for backing up and importing the original; it must
+        never grow to swallow the conversion window it is protecting."""
+        value = int(self._derive(safety_timeout))
+        assert value > safety_timeout / 2, (
+            f"a {safety_timeout}s timeout left only {value}s to convert"
+        )
+
+    @pytest.mark.parametrize("safety_timeout,expected", [(900, 810), (2700, 2430)])
+    def test_reachable_timeouts_are_unchanged(self, safety_timeout, expected):
+        """ingest_timeout_minutes is clamped to 5..120 server-side, so the
+        shipped range is 900..21600s. Pinning the endpoints of what users
+        actually run keeps the arithmetic repair from moving live behaviour."""
+        assert int(self._derive(safety_timeout)) == expected
+
+    def test_no_hard_limit_means_no_deadline(self):
+        assert self._derive(0) == "unset"
 
 
 class TestKepubFailureAlwaysReturnsAPair:

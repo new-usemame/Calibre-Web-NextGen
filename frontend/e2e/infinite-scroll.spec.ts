@@ -122,6 +122,43 @@ test.describe('library infinite scroll', () => {
     assertNoPageErrors(errors);
   });
 
+  test('scrolling auto-loads the next page through the real sentinel (#1144)', async ({ page }) => {
+    // The #704 test above stubs IntersectionObserver out to exercise the manual
+    // fallback, so nothing covered the observer path itself. It broke without a
+    // failing test: the sentinel only renders once results arrive, and the
+    // observer hook used to bind whatever `sentinelRef.current` held when its
+    // effect ran, never re-binding when the element mounted.
+    const requestedPages: number[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (!url.pathname.endsWith('/api/v1/books')) return;
+      const requested = Number(url.searchParams.get('page'));
+      if (requested > 0) requestedPages.push(requested);
+    });
+
+    const errors = collectPageErrors(page);
+    await page.goto('/app');
+
+    const cards = gridBookLinks(page);
+    await expect(cards.first()).toBeVisible();
+    const firstPageCount = await cards.count();
+
+    // Only meaningful when the seed has more books than one page holds.
+    const loadMore = page.getByRole('button', { name: 'Load more' });
+    test.skip(!(await loadMore.count()), 'seed fits in a single page');
+
+    // Scroll the sentinel into view. No clicking — the button is the fallback,
+    // and using it here would pass even with the observer dead.
+    for (let i = 0; i < 8 && !requestedPages.includes(2); i++) {
+      await page.mouse.wheel(0, 1400);
+      await page.waitForTimeout(300);
+    }
+
+    expect(requestedPages, 'scrolling reaches page 2 without touching Load more').toContain(2);
+    await expect(cards).not.toHaveCount(firstPageCount);
+    assertNoPageErrors(errors);
+  });
+
   test('page 1 is requested exactly once per library load (#1144)', async ({ page }) => {
     // Against the REAL backend: no routing, no fulfilment. This counts what the
     // app actually puts on the wire.

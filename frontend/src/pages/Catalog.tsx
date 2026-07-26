@@ -311,7 +311,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [gridNode, setGridNode] = useState<HTMLDivElement | null>(null);
   const fallbackPerPage = me?.display?.books_per_page && me.display.books_per_page > 0
     ? me.display.books_per_page : 24;
+  // columnCount starts as a GUESS derived from books_per_page; the real value is
+  // measured off the rendered grid below. The guess and the measurement rarely
+  // agree, so page 1 used to be fetched twice — once at the guessed size, then
+  // again once the measurement landed, with the first response thrown away
+  // (#1144). gridMeasured gates the query so only the measured size is ever
+  // requested; the guess survives only as the fail-open fallback.
   const [columnCount, setColumnCount] = useState(() => Math.max(1, Math.ceil(fallbackPerPage / rowsPerLoad)));
+  const [gridMeasured, setGridMeasured] = useState(false);
   const perPage = rowsPerLoad * columnCount;
   const [seriesPresentation, setSeriesPresentation] = usePersistentChoice(
     'cwng:series-presentation-v1', ['grid', 'list'] as const, 'grid');
@@ -323,12 +330,26 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       const tracks = getComputedStyle(gridNode).gridTemplateColumns.trim();
       const next = tracks && tracks !== 'none' ? tracks.split(/\s+/).length : 1;
       setColumnCount(Math.max(1, next));
+      setGridMeasured(true);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(gridNode);
     return () => observer.disconnect();
   }, [gridNode, density]);
+
+  // Fail-open. The measurement needs the grid element to exist, and a first
+  // attempt at this gate deadlocked: no data -> no grid -> no observer -> no
+  // measurement -> query stays disabled -> no data. Rendering the loading state
+  // inside the grid container (below) is what breaks that cycle, but the gate
+  // must not be the only thing standing between a user and their library, so
+  // any path that fails to measure within a frame falls back to the guess and
+  // queries anyway. Worst case is the old redundant fetch; never an empty page.
+  useEffect(() => {
+    if (gridMeasured) return;
+    const timer = setTimeout(() => setGridMeasured(true), 150);
+    return () => clearTimeout(timer);
+  }, [gridMeasured]);
 
   const accKeyRef = useRef<string>(snap?.resetKey ?? '');
 
@@ -437,6 +458,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A series shown as a list never renders the grid, so there is nothing to
+  // measure and nothing to wait for — it queries at the guessed size as before.
+  const usesGrid = !(isSeries && seriesPresentation === 'list');
+  const gridReady = gridMeasured || !usesGrid;
+
   // Both hooks are always called (hook order is fixed); exactly one is enabled.
   const booksQuery = useBooks({
     page,
@@ -448,11 +474,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     entityId,
     view,
     showHidden: !hideLibraryControls && showHidden,
-    enabled: !filterActive,
+    enabled: !filterActive && gridReady,
   });
   // The read/unread control is an explicit user action, so it overrides the
   // read_status baked into the saved filter; sort is the library's own.
-  const advParams: AdvancedSearchParams | null = filterActive
+  const advParams: AdvancedSearchParams | null = filterActive && gridReady
     ? { ...defaultFilter, sort, ...(readFilter !== 'all' ? { read_status: readFilter } : {}) }
     : null;
   const advQuery = useAdvancedSearch(advParams, page, perPage);
@@ -476,7 +502,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   const total = data?.total ?? 0;
   const hasMore = allBooks.length < total;
-  const isFirstLoad = isLoading && allBooks.length === 0;
+  // A disabled query is not "loading" as far as react-query is concerned, so the
+  // pre-measurement render has to be treated as first load explicitly. Without
+  // this it falls through to the empty state and flashes "No books here" before
+  // the first request is even made.
+  const isFirstLoad = (isLoading || !gridReady) && allBooks.length === 0;
 
   // The observer is a convenience, not the only way to reach another page:
   // this same guarded action also backs the keyboard/AT-visible Load more button.
@@ -764,7 +794,16 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       )}
 
       {isFirstLoad ? (
-        <SpinnerCentered size={36} />
+        // The loading state renders INSIDE the grid container rather than in
+        // place of it. The column measurement reads gridTemplateColumns off this
+        // element, and a CSS grid reports its tracks even with no cards in it —
+        // so having it on the first paint is what lets the very first query use
+        // the real column count instead of a guess (#1144).
+        <div ref={setGridNode} className={`${styles.grid} ${styles[`density_${density}`]}`}>
+          <div className={styles.gridLoading}>
+            <SpinnerCentered size={36} />
+          </div>
+        </div>
       ) : error ? (
         <EmptyState message={error instanceof Error ? error.message : t('Failed to load books.')} />
       ) : allBooks.length === 0 && !isFetching ? (

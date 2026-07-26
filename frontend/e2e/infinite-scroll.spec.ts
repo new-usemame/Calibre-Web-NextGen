@@ -7,13 +7,17 @@ import { collectPageErrors, assertNoPageErrors } from './utils';
  * page. A persistent "Load more" button is its keyboard/AT fallback when an
  * observer is unavailable or never delivers an intersecting entry.
  *
- * CI only seeds one real book, so this regression test supplies both library
+ * CI only seeds a few real books, so the paging test supplies both library
  * pages at the network boundary. Authentication and the rest of the SPA remain
- * real; only GET /api/v1/books is fulfilled here.
+ * real; only GET /api/v1/books is fulfilled there.
+ *
+ * per_page is NOT a constant. The grid asks for rowsPerLoad × the number of
+ * columns it actually measured, so it varies with viewport and density — this
+ * spec used to pin it at 24 and failed on every run once the measured size
+ * stopped coinciding with the guess (#1130, root-caused in #1144). The mock
+ * reads the size off the request instead of dictating it, and serves exactly
+ * two pages of whatever size was asked for.
  */
-
-const PER_PAGE = 24;
-const TOTAL = 50;
 
 function fakeBook(id: number): Book {
   return {
@@ -30,14 +34,15 @@ function fakeBook(id: number): Book {
   };
 }
 
-function booksPage(page: number): BooksPage {
-  const firstId = page === 1 ? 1 : PER_PAGE + 1;
-  const lastId = page === 1 ? PER_PAGE : TOTAL;
+function booksPage(page: number, perPage: number): BooksPage {
+  const total = perPage * 2;
+  const firstId = (page - 1) * perPage + 1;
+  const lastId = Math.min(page * perPage, total);
   return {
     items: Array.from({ length: lastId - firstId + 1 }, (_, index) => fakeBook(firstId + index)),
     page,
-    per_page: PER_PAGE,
-    total: TOTAL,
+    per_page: perPage,
+    total,
   };
 }
 
@@ -64,6 +69,7 @@ test.describe('library infinite scroll', () => {
     });
 
     const requestedPages: number[] = [];
+    const requestedSizes: number[] = [];
     await page.route('**/api/v1/books?**', async (route) => {
       if (route.request().method() !== 'GET') return route.continue();
 
@@ -73,19 +79,27 @@ test.describe('library infinite scroll', () => {
         return route.continue();
       }
 
-      expect(url.searchParams.get('per_page')).toBe(String(PER_PAGE));
+      const perPage = Number(url.searchParams.get('per_page'));
+      expect(perPage, 'the grid asks for a whole number of rows').toBeGreaterThan(0);
       expect(url.searchParams.get('sort')).toBe('new');
       requestedPages.push(pageNumber);
+      requestedSizes.push(perPage);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(booksPage(pageNumber)),
+        body: JSON.stringify(booksPage(pageNumber, perPage)),
       });
     });
 
     const errors = collectPageErrors(page);
     await page.goto('/app');
-    await expect(gridBookLinks(page)).toHaveCount(PER_PAGE);
+
+    await expect
+      .poll(() => requestedSizes.length, { message: 'the library issues its first page request' })
+      .toBeGreaterThan(0);
+    const perPage = requestedSizes[0];
+
+    await expect(gridBookLinks(page)).toHaveCount(perPage);
 
     const loadMore = page.getByRole('button', { name: 'Load more' });
     await expect(loadMore).toBeVisible();
@@ -96,14 +110,50 @@ test.describe('library infinite scroll', () => {
     // The observer stub never invokes its callback. Page 2 is therefore only
     // reachable through the product's manual fallback.
     await loadMore.click();
-    await expect(gridBookLinks(page)).toHaveCount(TOTAL);
+    await expect(gridBookLinks(page)).toHaveCount(perPage * 2);
     await expect(loadMore).toHaveCount(0);
 
     const hrefs = await gridBookLinks(page).evaluateAll((links) =>
       links.map((link) => (link as HTMLAnchorElement).getAttribute('href')),
     );
-    expect(new Set(hrefs).size, 'all mocked books render exactly once').toBe(TOTAL);
+    expect(new Set(hrefs).size, 'all mocked books render exactly once').toBe(perPage * 2);
     expect(requestedPages, 'the button requests the second SPA library page').toEqual([1, 2]);
+    expect(new Set(requestedSizes).size, 'both pages are requested at one size').toBe(1);
+    assertNoPageErrors(errors);
+  });
+
+  test('page 1 is requested exactly once per library load (#1144)', async ({ page }) => {
+    // Against the REAL backend: no routing, no fulfilment. This counts what the
+    // app actually puts on the wire.
+    //
+    // The grid's column count starts as a guess derived from books_per_page and
+    // is corrected by a ResizeObserver measurement. While the query fired on the
+    // guess, every load issued page 1 twice — once at the guessed size, then
+    // again at the measured one, with the first (expensive) response discarded.
+    const firstPageSizes: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (!url.pathname.endsWith('/api/v1/books')) return;
+      if (url.searchParams.get('page') !== '1') return;
+      firstPageSizes.push(url.searchParams.get('per_page') ?? '');
+    });
+
+    const errors = collectPageErrors(page);
+    await page.goto('/app');
+
+    await expect
+      .poll(() => firstPageSizes.length, { message: 'the library issues its first page request' })
+      .toBeGreaterThan(0);
+
+    // Give any late refetch (the one this pins against) room to land before
+    // asserting the count — the redundant request followed the first within a
+    // frame or two of the measurement.
+    await page.waitForTimeout(2000);
+
+    expect(
+      firstPageSizes,
+      'page 1 is fetched once, at the measured column count — not once per guess and once per measurement',
+    ).toHaveLength(1);
     assertNoPageErrors(errors);
   });
 });

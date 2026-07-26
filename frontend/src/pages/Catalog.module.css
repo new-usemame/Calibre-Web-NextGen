@@ -120,6 +120,13 @@
   animation: fadeRise var(--dur-slow) var(--ease-out) both;
 }
 
+/* The first-load spinner is a grid child (it is what gives the column
+   measurement an element to read), so it has to span every track to stay
+   centred instead of sitting in the first cell. */
+.gridLoading {
+  grid-column: 1 / -1;
+}
+
 .loadMore {
   display: flex;
   align-items: center;

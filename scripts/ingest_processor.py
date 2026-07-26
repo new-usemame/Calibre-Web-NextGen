@@ -1179,9 +1179,11 @@ class NewBookProcessor:
             # back to main(), which imports the original — the alternative is the
             # supervisor's SIGTERM killing us mid-conversion, taking the book with
             # it, which is what #1094 reported.
-            print(f"\n[ingest-processor]: CON_ERROR: {self.filename} could not be converted to {end_format} within "
-                  f"{conversion_deadline_seconds()} seconds.\nA large or image-heavy book can legitimately need longer — "
-                  f"raise 'Ingest Timeout' in CWA Settings to allow more time.", flush=True)
+            print(f"\n[ingest-processor]: CON_ERROR: {self.filename} could not be converted to {end_format} within its "
+                  f"{conversion_deadline_seconds()}s conversion budget, which covers this whole ingest run — including "
+                  f"the wait for the file to finish copying in, so a slow copy leaves less time to convert.\n"
+                  f"A large or image-heavy book can legitimately need longer — raise 'Ingest Timeout' in CWA Settings "
+                  f"to allow more time.", flush=True)
             self.backup(self.filepath, backup_type="failed")
             return False, ""
 

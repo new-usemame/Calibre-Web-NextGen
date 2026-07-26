@@ -387,6 +387,40 @@ class TestConversionBudgetIsSharedAcrossStages:
         assert ingest_processor.conversion_deadline_seconds() is None
         assert ingest_processor.conversion_budget_remaining() is None
 
+    def test_budget_covers_the_whole_run_not_just_converter_time(self):
+        """Deliberate policy, documented because it has a visible cost.
+
+        The budget is anchored at process start, so time spent waiting for the
+        file to finish copying in is deducted from it — a file that becomes
+        ready late leaves less time to convert. Anchoring at conversion start
+        instead would let the inner deadline outrun the outer `timeout`, which
+        starts at process launch, and that is precisely the drift that loses
+        the book. Under-granting costs a conversion; over-granting costs the
+        book, so the budget is measured from the same origin the watchdog is.
+        """
+        source = INGEST_PROCESSOR_PATH.read_text()
+        assert "_PROCESS_START_MONOTONIC = time.monotonic()" in source, (
+            "the anchor must be bound at import, matching the span the "
+            "service's `timeout` wrapper measures"
+        )
+        # Sliced on the next function boundary, not a byte window: a fixed
+        # window is exactly what this file's _shell_function_body() docstring
+        # warns about, and a docstring edit already pushed the reference out of
+        # an 800-byte one.
+        body = source.split("def conversion_budget_remaining()")[1].split("\ndef ")[0]
+        assert "_PROCESS_START_MONOTONIC" in body, (
+            "the budget must be measured from that anchor"
+        )
+
+    def test_timeout_message_does_not_promise_pure_converter_time(self):
+        """The number in the message is the whole-run budget, so the message
+        must not read as though the converter got all of it."""
+        source = INGEST_PROCESSOR_PATH.read_text()
+        assert "covers this whole ingest run" in source, (
+            "a user told 'could not convert within Ns' will size their timeout "
+            "against converter time unless the message says otherwise"
+        )
+
     def test_kepubify_also_receives_the_shared_budget(self):
         """Both converters must draw on the same allowance; a source-pin here
         because the two callsites are what the sharing property depends on."""

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface UseIntersectionObserverProps {
   onIntersect: () => void;
@@ -31,6 +31,18 @@ export function useIntersectionObserver({
 }: UseIntersectionObserverProps) {
   const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
 
+  // Held in a ref so the observer is not rebuilt when the handler's identity
+  // changes. Four of the five callers pass an inline arrow, so onIntersect is a
+  // new function every render; with it in the dependency list the observer was
+  // disconnected and re-observed on each one. IntersectionObserver invokes its
+  // callback with the target's CURRENT state on observe, so re-observing an
+  // already-visible sentinel fires it again — each firing advancing the page and
+  // causing the next render, bounded only by `enabled` going false while a fetch
+  // is in flight. Reading the latest handler through the ref keeps the observer
+  // tied to the target and options alone.
+  const onIntersectRef = useRef(onIntersect);
+  onIntersectRef.current = onIntersect;
+
   useEffect(() => {
     if (!enabled || !sentinel) return;
 
@@ -38,7 +50,7 @@ export function useIntersectionObserver({
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            onIntersect();
+            onIntersectRef.current();
           }
         });
       },
@@ -47,7 +59,7 @@ export function useIntersectionObserver({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [sentinel, enabled, onIntersect, threshold, rootMargin]);
+  }, [sentinel, enabled, threshold, rootMargin]);
 
   return setSentinel;
 }

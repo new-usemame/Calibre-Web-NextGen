@@ -328,8 +328,15 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     if (!gridNode) return;
     const measure = () => {
       const tracks = getComputedStyle(gridNode).gridTemplateColumns.trim();
-      const next = tracks && tracks !== 'none' ? tracks.split(/\s+/).length : 1;
-      setColumnCount(Math.max(1, next));
+      // An empty or 'none' track list means the grid has not been laid out yet
+      // (a hidden ancestor, a panel mid-transition), which is the absence of a
+      // measurement rather than a measurement of one column. Releasing the gate
+      // on it would query at rowsPerLoad x 1 and then correct once the real
+      // layout arrived — reinstating the double fetch this gate exists to stop.
+      // Leave gridMeasured false and let the next observer callback, or the
+      // fail-open timer, resolve it.
+      if (!tracks || tracks === 'none') return;
+      setColumnCount(Math.max(1, tracks.split(/\s+/).length));
       setGridMeasured(true);
     };
     // Measure first, observe second. Without a ResizeObserver the grid stops

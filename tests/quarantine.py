@@ -46,18 +46,8 @@ _REAL_BUG = (
     "correct and should go green by fixing the lookup, not by changing them. #1109"
 )
 
-_SHARED_SESSION = (
-    "asserts the fix for #1121, not current behaviour: CalibreDB.init_session "
-    "publishes the calling thread's scoped_session onto a shared attribute, so "
-    "a request thread's session is replaced whenever a background task starts "
-    "one. RED by design until the session resolves per-thread. #1121"
-)
-
 #: node id -> why it is skipped. Every reason must name an issue.
 QUARANTINED = {
-    # --- asserts a fix that has not landed yet (1) --------------------------
-    "tests/unit/test_1121_session_is_thread_local.py::test_a_thread_keeps_its_own_session_after_another_thread_starts_one": _SHARED_SESSION,
-
     # --- shim rot: the duplicate-detection module loaders (30) -------------
     "tests/unit/test_duplicate_delete_index_maintenance.py::test_auto_resolve_duplicates_deletes_duplicate_keys_and_refreshes_cache": _SHIM_ROT,
     "tests/unit/test_duplicate_delete_index_maintenance.py::test_delete_book_from_table_format_only_keeps_duplicate_keys_and_invalidates_cache": _SHIM_ROT,

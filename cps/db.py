@@ -799,9 +799,90 @@ class CalibreDB:
     def __init__(self, expire_on_commit=True, init=False):
         """ Initialize a new CalibreDB session
         """
-        self.session = None
+        # Per-thread storage for an *explicitly assigned* session (see the
+        # ``session`` property). Not the sessions themselves — those live in
+        # ``session_factory``'s own thread-local registry. Assigning
+        # ``self.session = None`` here would run the setter and tear down the
+        # calling thread's session, which matters because ``CalibreDB()`` is
+        # constructed inside request handlers (e.g. ``cps/web.py``).
+        self._session_local = threading.local()
+        self._expire_on_commit = expire_on_commit
         if init:
             self.init_db(expire_on_commit)
+
+    # -- session resolution (#1121) ------------------------------------------
+    #
+    # ``session_factory`` is a ``scoped_session``, which hands each thread its
+    # own Session. Storing the result of calling it on a plain attribute threw
+    # that away: whichever thread called ``init_session()`` last published its
+    # Session onto the shared attribute, and all ~270 ``calibre_db.session``
+    # call sites then read *that* thread's Session. CWNG runs gevent without
+    # ``monkey.patch_all()``, so ``WorkerThread`` is a real OS thread — two
+    # genuinely concurrent users of one Session and one SQLite connection.
+    #
+    # ``session`` is now a property that resolves through the registry on every
+    # read, so thread-locality survives. The setter is kept because callers
+    # assign to it: ``cps/editbooks.py`` drops a poisoned session with
+    # ``calibre_db.session = None``, and tests substitute stubs. Those
+    # assignments are now scoped to the assigning thread instead of leaking to
+    # every other one.
+
+    def _peek_session(self):
+        """The thread's current session, or None. Never creates one."""
+        local = self._session_local
+        if getattr(local, "override_set", False):
+            return local.override
+        factory = type(self).session_factory
+        if factory is None:
+            return None
+        try:
+            if not factory.registry.has():
+                return None
+        except Exception:
+            return None
+        return factory()
+
+    def _clear_session_override(self):
+        self._session_local.override = None
+        self._session_local.override_set = False
+
+    @property
+    def session(self):
+        local = self._session_local
+        if getattr(local, "override_set", False):
+            return local.override
+        factory = type(self).session_factory
+        if factory is None:
+            return None
+        # ``scoped_session`` creates this thread's Session on first call and
+        # returns the same one thereafter. Apply expire_on_commit only on
+        # creation so we don't stomp a setting another holder chose.
+        try:
+            fresh = not factory.registry.has()
+        except Exception:
+            fresh = False
+        session = factory()
+        if fresh:
+            session.expire_on_commit = self._expire_on_commit
+        return session
+
+    @session.setter
+    def session(self, value):
+        if value is None:
+            # "Drop what this thread was using." Clear any override and
+            # discard the thread's registry entry so the next read builds a
+            # fresh Session from the *current* factory — which is what makes
+            # reconnects visible to threads other than the one that ran them.
+            self._clear_session_override()
+            factory = type(self).session_factory
+            if factory is not None:
+                try:
+                    factory.remove()
+                except Exception:
+                    pass
+            return
+        self._session_local.override = value
+        self._session_local.override_set = True
 
     def init_db(self, expire_on_commit=True):
         if self._init:
@@ -813,8 +894,12 @@ class CalibreDB:
         if self.session_factory is None:
             log.error("Cannot init session: session_factory is None")
             return
-        self.session = self.session_factory()
-        self.session.expire_on_commit = expire_on_commit
+        self._expire_on_commit = expire_on_commit
+        # Drop any override so this instance goes back to the shared registry,
+        # then materialise this thread's Session.
+        self._clear_session_override()
+        session = self.session_factory()
+        session.expire_on_commit = expire_on_commit
         # UDFs (lower/uuid4/title_sort) are registered once per SQLite
         # connection via the engine-level ``connect`` event listener
         # (``_register_sqlite_udfs``); no per-Session call needed.
@@ -1820,7 +1905,9 @@ class CalibreDB:
         # Use lock to prevent concurrent dispose/reconnect operations
         with cls._reconnect_lock:
             for inst in cls.instances:
-                old_session = inst.session
+                # _peek_session, not `inst.session`: reading the property would
+                # *create* a Session for this thread just so we could close it.
+                old_session = inst._peek_session()
                 inst.session = None
                 if old_session:
                     try:

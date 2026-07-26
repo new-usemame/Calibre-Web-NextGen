@@ -49,6 +49,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
   - [Network shares (NFS, SMB, ZFS)](#network-shares-nfs-smb-zfs)
   - [Calibre desktop coexistence](#calibre-desktop-coexistence)
   - [Calibre plugins (DeDRM and others)](#calibre-plugins-dedrm-and-others)
+  - [Reverse proxy with a prefix](#reverse-proxy-with-a-prefix)
   - [Reverse proxy / Cloudflare Tunnel](#reverse-proxy--cloudflare-tunnel)
   - [Hardcover metadata provider](#hardcover-metadata-provider)
   - [KOReader sync](#koreader-sync)
@@ -410,6 +411,30 @@ docker exec -e HOME=/config calibre-web /app/calibre/calibre-customize -a "/conf
 ```
 
 The feature is off by default because it runs third-party plugin code inside your container — only install plugins you trust, from their official release pages. Which plugins are appropriate to use is your call.
+
+### Reverse proxy with a prefix
+
+To deploy CWA behind a reverse proxy, configure your reverse proxy to forward
+requests to the CWA service and handle the path prefix (e.g. `/cwa/`). For
+instance, with Nginx:
+
+```
+location /cwa/ {
+    proxy_pass http://calibre-web-automated:8083/;
+    include proxy_params;
+}
+```
+
+You must also configure the application with the external URL prefix by setting
+the following environment variable in your Docker compose file:
+
+```yaml
+environment:
+  - PROXY_SCRIPT_NAME=/cwa
+```
+
+This ensures that CWA correctly generates URLs when it is served from the
+prefix path instead of the web server root.
 
 ### Reverse proxy / Cloudflare Tunnel
 

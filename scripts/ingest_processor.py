@@ -416,6 +416,15 @@ def _ensure_processed_books_dirs() -> None:
         print(f"[ingest-processor] WARN: Could not ensure processed_books directories: {e}", flush=True)
 
 
+def failed_backup_dir() -> str:
+    """Absolute path of the folder holding files that failed to convert.
+
+    cwa-init creates it, so the scandir in _load_backup_destinations() normally
+    finds it; the literal is the fallback for a container where it is missing.
+    """
+    return backup_destinations.get("failed") or "/config/processed_books/failed"
+
+
 def _load_backup_destinations() -> None:
     global backup_destinations
     try:
@@ -1048,6 +1057,9 @@ class NewBookProcessor:
             os.makedirs(output_path, exist_ok=True)
             destination = shutil.copy(input_file, output_path)
             os.utime(destination, None)
+            # Name the absolute directory: "moved to failed backup" on its own
+            # left users with nowhere to look (#1094).
+            print(f"[ingest-processor]: Saved a copy of {os.path.basename(input_file)} to {output_path}", flush=True)
         except Exception as e:
             # Never let backups crash ingest; just log the problem
             print(f"[ingest-processor]: ERROR - Failed to backup '{input_file}' to '{output_path}': {e}")
@@ -1882,13 +1894,21 @@ def main(filepath=None):
         else:
             if nbp.auto_convert_on and nbp.can_convert: # File can be converted to target format and Auto-Converter is on
 
+                # Tracks whether a conversion was actually run. The ignore-list
+                # branch below reports convert_successful=False having already
+                # imported the original, so the failure fallback must not treat
+                # it as a failed conversion and import a second copy.
+                conversion_attempted = False
+
                 if nbp.input_format in nbp.convert_ignored_formats: # File could be converted & the converter is activated but the user has specified files of this format should not be converted
                     print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
                     nbp.add_book_to_library(filepath)
                     convert_successful = False
                 elif nbp.target_format == "kepub": # File is not in the convert ignore list and target is kepub, so we start the kepub conversion process
+                    conversion_attempted = True
                     convert_successful, converted_filepath = nbp.convert_to_kepub()
                 else: # File is not in the convert ignore list and target is not kepub, so we start the regular conversion process
+                    conversion_attempted = True
                     convert_successful, converted_filepath = nbp.convert_book()
 
                 if convert_successful: # If previous conversion process was successful, remove tmp files and import into library
@@ -1918,6 +1938,11 @@ def main(filepath=None):
                                 print(f"[ingest-processor] Could not find book ID to add retained format for: {nbp.filename}", flush=True)
                         except Exception as e:
                             print(f"[ingest-processor] Error adding retained format: {e}", flush=True)
+
+                elif conversion_attempted: # Conversion failed. Import the original anyway — a failed conversion is no reason to drop the book (#1094)
+                    print(f"\n[ingest-processor]: {nbp.filename} could not be converted to {nbp.target_format}, importing the original {nbp.input_format} instead so the book still lands in your library...", flush=True)
+                    print(f"[ingest-processor]: The file that failed to convert was also copied to {failed_backup_dir()} if you want to retry it by hand.", flush=True)
+                    nbp.add_book_to_library(filepath)
 
             elif nbp.can_convert and not nbp.auto_convert_on: # Books not in target format but Auto-Converter is off so files are imported anyway
                 print(f"\n[ingest-processor]: {nbp.filename} not in target format but CWA Auto-Convert is deactivated so importing the file anyway...", flush=True)

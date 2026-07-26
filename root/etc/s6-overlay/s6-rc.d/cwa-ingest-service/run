@@ -493,13 +493,14 @@ handle_event() {
 
         if [ $exit_code -eq 124 ]; then
                 echo "[cwa-ingest-service] SAFETY TIMEOUT: $filepath took longer than safety timeout of ${safety_timeout} seconds"
-                echo "[cwa-ingest-service] This indicates a serious issue - processor should have timed out internally at ${configured_timeout} seconds"
+                echo "[cwa-ingest-service] This is the only limit on conversion time - a large or image-heavy book can legitimately need longer."
+                echo "[cwa-ingest-service] Raise 'Ingest Timeout' in CWA Settings to increase it (safety timeout is 3x that value)."
                 echo "safety_timeout:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
                 # Move problematic file to failed backup with timestamp
                 if [ -d "/config/processed_books/failed" ]; then
                         local timestamp=$(date '+%Y%m%d_%H%M%S')
                         local failed_filename="${timestamp}_safety_timeout_${filename}"
-                        echo "[cwa-ingest-service] Moving $filename to failed backup as $failed_filename"
+                        echo "[cwa-ingest-service] Moving $filename to /config/processed_books/failed/$failed_filename"
                         cp "$filepath" "/config/processed_books/failed/$failed_filename" 2>/dev/null || true
                 fi
                 rm -f "$filepath" 2>/dev/null || true

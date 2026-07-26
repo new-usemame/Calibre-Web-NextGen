@@ -18,6 +18,8 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A page you are reading no longer breaks because a background job finished.** Duplicate scans, thumbnail generation, metadata backups and Hardcover syncs all share the server's connection to your library, and when one of them finished it could close that connection while a page you had open was still reading from it. The page then failed, usually with `Cannot operate on a closed database` in the log. It was intermittent by nature — it only bit when the timing overlapped, which is why a manual scan could break browsing once and then work fine on the next try. Background jobs and page loads now keep their own handle on the library, so one finishing can no longer interrupt the other ([#1121](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1121), reported downstream of [#1048](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1048) by [@auspex](https://github.com/auspex)).
+
 - **Opening your library no longer runs the same search twice.** Every visit to the library asked the server for the first page of books, then immediately asked for it again at a different size and threw the first answer away. Nothing looked wrong — the wasted answer never reached the screen — but on a large library that first page is the slowest query on it, and it was being run twice on every load, for every reader. The grid now waits until it knows how many columns it has before asking, so the page is fetched once ([#1144](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1144)).
 
 ## [v4.1.21] - 2026-07-25

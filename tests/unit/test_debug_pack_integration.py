@@ -35,7 +35,7 @@ def fake_config_and_logs(tmp_path, monkeypatch):
     log_path = tmp_path / "calibre-web.log"
     log_path.write_text(
         "[2026-05-26 12:00:00] WARN {cps.web:2521} Login failed for "
-        "user \"maggie\" IP-address: 192.168.1.42\n"
+        "user \"alice\" IP-address: 192.168.1.42\n"
         "[2026-05-26 12:00:01] INFO {cps.kobo:850} Reading "
         "/calibre-library/Author/Book/x.epub\n"
         "[2026-05-26 12:00:02] INFO {cps.kobo:851} Authorization: "

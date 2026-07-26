@@ -71,7 +71,7 @@ class TestHandleInitReadingServicesRedirect:
     + reading state) must be redirected to CWNG whenever Kobo sync is on,
     NOT only when Hardcover annotation sync is enabled.
 
-    Real-device test 2026-05-24: Maggie's Kobo synced fine but CWNG
+    Real-device test 2026-05-24: the tester's Kobo synced fine but CWNG
     captured 0 annotations because reading_services_host was gated on
     `config_hardcover_annotations_sync and bool(hardcover)`. With
     Hardcover off, the Init response left reading_services_host at

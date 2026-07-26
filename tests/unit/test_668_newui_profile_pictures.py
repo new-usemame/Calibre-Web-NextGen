@@ -45,55 +45,55 @@ def _write(tmp_path, monkeypatch, obj_or_text):
 
 @pytest.mark.unit
 def test_avatar_present_returns_data_uri(tmp_path, monkeypatch):
-    _write(tmp_path, monkeypatch, {"maggie": DATA_URI})
-    assert auth_mod._user_avatar("maggie") == DATA_URI
+    _write(tmp_path, monkeypatch, {"alice": DATA_URI})
+    assert auth_mod._user_avatar("alice") == DATA_URI
 
 
 @pytest.mark.unit
 def test_avatar_absent_user_returns_none(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, {"someone_else": DATA_URI})
-    assert auth_mod._user_avatar("maggie") is None
+    assert auth_mod._user_avatar("alice") is None
 
 
 @pytest.mark.unit
 def test_avatar_missing_file_returns_none(tmp_path, monkeypatch):
     monkeypatch.setattr(auth_mod, "_USER_PROFILES_JSON", str(tmp_path / "nope.json"))
-    assert auth_mod._user_avatar("maggie") is None
+    assert auth_mod._user_avatar("alice") is None
 
 
 @pytest.mark.unit
 def test_avatar_malformed_json_returns_none(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, "{ this is not json")
-    assert auth_mod._user_avatar("maggie") is None
+    assert auth_mod._user_avatar("alice") is None
 
 
 @pytest.mark.unit
 def test_avatar_non_dict_json_returns_none(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, ["not", "a", "dict"])
-    assert auth_mod._user_avatar("maggie") is None
+    assert auth_mod._user_avatar("alice") is None
 
 
 @pytest.mark.unit
 def test_avatar_non_image_value_is_rejected(tmp_path, monkeypatch):
     # A corrupted / hostile entry must not become an arbitrary URL the SPA renders.
-    _write(tmp_path, monkeypatch, {"maggie": "javascript:alert(1)"})
-    assert auth_mod._user_avatar("maggie") is None
+    _write(tmp_path, monkeypatch, {"alice": "javascript:alert(1)"})
+    assert auth_mod._user_avatar("alice") is None
 
 
 @pytest.mark.unit
 def test_avatar_non_string_value_returns_none(tmp_path, monkeypatch):
-    _write(tmp_path, monkeypatch, {"maggie": {"nested": "obj"}})
-    assert auth_mod._user_avatar("maggie") is None
+    _write(tmp_path, monkeypatch, {"alice": {"nested": "obj"}})
+    assert auth_mod._user_avatar("alice") is None
 
 
 # ── /api/v1/auth/me carries the avatar ──────────────────────────────────────
 
 @pytest.mark.unit
 def test_me_payload_includes_avatar(tmp_path, monkeypatch):
-    _write(tmp_path, monkeypatch, {"maggie": DATA_URI})
+    _write(tmp_path, monkeypatch, {"alice": DATA_URI})
     from cps import ub, constants
     u = ub.User()
-    u.id, u.name, u.locale, u.theme = 5, "maggie", "en", 1
+    u.id, u.name, u.locale, u.theme = 5, "alice", "en", 1
     u.role = constants.ROLE_USER
     app = _app()
     with patch("cps.api.auth.current_user", u):
@@ -108,7 +108,7 @@ def test_me_payload_avatar_null_when_unset(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, {})
     from cps import ub, constants
     u = ub.User()
-    u.id, u.name, u.locale, u.theme = 5, "maggie", "en", 1
+    u.id, u.name, u.locale, u.theme = 5, "alice", "en", 1
     u.role = constants.ROLE_USER
     app = _app()
     with patch("cps.api.auth.current_user", u):

@@ -33,7 +33,7 @@ def _sanitizer():
 class TestSanitizerStripsIps:
     def test_ipv4_redacted(self):
         s = _sanitizer()(
-            "[2026-05-26 12:00:00] WARN {cps.web:2521} Login failed for user \"maggie\" IP-address: 192.168.1.42"
+            "[2026-05-26 12:00:00] WARN {cps.web:2521} Login failed for user \"alice\" IP-address: 192.168.1.42"
         )
         assert "192.168.1.42" not in s
         assert "<ip>" in s, s

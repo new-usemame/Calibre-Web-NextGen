@@ -36,7 +36,7 @@ def _ctx():
 
 def _user(anon=False, admin=True, edit=False):
     return SimpleNamespace(
-        is_authenticated=not anon, is_anonymous=anon, id=1, name="maggie",
+        is_authenticated=not anon, is_anonymous=anon, id=1, name="alice",
         role_admin=lambda: admin, role_edit=lambda: edit,
     )
 

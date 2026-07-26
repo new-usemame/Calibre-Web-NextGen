@@ -297,7 +297,7 @@ class TestModelORMRoundTrip:
         record = ub.Annotation(
             user_id=7,
             annotation_id="dead-beef-1234",
-            book_id=348,  # Animal Farm in Maggie's library
+            book_id=348,  # Animal Farm in the tester's library
             highlighted_text="All animals are equal",
             highlight_color="yellow",
             note_text="key thesis",

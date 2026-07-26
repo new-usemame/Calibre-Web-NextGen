@@ -28,7 +28,7 @@ def _admin(is_admin=True, anon=False, uid=1):
                            role_admin=lambda: is_admin, id=uid)
 
 
-def _user(uid=2, name="maggie", role=constants.ROLE_DOWNLOAD):
+def _user(uid=2, name="alice", role=constants.ROLE_DOWNLOAD):
     return SimpleNamespace(id=uid, name=name, email="m@x.com", kindle_mail="",
                            locale="en", default_language="all", role=role)
 
@@ -170,7 +170,7 @@ def test_update_user_last_admin_lockout():
 @pytest.mark.unit
 def test_update_user_toggles_roles():
     from cps.api import admin as mod
-    target = _user(uid=2, name="maggie", role=constants.ROLE_DOWNLOAD)
+    target = _user(uid=2, name="alice", role=constants.ROLE_DOWNLOAD)
     mock_ub = MagicMock()
     mock_ub.session.query.return_value.filter.return_value.first.return_value = target
     with _ctx("/api/v1/admin/users/2", body={"roles": {"upload": True, "download": False}}):
@@ -301,7 +301,7 @@ def test_create_user_valid_sets_roles_and_commits():
     mock_ub.User = _U
 
     with _ctx("/api/v1/admin/users",
-              body={"name": "maggie", "password": "S3cret!pw",
+              body={"name": "alice", "password": "S3cret!pw",
                     "roles": {"upload": True, "download": True}}):
         with patch.object(mod, "current_user", _admin()), \
              patch.object(mod, "ub", mock_ub), \
@@ -316,7 +316,7 @@ def test_create_user_valid_sets_roles_and_commits():
     mock_ub.session.add.assert_called_once()
     mock_ub.session.commit.assert_called_once()
     obj = created["obj"]
-    assert obj.name == "maggie"
+    assert obj.name == "alice"
     assert obj.password == "HASH:S3cret!pw"
     assert obj.role & constants.ROLE_UPLOAD
     assert obj.role & constants.ROLE_DOWNLOAD

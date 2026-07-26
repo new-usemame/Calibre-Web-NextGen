@@ -61,7 +61,7 @@ _CONTAINER_NS = {"c": "urn:oasis:names:tc:opendocument:xmlns:container"}
 # Sentinel value Kobo writes in ``StartContainerChildIndex`` when the
 # corresponding ``StartContainerPath`` is a CSS selector (kepub case)
 # rather than a DOM-index walk path (plain EPUB case). Discovered
-# empirically against 145 real highlights from Maggie's Animal Farm
+# empirically against 145 real highlights from the tester's Animal Farm
 # kepub (see design doc §3.6 finding 2).
 KOBO_SELECTOR_SENTINEL = -99
 

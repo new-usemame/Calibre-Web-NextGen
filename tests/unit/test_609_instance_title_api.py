@@ -68,11 +68,11 @@ def test_auth_me_includes_instance_name():
     app = _app()
     from cps import ub, constants
     u = ub.User()
-    u.id, u.name, u.locale, u.theme = 5, "maggie", "en", 1
+    u.id, u.name, u.locale, u.theme = 5, "alice", "en", 1
     u.role = constants.ROLE_USER
     with patch("cps.api.auth.current_user", u), \
          patch.object(cps.api.auth, "config") as cfg:
-        cfg.config_calibre_web_title = "Maggie's Library"
+        cfg.config_calibre_web_title = "Alice's Library"
         cfg.config_user_hide_enabled = False
         cfg.get_mail_server_configured.return_value = False
         cfg.config_public_reg = False
@@ -80,7 +80,7 @@ def test_auth_me_includes_instance_name():
         cfg.config_kobo_sync = False
         resp = app.test_client().get("/api/v1/auth/me")
     assert resp.status_code == 200
-    assert resp.get_json()["instance_name"] == "Maggie's Library"
+    assert resp.get_json()["instance_name"] == "Alice's Library"
 
 
 @pytest.mark.unit
@@ -97,7 +97,7 @@ def test_login_payload_includes_instance_name():
          patch.object(cps.api.auth, "config") as cfg, \
          patch("cps.api.auth.login_user"):
         cfg.config_disable_standard_login = False
-        cfg.config_calibre_web_title = "Maggie's Library"
+        cfg.config_calibre_web_title = "Alice's Library"
         cfg.config_user_hide_enabled = False
         cfg.get_mail_server_configured.return_value = False
         cfg.config_public_reg = False
@@ -106,7 +106,7 @@ def test_login_payload_includes_instance_name():
         resp = app.test_client().post("/api/v1/auth/login",
                                       json={"username": "admin", "password": "x"})
     assert resp.status_code == 200
-    assert resp.get_json()["instance_name"] == "Maggie's Library"
+    assert resp.get_json()["instance_name"] == "Alice's Library"
 
 
 # --- Frontend source pins (no JS test runner in this repo; same idiom as the

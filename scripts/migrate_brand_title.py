@@ -14,7 +14,7 @@ read as the old brand in the browser tab and navbar after the v4.0.60
 rebrand and confuse users into thinking the upgrade didn't apply.
 
 We migrate those two legacy defaults — and only those — to the new
-brand. Any custom title (e.g. ``Maggie's Library``) is left untouched.
+brand. Any custom title (e.g. ``Alice's Library``) is left untouched.
 The match is hyphen-and-case-agnostic so variants like
 ``CALIBRE-WEB AUTOMATED`` or ``calibre web`` also get rebranded.
 

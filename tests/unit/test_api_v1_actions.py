@@ -26,7 +26,7 @@ def _user(anon=False, download=True, kindle="k@x.com"):
     return SimpleNamespace(
         is_authenticated=True, is_anonymous=anon, id=1,
         role_download=lambda: download, kindle_mail=kindle, kindle_mail_subject=None,
-        name="maggie",
+        name="alice",
     )
 
 

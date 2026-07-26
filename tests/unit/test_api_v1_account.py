@@ -24,7 +24,7 @@ def _ctx(path, method="POST", body=None):
 def _user(**kw):
     defaults = dict(
         is_authenticated=True, is_anonymous=False, id=1,
-        name="maggie", email="m@example.com", kindle_mail="",
+        name="alice", email="m@example.com", kindle_mail="",
         locale="en", default_language="all", password="HASH",
         kindle_mail_subject="", kobo_only_shelves_sync=0, opds_only_shelves_sync=0,
         ui_font_body="", ui_font_display="", theme=1,  # #736: real User always has a theme code

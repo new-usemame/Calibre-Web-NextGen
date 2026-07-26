@@ -41,12 +41,12 @@ def test_me_authenticated_returns_user():
     app = _app()
     from cps import ub, constants
     u = ub.User()
-    u.id, u.name, u.locale, u.theme = 5, "maggie", "en", 1
+    u.id, u.name, u.locale, u.theme = 5, "alice", "en", 1
     u.role = constants.ROLE_USER
     with patch("cps.api.auth.current_user", u):
         resp = app.test_client().get("/api/v1/auth/me")
     assert resp.status_code == 200
-    assert resp.get_json()["name"] == "maggie"
+    assert resp.get_json()["name"] == "alice"
 
 
 @pytest.mark.unit
@@ -424,13 +424,13 @@ def test_magic_link_poll_success_logs_in_and_consumes_token():
     tok.expiration = datetime(2999, 1, 1)
     tok.user_id = 7
     user = MagicMock()
-    user.id, user.name, user.locale, user.theme = 7, "maggie", "en", 1
+    user.id, user.name, user.locale, user.theme = 7, "alice", "en", 1
     user.role = constants.ROLE_USER
     user.role_anonymous.return_value = False
     with patch.object(cps.api.auth, "config") as cfg, \
          patch.object(cps.api.auth, "ub") as ub, \
          patch.object(cps.api.auth, "login_user") as lu, \
-         patch.object(cps.api.auth, "serialize_user", return_value={"name": "maggie"}), \
+         patch.object(cps.api.auth, "serialize_user", return_value={"name": "alice"}), \
          patch.object(cps.api.auth, "_server_features", return_value={}), \
          patch.object(cps.api.auth, "_user_avatar", return_value=None):
         cfg.config_remote_login = True
@@ -441,7 +441,7 @@ def test_magic_link_poll_success_logs_in_and_consumes_token():
         d = app.test_client().post("/api/v1/auth/magic-link/poll",
                                    json={"token": "t"}).get_json()
     assert d["status"] == "success"
-    assert d["user"]["name"] == "maggie"
+    assert d["user"]["name"] == "alice"
     # #668: magic-link now returns the same me-shape as /me and login (built by
     # the shared _me_payload), so instance_name + avatar are present.
     assert d["user"]["instance_name"] == "Calibre-Web NextGen"

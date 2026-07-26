@@ -24,7 +24,7 @@ def _ctx(files=None):
 
 def _uploader(role_upload=True, anon=False):
     return SimpleNamespace(is_authenticated=True, is_anonymous=anon,
-                           role_upload=lambda: role_upload, id=1, name="maggie")
+                           role_upload=lambda: role_upload, id=1, name="alice")
 
 
 @pytest.mark.unit

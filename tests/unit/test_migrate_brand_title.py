@@ -6,12 +6,12 @@
 """Pin the brand-title migration shipped with v4.0.60+.
 
 The v4.0.60 rebrand changed the *default* for fresh installs to
-``Calibre-Web NextGen`` but left existing rows alone. Maggie's install
+``Calibre-Web NextGen`` but left existing rows alone. the tester's install
 was still showing ``Calibre-Web`` in the browser tab after the upgrade
 because her ``settings`` row predated the default change. This migration
 fixes that for everyone migrating from stock calibre-web (default
 ``Calibre-Web``) or from CWA (default ``Calibre-Web Automated``) while
-leaving anyone who picked a custom title (``Maggie's Library``,
+leaving anyone who picked a custom title (``Alice's Library``,
 ``Sample Family Library``, etc.) untouched.
 
 Behavior under test:
@@ -105,7 +105,7 @@ def test_should_migrate_recognizes_legacy(title):
     [
         "Calibre-Web NextGen",          # already on new brand
         "calibre-web nextgen",
-        "Maggie's Library",
+        "Alice's Library",
         "Sample Family Library",
         "CWA",                          # acronym alone is not the legacy default
         "Calibre-Web Automated v2",     # customized suffix
@@ -137,11 +137,11 @@ def test_migrate_rewrites_legacy_calibre_web_automated(tmp_path):
 
 
 def test_migrate_preserves_custom_title(tmp_path):
-    db = _make_db(str(tmp_path), "Maggie's Library")
+    db = _make_db(str(tmp_path), "Alice's Library")
     updated, previous = mod.migrate(db)
     assert updated is False
-    assert previous == "Maggie's Library"
-    assert _read_title(db) == "Maggie's Library"
+    assert previous == "Alice's Library"
+    assert _read_title(db) == "Alice's Library"
 
 
 def test_migrate_noop_when_already_on_new_brand(tmp_path):
@@ -197,12 +197,12 @@ def test_cli_returns_zero_and_prints_on_update(tmp_path, capsys):
 
 
 def test_cli_returns_zero_and_prints_on_noop(tmp_path, capsys):
-    db = _make_db(str(tmp_path), "Maggie's Library")
+    db = _make_db(str(tmp_path), "Alice's Library")
     rc = mod.main([db])
     captured = capsys.readouterr()
     assert rc == 0
     assert "No change" in captured.out
-    assert _read_title(db) == "Maggie's Library"
+    assert _read_title(db) == "Alice's Library"
 
 
 def test_cli_returns_one_on_sqlite_error(tmp_path, capsys):

@@ -76,7 +76,7 @@ class _FakeUser:
         self.is_authenticated = True
         self.is_anonymous = False
         self.id = 1
-        self.name = "maggie"
+        self.name = "alice"
         self.sidebar_view = sidebar_view
         self.view_settings = view_settings if view_settings is not None else {}
 

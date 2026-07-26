@@ -49,7 +49,7 @@ def test_cancel_task_forbidden_for_other_users_task():
     worker.tasks = [(0, "someone_else", 0, other_task, 0)]
     with _ctx("/api/v1/tasks/9/cancel"):
         with patch.object(mod.WorkerThread, "get_instance", staticmethod(lambda: worker)), \
-             patch.object(mod, "current_user", SimpleNamespace(name="maggie", role_admin=lambda: False)):
+             patch.object(mod, "current_user", SimpleNamespace(name="alice", role_admin=lambda: False)):
             resp = inspect.unwrap(mod.cancel_task_api)("9")
     assert resp[1] == 403
     worker.end_task.assert_not_called()
@@ -60,10 +60,10 @@ def test_cancel_task_owner_ends_task():
     from cps.api import info as mod
     my_task = SimpleNamespace(id=9)
     worker = MagicMock()
-    worker.tasks = [(0, "maggie", 0, my_task, 0)]
+    worker.tasks = [(0, "alice", 0, my_task, 0)]
     with _ctx("/api/v1/tasks/9/cancel"):
         with patch.object(mod.WorkerThread, "get_instance", staticmethod(lambda: worker)), \
-             patch.object(mod, "current_user", SimpleNamespace(name="maggie", role_admin=lambda: False)):
+             patch.object(mod, "current_user", SimpleNamespace(name="alice", role_admin=lambda: False)):
             resp = inspect.unwrap(mod.cancel_task_api)("9")
     assert resp[1] == 204
     worker.end_task.assert_called_once_with(9)

@@ -749,6 +749,23 @@ _CONVERSION_FAILURE_GUIDANCE = {
 }
 
 
+# fork #1094: formats where a failed conversion means "this was never a book".
+# Importing the original rescues a real book whose conversion failed, but for
+# these it would file a junk entry — an .acsm is an Adobe fulfillment ticket,
+# and the guidance above promises the user it went to processed_books/failed.
+_NOT_A_BOOK_FORMATS = frozenset({'acsm'})
+
+
+def is_rescuable_on_conversion_failure(input_format) -> bool:
+    """Whether importing the original is right when its conversion failed.
+
+    True for real book formats: a conversion failure says nothing about
+    whether the file is a readable book. False for formats that are not
+    books at all, where the original is a ticket or container.
+    """
+    return (input_format or '').lower() not in _NOT_A_BOOK_FORMATS
+
+
 def conversion_failure_guidance(input_format, filename):
     """Return user-facing guidance for a failed conversion of input_format,
     or None when no format-specific advice exists.
@@ -1939,7 +1956,7 @@ def main(filepath=None):
                         except Exception as e:
                             print(f"[ingest-processor] Error adding retained format: {e}", flush=True)
 
-                elif conversion_attempted: # Conversion failed. Import the original anyway — a failed conversion is no reason to drop the book (#1094)
+                elif conversion_attempted and is_rescuable_on_conversion_failure(nbp.input_format): # Conversion failed. Import the original anyway — a failed conversion is no reason to drop the book (#1094)
                     print(f"\n[ingest-processor]: {nbp.filename} could not be converted to {nbp.target_format}, importing the original {nbp.input_format} instead so the book still lands in your library...", flush=True)
                     print(f"[ingest-processor]: The file that failed to convert was also copied to {failed_backup_dir()} if you want to retry it by hand.", flush=True)
                     nbp.add_book_to_library(filepath)

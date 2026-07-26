@@ -194,6 +194,52 @@ class TestFailedConversionStillImports:
         )
 
 
+class TestNotABookFormatsAreNotRescued:
+    """An .acsm is an Adobe fulfillment ticket, not a book. Rescuing it would
+    file a junk library entry AND contradict the guidance CWA already prints,
+    which promises the file went to processed_books/failed (fork #448)."""
+
+    def test_acsm_conversion_failure_does_not_import_the_ticket(
+        self, monkeypatch, tmp_path
+    ):
+        source = tmp_path / "fulfillment.acsm"
+        source.write_text("<fulfillmentToken/>")
+        holder = {}
+
+        def _factory(filepath):
+            fake = _FakeProcessor(filepath, convert_result=(False, ""))
+            fake.input_format = "acsm"
+            holder["fake"] = fake
+            return fake
+
+        monkeypatch.setattr(ingest_processor, "NewBookProcessor", _factory)
+        monkeypatch.setattr(
+            ingest_processor, "_acquire_process_lock_or_exit", lambda: None
+        )
+        assert ingest_processor.main(str(source)) == 0
+        assert holder["fake"].imported == [], (
+            "an .acsm ticket must not be filed as a book when it fails to convert"
+        )
+
+    def test_real_book_formats_are_rescuable(self):
+        for fmt in ("pdf", "mobi", "azw3", "PDF", "djvu", None, ""):
+            assert ingest_processor.is_rescuable_on_conversion_failure(fmt) is True
+
+    def test_acsm_is_not_rescuable_any_case(self):
+        for fmt in ("acsm", "ACSM", "Acsm"):
+            assert ingest_processor.is_rescuable_on_conversion_failure(fmt) is False
+
+    def test_every_not_a_book_format_explains_itself_to_the_user(self):
+        """Keeps the two registries in sync: silently declining to import a
+        file the user dropped is only acceptable if we tell them why."""
+        for fmt in ingest_processor._NOT_A_BOOK_FORMATS:
+            guidance = ingest_processor.conversion_failure_guidance(
+                fmt, f"x.{fmt}"
+            )
+            assert guidance, f"{fmt} is skipped on failure but explains nothing"
+            assert "processed_books/failed" in guidance
+
+
 class TestFailedBackupIsDiscoverable:
     def test_backup_logs_the_absolute_destination(self, tmp_path, capsys):
         """#1094: 'Moving ... to failed backup' named no path the user could find."""

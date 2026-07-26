@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Opening your library no longer runs the same search twice.** Every visit to the library asked the server for the first page of books, then immediately asked for it again at a different size and threw the first answer away. Nothing looked wrong — the wasted answer never reached the screen — but on a large library that first page is the slowest query on it, and it was being run twice on every load, for every reader. The grid now waits until it knows how many columns it has before asking, so the page is fetched once ([#1144](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1144)).
+
 ## [v4.1.21] - 2026-07-25
 
 ### Added

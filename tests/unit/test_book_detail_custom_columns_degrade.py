@@ -64,18 +64,35 @@ def test_missing_custom_columns_table_does_not_raise(unreadable_calibre_schema):
 
 
 @pytest.mark.unit
-def test_underlying_query_really_does_raise(unreadable_calibre_schema):
-    """Pins that the fixture reproduces the real failure.
+def test_get_cc_columns_degrades_for_every_caller(unreadable_calibre_schema):
+    """The degradation lives in ``get_cc_columns``, not in one caller's wrapper.
 
-    Without this, the test above would still pass if ``get_cc_columns`` quietly
-    stopped touching the DB, and the regression it guards would be unpinned.
+    Five callers want "the custom columns, if any": the book detail page
+    (``cps/web.py`` ``show_book``), the detail API, the books table, and both
+    search surfaces. Only the API had a guard, so a classic-theme book page
+    still 500'd on an unreadable schema -- caught by driving the real routes,
+    not by the unit tests. Pinning it at the source keeps the other four from
+    regressing independently.
     """
-    from cps import config_sql  # noqa: F401  (import parity with books module)
     from cps.api import books as books_mod
 
+    assert books_mod.calibre_db.get_cc_columns(books_mod.config,
+                                               filter_config_custom_read=True) == []
+
+
+@pytest.mark.unit
+def test_fixture_really_reproduces_an_unreadable_schema(unreadable_calibre_schema):
+    """Pins that the fixture reproduces the real failure.
+
+    Without this the contract tests would still pass if ``get_cc_columns``
+    quietly stopped touching the DB, and the regression they guard would be
+    unpinned. Asserts against the raw query rather than the guarded method.
+    """
+    from cps import db as dbmod
+
+    session = dbmod.CalibreDB.session_factory()
     with pytest.raises(SQLAlchemyError):
-        books_mod.calibre_db.get_cc_columns(books_mod.config,
-                                            filter_config_custom_read=True)
+        session.query(dbmod.CustomColumns).all()
 
 
 @pytest.mark.unit

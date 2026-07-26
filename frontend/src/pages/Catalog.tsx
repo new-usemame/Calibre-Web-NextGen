@@ -325,14 +325,20 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!gridNode || typeof ResizeObserver === 'undefined') return;
+    if (!gridNode) return;
     const measure = () => {
       const tracks = getComputedStyle(gridNode).gridTemplateColumns.trim();
       const next = tracks && tracks !== 'none' ? tracks.split(/\s+/).length : 1;
       setColumnCount(Math.max(1, next));
       setGridMeasured(true);
     };
+    // Measure first, observe second. Without a ResizeObserver the grid stops
+    // reacting to later resizes, but the one measurement that the initial query
+    // waits on still happens — the absence of the observer used to skip it
+    // entirely, which would now mean waiting out the fail-open timer on every
+    // load and then querying at the guessed size anyway.
     measure();
+    if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(gridNode);
     return () => observer.disconnect();
@@ -458,9 +464,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A series shown as a list never renders the grid, so there is nothing to
-  // measure and nothing to wait for — it queries at the guessed size as before.
-  const usesGrid = !(isSeries && seriesPresentation === 'list');
+  // A series shown as a list renders no grid, so there is nothing to measure and
+  // nothing to wait for — it queries at the guessed size as before. Mirrors the
+  // presentation condition on the list branch below; multi-select turns the grid
+  // back on, which is why it belongs here too.
+  const usesGrid = !(isSeries && seriesPresentation === 'list' && !selecting);
   const gridReady = gridMeasured || !usesGrid;
 
   // Both hooks are always called (hook order is fixed); exactly one is enabled.

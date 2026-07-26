@@ -12,7 +12,7 @@ import threading
 from datetime import datetime, timezone
 from urllib.parse import quote
 import unidecode
-from weakref import WeakSet
+from weakref import WeakSet, WeakKeyDictionary
 from uuid import uuid4
 
 import sqlite3
@@ -31,6 +31,14 @@ except ImportError:
     from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql.expression import and_, true, false, text, func, or_
+try:
+    # Scope key for the session registry, see _make_session_factory. greenlet is
+    # a pinned requirement (requirements.txt) and a hard dependency of gevent;
+    # the fallback exists only for the tornado path, where there are no
+    # greenlets and the default thread scope is already correct.
+    from greenlet import getcurrent as _current_greenlet
+except ImportError:  # pragma: no cover - greenlet is pinned in requirements.txt
+    _current_greenlet = None
 from sqlalchemy.ext.associationproxy import association_proxy
 from .cw_login import current_user
 from flask_babel import gettext as _
@@ -785,6 +793,50 @@ class AlchemyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
+def _make_session_factory(engine):
+    """Build the calibre ``scoped_session``, scoped to the current *greenlet*.
+
+    SQLAlchemy's default scope is the OS thread. That is the wrong unit here.
+    CWNG serves every request from a gevent greenlet and deliberately does not
+    call ``monkey.patch_all()`` (notes/561-embed-gevent-hub-block-DESIGN.md), so
+    every concurrent request runs on the *same* OS thread and, under the default
+    scope, shares one Session. ``shutdown_session`` (``cps/__init__.py``) then
+    calls ``remove()`` on every request teardown, which closes that shared
+    Session -- expunging the ORM objects other in-flight requests are still
+    reading from. The victim fails wherever it happens to be, typically with
+    ``InvalidRequestError: Instance ... is not persistent within this Session``
+    (fork #1150).
+
+    ``greenlet.getcurrent()`` returns a distinct object per greenlet, and a
+    distinct root greenlet per OS thread, so this scope *subsumes* thread
+    scoping: background ``WorkerThread``s stay isolated from request handlers
+    exactly as before (fork #1121), and request greenlets are now isolated from
+    each other as well. Per-request ``remove()`` becomes correct rather than
+    destructive, because it can only reach the caller's own Session.
+
+    Passing any ``scopefunc`` swaps SQLAlchemy's ``ThreadLocalRegistry`` (a
+    ``threading.local``, freed with its thread) for a plain dict, which would
+    retain a Session for every greenlet that never reaches a teardown. Measured:
+    50 dead greenlets leave 50 entries with a plain dict and 0 with weak keys,
+    so the map is weak-keyed. Sessions still die with their greenlet.
+
+    Note this does not make transaction boundaries per-greenlet: ``StaticPool``
+    keeps one DBAPI connection process-wide (required, see
+    notes/fix-udf-gil-deadlock-DESIGN.md), so a ``commit()`` still commits any
+    other in-flight write. That is unchanged by this function -- it was equally
+    true when every greenlet shared a single Session -- and is tracked
+    separately. What changes is that identity maps are no longer shared, and no
+    request can close another's Session.
+    """
+    factory = scoped_session(sessionmaker(autocommit=False,
+                                          autoflush=True,
+                                          bind=engine, future=True),
+                             scopefunc=_current_greenlet)
+    if _current_greenlet is not None:
+        factory.registry.registry = WeakKeyDictionary()
+    return factory
+
+
 class CalibreDB:
     _init = False
     engine = None
@@ -1315,9 +1367,7 @@ class CalibreDB:
             except Exception:
                 Books._has_isbn_column = False
 
-            cls.session_factory = scoped_session(sessionmaker(autocommit=False,
-                                                              autoflush=True,
-                                                              bind=cls.engine, future=True))
+            cls.session_factory = _make_session_factory(cls.engine)
             for inst in cls.instances:
                 inst.init_session()
 

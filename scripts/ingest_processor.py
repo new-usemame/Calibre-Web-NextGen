@@ -416,6 +416,27 @@ def _ensure_processed_books_dirs() -> None:
         print(f"[ingest-processor] WARN: Could not ensure processed_books directories: {e}", flush=True)
 
 
+def conversion_deadline_seconds():
+    """In-process conversion deadline, or None when there isn't one.
+
+    The ingest service sets CWA_CONVERSION_DEADLINE_SECONDS just inside the
+    hard `timeout` it wraps us in. Owning a deadline of our own is what lets a
+    slow conversion end as an ordinary failure — which imports the original
+    rather than losing it (#1094) — instead of a SIGTERM that kills us first.
+    Absent or unparseable means no deadline, which is the right default for a
+    direct invocation with no supervisor holding a stopwatch.
+    """
+    raw = os.environ.get("CWA_CONVERSION_DEADLINE_SECONDS")
+    if not raw:
+        return None
+    try:
+        value = int(float(raw))
+    except (TypeError, ValueError):
+        print(f"[ingest-processor] WARN: ignoring unparseable CWA_CONVERSION_DEADLINE_SECONDS={raw!r}", flush=True)
+        return None
+    return value if value > 0 else None
+
+
 def failed_backup_dir() -> str:
     """Absolute path of the folder holding files that failed to convert.
 
@@ -1095,7 +1116,8 @@ class NewBookProcessor:
         target_filepath = f"{self.tmp_conversion_dir}{original_filepath.stem}.{end_format}"
         try:
             t_convert_book_start = time.time()
-            subprocess.run(['ebook-convert', self.filepath, target_filepath], env=self.calibre_env, check=True)
+            subprocess.run(['ebook-convert', self.filepath, target_filepath], env=self.calibre_env, check=True,
+                           timeout=conversion_deadline_seconds())
             t_convert_book_end = time.time()
             time_book_conversion = t_convert_book_end - t_convert_book_start
             print(f"\n[ingest-processor]: END_CON: Conversion of {self.filename} complete in {time_book_conversion:.2f} seconds.\n", flush=True)
@@ -1121,6 +1143,37 @@ class NewBookProcessor:
             self.backup(self.filepath, backup_type="failed")
             return False, ""
 
+        except subprocess.TimeoutExpired:
+            # Ran past our own deadline. Returning a normal failure hands control
+            # back to main(), which imports the original — the alternative is the
+            # supervisor's SIGTERM killing us mid-conversion, taking the book with
+            # it, which is what #1094 reported.
+            print(f"\n[ingest-processor]: CON_ERROR: {self.filename} could not be converted to {end_format} within "
+                  f"{conversion_deadline_seconds()} seconds.\nA large or image-heavy book can legitimately need longer — "
+                  f"raise 'Ingest Timeout' in CWA Settings to allow more time.", flush=True)
+            self.backup(self.filepath, backup_type="failed")
+            return False, ""
+
+        except OSError as e:
+            # ebook-convert missing or not executable. Still a conversion
+            # failure, so it must not fall through as an unhandled exception.
+            print(f"\n[ingest-processor]: CON_ERROR: could not run the converter for {self.filename}: {e}", flush=True)
+            self.backup(self.filepath, backup_type="failed")
+            return False, ""
+
+
+    def _backup_failed_kepub_inputs(self, converted_filepath) -> None:
+        """Keep the original alongside any intermediate epub.
+
+        The kepub path may convert the original to epub first, and the old
+        failure handler backed up only that intermediate — so for a non-epub
+        input the failed folder never held the file the user actually dropped
+        in, which is the one they would retry (#1094).
+        """
+        self.backup(self.filepath, backup_type="failed")
+        if converted_filepath and str(converted_filepath) != str(self.filepath):
+            self.backup(str(converted_filepath), backup_type="failed")
+
 
     # Kepubify can only convert EPUBs to Kepubs
     def convert_to_kepub(self) -> tuple[bool,str]:
@@ -1141,7 +1194,8 @@ class NewBookProcessor:
             converted_filepath = Path(converted_filepath)
             target_filepath = f"{self.tmp_conversion_dir}{converted_filepath.stem}.kepub"
             try:
-                subprocess.run(['kepubify', '--inplace', '--calibre', '--output', self.tmp_conversion_dir, converted_filepath], check=True)
+                subprocess.run(['kepubify', '--inplace', '--calibre', '--output', self.tmp_conversion_dir, converted_filepath], check=True,
+                               timeout=conversion_deadline_seconds())
                 if self.cwa_settings['auto_backup_conversions']:
                     self.backup(self.filepath, backup_type="converted")
 
@@ -1155,10 +1209,20 @@ class NewBookProcessor:
             except subprocess.CalledProcessError as e:
                 error_detail = e.stderr if e.stderr else "(see kepubify output above)"
                 print(f"[ingest-processor]: CON_ERROR: {self.filename} could not be converted to kepub due to the following error:\nEXIT/ERROR CODE: {e.returncode}\n{error_detail}", flush=True)
-                self.backup(converted_filepath, backup_type="failed")
+                self._backup_failed_kepub_inputs(converted_filepath)
+                return False, ""
+            except subprocess.TimeoutExpired:
+                print(f"[ingest-processor]: CON_ERROR: {self.filename} could not be converted to kepub within "
+                      f"{conversion_deadline_seconds()} seconds.\nRaise 'Ingest Timeout' in CWA Settings to allow more time.", flush=True)
+                self._backup_failed_kepub_inputs(converted_filepath)
                 return False, ""
             except Exception as e:
+                # Must return a pair: main() unpacks this call, so falling
+                # through returned None and raised TypeError, skipping the
+                # failure fallback and dropping the book entirely (#1094).
                 print(f"[ingest-processor] ingest-processor ran into the following error:\n{e}", flush=True)
+                self._backup_failed_kepub_inputs(converted_filepath)
+                return False, ""
         else:
             print(f"[ingest-processor]: An error occurred when converting the original {self.input_format} to epub. Cancelling kepub conversion...", flush=True)
             return False, ""

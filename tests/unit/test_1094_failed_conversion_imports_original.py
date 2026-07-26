@@ -27,11 +27,23 @@ Pinned behaviour:
   4. ``backup()`` names the absolute destination directory it wrote to, so
      "moved to failed backup" is actionable instead of a dead end.
   5. The ingest service no longer claims the processor "should have timed out
-     internally", because no internal conversion timeout exists —
-     ``ingest_timeout_minutes`` bounds only the file-stability wait.
+     internally", because it previously had no conversion timeout at all —
+     ``ingest_timeout_minutes`` bounded only the file-stability wait.
+  6. The processor now owns a conversion deadline just inside the service's
+     hard ``timeout``, derived from it in one place. Without that, the
+     reporter's own case never reached the fallback at all: the supervisor
+     SIGTERMed the processor mid-conversion, so ``main()`` never regained
+     control. An overrun is now an ordinary failure, and the book is imported.
+  7. Every non-success path of ``convert_to_kepub()`` returns a ``(bool, str)``
+     pair. One returned ``None``, which made ``main()``'s tuple-unpack raise
+     ``TypeError`` and skip the fallback — dropping the book for exactly the
+     reason this issue is about.
+  8. A failed kepub conversion backs up the original as well as any
+     intermediate epub, so the failed folder holds the file the user dropped.
 """
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -50,6 +62,40 @@ import ingest_processor  # noqa: E402
 INGEST_SERVICE_RUN = (
     REPO_ROOT / "root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run"
 )
+
+
+def _shell_function_body(text, name):
+    """Body of a shell function, from its opening line to the closing brace.
+
+    A fixed byte window silently truncated mid-expression and failed on an
+    edit that only made the function longer.
+    """
+    lines = text.splitlines()
+    start = next(
+        (i for i, l in enumerate(lines) if l.startswith(f"{name}() {{")), None
+    )
+    assert start is not None, f"{name}() not found in {INGEST_SERVICE_RUN}"
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i] == "}"), None
+    )
+    assert end is not None, f"no closing brace for {name}()"
+    return "\n".join(lines[start : end + 1])
+
+
+def _conversion_processor(tmp_path):
+    """Minimal real NewBookProcessor for exercising convert_book() directly."""
+    nbp = object.__new__(ingest_processor.NewBookProcessor)
+    nbp.filepath = str(tmp_path / "Big Handbook.pdf")
+    Path(nbp.filepath).write_bytes(b"pdf bytes")
+    nbp.filename = "Big Handbook.pdf"
+    nbp.input_format = "pdf"
+    nbp.target_format = "epub"
+    nbp.tmp_conversion_dir = str(tmp_path) + os.sep
+    nbp.calibre_env = os.environ.copy()
+    nbp.cwa_settings = {"auto_backup_conversions": False}
+    nbp.backed_up = []
+    nbp.backup = lambda f, backup_type: nbp.backed_up.append((f, backup_type))
+    return nbp
 
 
 class _FakeProcessor:
@@ -192,6 +238,144 @@ class TestFailedConversionStillImports:
             "an ignored format must be imported exactly once; got "
             f"{len(fake.imported)} imports: {fake.imported!r}"
         )
+
+
+class TestConversionDeadline:
+    """The reporter's actual failure was the supervisor's hard `timeout`
+    SIGTERMing the processor mid-conversion, so main() never regained control
+    and the fallback could not run. Owning a deadline just inside the hard one
+    turns that into an ordinary failure the fallback can handle."""
+
+    def test_absent_env_means_no_deadline(self, monkeypatch):
+        monkeypatch.delenv("CWA_CONVERSION_DEADLINE_SECONDS", raising=False)
+        assert ingest_processor.conversion_deadline_seconds() is None
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [("900", 900), ("2430", 2430), ("30.0", 30), ("0", None), ("-5", None),
+         ("", None), ("banana", None)],
+    )
+    def test_env_parsing(self, monkeypatch, raw, expected):
+        monkeypatch.setenv("CWA_CONVERSION_DEADLINE_SECONDS", raw)
+        assert ingest_processor.conversion_deadline_seconds() == expected
+
+    def test_convert_book_passes_the_deadline_to_the_converter(
+        self, monkeypatch, tmp_path
+    ):
+        monkeypatch.setenv("CWA_CONVERSION_DEADLINE_SECONDS", "1234")
+        captured = {}
+
+        def _fake_run(cmd, **kwargs):
+            captured.update(kwargs)
+            raise subprocess.TimeoutExpired(cmd, 1234)
+
+        monkeypatch.setattr(subprocess, "run", _fake_run)
+        nbp = _conversion_processor(tmp_path)
+        ok, out = nbp.convert_book()
+
+        assert captured.get("timeout") == 1234
+        assert (ok, out) == (False, ""), (
+            "a deadline overrun must be reported as an ordinary conversion "
+            "failure so main() imports the original"
+        )
+        assert nbp.backed_up == [(str(nbp.filepath), "failed")]
+
+    def test_converter_missing_is_a_failure_not_a_crash(
+        self, monkeypatch, tmp_path
+    ):
+        def _fake_run(cmd, **kwargs):
+            raise OSError(2, "No such file or directory")
+
+        monkeypatch.setattr(subprocess, "run", _fake_run)
+        nbp = _conversion_processor(tmp_path)
+        assert nbp.convert_book() == (False, "")
+
+    def test_shell_derives_the_deadline_from_the_hard_timeout(self):
+        """One source of truth for the two limits."""
+        text = INGEST_SERVICE_RUN.read_text()
+        assert "CWA_CONVERSION_DEADLINE_SECONDS" in text
+        body = _shell_function_body(text, "run_processor_with_timeout")
+        assert "safety_timeout - margin" in body, (
+            "the in-process deadline must be derived from the hard timeout, "
+            "not hard-coded alongside it"
+        )
+        assert "export CWA_CONVERSION_DEADLINE_SECONDS" in body
+        assert "unset CWA_CONVERSION_DEADLINE_SECONDS" in body, (
+            "`timeout 0` means no hard limit, so there is no envelope to sit "
+            "inside and no deadline should be imposed"
+        )
+
+
+class TestKepubFailureAlwaysReturnsAPair:
+    """main() unpacks convert_to_kepub() into two names. A path that returned
+    None raised TypeError, skipped the fallback and dropped the book."""
+
+    def _kepub_processor(self, tmp_path):
+        nbp = object.__new__(ingest_processor.NewBookProcessor)
+        nbp.filepath = str(tmp_path / "Book.epub")
+        Path(nbp.filepath).write_bytes(b"epub bytes")
+        nbp.filename = "Book.epub"
+        nbp.input_format = "epub"
+        nbp.target_format = "kepub"
+        nbp.tmp_conversion_dir = str(tmp_path) + os.sep
+        nbp.calibre_env = os.environ.copy()
+        nbp.cwa_settings = {"auto_backup_conversions": False}
+        nbp.backed_up = []
+        nbp.backup = lambda f, backup_type: nbp.backed_up.append((f, backup_type))
+        return nbp
+
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            OSError(2, "kepubify missing"),
+            RuntimeError("something unexpected"),
+            ValueError("bad argument"),
+        ],
+    )
+    def test_unexpected_error_returns_false_pair(
+        self, monkeypatch, tmp_path, exc
+    ):
+        monkeypatch.setattr(
+            subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(exc)
+        )
+        nbp = self._kepub_processor(tmp_path)
+        result = nbp.convert_to_kepub()
+
+        assert result is not None, "returning None makes main() raise TypeError"
+        assert result == (False, "")
+        first, second = result  # must be unpackable, as main() does
+
+    def test_non_epub_input_backs_up_the_original_too(
+        self, monkeypatch, tmp_path
+    ):
+        """Backing up only the intermediate left the user's own file nowhere."""
+        nbp = self._kepub_processor(tmp_path)
+        nbp.filepath = str(tmp_path / "Book.mobi")
+        Path(nbp.filepath).write_bytes(b"mobi bytes")
+        nbp.filename = "Book.mobi"
+        nbp.input_format = "mobi"
+        intermediate = str(tmp_path / "Book.epub")
+        Path(intermediate).write_bytes(b"epub bytes")
+
+        monkeypatch.setattr(
+            ingest_processor.NewBookProcessor,
+            "convert_book",
+            lambda self, end_format=None: (True, intermediate),
+        )
+        monkeypatch.setattr(
+            subprocess,
+            "run",
+            lambda *a, **k: (_ for _ in ()).throw(
+                subprocess.CalledProcessError(1, "kepubify")
+            ),
+        )
+
+        assert nbp.convert_to_kepub() == (False, "")
+        backed = [f for f, kind in nbp.backed_up if kind == "failed"]
+        assert str(nbp.filepath) in backed, (
+            "the original the user dropped in must reach the failed folder"
+        )
+        assert intermediate in backed
 
 
 class TestNotABookFormatsAreNotRescued:

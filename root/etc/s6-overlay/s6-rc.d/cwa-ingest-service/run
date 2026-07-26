@@ -236,6 +236,24 @@ is_recent_duplicate_event() {
 run_processor_with_timeout() {
         local safety_timeout="$1"
         local filepath="$2"
+        # Give the processor its own conversion deadline just inside the hard
+        # one, so a slow conversion ends as a normal Python failure -- which
+        # imports the original instead of losing it (#1094) -- rather than as
+        # a SIGTERM that kills the processor before it can recover. Derived
+        # here so the two limits can't drift apart. The margin is the budget
+        # for backing up and importing the original after the deadline fires.
+        # `timeout 0` means "no limit", so there is nothing to sit inside of.
+        if [ "$safety_timeout" -gt 0 ] 2>/dev/null; then
+                local margin=$(( safety_timeout / 10 ))
+                [ "$margin" -lt 30 ] && margin=30
+                # A flat 30s floor can meet or exceed a very small safety
+                # timeout, which would leave no headroom at all; fall back to a
+                # proportional margin so there is always room to recover.
+                [ "$margin" -ge "$safety_timeout" ] && margin=$(( (safety_timeout / 5) + 1 ))
+                export CWA_CONVERSION_DEADLINE_SECONDS=$(( safety_timeout - margin ))
+        else
+                unset CWA_CONVERSION_DEADLINE_SECONDS
+        fi
         # Privilege-drop to the abc service user (PR #37 / #56) so books
         # written by the ingest pipeline land with PUID:PGID ownership
         # rather than root:root. The CWA_INGEST_PROCESSOR_CMD override

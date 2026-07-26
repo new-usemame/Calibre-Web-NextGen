@@ -66,6 +66,50 @@ def get_language_names(locale):
     return names
 
 
+#: ISO 639-2/B (bibliographic) -> ISO 639-2/T (terminological).
+#:
+#: LANGUAGE_NAMES is keyed on /T only ('deu', 'fra'), but books carry /B codes
+#: ('ger', 'fre') often enough to matter — MARC-derived metadata emits /B, and
+#: an EPUB's OPF may declare either. Without the alias a /B code misses the
+#: table entirely: it displays as "Unknown" everywhere, and on upload
+#: get_valid_language_codes_from_code rejects it as invalid.
+#:
+#: These 20 pairs are the complete set. 639-2/B is a closed list — it exists
+#: only for the languages whose English-derived name differs from the native
+#: one, and ISO adds no new /B codes — so this is a fixed table rather than
+#: something derived at import time. test_iso6392b_table_matches_pycountry
+#: pins it against pycountry so drift cannot go unnoticed.
+ISO6392B_TO_T = {
+    "alb": "sqi", "arm": "hye", "baq": "eus", "bur": "mya", "chi": "zho",
+    "cze": "ces", "dut": "nld", "fre": "fra", "geo": "kat", "ger": "deu",
+    "gre": "ell", "ice": "isl", "mac": "mkd", "mao": "mri", "may": "msa",
+    "per": "fas", "rum": "ron", "slo": "slk", "tib": "bod", "wel": "cym",
+}
+
+
+def _resolve_lang_code(names, lang_code):
+    """Look *lang_code* up in *names*, retrying through the 639-2/B alias.
+
+    Returns ``(name, True)`` on a hit and ``(None, False)`` on a miss, so
+    callers can tell "resolved" from "fell back" without comparing against the
+    "Unknown" sentinel — a table entry could legitimately be any string.
+    """
+    name = names.get(lang_code)
+    if name:
+        return name, True
+    alias = ISO6392B_TO_T.get(lang_code)
+    if alias is not None:
+        name = names.get(alias)
+        if name:
+            return name, True
+    return None, False
+
+
+def canonical_lang_code(lang_code):
+    """Return the ISO 639-2/T form of *lang_code*, unchanged if not a /B code."""
+    return ISO6392B_TO_T.get(lang_code, lang_code)
+
+
 def get_language_name(locale, lang_code):
     UNKNOWN_TRANSLATION = "Unknown"
     names = get_language_names(locale)
@@ -74,9 +118,13 @@ def get_language_name(locale, lang_code):
         log.warning("No language-names dictionary for locale: %r", locale)
         return UNKNOWN_TRANSLATION
 
-    name = names.get(lang_code, UNKNOWN_TRANSLATION)
-    if name == UNKNOWN_TRANSLATION:
-        log.error("Missing translation for language name: {}".format(lang_code))
+    name, resolved = _resolve_lang_code(names, lang_code)
+    if not resolved:
+        # A code we cannot map is a metadata problem, not an application
+        # fault. Logging it at ERROR put it in the stream users copy into
+        # unrelated bug reports, once per lookup per book.
+        log.warning("Missing translation for language name: %s", lang_code)
+        return UNKNOWN_TRANSLATION
 
     return name
 
@@ -98,10 +146,22 @@ def get_valid_language_codes_from_code(locale, language_names, remainder=None):
     lang = list()
     if "" in language_names:
         language_names.remove("")
-    for k, __ in get_language_names(locale).items():
+    names = get_language_names(locale)
+    for k, __ in names.items():
         if k in language_names:
             lang.append(k)
             language_names.remove(k)
+    # Accept ISO 639-2/B input by storing the /T equivalent — 'ger' from an
+    # OPF is a valid language, and 'deu' is the form the rest of the stack
+    # (LANGUAGE_NAMES, the browse list, the detail page) can render. Without
+    # this the code falls through to *remainder* and the upload path rejects
+    # the book with "'ger' is not a valid language".
+    for code in list(language_names):
+        alias = ISO6392B_TO_T.get(code)
+        if alias and alias in names:
+            if alias not in lang:
+                lang.append(alias)
+            language_names.remove(code)
     if remainder is not None and len(language_names):
         remainder.extend(language_names)
     return lang

@@ -20,7 +20,6 @@ These tests pin both the user-visible behavior (no crash) and the invariant that
 protects it (autoflush stays on), so a future session-config or ``add_objects``
 refactor can't silently reintroduce the upstream crash.
 """
-import inspect
 from datetime import datetime, timezone
 
 import pytest
@@ -142,13 +141,23 @@ def test_autoflush_off_reproduces_upstream_crash():
 
 @pytest.mark.unit
 def test_calibre_session_configures_autoflush_on():
-    """Source-pin the invariant that protects the behavior: the calibre session
-    factory must be built with ``autoflush=True``. If a refactor drops it, the
-    #3670 crash returns for real users - catch it here, not in production.
+    """Pin the invariant that protects the behavior: sessions the calibre factory
+    hands out must have autoflush enabled. If a refactor drops it, the #3670
+    crash returns for real users - catch it here, not in production.
+
+    Asserted on a real Session rather than on the source text of ``setup_db``,
+    so that moving where the factory is built (as #1150 did, extracting it into
+    ``_make_session_factory``) cannot make the pin quietly stop looking at the
+    thing it guards.
     """
-    src = inspect.getsource(db.CalibreDB.setup_db)
-    assert "autoflush=True" in src, (
-        "calibre session_factory must keep autoflush=True; without it, saving a "
-        "book with case-variant tags (Java, java) crashes with a UNIQUE "
-        "constraint error (janeczku/calibre-web#3670)."
-    )
+    engine = create_engine("sqlite://")
+    factory = db._make_session_factory(engine)
+    try:
+        assert factory().autoflush is True, (
+            "calibre sessions must keep autoflush=True; without it, saving a "
+            "book with case-variant tags (Java, java) crashes with a UNIQUE "
+            "constraint error (janeczku/calibre-web#3670)."
+        )
+    finally:
+        factory.remove()
+        engine.dispose()

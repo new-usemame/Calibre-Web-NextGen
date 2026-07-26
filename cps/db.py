@@ -1904,11 +1904,23 @@ class CalibreDB:
         """
         try:
             self.ensure_session()
-            tmp_cc = (self.session.query(CustomColumns)
-                      .filter(CustomColumns.datatype.notin_(cc_exceptions)).all())
+            session = self.session
+            # no_autoflush because this is a read of definitions, and the
+            # session may be carrying a caller's pending mutation. With
+            # autoflush on, our SELECT would flush *their* write first, so an
+            # unrelated IntegrityError would surface here, get swallowed as
+            # "no custom columns", and leave the session needing a rollback for
+            # the rest of the request. Not reachable from today's five callers
+            # (all read paths), but the failure would be silent and remote from
+            # its cause, so don't leave it available to the sixth.
+            with session.no_autoflush:
+                tmp_cc = (session.query(CustomColumns)
+                          .filter(CustomColumns.datatype.notin_(cc_exceptions)).all())
         except (SQLAlchemyError, AttributeError):
-            # AttributeError covers the reconnect window, where the session can
-            # be absent rather than merely unreadable.
+            # AttributeError: the session is absent rather than unreadable --
+            # `session` is None whenever session_factory is (before init_db, or
+            # after an explicit `session = None`), and None.query() is an
+            # AttributeError rather than a SQLAlchemyError.
             log.warning("Custom-column definitions unavailable; continuing without them",
                         exc_info=True)
             return []

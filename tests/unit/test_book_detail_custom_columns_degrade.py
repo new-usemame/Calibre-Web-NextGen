@@ -18,9 +18,10 @@ gap only showed up once the session became a property that always materialises
 import sqlite3
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text as sa_text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -93,6 +94,73 @@ def test_fixture_really_reproduces_an_unreadable_schema(unreadable_calibre_schem
     session = dbmod.CalibreDB.session_factory()
     with pytest.raises(SQLAlchemyError):
         session.query(dbmod.CustomColumns).all()
+
+
+@pytest.mark.unit
+def test_request_can_keep_querying_after_the_failure(unreadable_calibre_schema):
+    """The safety property that actually matters, not just the return value.
+
+    Degrading is only useful if the *rest* of the page still renders. A caught
+    DB error can leave a Session in partial-rollback, where every later query
+    raises ``PendingRollbackError`` -- which would turn one dead page into a
+    subtly broken one and still satisfy a test that only asserts ``[]``.
+
+    So: fail the custom-column read, then keep using the same session.
+    """
+    from cps import db as dbmod
+    from cps.api import books as books_mod
+
+    session = dbmod.CalibreDB.session_factory()
+    session.execute(sa_text("CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT)"))
+    session.execute(sa_text("INSERT INTO books (id, title) VALUES (1, 'Still here')"))
+    session.commit()
+
+    assert books_mod.calibre_db.get_cc_columns(books_mod.config,
+                                               filter_config_custom_read=True) == []
+
+    # Same session, after the swallowed error.
+    assert session.execute(sa_text("SELECT title FROM books WHERE id = 1")).scalar() == "Still here"
+    assert session.is_active
+
+
+@pytest.mark.unit
+def test_healthy_library_still_returns_its_custom_columns():
+    """Guards the degrade tests against passing vacuously.
+
+    Every other test here asserts ``[]``, so an accidental unconditional
+    ``return []`` -- which would silently hide custom columns from every user
+    with a perfectly healthy library -- would leave them all green.
+    """
+    from cps import db as dbmod
+
+    tmp = Path(tempfile.mkdtemp()) / "metadata.db"
+    con = sqlite3.connect(tmp)
+    con.execute("""CREATE TABLE custom_columns (
+        id INTEGER PRIMARY KEY, label TEXT, name TEXT, datatype TEXT,
+        mark_for_delete BOOL, editable BOOL, display TEXT, is_multiple BOOL,
+        normalized BOOL)""")
+    con.execute("INSERT INTO custom_columns VALUES (1,'read','Read','bool',0,1,'{}',0,0)")
+    con.commit()
+    con.close()
+
+    engine = create_engine(f"sqlite:///{tmp}", future=True)
+    factory = scoped_session(sessionmaker(autocommit=False, autoflush=True,
+                                          bind=engine, future=True))
+    previous_factory = dbmod.CalibreDB.session_factory
+    previous_init = dbmod.CalibreDB._init
+    dbmod.CalibreDB.session_factory = factory
+    dbmod.CalibreDB._init = True
+    try:
+        cdb = dbmod.CalibreDB.__new__(dbmod.CalibreDB)
+        cc = cdb.get_cc_columns(SimpleNamespace(config_columns_to_ignore=None,
+                                                config_read_column=0))
+        assert [c.name for c in cc] == ["Read"]
+    finally:
+        factory.remove()
+        engine.dispose()
+        dbmod.CalibreDB.session_factory = previous_factory
+        dbmod.CalibreDB._init = previous_init
+        tmp.unlink(missing_ok=True)
 
 
 @pytest.mark.unit

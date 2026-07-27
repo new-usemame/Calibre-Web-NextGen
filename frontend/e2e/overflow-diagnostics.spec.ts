@@ -54,6 +54,54 @@ test('the overflow reporter names the offending element and its CSS', async ({ p
   await assertNoHorizontalOverflow(page);
 });
 
+test('the overflow reporter explains overflow no border box accounts for', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app');
+  expect(await pageOverflow(page)).toBeLessThanOrEqual(1);
+
+  // A pseudo-element is the case that actually reproduces this shape, and it is a
+  // strong candidate for CI's own 35px: `::after` has no node, so it is invisible
+  // to querySelectorAll, yet it widens its parent all the same. Its parent then
+  // reads `scrollWidth > clientWidth` while every border box stays inside the
+  // viewport — which is exactly the state CI reports.
+  //
+  // Note a right MARGIN does not produce this in Chromium: it does not extend the
+  // document's scrollable overflow, so it cannot be the cause on its own. The
+  // reporter still measures margin boxes, but as a secondary signal.
+  await page.evaluate(() => {
+    const host = document.createElement('div');
+    host.setAttribute('data-testid', 'pseudo-host');
+    host.style.cssText = 'position:absolute;top:0;left:0;width:100px;height:10px';
+    const style = document.createElement('style');
+    style.setAttribute('data-testid', 'pseudo-style');
+    style.textContent =
+      '[data-testid="pseudo-host"]::after{content:"";display:block;width:900px;height:10px}';
+    document.head.appendChild(style);
+    document.body.appendChild(host);
+  });
+
+  expect(
+    await pageOverflow(page),
+    'the pseudo-element should widen the document',
+  ).toBeGreaterThan(1);
+
+  const report = await describeOverflowingElements(page);
+  expect(report, 'must say the border boxes are all inside the edge').toContain(
+    'no element’s border box crosses the viewport edge',
+  );
+  expect(report, 'must localise the box holding the oversized content').toContain(
+    'more content than its box',
+  );
+  expect(report, 'must name that box').toContain('pseudo-host');
+  expect(report, 'must flag that the box carries a pseudo-element').toContain('pseudo=::after');
+
+  await page.evaluate(() => {
+    document.querySelector('[data-testid="pseudo-host"]')?.remove();
+    document.querySelector('[data-testid="pseudo-style"]')?.remove();
+  });
+  await assertNoHorizontalOverflow(page);
+});
+
 test('the overflow reporter ignores children a scrollable ancestor absorbs', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app');

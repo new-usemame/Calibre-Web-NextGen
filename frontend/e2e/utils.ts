@@ -93,10 +93,13 @@ export async function describeOverflowingElements(page: Page, limit = 8): Promis
   }, limit);
 
   if (rows.length === 0) {
-    // Overflow with no element past the edge means the scroll width comes from
-    // something the rect sweep cannot see — a margin, a pseudo-element, or a
-    // transform. Say so rather than printing an empty list.
-    return '  (no element extends past the viewport — suspect a margin, ::before/::after, or a transform)';
+    // A border box can sit inside the viewport and still push the document wider:
+    // scrollable overflow counts a child's MARGIN box, and a pseudo-element has no
+    // node for the sweep above to find. CI's long-standing 35px detail-page
+    // overflow lands here — every element is within the edge — so an empty list
+    // would be the least useful thing to print. Fall back to the two measurements
+    // that do explain this case.
+    return describeIndirectOverflow(page, limit);
   }
   return rows
     .map(
@@ -118,4 +121,95 @@ export async function pageOverflow(page: Page): Promise<number> {
     const el = document.documentElement;
     return el.scrollWidth - el.clientWidth;
   });
+}
+
+/** Explains overflow that no element's border box accounts for.
+ *
+ *  Two causes produce a wider document while every rect stays inside the viewport:
+ *
+ *  1. A **margin**. Scrollable overflow includes a child's margin box, so an
+ *     element ending at 388px with `margin-right: 37px` widens the document to
+ *     425px while its own `right` is comfortably within the edge.
+ *  2. Content wider than its own box — a **pseudo-element**, a transform, or a
+ *     min-width floor — on an element that is not a scroll container. Such an
+ *     element has `scrollWidth > clientWidth` while its rect stays put, and it
+ *     hands the excess up to its parent.
+ *
+ *  Reporting the containers in (2) deepest-first localises the cause to one box
+ *  even when the thing inside it has no node of its own. */
+async function describeIndirectOverflow(page: Page, limit: number): Promise<string> {
+  const found = await page.evaluate((max) => {
+    const viewport = document.documentElement.clientWidth;
+    const depthOf = (el: HTMLElement) => {
+      let d = 0;
+      for (let p: HTMLElement | null = el; p?.parentElement; p = p.parentElement) d += 1;
+      return d;
+    };
+    const scrolls = (el: HTMLElement) => {
+      const ox = getComputedStyle(el).overflowX;
+      return ox === 'auto' || ox === 'scroll' || ox === 'hidden' || ox === 'clip';
+    };
+    const absorbed = (el: HTMLElement) => {
+      for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+        if (scrolls(p)) return true;
+      }
+      return false;
+    };
+
+    const margins: string[] = [];
+    const inner: string[] = [];
+
+    document.querySelectorAll<HTMLElement>('*').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) return;
+      if (absorbed(el)) return;
+      const cs = getComputedStyle(el);
+      const label =
+        `<${el.tagName.toLowerCase()}` +
+        `${el.getAttribute('data-testid') ? ` data-testid="${el.getAttribute('data-testid')}"` : ''}` +
+        ` class="${String((el as unknown as { className?: string }).className ?? '').slice(0, 60)}">`;
+
+      const marginRight = parseFloat(cs.marginRight) || 0;
+      if (marginRight > 0 && r.right + marginRight > viewport + 1) {
+        margins.push(
+          `  ${Math.round(r.right + marginRight - viewport)}px past (margin box) @ depth ${depthOf(el)}: ${label}` +
+            ` right=${Math.round(r.right)} margin-right=${cs.marginRight}`,
+        );
+      }
+
+      const excess = el.scrollWidth - el.clientWidth;
+      if (excess > 1 && !scrolls(el)) {
+        const before = getComputedStyle(el, '::before').content;
+        const after = getComputedStyle(el, '::after').content;
+        const pseudo = [
+          before && before !== 'none' ? '::before' : '',
+          after && after !== 'none' ? '::after' : '',
+        ]
+          .filter(Boolean)
+          .join('+');
+        inner.push(
+          `  holds ${excess}px more content than its box @ depth ${depthOf(el)}: ${label}` +
+            ` client=${el.clientWidth} scroll=${el.scrollWidth} min-width=${cs.minWidth}` +
+            ` transform=${cs.transform === 'none' ? 'none' : 'yes'}${pseudo ? ` pseudo=${pseudo}` : ''}`,
+        );
+      }
+    });
+
+    const byDepthDesc = (a: string, b: string) =>
+      Number(/@ depth (\d+)/.exec(b)?.[1] ?? 0) - Number(/@ depth (\d+)/.exec(a)?.[1] ?? 0);
+    return {
+      margins: margins.sort(byDepthDesc).slice(0, max),
+      inner: inner.sort(byDepthDesc).slice(0, max),
+    };
+  }, limit);
+
+  const parts: string[] = [
+    '  (no element’s border box crosses the viewport edge — the width comes from a margin, a pseudo-element, a transform, or a min-width floor)',
+  ];
+  if (found.margins.length) parts.push('  margin boxes past the edge:', ...found.margins);
+  if (found.inner.length) parts.push('  boxes whose content is wider than they are:', ...found.inner);
+  if (!found.margins.length && !found.inner.length) {
+    parts.push('  nothing matched either probe — inspect documentElement/body padding directly');
+  }
+  return parts.join('\n');
 }

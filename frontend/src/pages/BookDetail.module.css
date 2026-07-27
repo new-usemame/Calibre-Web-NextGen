@@ -160,6 +160,19 @@
   gap: var(--sp-5);
 }
 
+/* The header text column is ~217px on a 390px phone, and these three lines carry
+   arbitrary library metadata: a German compound title, a transliterated name, a
+   long series title. Without a break rule a single token wider than the column
+   overflows it and drags the whole page into horizontal scroll — measured at
+   290px of document overflow for one 35-character title. Normal wrapping still
+   breaks between words first; `anywhere` only splits a token that cannot fit on
+   a line by itself. Same treatment as the tag pill in #1170. */
+.title,
+.authors,
+.series {
+  overflow-wrap: anywhere;
+}
+
 .title {
   font-family: var(--font-display);
   font-size: var(--fs-2xl);

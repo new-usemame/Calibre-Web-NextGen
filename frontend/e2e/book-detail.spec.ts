@@ -238,3 +238,56 @@ test('long tag names add no horizontal overflow to the read-only detail page', a
     `long tags widened the page by ${withLongTags - baseline}px (baseline ${baseline}px)`,
   ).toBeLessThanOrEqual(1);
 });
+
+// The header text column is ~217px wide on a 390px phone, and `.title`,
+// `.authors` and `.series` had no break rule. A single token wider than that
+// column overflowed it and dragged the whole page into horizontal scroll —
+// measured at 290px of document overflow for one 35-character German compound
+// title on cwn-local, 0 after adding `overflow-wrap: anywhere`.
+//
+// This is the cause of the ~35px baseline overflow CI's detail page carried for
+// several releases (notes/e2e-mobile-overflow-ci-triage.md). It stayed invisible
+// because no element's BORDER BOX crosses the viewport edge — the text overflows
+// its own box, so a getBoundingClientRect sweep finds nothing. What identified it
+// was the `scrollWidth > clientWidth` probe added in #1177, which named
+// `<h1 class="_title_…">` as holding 48px more content than its box.
+//
+// Measures the DELTA the long metadata adds, not absolute overflow, so it holds
+// on any fixture regardless of what other baseline the page happens to carry.
+test('long title, author and series tokens add no horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app');
+  const bookId = await firstBookId(page);
+  test.skip(bookId == null, 'seed has no books');
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main h1')).toBeVisible({ timeout: 10_000 });
+  const baseline = await pageOverflow(page);
+
+  // Each is a real shape a library carries: a German compound noun, a long
+  // transliterated name, a long series title. None contains a break opportunity.
+  const longTitle = 'Kraftfahrzeughaftpflichtversicherungsgesetz';
+  await page.route(`**/api/v1/books/${bookId}`, async (route) => {
+    const res = await route.fetch();
+    const book = await res.json();
+    book.title = longTitle;
+    book.authors = [{ id: 990101, name: 'Nebuchadnezzarssonssonssonsdottir' }];
+    book.series = { id: 990102, name: 'Donaudampfschiffahrtsgesellschaftskapitaen' };
+    book.series_index = 1;
+    await route.fulfill({ response: res, json: book });
+  });
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main h1')).toContainText('Kraftfahrzeug', { timeout: 10_000 });
+  const withLongText = await pageOverflow(page);
+
+  expect(
+    withLongText - baseline,
+    `long title/author/series widened the page by ${withLongText - baseline}px (baseline ${baseline}px)`,
+  ).toBeLessThanOrEqual(1);
+
+  // And the title box itself must not hold more content than it can show — this
+  // is the measurement that localised the bug, so pin it directly.
+  const titleExcess = await page.locator('main h1').evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(titleExcess, 'the title must wrap inside its column, not overflow it').toBeLessThanOrEqual(1);
+});

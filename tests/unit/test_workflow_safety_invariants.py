@@ -495,6 +495,77 @@ def test_integration_tests_job_authenticates_to_ghcr():
     )
 
 
+# ─── Wall 6: manifest-merge jobs don't boot BuildKit ───────────────────
+#
+# `docker buildx imagetools create` is a registry-only operation: it
+# reads the per-arch manifests and writes a manifest list. It needs no
+# builder. But `docker/setup-buildx-action` defaults to the
+# docker-container driver, which boots moby/buildkit pulled from Docker
+# Hub — so a job that only merges manifests took a hard dependency on a
+# third-party registry it never otherwise touches.
+#
+# Docker Hub egress from GitHub-hosted runners intermittently times out.
+# On 2026-07-27 three consecutive dev builds died at "booting buildkit"
+# with `Get "https://registry-1.docker.io/v2/": context deadline
+# exceeded` — after both arch builds had already succeeded and pushed.
+# The :dev tag went stale and the household canary stopped receiving
+# merges. The same shape sits in the release workflow's merge job, where
+# it is worse: the tag publishes, the manifest never lands, and
+# `docker pull ...:vX.Y.Z` 404s for everyone (the v4.0.169 failure mode).
+#
+# So: a job that merges manifests and does not itself build an image
+# must not set up a container-driver buildx.
+
+
+def _job_text(job: dict) -> str:
+    """Flatten every step's `run` + `uses` into one searchable string."""
+    parts = []
+    for step in _steps(job):
+        parts.append(str(step.get("run", "")))
+        parts.append(str(step.get("uses", "")))
+    return "\n".join(parts)
+
+
+def test_manifest_merge_jobs_do_not_boot_container_buildkit():
+    """Registry-only manifest merges must not pull moby/buildkit.
+
+    Applies to any job that runs `imagetools create` but never builds an
+    image. Such a job may either omit setup-buildx-action entirely (the
+    buildx CLI plugin is preinstalled on GitHub runners) or pin
+    `driver: docker`, which reuses the local dockerd. What it may not do
+    is take the default container driver.
+    """
+    offenders = []
+    for path in all_workflows():
+        wf = _load(path)
+        for job_name, job in (wf.get("jobs") or {}).items():
+            if not isinstance(job, dict):
+                continue
+            text = _job_text(job)
+            if "imagetools create" not in text:
+                continue
+            # A job that genuinely builds an image needs a real builder.
+            builds = "docker/build-push-action" in text or re.search(
+                r"docker\s+buildx\s+build\b", text
+            )
+            if builds:
+                continue
+            for step in _steps(job):
+                if not str(step.get("uses", "")).startswith(
+                    "docker/setup-buildx-action"
+                ):
+                    continue
+                driver = (step.get("with") or {}).get("driver")
+                if driver != "docker":
+                    offenders.append(f"{path.name}:{job_name}")
+    assert not offenders, (
+        "Manifest-merge job(s) boot a container-driver BuildKit for a "
+        "registry-only `imagetools create`, taking a needless Docker Hub "
+        "dependency that has already broken the dev channel: "
+        f"{offenders}. Drop the setup-buildx step or pin `driver: docker`."
+    )
+
+
 def test_all_workflows_have_minimum_permissions_block():
     """Every workflow that does any mutating action (commenting,
     labeling, merging) must have an explicit top-level OR job-level

@@ -122,6 +122,24 @@ jobs:
           password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
 
       # --- 3. Build & Push (Digest Only) ---
+      # Unlike the merge job, this one genuinely needs BuildKit, so it can't
+      # drop the container driver. Pre-pull with backoff instead: the Docker
+      # Hub timeouts that red these builds are transient, and
+      # setup-buildx-action boots from the local image when one is present.
+      # Fail-soft — if the pull never lands, or the action's default image tag
+      # moves in a future buildx, fall through and let it pull as before.
+      - name: Pre-pull BuildKit image (Docker Hub flake guard)
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            if docker pull moby/buildkit:buildx-stable-1; then
+              exit 0
+            fi
+            echo "buildkit pull attempt ${attempt} failed; retrying in $((attempt * 15))s"
+            sleep "$((attempt * 15))"
+          done
+          echo "::warning::Could not pre-pull moby/buildkit after 3 attempts; letting setup-buildx-action try."
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
         with:
@@ -243,6 +261,24 @@ jobs:
           password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
 
       # --- 3. Build & Push (Digest Only) ---
+      # Unlike the merge job, this one genuinely needs BuildKit, so it can't
+      # drop the container driver. Pre-pull with backoff instead: the Docker
+      # Hub timeouts that red these builds are transient, and
+      # setup-buildx-action boots from the local image when one is present.
+      # Fail-soft — if the pull never lands, or the action's default image tag
+      # moves in a future buildx, fall through and let it pull as before.
+      - name: Pre-pull BuildKit image (Docker Hub flake guard)
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            if docker pull moby/buildkit:buildx-stable-1; then
+              exit 0
+            fi
+            echo "buildkit pull attempt ${attempt} failed; retrying in $((attempt * 15))s"
+            sleep "$((attempt * 15))"
+          done
+          echo "::warning::Could not pre-pull moby/buildkit after 3 attempts; letting setup-buildx-action try."
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
         with:
@@ -388,8 +424,17 @@ jobs:
           pattern: digests-*
           merge-multiple: true
 
-      - name: Set up Docker Buildx
+      # `imagetools create` below is a registry-only operation — it reads the
+      # per-arch manifests and writes a manifest list. It needs no BuildKit.
+      # The default docker-container driver would boot moby/buildkit pulled
+      # from Docker Hub, whose egress from GitHub runners intermittently times
+      # out; on 2026-07-27 that killed three consecutive dev builds at "booting
+      # buildkit" *after* both arch builds had already pushed, stranding :dev.
+      # `driver: docker` reuses the local dockerd, so this job touches only GHCR.
+      - name: Set up Docker Buildx (local driver — no Docker Hub pull)
         uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - name: Create manifest list and push
         working-directory: /tmp/digests

@@ -95,6 +95,21 @@ jobs:
           # pbs-cache mirror; falls back to GITHUB_TOKEN for push-only contexts.
           password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
 
+      # See the dev workflow for the full note. This job builds, so it needs
+      # BuildKit; pre-pull with backoff to survive a transient Docker Hub
+      # timeout. Fail-soft — falls through to the action's own pull.
+      - name: Pre-pull BuildKit image (Docker Hub flake guard)
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            if docker pull moby/buildkit:buildx-stable-1; then
+              exit 0
+            fi
+            echo "buildkit pull attempt ${attempt} failed; retrying in $((attempt * 15))s"
+            sleep "$((attempt * 15))"
+          done
+          echo "::warning::Could not pre-pull moby/buildkit after 3 attempts; letting setup-buildx-action try."
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
 
@@ -191,8 +206,16 @@ jobs:
           pattern: digests-*
           merge-multiple: true
 
-      - name: Set up Docker Buildx
+      # Registry-only manifest merge — see the dev workflow for the full note.
+      # The default container driver boots moby/buildkit from Docker Hub, which
+      # intermittently times out from GitHub runners. Here that is worse than on
+      # dev: the tag is already published, so a failure leaves
+      # `docker pull ...:vX.Y.Z` 404ing for every user (the v4.0.169 failure
+      # mode). `driver: docker` keeps this job on GHCR only.
+      - name: Set up Docker Buildx (local driver — no Docker Hub pull)
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
+        with:
+          driver: docker
 
       - name: Compute tag list
         id: tags

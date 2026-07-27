@@ -26,9 +26,17 @@ export function assertNoPageErrors(errors: string[]) {
 /** No horizontal body overflow — the signature of the mobile-reflow regressions
  *  (#288 banner, #576 drawer, edit-cover at 375px). */
 export async function assertNoHorizontalOverflow(page: Page) {
-  const overflow = await page.evaluate(() => {
+  const overflow = await pageOverflow(page);
+  expect(overflow, 'page scrolls horizontally (mobile reflow regression)').toBeLessThanOrEqual(1);
+}
+
+/** Horizontal overflow in px, for specs that need to compare one render against
+ *  another rather than assert the absolute property. Asserting "no overflow at
+ *  all" makes a spec fail for any unrelated overflow the page happens to carry,
+ *  which tells you nothing about the element under test. */
+export async function pageOverflow(page: Page): Promise<number> {
+  return page.evaluate(() => {
     const el = document.documentElement;
     return el.scrollWidth - el.clientWidth;
   });
-  expect(overflow, 'page scrolls horizontally (mobile reflow regression)').toBeLessThanOrEqual(1);
 }

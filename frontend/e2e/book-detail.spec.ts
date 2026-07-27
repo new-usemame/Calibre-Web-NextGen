@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow } from './utils';
+import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow, pageOverflow } from './utils';
 
 /*
  * Book-detail completeness pass:
@@ -192,7 +192,13 @@ test('book detail with a "More by" strip has no horizontal overflow on mobile', 
 // specs — all of which log in as admin — never saw this.
 //
 // Deterministic on any seed: the role and the tag list are both stubbed.
-test('long tag names do not push the read-only detail page into horizontal scroll', async ({ page }) => {
+//
+// Measures the DELTA the long tags add, not absolute overflow. The CI fixture's
+// detail page carries ~35px of horizontal overflow from an unrelated cause
+// (notes/e2e-mobile-overflow-ci-triage.md), and an absolute assertion here would
+// fail on that instead of on the tag row, reporting nothing about the pills. The
+// delta is what this fix owns: pre-fix it was ~300px, post-fix it is 0.
+test('long tag names add no horizontal overflow to the read-only detail page', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app');
   const bookId = await firstBookId(page);
@@ -207,19 +213,28 @@ test('long tag names do not push the read-only detail page into horizontal scrol
     await route.fulfill({ response: res, json: me });
   });
 
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main h1')).toBeVisible({ timeout: 10_000 });
+  const baseline = await pageOverflow(page);
+
   // A real LoC heading plus a single unbroken token wider than the viewport.
+  const longTag = 'France -- History -- Revolution, 1789-1799 -- Fiction';
   await page.route(`**/api/v1/books/${bookId}`, async (route) => {
     const res = await route.fetch();
     const book = await res.json();
     book.tags = [
-      { id: 990001, name: 'France -- History -- Revolution, 1789-1799 -- Fiction' },
+      { id: 990001, name: longTag },
       { id: 990002, name: 'Bildungsroman'.repeat(8) },
     ];
     await route.fulfill({ response: res, json: book });
   });
 
-  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('#book-tags')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('France -- History -- Revolution, 1789-1799 -- Fiction')).toBeVisible();
-  await assertNoHorizontalOverflow(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByText(longTag)).toBeVisible({ timeout: 10_000 });
+  const withLongTags = await pageOverflow(page);
+
+  expect(
+    withLongTags - baseline,
+    `long tags widened the page by ${withLongTags - baseline}px (baseline ${baseline}px)`,
+  ).toBeLessThanOrEqual(1);
 });

@@ -56,6 +56,49 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.22',
+    date: '2026-07-27',
+    items: [
+      {
+        title: 'A book that cannot be converted still lands in your library',
+        body: 'If an incoming book could not be converted to your chosen format — a large PDF that ran out of time, a file Calibre chokes on, a format needing a plugin you do not have — it was dropped altogether: no entry in the library and the file gone from the ingest folder, while the log still reported success. The original file is now imported whenever a conversion fails, and a conversion that runs long ends as an ordinary failure instead of killing the import outright. Raising Ingest Timeout in CWA Settings raises the conversion limit along with it.',
+        category: 'Library',
+      },
+      {
+        title: 'The "read" mark on a cover now says Read',
+        body: 'A finished book was marked with a small unlabelled tick in the corner of its cover, which was easy to miss at a glance — particularly in the light theme. It is now a green "Read" label at the bottom-left, the same place and wording the classic view uses, and it stays large enough to see on a phone or tablet. The label follows the language you read the interface in.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Books recorded as "ger", "fre" or "dut" show their real language',
+        body: 'A language can be written two ways in book metadata, and only the form Calibre normally writes was recognised — so a book carrying the other form, common in library-catalogue records and some EPUB files, showed "Unknown" as its language, and importing one could be refused outright. Both forms are now accepted for all twenty languages where they differ. Whether a language counts as valid also no longer depends on the language you happen to read the interface in.',
+        category: 'Library',
+        link: { to: '/languages', label: 'Browse languages' },
+      },
+      {
+        title: 'Pages no longer fail at random when the server is busy',
+        body: 'The server kept one working copy of your library and shared it across everything it was doing at once, so a page being built could lose its data the moment another page finished — or the moment a background job such as a duplicate scan, thumbnail run or metadata backup completed. It surfaced as a different-looking error every time, and grew likelier the busier the server was, which hit big libraries and shared instances hardest. Every page load and every background job now works from its own copy.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Your library keeps working when its extra fields cannot be read',
+        body: 'Book pages, the table view and both search screens ask your library for the extra fields you can add to a book in Calibre. If that lookup failed — the library mid-write, its folder moved, the definitions not there yet — those pages returned an error rather than simply leaving the extra fields out, even though the rest of the library was perfectly readable. They now load without them and note the reason in the log.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Opening your library runs one search instead of two',
+        body: 'Every visit asked the server for the first page of books, then immediately asked again at a different size and threw the first answer away. Nothing looked wrong, but on a large library that first page is the slowest query there is, and it was running twice on every load for every reader. The grid now waits until it knows how many columns it has before asking.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The series line under a cover is easier to read',
+        body: 'The small series text on a book cover was given the muted grey the rest of the interface uses and then faded a second time on top of that, which took it below the contrast small text needs to stay legible. The extra fade is gone, so the line is the muted grey it was meant to be.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.21',
     date: '2026-07-25',
     items: [

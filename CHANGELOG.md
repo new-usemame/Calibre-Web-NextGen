@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.22] - 2026-07-27
+
 ### Changed
 
 - **The "read" mark on a book cover is now a green "Read" label at the bottom-left, instead of a small tick in the corner.** It was a 22-pixel checkmark circle in the top-right with no wording, which was easy to miss at a glance — the reporter, who reads in the light theme because of their eyesight, pointed out that the classic view's labelled green badge was far easier to spot. It now says what it means, sits where the classic one sits, and gets larger again on phones and tablets. The wording follows your language, so a German library reads "Gelesen" exactly as the classic view does. Reported by [@uschi1](https://github.com/new-usemame/Calibre-Web-NextGen/issues/351) ([#1117](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1117)).
@@ -37,6 +39,8 @@ is for things you can see or feel when running the app.
   Two smaller things from the same report. The log now names the folder it keeps the copy in, `/config/processed_books/failed/`, where before it said only "failed backup" — a copy existed, but not where. And when a conversion overran, the service claimed the app "should have timed out internally", which was misleading advice about a limit that did not exist; it now points at the setting that does control it. Reported by [@auspex](https://github.com/auspex) ([#1094](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1094)).
 
 - **Opening your library no longer runs the same search twice.** Every visit to the library asked the server for the first page of books, then immediately asked for it again at a different size and threw the first answer away. Nothing looked wrong — the wasted answer never reached the screen — but on a large library that first page is the slowest query on it, and it was being run twice on every load, for every reader. The grid now waits until it knows how many columns it has before asking, so the page is fetched once ([#1144](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1144)).
+
+- **The series line on a book cover is dark enough to read again.** The small series text under a title on each cover was styled with the muted grey the rest of the interface uses, and then faded a second time on top of that. The two together took it to a contrast of about 4:1 against the card, below the 4.5:1 that small text needs to stay legible, which made it hard to read for anyone whose eyesight or screen is less than ideal. The second fade is gone, so the line is the muted grey it was meant to be ([#1135](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1135)).
 
 ## [v4.1.21] - 2026-07-25
 

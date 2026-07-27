@@ -90,9 +90,13 @@ ISO6392B_TO_T = {
 def _resolve_lang_code(names, lang_code):
     """Look *lang_code* up in *names*, retrying through the 639-2/B alias.
 
-    Returns ``(name, True)`` on a hit and ``(None, False)`` on a miss, so
+    Returns ``(name, True)`` on a hit and ``(None, False)`` otherwise, so
     callers can tell "resolved" from "fell back" without comparing against the
-    "Unknown" sentinel — a table entry could legitimately be any string.
+    "Unknown" sentinel.
+
+    An entry that is present but empty counts as *unresolved*, deliberately:
+    a blank language label is not more useful to a reader than "Unknown", and
+    treating it as a hit would render an empty pill on the book page.
     """
     name = names.get(lang_code)
     if name:
@@ -108,6 +112,20 @@ def _resolve_lang_code(names, lang_code):
 def canonical_lang_code(lang_code):
     """Return the ISO 639-2/T form of *lang_code*, unchanged if not a /B code."""
     return ISO6392B_TO_T.get(lang_code, lang_code)
+
+
+def _reference_language_codes():
+    """Every language code the app knows, independent of UI locale.
+
+    The per-locale tables in LANGUAGE_NAMES are *translation* data and are
+    legitimately incomplete — 27 of the 28 shipped locales are missing between
+    1 and 48 of the 424 codes. Whether a code is a valid language is a
+    different question from whether the current locale has a name for it, and
+    validation must not confuse the two: ``ell`` is absent from the tables for
+    gl, id, ko, no, pt, pt_BR, sk, sl, tr, vi and zh_Hant_TW, so gating on the
+    locale table rejects a perfectly good Greek book for those users.
+    """
+    return _LANGUAGE_NAMES["en"]
 
 
 def get_language_name(locale, lang_code):
@@ -151,16 +169,20 @@ def get_valid_language_codes_from_code(locale, language_names, remainder=None):
         if k in language_names:
             lang.append(k)
             language_names.remove(k)
-    # Accept ISO 639-2/B input by storing the /T equivalent — 'ger' from an
-    # OPF is a valid language, and 'deu' is the form the rest of the stack
-    # (LANGUAGE_NAMES, the browse list, the detail page) can render. Without
-    # this the code falls through to *remainder* and the upload path rejects
-    # the book with "'ger' is not a valid language".
+    # Second pass over whatever the locale table did not claim. Validity is a
+    # property of the code, not of the current locale's translation coverage,
+    # so this pass checks the reference table — which both accepts /B input by
+    # normalizing it to /T ('ger' from an OPF is a valid language, and 'deu' is
+    # the form the rest of the stack can render), and stops a valid /T code
+    # being refused just because the user's locale has no name for it.
+    # Without this, upload rejects the book with "'ger' is not a valid
+    # language".
+    reference = _reference_language_codes()
     for code in list(language_names):
-        alias = ISO6392B_TO_T.get(code)
-        if alias and alias in names:
-            if alias not in lang:
-                lang.append(alias)
+        canonical = canonical_lang_code(code)
+        if canonical in reference:
+            if canonical not in lang:
+                lang.append(canonical)
             language_names.remove(code)
     if remainder is not None and len(language_names):
         remainder.extend(language_names)

@@ -47,6 +47,23 @@ def test_iso6392b_table_matches_pycountry():
     assert isoLanguages.ISO6392B_TO_T == derived
 
 
+def test_alias_targets_resolve_through_the_language_backend():
+    """A cross-check that does not depend on pycountry being installed.
+
+    ``pycountry`` is only a dependency on Python >= 3.12; below that the module
+    falls back to ``iso-639``, and test_iso6392b_table_matches_pycountry skips.
+    This one runs on either backend: every /T target must resolve through the
+    module's own ``get()``, and no /B code may — if a /B code resolved
+    directly, it would not need aliasing and the table entry would be wrong.
+    """
+    for b_code, t_code in isoLanguages.ISO6392B_TO_T.items():
+        record = isoLanguages.get(part3=t_code)
+        assert getattr(record, "name", None), \
+            f"/T target {t_code!r} does not resolve through the backend"
+        with pytest.raises(AttributeError):
+            isoLanguages.get(part3=b_code)
+
+
 def test_iso6392b_table_is_not_self_mapping():
     """A /B code and its /T target must always differ — a self-map would mean
     the entry is junk and would mask a genuine miss."""
@@ -199,12 +216,83 @@ def test_valid_codes_accepts_every_bibliographic_code(b_code, t_code):
     assert remainder == []
 
 
+def test_valid_codes_accepts_bibliographic_in_every_locale():
+    """Whether a language code is valid must not depend on the UI locale.
+
+    The per-locale tables are translation data and are incomplete — 'ell' is
+    missing from 11 of them. Validating against the locale table therefore
+    rejected a Greek book for a Portuguese user. Validity now comes from the
+    reference table, so every /B code is accepted under every shipped locale.
+    """
+    from cps.iso_language_names import LANGUAGE_NAMES
+
+    for locale in LANGUAGE_NAMES:
+        for b_code, t_code in isoLanguages.ISO6392B_TO_T.items():
+            remainder = []
+            out = isoLanguages.get_valid_language_codes_from_code(
+                locale, [b_code], remainder
+            )
+            assert out == [t_code], \
+                f"{b_code} rejected under locale {locale!r} (got {out!r})"
+            assert remainder == []
+
+
+def test_valid_codes_accepts_terminological_code_missing_from_locale_table():
+    """The same defect on the /T side, which predates the alias work.
+
+    'ell' is not in the pt_BR table, so a book tagged with plain 'ell' was
+    refused for a Brazilian-Portuguese user even though nothing about it is
+    invalid.
+    """
+    remainder = []
+    out = isoLanguages.get_valid_language_codes_from_code("pt_BR", ["ell"], remainder)
+    assert out == ["ell"]
+    assert remainder == []
+
+
 # --------------------------------------------------------------------------
 # canonical_lang_code() — the normalizer the two paths above share.
 # --------------------------------------------------------------------------
 
 def test_canonical_lang_code_maps_bibliographic():
     assert isoLanguages.canonical_lang_code("ger") == "deu"
+
+
+def test_validator_normalizes_through_canonical_lang_code(monkeypatch):
+    """The normalizer must be the one the validator actually uses.
+
+    A public helper that duplicates a lookup the production path does inline
+    is dead code that can silently drift from it. Patching the helper must
+    therefore change what the validator stores.
+    """
+    monkeypatch.setattr(
+        isoLanguages, "canonical_lang_code", lambda code: "eng"
+    )
+    remainder = []
+    out = isoLanguages.get_valid_language_codes_from_code("en", ["ger"], remainder)
+    assert out == ["eng"], "validator does not route through canonical_lang_code"
+    assert remainder == []
+
+
+# --------------------------------------------------------------------------
+# _resolve_lang_code() — the present-but-empty contract.
+# --------------------------------------------------------------------------
+
+def test_empty_table_entry_counts_as_unresolved():
+    """A blank name is not a usable label, so it falls back to "Unknown"
+    rather than rendering an empty pill on the book page."""
+    name, resolved = isoLanguages._resolve_lang_code({"deu": ""}, "deu")
+    assert (name, resolved) == (None, False)
+
+
+def test_empty_alias_target_counts_as_unresolved():
+    name, resolved = isoLanguages._resolve_lang_code({"deu": ""}, "ger")
+    assert (name, resolved) == (None, False)
+
+
+def test_present_and_non_empty_entry_resolves():
+    name, resolved = isoLanguages._resolve_lang_code({"deu": "Deutsch"}, "ger")
+    assert (name, resolved) == ("Deutsch", True)
 
 
 def test_canonical_lang_code_passes_through_everything_else():

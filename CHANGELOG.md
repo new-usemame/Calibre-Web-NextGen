@@ -16,6 +16,14 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- Book pages no longer scroll sideways on a phone when a book carries long
+  subject tags. Libraries with Library-of-Congress headings (for example
+  "France -- History -- Revolution, 1789-1799 -- Fiction") pushed the tag row
+  off the edge of the screen for anyone reading without an editor account,
+  including guests. Long tags now wrap instead. (#1170)
+
 ## [v4.1.22] - 2026-07-27
 
 ### Changed

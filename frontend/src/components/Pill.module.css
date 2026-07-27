@@ -7,5 +7,11 @@
   border-radius: var(--r-full);
   padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--border);
-  white-space: nowrap;
+  /* No nowrap: real Calibre libraries carry Library-of-Congress subject
+     headings ("France -- History -- Revolution, 1789-1799 -- Fiction") that are
+     wider than a phone, and an unbreakable pill pushed the whole book detail
+     page into horizontal scroll (#1130). Normal wrapping still keeps every
+     pill that fits on one line; anywhere breaks a single oversized token. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }

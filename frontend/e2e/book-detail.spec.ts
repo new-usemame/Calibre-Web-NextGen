@@ -182,3 +182,44 @@ test('book detail with a "More by" strip has no horizontal overflow on mobile', 
   await expect(page.locator('section[aria-label^="More by"]')).toBeVisible({ timeout: 10_000 });
   await assertNoHorizontalOverflow(page);
 });
+
+// A reader without the edit role sees the read-only tag pills, and those pills
+// were `white-space: nowrap` with no max-width. Real libraries carry
+// Library-of-Congress subject headings ("France -- History -- Revolution,
+// 1789-1799 -- Fiction") that are wider than a phone, so one tag dragged the
+// whole detail page into horizontal scroll. The admin-role branch renders
+// removable chips instead and wraps fine, which is why the existing mobile
+// specs — all of which log in as admin — never saw this.
+//
+// Deterministic on any seed: the role and the tag list are both stubbed.
+test('long tag names do not push the read-only detail page into horizontal scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app');
+  const bookId = await firstBookId(page);
+  test.skip(bookId == null, 'seed has no books');
+
+  // Drop the edit role so the page renders the read-only Pill branch that a
+  // guest or viewer account gets.
+  await page.route('**/api/v1/auth/me', async (route) => {
+    const res = await route.fetch();
+    const me = await res.json();
+    if (me?.role) me.role.edit = false;
+    await route.fulfill({ response: res, json: me });
+  });
+
+  // A real LoC heading plus a single unbroken token wider than the viewport.
+  await page.route(`**/api/v1/books/${bookId}`, async (route) => {
+    const res = await route.fetch();
+    const book = await res.json();
+    book.tags = [
+      { id: 990001, name: 'France -- History -- Revolution, 1789-1799 -- Fiction' },
+      { id: 990002, name: 'Bildungsroman'.repeat(8) },
+    ];
+    await route.fulfill({ response: res, json: book });
+  });
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#book-tags')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('France -- History -- Revolution, 1789-1799 -- Fiction')).toBeVisible();
+  await assertNoHorizontalOverflow(page);
+});

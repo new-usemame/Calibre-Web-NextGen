@@ -332,7 +332,13 @@ jobs:
           # busy main does not make every PR look like it touched everything.
           files="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" || git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
           echo "$files"
-          if echo "$files" | grep -qE '^(frontend/|cps/static/app/)'; then
+          # tests.yml itself counts: the e2e job's container setup and seed steps
+          # live in this file, so a PR that changes how the harness is fixtured
+          # could not otherwise be validated by the harness. That is how a broken
+          # seed (config_remote_login left at its default False, so every
+          # magic-link spec 403'd) stayed invisible — the fix for a red e2e gate
+          # would not have run the e2e gate.
+          if echo "$files" | grep -qE '^(frontend/|cps/static/app/|\.github/workflows/tests\.yml$)'; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
             echo "frontend=false" >> "$GITHUB_OUTPUT"

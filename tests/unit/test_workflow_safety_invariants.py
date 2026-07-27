@@ -676,3 +676,28 @@ def test_e2e_remote_login_seed_fails_loudly_when_the_endpoint_regresses():
     )
     assert "::error::" in run, "seed step should emit a GitHub ::error:: annotation on failure"
     assert "exit 1" in run, "seed step must fail the job when the fixture is broken"
+
+
+def test_changed_paths_treats_tests_yml_as_frontend_relevant():
+    """A change to the e2e harness must be able to run the e2e harness.
+
+    The e2e job's container setup and seed steps live in tests.yml. While the
+    detector only matched frontend/ and cps/static/app/, a PR fixing the e2e
+    fixture could not be validated by the e2e job — the fix for a red gate
+    would not run the gate.
+    """
+    wf = _load(WF_DIR / "tests.yml")
+    detect = next(
+        (
+            s
+            for s in ((wf.get("jobs") or {}).get("changed_paths") or {}).get("steps", [])
+            if isinstance(s, dict) and s.get("id") == "detect"
+        ),
+        None,
+    )
+    assert detect is not None, "changed_paths has no `detect` step"
+    run = detect.get("run") or ""
+    assert "workflows/tests" in run.replace("\\", ""), (
+        "changed_paths does not treat .github/workflows/tests.yml as frontend-relevant, "
+        "so a PR that changes the e2e seed/setup will skip the e2e job that it changes."
+    )

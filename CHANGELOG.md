@@ -16,14 +16,6 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
-### Fixed
-
-- Book pages no longer scroll sideways on a phone when a book carries long
-  subject tags. Libraries with Library-of-Congress headings (for example
-  "France -- History -- Revolution, 1789-1799 -- Fiction") pushed the tag row
-  off the edge of the screen for anyone reading without an editor account,
-  including guests. Long tags now wrap instead. (#1170)
-
 ## [v4.1.22] - 2026-07-27
 
 ### Changed
@@ -47,6 +39,8 @@ is for things you can see or feel when running the app.
   Two smaller things from the same report. The log now names the folder it keeps the copy in, `/config/processed_books/failed/`, where before it said only "failed backup" — a copy existed, but not where. And when a conversion overran, the service claimed the app "should have timed out internally", which was misleading advice about a limit that did not exist; it now points at the setting that does control it. Reported by [@auspex](https://github.com/auspex) ([#1094](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1094)).
 
 - **Opening your library no longer runs the same search twice.** Every visit to the library asked the server for the first page of books, then immediately asked for it again at a different size and threw the first answer away. Nothing looked wrong — the wasted answer never reached the screen — but on a large library that first page is the slowest query on it, and it was being run twice on every load, for every reader. The grid now waits until it knows how many columns it has before asking, so the page is fetched once ([#1144](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1144)).
+
+- **Book pages no longer scroll sideways on a phone when a book carries long subject tags.** Libraries catalogued with Library-of-Congress subject headings — "France -- History -- Revolution, 1789-1799 -- Fiction" and the like — carry tags wider than a phone screen, and the tag row would not break one onto a second line, so the whole book page could be dragged sideways. It hit anyone reading without an editor account, guests included, because the editing view already wrapped its tags. Long tags now wrap ([#1170](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1170)).
 
 - **The series line on a book cover is dark enough to read again.** The small series text under a title on each cover was styled with the muted grey the rest of the interface uses, and then faded a second time on top of that. The two together took it to a contrast of about 4:1 against the card, below the 4.5:1 that small text needs to stay legible, which made it hard to read for anyone whose eyesight or screen is less than ideal. The second fade is gone, so the line is the muted grey it was meant to be ([#1135](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1135)).
 

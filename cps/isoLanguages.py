@@ -115,7 +115,11 @@ def canonical_lang_code(lang_code):
 
 
 def _reference_language_codes():
-    """Every language code the app knows, independent of UI locale.
+    """The complete checked-in reference table, independent of UI locale.
+
+    This is the application's own language data, not an ISO registry: it is
+    the one locale table that is complete, and ``test_reference_table_is_the
+    _superset_of_every_locale`` pins that it stays a superset of every other.
 
     The per-locale tables in LANGUAGE_NAMES are *translation* data and are
     legitimately incomplete — 27 of the 28 shipped locales are missing between
@@ -164,23 +168,28 @@ def get_valid_language_codes_from_code(locale, language_names, remainder=None):
     lang = list()
     if "" in language_names:
         language_names.remove("")
-    names = get_language_names(locale)
-    for k, __ in names.items():
-        if k in language_names:
-            lang.append(k)
-            language_names.remove(k)
-    # Second pass over whatever the locale table did not claim. Validity is a
-    # property of the code, not of the current locale's translation coverage,
-    # so this pass checks the reference table — which both accepts /B input by
-    # normalizing it to /T ('ger' from an OPF is a valid language, and 'deu' is
-    # the form the rest of the stack can render), and stops a valid /T code
-    # being refused just because the user's locale has no name for it.
-    # Without this, upload rejects the book with "'ger' is not a valid
-    # language".
+    names = get_language_names(locale) or {}
+    # An unrecognised locale used to crash here (AttributeError on None.items),
+    # even though get_language_names is explicitly documented to return None
+    # for one and get_language_name already guards it. Validity does not depend
+    # on the locale table anyway, so fall through to the reference and let the
+    # book import rather than 500 the request.
     reference = _reference_language_codes()
+    # Normalize /B -> /T *before* looking anything up. Doing the locale-table
+    # lookup first and only aliasing the leftovers would let a locale table
+    # that ever gained a /B key capture 'ger' unchanged — storing a code the
+    # rest of the stack cannot render, and defeating the de-duplication of a
+    # book that declares both 'ger' and 'deu'. The current tables are /T-only,
+    # so this is about not depending on that holding forever.
     for code in list(language_names):
         canonical = canonical_lang_code(code)
-        if canonical in reference:
+        # Validity is a property of the code, not of the current locale's
+        # translation coverage, so the reference table is what decides it —
+        # otherwise a valid /T code is refused just because the user's locale
+        # has no name for it, and upload rejects the book with "'ell' is not
+        # a valid language". The locale table is still consulted so a code it
+        # somehow carries that the reference lacks stays accepted.
+        if canonical in names or canonical in reference:
             if canonical not in lang:
                 lang.append(canonical)
             language_names.remove(code)

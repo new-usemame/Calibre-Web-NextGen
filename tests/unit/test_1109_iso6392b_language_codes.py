@@ -55,13 +55,24 @@ def test_alias_targets_resolve_through_the_language_backend():
     This one runs on either backend: every /T target must resolve through the
     module's own ``get()``, and no /B code may — if a /B code resolved
     directly, it would not need aliasing and the table entry would be wrong.
+
+    The *miss* is asserted semantically rather than as a specific exception.
+    pycountry's wrapper happens to raise AttributeError (it calls
+    _copy_fields(None)), but iso-639 is free to return None or raise
+    KeyError, and pinning one backend's failure mode would make this the
+    pycountry-only test it claims not to be.
     """
+    def resolves(code):
+        try:
+            return bool(getattr(isoLanguages.get(part3=code), "name", None))
+        except Exception:
+            return False
+
     for b_code, t_code in isoLanguages.ISO6392B_TO_T.items():
-        record = isoLanguages.get(part3=t_code)
-        assert getattr(record, "name", None), \
+        assert resolves(t_code), \
             f"/T target {t_code!r} does not resolve through the backend"
-        with pytest.raises(AttributeError):
-            isoLanguages.get(part3=b_code)
+        assert not resolves(b_code), \
+            f"/B code {b_code!r} resolves directly, so it does not need aliasing"
 
 
 def test_iso6392b_table_is_not_self_mapping():
@@ -258,20 +269,26 @@ def test_canonical_lang_code_maps_bibliographic():
     assert isoLanguages.canonical_lang_code("ger") == "deu"
 
 
-def test_validator_normalizes_through_canonical_lang_code(monkeypatch):
-    """The normalizer must be the one the validator actually uses.
+def test_normalization_precedes_the_locale_table_lookup(monkeypatch):
+    """A /B key in a locale table must not capture the code before aliasing.
 
-    A public helper that duplicates a lookup the production path does inline
-    is dead code that can silently drift from it. Patching the helper must
-    therefore change what the validator stores.
+    The shipped tables are /T-only, so this is about not silently depending on
+    that. If the locale lookup ran first and only the leftovers were aliased,
+    a table that ever gained a "ger" key would store 'ger' verbatim — a code
+    the rest of the stack cannot render — and a book declaring both forms
+    would store two rows for one language instead of de-duplicating.
     """
     monkeypatch.setattr(
-        isoLanguages, "canonical_lang_code", lambda code: "eng"
+        isoLanguages, "get_language_names",
+        lambda locale: {"ger": "German (B)", "deu": "German (T)"},
     )
-    remainder = []
-    out = isoLanguages.get_valid_language_codes_from_code("en", ["ger"], remainder)
-    assert out == ["eng"], "validator does not route through canonical_lang_code"
-    assert remainder == []
+    for order in (["ger", "deu"], ["deu", "ger"], ["ger"]):
+        remainder = []
+        out = isoLanguages.get_valid_language_codes_from_code(
+            "en", list(order), remainder
+        )
+        assert out == ["deu"], f"{order} stored {out!r}, expected ['deu']"
+        assert remainder == []
 
 
 # --------------------------------------------------------------------------
@@ -298,3 +315,106 @@ def test_present_and_non_empty_entry_resolves():
 def test_canonical_lang_code_passes_through_everything_else():
     for code in ("deu", "eng", "", "totallymadeupcode"):
         assert isoLanguages.canonical_lang_code(code) == code
+
+
+# --------------------------------------------------------------------------
+# The invariant that makes _reference_language_codes() a valid oracle.
+# --------------------------------------------------------------------------
+
+def test_reference_table_is_the_superset_of_every_locale():
+    """Validation resolves against the reference table, so it must not be
+    possible for a locale to know a code the reference does not.
+
+    If a future translation adds a code to, say, `de` but not `en`, the
+    reference stops being an oracle and this fails rather than silently
+    narrowing what uploads accept.
+    """
+    from cps.iso_language_names import LANGUAGE_NAMES
+
+    reference = set(isoLanguages._reference_language_codes())
+    for locale, table in LANGUAGE_NAMES.items():
+        extra = set(table) - reference
+        assert not extra, \
+            f"locale {locale!r} carries codes absent from the reference: {sorted(extra)}"
+
+
+# --------------------------------------------------------------------------
+# The real caller. get_valid_language_codes_from_code() is only reachable in
+# production through edit_book_languages(upload_mode=True), which is where
+# remainder becomes the ValueError the reporter saw. Pinning the helper alone
+# would let a refactor stop passing upload_mode, swap to the name parser, or
+# mishandle the remainder loop with every helper test still green.
+# --------------------------------------------------------------------------
+
+def _import_editbooks():
+    import cps.editbooks as editbooks
+    return editbooks
+
+
+def _upload_languages(locale, languages):
+    """Drive edit_book_languages(upload_mode=True); return stored lang codes.
+
+    Everything past the validation branch (the filter-language fixup, the
+    session write) is mocked out — this pins the accept/reject boundary, not
+    the DB layer.
+    """
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock, patch
+
+    editbooks = _import_editbooks()
+    book = SimpleNamespace(id=1, languages=[])
+    captured = {}
+
+    def fake_modify(input_l, db_field, db_type, session, db_name):
+        captured["langs"] = list(input_l)
+        return True
+
+    user = MagicMock()
+    user.filter_language.return_value = "all"
+
+    with patch.object(editbooks, "get_locale", lambda: locale), \
+            patch.object(editbooks, "current_user", user), \
+            patch.object(editbooks, "calibre_db", MagicMock()), \
+            patch.object(editbooks, "modify_database_object", fake_modify), \
+            patch.object(editbooks, "log", MagicMock()):
+        editbooks.edit_book_languages(languages, book, upload_mode=True)
+    return captured.get("langs", [])
+
+
+def test_upload_accepts_greek_under_a_locale_missing_the_name():
+    """#1109's upload half, at the boundary that actually raised.
+
+    'ell' is absent from the pt_BR name table, so validating against that
+    table dropped it into remainder and edit_book_languages turned it into
+    ValueError("'ell' is not a valid language") — a Greek book refused for a
+    Brazilian-Portuguese user and imported fine for an English one.
+    """
+    assert _upload_languages("pt_BR", "ell") == ["ell"]
+
+
+def test_upload_accepts_bibliographic_code_and_stores_terminological():
+    assert _upload_languages("en", "ger") == ["deu"]
+
+
+def test_upload_dedupes_a_book_declaring_both_forms():
+    assert _upload_languages("en", "ger,deu") == ["deu"]
+
+
+def test_upload_still_rejects_a_genuinely_invalid_code():
+    """The permissive change must not turn the validator into a rubber stamp."""
+    with pytest.raises(ValueError):
+        _upload_languages("pt_BR", "zzz")
+
+
+def test_unknown_locale_does_not_crash_the_validator():
+    """get_language_names() is documented to return None for an unrecognised
+    locale, and get_language_name() has always guarded that. The validator did
+    not, so the same input raised AttributeError on None.items() and 500'd the
+    request. Validity does not depend on the locale table, so the book imports.
+    """
+    remainder = []
+    out = isoLanguages.get_valid_language_codes_from_code(
+        "xx_YY", ["ger", "eng", "zzz"], remainder
+    )
+    assert out == ["deu", "eng"]
+    assert remainder == ["zzz"]

@@ -29,7 +29,14 @@ end
 -- Verbatim slice of the shipped function. Every nested block in main.lua is
 -- indented, so the first column-zero `end` closes it.
 local function loadProductionFunction(env)
-    local f = assert(io.open("../main.lua", "r"), "cannot read ../main.lua")
+    -- Resolved through package.path (set above) rather than a literal "../",
+    -- so this runs from the plugin dir and from tests/ alike -- the same way
+    -- sync_logic_test.lua and device_annotations_test.lua locate their modules.
+    -- A hardcoded relative path passes only from tests/ and fails elsewhere
+    -- with "cannot read", which reads like a missing file rather than a cwd.
+    local main_path = assert(package.searchpath("main", package.path),
+        "cannot locate main.lua via package.path")
+    local f = assert(io.open(main_path, "r"), "cannot read " .. main_path)
     local source = f:read("*a")
     f:close()
 
@@ -51,7 +58,13 @@ end
 -- PATH it hashed are both assertable.
 local function newEnv(opts)
     opts = opts or {}
-    local calls = { hashed = {}, sidecar_opened = {}, ui_sidecar_reads = 0 }
+    local calls = {
+        hashed = {},
+        sidecar_opened = {},
+        ui_sidecar_reads = 0,
+        samples = {}, -- every {offset, size} the sampler asked for, in order
+        closes = 0,
+    }
 
     local env = {
         pcall = pcall,
@@ -60,18 +73,48 @@ local function newEnv(opts)
         io = {
             open = function(path)
                 table.insert(calls.hashed, path)
-                if not opts.io_bytes then
+                -- io_empty opens successfully and reads EOF at every offset:
+                -- a zero-byte file, which is NOT the same as an unopenable one.
+                if not opts.io_bytes and not opts.io_empty and not opts.io_every then
                     return nil
                 end
                 local pos = 0
                 return {
-                    seek = function(_, _, offset) pos = offset; return offset end,
-                    read = function() return pos == 0 and opts.io_bytes or nil end,
-                    close = function() end,
+                    seek = function(_, _, offset)
+                        if opts.throw_at_offset and offset == opts.throw_at_offset then
+                            error("SD card detached")
+                        end
+                        pos = offset
+                        return offset
+                    end,
+                    read = function(_, size)
+                        table.insert(calls.samples, { offset = pos, size = size })
+                        if opts.io_empty then
+                            return nil
+                        end
+                        -- io_every keeps the loop running to its full extent so
+                        -- every sampled offset is observable; io_bytes stops it
+                        -- at the first empty read, one offset in.
+                        if opts.io_every then
+                            return opts.io_every
+                        end
+                        return pos == 0 and opts.io_bytes or nil
+                    end,
+                    close = function() calls.closes = calls.closes + 1 end,
                 }
             end,
         },
-        bit = { lshift = function(a, b) return b < 0 and 0 or a end },
+        -- LuaJIT semantics, which the sampler's offsets depend on and the
+        -- server mirrors: only the low 5 bits of the shift count are used and
+        -- the result wraps to 32 bits, so lshift(1024, -2) is 0, not 1024.
+        -- The previous stub returned the operand unshifted, which made every
+        -- offset look like 1024 and pinned nothing.
+        bit = {
+            lshift = function(a, b)
+                local masked = b % 32
+                return (a * 2 ^ masked) % 2 ^ 32
+            end,
+        },
         md5 = function(s) return "io-fallback:" .. s end,
         util = {},
         SyncLogic = SyncLogic,
@@ -195,6 +238,62 @@ local function testInlineSamplerIsUsedWhenPartialMD5IsAbsent()
     assertEqual(calls.ui_sidecar_reads, 0, "the sampler still beats the cache")
 end
 
+-- The sampler's offsets ARE the digest. If they drift, every digest this
+-- device reports stops matching the server's and sync breaks for everyone on a
+-- build without util.partialMD5 -- silently, because the value still looks like
+-- a hash. The expected sequence is KOReader's, mirrored by the server in
+-- cps/progress_syncing/checksums/koreader.py.
+local function testInlineSamplerReadsKOReaderOffsets()
+    -- Every read returns bytes, so the loop runs to its full extent and all
+    -- twelve offsets are observable. A stub that answers only at offset 0 stops
+    -- the loop after one sample and pins nothing beyond it.
+    local value, calls = digest({ current_file = "/b.epub", io_every = "X" })
+
+    local expected = {
+        0, 1024, 4096, 16384, 65536, 262144,
+        1048576, 4194304, 16777216, 67108864, 268435456, 1073741824,
+    }
+    assertEqual(#calls.samples, #expected, "the sampler takes exactly 12 samples")
+    for i, sample in ipairs(calls.samples) do
+        assertEqual(sample.offset, expected[i], "sample " .. i .. " offset")
+        assertEqual(sample.size, 1024, "sample " .. i .. " reads exactly 1 KiB")
+    end
+    assertEqual(value, "io-fallback:" .. string.rep("X", #expected),
+        "the digest covers every sample, in order")
+end
+
+-- Sampling must stop at the first empty read rather than walking all twelve
+-- offsets past the end of a short file.
+local function testInlineSamplerStopsAtEOF()
+    local _, calls = digest({ current_file = "/b.epub", io_bytes = "BYTES" })
+    assertEqual(#calls.samples, 2, "a short file stops at the first empty read")
+    assertEqual(calls.samples[1].offset, 0, "first sample is the file head")
+end
+
+-- The whole point of #991 is never reporting bytes we do not hold. A zero-byte
+-- file is readable, so it has a real digest -- the server returns md5("") for
+-- it -- and must not be answered from the stale sidecar.
+local function testEmptyFileHashesRatherThanFallingBackToSidecar()
+    local value, calls = digest({
+        current_file = "/empty.epub", io_empty = true, ui_sidecar = "stale",
+    })
+    assertEqual(value, "io-fallback:", "a zero-byte file hashes to md5 of no bytes")
+    assertEqual(calls.ui_sidecar_reads, 0, "the empty file still beats the cache")
+end
+
+-- A card yanked mid-hash must not strand the descriptor: bulk pull runs this
+-- once per book, so a leak per book exhausts the device.
+local function testHandleIsClosedWhenHashingThrows()
+    local value, calls = digest({
+        current_file = "/b.epub",
+        io_bytes = "BYTES",
+        throw_at_offset = 1024,
+        ui_sidecar = "cached",
+    })
+    assertEqual(calls.closes, 1, "the file handle is closed even when seek throws")
+    assertEqual(value, "cached", "a throwing hash falls back to the cache")
+end
+
 -- A broken docsettings module must not take the sync down.
 local function testMissingDocSettingsModuleIsSurvivable()
     local value = digest({
@@ -203,6 +302,10 @@ local function testMissingDocSettingsModuleIsSurvivable()
     assertEqual(value, nil, "an unavailable docsettings module resolves to nil")
 end
 
+testInlineSamplerReadsKOReaderOffsets()
+testInlineSamplerStopsAtEOF()
+testEmptyFileHashesRatherThanFallingBackToSidecar()
+testHandleIsClosedWhenHashingThrows()
 testStaleSidecarLosesToTheFile()
 testAccurateSidecarIsANoOp()
 testUnhashableFileFallsBackToSidecar()

@@ -625,29 +625,43 @@ function CWASync:getDocumentDigest(file_path)
                 return nil
             end
 
-            local step = 1024
-            local sample_size = 1024
-            local chunks = {}
-            for i = -1, 10 do
-                local position = bit.lshift(step, 2 * i)
-                local ok_seek = f:seek("set", position)
-                if not ok_seek then
-                    break
+            -- The handle is closed on every exit, not just the clean one. A
+            -- detached SD card makes seek/read throw mid-loop, and bulk library
+            -- pull runs this once per book, so a success-only close leaks one
+            -- descriptor per book until the device runs out.
+            local ok_hash, hashed = pcall(function()
+                local step = 1024
+                local sample_size = 1024
+                local chunks = {}
+                for i = -1, 10 do
+                    local position = bit.lshift(step, 2 * i)
+                    local ok_seek = f:seek("set", position)
+                    if not ok_seek then
+                        break
+                    end
+
+                    local sample = f:read(sample_size)
+                    if not sample or #sample == 0 then
+                        break
+                    end
+                    chunks[#chunks + 1] = sample
                 end
 
-                local sample = f:read(sample_size)
-                if not sample or #sample == 0 then
-                    break
-                end
-                chunks[#chunks + 1] = sample
-            end
-            f:close()
+                -- Hash whatever was sampled, including nothing. The server's
+                -- calculate_koreader_partial_md5 breaks out of this same loop
+                -- and returns md5("") for a zero-byte file rather than None
+                -- (cps/progress_syncing/checksums/koreader.py), so returning
+                -- nil here would drop us onto the stale sidecar and reproduce
+                -- #991 for exactly the file the server can still resolve.
+                return md5(table.concat(chunks))
+            end)
 
-            if #chunks == 0 then
-                return nil
-            end
+            pcall(f.close, f)
 
-            return md5(table.concat(chunks))
+            if ok_hash then
+                return hashed
+            end
+            return nil
         end, file_path)
 
         if ok and result and result ~= "" then

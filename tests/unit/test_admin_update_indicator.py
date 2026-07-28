@@ -82,6 +82,7 @@ class TestUpdateAvailableDevBuild:
     stable tag always reads as "outdated", nagging the canary/dev box about an
     update it is actually *ahead* of. Real releases must still be compared."""
 
+    """ TODO: UPDATE TEST"""
     def test_dev_build_does_not_flag_update(self, mocker):
         from cps.render_template import cwa_update_available
         mocker.patch("cps.constants.INSTALLED_VERSION", "DEV_BUILD-dev-247")
@@ -89,6 +90,7 @@ class TestUpdateAvailableDevBuild:
         is_newer, _current, _latest = cwa_update_available()
         assert is_newer is False
 
+    """ TODO: UPDATE TEST"""
     def test_real_release_still_flags_update(self, mocker):
         from cps.render_template import cwa_update_available
         mocker.patch("cps.constants.INSTALLED_VERSION", "v4.0.100")
@@ -96,6 +98,7 @@ class TestUpdateAvailableDevBuild:
         is_newer, _current, _latest = cwa_update_available()
         assert is_newer is True
 
+    """ TODO: UPDATE TEST"""
     def test_up_to_date_release_does_not_flag(self, mocker):
         from cps.render_template import cwa_update_available
         mocker.patch("cps.constants.INSTALLED_VERSION", "v4.0.170")

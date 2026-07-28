@@ -25,6 +25,7 @@ import sys
 sys.path.insert(1, '/app/calibre-web-automated/scripts/')
 from cwa_db import CWA_DB
 
+import requests
 
 log = logger.create()
 
@@ -185,8 +186,14 @@ def get_sidebar_config(kwargs=None):
 # Checks if an update for CWA is available, returning True if yes
 def cwa_update_available() -> tuple[bool, str, str]:
     try:
+        def _last_release_version_number() -> str:
+            release_repo = "new-usemame/Calibre-Web-NextGen"
+            release_api_url = f"https://api.github.com/repos/{release_repo}/releases/latest"
+            data = requests.get(release_api_url, timeout=5).json()
+            return data["tag_name"]
+
         current_version = constants.INSTALLED_VERSION
-        tag_name = constants.STABLE_VERSION
+        tag_name = _last_release_version_number()
 
         def _normalize_version(value: str) -> str:
             return (value or "").lstrip("vV")

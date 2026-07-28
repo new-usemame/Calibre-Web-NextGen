@@ -332,7 +332,13 @@ jobs:
           # busy main does not make every PR look like it touched everything.
           files="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" || git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
           echo "$files"
-          if echo "$files" | grep -qE '^(frontend/|cps/static/app/)'; then
+          # tests.yml itself counts: the e2e job's container setup and seed steps
+          # live in this file, so a PR that changes how the harness is fixtured
+          # could not otherwise be validated by the harness. That is how a broken
+          # seed (config_remote_login left at its default False, so every
+          # magic-link spec 403'd) stayed invisible — the fix for a red e2e gate
+          # would not have run the e2e gate.
+          if echo "$files" | grep -qE '^(frontend/|cps/static/app/|\.github/workflows/tests\.yml$)'; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
             echo "frontend=false" >> "$GITHUB_OUTPUT"
@@ -553,6 +559,59 @@ jobs:
             | python3 -c 'import sys,json;d=json.load(sys.stdin);print(len(d.get("items",[])))' 2>/dev/null || echo 0)
           echo "series now: $series_count"
           [ "${series_count:-0}" -ge 1 ] || { echo "::error::no series after seeding"; exit 1; }
+
+      - name: Enable magic-link login (spec fixture)
+        run: |
+          # login-redirect.spec.ts drives a REAL magic-link flow: it POSTs
+          # /api/v1/auth/magic-link/start logged-out and asserts the response is
+          # 2xx. That endpoint is gated on the admin toggle config_remote_login,
+          # which is `default=False` in cps/config_sql.py — so a fresh container
+          # answers 403 magic_link_disabled and the spec fails on the FIXTURE,
+          # not on the product. It failed that way on every branch, including a
+          # CHANGELOG-only one, which is how a permanently-red advisory gate got
+          # normalised. Same class as the missing shelves (#1130) and the missing
+          # series above: a gate that depends on the seed happening to contain
+          # the right shape of data is not a gate.
+          #
+          # sp2-display-options.spec.ts does not need this — it mocks
+          # /auth/config at the network layer and never reaches the endpoint.
+          jar=$(mktemp)
+          csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
+          curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
+            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
+            -d '{"username":"admin","password":"admin123"}' -o /dev/null
+          csrf=$(curl -s -b "$jar" -c "$jar" http://localhost:8083/api/v1/auth/csrf \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
+          code=$(curl -s -o /tmp/sec.json -w '%{http_code}' \
+            -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/admin/security \
+            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
+            -d '{"remote_login": true}')
+          echo "  enable remote_login -> $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::could not enable remote_login (HTTP $code)"; cat /tmp/sec.json; exit 1
+          fi
+          enabled=$(curl -s -b "$jar" http://localhost:8083/api/v1/admin/security \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin).get("remote_login"))')
+          echo "remote_login now: $enabled"
+          [ "$enabled" = "True" ] || { echo "::error::remote_login still $enabled after seeding"; exit 1; }
+
+          # Assert the thing the spec actually depends on, from a LOGGED-OUT
+          # session, so a future regression fails loudly here instead of
+          # resurfacing as a confusing spec failure 15 minutes later.
+          anon=$(mktemp)
+          acsrf=$(curl -s -c "$anon" http://localhost:8083/api/v1/auth/csrf \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
+          code=$(curl -s -o /tmp/ml.json -w '%{http_code}' \
+            -b "$anon" -c "$anon" -X POST http://localhost:8083/api/v1/auth/magic-link/start \
+            -H 'Content-Type: application/json' -H "X-CSRFToken: $acsrf")
+          echo "  anonymous magic-link/start -> $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::magic-link/start returns $code for a logged-out client — login-redirect.spec.ts cannot pass"
+            cat /tmp/ml.json; exit 1
+          fi
+          python3 -c 'import json,sys; d=json.load(open("/tmp/ml.json")); sys.exit(0 if d.get("verify_url") else 1)' \
+            || { echo "::error::magic-link/start returned 200 with no verify_url"; cat /tmp/ml.json; exit 1; }
 
       - name: Install Playwright
         working-directory: frontend

@@ -25,6 +25,11 @@ export interface CatalogSnapshot {
   searchInput: string;
   sort: string;
   readFilter: string;
+  /** True when only the server can decide what belongs in this listing — a
+   *  search, an entity page, a discovery view, or the saved default filter.
+   *  An edit can change membership there, so the snapshot is dropped rather
+   *  than patched (see applyBookEditToCache). */
+  membershipFiltered: boolean;
 }
 
 const _cache = new Map<string, CatalogSnapshot>();
@@ -53,5 +58,29 @@ export function removeBookFromCache(id: number): void {
   for (const snap of _cache.values()) {
     const filtered = snap.books.filter((b) => b.id !== id);
     if (filtered.length !== snap.books.length) snap.books = filtered;
+  }
+}
+
+/** Apply a metadata EDIT to the cached snapshots. An edit is not a delete: the
+ *  book still exists, so removeBookFromCache is the wrong tool for it (#1169).
+ *  Evicting an edited book leaves it to the refetch to reappear, and the grid's
+ *  merge only upserts or appends — so a book that was first in the listing came
+ *  back as the last card of everything loaded, which from the top of the grid
+ *  reads as "it disappeared".
+ *
+ *  Where membership is fixed (the plain library), patch the book in place: the
+ *  card shows the edit immediately and keeps its position, including on pages
+ *  the catalog won't re-request. Where only the server can decide membership
+ *  (search / entity / discovery / saved filter), the edit may genuinely have
+ *  moved the book out of the listing and no client-side merge can tell — drop
+ *  that snapshot so the view rebuilds from page 1 on the next visit. */
+export function applyBookEditToCache(id: number, patch: Partial<Book>): void {
+  for (const [key, snap] of [..._cache]) {
+    if (snap.membershipFiltered) {
+      _cache.delete(key);
+      continue;
+    }
+    if (!snap.books.some((b) => b.id === id)) continue;
+    snap.books = snap.books.map((b) => (b.id === id ? { ...b, ...patch } : b));
   }
 }

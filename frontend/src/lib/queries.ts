@@ -4,10 +4,10 @@ import {
   navigateToLogout, noteSessionIdentity,
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
-import { removeBookFromCache } from './scrollCache';
+import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import type { MetadataProvider, MetaSearchResponse } from './api';
 import type {
-  Me, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
+  Me, Book, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
   SearchOptions, AdvancedSearchParams, AdvSearchResult, Account, ProfileUpdate,
   BookMetadata, MetadataUpdate, UploadResult, AdminUser, AboutInfo, TaskItem, AuthConfig,
 } from './api';
@@ -651,6 +651,30 @@ export function useBookMetadata(id: string | number) {
   });
 }
 
+/** The list-item fields a metadata edit can change, in the shape the catalog
+ *  grid holds them. The editable-metadata endpoint returns authors '&'-joined
+ *  and tags comma-separated, and the save path splits the submitted strings the
+ *  same way (cps/editbooks.py), so mirroring that split here reproduces what the
+ *  next list fetch would return rather than guessing at it.
+ *
+ *  Only fields the payload actually carries are patched: a partial response
+ *  must not blank a card's authors or tags on its way past. */
+function bookFieldsFromMetadata(m: BookMetadata): Partial<Book> {
+  const names = (value: string, sep: string) =>
+    value.split(sep).map((s) => s.trim()).filter(Boolean);
+  const patch: Partial<Book> = {};
+  if (typeof m.title === 'string') patch.title = m.title;
+  if (typeof m.authors === 'string') patch.authors = names(m.authors, '&');
+  if (typeof m.tags === 'string') patch.tags = names(m.tags, ',');
+  if (typeof m.series === 'string') {
+    patch.series = m.series || null;
+    const raw = String(m.series_index ?? '').trim();
+    const index = raw === '' ? NaN : Number(raw);
+    patch.series_index = m.series && Number.isFinite(index) ? index : null;
+  }
+  return patch;
+}
+
 export function useUpdateMetadata(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
@@ -659,11 +683,16 @@ export function useUpdateMetadata(id: string | number) {
       qc.setQueryData(['metadata', String(id)], data);
       // The detail/catalog views show the same fields — refresh them.
       void qc.invalidateQueries({ queryKey: ['book', String(id)] });
-      // A title/author edit can make this book stop matching both a restored
-      // catalog snapshot and react-query's retained page for that search. Drop
-      // both layers: otherwise the retained page is replayed on remount and
-      // dedupAppend re-adds the stale card before the refetch can return empty.
-      removeBookFromCache(Number(id));
+      // Carry the edit into any cached catalog snapshot. This used to evict the
+      // book outright, which is what a DELETE needs but not an edit: the book
+      // still exists, and the grid's merge only upserts or appends, so an
+      // evicted book returned as the last card of everything loaded — reported
+      // as "items disappear from results after edit" (#1169).
+      applyBookEditToCache(Number(id), bookFieldsFromMetadata(data));
+      // A title/author edit can make this book stop matching react-query's
+      // retained page for an active search. Drop those pages rather than
+      // invalidate: a retained page is replayed on remount and the merge would
+      // re-add the stale card before the refetch could return without it.
       qc.removeQueries({ queryKey: ['books'] });
     },
   });

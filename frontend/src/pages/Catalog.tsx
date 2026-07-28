@@ -424,8 +424,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   // Persist this catalog's state on unmount (e.g. navigating into a book) so a
   // later Back rehydrates the loaded pages, filters and scroll position (#578).
-  const persistRef = useRef({ page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter });
-  persistRef.current = { page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter };
+  // Whether this listing's contents are the server's call — a search, an entity
+  // page, a discovery view or the saved default filter. Recorded on the snapshot
+  // so an edit elsewhere in the app knows whether it may patch a book in place
+  // or has to let the view rebuild (#1169). Computed here because this is where
+  // the knowledge lives.
+  const membershipFiltered = !!search || !!entityKind || !!view || filterActive;
+  const persistRef = useRef({ page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter, membershipFiltered });
+  persistRef.current = { page, books: allBooks, resetKey: accKeyRef.current, search, searchInput, sort, readFilter, membershipFiltered };
 
   // Track the live scroll offset in a ref. Reading window.scrollY in the unmount
   // cleanup is too late: by then the catalog has been swapped for the (shorter)

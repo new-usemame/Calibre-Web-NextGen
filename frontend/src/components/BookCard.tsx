@@ -140,27 +140,30 @@ export function BookCard({
     );
   }
 
-  // Browse mode: the card is a single link. Action buttons are SIBLINGS of the
-  // link (never nested inside <a> — that's invalid + a second tab stop),
-  // absolutely positioned over the cover by .wrap.
+  // Browse mode: the card is a single link. Action controls are SIBLINGS of the
+  // link (never nested inside <a> — that's invalid + a second tab stop).
+  //
+  // The read + edit controls share one flex row in NORMAL FLOW below the
+  // metadata (#1166). They used to be absolutely positioned over the bottom of
+  // the card, with room for the pencil reserved as fixed padding on the label
+  // (#1112) — which holds only while the card is wider than the reservation. On
+  // a 4-column phone grid the card is ~80px and the reservation 60px, so the
+  // label wrapped to two lines, the row grew, and the 44px pencil rose into the
+  // series line. Reported by rogovmtlz, @iroQuai and @HLRobius.
+  //
+  // A real row lets the browser allocate the space instead of the stylesheet
+  // guessing at it, so a control can no longer land on top of card text at any
+  // width, density or locale — the same "impossible by construction" move the
+  // badge row above makes. `.removeBtn` stays absolute: it belongs to the cover,
+  // not to this row.
+  const hasActionRow = Boolean(readTarget) || quickEdit;
+
   return (
     <div className={styles.wrap} style={style}>
       <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
         {cover}
         {info}
       </Link>
-      {readTarget && (
-        <Link
-          href={readTarget}
-          // Reserve the bottom-right corner only when the pencil is actually
-          // rendered there, so cards without edit permission keep a centred
-          // label (#1112).
-          className={quickEdit ? `${styles.readNow} ${styles.readNowInset}` : styles.readNow}
-          aria-label={t('Read {title}', { title: book.title })}
-        >
-          <BookOpen size={15} aria-hidden="true" focusable={false} /> {t('Read now')}
-        </Link>
-      )}
       {onRemove && (
         <button
           type="button"
@@ -171,21 +174,38 @@ export function BookCard({
           <X size={14} strokeWidth={3} aria-hidden="true" />
         </button>
       )}
-      {quickEdit && (
-        <Link
-          href={`/book/${book.id}/edit`}
-          className={styles.quickEditBtn}
-          aria-label={t('Edit {title}', { title: book.title })}
-          // The pencil is a SIBLING of the card link (never nested in an <a>),
-          // so a click can't bubble to the card's own navigation — stopPropagation
-          // keeps that invariant explicit if the layout is ever re-nested.
-          // wouter's <Link> runs SPA navigation only on a plain left-click; on
-          // ⌘/ctrl/shift/alt-click it returns early without preventDefault, so the
-          // browser opens the edit page in a new tab natively (#798).
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Pencil size={13} strokeWidth={2.5} aria-hidden="true" />
-        </Link>
+      {hasActionRow && (
+        <div className={quickEdit ? `${styles.actionRow} ${styles.actionRowEdit}` : styles.actionRow}>
+          {readTarget && (
+            <Link
+              href={readTarget}
+              className={styles.readNow}
+              aria-label={t('Read {title}', { title: book.title })}
+            >
+              <BookOpen size={15} aria-hidden="true" focusable={false} />
+              {/* The text is a span so a narrow card can drop the wording and
+                  keep the icon, rather than ellipsising it to "R…". The
+                  aria-label above still names the action either way. */}
+              <span className={styles.readNowLabel}>{t('Read now')}</span>
+            </Link>
+          )}
+          {quickEdit && (
+            <Link
+              href={`/book/${book.id}/edit`}
+              className={styles.quickEditBtn}
+              aria-label={t('Edit {title}', { title: book.title })}
+              // The pencil is a SIBLING of the card link (never nested in an <a>),
+              // so a click can't bubble to the card's own navigation — stopPropagation
+              // keeps that invariant explicit if the layout is ever re-nested.
+              // wouter's <Link> runs SPA navigation only on a plain left-click; on
+              // ⌘/ctrl/shift/alt-click it returns early without preventDefault, so the
+              // browser opens the edit page in a new tab natively (#798).
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Pencil size={13} strokeWidth={2.5} aria-hidden="true" />
+            </Link>
+          )}
+        </div>
       )}
     </div>
   );

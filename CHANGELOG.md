@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The edit pencil no longer sits on top of a book's series or author line, and "Read now" no longer breaks across two lines on a phone.** The bottom of each book card wasn't a real layout: the pencil floated over the card and room for it was reserved by padding the "Read now" label. That works only while the card is wider than the space being reserved — on a phone in Compact or Dense view the card is around 82–106 pixels and the reservation alone was 60, so the label wrapped, the row grew, and the pencil rode up into the line above it. Books with no readable format had no "Read now" at all, so the pencil landed directly on the series. The two controls now share one row, sized by the browser rather than guessed at, and on the narrowest cards the pencil scales down and the label gives way to its icon instead of being squeezed. Reported by rogovmtlz on Discord, [@iroQuai](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1166) and [@HLRobius](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1166) ([#1166](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1166), [#1112](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1112)).
+
 ## [v4.1.22] - 2026-07-27
 
 ### Changed

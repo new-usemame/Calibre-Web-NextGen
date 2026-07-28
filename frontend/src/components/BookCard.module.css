@@ -5,6 +5,13 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  /* Named query container so the action row can respond to the CARD's width
+     rather than the viewport's (#1166) — the same card renders at 82px in a
+     dense phone grid and at 260px in search results on the same screen.
+     Safe here because every consumer sizes the card from the outside (a grid
+     track, or the rails' explicit 132px/116px `.item`), so nothing depends on
+     the card's contents to establish its own inline size. */
+  container: book-card / inline-size;
 }
 
 /* The single focusable control (a <Link> or a toggle <button>). */
@@ -246,13 +253,11 @@
   border-color: var(--danger);
 }
 
-/* Quick-edit pencil (fork #572): bottom-right so it never overlaps the read
-   badge (top-right) or the remove control (top-left). Hover/focus-reveal like
-   the remove button, but always reachable via keyboard focus. */
+/* Quick-edit pencil (fork #572). Lives in `.actionRow`, in normal flow beside
+   the read link — NOT absolutely positioned over the card (#1166). Hover/
+   focus-reveal like the remove button, but always reachable via keyboard focus. */
 .quickEditBtn {
-  position: absolute;
-  bottom: var(--sp-2);
-  right: var(--sp-2);
+  flex: 0 0 auto;
   width: 24px;
   height: 24px;
   border-radius: var(--r-full);
@@ -281,27 +286,35 @@
   border-color: var(--accent);
 }
 
-/* The pencil floats over the bottom-right corner while .readNow spans the full
-   card width, so a centred label runs underneath it. Measured at 360px in a
-   touch context: 52px of the label sat under the button, clipping the tail of
-   "Read now" (#1112, reported by @Andrew-H2O). On touch it is always visible —
-   the coarse-pointer block below sets both to opacity 1 — so this is the
-   default state on a phone, not a hover edge case.
+/* The card's bottom action row: read link + edit pencil, side by side in normal
+   flow (#1166).
 
-   Reserve the corner rather than moving the label. Left-aligning it (the
-   reporter's suggestion) still collides once the title's button label is long,
-   and it changes the look on desktop where nothing collides. Padding keeps the
-   label centred within the space actually available.
+   This replaces the reserved-corner approach from #1112, where the pencil was
+   absolutely positioned over the bottom-right and `.readNow` carried a fixed
+   `padding-right: calc(44px + sp-2 * 2)` to keep its label clear of it.
+   Reserving space works only while the card is wider than the reservation. On
+   the 4-column 375px grid the card is ~80px and the reservation 60px, leaving
+   the label ~20px: it wrapped to two lines, which grew the row, which pushed
+   the 44px pencil (bottom: 8px, so top at wrap.bottom - 52) up through the
+   44px label band and into the series line above.
 
-   Only applied when the pencil is rendered, so a card without edit permission
-   keeps a truly centred label. */
-.readNowInset {
-  padding-right: calc(24px + var(--sp-2) * 2);
+   A flex row makes the browser allocate the width, so no control can sit on
+   card text at any width, density or locale. Measured at 375px dense before the
+   fix: 8px of the pencil over the series/author line on every card with an edit
+   control; after: 0. */
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: auto;
 }
 
 .readNow {
+  /* Takes the space the pencil does not. min-width: 0 lets it actually shrink
+     inside the flex row instead of forcing the row wider than the card. */
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 32px;
-  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -311,8 +324,20 @@
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   text-decoration: none;
+  /* One line, always. Two-line labels are what grew the row into the metadata. */
+  white-space: nowrap;
+  overflow: hidden;
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.readNow svg {
+  flex: 0 0 auto;
+}
+
+.readNowLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .wrap:hover .readNow,
@@ -330,13 +355,34 @@
      case the reporter was describing. */
   .readBadge, .hiddenBadge { min-height: 28px; font-size: var(--fs-sm); }
   .seriesBadge { min-width: 28px; height: 28px; font-size: var(--fs-sm); }
-  /* The pencil grows to a 44px touch target here, so the reserved corner has
-     to grow with it or the overlap comes straight back on the exact devices
-     where both controls are permanently visible. */
-  .readNowInset { padding-right: calc(44px + var(--sp-2) * 2); }
   .removeBtn, .quickEditBtn {
     width: 44px;
     height: 44px;
     opacity: 1;
   }
+}
+
+/* Narrow cards — the Compact and Dense grids, which are 3 and 4 columns on a
+   phone. Measured at 375px: comfortable 164px, compact 106px, dense 82px per
+   card. @HLRobius reported that the edit button "doesn't resize on mobile with
+   the different settings": a 44px control keeps its full size while the card
+   shrinks around it, so by Dense it is most of the card and the read label has
+   nowhere to go.
+
+   Scale the control with the card and drop the label wording, keeping the icon.
+   Queried on the card's own inline size rather than the viewport, because the
+   same BookCard renders in the catalog grid, shelves, search and the
+   "More by author" rail, each with its own column width at any given viewport
+   (the rails are a fixed 132px / 116px regardless of screen).
+
+   32px stays above the 24x24 CSS-px floor in WCAG 2.2 SC 2.5.8 Target Size
+   (Minimum, AA); the row keeps its 44px min-height, so the read link's touch
+   area is unchanged. */
+@container book-card (max-width: 132px) {
+  /* Only a row that also carries the pencil is tight enough to lose the
+     wording. A rail card at the same width has the whole row to itself, and
+     "Read now" fits there — hiding it would be a regression bought with a
+     threshold that has nothing to do with the rail. */
+  .actionRowEdit .readNowLabel { display: none; }
+  .removeBtn, .quickEditBtn { width: 32px; height: 32px; }
 }

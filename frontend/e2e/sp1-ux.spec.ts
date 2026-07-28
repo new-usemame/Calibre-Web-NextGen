@@ -54,7 +54,11 @@ test('grid keeps details and adds a direct reader action (#653)', async ({ page 
   const readHref = await read.getAttribute('href');
   expect(readHref).toMatch(/\/(read|view)\//);
 
-  const card = read.locator('..');
+  // Resolve the enclosing card by its wrapper rather than by a fixed number of
+  // `..` hops. The read link gained an action-row parent in #1166, and a
+  // parent-depth assumption fails the moment the card's internals move — which
+  // says nothing about whether the card still offers both actions.
+  const card = read.locator('xpath=ancestor::*[contains(@class,"wrap")][1]');
   const details = card.getByRole('link', { name: /^Open details for / });
   await expect(details).toBeVisible();
   await expect(details).toHaveAttribute('href', /\/book\//);

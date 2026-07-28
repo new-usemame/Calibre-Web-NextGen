@@ -421,9 +421,19 @@ instance, with Nginx:
 ```
 location /cwa/ {
     proxy_pass http://calibre-web-automated:8083/;
-    include proxy_params;
+
+    proxy_set_header Host              $http_host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
+
+The trailing slash on `proxy_pass` matters: it strips `/cwa/` before the request
+reaches CWA. The headers are written out rather than pulled in with
+`include proxy_params;` because that file ships with Debian and Ubuntu's nginx
+package only — the official `nginx` Docker images don't have it, and nginx
+refuses to start when the include is missing.
 
 You must also configure the application with the external URL prefix by setting
 the following environment variable in your Docker compose file:
@@ -433,8 +443,15 @@ environment:
   - PROXY_SCRIPT_NAME=/cwa
 ```
 
+Leave the trailing slash off `PROXY_SCRIPT_NAME` — CWA joins it to each path
+directly, so `/cwa/` would generate doubled-slash URLs.
+
 This ensures that CWA correctly generates URLs when it is served from the
 prefix path instead of the web server root.
+
+For TLS, upload limits, and the larger proxy buffers Kobo sync needs, see
+[`examples/nginx-reverse-proxy.conf`](examples/nginx-reverse-proxy.conf) — the
+settings there apply to a prefixed deployment too.
 
 ### Reverse proxy / Cloudflare Tunnel
 

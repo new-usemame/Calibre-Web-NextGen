@@ -158,11 +158,65 @@ local function testAnnotationIds()
     assertEqual(#SyncLogic.annotationIds(nil), 0, "nil list yields no ids")
 end
 
+-- #991: the reporter's device kept sending a digest for bytes it no longer had,
+-- so every re-download over OPDS registered one more digest it would never
+-- compute and the server answered "No book found for checksum" forever.
+local function testResolveDocumentDigest()
+    local function returns(value)
+        return function() return value end
+    end
+
+    -- The regression itself: the sidecar is stale because the file at that path
+    -- was replaced. The digest of the bytes we actually hold has to win.
+    assertEqual(
+        SyncLogic.resolveDocumentDigest(returns("fresh"), returns("stale")),
+        "fresh", "the digest computed from the file wins over a cached one")
+
+    -- Unchanged file: recomputing agrees with the cache, so nothing moves.
+    assertEqual(
+        SyncLogic.resolveDocumentDigest(returns("same"), returns("same")),
+        "same", "an accurate cache is indistinguishable from a recompute")
+
+    -- File missing/unreadable (detached SD card, deleted book): a stale digest
+    -- still beats no digest, since progress stored under it can round-trip.
+    assertEqual(
+        SyncLogic.resolveDocumentDigest(returns(nil), returns("cached")),
+        "cached", "the cache is used when the file cannot be hashed")
+
+    -- Hashing that throws must not take the sync down with it.
+    assertEqual(
+        SyncLogic.resolveDocumentDigest(function() error("unreadable") end, returns("cached")),
+        "cached", "a compute that errors falls back to the cache")
+    assertEqual(
+        SyncLogic.resolveDocumentDigest(returns("fresh"), function() error("no sidecar") end),
+        "fresh", "a cache read that errors does not discard a good digest")
+
+    -- Empty strings are absent values, not digests -- KOReader leaves "" in the
+    -- sidecar for documents it has not hashed yet.
+    assertEqual(
+        SyncLogic.resolveDocumentDigest(returns(""), returns("cached")),
+        "cached", "an empty computed digest is treated as absent")
+    assertEqual(
+        SyncLogic.resolveDocumentDigest(returns(""), returns("")),
+        nil, "two empty digests resolve to nothing")
+
+    -- Nothing available at all, and non-callable sources.
+    assertEqual(SyncLogic.resolveDocumentDigest(returns(nil), returns(nil)), nil,
+        "no digest anywhere resolves to nil")
+    assertEqual(SyncLogic.resolveDocumentDigest(nil, nil), nil,
+        "missing sources resolve to nil rather than erroring")
+
+    -- A non-string return (a table from a bad DocSettings read) is not a digest.
+    assertEqual(SyncLogic.resolveDocumentDigest(returns({}), returns("cached")),
+        "cached", "a non-string computed value is treated as absent")
+end
+
 testIsRemoteProgressFromThisDevice()
 testDidBookProgressChange()
 testMergeAnnotation()
 testDiffAnnotations()
 testComputeDeletions()
 testAnnotationIds()
+testResolveDocumentDigest()
 
 print("sync_logic tests passed")

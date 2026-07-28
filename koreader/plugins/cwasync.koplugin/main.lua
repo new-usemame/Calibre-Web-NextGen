@@ -27,7 +27,7 @@ end
 local CWASync = WidgetContainer:extend{
     name = "cwasync",
     title = _("Login to NextGen Server"),
-    version = "4.1.16",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
+    version = "4.1.23",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
 
     push_timestamp = nil,
     pull_timestamp = nil,
@@ -596,36 +596,29 @@ function CWASync:getCurrentDocumentFile()
     return nil
 end
 
+-- Resolve the digest the server keys this book's progress on. Precedence lives
+-- in SyncLogic.resolveDocumentDigest: the bytes on disk win, KOReader's cached
+-- sidecar value is only a fallback. See the comment there for why (#991).
 function CWASync:getDocumentDigest(file_path)
-    local digest = nil
-    if not file_path and self.ui and self.ui.doc_settings and self.ui.doc_settings.readSetting then
-        digest = self.ui.doc_settings:readSetting("partial_md5_checksum")
-    elseif file_path then
-        local ok, DocSettings = pcall(require, "docsettings")
-        if ok and DocSettings then
-            local ok_open, doc_settings = pcall(DocSettings.open, DocSettings, file_path)
-            if ok_open and doc_settings and doc_settings.readSetting then
-                digest = doc_settings:readSetting("partial_md5_checksum")
-            end
-        end
-    end
-
-    if digest and digest ~= "" then
-        return digest
-    end
-
+    -- When called without a path we are on the open document, whose settings are
+    -- already loaded; with a path we have to open that document's sidecar.
+    local settings_path = file_path
     if not file_path then
         file_path = self:getCurrentDocumentFile()
     end
 
-    if util.partialMD5 and file_path then
-        local ok, result = pcall(util.partialMD5, file_path)
-        if ok and result and result ~= "" then
-            return result
+    local function computeFromFile()
+        if not file_path then
+            return nil
         end
-    end
 
-    if file_path then
+        if util.partialMD5 then
+            local ok, result = pcall(util.partialMD5, file_path)
+            if ok and result and result ~= "" then
+                return result
+            end
+        end
+
         local ok, result = pcall(function(path)
             local f = io.open(path, "rb")
             if not f then
@@ -660,9 +653,32 @@ function CWASync:getDocumentDigest(file_path)
         if ok and result and result ~= "" then
             return result
         end
+
+        return nil
     end
 
-    return nil
+    local function readCachedDigest()
+        if not settings_path then
+            if self.ui and self.ui.doc_settings and self.ui.doc_settings.readSetting then
+                return self.ui.doc_settings:readSetting("partial_md5_checksum")
+            end
+            return nil
+        end
+
+        local ok, DocSettings = pcall(require, "docsettings")
+        if not (ok and DocSettings) then
+            return nil
+        end
+
+        local ok_open, doc_settings = pcall(DocSettings.open, DocSettings, settings_path)
+        if ok_open and doc_settings and doc_settings.readSetting then
+            return doc_settings:readSetting("partial_md5_checksum")
+        end
+
+        return nil
+    end
+
+    return SyncLogic.resolveDocumentDigest(computeFromFile, readCachedDigest)
 end
 
 function CWASync:getLibraryBookPaths()

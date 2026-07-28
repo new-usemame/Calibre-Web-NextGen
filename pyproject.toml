@@ -132,4 +132,4 @@ include-package-data = true
 license-files = ["LICENSE"]
 
 [tool.setuptools.dynamic]
-version = {attr = "calibreweb.cps.constants.STABLE_VERSION"}
+version = {attr = "calibreweb.cps.constants.INSTALLED_VERSION"}

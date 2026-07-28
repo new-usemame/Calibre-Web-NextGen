@@ -16,6 +16,10 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A running install is told about new releases again, instead of being stuck on whatever was newest the day its container started.** The admin page's "Update available" line compared your installed version against a value fetched once, at container start, and written to a file — so a container that had been up for a week was still comparing against the release list from a week earlier, and the notice for anything published since never appeared. Restarting the container was the only way to refresh it, which is the one thing someone who doesn't know an update exists has no reason to do. The latest release is now looked up when the page is actually rendered, cached for six hours so it costs at most a handful of requests a day, and looked up on a background thread so the page never waits on it. Two related mix-ups went with it: `--version` on the command line and the updater's own version report both named the newest *published* release rather than the one you were running, which made the updater tell some installs they were already current when they weren't. Reported by [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1108) ([#1108](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1108)).
+
 ## [v4.1.23] - 2026-07-28
 
 ### Fixed

@@ -185,8 +185,15 @@ def get_sidebar_config(kwargs=None):
 # Checks if an update for CWA is available, returning True if yes
 def cwa_update_available() -> tuple[bool, str, str]:
     try:
+        # Imported here rather than at module scope: cps.services.__init__
+        # pulls in the optional integrations (goodreads, ldap, kobo, …) and
+        # render_template is imported very early in app setup.
+        from .services.latest_release import get_latest_release_tag
+
         current_version = constants.INSTALLED_VERSION
-        tag_name = constants.STABLE_VERSION
+        # Resolved on demand and cached, NOT read from a boot-time snapshot —
+        # see cps/services/latest_release.py for why (fork #1108).
+        tag_name = get_latest_release_tag()
 
         def _normalize_version(value: str) -> str:
             return (value or "").lstrip("vV")

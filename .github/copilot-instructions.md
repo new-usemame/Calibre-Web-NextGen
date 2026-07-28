@@ -200,7 +200,7 @@ Pluggable providers in `cps/metadata_provider/`:
 
 ## Version Management
 - **Installed version**: `/app/CWA_RELEASE` (baked at build time)
-- **Latest stable**: `/app/CWA_STABLE_RELEASE` (fetched at startup from GitHub API)
+- **Latest stable**: resolved on demand and cached by `cps/services/latest_release.py` (GitHub releases API)
 - **Update notifications**: Shown in UI when installed < stable (admin users only)
 - **Build args**: `VERSION` and `BUILD_DATE` in Dockerfile
 

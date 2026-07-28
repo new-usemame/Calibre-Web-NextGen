@@ -170,16 +170,21 @@ BookMeta = namedtuple('BookMeta', 'file_path, extension, title, author, cover, d
                                   'series_id, languages, publisher, pubdate, identifiers')
 
 def _read_text(path: str, default: str = "") -> str:
+    # An empty file falls back too: a zero-byte /app/CWA_RELEASE used to make
+    # INSTALLED_VERSION the empty string, which silently disables the update
+    # indicator instead of reading as an unknown version.
     try:
         with open(path, 'r') as f:
-            return f.read().strip()
+            return f.read().strip() or default
     except Exception:
         return default
 
-# Versions are resolved at container startup by cwa-init and provided via env and persisted files.
-# Avoid any network or slow I/O during module import.
+# The installed version is baked at build time and surfaced by cwa-init via
+# env; avoid any network or slow I/O during module import. The *latest
+# published* version deliberately does NOT live here — a module-level binding
+# read once at import can never go anything but stale (fork #1108). It is
+# resolved on demand and cached by cps/services/latest_release.py.
 INSTALLED_VERSION = os.environ.get("CWA_INSTALLED_VERSION") or _read_text("/app/CWA_RELEASE", "v0.0.0")
-STABLE_VERSION = os.environ.get("CWA_STABLE_VERSION") or _read_text("/app/CWA_STABLE_RELEASE", "v0.0.0")
 
 USER_AGENT = f"Calibre-Web-NextGen/{INSTALLED_VERSION}"
 

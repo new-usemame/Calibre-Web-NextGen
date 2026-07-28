@@ -383,8 +383,11 @@ class Updater(threading.Thread):
 
     @classmethod
     def _stable_version_info(cls):
-        log.debug("Stable version: {}".format(constants.STABLE_VERSION))
-        return {'version': constants.STABLE_VERSION }
+        # The version we are ON, not the newest one published (fork #1108):
+        # returning the latest tag here made every install compare equal to
+        # the release it was being offered and report "already current".
+        log.debug("Stable version: {}".format(constants.INSTALLED_VERSION))
+        return {'version': constants.INSTALLED_VERSION }
 
     @classmethod
     def dry_run(cls):

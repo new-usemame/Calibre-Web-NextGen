@@ -11,15 +11,15 @@ import argparse
 import socket
 
 from .constants import CONFIG_DIR as _CONFIG_DIR
-from .constants import STABLE_VERSION as _STABLE_VERSION
-from .constants import NIGHTLY_VERSION as _NIGHTLY_VERSION
+from .constants import INSTALLED_VERSION as _INSTALLED_VERSION
 from .constants import DEFAULT_SETTINGS_FILE, DEFAULT_GDRIVE_FILE
 
 
 def version_info():
-    if _NIGHTLY_VERSION[1].startswith('$Format'):
-        return "Calibre-Web version: %s - unknown git-clone" % _STABLE_VERSION.replace("b", " Beta")
-    return "Calibre-Web version: %s -%s" % (_STABLE_VERSION.replace("b", " Beta"), _NIGHTLY_VERSION[1])
+    # What is actually running here, not whatever tag happened to be the
+    # newest release (fork #1108) — `--version` reporting the latter made the
+    # CLI claim a version the install did not have.
+    return "Calibre-Web version: %s" % _INSTALLED_VERSION
 
 
 class CliParameter(object):

@@ -599,7 +599,7 @@ The defaults are `admin` / `admin123` (lowercase). If you've already changed the
 
 Check the [issue tracker](https://github.com/new-usemame/Calibre-Web-NextGen/issues) or [open a new issue](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new). Useful information:
 
-- The version: `docker exec calibre-web cat /app/CWA_STABLE_RELEASE`
+- The version: `docker exec calibre-web cat /app/CWA_RELEASE`
 - Recent logs: `docker logs calibre-web 2>&1 | tail -50`
 - What you did and what you expected to happen
 

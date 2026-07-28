@@ -14,16 +14,16 @@ operator's deployment + every fork user pulling
 ``ghcr.io/new-usemame/calibre-web-nextgen``. Those users had no way to learn
 from the admin UI that a newer release existed.
 
-The s6-init bootstrap probe (PR #28, v4.0.8) already writes the latest fork
-tag to ``/app/CWA_STABLE_RELEASE`` at container boot, and
-``cwa_update_available()`` already compares installed vs stable. We just
-need to surface that comparison next to the installed version in the admin
-Version Information table.
+``cwa_update_available()`` compares the installed version against the latest
+published tag, which ``cps/services/latest_release.py`` resolves on demand and
+caches (fork #1108 — it used to be a snapshot taken once at container boot).
+We surface that comparison next to the installed version in the admin Version
+Information table.
 
 These tests pin:
 
-1. ``cwa_get_update_indicator()`` returns ``(True, "v4.0.46")`` when stable
-   is strictly newer than installed.
+1. ``cwa_get_update_indicator()`` returns ``(True, "v4.0.46")`` when the
+   latest published tag is strictly newer than installed.
 2. It returns ``(False, ...)`` when installed equals or exceeds stable.
 3. It returns ``(False, "")`` gracefully on any exception from
    ``cwa_update_available`` (never breaks the admin page render).
@@ -79,27 +79,40 @@ class TestUpdateAvailableDevBuild:
 
     The :dev image stamps INSTALLED_VERSION as e.g. "DEV_BUILD-dev-247", which
     parses to a ``(0,)`` version tuple — so a naive compare against the latest
-    stable tag always reads as "outdated", nagging the canary/dev box about an
+    latest tag always reads as "outdated", nagging the canary/dev box about an
     update it is actually *ahead* of. Real releases must still be compared."""
+
+    @staticmethod
+    def _patch(mocker, installed, latest):
+        mocker.patch("cps.constants.INSTALLED_VERSION", installed)
+        mocker.patch(
+            "cps.services.latest_release.get_latest_release_tag",
+            return_value=latest,
+        )
 
     def test_dev_build_does_not_flag_update(self, mocker):
         from cps.render_template import cwa_update_available
-        mocker.patch("cps.constants.INSTALLED_VERSION", "DEV_BUILD-dev-247")
-        mocker.patch("cps.constants.STABLE_VERSION", "v4.0.170")
+        self._patch(mocker, "DEV_BUILD-dev-247", "v4.0.170")
         is_newer, _current, _latest = cwa_update_available()
         assert is_newer is False
 
     def test_real_release_still_flags_update(self, mocker):
         from cps.render_template import cwa_update_available
-        mocker.patch("cps.constants.INSTALLED_VERSION", "v4.0.100")
-        mocker.patch("cps.constants.STABLE_VERSION", "v4.0.170")
+        self._patch(mocker, "v4.0.100", "v4.0.170")
         is_newer, _current, _latest = cwa_update_available()
         assert is_newer is True
 
     def test_up_to_date_release_does_not_flag(self, mocker):
         from cps.render_template import cwa_update_available
-        mocker.patch("cps.constants.INSTALLED_VERSION", "v4.0.170")
-        mocker.patch("cps.constants.STABLE_VERSION", "v4.0.170")
+        self._patch(mocker, "v4.0.170", "v4.0.170")
+        is_newer, _current, _latest = cwa_update_available()
+        assert is_newer is False
+
+    def test_unknown_latest_tag_does_not_flag(self, mocker):
+        """An offline install (probe returned nothing) must show no
+        indicator rather than a bogus one."""
+        from cps.render_template import cwa_update_available
+        self._patch(mocker, "v4.0.170", "")
         is_newer, _current, _latest = cwa_update_available()
         assert is_newer is False
 

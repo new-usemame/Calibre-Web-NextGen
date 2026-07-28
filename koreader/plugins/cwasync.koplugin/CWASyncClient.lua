@@ -56,7 +56,11 @@ local function finish(callback, ok, res, label)
         if not succeeded then reason = "HTTP " .. tostring(res.status) end
         callback(succeeded, res.body, reason)
     else
-        logger.warn(label .. " failure:", res)
+        -- The projection, not the raw error. Raising this from dbg to warn puts
+        -- it in crash.log, which is the file users paste into issue threads, so
+        -- what goes in is kept to the message/status rather than whatever object
+        -- the transport happened to raise.
+        logger.warn(label .. " failure:", describeFailure(res))
         callback(false, nil, describeFailure(res))
     end
 end
@@ -173,7 +177,9 @@ function CWASyncClient:authorize(username, password)
     if ok then
         return res.status == 200, res.body
     else
-        logger.warn("CWASyncClient:authorize failure:", res)
+        -- Same reasoning as `finish`, and it matters most here: this is the one
+        -- call that is handed a password.
+        logger.warn("CWASyncClient:authorize failure:", describeFailure(res))
         return false, nil, describeFailure(res)
     end
 end

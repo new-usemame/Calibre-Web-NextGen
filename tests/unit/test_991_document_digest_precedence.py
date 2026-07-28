@@ -15,13 +15,23 @@ compute. The reporter re-downloaded over OPDS repeatedly and kept getting
 `No book found for checksum`, which is exactly this shape.
 
 The fix inverts the precedence: the bytes on disk are the authority and the
-cache is a fallback for when hashing is impossible. The policy itself is pure
-and lives in `sync_logic.lua`, behaviourally tested by
-`koreader/plugins/cwasync.koplugin/tests/sync_logic_test.lua`. We don't run a
-Lua runner in CI, so these tests pin the wiring: that `getDocumentDigest`
-delegates to that policy, and that it passes the two sources in the order that
-makes the computed digest win. Swapping the two arguments restores the bug and
-trips `test_computed_digest_is_passed_as_the_winning_source`.
+cache is a fallback for when hashing is impossible.
+
+**These tests are structural tripwires, not behavioural coverage.** They only
+read `main.lua` as text; they never execute it. The behaviour is proven by two
+Lua suites that do execute the code, and CI runs no Lua runner, so what these
+buy is a CI-visible alarm when the shipped wiring drifts away from the shape the
+Lua suites assume:
+
+* `koreader/plugins/cwasync.koplugin/tests/sync_logic_test.lua` — the pure
+  precedence policy.
+* `koreader/plugins/cwasync.koplugin/tests/document_digest_test.lua` — the real
+  `getDocumentDigest` source, sliced out of `main.lua` and loaded into a sandbox
+  with stubbed `util` / `io` / `DocSettings` / `self.ui`. That one is verified
+  red against the pre-fix `main.lua`.
+
+Read the assertions here accordingly: passing means the source still *looks*
+like the version the Lua suites exercised, not that it *behaves*.
 """
 
 from __future__ import annotations
@@ -39,6 +49,7 @@ PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwasync.koplugin"
 MAIN_LUA = PLUGIN_DIR / "main.lua"
 SYNC_LOGIC_LUA = PLUGIN_DIR / "sync_logic.lua"
 SYNC_LOGIC_TEST_LUA = PLUGIN_DIR / "tests" / "sync_logic_test.lua"
+DIGEST_TEST_LUA = PLUGIN_DIR / "tests" / "document_digest_test.lua"
 
 CACHED_SETTING = "partial_md5_checksum"
 
@@ -157,3 +168,21 @@ def test_policy_has_behavioural_lua_coverage():
     assert 'returns("fresh"), returns("stale")' in body, (
         "the stale-cache case (#991) must stay covered"
     )
+
+
+def test_production_function_has_behavioural_lua_coverage():
+    """The suite that actually executes the shipped getDocumentDigest source."""
+    body = _read(DIGEST_TEST_LUA)
+    assert 'source:find(header, 1, true)' in body, (
+        "document_digest_test.lua must slice the real function out of main.lua "
+        "rather than re-implementing it, or it stops tracking what ships"
+    )
+    for name in (
+        "testStaleSidecarLosesToTheFile",
+        "testExplicitPathIsHonoured",
+        "testUnhashableFileFallsBackToSidecar",
+        "testInlineSamplerIsUsedWhenPartialMD5IsAbsent",
+    ):
+        assert re.search(rf"^{name}\(\)", body, re.MULTILINE), (
+            f"{name} must stay defined and invoked by the Lua runner"
+        )

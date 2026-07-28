@@ -21,11 +21,20 @@ end
 -- is #991, where the reporter re-downloaded over OPDS and kept getting
 -- "No book found for checksum".
 --
--- So the bytes on disk are the authority. Recomputing costs 12 reads of 1 KiB,
--- cheap enough to do on every sync. The cache is kept only as a fallback for
--- when recomputing is impossible (file missing, unreadable, detached SD card):
--- there a stale digest still beats no digest, because progress already stored
--- under it can still round-trip.
+-- So the bytes on disk are the authority. The cache is kept only as a fallback
+-- for when recomputing is impossible (file missing, unreadable, detached SD
+-- card): there a stale digest still beats no digest, because progress already
+-- stored under it can still round-trip.
+--
+-- Recomputing is not free: it is one open plus 12 seek/read pairs of 1 KiB per
+-- call, and bulk library pull does this once per book. That cost has not been
+-- measured on e-reader storage. It is accepted rather than optimised because
+-- there is no sound way to decide the cache is fresh -- KOReader rewrites the
+-- sidecar on ordinary progress saves without recomputing the digest, so neither
+-- the sidecar's mtime nor its presence tells you whether the file underneath it
+-- changed. Note the path this replaced was not free either: it opened and
+-- parsed each book's sidecar, and in bulk pull every book is followed by an
+-- HTTP round trip that dominates either cost.
 function SyncLogic.resolveDocumentDigest(computeFromFile, readCachedDigest)
     local function call(source)
         if type(source) ~= "function" then

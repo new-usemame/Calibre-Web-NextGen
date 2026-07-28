@@ -56,6 +56,40 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.23',
+    date: '2026-07-28',
+    items: [
+      {
+        title: 'A newly imported book keeps its own title and author',
+        body: 'With automatic metadata fetching switched on, importing a book could quietly replace its details with those of an entirely different book — often another title by the same author. Whichever result a metadata site happened to list first was accepted, and the only thing checked was an ISBN, which a freshly imported file usually does not carry. Results are now matched on the title\'s identifying words and refused if they name a different author, so a book that cannot be matched is left exactly as it was imported.',
+        category: 'Library',
+      },
+      {
+        title: 'A book you just edited stays where it was in your library',
+        body: 'Saving a change to a book and heading back to the library left that book missing from the grid until you reloaded the page. Where it did come back it arrived as the very last card of everything loaded, which from the top of a large library is indistinguishable from gone. An edited book now holds its place and shows its new title, author and series straight away.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'KOReader finds your book again after its file changes on the server',
+        body: 'Progress sync identifies a book by a fingerprint of its file, and the plugin was reading that fingerprint out of KOReader\'s cache instead of the file on the device. Once a book\'s file changed on the server — a Calibre database rebuild, a metadata write-back, a re-import — the device kept reporting a fingerprint for a copy it no longer held, and progress stopped syncing. The plugin now works it out from the file it actually has; update the NextGen Progress Sync plugin to 4.1.23 on each device to pick this up.',
+        category: 'Sync',
+        link: { to: '/account', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'The edit pencil no longer sits on top of a book\'s series',
+        body: 'The pencil on each book card floated over the card rather than sitting in a row of its own, and room for it was reserved by padding the "Read now" label. On a phone in Compact or Dense view there was not enough card to reserve, so the label broke across two lines and the pencil rode up into the author or series beneath the title. The two controls now share one row, and on the narrowest cards the pencil scales down and "Read now" gives way to its icon.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'A very long title or author name no longer breaks the book page on a phone',
+        body: 'The header column beside the cover is only about 217 pixels wide on a phone. A word longer than that — a German compound title, a long transliterated name, a lengthy series title — ran past the edge and made the whole book page scroll sideways. Those lines now wrap mid-word when a word cannot fit on a line by itself. Ordinary titles look exactly as they did, because wrapping still prefers to break between words.',
+        category: 'Library',
+      },
+    ],
+  },
+  {
     version: 'v4.1.22',
     date: '2026-07-27',
     items: [
@@ -90,11 +124,6 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         title: 'Opening your library runs one search instead of two',
         body: 'Every visit asked the server for the first page of books, then immediately asked again at a different size and threw the first answer away. Nothing looked wrong, but on a large library that first page is the slowest query there is, and it was running twice on every load for every reader. The grid now waits until it knows how many columns it has before asking.',
         category: 'Under the hood',
-      },
-      {
-        title: 'A very long title or author name no longer breaks the book page on a phone',
-        body: 'The header column beside the cover is only about 217 pixels wide on a phone. A word longer than that — a German compound title, a long transliterated name, a lengthy series title — ran past the edge and made the whole book page scroll sideways. Those lines now wrap mid-word when a word cannot fit on a line by itself. Ordinary titles look exactly as they did, because wrapping still prefers to break between words.',
-        category: 'Library',
       },
       {
         title: 'Book pages stop scrolling sideways on a phone',

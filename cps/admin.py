@@ -556,9 +556,6 @@ def cwa_get_update_indicator() -> tuple[bool, str]:
     renders — Docker users (the operator's deployment, plus everyone
     pulling ``ghcr.io/new-usemame/calibre-web-nextgen``) had no way to
     learn that a newer release existed from the admin UI.
-    ``s6-init/cwa-init`` (per PR #28) already writes the latest fork tag
-    to ``/app/CWA_STABLE_RELEASE`` at container boot; we just need to
-    surface it next to the installed version in the admin table.
     Returns ``(False, "")`` on any error so the page never fails to
     render because of a version-probe glitch.
     """

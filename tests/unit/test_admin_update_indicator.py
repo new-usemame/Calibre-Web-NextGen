@@ -14,12 +14,6 @@ operator's deployment + every fork user pulling
 ``ghcr.io/new-usemame/calibre-web-nextgen``. Those users had no way to learn
 from the admin UI that a newer release existed.
 
-The s6-init bootstrap probe (PR #28, v4.0.8) already writes the latest fork
-tag to ``/app/CWA_STABLE_RELEASE`` at container boot, and
-``cwa_update_available()`` already compares installed vs stable. We just
-need to surface that comparison next to the installed version in the admin
-Version Information table.
-
 These tests pin:
 
 1. ``cwa_get_update_indicator()`` returns ``(True, "v4.0.46")`` when stable

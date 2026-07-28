@@ -315,13 +315,21 @@
   align-items: center;
   gap: var(--sp-1);
   margin-top: auto;
+  /* Below ~60px of card the two controls cannot both hold their 24px floor on
+     one line (see .readNow). Wrapping keeps each one tappable instead of
+     shrinking one under the floor or pushing it out of the card. Inert at every
+     realistic width: a 4-column dense grid is 82px at 375px, 68px at 320px. */
+  flex-wrap: wrap;
 }
 
 .readNow {
-  /* Takes the space the pencil does not. min-width: 0 lets it actually shrink
-     inside the flex row instead of forcing the row wider than the card. */
+  /* Takes the space the pencil does not, down to a floor of 24px — WCAG 2.2
+     SC 2.5.8's minimum target size. It used to floor at 0, which let the link
+     shrink without limit: on a 280px screen (Galaxy Fold, folded) a dense card
+     is 58px and the link measured 22px, a target too small to reliably hit.
+     The label keeps its own min-width: 0, so text still ellipsises inside. */
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 24px;
   min-height: 32px;
   display: flex;
   align-items: center;

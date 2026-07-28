@@ -202,3 +202,44 @@ test('the Edit control stays off the metadata when a book has no readable format
     `the lone Edit control drifted off the right edge (${r.distFromRight}px from right, ${r.distFromLeft}px from left) — it should stay bottom-right (#1166)`
   ).toBeLessThan(r.distFromLeft!);
 });
+
+/*
+ * Letting the row size itself only helps while what it hands each control is
+ * still tappable. `.readNow` used to floor at min-width: 0, so on the narrowest
+ * real screen — 280px, a folded Galaxy Fold — a 4-column dense card is 58px and
+ * the link measured 22px wide, under WCAG 2.2 SC 2.5.8's 24x24 minimum.
+ *
+ * 280px dense is the worst case the app can be put in, which is why it is the
+ * width asserted here: every wider grid clears the floor with room to spare.
+ */
+test('both card actions stay at a tappable size on the narrowest screens (#1166)', async ({ page }) => {
+  await page.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key, value),
+    ['cwng:catalog-density-v1', 'dense'] as const,
+  );
+  await page.setViewportSize({ width: 280, height: 800 });
+  await page.goto('/app/');
+  await page.waitForLoadState('networkidle');
+  await page.locator('[class*="quickEditBtn"]').first().waitFor({ state: 'attached' });
+
+  const r = await page.evaluate(`(() => {
+    const card = [...document.querySelectorAll('[class*="wrap"]')]
+      .find((w) => w.querySelector('[class*="quickEditBtn"]'));
+    if (!card) return { found: false };
+    const cb = card.getBoundingClientRect();
+    const small = [];
+    for (const [name, sel] of [['Read now', '[class*="readNow"]:not([class*="Label"])'], ['Edit', '[class*="quickEditBtn"]']]) {
+      const el = card.querySelector(sel);
+      if (!el || getComputedStyle(el).opacity === '0') continue;
+      const b = el.getBoundingClientRect();
+      if (b.width < 24 || b.height < 24) small.push({ name, w: Math.round(b.width), h: Math.round(b.height) });
+    }
+    return { found: true, cardWidth: Math.round(cb.width), small };
+  })()`) as { found: boolean; cardWidth?: number; small?: { name: string; w: number; h: number }[] };
+
+  test.skip(!r.found, 'no card with an edit control in this seed');
+
+  expect(r.small,
+    `a card action shrank below the 24x24 minimum target size on a ${r.cardWidth}px card (WCAG 2.2 SC 2.5.8, #1166): ${JSON.stringify(r.small)}`
+  ).toEqual([]);
+});

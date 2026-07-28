@@ -80,7 +80,44 @@ export function applyBookEditToCache(id: number, patch: Partial<Book>): void {
       _cache.delete(key);
       continue;
     }
-    if (!snap.books.some((b) => b.id === id)) continue;
+    const current = snap.books.find((b) => b.id === id);
+    if (!current) continue;
+    // Patching in place keeps the card where the user left it, which is right
+    // only while the edit can't have moved it. Sorting by a field the edit
+    // changed does move it, and an upsert can't relocate a row — so drop the
+    // snapshot and let the next visit rebuild in the server's order.
+    if (reordersUnder(snap.sort, current, patch)) {
+      _cache.delete(key);
+      continue;
+    }
     snap.books = snap.books.map((b) => (b.id === id ? { ...b, ...patch } : b));
   }
+}
+
+/** Which list-item field each sort is keyed on. Sorts that are absent here —
+ *  date added (the default), and anything not derived from editable metadata —
+ *  can't be perturbed by a metadata edit. */
+const SORT_KEY_FIELDS: Record<string, readonly (keyof Book)[]> = {
+  abc: ['title'], zyx: ['title'],
+  authaz: ['authors'], authza: ['authors'],
+  seriesasc: ['series', 'series_index'], seriesdesc: ['series', 'series_index'],
+};
+
+/** Sorts keyed on a field the list item doesn't carry, so "did it change?" is
+ *  unanswerable here. Publication date is editable, so assume it moved. */
+const OPAQUE_SORT_KEYS = new Set(['pubnew', 'pubold']);
+
+function reordersUnder(sort: string, current: Book, patch: Partial<Book>): boolean {
+  if (OPAQUE_SORT_KEYS.has(sort)) return true;
+  return (SORT_KEY_FIELDS[sort] ?? []).some((field) => {
+    if (!(field in patch)) return false;
+    const before = current[field];
+    const after = patch[field];
+    if (Array.isArray(before) || Array.isArray(after)) {
+      const a = Array.isArray(before) ? before : [];
+      const b = Array.isArray(after) ? after : [];
+      return a.length !== b.length || a.some((v, i) => v !== b[i]);
+    }
+    return before !== after;
+  });
 }

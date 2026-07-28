@@ -224,4 +224,49 @@ test.describe('#1169 an edited book stays in the library listing', () => {
 
     assertNoPageErrors(errors);
   });
+
+  /*
+   * The other half of the same decision, raised by the cross-family review of
+   * this fix. Patching in place is only right while the edit can't have moved
+   * the card. Under a title sort, renaming a book DOES move it, and the grid's
+   * merge can upsert or append but never relocate a row — so an in-place patch
+   * would pin the renamed book at its old position indefinitely. That case has
+   * to drop the snapshot and rebuild in the server's order instead.
+   */
+  test('a rename under a title sort rebuilds the listing instead of pinning the card', async ({ page }) => {
+    let title = OLD_TITLE;
+    await mockLibrary(page, () => title);
+    await mockEditEndpoints(page, (t) => { title = t; }, () => title);
+    await page.addInitScript(() => localStorage.setItem('cwng:library-sort-v1', 'abc'));
+
+    await page.goto('/app');
+    const loadMore = page.getByRole('button', { name: 'Load more' });
+    await expect(loadMore).toBeVisible();
+    const firstPageCount = await gridBookLinks(page).count();
+    await loadMore.click();
+    await expect(gridBookLinks(page)).toHaveCount(firstPageCount * 2);
+
+    const card = targetCard(page).first();
+    await card.hover();
+    await page.locator(`main a[href$="/book/${TARGET_ID}/edit"]`).first().click();
+    await page.waitForURL(`**/book/${TARGET_ID}/edit`);
+    await page.getByLabel(/^title$/i).first().fill(NEW_TITLE);
+    await page.getByRole('button', { name: /save changes/i }).click();
+    await page.waitForURL(`**/book/${TARGET_ID}`, { timeout: 15_000 });
+
+    await page.goBack();
+    await page.waitForURL(`**/book/${TARGET_ID}/edit`);
+    await page.goBack();
+    await page.waitForURL((u) => !/\/book\//.test(u.pathname));
+
+    // The snapshot is gone, so the library starts again from page 1 rather
+    // than restoring an accumulation the rename has invalidated the order of.
+    await expect
+      .poll(() => gridBookLinks(page).count(),
+        { message: 'a sort-perturbing edit should rebuild the listing, not restore it' })
+      .toBe(firstPageCount);
+    // Still listed, and carrying the edit.
+    await expect(targetCard(page)).toHaveCount(1);
+    await expect(targetCard(page).first()).toContainText(NEW_TITLE);
+  });
 });

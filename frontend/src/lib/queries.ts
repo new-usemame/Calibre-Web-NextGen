@@ -693,7 +693,11 @@ export function useUpdateMetadata(id: string | number) {
       // retained page for an active search. Drop those pages rather than
       // invalidate: a retained page is replayed on remount and the merge would
       // re-add the stale card before the refetch could return without it.
+      // ['adv-search'] is a separate key family and needs the same treatment —
+      // it backs the saved default library view (#498) and the advanced-search
+      // page, whose membership an edit can equally change.
       qc.removeQueries({ queryKey: ['books'] });
+      qc.removeQueries({ queryKey: ['adv-search'] });
     },
   });
 }

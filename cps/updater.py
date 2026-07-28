@@ -383,8 +383,8 @@ class Updater(threading.Thread):
 
     @classmethod
     def _stable_version_info(cls):
-        log.debug("Stable version: {}".format(constants.STABLE_VERSION))
-        return {'version': constants.STABLE_VERSION }
+        log.debug("Stable version: {}".format(constants.INSTALLED_VERSION))
+        return {'version': constants.INSTALLED_VERSION }
 
     @classmethod
     def dry_run(cls):

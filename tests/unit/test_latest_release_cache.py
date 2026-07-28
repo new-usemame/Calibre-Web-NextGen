@@ -233,3 +233,78 @@ class TestInstalledVersionReporting:
         populated = tmp_path / "populated"
         populated.write_text("v4.1.23\n")
         assert _read_text(str(populated), "v0.0.0") == "v4.1.23"
+
+
+@pytest.mark.unit
+class TestConcurrentRefresh:
+    """The AST tripwires above catch a wholesale reversion; they do not prove
+    the slot-claim state machine holds when greenlets actually interleave.
+    These drive two real callers through a probe that is parked mid-flight."""
+
+    @staticmethod
+    def _parked_probe(latest_release, mocker, result="v4.1.24"):
+        gevent = pytest.importorskip("gevent")
+        started = gevent.event.Event()
+        release = gevent.event.Event()
+        calls = []
+
+        def slow_fetch():
+            calls.append(1)
+            started.set()
+            release.wait(timeout=10)
+            return result
+
+        mocker.patch.object(latest_release, "_fetch_latest_release_tag", side_effect=slow_fetch)
+        return gevent, started, release, calls
+
+    def _seed(self, latest_release, mocker, tag="v4.1.23"):
+        mocker.patch.object(latest_release, "_fetch_latest_release_tag", return_value=tag)
+        assert latest_release.get_latest_release_tag() == tag
+        latest_release._cache_expires_at = 0.0  # TTL elapsed
+
+    def test_caller_arriving_mid_probe_gets_the_last_known_tag(self, latest_release, mocker):
+        self._seed(latest_release, mocker)
+        gevent, started, release, calls = self._parked_probe(latest_release, mocker)
+
+        first = gevent.spawn(latest_release.get_latest_release_tag)
+        assert started.wait(timeout=5), "the probe never started"
+
+        assert latest_release.get_latest_release_tag() == "v4.1.23", (
+            "a second render must be served the tag we already have, not wait "
+            "on the in-flight probe"
+        )
+        assert len(calls) == 1
+
+        release.set()
+        assert first.get(timeout=5) == "v4.1.24"
+        assert len(calls) == 1
+        assert latest_release.get_latest_release_tag() == "v4.1.24"
+
+    def test_a_wedged_probe_does_not_let_a_second_one_start(self, latest_release, mocker):
+        """The failure TTL is only a lease. A worker stuck longer than it — a
+        name resolution outliving the socket timeout, say — must not let every
+        later caller open another connection."""
+        self._seed(latest_release, mocker)
+        gevent, started, release, calls = self._parked_probe(latest_release, mocker)
+
+        first = gevent.spawn(latest_release.get_latest_release_tag)
+        assert started.wait(timeout=5)
+
+        latest_release._cache_expires_at = 0.0  # the 15-minute lease elapses
+
+        assert latest_release.get_latest_release_tag() == "v4.1.23"
+        assert latest_release.get_latest_release_tag() == "v4.1.23"
+        assert len(calls) == 1, "a wedged probe must not be joined by others"
+
+        release.set()
+        assert first.get(timeout=5) == "v4.1.24"
+
+    def test_in_flight_flag_is_cleared_when_the_probe_raises(self, latest_release, mocker):
+        """A raising probe must not leave the module permanently convinced a
+        refresh is running, which would freeze the tag until a restart."""
+        mocker.patch.object(
+            latest_release, "_fetch_latest_release_tag", side_effect=RuntimeError("boom")
+        )
+        with pytest.raises(RuntimeError):
+            latest_release.get_latest_release_tag()
+        assert latest_release._refresh_in_flight is False

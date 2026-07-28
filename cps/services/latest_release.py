@@ -44,9 +44,10 @@ GitHub's unauthenticated API allows 60 requests/hour/IP. A six-hour success
 TTL means a busy admin session costs one request, and several containers
 behind one NAT still stay far under the limit. Failures are cached for
 fifteen minutes so an offline install retries occasionally instead of on
-every page render. The refresh slot is claimed *before* the network call so
-concurrent callers keep serving the previous value rather than piling onto
-the API together.
+every page render. A refresh in progress is tracked explicitly, so callers
+arriving mid-probe keep serving the previous value rather than piling onto
+the API together — the failure TTL alone would only lease that guarantee for
+fifteen minutes, which a wedged worker can outlive.
 
 There is deliberately no lock around the refresh. Under unpatched gevent a
 ``threading.Lock`` held across a hub yield deadlocks the process: the waiter
@@ -83,6 +84,7 @@ _TAG_RE = re.compile(r"^[Vv]?[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$")
 
 _cached_tag = ""
 _cache_expires_at = 0.0
+_refresh_in_flight = False
 
 
 def release_repo() -> str:
@@ -93,9 +95,10 @@ def release_repo() -> str:
 def reset_cache() -> None:
     """Drop the cached tag. For tests and for callers that need a forced
     refresh; nothing on the request path should call this."""
-    global _cached_tag, _cache_expires_at
+    global _cached_tag, _cache_expires_at, _refresh_in_flight
     _cached_tag = ""
     _cache_expires_at = 0.0
+    _refresh_in_flight = False
 
 
 def get_latest_release_tag() -> str:
@@ -105,19 +108,31 @@ def get_latest_release_tag() -> str:
     Never raises and never blocks the gevent hub. A cached value is returned
     without any network access until its TTL expires.
     """
-    global _cached_tag, _cache_expires_at
+    global _cached_tag, _cache_expires_at, _refresh_in_flight
 
     now = time.monotonic()
     if now < _cache_expires_at:
         return _cached_tag
 
-    # Claim the refresh slot before the network call: any other greenlet that
-    # arrives while this fetch is in flight sees a non-expired entry and keeps
-    # serving the previous value instead of starting a second request. If the
-    # fetch fails, this is already the correct back-off window.
-    _cache_expires_at = now + FAILURE_TTL_SECONDS
+    # A refresh is already running. Serve what we have rather than opening a
+    # second connection. The back-off window below would usually cover this,
+    # but it is only a lease: a worker wedged for longer than FAILURE_TTL (a
+    # name resolution that outlives the socket timeout, say) would otherwise
+    # let every later caller start another probe. The check and the set below
+    # have no yield point between them, so on gevent's single request thread
+    # this cannot interleave.
+    if _refresh_in_flight:
+        return _cached_tag
 
-    tag = _fetch_latest_release_tag()
+    _refresh_in_flight = True
+    # Claim the back-off window before the network call too, so a *failed*
+    # refresh does not retry on the very next render.
+    _cache_expires_at = now + FAILURE_TTL_SECONDS
+    try:
+        tag = _fetch_latest_release_tag()
+    finally:
+        _refresh_in_flight = False
+
     if tag:
         _cached_tag = tag
         _cache_expires_at = time.monotonic() + SUCCESS_TTL_SECONDS

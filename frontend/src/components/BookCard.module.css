@@ -1,5 +1,6 @@
-/* Positioning root: the link/toggle button fills it; action buttons overlay it
-   as siblings of that control (never nested inside the <a>). */
+/* Positioning root: the link/toggle button fills it. The remove control and the
+   cover badges overlay it as siblings of that control (never nested inside the
+   <a>); the read + edit actions sit below it in `.actionRow`. */
 .wrap {
   position: relative;
   display: flex;
@@ -133,14 +134,16 @@
    spot. A flex row makes that impossible rather than relying on each badge's
    comment asserting the others are elsewhere.
 
-   max-width reserves the bottom-right corner for the quick-edit pencil, so
-   the row can never grow under it (the #1112 collision, avoided by
-   construction this time). */
+   max-width is now just the cover inset. It used to also reserve 34px at the
+   bottom-right for the quick-edit pencil; since #1166 the pencil sits in the
+   action row below the metadata and cannot reach the cover, so that reservation
+   only shrank the row. On an 82px dense card it left the badges 32px — narrower
+   than the "Read" badge alone, which then wrapped for no reason. */
 .badgeRow {
   position: absolute;
   bottom: var(--sp-2);
   left: var(--sp-2);
-  max-width: calc(100% - var(--sp-2) * 2 - 34px);
+  max-width: calc(100% - var(--sp-2) * 2);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -258,6 +261,11 @@
    focus-reveal like the remove button, but always reachable via keyboard focus. */
 .quickEditBtn {
   flex: 0 0 auto;
+  /* A card with no readable format has no "Read now" link, so the pencil is
+     alone in the row and would otherwise flex-start to the LEFT edge — moving
+     a control users have always found at bottom-right, on exactly the
+     MOBI/AZW3 cards this fix was meant to help. */
+  margin-left: auto;
   width: 24px;
   height: 24px;
   border-radius: var(--r-full);
@@ -335,7 +343,13 @@
   flex: 0 0 auto;
 }
 
+/* min-width: 0 is load-bearing: a flex item's automatic minimum size is its
+   min-content width, so without this the label refuses to shrink and the
+   parent's overflow:hidden hard-clips it mid-word instead of ellipsising. The
+   gap is widest just above the container-query threshold, where a 44px touch
+   pencil leaves ~85px for a long localized string ("Jetzt lesen", "Nu lezen"). */
 .readNowLabel {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }

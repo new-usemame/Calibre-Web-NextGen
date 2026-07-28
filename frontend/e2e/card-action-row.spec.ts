@@ -169,6 +169,12 @@ test('the Edit control stays off the metadata when a book has no readable format
 
     const pencil = card.querySelector('[class*="quickEditBtn"]');
     const pb = pencil.getBoundingClientRect();
+    const cb = card.getBoundingClientRect();
+    // Alone in the row, the pencil must still sit at the RIGHT edge. A bare
+    // flex row would start-align it, silently moving a control users have
+    // always found bottom-right — and only on the cards this fix targets.
+    const distFromRight = Math.round(cb.right - pb.right);
+    const distFromLeft = Math.round(pb.left - cb.left);
     const hits = [];
     for (const sel of ['[class*="title"]', '[class*="author"]', '[data-testid="book-card-series"]']) {
       const el = card.querySelector(sel);
@@ -178,12 +184,21 @@ test('the Edit control stays off the metadata when a book has no readable format
       const h = Math.min(pb.right, b.right) - Math.max(pb.left, b.left);
       if (v > 0.5 && h > 0.5) hits.push({ on: sel, v: Math.round(v), h: Math.round(h) });
     }
-    return { simulated: true, hits, pencilVisible: getComputedStyle(pencil).opacity !== '0' || true };
-  })()`) as { simulated: boolean; hits?: { on: string; v: number; h: number }[] };
+    return { simulated: true, hits, distFromRight, distFromLeft };
+  })()`) as {
+    simulated: boolean;
+    hits?: { on: string; v: number; h: number }[];
+    distFromRight?: number;
+    distFromLeft?: number;
+  };
 
   test.skip(!r.simulated, 'no card in this seed has both a read link and an edit control');
 
   expect(r.hits,
     `with no "Read now" link the Edit control drops onto the card's metadata (#1166): ${JSON.stringify(r.hits)}`
   ).toEqual([]);
+
+  expect(r.distFromRight!,
+    `the lone Edit control drifted off the right edge (${r.distFromRight}px from right, ${r.distFromLeft}px from left) — it should stay bottom-right (#1166)`
+  ).toBeLessThan(r.distFromLeft!);
 });

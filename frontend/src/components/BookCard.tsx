@@ -202,7 +202,7 @@ export function BookCard({
               // browser opens the edit page in a new tab natively (#798).
               onClick={(e) => e.stopPropagation()}
             >
-              <Pencil size={13} strokeWidth={2.5} aria-hidden="true" />
+              <Pencil size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
             </Link>
           )}
         </div>

@@ -491,28 +491,38 @@ def _title_similarity(left, right):
     return SequenceMatcher(None, a, b).ratio()
 
 
-def _author_surnames(authors):
-    """Normalized surnames for a book's or candidate's authors. Accepts ORM
-    author objects and the plain strings providers return."""
-    surnames = set()
+def _author_name_tokens(authors):
+    """Normalized name words for a book's or candidate's authors (fork #1164).
+
+    Every word is kept rather than just the last one, because name ORDER is not
+    dependable here: Calibre stores and sorts authors as "King, Stephen" while
+    providers return "Stephen King", so keying on the final word would make
+    those two disagree and reject a correct match for most of a library. Words
+    of one or two characters are dropped so initials ("J.") neither match nor
+    block.
+
+    Accepts ORM author objects and the plain strings providers return. A bare
+    string is wrapped rather than iterated, which would otherwise walk it one
+    character at a time.
+    """
+    if isinstance(authors, str):
+        authors = [authors]
+    tokens = set()
     for author in (authors or []):
         name = author if isinstance(author, str) else getattr(author, "name", "")
-        normalized = _normalize_title(name)
-        if not normalized:
-            continue
-        tokens = normalized.split()
-        # Skip initials ("j.") so "J. Abercrombie" still agrees with "Joe
-        # Abercrombie" on the surname.
-        surname = tokens[-1]
-        if len(surname) > 2:
-            surnames.add(surname)
-    return surnames
+        tokens.update(w for w in _normalize_title(name).split() if len(w) > 2)
+    return tokens
 
 
 def _authors_agree(book_authors, candidate_authors):
-    """True when the book and candidate share an author surname (fork #1164).
-    Absence of author information on either side is not agreement."""
-    return bool(_author_surnames(book_authors) & _author_surnames(candidate_authors))
+    """True when the book and candidate share any author name word (fork #1164).
+    Absence of author information on either side is not agreement.
+
+    Deliberately generous: this signal is only ever used to REJECT an otherwise
+    matching title, so a shared given name costing us a rejection is far cheaper
+    than a name-order mismatch costing every correct match in a library.
+    """
+    return bool(_author_name_tokens(book_authors) & _author_name_tokens(candidate_authors))
 
 
 def _select_metadata_result(results, book_isbn, book_title=None, book_authors=None):
@@ -566,7 +576,7 @@ def _select_metadata_result(results, book_isbn, book_title=None, book_authors=No
     # Titles can collide across genuinely different books. When both sides name
     # an author and none of them agree, that's a different book, not an edition.
     candidate_authors = getattr(best, "authors", None)
-    if (_author_surnames(book_authors) and _author_surnames(candidate_authors)
+    if (_author_name_tokens(book_authors) and _author_name_tokens(candidate_authors)
             and not _authors_agree(book_authors, candidate_authors)):
         log.info(
             "Rejected metadata for %r: candidate %r matches on title but its "

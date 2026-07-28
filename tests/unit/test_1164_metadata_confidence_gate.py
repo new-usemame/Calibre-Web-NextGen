@@ -154,6 +154,61 @@ class TestAuthorDisagreementRejects:
             book_title="The Devils", book_authors=["Joe Abercrombie"],
         ) is None
 
+    @pytest.mark.parametrize("book_author,candidate_author", [
+        # Calibre stores and sorts authors "Last, First"; providers return
+        # "First Last". Keying agreement on the final word would make these
+        # disagree and reject a correct match for most books in a library.
+        ("Stephen King", "King, Stephen"),
+        ("King, Stephen", "Stephen King"),
+        ("Philip K. Dick", "Dick, Philip K."),
+        ("Joe Abercrombie", "J. Abercrombie"),
+    ])
+    def test_author_name_order_does_not_reject_a_correct_match(
+            self, book_author, candidate_author):
+        cand = _cand("The Stand", [candidate_author])
+        assert m._select_metadata_result(
+            [cand], None, book_title="The Stand", book_authors=[book_author],
+        ) is cand
+
+    def test_missing_author_information_does_not_reject(self):
+        cand = _cand("The Stand", [])
+        assert m._select_metadata_result(
+            [cand], None, book_title="The Stand", book_authors=["Stephen King"],
+        ) is cand
+
+    def test_authors_given_as_a_bare_string_are_not_walked_per_character(self):
+        """A str is iterable; iterating it would yield single letters, silently
+        emptying the author signal instead of comparing names."""
+        assert m._author_name_tokens("Stephen King") == {"stephen", "king"}
+
+
+# --- degenerate input must not crash or collide ------------------------------
+
+class TestDegenerateInput:
+    @pytest.mark.parametrize("book_title,candidate_title", [
+        ("The The", "A An Of"),      # everything is a joining word
+        ("!!!", "???"),              # nothing survives normalization
+        ("and the of", "in on to"),
+    ])
+    def test_titles_with_no_identifying_words_never_match(self, book_title, candidate_title):
+        """Both sides reduce to an empty word tuple; equality on empties would
+        make every such pair a perfect match."""
+        assert m._select_metadata_result(
+            [_cand(candidate_title, ["Same Author"])], None,
+            book_title=book_title, book_authors=["Same Author"],
+        ) is None
+
+    @pytest.mark.parametrize("left,right", [(None, "X"), ("X", None), (123, "X")])
+    def test_non_string_titles_do_not_raise(self, left, right):
+        assert m._title_similarity(left, right) == 0.0
+
+    def test_result_without_a_title_attribute_is_not_applied(self):
+        class Bare:
+            pass
+        assert m._select_metadata_result(
+            [Bare()], None, book_title="The Devils", book_authors=["Joe Abercrombie"],
+        ) is None
+
 
 # --- #402 ISBN priority is preserved ----------------------------------------
 

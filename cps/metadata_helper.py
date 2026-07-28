@@ -6,6 +6,9 @@
 # See CONTRIBUTORS for full list of authors.
 
 import json
+import re
+import unicodedata
+from difflib import SequenceMatcher
 
 from cps import logger, db
 from cps.metadata_constants import (
@@ -103,12 +106,27 @@ def fetch_and_apply_metadata(book_id: int, user_enabled: bool = False) -> bool:
                     continue
                     
                 # Prefer the candidate whose ISBN matches the book's existing ISBN
-                # over a blind first result (fork #402).
-                metadata = _select_metadata_result(results, book_isbn)
-                
+                # over a blind first result (fork #402), and refuse a candidate
+                # that isn't plausibly this book at all (fork #1164).
+                metadata = _select_metadata_result(
+                    results, book_isbn,
+                    book_title=book.title, book_authors=book.authors,
+                )
+                if metadata is None:
+                    log.info(
+                        f"No confident match from {provider.__name__} for book: "
+                        f"{book.title} — leaving its metadata untouched"
+                    )
+                    continue
+
+                # Captured before the apply: _apply_metadata_to_book overwrites
+                # book.title, so logging it afterwards named the book we fetched
+                # rather than the book we changed (fork #1164).
+                searched_title = book.title
+
                 # Apply metadata to book
                 if _apply_metadata_to_book(book, metadata, calibre_db_instance):
-                    log.info(f"Successfully applied metadata from {provider.__name__} for book: {book.title}")
+                    log.info(f"Successfully applied metadata from {provider.__name__} for book: {searched_title}")
                     metadata_found = True
                     break
                     
@@ -391,10 +409,130 @@ def _book_isbn(book):
     return isbn13 or isbn
 
 
-def _select_metadata_result(results, book_isbn):
-    """Pick the candidate whose ISBN matches the book's existing ISBN, else the
-    first result (fork #402). Prevents a blind ``results[0]`` from applying a wrong
-    foreign edition over a book that already carries a correct ISBN."""
+# How close two titles must be, when their identifying words are NOT identical,
+# before metadata is applied. Deliberately near-exact: this path exists only to
+# absorb spelling/diacritic noise, not to judge whether two different titles are
+# "close enough". Applying nothing is recoverable; silently overwriting a book
+# with a different book's metadata is not (fork #1164).
+#
+# A plain character-similarity bar cannot do this job on its own: series titles
+# share a long prefix, so "Harry Potter and the Chamber of Secrets" scores 0.78
+# against "...and the Goblet of Fire" — high enough to pass any threshold loose
+# enough to accept real-world title variance. Identifying-word equality is what
+# separates "same book, different edition" from "next book in the series".
+_TITLE_FUZZY_MATCH_MIN = 0.92
+
+# Joining words carry no identifying weight and inflate similarity between
+# unrelated titles in the same series.
+_TITLE_STOPWORDS = frozenset((
+    "and", "or", "the", "a", "an", "of", "in", "on", "to", "for", "with",
+    "from", "at", "by", "its", "his", "her", "their",
+))
+
+# Generic descriptors publishers append to a title. Stripped so "The Devils"
+# still matches "The Devils: A Novel". Deliberately a short curated list of
+# non-identifying words — a substantive subtitle ("Dune: Messiah") must NOT be
+# stripped, or every book in a series collapses onto its sibling.
+_GENERIC_TITLE_TAILS = (
+    "a novel", "an novel", "novel", "a memoir", "a story", "stories",
+    "a biography", "an autobiography", "unabridged", "abridged",
+)
+
+_LEADING_ARTICLES = ("the ", "a ", "an ")
+
+
+def _normalize_title(value):
+    """Casefold and strip accents, bracketed asides, punctuation, a leading
+    article and any generic publisher tail, so titles compare on the words that
+    actually identify the book (fork #1164)."""
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch)).casefold()
+    # Series markers and format notes: "(First Law World)", "[Unabridged]".
+    text = re.sub(r"[(\[{][^)\]}]*[)\]}]", " ", text)
+    text = "".join(ch if ch.isalnum() else " " for ch in text)
+    text = " ".join(text.split())
+    for article in _LEADING_ARTICLES:
+        if text.startswith(article):
+            text = text[len(article):]
+            break
+    for tail in _GENERIC_TITLE_TAILS:
+        if text.endswith(" " + tail):
+            stripped = text[: -(len(tail) + 1)].strip()
+            if stripped:
+                text = stripped
+                break
+    return text
+
+
+def _title_content_words(value):
+    """The identifying words of a title, in order, with joining words removed
+    (fork #1164). Order is kept so "Blood and Iron" doesn't match "Iron and
+    Blood"."""
+    return tuple(w for w in _normalize_title(value).split()
+                 if w not in _TITLE_STOPWORDS)
+
+
+def _title_similarity(left, right):
+    """0.0-1.0 similarity of two titles after normalization (fork #1164).
+
+    1.0 exactly when the identifying words are the same in the same order —
+    that is the only signal trusted to mean "the same book". Anything else is
+    scored on character similarity and must clear ``_TITLE_FUZZY_MATCH_MIN``,
+    which is set high enough that a sibling in the same series cannot pass.
+    """
+    a, b = _normalize_title(left), _normalize_title(right)
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    words_a, words_b = _title_content_words(left), _title_content_words(right)
+    if words_a and words_a == words_b:
+        return 1.0
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _author_surnames(authors):
+    """Normalized surnames for a book's or candidate's authors. Accepts ORM
+    author objects and the plain strings providers return."""
+    surnames = set()
+    for author in (authors or []):
+        name = author if isinstance(author, str) else getattr(author, "name", "")
+        normalized = _normalize_title(name)
+        if not normalized:
+            continue
+        tokens = normalized.split()
+        # Skip initials ("j.") so "J. Abercrombie" still agrees with "Joe
+        # Abercrombie" on the surname.
+        surname = tokens[-1]
+        if len(surname) > 2:
+            surnames.add(surname)
+    return surnames
+
+
+def _authors_agree(book_authors, candidate_authors):
+    """True when the book and candidate share an author surname (fork #1164).
+    Absence of author information on either side is not agreement."""
+    return bool(_author_surnames(book_authors) & _author_surnames(candidate_authors))
+
+
+def _select_metadata_result(results, book_isbn, book_title=None, book_authors=None):
+    """Pick the provider result that is actually the same book.
+
+    ISBN wins outright when the book carries one (fork #402). Otherwise — the
+    normal case for a freshly ingested EPUB, which has no ISBN — the candidates
+    are scored on title similarity and the BEST one is returned, but only if it
+    clears the confidence bar. ``None`` means "no candidate is plausibly this
+    book"; the caller must then apply nothing rather than fall back to a guess.
+
+    Before fork #1164 this fell through to ``results[0]`` whenever ISBN could not
+    decide, so whatever the provider ranked first was applied unconditionally —
+    which is how a search for "The Devils" overwrote the book with "The Heretics".
+
+    ``book_title``/``book_authors`` default to ``None`` for backwards
+    compatibility; when no title is supplied the legacy first-result behaviour is
+    kept, so the gate is only ever as strong as the caller. ``fetch_and_apply_
+    metadata`` always passes them and a test pins that call site.
+    """
     if book_isbn:
         target = _normalize_isbn(book_isbn)
         for result in results:
@@ -403,7 +541,41 @@ def _select_metadata_result(results, book_isbn):
                 candidate = identifiers.get(key)
                 if candidate and _normalize_isbn(candidate) == target:
                     return result
-    return results[0]
+
+    if not book_title:
+        return results[0]
+
+    best = None
+    best_score = 0.0
+    for result in results:
+        score = _title_similarity(book_title, getattr(result, "title", ""))
+        if score > best_score:
+            best, best_score = result, score
+
+    if best is None:
+        return None
+
+    if best_score < 1.0 and best_score < _TITLE_FUZZY_MATCH_MIN:
+        log.info(
+            "Rejected metadata for %r: closest candidate %r scored %.2f, below "
+            "the confidence bar — applying nothing rather than a different book",
+            book_title, getattr(best, "title", ""), best_score,
+        )
+        return None
+
+    # Titles can collide across genuinely different books. When both sides name
+    # an author and none of them agree, that's a different book, not an edition.
+    candidate_authors = getattr(best, "authors", None)
+    if (_author_surnames(book_authors) and _author_surnames(candidate_authors)
+            and not _authors_agree(book_authors, candidate_authors)):
+        log.info(
+            "Rejected metadata for %r: candidate %r matches on title but its "
+            "author differs — applying nothing rather than a different book",
+            book_title, getattr(best, "title", ""),
+        )
+        return None
+
+    return best
 
 
 def _has_meaningful_authors(book):

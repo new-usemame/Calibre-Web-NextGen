@@ -27,7 +27,7 @@ end
 local CWASync = WidgetContainer:extend{
     name = "cwasync",
     title = _("Login to NextGen Server"),
-    version = "4.1.23",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
+    version = "4.1.24",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
 
     push_timestamp = nil,
     pull_timestamp = nil,
@@ -1601,7 +1601,7 @@ function CWASync:syncAnnotations(interactive)
             if #diff.send_to_server > 0 or #deleted > 0 then
                 client:push_annotations(self.settings.username, self.settings.password, digest,
                     diff.send_to_server, deleted,
-                    function(ok2, _body2)
+                    function(ok2, _body2, reason)
                         -- Only once the server has it: a failed push must leave
                         -- the deletion pending, not forget it.
                         if ok2 and local_set_known then
@@ -1614,9 +1614,17 @@ function CWASync:syncAnnotations(interactive)
                                     timeout = 4,
                                 })
                             else
+                                -- Name the reason. On an e-reader, getting
+                                -- crash.log off the device is a chore, and a
+                                -- push that never reached the server leaves
+                                -- nothing in the server log to ask for either
+                                -- (#920) -- so the screen is the only place the
+                                -- user can read what went wrong.
                                 UIManager:show(InfoMessage:new{
-                                    text = T(_("Highlights synced: %1 to device. Server push failed."), applied),
-                                    timeout = 4,
+                                    text = reason
+                                        and T(_("Highlights synced: %1 to device. Server push failed: %2"), applied, reason)
+                                        or T(_("Highlights synced: %1 to device. Server push failed."), applied),
+                                    timeout = 6,
                                 })
                             end
                         end

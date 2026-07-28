@@ -14,6 +14,58 @@ local CWASyncClient = {
     service_url = nil,
 }
 
+-- Turn whatever a failed call produced into one line a user can read off the
+-- screen or find in crash.log.
+--
+-- Two shapes arrive here. A call that reached the server returns a response, so
+-- the useful fact is its status. A call that never got that far raises, and
+-- `pcall` hands back the error itself -- a string from the transport, or a table
+-- from lua-Spore.
+--
+-- This exists because both used to be thrown away. The failure was logged with
+-- `logger.dbg`, which KOReader suppresses unless the user has switched on debug
+-- logging, and the callback was handed `res.body` -- always nil on a raise,
+-- since the error is not a response. A push that never reached the server
+-- therefore left no trace on the device and none in the server log either, and
+-- "Server push failed" was the whole of what anyone could report. #920 survived
+-- three wrong diagnoses that way; the server's half of the same gap was closed
+-- in #1101, and this is the device's half.
+local function describeFailure(err)
+    if type(err) == "table" then
+        local detail = err.message or err.error or err.reason
+        if detail then return tostring(detail) end
+        if err.status then return "HTTP " .. tostring(err.status) end
+    elseif type(err) == "string" and err ~= "" then
+        return err
+    end
+    return "no response from server"
+end
+
+CWASyncClient.describeFailure = describeFailure
+
+
+-- Report a completed call. `reason` is nil when it succeeded, and otherwise
+-- names why, so callers never have to guess from a bare boolean.
+local function finish(callback, ok, res, label)
+    if ok then
+        local succeeded = res.status == 200
+        -- Not `succeeded and nil or ...`: that idiom cannot yield nil, so a
+        -- success would carry the reason "HTTP 200" and callers branching on
+        -- `reason` would treat every sync as failed.
+        local reason
+        if not succeeded then reason = "HTTP " .. tostring(res.status) end
+        callback(succeeded, res.body, reason)
+    else
+        logger.warn(label .. " failure:", res)
+        callback(false, nil, describeFailure(res))
+    end
+end
+
+-- Exposed for the offline tests: every sync call funnels its outcome through
+-- here, and the contract (a reason whenever ok is false) is what stops a
+-- failure going unreported again.
+CWASyncClient._reportOutcome = finish
+
 function CWASyncClient:new(o)
     if o == nil then o = {} end
     setmetatable(o, self)
@@ -121,8 +173,8 @@ function CWASyncClient:authorize(username, password)
     if ok then
         return res.status == 200, res.body
     else
-        logger.dbg("CWASyncClient:authorize failure:", res)
-        return false, res.body
+        logger.warn("CWASyncClient:authorize failure:", res)
+        return false, nil, describeFailure(res)
     end
 end
 
@@ -154,12 +206,7 @@ function CWASyncClient:update_progress(
                 device_id = device_id,
             })
         end)
-        if ok then
-            callback(res.status == 200, res.body)
-        else
-            logger.dbg("CWASyncClient:update_progress failure:", res)
-            callback(false, res.body)
-        end
+        finish(callback, ok, res, "CWASyncClient:update_progress")
     end)
     self.client:enable("AsyncHTTP", {thread = co})
     coroutine.resume(co)
@@ -186,12 +233,7 @@ function CWASyncClient:get_progress(
                 document = document,
             })
         end)
-        if ok then
-            callback(res.status == 200, res.body)
-        else
-            logger.dbg("CWASyncClient:get_progress failure:", res)
-            callback(false, res.body)
-        end
+        finish(callback, ok, res, "CWASyncClient:get_progress")
     end)
     self.client:enable("AsyncHTTP", {thread = co})
     coroutine.resume(co)
@@ -215,12 +257,7 @@ function CWASyncClient:pull_annotations(username, password, document, callback)
                 document = document,
             })
         end)
-        if ok then
-            callback(res.status == 200, res.body)
-        else
-            logger.dbg("CWASyncClient:pull_annotations failure:", res)
-            callback(false, res.body)
-        end
+        finish(callback, ok, res, "CWASyncClient:pull_annotations")
     end)
     self.client:enable("AsyncHTTP", {thread = co})
     coroutine.resume(co)
@@ -260,12 +297,7 @@ function CWASyncClient:push_annotations(username, password, document, annotation
                 delete_source = (deleted and #deleted > 0) and "koreader" or nil,
             })
         end)
-        if ok then
-            callback(res.status == 200, res.body)
-        else
-            logger.dbg("CWASyncClient:push_annotations failure:", res)
-            callback(false, res.body)
-        end
+        finish(callback, ok, res, "CWASyncClient:push_annotations")
     end)
     self.client:enable("AsyncHTTP", {thread = co})
     coroutine.resume(co)

@@ -38,11 +38,52 @@ def test_push_callback_binds_success_flag():
     # The callback's first parameter must be a usable name, not the discarded
     # `_ok2` it was before — otherwise the branch below can't gate on it.
     body = _read(MAIN_LUA)
-    assert "function(_ok2, _body2)" not in body, (
+    assert "function(_ok2," not in body, (
         "push_annotations callback must not discard its success flag as `_ok2`"
     )
-    assert "function(ok2, _body2)" in body, (
+    assert re.search(r"function\(ok2,\s*_body2", body), (
         "push_annotations callback must bind its success flag as `ok2`"
+    )
+
+
+def test_push_callback_binds_and_surfaces_the_failure_reason():
+    """A failed push must name why, not just that it failed.
+
+    #920: the reporter's server log recorded no push at all for a delete — the
+    request never left the device — while the screen said only "Server push
+    failed". The reason existed and was thrown away twice: `logger.dbg`, which
+    KOReader suppresses unless debug logging is on, and a callback handed
+    `res.body`, which is nil on a raise. With no trace on either side, three
+    diagnoses were guessed over ten days of the reporter's testing.
+
+    Getting crash.log off an e-reader is a chore, so the toast is the surface
+    that has to carry it.
+    """
+    body = _read(MAIN_LUA)
+    assert re.search(r"function\(ok2,\s*_body2,\s*reason\)", body), (
+        "push_annotations callback must bind the failure reason, not drop it"
+    )
+    assert '_("Highlights synced: %1 to device. Server push failed: %2")' in body, (
+        "the failure toast must name the reason when the client reports one"
+    )
+
+
+def test_sync_client_reports_a_reason_and_logs_where_users_can_see_it():
+    """The device half of the #1101 rejection-logging guarantee.
+
+    The server funnels every refusal through one `_reject` so the log cannot
+    regress to silence one branch at a time. The client needs the same: a sync
+    call that hand-rolls `logger.dbg` is invisible again, and only on that one
+    path — the hardest kind of gap to notice.
+    """
+    body = _read(PLUGIN_DIR / "CWASyncClient.lua")
+    assert "logger.dbg(" not in body, (
+        "no sync failure may log at dbg — KOReader suppresses it unless the user "
+        "turned on debug logging, which is how #920 lost its only device-side trace"
+    )
+    assert "logger.warn(" in body, "sync failures must log at warn"
+    assert "describeFailure" in body, (
+        "a failed call must be turned into a readable reason, not passed on as nil"
     )
 
 
@@ -55,7 +96,7 @@ def test_push_callback_branches_on_success():
         "push callback must gate the success toast behind `if ok2 then`"
     )
     assert '_("Highlights synced: %1 to device. Server push failed.")' in body, (
-        "push callback must show a distinct message when the server push fails"
+        "push callback must keep a message for when no reason is available"
     )
 
 

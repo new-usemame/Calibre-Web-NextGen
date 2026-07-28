@@ -44,7 +44,7 @@ SYNC_LOGIC_TEST_LUA = PLUGIN_DIR / "tests" / "sync_logic_test.lua"
 # a book whose file was replaced, #991). The bump is load-bearing here: the
 # Updates Manager compares this string to decide whether a device needs the new
 # plugin, so a device-side fix shipped without it would never reach anyone.
-EXPECTED_PLUGIN_VERSION = "4.1.23"
+EXPECTED_PLUGIN_VERSION = "4.1.24"
 
 
 def _read(path: Path) -> str:

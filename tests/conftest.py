@@ -63,7 +63,7 @@ def _get_test_uid_gid() -> tuple[str, str]:
 if USE_DOCKER_VOLUMES:
     print("\n🔄 Docker Volume mode enabled (USE_DOCKER_VOLUMES=true)")
     print("   Using Docker volumes instead of bind mounts for DinD compatibility\n")
-    from conftest_volumes import volume_copy, VolumePath
+    from tests.conftest_volumes import volume_copy, VolumePath
 else:
     # Bind mode by default, but support auto-fallback copying via docker cp
     class DockerPath:
@@ -453,10 +453,10 @@ def pytest_configure(config):
 
 TESTS_ROOT = Path(__file__).resolve().parent
 
-if str(TESTS_ROOT) not in sys.path:
-    sys.path.insert(0, str(TESTS_ROOT))
-
-from quarantine import QUARANTINED  # noqa: E402  (needs TESTS_ROOT on sys.path)
+# Imported through the `tests` package, never by bare name: putting TESTS_ROOT
+# on sys.path would make tests/docker/ shadow the installed Docker SDK. See
+# tests/__init__.py.
+from tests.quarantine import QUARANTINED  # noqa: E402
 
 #: Directory under tests/ -> the lane marker its tests belong to.
 LANE_BY_DIRECTORY = {
@@ -855,16 +855,7 @@ def sample_ebook_path(tmp_path) -> Path:
 
     Creates a fresh minimal EPUB for each test function.
     """
-    # Import relative to tests directory
-    import sys
-    from pathlib import Path as PathLib
-
-    # Add tests directory to path if not already there
-    tests_dir = PathLib(__file__).parent
-    if str(tests_dir) not in sys.path:
-        sys.path.insert(0, str(tests_dir))
-
-    from fixtures.generate_synthetic import create_minimal_epub
+    from tests.fixtures.generate_synthetic import create_minimal_epub
 
     epub_path = tmp_path / "test_sample.epub"
     create_minimal_epub(epub_path)
@@ -902,7 +893,7 @@ def library_folder(test_volumes: dict, container_name: str) -> Path:
 
 if USE_DOCKER_VOLUMES:
     # Import volume-based fixtures
-    from conftest_volumes import (
+    from tests.conftest_volumes import (
         test_volumes_dind,
         cwa_container_dind,
         ingest_folder_dind,

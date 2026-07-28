@@ -37,10 +37,10 @@ import pytest
 #: nothing at all.
 pytestmark = pytest.mark.unit
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from conftest import LANE_BY_DIRECTORY, LANE_MARKERS, lane_for_path  # noqa: E402
-from quarantine import QUARANTINED  # noqa: E402
+from tests.conftest import LANE_BY_DIRECTORY, LANE_MARKERS, lane_for_path  # noqa: E402
+from tests.quarantine import QUARANTINED  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 TESTS = REPO / "tests"

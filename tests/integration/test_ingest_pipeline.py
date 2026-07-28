@@ -21,15 +21,11 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import json
-import sys
 
-# Ensure fixtures directory is importable
-_tests_dir = Path(__file__).parent.parent
-if str(_tests_dir) not in sys.path:
-    sys.path.insert(0, str(_tests_dir))
-
-# Import volume_copy from conftest - works in both modes
-from conftest import volume_copy, get_db_path
+# Import volume_copy from conftest - works in both modes. Qualified through the
+# `tests` package: putting tests/ on sys.path would make tests/docker/ shadow
+# the installed Docker SDK. See tests/__init__.py.
+from tests.conftest import volume_copy, get_db_path
 
 
 @pytest.mark.docker_integration
@@ -101,7 +97,7 @@ class TestBookIngestInContainer:
     
     def test_ingest_multiple_files(self, ingest_folder, library_folder, tmp_path, cwa_container):
         """Test ingesting multiple files at once."""
-        from fixtures.generate_synthetic import create_minimal_epub
+        from tests.fixtures.generate_synthetic import create_minimal_epub
         
         # Create 3 test EPUBs
         test_files = []
@@ -172,7 +168,7 @@ class TestIngestErrorHandling:
     
     def test_ingest_corrupted_file(self, ingest_folder, tmp_path, cwa_container):
         """Test that corrupted files are handled gracefully."""
-        from fixtures.generate_synthetic import create_corrupted_epub
+        from tests.fixtures.generate_synthetic import create_corrupted_epub
         
         # Create corrupted file
         corrupted = tmp_path / "corrupted_test.epub"
@@ -252,7 +248,7 @@ class TestInternationalCharacters:
         - Nordic: åøæ
         - Polish: książka
         """
-        from fixtures.generate_synthetic import create_minimal_epub
+        from tests.fixtures.generate_synthetic import create_minimal_epub
         
         # Create EPUB with international characters in filename
         international_filename = "test_international_äöüß_éèêë_áéíóú_ñ_åøæ_książka.epub"
@@ -507,7 +503,7 @@ class TestAdvancedIngestFeatures:
         
         Users sometimes drag entire folders into the ingest directory.
         """
-        from fixtures.generate_synthetic import create_minimal_epub
+        from tests.fixtures.generate_synthetic import create_minimal_epub
         
         # Create a subdirectory with multiple files
         sub_dir = ingest_folder / "batch_import"
@@ -584,7 +580,7 @@ class TestFilenameHandling:
         """
         Test that empty directories are cleaned up after files are processed.
         """
-        from fixtures.generate_synthetic import create_minimal_epub
+        from tests.fixtures.generate_synthetic import create_minimal_epub
         
         # Create subdirectory with one file
         sub_dir = ingest_folder / "temp_folder"
@@ -649,7 +645,7 @@ class TestIngestStability:
         
         Regression test for memory leaks and resource exhaustion.
         """
-        from fixtures.generate_synthetic import create_minimal_epub
+        from tests.fixtures.generate_synthetic import create_minimal_epub
         
         num_files = 5  # Conservative number for CI
         created_files = []
@@ -696,7 +692,7 @@ class TestIngestStability:
         time.sleep(20)
         
         # Drop a valid file afterwards to verify ingest still works
-        from fixtures.generate_synthetic import create_minimal_epub
+        from tests.fixtures.generate_synthetic import create_minimal_epub
         local_valid_file = tmp_path / "after_zero_byte.epub"
         create_minimal_epub(local_valid_file)
         

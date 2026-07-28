@@ -31,12 +31,7 @@ def test_simple_epub_ingest(cwa_container, ingest_folder, library_folder):
     print("="*80)
     
     # Create a minimal EPUB
-    import sys
-    tests_dir = Path(__file__).parent
-    if str(tests_dir) not in sys.path:
-        sys.path.insert(0, str(tests_dir))
-    
-    from fixtures.generate_synthetic import create_minimal_epub
+    from tests.fixtures.generate_synthetic import create_minimal_epub
     
     epub_path = Path("/tmp/simple_test.epub")
     create_minimal_epub(epub_path)

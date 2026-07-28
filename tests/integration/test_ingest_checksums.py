@@ -108,7 +108,7 @@ class TestIngestChecksumGeneration:
 
     def test_epub_ingest_generates_checksum(self, cwa_container, ingest_folder, library_folder, test_epub):
         """Test that importing an EPUB generates a checksum."""
-        from conftest import volume_copy, get_db_path
+        from tests.conftest import volume_copy, get_db_path
 
         # Copy test EPUB to ingest folder
         volume_copy(test_epub, ingest_folder / "test.epub")
@@ -138,7 +138,7 @@ class TestIngestChecksumGeneration:
         self, cwa_container, ingest_folder, library_folder, test_mobi
     ):
         """Test that conversion generates checksums for both original and converted formats."""
-        from conftest import volume_copy, get_db_path
+        from tests.conftest import volume_copy, get_db_path
 
         # Enable auto-convert in settings (this might need API call to change settings)
         # For now, assume it's enabled by default or in test config
@@ -171,7 +171,7 @@ class TestIngestChecksumGeneration:
         self, cwa_container, ingest_folder, library_folder, test_epub
     ):
         """Test that books with multiple formats get checksums for each."""
-        from conftest import volume_copy, get_db_path
+        from tests.conftest import volume_copy, get_db_path
         import shutil
 
         # Copy same book with different extensions (simulating multi-format)
@@ -198,7 +198,7 @@ class TestIngestChecksumGeneration:
         self, container_name, ingest_folder, library_folder, test_epub
     ):
         """Test that checksums survive container restart."""
-        from conftest import volume_copy, get_db_path
+        from tests.conftest import volume_copy, get_db_path
         import subprocess
 
         # Ingest a book
@@ -240,7 +240,7 @@ class TestChecksumGenerationEdgeCases:
         self, cwa_container, ingest_folder, library_folder, tmp_path
     ):
         """Test that failed ingests don't leave orphan checksums."""
-        from conftest import volume_copy, get_db_path
+        from tests.conftest import volume_copy, get_db_path
 
         # Create an invalid file that will fail to ingest
         invalid_file = tmp_path / "invalid.epub"
@@ -263,7 +263,7 @@ class TestChecksumGenerationEdgeCases:
         self, cwa_container, ingest_folder, library_folder, test_epub
     ):
         """Test that re-importing a book updates or maintains checksum."""
-        from conftest import volume_copy, get_db_path
+        from tests.conftest import volume_copy, get_db_path
 
         # Import once
         volume_copy(test_epub, ingest_folder / "duplicate1.epub")
@@ -290,7 +290,7 @@ class TestChecksumGenerationEdgeCases:
         self, cwa_container, ingest_folder, library_folder, test_epub
     ):
         """Test that checksum is generated even if metadata fetch fails."""
-        from conftest import volume_copy, get_db_path
+        from tests.conftest import volume_copy, get_db_path
 
         # This test would need to disable metadata fetching or use a book
         # that won't match any metadata providers
@@ -392,7 +392,7 @@ class TestChecksumInitialization:
         self, cwa_container, library_folder
     ):
         """Test that existing books get checksums on first container startup."""
-        from conftest import get_db_path
+        from tests.conftest import get_db_path
 
         # This test assumes container was just started for the first time
         # and the init script ran

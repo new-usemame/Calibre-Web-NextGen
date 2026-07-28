@@ -15,13 +15,12 @@ shared between docker/ and integration/ test directories.
 """
 
 import pytest
-import sys
 from pathlib import Path
 
-# Add parent tests directory to path
+# Never put tests/ on sys.path — tests/docker/ would shadow the installed
+# Docker SDK and testcontainers could no longer import docker.context. See
+# tests/__init__.py.
 _tests_dir = Path(__file__).parent.parent
-if str(_tests_dir) not in sys.path:
-    sys.path.insert(0, str(_tests_dir))
 
 # Import and re-export from parent conftest (avoids circular import)
 import importlib.util

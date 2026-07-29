@@ -158,18 +158,27 @@ def test_custom_column_write_requires_the_edit_role():
 # ── outbound value contract (what edit_cc_data parses) ───────────────────────
 
 @pytest.mark.unit
-@pytest.mark.parametrize("raw,expected", [
-    (250, "250"),
-    (3.5, "3.5"),
-    ("Hardback", "Hardback"),
-    (True, "True"),
-    (False, "False"),
-    (None, ""),            # explicit null clears, matching '' in the classic form
-    (["a", "b"], "a, b"),  # is_multiple arrives as a list from the SPA
+@pytest.mark.parametrize("datatype,raw,expected", [
+    ("int", 250, "250"),
+    ("float", 3.5, "3.5"),
+    ("text", "Hardback", "Hardback"),
+    ("bool", True, "True"),
+    ("bool", False, "False"),
+    ("int", None, ""),          # explicit null clears, matching '' in the classic form
+    ("datetime", "2024-03-09", "2024-03-09"),
+    ("rating", "3.5", "3.5"),
 ])
-def test_write_value_normalization(raw, expected):
+def test_write_value_normalization(datatype, raw, expected):
     from cps.api import edit as mod
-    assert mod._custom_write_value(raw) == expected
+    value, err = mod._custom_write_value(_column(7, datatype), raw)
+    assert (value, err) == (expected, None)
+
+
+@pytest.mark.unit
+def test_multiple_value_column_accepts_a_list():
+    from cps.api import edit as mod
+    col = _column(7, "text", is_multiple=True)
+    assert mod._custom_write_value(col, ["a", "b"]) == ("a, b", None)
 
 
 @pytest.mark.unit
@@ -177,8 +186,98 @@ def test_bool_write_value_is_not_python_truthiness():
     """'False' must survive as the string edit_cc_data_value compares against;
     a plain str(0) or a falsy-collapse would clear the column instead."""
     from cps.api import edit as mod
-    assert mod._custom_write_value(False) == "False"
-    assert mod._custom_write_value(False) != ""
+    col = _column(7, "bool")
+    assert mod._custom_write_value(col, False) == ("False", None)
+
+
+# ── validation: values a form could not produce, but arbitrary JSON can ───────
+#
+# The core is shared with the classic editor and only ever sees browser-
+# constrained input, so it trusts what it gets. This endpoint does not have that
+# luxury. Each case below was confirmed against the running container before the
+# guard existed.
+
+@pytest.mark.unit
+def test_non_numeric_rating_is_rejected_not_a_500():
+    """edit_cc_data_string does int(float(v) * 2); edit_book_param catches only
+    DB errors, so a ValueError escaped as an unhandled 500 -- after any field
+    sent earlier in the same body had already committed."""
+    from cps.api import edit as mod
+    value, err = mod._custom_write_value(_column(6, "rating"), "not-a-number")
+    assert err and "number" in err.lower()
+    assert value == ""
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("bad", ["nan", "inf", "-inf", "Infinity"])
+def test_nan_and_infinity_are_rejected(bad):
+    """These survive float() but blow up in int(), so they reach the same 500."""
+    from cps.api import edit as mod
+    _, err = mod._custom_write_value(_column(6, "rating"), bad)
+    assert err is not None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("out_of_range", ["-1", "6", "99"])
+def test_rating_outside_zero_to_five_is_rejected(out_of_range):
+    """The store is 0-10 and the value is doubled on save, so 99 would write a
+    rating no UI can render back."""
+    from cps.api import edit as mod
+    _, err = mod._custom_write_value(_column(6, "rating"), out_of_range)
+    assert err is not None
+
+
+@pytest.mark.unit
+def test_unparseable_date_is_rejected_instead_of_erasing_the_stored_one():
+    """edit_cc_data_value swallows a strptime failure into calibre's year-101
+    DEFAULT_PUBDATE sentinel: the real date is gone and the caller is told
+    nothing. Verified live -- 2024-03-09 became 0101-01-01 with HTTP 200."""
+    from cps.api import edit as mod
+    col = _column(5, "datetime")
+    for bad in ["09/03/2024", "2024-3-9x", "not a date", {"year": 2026}]:
+        _, err = mod._custom_write_value(col, bad)
+        assert err is not None, f"{bad!r} must be rejected, not silently swallowed"
+    assert mod._custom_write_value(col, "2024-03-09") == ("2024-03-09", None)
+
+
+@pytest.mark.unit
+def test_non_numeric_text_is_rejected_for_numeric_columns():
+    """SQLite type affinity stores text in an INTEGER column without complaint,
+    so an unvalidated write silently corrupts the column's type."""
+    from cps.api import edit as mod
+    _, err = mod._custom_write_value(_column(2, "int"), "many")
+    assert err is not None
+    _, err = mod._custom_write_value(_column(2, "int"), "2.5")
+    assert err is not None, "an int column must not accept a fractional value"
+    assert mod._custom_write_value(_column(2, "int"), 250.0) == ("250", None)
+
+
+@pytest.mark.unit
+def test_structured_json_is_rejected():
+    """str({'year': 2026}) is garbage for every datatype -- reject the shape."""
+    from cps.api import edit as mod
+    _, err = mod._custom_write_value(_column(7, "comments"), {"year": 2026})
+    assert err is not None
+    _, err = mod._custom_write_value(_column(7, "comments"), ["a", "b"])
+    assert err is not None, "a single-value column must not accept a list"
+    _, err = mod._custom_write_value(_column(8, "text", is_multiple=True), [["a"]])
+    assert err is not None, "a nested list is not a value"
+
+
+@pytest.mark.unit
+def test_invalid_value_never_reaches_the_write_core():
+    """The guard must stop the call, not just annotate the response."""
+    from cps.api import edit as mod
+    with _ctx("/api/v1/books/5/metadata", body={"custom_column_6": "not-a-number"}):
+        with patch.object(mod, "current_user", _editor()), \
+             patch.object(mod, "calibre_db", SimpleNamespace(
+                 get_book=lambda _id: _book(),
+                 get_cc_columns=lambda *a, **k: [_column(6, "rating")])), \
+             patch.object(mod, "edit_book_param", return_value=_SUCCESS) as core, \
+             patch.object(mod, "get_locale", return_value="en"):
+            resp = inspect.unwrap(mod.update_metadata)(5)
+    assert core.call_count == 0
+    assert "custom_column_6" in resp.get_json()["errors"]
 
 
 # ── inbound value contract (seeding the form) ────────────────────────────────

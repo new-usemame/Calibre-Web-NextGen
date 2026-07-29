@@ -860,7 +860,7 @@ function CustomColumnField({ column, value, error, onChange }:
   const t = useT();
   const label = column.name || column.label;
 
-  if (column.datatype === 'bool') {
+  if (column.datatype === 'bool' && !column.is_multiple) {
     return (
       <Field label={label} error={error} grow={false}>
         <select className={styles.select} value={value} onChange={(e) => onChange(e.target.value)}>
@@ -872,7 +872,11 @@ function CustomColumnField({ column, value, error, onChange }:
     );
   }
 
-  if (column.datatype === 'enumeration') {
+  // is_multiple is checked before datatype for the single-value widgets below:
+  // calibre accepts --is-multiple on an enumeration, and rendering that as a
+  // one-of select would delete every other stored value the moment you picked
+  // one. Multi-value columns fall through to the comma-separated text input.
+  if (column.datatype === 'enumeration' && !column.is_multiple) {
     return (
       <Field label={label} error={error}>
         <select className={styles.select} value={value} onChange={(e) => onChange(e.target.value)}>
@@ -888,7 +892,7 @@ function CustomColumnField({ column, value, error, onChange }:
     );
   }
 
-  if (column.datatype === 'rating') {
+  if (column.datatype === 'rating' && !column.is_multiple) {
     return (
       <Field label={label} error={error} grow={false} composite>
         <RatingSelector value={value} onChange={onChange} />
@@ -896,7 +900,7 @@ function CustomColumnField({ column, value, error, onChange }:
     );
   }
 
-  if (column.datatype === 'comments') {
+  if (column.datatype === 'comments' && !column.is_multiple) {
     return (
       <Field label={label} error={error}>
         <textarea className={styles.textarea} rows={4} value={value}
@@ -905,7 +909,7 @@ function CustomColumnField({ column, value, error, onChange }:
     );
   }
 
-  if (column.datatype === 'datetime') {
+  if (column.datatype === 'datetime' && !column.is_multiple) {
     return (
       <Field label={label} error={error} grow={false}>
         <input className={styles.inputNarrow} type="date" value={value}
@@ -914,7 +918,7 @@ function CustomColumnField({ column, value, error, onChange }:
     );
   }
 
-  if (column.datatype === 'int' || column.datatype === 'float') {
+  if ((column.datatype === 'int' || column.datatype === 'float') && !column.is_multiple) {
     return (
       <Field label={label} error={error} grow={false}>
         <input className={styles.inputNarrow} type="number"

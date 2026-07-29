@@ -9,6 +9,7 @@ series/language parsing, activity logging, commit/rollback). The SPA edit form
 presents all fields together; we apply each changed field through that core.
 """
 import json
+from datetime import datetime
 
 from flask import jsonify, request, Response
 from flask_babel import get_locale
@@ -132,22 +133,78 @@ def _custom_column_payload(book):
     return payload
 
 
-def _custom_write_value(raw):
-    """Normalize a JSON custom-column value to the string ``edit_cc_data`` wants.
+def _custom_write_value(column, raw):
+    """Normalize and validate a JSON custom-column value into the string
+    ``edit_cc_data`` parses. Returns ``(value, error)``; ``error`` is None on OK.
 
     ``None`` clears (same as the classic form's empty field). Booleans are
     spelled out because ``edit_cc_data_value`` compares against the literal
     ``'True'``/``'False'`` -- ``str(False)`` happens to match, but a falsy
     collapse to ``''`` would clear the column instead of setting it to No.
     A list (how the SPA sends a multi-value column) is comma-joined.
+
+    Validation belongs here rather than in the core, because the core is shared
+    with the classic editor and only ever sees browser-constrained form input.
+    This endpoint takes arbitrary JSON, and the core reacts badly to values a
+    form could not produce:
+
+    * a non-numeric rating raises ``ValueError`` out of ``edit_cc_data_string``
+      (``int(float(v) * 2)``) -- an unhandled 500, and because every field
+      commits individually, one sent earlier in the same body has already landed;
+    * an unparseable datetime is swallowed into calibre's year-101 DEFAULT_PUBDATE
+      sentinel, so a stored date is erased and the caller is told nothing;
+    * a non-numeric string handed to an int/float column is stored as-is, because
+      SQLite's type affinity accepts text in a numeric column.
+
+    Rejecting is the right call over coercing: the value is user data, and
+    guessing what someone meant by a malformed date is how you lose the real one.
     """
     if raw is None:
-        return ""
+        return "", None
     if isinstance(raw, bool):
-        return "True" if raw else "False"
+        return ("True" if raw else "False"), None
+    if isinstance(raw, dict):
+        return "", "Expected a single value, not an object"
     if isinstance(raw, (list, tuple)):
-        return ", ".join(str(v) for v in raw if str(v).strip())
-    return str(raw)
+        if not column.is_multiple:
+            return "", "This column holds a single value"
+        if any(isinstance(v, (list, tuple, dict)) for v in raw):
+            return "", "Expected a list of plain values"
+        return ", ".join(str(v).strip() for v in raw if str(v).strip()), None
+
+    value = str(raw).strip()
+    if not value or column.is_multiple:
+        return value, None  # '' clears; multi-value entries are free text
+
+    datatype = column.datatype
+    if datatype in ("int", "float", "rating"):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return "", "Expected a number"
+        if number != number or number in (float("inf"), float("-inf")):
+            return "", "Expected a number"  # NaN/inf survive float() but not int()
+        if datatype == "int":
+            if number != int(number):
+                return "", "Expected a whole number"
+            return str(int(number)), None
+        if datatype == "rating":
+            # The classic editor's control is 1-5 in half steps, and the store is
+            # 0-10; anything outside that writes a rating no UI can render back.
+            if not 0 <= number <= 5:
+                return "", "Expected a rating between 0 and 5"
+        return value, None
+    if datatype == "datetime":
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            return "", "Expected a date as YYYY-MM-DD"
+        return value, None
+    if datatype == "bool":
+        if value not in ("True", "False"):
+            return "", "Expected true or false"
+        return value, None
+    return value, None
 
 
 def _editable_metadata(book):
@@ -295,13 +352,18 @@ def update_metadata(book_id):
     # a bad key look like a successful save.
     custom_keys = [k for k in data if isinstance(k, str) and k.startswith(CUSTOM_COLUMN_PREFIX)]
     if custom_keys:
-        editable = {CUSTOM_COLUMN_PREFIX + str(c.id) for c in _custom_column_defs()}
+        editable = {CUSTOM_COLUMN_PREFIX + str(c.id): c for c in _custom_column_defs()}
         for key in custom_keys:
-            if key not in editable:
+            column = editable.get(key)
+            if column is None:
                 errors[key] = "Unknown or non-editable custom column"
                 continue
-            vals = {"pk": str(book_id), "value": _custom_write_value(data[key])}
-            ok, message = _parse_edit_result(edit_book_param(key, vals))
+            value, invalid = _custom_write_value(column, data[key])
+            if invalid:
+                errors[key] = invalid
+                continue
+            ok, message = _parse_edit_result(
+                edit_book_param(key, {"pk": str(book_id), "value": value}))
             if not ok:
                 errors[key] = message
 

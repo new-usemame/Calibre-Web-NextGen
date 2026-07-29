@@ -65,17 +65,21 @@ def release_url_for_version(version):
     the exact release tag only when the string parses as a release tag
     (``vX.Y.Z`` / ``X.Y.Z``); otherwise we fall back to the repository's
     releases listing, which always resolves. Returns ``None`` when there is
-    no meaningful target (empty / ``"Unknown"`` / the unknown sentinel) so
-    the caller renders plain text instead of a dead link. The sentinel needs
-    its own case precisely because it *does* parse as a release tag, and
-    ``v0.0.0`` was never published (fork #1231). The slug is shared with
-    ``_REPOSITORY_API_URL`` so the link follows the same
-    ``CWA_RELEASE_REPO`` override.
+    no meaningful target (empty / ``"Unknown"`` / an unstamped build) so the
+    caller renders plain text instead of a dead link. The sentinel needs its
+    own case precisely because it *does* parse as a release tag, so without
+    one an unstamped build links to a ``v0.0.0`` tag that was never published
+    (fork #1231). That case is gated on ``VERSION_IS_STAMPED`` rather than on
+    the string alone: the slug is shared with ``_REPOSITORY_API_URL`` and
+    follows the same ``CWA_RELEASE_REPO`` override, so a downstream fork
+    really can be running a published ``v0.0.0`` — and that one should link.
     """
     if not version:
         return None
     tag = version.strip()
-    if not tag or tag.lower() == "unknown" or tag == constants.UNKNOWN_VERSION:
+    if not tag or tag.lower() == "unknown":
+        return None
+    if tag == constants.UNKNOWN_VERSION and not constants.VERSION_IS_STAMPED:
         return None
     base = "https://github.com/" + _REPOSITORY_SLUG
     if _normalize_tag(tag) is not None:

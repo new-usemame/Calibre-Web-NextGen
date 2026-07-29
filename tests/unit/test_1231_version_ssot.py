@@ -107,7 +107,41 @@ _BASE = "https://github.com/" + _updater._REPOSITORY_SLUG
 
 def test_unknown_sentinel_returns_no_link():
     """The whole point of #1231's regression: v0.0.0 parses as a tag."""
+    # The suite runs unstamped (no /app/CWA_RELEASE, no env override), which
+    # is exactly the state this guards.
+    assert _constants.VERSION_IS_STAMPED is False
     assert release_url_for_version(_constants.UNKNOWN_VERSION) is None
+
+
+def test_a_genuinely_published_v0_0_0_still_links(monkeypatch):
+    """The sentinel must not swallow a downstream fork's real v0.0.0.
+
+    ``CWA_RELEASE_REPO`` repoints the slug, so a fork can legitimately publish
+    a ``v0.0.0`` tag. Suppressing on the string alone would hide a link that
+    resolves — the suppression is about *not having been stamped*, not about
+    the digits.
+    """
+    monkeypatch.setattr(_updater.constants, "VERSION_IS_STAMPED", True)
+    assert release_url_for_version("v0.0.0") == _BASE + "/releases/tag/v0.0.0"
+
+
+def test_stamped_flag_is_false_exactly_when_nothing_was_stamped(monkeypatch):
+    """VERSION_IS_STAMPED must track the source, not the resulting string."""
+    monkeypatch.setenv("CWA_INSTALLED_VERSION", "v9.9.9")
+    reloaded = _load("cps.constants", "cps/constants.py")
+    assert reloaded.VERSION_IS_STAMPED is True
+    assert reloaded.INSTALLED_VERSION == "v9.9.9"
+
+    # An explicit env value that happens to equal the sentinel is still stamped.
+    monkeypatch.setenv("CWA_INSTALLED_VERSION", "v0.0.0")
+    reloaded = _load("cps.constants", "cps/constants.py")
+    assert reloaded.VERSION_IS_STAMPED is True
+    assert reloaded.INSTALLED_VERSION == "v0.0.0"
+
+    monkeypatch.delenv("CWA_INSTALLED_VERSION", raising=False)
+    reloaded = _load("cps.constants", "cps/constants.py")
+    assert reloaded.VERSION_IS_STAMPED is False
+    assert reloaded.INSTALLED_VERSION == reloaded.UNKNOWN_VERSION
 
 
 def test_unknown_sentinel_is_the_literal_we_think_it_is():

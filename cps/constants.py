@@ -192,7 +192,16 @@ UNKNOWN_VERSION = "v0.0.0"
 # published* version deliberately does NOT live here — a module-level binding
 # read once at import can never go anything but stale (fork #1108). It is
 # resolved on demand and cached by cps/services/latest_release.py.
-INSTALLED_VERSION = os.environ.get("CWA_INSTALLED_VERSION") or _read_text("/app/CWA_RELEASE", UNKNOWN_VERSION)
+_stamped_version = os.environ.get("CWA_INSTALLED_VERSION") or _read_text("/app/CWA_RELEASE", "")
+
+# Whether the build actually stamped a version, as opposed to us falling back
+# to the sentinel. The version string alone cannot answer this: UNKNOWN_VERSION
+# is a well-formed version, so a downstream fork pointing CWA_RELEASE_REPO at
+# its own repo could legitimately be running a published v0.0.0. Only this
+# module knows which of the two happened, so it has to say so out of band.
+VERSION_IS_STAMPED = bool(_stamped_version)
+
+INSTALLED_VERSION = _stamped_version or UNKNOWN_VERSION
 
 USER_AGENT = f"Calibre-Web-NextGen/{INSTALLED_VERSION}"
 

@@ -6,6 +6,7 @@ properties, but two gaps remained: fuzzy/empty French catalog entries are
 absent from the SPA catalog, and default smart-shelf names are canonical
 English database values rendered as if they were already display text.
 """
+import ast
 import importlib.util
 import re
 from pathlib import Path
@@ -36,18 +37,54 @@ def _load_extractor():
     return mod
 
 
+def _anchored_spa_msgids():
+    """Every msgid the project has declared it ships for SPA translation.
+
+    ``cps/spa_strings.py`` is that declaration: pybabel does not scan ``.tsx``,
+    so a string reaches the catalogs only by being anchored there. Anchored
+    therefore means "we translate this"; absent means "English by design"
+    (release-note entry copy) — which is exactly the boundary the gate wants.
+    """
+    source = (ROOT / "cps" / "spa_strings.py").read_text(encoding="utf-8")
+    return {
+        node.args[0].value
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in ("_", "N_")
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    }
+
+
 def _spa_chrome_keys():
     """SPA translation keys that make up the app's own interface.
 
-    Excludes keys that occur *only* in the release-note data file; a key used
-    both there and in real chrome stays in the set.
+    Derived from what the project *ships* for translation, not from how the
+    frontend happens to spell the call. Deriving it from ``t()`` call sites
+    alone is what let #1223 through: a string only counts there if its literal
+    sits at the call, so anything data-authored or computed is invisible —
+    the filter-operator list, theme and sort names, the Ko-fi banner and the
+    What's New buttons all render through a variable. 89 anchored strings were
+    unchecked that way, and fr/nl certified 732/732 with 43 and 76 of them
+    still English. #1221 was the same drift in miniature (system shelf names
+    arriving via ``N_()`` in ``cps/magic_shelf.py``) and got a bespoke test;
+    two instances argue for fixing the derivation instead of adding a third.
+
+    Frontend-extracted keys stay unioned in as defence in depth: a ``t()``
+    literal nobody anchored is missing from every catalog, and this set is
+    where that should fail. Release-note *entry copy* is still excluded —
+    it is English by design and is never anchored — while the deep-link
+    button labels beside it are anchored, so they are gated like any chrome.
     """
     keys = _load_extractor().extract_frontend_keys()
-    return {
+    frontend = {
         msgid
         for msgid, sources in keys.items()
         if not all(src == RELEASE_NOTE_SOURCE for src in sources)
     }
+    return frontend | _anchored_spa_msgids()
 
 
 def _live_catalog(locale):

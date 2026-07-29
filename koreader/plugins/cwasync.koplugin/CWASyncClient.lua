@@ -281,10 +281,17 @@ end
 -- has since removed. The server never infers a deletion from an omission (#920),
 -- so anything not named here is left alone.
 --
--- Every key sent must be listed in api.json's `payload` for push_annotations:
--- lua-Spore rebuilds the request body from exactly that list and silently drops
--- everything else (Spore.lua:137-141), which is how #906's `complete` flag was
--- thrown away before it ever reached the wire.
+-- Every key sent must be listed TWICE in api.json for push_annotations, in two
+-- lists that Spore treats as unrelated:
+--   * `payload` — Spore rebuilds the request body from exactly that list and
+--     silently drops everything else, which is how #906's `complete` flag was
+--     thrown away before it ever reached the wire.
+--   * `required_params` or `optional_params` — Spore's validate() runs first and
+--     raises "<key> is not expected for method push_annotations" on any name it
+--     was not told to expect. #924 declared these two in `payload` alone, so
+--     every delete cycle died inside the plugin and no request went out (#920).
+-- Declaring one and not the other is not caught by review or by a server-side
+-- HTTP test; tests/unit/test_cwasync_plugin_wire_contract.py pins both.
 function CWASyncClient:push_annotations(username, password, document, annotations, deleted, callback)
     self.client:reset_middlewares()
     self.client:enable("Format.JSON")

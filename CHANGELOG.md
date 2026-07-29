@@ -18,6 +18,19 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Deleting a highlight in KOReader now actually removes it from the server.**
+  Creating highlights synced fine, but deleting one reported "Server push
+  failed" and the deletion never went anywhere — reopen the book on another
+  device and the highlight was still there. The push was failing inside the
+  plugin before it ever became a request, so nothing showed up in the server log
+  either, which is why this took several passes to find. The KOReader plugin is
+  updated to 4.1.25; open KOReader's Updates Manager to pick it up, or the plugin
+  page in its menu will show the new version. Reported by
+  [@iroQuai](https://github.com/new-usemame/Calibre-Web-NextGen/issues/920)
+  ([#920](https://github.com/new-usemame/Calibre-Web-NextGen/issues/920),
+  [#905](https://github.com/new-usemame/Calibre-Web-NextGen/issues/905),
+  [#699](https://github.com/new-usemame/Calibre-Web-NextGen/issues/699)).
+
 - **The version number on the admin page no longer links to a release that
   doesn't exist.** On a build that was never stamped with a version — running
   from a source checkout rather than one of the published Docker images — the

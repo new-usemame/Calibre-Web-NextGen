@@ -40,11 +40,13 @@ SYNC_LOGIC_TEST_LUA = PLUGIN_DIR / "tests" / "sync_logic_test.lua"
 # Standing rule: plugin version mirrors the CWNG release tag (drop the `v`).
 # Update this in lockstep with main.lua on every plugin-touching release — it is
 # a deliberate forcing function, not a value to read dynamically. Currently
-# 4.1.23 (the release that stops the plugin reporting a stale cached digest for
-# a book whose file was replaced, #991). The bump is load-bearing here: the
-# Updates Manager compares this string to decide whether a device needs the new
-# plugin, so a device-side fix shipped without it would never reach anyone.
-EXPECTED_PLUGIN_VERSION = "4.1.24"
+# 4.1.25 (the release that lets a KOReader highlight deletion reach the server at
+# all: `api.json` declared `deleted`/`delete_source` for the body but not as
+# expected params, so lua-Spore's validate() raised and the push was never built,
+# #920). The bump is load-bearing here: the Updates Manager compares this string
+# to decide whether a device needs the new plugin, so a device-side fix shipped
+# without it would never reach anyone.
+EXPECTED_PLUGIN_VERSION = "4.1.25"
 
 
 def _read(path: Path) -> str:

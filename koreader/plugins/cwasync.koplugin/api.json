@@ -48,6 +48,10 @@
                 "document",
                 "annotations"
             ],
+            "optional_params" : [
+                "deleted",
+                "delete_source"
+            ],
             "payload" : [
                 "document",
                 "annotations",

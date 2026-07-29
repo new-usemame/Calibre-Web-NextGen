@@ -32,3 +32,14 @@ TESTING*.md
 # build must never leak into the context (keeps builds reproducible + lean).
 frontend/node_modules
 cps/static/app/
+
+# Runtime state must never be baked into the image. A developer who mounts
+# /config at the repo root (the documented local-dev setup) otherwise ships
+# their own .cwa_migrations markers inside the build — and a marker present on
+# a fresh install makes the migration it gates get *skipped*, so the install
+# silently never runs it. CI builds from a clean checkout and was never
+# affected; local images were (#1162).
+.cwa_migrations/
+app.db
+*.db-wal
+*.db-shm

@@ -1569,9 +1569,10 @@ function CWASync:syncAnnotations(interactive)
             -- Whether we can actually enumerate the device's annotations. When
             -- we cannot, `localList` below is a placeholder, NOT an empty set —
             -- reading it as "the user deleted everything" would destroy the
-            -- library (#920).
-            local local_set_known = (provider.push_all_local or volume_id) and true or false
-            local localList = local_set_known and provider.readAll(volume_id) or {}
+            -- library (#920). The provider is picked before the pull and read
+            -- after it, so the reader can be torn down in between; only the read
+            -- itself can answer this, never a capability flag.
+            local localList, local_set_known = SyncLogic.resolveLocalSet(provider, volume_id)
             local diff = SyncLogic.diffAnnotations(localList, remote)
             if provider.push_all_local then
                 -- Phase 1 native KOReader provider: retries the complete local

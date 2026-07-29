@@ -133,9 +133,16 @@ local function open_db()
 end
 
 -- Read every highlight Bookmark for a VolumeID -> portable list.
+--
+-- Returns nil, not {}, when the device's set could not be read. KoboReader.sqlite
+-- is a live database owned by Nickel: it can be locked, the SD card can be
+-- detached, the schema can move. Reporting those as "this device has no
+-- highlights" is what turns a transient read failure into a permanent deletion,
+-- because the caller diffs this list against the watermark to name deletes
+-- (#920). An unreadable device knows nothing, and nothing is not empty.
 function KoboSqliteProvider.readAll(volume_id)
     local ok, conn = pcall(open_db)
-    if not ok then return {} end
+    if not ok then return nil end
     local out = {}
     local ok2, err = pcall(function()
         local stmt = conn:prepare(
@@ -156,7 +163,7 @@ function KoboSqliteProvider.readAll(volume_id)
         stmt:close()
     end)
     conn:close()
-    if not ok2 then return {} end
+    if not ok2 then return nil end
     return out
 end
 

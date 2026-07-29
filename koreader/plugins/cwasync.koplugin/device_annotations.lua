@@ -9,9 +9,18 @@ interface; nothing else in the plugin needs to change when it lands.
 
 Provider interface:
     available()                       -> bool   (is this provider usable here?)
-    readAll(volume_id)                -> list    (device's annotations, portable)
+    readAll(volume_id)                -> list|nil (device's annotations, portable;
+                                                  nil when they could not be read)
     applyToDevice(portables, vol_id)  -> count   (write server annotations locally)
     backup()                          -> path|false
+
+`readAll` returning nil rather than {} is load-bearing, not a style choice. The
+caller diffs the returned list against the ids it last pushed to name deletions,
+so "could not read" and "the user deleted everything" produce opposite actions
+from the same empty table. Providers must therefore report failure as nil and
+reserve {} for a device that genuinely holds no highlights (#920). Read the
+result through SyncLogic.resolveLocalSet, which enforces this and treats a
+provider that throws as unreadable too.
 ]]--
 
 local DeviceAnnotations = {}

@@ -211,6 +211,66 @@ local function testResolveDocumentDigest()
         "cached", "a non-string computed value is treated as absent")
 end
 
+-- The device half of #920. `computeDeletions` is only sound when the list it is
+-- handed was genuinely read off the device, and the thing that decided that used
+-- to be `push_all_local` — a constant, true for the KOReader provider on every
+-- call, including the ones where the read returned nothing because the reader
+-- had gone away. These pin that an unreadable device reports `known = false`,
+-- which is what stops its whole watermark from being named for deletion.
+local function testResolveLocalSet()
+    local function providerReturning(value, extra)
+        local p = { readAll = function() return value end }
+        for k, v in pairs(extra or {}) do p[k] = v end
+        return p
+    end
+
+    -- A read that succeeded and found nothing. This IS authoritative: the user
+    -- deleted their last highlight (#905) and the deletion must still sync.
+    local list, known = SyncLogic.resolveLocalSet(
+        providerReturning({}, { push_all_local = true }))
+    assertEqual(known, true, "a successful read of an empty device is known")
+    assertEqual(#list, 0, "and yields an empty list")
+    assertEqual(#SyncLogic.computeDeletions({ "a" }, list), 1,
+        "so deleting the last highlight still reaps (#905)")
+
+    -- A read that could not happen. Same empty table on the wire, opposite
+    -- meaning: the device is not saying anything about its highlights.
+    list, known = SyncLogic.resolveLocalSet(
+        providerReturning(nil, { push_all_local = true }))
+    assertEqual(known, false, "a provider that could not read is not known")
+    assertEqual(#list, 0, "and still yields a safe empty list to diff against")
+
+    -- The regression this exists to stop: unknown must never become deletions.
+    assertEqual(known and #SyncLogic.computeDeletions({ "a", "b" }, list) or 0, 0,
+        "an unreadable device deletes nothing, however full its watermark (#920)")
+
+    -- A provider that raises is the least trustworthy answer, not an empty one.
+    list, known = SyncLogic.resolveLocalSet({
+        push_all_local = true,
+        readAll = function() error("reader torn down") end,
+    })
+    assertEqual(known, false, "a provider that throws is unreadable, not empty")
+    assertEqual(#list, 0, "and still returns a list callers can diff")
+
+    -- A non-list return (a provider bug, or a stub) is not a set either.
+    assertEqual(select(2, SyncLogic.resolveLocalSet(
+        providerReturning("nope", { push_all_local = true }))), false,
+        "a non-table read result is not a set")
+
+    -- The Kobo provider addresses rows by VolumeID. Without one it cannot read
+    -- the device, so it must not be trusted to have read an empty one.
+    assertEqual(select(2, SyncLogic.resolveLocalSet(providerReturning({}))), false,
+        "a volume-addressed provider with no volume_id has read nothing")
+    assertEqual(select(2, SyncLogic.resolveLocalSet(providerReturning({}), "vol-1")), true,
+        "the same provider with a volume_id has genuinely read")
+
+    -- Absent/malformed providers fail closed rather than erroring.
+    assertEqual(select(2, SyncLogic.resolveLocalSet(nil)), false,
+        "a missing provider is unreadable")
+    assertEqual(select(2, SyncLogic.resolveLocalSet({})), false,
+        "a provider with no readAll is unreadable")
+end
+
 testIsRemoteProgressFromThisDevice()
 testDidBookProgressChange()
 testMergeAnnotation()
@@ -218,5 +278,6 @@ testDiffAnnotations()
 testComputeDeletions()
 testAnnotationIds()
 testResolveDocumentDigest()
+testResolveLocalSet()
 
 print("sync_logic tests passed")

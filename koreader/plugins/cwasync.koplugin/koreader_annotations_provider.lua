@@ -49,8 +49,16 @@ local function toPortable(annotation)
     }
 end
 
+-- Returns nil, not {}, when the reader's annotation collection cannot be read.
+--
+-- The provider is chosen once, before the pull, and read again after it — a gap
+-- of up to one HTTP round trip (ANNOTATION_TIMEOUTS, 15s), during which the user
+-- can close the book and KOReader can tear `ui.annotation` down. Returning {}
+-- there would say "the user deleted every highlight" and the caller would name
+-- each one to the server, which obeys explicit deletes and never un-hides a
+-- tombstone (#920). Unreadable is not empty.
 function Provider.readAll(_volume_id)
-    if not Provider.available() then return {} end
+    if not Provider.available() then return nil end
     local out = {}
     for _, annotation in ipairs(Provider.ui.annotation.annotations) do
         -- A page bookmark with neither selected text nor note is not a

@@ -60,11 +60,14 @@ jobs:
         with:
           python-version: '3.13'
           cache: 'pip'
-      
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libldap2-dev libsasl2-dev libssl-dev gettext
+          # lua5.4 runs the cwasync KOReader plugin's own test suites. They are
+          # pure logic with no KOReader imports and had no CI runner until now,
+          # so the plugin's sync-safety logic was gated by nothing (#920).
+          sudo apt-get install -y libldap2-dev libsasl2-dev libssl-dev gettext lua5.4
 
       - name: Install dependencies
         run: |

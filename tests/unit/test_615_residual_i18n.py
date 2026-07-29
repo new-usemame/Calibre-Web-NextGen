@@ -72,21 +72,36 @@ def _live_catalog(locale):
     }
 
 
+# Locales we have deliberately completed for the new UI and now hold at 100%.
+# Adding one here means every future SPA string must be translated into it
+# before CI goes green, so the list is opt-in per locale rather than "every
+# locale we ship" — gating all 28 would put a 28-translation step in front of
+# every new label (#1217).
+#
+# Russian is at 100% too but is intentionally NOT gated: it is maintained by a
+# community translator on their own cadence, and gating it would stall our
+# release train on someone else's availability rather than on our own work.
+COMPLETE_LOCALES = ("fr", "nl")
+
+
 @pytest.mark.unit
-def test_french_spa_chrome_is_fully_translated():
-    """Every SPA interface string resolves to French for a French user.
+@pytest.mark.parametrize("locale", COMPLETE_LOCALES)
+def test_completed_locale_spa_chrome_is_fully_translated(locale):
+    """Every SPA interface string resolves for a user on a completed locale.
 
     This is the #615 symptom itself: the SPA's English source strings are the
     msgids, so an untranslated entry doesn't fail loudly — it renders the
     English source. That made a 33%-translated interface look like a handful of
-    stray strings, and @hayvan96 had to find them screen by screen. Pinning the
-    whole set means the next gap fails here instead of in a user's screenshot.
+    stray strings, and @hayvan96 had to find them screen by screen. Dutch then
+    reproduced it from the other end (#886): @iroQuai reported "mixed language"
+    labels on a catalog that was only 10% filled. Pinning the whole set means
+    the next gap fails here instead of in a user's screenshot.
     """
-    missing = sorted(_spa_chrome_keys() - set(_live_catalog("fr")))
+    missing = sorted(_spa_chrome_keys() - set(_live_catalog(locale)))
     assert missing == [], (
-        f"{len(missing)} SPA interface string(s) have no French translation and "
-        f"will render in English (#615). Add them to "
-        f"cps/translations/fr/LC_MESSAGES/messages.po. Missing: {missing[:15]}"
+        f"{len(missing)} SPA interface string(s) have no {locale} translation "
+        f"and will render in English (#615/#1217). Add them to "
+        f"cps/translations/{locale}/LC_MESSAGES/messages.po. Missing: {missing[:15]}"
     )
 
 
@@ -119,6 +134,34 @@ def test_spa_placeholders_survive_translation(locale):
     assert offenders == [], (
         f"{locale}: {len(offenders)} SPA translation(s) changed their "
         f"placeholders, which breaks substitution at render time: {offenders[:5]}"
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("locale", COMPLETE_LOCALES)
+def test_completed_locale_translates_system_shelf_names(locale):
+    """System smart-shelf names are translated for a completed locale.
+
+    These render on the library sidebar next to the SPA chrome, but they enter
+    the catalog from ``cps/magic_shelf.py`` via ``N_()`` rather than from a
+    frontend ``t()`` call, so ``_spa_chrome_keys()`` cannot see them and the
+    coverage gate above skipped them. Dutch shipped at 100% SPA coverage with
+    all five of these still empty, which left "Currently Reading" sitting in
+    English in an otherwise Dutch sidebar — the exact mixed-language symptom
+    #886 was filed about.
+    """
+    from cps.magic_shelf import SYSTEM_SHELF_TEMPLATES
+
+    catalog = _live_catalog(locale)
+    untranslated = sorted(
+        template["name"]
+        for template in SYSTEM_SHELF_TEMPLATES.values()
+        if template["name"] not in catalog
+    )
+    assert untranslated == [], (
+        f"{locale}: {len(untranslated)} system smart-shelf name(s) render in "
+        f"English in an otherwise translated sidebar (#886). Add them to "
+        f"cps/translations/{locale}/LC_MESSAGES/messages.po: {untranslated}"
     )
 
 

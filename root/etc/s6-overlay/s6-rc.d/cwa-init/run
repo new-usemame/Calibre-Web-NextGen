@@ -26,7 +26,7 @@ done
 
 # Verify essential files exist
 echo "[cwa-init] Verifying essential files..."
-for file in "/app/CWA_RELEASE" "/CALIBRE_RELEASE"; do
+for file in "/app/CWA_RELEASE" "/app/CALIBRE_RELEASE"; do
   if [[ ! -f "$file" ]]; then
     echo "[cwa-init] WARNING: Expected file $file does not exist"
   else

@@ -535,7 +535,7 @@ def cwa_get_package_versions() -> tuple[str, str, str, str]:
         kepubify_version = "Unknown"
 
     try:
-        with open("/CALIBRE_RELEASE", "r") as f:
+        with open("/app/CALIBRE_RELEASE", "r") as f:
             calibre_version = f.read()
     except Exception:
         calibre_version = "Unknown"

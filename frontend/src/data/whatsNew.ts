@@ -56,6 +56,40 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.24',
+    date: '2026-07-29',
+    items: [
+      {
+        title: 'KOReader no longer deletes highlights it was unable to read',
+        body: 'To work out what you removed, the plugin compares the highlights on your device now against the ones it last sent, and anything missing is reported to the server as a deletion. A read that came back with nothing — a book closed mid-sync, a locked database, an SD card pulled — was indistinguishable from a book you had cleared by hand, so every highlight in it was deleted, permanently. A sync that cannot see your highlights now leaves them alone; update the NextGen Progress Sync plugin to 4.1.24 on each device to pick this up.',
+        category: 'Sync',
+        link: { to: '/account', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'The new interface now reads in French and Dutch throughout',
+        body: 'With the interface set to French or Dutch, much of it still showed English: the sidebar, search, upload, book pages, shelves and settings, along with the appearance and theme options and the whole list of search filter conditions. Nothing failed when this happened — a phrase with no translation quietly renders the English one — so it lasted until someone reading the screens noticed. Both languages are now complete across all 821 phrases the interface can translate, with wording matched to the older screens so tags and shelves keep one name everywhere; Russian is complete too.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'Your install notices new releases again',
+        body: 'The "update available" line on the admin page compared your version against a release list fetched once, when the container started. An install that had been running for a week was still comparing against week-old information, and restarting the container is the one thing someone who does not know an update exists has no reason to do. The latest release is now looked up when you open the page.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'A failed KOReader sync now tells you why',
+        body: 'A sync that did not go through reported only "Server push failed". The plugin knew the reason and discarded it into a debug log that is off unless you have turned it on, so a sync that never left the device looked exactly like one the server had rejected. The reason now appears on screen and is recorded in crash.log.',
+        category: 'Sync',
+      },
+      {
+        title: 'Adding a book no longer fills the log with permission warnings',
+        body: 'Every book that came in printed five warnings about a folder it could not write to. Nothing visible was broken, but because the one-time database upgrades could never record that they had finished, they ran again from scratch on every single import. The background services now agree on where the app keeps its own files, so the upgrades run once and the log stays quiet.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.23',
     date: '2026-07-28',
     items: [

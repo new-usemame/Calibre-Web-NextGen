@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.24] - 2026-07-29
+
 ### Fixed
 
 - **The "Browse languages" button on the What's New page now reads in Russian.** Russian is otherwise fully translated, so this one phrase sat in English on a screen that already said "Просмотр авторов" and "Просмотр тегов" right beside it. The new interface uses its English text as the lookup key, so a missing translation quietly renders the English rather than reporting anything — which is how a single gap like this survives until someone reading the page notices it. Russian is now complete at 2,606 of 2,606 phrases. Contributed by [@standhaftsohnsergius](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1220) ([#1220](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1220)).

@@ -29,6 +29,22 @@ is for things you can see or feel when running the app.
   [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1231)
   ([#1231](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1231)).
 
+- **Brazilian Portuguese covers 120 more of the interface, and 57 phrases that
+  were holding the wrong text are corrected.** With the language set to
+  Brazilian Portuguese, the Hardcover match-review screens, the announcement
+  email form, backup and restore messages, the app-password help text and a
+  long tail of task and error messages still read in English. Some of those
+  were worse than untranslated: gettext had guessed them from a similar English
+  sentence and marked the guess provisional, so the file was holding Portuguese
+  that said something else entirely — "Hardcover ID applied successfully" was
+  carrying the text for "{} user(s) removed successfully", and "Email Your
+  Users" was carrying "Edit Users". A provisional entry is dropped when the
+  catalog is compiled, so those showed in English while the wrong Portuguese sat
+  in the file waiting for somebody to confirm it. All 57 are now written out
+  properly, which takes Brazilian Portuguese to 1,409 of 2,609 phrases.
+  Contributed by [@pedronora](https://github.com/pedronora)
+  ([#1227](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1227)).
+
 ### Added
 
 - **Custom columns are editable in the new UI.** Your own calibre columns — page

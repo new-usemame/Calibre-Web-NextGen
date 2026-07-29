@@ -202,6 +202,49 @@ class TestConverterStreamingTee:
         assert "truncated" in captured
 
 
+class TestTimeoutPathPreservesItsExceptionContract:
+    """#1094 rescues the original file by catching TimeoutExpired. Anything
+    that replaces that exception silently disables the rescue."""
+
+    def test_timeout_still_raises_timeoutexpired_under_a_chatty_child(self):
+        script = ("import sys\n"
+                  "while True:\n"
+                  "    sys.stdout.write('x' * 200 + '\\n'); sys.stdout.flush()")
+        for _ in range(3):
+            with pytest.raises(subprocess.TimeoutExpired):
+                ingest_processor._run_converter_streaming(
+                    [sys.executable, "-c", script], env=None, timeout=1)
+
+    def test_the_pump_is_joined_before_the_tail_is_read(self):
+        """Ordering pin. The race above is real but narrow enough that it does
+        not reproduce on demand, so pin the ordering that closes it: in the
+        timeout handler the join must precede the ''.join(tail) whose result
+        becomes TimeoutExpired.output. A refactor that moves the join back
+        below reopens a RuntimeError that masks TimeoutExpired.
+        """
+        import ast
+        import inspect
+
+        src = inspect.getsource(ingest_processor._run_converter_streaming)
+        tree = ast.parse(textwrap.dedent(src))
+        handlers = [n for n in ast.walk(tree) if isinstance(n, ast.ExceptHandler)]
+        timeout_handler = next(
+            h for h in handlers
+            if "TimeoutExpired" in ast.dump(h.type or ast.Pass()))
+
+        def line_of(pred):
+            return next(n.lineno for n in ast.walk(timeout_handler)
+                        if isinstance(n, ast.Call) and pred(n))
+
+        join_line = line_of(
+            lambda n: isinstance(n.func, ast.Attribute) and n.func.attr == "join"
+            and isinstance(n.func.value, ast.Name) and n.func.value.id == "pump")
+        tail_read_line = line_of(
+            lambda n: isinstance(n.func, ast.Attribute) and n.func.attr == "join"
+            and isinstance(n.func.value, ast.Constant))
+        assert join_line < tail_read_line
+
+
 class TestSurfacedReasonIsSafeToLog:
     """The reason is quoted into a log line and derives from file content."""
 

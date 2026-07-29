@@ -922,6 +922,13 @@ def _run_converter_streaming(cmd, env, timeout=None):
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
+        # Join before reading the tail, not after. This runs before the
+        # finally below, so without the join the pump can still be appending
+        # while ''.join() iterates the deque — that raises RuntimeError and
+        # replaces the TimeoutExpired convert_book() handles, which is what
+        # #1094 relies on to rescue the original file. The success path is
+        # already safe: it reads the tail after the finally.
+        pump.join(timeout=5)
         raise subprocess.TimeoutExpired(cmd, timeout, output=''.join(tail))
     finally:
         pump.join(timeout=5)

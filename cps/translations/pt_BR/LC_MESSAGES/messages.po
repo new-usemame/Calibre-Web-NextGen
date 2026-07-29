@@ -118,7 +118,7 @@ msgstr "Página de Administração"
 
 #: cps/admin.py:610
 msgid "Hardcover token expires"
-msgstr "Token do Hardcover expirou"
+msgstr "Token do Hardcover expira"
 
 #: cps/admin.py:618
 msgid "Basic Configuration"

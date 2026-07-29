@@ -209,7 +209,9 @@ def test_every_payload_field_is_also_an_expected_param(method):
     undeclared = set(spec["payload"]) - _expected_params(spec)
     assert not undeclared, (
         f"{method} lists {sorted(undeclared)} in `payload` but in neither "
-        f"`required_params` nor `optional_params`. Any caller passing them hits "
-        f"Spore's validate() and raises; any caller omitting them sends null. "
-        f"Add them to optional_params."
+        f"`required_params` nor `optional_params`, so the declaration is dead "
+        f"either way: a caller that passes them hits Spore's validate() and "
+        f"raises, and a caller that omits them leaves `payload[k] = nil`, which "
+        f"in Lua means the key is absent from the body rather than null — so the "
+        f"field can never actually be populated. Add them to optional_params."
     )

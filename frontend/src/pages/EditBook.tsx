@@ -11,7 +11,7 @@ import { MetadataTypeahead } from '../components/MetadataTypeahead';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { StarRating } from '../components/StarRating';
-import type { MetadataUpdate, MetaResult } from '../lib/api';
+import type { MetadataUpdate, MetaResult, EditableCustomColumn } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -31,6 +31,10 @@ interface FormState {
   comments: string;
   pubdate: string;
   identifiers: Ident[];
+  /** Custom-column values keyed by their server key ('custom_column_7'). Held
+   *  as strings throughout, because that is the wire format in both directions
+   *  — see EditableCustomColumn.value. */
+  custom: Record<string, string>;
 }
 
 function RatingSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -113,6 +117,7 @@ export function EditBook({ id }: { id: string }) {
       comments: meta.comments,
       pubdate: meta.pubdate || '',
       identifiers: (meta.identifiers || []).map((i) => ({ type: i.type, val: i.val })),
+      custom: Object.fromEntries((meta.custom_columns || []).map((c) => [c.key, c.value])),
     });
   }, [meta]);
 
@@ -129,6 +134,10 @@ export function EditBook({ id }: { id: string }) {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
+
+  // Definitions come from the server, not from the form: `form.custom` only
+  // carries values, and the datatype decides which control to render.
+  const customColumns = meta?.custom_columns ?? [];
 
   // Apply only the user-selected fields of an online result into the form. Cover
   // is applied as a side effect (it isn't a form field). Identifiers merge by
@@ -168,6 +177,8 @@ export function EditBook({ id }: { id: string }) {
 
   const setIdent = (i: number, patch: Partial<Ident>) =>
     setForm((f) => (f ? { ...f, identifiers: f.identifiers.map((row, j) => (j === i ? { ...row, ...patch } : row)) } : f));
+  const setCustom = (key: string, value: string) =>
+    setForm((f) => (f ? { ...f, custom: { ...f.custom, [key]: value } } : f));
   const addIdent = () => setForm((f) => (f ? { ...f, identifiers: [...f.identifiers, { type: '', val: '' }] } : f));
   const removeIdent = (i: number) => setForm((f) => (f ? { ...f, identifiers: f.identifiers.filter((_, j) => j !== i) } : f));
 
@@ -190,6 +201,10 @@ export function EditBook({ id }: { id: string }) {
       identifiers: form.identifiers
         .map((i) => ({ type: i.type.trim().toLowerCase(), val: i.val.trim() }))
         .filter((i) => i.type && i.val),
+      // Custom columns go up flat under their own keys. Only columns the server
+      // told us about are in `form.custom`, so this can't invent a key; an empty
+      // string clears the value, which is what the classic editor does too.
+      ...form.custom,
     };
     update.mutate(payload, {
       onSuccess: (data) => {
@@ -293,6 +308,23 @@ export function EditBook({ id }: { id: string }) {
           </button>
           <span className={styles.hint}>{t('Each type (isbn, amazon, google, doi…) may appear once.')}</span>
         </div>
+
+        {/* Custom columns — the library's own fields (#pages, #status, …). The
+            new UI displayed these from v4.1.11 but had no way to change one, so
+            setting a page count meant going back to the classic view (#997). */}
+        {customColumns.length > 0 && (
+          <div className={styles.customSection}>
+            <h2 className={styles.customHeading}>{t('Custom columns')}</h2>
+            <div className={styles.customGrid}>
+              {customColumns.map((column) => (
+                <CustomColumnField key={column.key} column={column}
+                  value={form.custom[column.key] ?? ''}
+                  error={fieldErrors[column.key]}
+                  onChange={(v) => setCustom(column.key, v)} />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className={styles.actions}>
           <Button type="submit" disabled={update.isPending}>
@@ -814,6 +846,90 @@ function FormatsManager({ id }: { id: string }) {
       )}
       <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
     </section>
+  );
+}
+
+/** One custom column, rendered as the control its calibre datatype calls for —
+ *  the same set the classic editor offers. Every value is carried as the string
+ *  the server parses back (see EditableCustomColumn.value), so this only picks
+ *  the widget; it never reformats what it is handed. Composite and series
+ *  columns never arrive here — calibre can't edit those and the server drops
+ *  them (db.cc_exceptions). */
+function CustomColumnField({ column, value, error, onChange }:
+  { column: EditableCustomColumn; value: string; error?: string; onChange: (v: string) => void }) {
+  const t = useT();
+  const label = column.name || column.label;
+
+  if (column.datatype === 'bool') {
+    return (
+      <Field label={label} error={error} grow={false}>
+        <select className={styles.select} value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">{t('Not set')}</option>
+          <option value="True">{t('Yes')}</option>
+          <option value="False">{t('No')}</option>
+        </select>
+      </Field>
+    );
+  }
+
+  if (column.datatype === 'enumeration') {
+    return (
+      <Field label={label} error={error}>
+        <select className={styles.select} value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">{t('Not set')}</option>
+          {/* A value already stored but no longer in the column's allowed list
+              would otherwise vanish from the select and get silently cleared on
+              the next save, so keep it as an option. */}
+          {[...new Set([...(column.enum_values || []), ...(value ? [value] : [])])].map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </Field>
+    );
+  }
+
+  if (column.datatype === 'rating') {
+    return (
+      <Field label={label} error={error} grow={false} composite>
+        <RatingSelector value={value} onChange={onChange} />
+      </Field>
+    );
+  }
+
+  if (column.datatype === 'comments') {
+    return (
+      <Field label={label} error={error}>
+        <textarea className={styles.textarea} rows={4} value={value}
+          onChange={(e) => onChange(e.target.value)} />
+      </Field>
+    );
+  }
+
+  if (column.datatype === 'datetime') {
+    return (
+      <Field label={label} error={error} grow={false}>
+        <input className={styles.inputNarrow} type="date" value={value}
+          onChange={(e) => onChange(e.target.value)} />
+      </Field>
+    );
+  }
+
+  if (column.datatype === 'int' || column.datatype === 'float') {
+    return (
+      <Field label={label} error={error} grow={false}>
+        <input className={styles.inputNarrow} type="number"
+          step={column.datatype === 'int' ? '1' : '0.01'} value={value}
+          onChange={(e) => onChange(e.target.value)} />
+      </Field>
+    );
+  }
+
+  // text (and anything new calibre grows) — comma separated when the column
+  // holds several values, which is how the server splits it back apart.
+  return (
+    <Field label={column.is_multiple ? t('{field} (comma separated)', { field: label }) : label} error={error}>
+      <input className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} />
+    </Field>
   );
 }
 

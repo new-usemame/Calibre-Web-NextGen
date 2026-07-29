@@ -944,4 +944,11 @@ _("Duplicate detection settings")
 _("Duplicate scan started. It runs in the background — this list updates when it finishes.")
 _("Scan for duplicates")
 _("Starting scan…")
+
+# #997 — SPA-only strings for editing custom columns. The column's own name is
+# user data (it comes from the library), so only the surrounding chrome is
+# translatable; "{field} (comma separated)" takes that name as a placeholder.
+_("Custom columns")
+_("Not set")
+_("{field} (comma separated)")
 # ==== END AUTOGEN ====

@@ -87,7 +87,8 @@ def test_update_metadata_calls_core_per_field():
     success = flask.Response(json.dumps({"success": True}), mimetype="application/json")
     with _ctx("/api/v1/books/5/metadata", body={"title": "New Title", "tags": "a, b"}):
         with patch.object(mod, "current_user", _editor()), \
-             patch.object(mod, "calibre_db", SimpleNamespace(get_book=lambda _id: fake_book)), \
+             patch.object(mod, "calibre_db", SimpleNamespace(get_book=lambda _id: fake_book,
+                                                    get_cc_columns=lambda *a, **k: [])), \
              patch.object(mod, "edit_book_param", return_value=success) as core, \
              patch.object(mod, "get_locale", return_value="en"):
             resp = inspect.unwrap(mod.update_metadata)(5)
@@ -170,7 +171,8 @@ def test_update_metadata_collects_field_errors():
                           mimetype="application/json")
     with _ctx("/api/v1/books/5/metadata", body={"languages": "zz"}):
         with patch.object(mod, "current_user", _editor()), \
-             patch.object(mod, "calibre_db", SimpleNamespace(get_book=lambda _id: fake_book)), \
+             patch.object(mod, "calibre_db", SimpleNamespace(get_book=lambda _id: fake_book,
+                                                    get_cc_columns=lambda *a, **k: [])), \
              patch.object(mod, "edit_book_param", return_value=fail), \
              patch.object(mod, "get_locale", return_value="en"):
             resp = inspect.unwrap(mod.update_metadata)(5)

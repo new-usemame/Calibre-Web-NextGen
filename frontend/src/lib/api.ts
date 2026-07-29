@@ -307,10 +307,34 @@ export interface BookMetadata {
    *  (calibre's year-101 DEFAULT_PUBDATE sentinel). Editable in the SPA (#689). */
   pubdate: string;
   identifiers: { type: string; val: string }[];
+  /** User-defined calibre columns (#pages, #status, …), editable since #997.
+   *  `value` is always the string the server parses back — '' is "no value",
+   *  bool is 'True'/'False', datetime is YYYY-MM-DD, rating is 0-5 half-stars,
+   *  and a multi-value column is comma-joined. */
+  custom_columns?: EditableCustomColumn[];
   errors?: Record<string, string>;
 }
 
-export type MetadataUpdate = Partial<Omit<BookMetadata, 'id' | 'errors'>>;
+export interface EditableCustomColumn {
+  id: number;
+  /** The key to POST this column back under, e.g. 'custom_column_7'. Built
+   *  server-side so the client never has to know the naming rule. */
+  key: string;
+  label: string;
+  name: string;
+  /** text | comments | int | float | bool | datetime | rating | enumeration */
+  datatype: string;
+  is_multiple: boolean;
+  value: string;
+  /** Allowed values, enumeration columns only. */
+  enum_values?: string[];
+}
+
+/** Custom columns are sent flat, keyed as the server expects (`custom_column_7`),
+ *  not as the definition list the GET returns. */
+export type MetadataUpdate = Partial<Omit<BookMetadata, 'id' | 'errors' | 'custom_columns'>> & {
+  [key: `custom_column_${number}`]: string;
+};
 
 export interface UploadResult {
   queued: string[];

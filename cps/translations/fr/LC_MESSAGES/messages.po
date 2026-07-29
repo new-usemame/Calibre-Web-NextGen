@@ -12940,3 +12940,15 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr ""
 #~ "Cliquer sur la couverture pour importer les métadonnées dans le formulaire"
+
+#: cps/spa_strings.py
+msgid "Custom columns"
+msgstr "Colonnes personnalisées"
+
+#: cps/spa_strings.py
+msgid "Not set"
+msgstr "Non défini"
+
+#: cps/spa_strings.py
+msgid "{field} (comma separated)"
+msgstr "{field} (séparés par des virgules)"

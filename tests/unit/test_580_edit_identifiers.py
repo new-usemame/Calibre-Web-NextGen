@@ -71,7 +71,8 @@ def test_update_metadata_persists_identifiers_lowercased_and_skips_blank_rows():
     with _ctx("/api/v1/books/5/metadata", body=body):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db",
-                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session)), \
+                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session,
+                                          get_cc_columns=lambda *a, **k: [])), \
              patch.object(mod, "modify_identifiers", side_effect=fake_modify), \
              patch.object(mod, "get_locale", return_value="en"):
             resp = inspect.unwrap(mod.update_metadata)(5)
@@ -98,7 +99,8 @@ def test_update_metadata_duplicate_identifier_reports_field_error():
     with _ctx("/api/v1/books/5/metadata", body=body):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db",
-                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session)), \
+                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session,
+                                          get_cc_columns=lambda *a, **k: [])), \
              patch.object(mod, "modify_identifiers", side_effect=fake_modify), \
              patch.object(mod, "get_locale", return_value="en"):
             resp = inspect.unwrap(mod.update_metadata)(5)
@@ -117,7 +119,8 @@ def test_update_metadata_without_identifiers_key_does_not_touch_them():
     with _ctx("/api/v1/books/5/metadata", body={"title": "New"}):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db",
-                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session)), \
+                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session,
+                                          get_cc_columns=lambda *a, **k: [])), \
              patch.object(mod, "modify_identifiers", side_effect=AssertionError("must not be called")), \
              patch.object(mod, "edit_book_param",
                           return_value=flask.Response(json.dumps({"success": True}),

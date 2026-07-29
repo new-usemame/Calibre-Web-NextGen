@@ -54,7 +54,7 @@
   color: var(--text-muted);
 }
 
-.input, .inputNarrow, .textarea {
+.input, .inputNarrow, .textarea, .select {
   background: var(--surface-3);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -82,7 +82,24 @@
   line-height: var(--lh-base);
 }
 
-.input:focus, .inputNarrow:focus, .textarea:focus { border-color: var(--accent); }
+.input:focus, .inputNarrow:focus, .textarea:focus, .select:focus { border-color: var(--accent); }
+
+/* Custom columns (#997). Same field grid as the built-in metadata above it,
+   under its own heading so it reads as "your library's extra fields" rather
+   than more calibre-standard ones. */
+.select { width: 100%; min-height: 40px; }
+.customSection { display: flex; flex-direction: column; gap: var(--sp-2); }
+.customHeading {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  margin: var(--sp-2) 0 0;
+}
+.customGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-4);
+}
 
 .hint {
   font-size: var(--fs-xs);

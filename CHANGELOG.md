@@ -16,6 +16,17 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Custom columns are editable in the new UI.** Your own calibre columns — page
+  counts, reading status, notes, shelf location — showed up on a book's page but
+  there was nowhere to change them, so setting one meant switching back to the
+  classic view. The edit screen now has a Custom columns section with the right
+  control for each column type: a number box for integers, a date picker, a
+  yes/no menu, a star rating, a text area for long notes, and a dropdown of the
+  allowed values for enumerated columns. Reported by @jasonxbergman (#997) and
+  by mx.meredith on Discord.
+
 ### Fixed
 
 - **Ingest told you to install an ACSM plugin you already had.** When an `.acsm`

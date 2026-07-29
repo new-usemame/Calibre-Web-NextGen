@@ -12516,3 +12516,15 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"
+
+#: cps/spa_strings.py
+msgid "Custom columns"
+msgstr "Aangepaste kolommen"
+
+#: cps/spa_strings.py
+msgid "Not set"
+msgstr "Niet ingesteld"
+
+#: cps/spa_strings.py
+msgid "{field} (comma separated)"
+msgstr "{field} (door komma's gescheiden)"

@@ -5,6 +5,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import atexit
+import collections
 import json
 import os
 import subprocess
@@ -801,6 +802,107 @@ _CONVERSION_FAILURE_GUIDANCE = {
 }
 
 
+# fork #984: the guidance above is right only when no ACSM plugin is present.
+# A user whose DeACSM was installed and had run was still told to install one,
+# because the message was chosen from the file extension alone while the
+# plugin's own explanation ("ADE auth is missing or broken") scrolled past in
+# the converter output. These markers are how a plugin announces itself there;
+# Calibre's own "No plugin to handle input format: acsm" matches none of them,
+# so it still reads as the absence signal it is.
+_ACSM_PLUGIN_MARKERS = ('deacsm', 'acsm input')
+
+_ACSM_PLUGIN_RAN_GUIDANCE = (
+    "ACSM_NOTICE: '{filename}' is an Adobe ACSM fulfillment ticket, not an ebook. "
+    "An ACSM-capable Calibre plugin is installed and did run, so this is not a "
+    "missing-plugin problem — the plugin itself reported: \"{reason}\". Fix that "
+    "and the ticket will fulfill; a broken or missing Adobe Digital Editions "
+    "authorization is the usual cause, and the plugin needs its own account data "
+    "copied over (for DeACSM that is the 'account' folder inside its plugin "
+    "directory), not just the plugin zip. Alternatively, open the .acsm in Adobe "
+    "Digital Editions or Calibre desktop to download the actual book, then drop "
+    "the downloaded EPUB/PDF into the ingest folder instead. The original file "
+    "has been moved to the failed books folder (processed_books/failed)."
+)
+
+
+def _acsm_plugin_failure_reason(converter_output):
+    """The line where an ACSM plugin reported its own failure, or None.
+
+    None means "no evidence a plugin ran" — the caller must then keep the
+    install-a-plugin guidance rather than guess.
+    """
+    reason = None
+    for line in (converter_output or '').splitlines():
+        stripped = line.strip()
+        lowered = stripped.lower()
+        if any(marker in lowered for marker in _ACSM_PLUGIN_MARKERS):
+            # Last match wins: a plugin narrates its attempt before it
+            # reports why the attempt failed, and the failure is the part
+            # the user can act on.
+            reason = stripped
+    return reason
+
+
+# How many lines of converter output to keep for diagnosis. Bounded so a
+# chatty conversion cannot grow this without limit; the tail is the useful
+# end, because a plugin prints its error last.
+_CONVERTER_LOG_TAIL_LINES = 400
+
+
+def _run_converter_streaming(cmd, env, timeout=None):
+    """Run a converter, echoing its output live while keeping a bounded tail.
+
+    The converter's output is the only place a Calibre plugin says why it
+    failed, so the failure path needs a copy of it (#984). It also has to keep
+    streaming as it arrives — a log that goes silent for the length of a
+    conversion is indistinguishable from a hang — so this tees rather than
+    captures.
+
+    Returns the captured tail. Raises exactly what the callers already handle:
+    CalledProcessError (tail on `.output`) for a non-zero exit, TimeoutExpired
+    when the deadline passes, OSError when the converter cannot be run.
+    """
+    proc = subprocess.Popen(
+        cmd, env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1,
+    )
+    tail = collections.deque(maxlen=_CONVERTER_LOG_TAIL_LINES)
+
+    def _pump():
+        try:
+            for line in proc.stdout:
+                print(line, end='', flush=True)
+                tail.append(line)
+        except (ValueError, OSError):
+            # The pipe was closed under us by the timeout path below.
+            pass
+
+    # Draining on a thread keeps the deadline independent of whether the child
+    # ever writes anything. A deadline checked inside the read loop never fires
+    # for a converter that hangs silently, which is the case that matters.
+    pump = threading.Thread(target=_pump, daemon=True)
+    pump.start()
+    try:
+        returncode = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        raise subprocess.TimeoutExpired(cmd, timeout, output=''.join(tail))
+    finally:
+        pump.join(timeout=5)
+        try:
+            if proc.stdout:
+                proc.stdout.close()
+        except (ValueError, OSError):
+            pass
+
+    output = ''.join(tail)
+    if returncode != 0:
+        raise subprocess.CalledProcessError(returncode, cmd, output=output)
+    return output
+
+
 # fork #1094: formats where a failed conversion means "this was never a book".
 # Importing the original rescues a real book whose conversion failed, but for
 # these it would file a junk entry — an .acsm is an Adobe fulfillment ticket,
@@ -818,16 +920,29 @@ def is_rescuable_on_conversion_failure(input_format) -> bool:
     return (input_format or '').lower() not in _NOT_A_BOOK_FORMATS
 
 
-def conversion_failure_guidance(input_format, filename):
+def conversion_failure_guidance(input_format, filename, converter_output=None):
     """Return user-facing guidance for a failed conversion of input_format,
     or None when no format-specific advice exists.
 
     input_format may be None or any case; filename is interpolated into
     the returned message verbatim.
+
+    converter_output is the converter's own output for this attempt. For
+    .acsm it decides which of two opposite messages is true: telling a user
+    to install a plugin they already have is the #984 complaint, so when the
+    output shows a plugin ran, its own reported reason is surfaced instead.
+    Without that evidence the original install-a-plugin guidance stands —
+    the new branch fires only on positive proof, never on a guess.
     """
-    template = _CONVERSION_FAILURE_GUIDANCE.get((input_format or '').lower())
+    fmt = (input_format or '').lower()
+    template = _CONVERSION_FAILURE_GUIDANCE.get(fmt)
     if template is None:
         return None
+    if fmt == 'acsm':
+        reason = _acsm_plugin_failure_reason(converter_output)
+        if reason:
+            return _ACSM_PLUGIN_RAN_GUIDANCE.format(
+                filename=filename, reason=reason)
     return template.format(filename=filename)
 
 
@@ -1147,8 +1262,9 @@ class NewBookProcessor:
         target_filepath = f"{self.tmp_conversion_dir}{original_filepath.stem}.{end_format}"
         try:
             t_convert_book_start = time.time()
-            subprocess.run(['ebook-convert', self.filepath, target_filepath], env=self.calibre_env, check=True,
-                           timeout=conversion_budget_remaining())
+            _run_converter_streaming(['ebook-convert', self.filepath, target_filepath],
+                                     env=self.calibre_env,
+                                     timeout=conversion_budget_remaining())
             t_convert_book_end = time.time()
             time_book_conversion = t_convert_book_end - t_convert_book_start
             print(f"\n[ingest-processor]: END_CON: Conversion of {self.filename} complete in {time_book_conversion:.2f} seconds.\n", flush=True)
@@ -1164,11 +1280,15 @@ class NewBookProcessor:
             return True, target_filepath
 
         except subprocess.CalledProcessError as e:
-            # ebook-convert output is not captured, so e.stderr is always
-            # None here — its real output streamed to the service log above.
+            # The tee already streamed ebook-convert's output to the service
+            # log, so this line still points at it rather than repeating it.
+            # The captured copy on e.output is not for display — it is what
+            # lets the guidance below tell "no ACSM plugin installed" apart
+            # from "a plugin ran and failed for its own reason" (#984).
             error_detail = e.stderr if e.stderr else "(see ebook-convert output above)"
             print(f"\n[ingest-processor]: CON_ERROR: {self.filename} could not be converted to {end_format} due to the following error:\nEXIT/ERROR CODE: {e.returncode}\n{error_detail}", flush=True)
-            guidance = conversion_failure_guidance(self.input_format, self.filename)
+            guidance = conversion_failure_guidance(self.input_format, self.filename,
+                                                   converter_output=getattr(e, 'output', None))
             if guidance:
                 print(f"\n[ingest-processor]: {guidance}\n", flush=True)
             self.backup(self.filepath, backup_type="failed")

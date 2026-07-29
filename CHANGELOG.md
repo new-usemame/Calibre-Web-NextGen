@@ -16,6 +16,17 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ingest told you to install an ACSM plugin you already had.** When an `.acsm`
+  fulfillment ticket failed to convert, the log always said no ACSM-capable
+  plugin was installed — even when one was installed, had run, and had printed
+  the actual reason it gave up, such as `DeACSM v0.0.16: ADE auth is missing or
+  broken`. That sent people looking for a missing plugin instead of at the real
+  problem. The ingest log now repeats the plugin's own reason when a plugin ran,
+  and still suggests installing one only when nothing handled the file. Reported
+  by @auspex (#984).
+
 ## [v4.1.24] - 2026-07-29
 
 ### Fixed

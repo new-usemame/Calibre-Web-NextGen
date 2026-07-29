@@ -284,7 +284,7 @@ class TestConversionDeadline:
             captured.update(kwargs)
             raise subprocess.TimeoutExpired(cmd, 1234)
 
-        monkeypatch.setattr(subprocess, "run", _fake_run)
+        monkeypatch.setattr(ingest_processor, "_run_converter_streaming", _fake_run)
         nbp = _conversion_processor(tmp_path)
         ok, out = nbp.convert_book()
 
@@ -305,7 +305,7 @@ class TestConversionDeadline:
         def _fake_run(cmd, **kwargs):
             raise OSError(2, "No such file or directory")
 
-        monkeypatch.setattr(subprocess, "run", _fake_run)
+        monkeypatch.setattr(ingest_processor, "_run_converter_streaming", _fake_run)
         nbp = _conversion_processor(tmp_path)
         assert nbp.convert_book() == (False, "")
 

@@ -74,9 +74,11 @@ class TestConvertBookFailurePath:
         nbp = _failing_processor(tmp_path, fmt, name)
 
         def _raise(cmd, *args, **kwargs):
+            # No `output`, i.e. no evidence a plugin ran — the case this file
+            # pins. #984 added the opposite branch and stubs the same seam.
             raise subprocess.CalledProcessError(1, cmd)
 
-        monkeypatch.setattr(ingest_processor.subprocess, "run", _raise)
+        monkeypatch.setattr(ingest_processor, "_run_converter_streaming", _raise)
         ok, path = nbp.convert_book()
         assert ok is False and path == ""
         return capsys.readouterr().out

@@ -57,21 +57,25 @@ def _normalize_tag(tag_name):
 def release_url_for_version(version):
     """GitHub web URL where the release notes for ``version`` can be read.
 
-    ``version`` is the string shown in the admin version table, read
-    verbatim from ``/app/CWA_RELEASE`` — so it may carry surrounding
-    whitespace, be ``"Unknown"`` when the probe failed, or be a non-release
-    marker (``DEV_BUILD-…``) on a dev/canary image. We point at the exact
-    release tag only when the string parses as a release tag (``vX.Y.Z`` /
-    ``X.Y.Z``); otherwise we fall back to the repository's releases listing,
-    which always resolves. Returns ``None`` when there is no meaningful
-    target (empty / ``"Unknown"``) so the caller renders plain text instead
-    of a dead link. The slug is shared with ``_REPOSITORY_API_URL`` so the
-    link follows the same ``CWA_RELEASE_REPO`` override.
+    ``version`` is the string shown in the admin version table, which comes
+    from ``constants.INSTALLED_VERSION`` — so it may be
+    ``constants.UNKNOWN_VERSION`` when the build never stamped one, be
+    ``"Unknown"`` from a caller that probed a file itself, or be a
+    non-release marker (``DEV_BUILD-…``) on a dev/canary image. We point at
+    the exact release tag only when the string parses as a release tag
+    (``vX.Y.Z`` / ``X.Y.Z``); otherwise we fall back to the repository's
+    releases listing, which always resolves. Returns ``None`` when there is
+    no meaningful target (empty / ``"Unknown"`` / the unknown sentinel) so
+    the caller renders plain text instead of a dead link. The sentinel needs
+    its own case precisely because it *does* parse as a release tag, and
+    ``v0.0.0`` was never published (fork #1231). The slug is shared with
+    ``_REPOSITORY_API_URL`` so the link follows the same
+    ``CWA_RELEASE_REPO`` override.
     """
     if not version:
         return None
     tag = version.strip()
-    if not tag or tag.lower() == "unknown":
+    if not tag or tag.lower() == "unknown" or tag == constants.UNKNOWN_VERSION:
         return None
     base = "https://github.com/" + _REPOSITORY_SLUG
     if _normalize_tag(tag) is not None:

@@ -16,6 +16,19 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The version number on the admin page no longer links to a release that
+  doesn't exist.** On a build that was never stamped with a version — running
+  from a source checkout rather than one of the published Docker images — the
+  version read `v0.0.0`, and because that looks like an ordinary version it was
+  turned into a link to a release tag of that name, which 404s. It now renders
+  as plain text when there is nothing real to point at. The same page also
+  stopped showing a stray blank line after the version, and now agrees with the
+  version the app reports to other services. Contributed by
+  [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1231)
+  ([#1231](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1231)).
+
 ### Added
 
 - **Custom columns are editable in the new UI.** Your own calibre columns — page

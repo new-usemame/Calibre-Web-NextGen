@@ -15,7 +15,7 @@ import flask
 from flask import redirect, url_for
 from flask_babel import gettext as _
 
-from . import db, calibre_db, converter, uploader, dep_check
+from . import constants, db, calibre_db, converter, uploader, dep_check
 from .render_template import render_title_template
 from .usermanagement import user_login_required
 
@@ -35,13 +35,7 @@ sorted_modules = OrderedDict((sorted(modules.items(), key=lambda x: x[0].casefol
 
 
 def collect_stats():
-    try:
-        with open("/app/CWA_RELEASE", "r") as f:
-            cwa_version = f.read()
-    except Exception:
-        cwa_version = "Unknown"
-
-    _VERSIONS = {'Calibre-Web NextGen': cwa_version}
+    _VERSIONS = {'Calibre-Web NextGen': constants.INSTALLED_VERSION}
     _VERSIONS.update(OrderedDict(
         Python=sys.version,
         Platform='{0[0]} {0[2]} {0[3]} {0[4]} {0[5]}'.format(platform.uname()),

@@ -179,12 +179,20 @@ def _read_text(path: str, default: str = "") -> str:
     except Exception:
         return default
 
+# What INSTALLED_VERSION reads as when the build never stamped a version —
+# a source checkout, a bare-metal install, or a zero-byte /app/CWA_RELEASE.
+# It has to parse as a version so ordering comparisons keep working, which
+# also means it parses as a *release tag*: consumers that turn a version into
+# a release link must special-case it or they emit a link to a tag that was
+# never published (fork #1231).
+UNKNOWN_VERSION = "v0.0.0"
+
 # The installed version is baked at build time and surfaced by cwa-init via
 # env; avoid any network or slow I/O during module import. The *latest
 # published* version deliberately does NOT live here — a module-level binding
 # read once at import can never go anything but stale (fork #1108). It is
 # resolved on demand and cached by cps/services/latest_release.py.
-INSTALLED_VERSION = os.environ.get("CWA_INSTALLED_VERSION") or _read_text("/app/CWA_RELEASE", "v0.0.0")
+INSTALLED_VERSION = os.environ.get("CWA_INSTALLED_VERSION") or _read_text("/app/CWA_RELEASE", UNKNOWN_VERSION)
 
 USER_AGENT = f"Calibre-Web-NextGen/{INSTALLED_VERSION}"
 

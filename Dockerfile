@@ -385,7 +385,7 @@ RUN \
   # STEP 7.5 - ADD files referencing the versions of the installed main packages
   echo "$VERSION" >| /app/CWA_RELEASE && \
   echo "$KEPUBIFY_RELEASE" >| /app/KEPUBIFY_RELEASE && \
-  echo "$CALIBRE_RELEASE" > /CALIBRE_RELEASE
+  echo "$CALIBRE_RELEASE" > /app/CALIBRE_RELEASE
 
 # Add unrar from unrar stage
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar

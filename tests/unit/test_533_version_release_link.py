@@ -65,7 +65,21 @@ def _load_updater():
             sys.modules["cps.logger"] = logger_mod
 
         if "cps.constants" not in sys.modules:
-            sys.modules["cps.constants"] = types.ModuleType("cps.constants")
+            # Load the *real* constants module rather than an empty stub.
+            # updater.py reads constants.UNKNOWN_VERSION, and an empty stub
+            # only survived by import-order luck — conftest happened to have
+            # loaded the real module first, so this file passed standalone
+            # while the same shim in a pristine interpreter raised
+            # AttributeError. constants.py is a leaf (os/sys/collections +
+            # flask_babel) whose only I/O is a guarded read of
+            # /app/CWA_RELEASE, so loading it for real stays cheap and the
+            # stub can never drift from the contract it stands in for.
+            constants_spec = importlib.util.spec_from_file_location(
+                "cps.constants", _REPO_ROOT / "cps" / "constants.py"
+            )
+            constants_mod = importlib.util.module_from_spec(constants_spec)
+            sys.modules["cps.constants"] = constants_mod
+            constants_spec.loader.exec_module(constants_mod)
 
         if "cps.file_helper" not in sys.modules:
             file_helper_mod = types.ModuleType("cps.file_helper")
@@ -99,8 +113,10 @@ def test_clean_fork_tag_points_at_exact_release():
 
 
 def test_trailing_newline_is_stripped():
-    # cwa_get_package_versions does f.read() without strip(), so the value can
-    # carry the file's trailing newline; the tag in the URL must not.
+    # The CWNG version now arrives pre-stripped via constants.INSTALLED_VERSION
+    # (#1231), but the kepubify/calibre readers beside it still do a raw
+    # f.read(), and callers may hand us a file read directly — so the builder
+    # keeps stripping rather than trusting its input.
     assert release_url_for_version("v4.0.172\n") == _BASE + "/releases/tag/v4.0.172"
 
 
@@ -120,7 +136,10 @@ def test_non_semver_marker_falls_back_to_releases_listing():
 
 
 def test_unknown_returns_none():
-    # cwa_get_package_versions returns "Unknown" when /app/CWA_RELEASE is missing.
+    # The kepubify/calibre readers still return "Unknown" when their file is
+    # missing. Since #1231 the CWNG version instead falls back to
+    # constants.UNKNOWN_VERSION; that sentinel is pinned in
+    # test_1231_version_ssot.py because it *does* parse as a release tag.
     assert release_url_for_version("Unknown") is None
     assert release_url_for_version("unknown") is None
 

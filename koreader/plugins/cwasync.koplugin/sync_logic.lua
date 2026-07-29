@@ -157,6 +157,31 @@ function SyncLogic.resolveLocalSet(provider, volume_id)
     return list, true
 end
 
+-- Everything the push needs to know about this device's own set, decided here
+-- rather than at the call site.
+--
+-- The call site is a callback inside a 1600-line file that no test can reach,
+-- so any authority logic written there is unexecutable by construction — and
+-- the bug this replaces lived there for exactly that reason. Returning the
+-- decision as data means the whole path, provider read through to "which ids do
+-- we tell the server to delete", runs in the test suite.
+--
+--   list      -- the device's live annotations, {} when they could not be read
+--   known     -- whether that list is a genuine read (see resolveLocalSet)
+--   deletions -- ids to name to the server; ALWAYS empty on an unknown read
+--   may_save_watermark -- whether `list` is fit to become the new watermark;
+--                         saving a placeholder would make the next sync believe
+--                         the device had nothing to begin with
+function SyncLogic.planLocalContribution(provider, volume_id, watermark)
+    local list, known = SyncLogic.resolveLocalSet(provider, volume_id)
+    return {
+        list = list,
+        known = known,
+        deletions = known and SyncLogic.computeDeletions(watermark, list) or {},
+        may_save_watermark = known,
+    }
+end
+
 function SyncLogic.diffAnnotations(localList, remoteList)
     local function byId(list)
         local m = {}

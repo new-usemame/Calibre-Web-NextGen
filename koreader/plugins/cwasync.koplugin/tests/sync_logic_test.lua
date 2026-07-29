@@ -271,6 +271,69 @@ local function testResolveLocalSet()
         "a provider with no readAll is unreadable")
 end
 
+-- The whole decision, provider read through to "what do we tell the server to
+-- delete". This is the test that would have caught #920's device half: the
+-- resolver and computeDeletions were each individually correct, and the bug was
+-- in how the call site joined them. Anything that re-derives authority from a
+-- capability flag has to break one of these.
+local function testPlanLocalContribution()
+    local function providerReturning(value, extra)
+        local p = { readAll = function() return value end }
+        for k, v in pairs(extra or {}) do p[k] = v end
+        return p
+    end
+    local WATERMARK = { "a", "b" }
+
+    -- Unreadable device, full watermark. The catastrophic case: every id in the
+    -- watermark is a highlight the server still holds and will tombstone.
+    local plan = SyncLogic.planLocalContribution(
+        providerReturning(nil, { push_all_local = true }), nil, WATERMARK)
+    assertEqual(plan.known, false, "an unreadable device is not known")
+    assertEqual(#plan.deletions, 0,
+        "and names NOTHING for deletion, however full its watermark (#920)")
+    assertEqual(plan.may_save_watermark, false,
+        "and must not overwrite the watermark with its placeholder")
+    assertEqual(#plan.list, 0, "and still offers a list safe to diff against")
+
+    -- Same, via a provider that raises rather than returning nil.
+    plan = SyncLogic.planLocalContribution({
+        push_all_local = true,
+        readAll = function() error("reader torn down mid-sync") end,
+    }, nil, WATERMARK)
+    assertEqual(plan.known, false, "a provider that throws is not known")
+    assertEqual(#plan.deletions, 0, "and names nothing for deletion")
+    assertEqual(plan.may_save_watermark, false, "and cannot set the watermark")
+
+    -- The #905 case that must survive: the user really did delete everything.
+    plan = SyncLogic.planLocalContribution(
+        providerReturning({}, { push_all_local = true }), nil, WATERMARK)
+    assertEqual(plan.known, true, "a successful read of an empty device IS known")
+    assertEqual(#plan.deletions, 2,
+        "so clearing every highlight still syncs as a deletion (#905)")
+    assertEqual(plan.may_save_watermark, true, "and may set the watermark")
+
+    -- A partial delete: one of the two survives.
+    plan = SyncLogic.planLocalContribution(
+        providerReturning({ { annotation_id = "a" } }, { push_all_local = true }),
+        nil, WATERMARK)
+    assertEqual(#plan.deletions, 1, "only the removed highlight is deleted")
+    assertEqual(plan.deletions[1], "b", "and it is the right one")
+
+    -- Kobo: addressable only with a volume_id, so without one it has read
+    -- nothing and must not be allowed to delete.
+    plan = SyncLogic.planLocalContribution(providerReturning({}), nil, WATERMARK)
+    assertEqual(plan.known, false, "no volume_id means the device was not read")
+    assertEqual(#plan.deletions, 0, "so it names nothing for deletion")
+    plan = SyncLogic.planLocalContribution(providerReturning({}), "vol-1", WATERMARK)
+    assertEqual(plan.known, true, "with a volume_id the same read is genuine")
+    assertEqual(#plan.deletions, 2, "and an emptied Kobo still syncs its deletions")
+
+    -- A fresh install has no watermark, so it has deleted nothing either way.
+    plan = SyncLogic.planLocalContribution(
+        providerReturning({}, { push_all_local = true }), nil, nil)
+    assertEqual(#plan.deletions, 0, "an empty watermark yields no deletions")
+end
+
 testIsRemoteProgressFromThisDevice()
 testDidBookProgressChange()
 testMergeAnnotation()
@@ -279,5 +342,6 @@ testComputeDeletions()
 testAnnotationIds()
 testResolveDocumentDigest()
 testResolveLocalSet()
+testPlanLocalContribution()
 
 print("sync_logic tests passed")

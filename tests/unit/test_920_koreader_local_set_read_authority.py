@@ -47,11 +47,18 @@ def _lua() -> str | None:
     return None
 
 
-@pytest.mark.parametrize("suite", [
-    "sync_logic_test.lua",
-    "device_annotations_test.lua",
-    "document_digest_test.lua",
-])
+# Discovered, not listed. A hand-maintained list is how `sync_client_outcome_test`
+# came to exist, pass, and be gated by nothing; globbing means a suite added
+# later is covered the day it lands rather than the day someone remembers.
+LUA_SUITES = sorted(p.name for p in (PLUGIN / "tests").glob("*_test.lua"))
+
+
+def test_every_lua_suite_is_discovered():
+    """Guard the guard: an empty glob would make the runner below vacuous."""
+    assert len(LUA_SUITES) >= 4, LUA_SUITES
+
+
+@pytest.mark.parametrize("suite", LUA_SUITES)
 def test_plugin_lua_suites_pass(suite):
     """Run the plugin's Lua tests for real.
 
@@ -83,54 +90,46 @@ def test_plugin_lua_suites_pass(suite):
     assert "passed" in result.stdout
 
 
-def test_providers_report_an_unreadable_device_as_nil_not_empty():
-    """{} means "no highlights"; nil means "do not ask me". Never the reverse."""
-    native = (PLUGIN / "koreader_annotations_provider.lua").read_text()
-    kobo = (PLUGIN / "kobo_sqlite_provider.lua").read_text()
+def test_the_call_site_consumes_the_decision_rather_than_recomputing_it():
+    """The wiring the Lua suites cannot reach.
 
-    assert "if not Provider.available() then return nil end" in native, (
-        "the native provider must report a torn-down reader as unreadable"
-    )
-
-    # Both of the Kobo provider's failure exits are inside readAll: the DB that
-    # would not open, and the query that raised. Neither may answer with a set.
-    read_all = kobo.split("function KoboSqliteProvider.readAll", 1)[1]
-    read_all = read_all.split("\nfunction ", 1)[0]
-    assert "if not ok then return nil end" in read_all, (
-        "a KoboReader.sqlite that will not open has read nothing"
-    )
-    assert "if not ok2 then return nil end" in read_all, (
-        "a query that raised has read nothing"
-    )
-    assert "return {}" not in read_all, (
-        "no failure path in readAll may report an empty device"
-    )
-
-
-def test_authority_comes_from_the_read_not_from_a_capability_flag():
-    """The regression shape: `push_all_local` deciding whether a set is known."""
+    ``syncAnnotations`` is a callback inside a 1600-line file with KOReader
+    imports, so it cannot be executed here — which is precisely why the bug
+    lived there. The behaviour is pinned by ``planLocalContribution`` in the Lua
+    suites above; what remains to check is that the call site still *asks* it
+    instead of deciding for itself. Both halves are needed: an executable
+    contract nobody calls is as useless as a call site nobody tests.
+    """
     main = (PLUGIN / "main.lua").read_text()
     logic = (PLUGIN / "sync_logic.lua").read_text()
 
-    assert "function SyncLogic.resolveLocalSet" in logic
-    # Treating a provider that raises as unreadable is part of the contract, not
-    # incidental hardening: an error is the least trustworthy answer of all.
-    resolve = logic.split("function SyncLogic.resolveLocalSet", 1)[1]
-    resolve = resolve.split("\nfunction ", 1)[0]
-    assert "pcall(provider.readAll" in resolve
+    assert "function SyncLogic.planLocalContribution" in logic
+    assert "SyncLogic.planLocalContribution(" in main, (
+        "the call site must take its decision from the resolver"
+    )
 
-    assert "SyncLogic.resolveLocalSet(provider, volume_id)" in main, (
-        "the call site must take both the list and its trustworthiness from "
-        "the resolver"
+    # The three fields a wrong answer turns into data loss, each read straight
+    # from the plan. Re-deriving any of them locally is the regression.
+    assert "local deleted = plan.deletions" in main, (
+        "deletions must be the plan's, not recomputed at the call site"
     )
-    assert "local_set_known = (provider.push_all_local" not in main, (
-        "a constant capability flag cannot tell a failed read from an empty "
-        "device (#920)"
-    )
-    # The two consumers that a wrong `known` would turn into data loss.
-    assert "local deleted = local_set_known" in main, (
-        "deletions must still be gated on the set being known"
-    )
-    assert "if ok2 and local_set_known then" in main, (
+    assert "if ok2 and plan.may_save_watermark then" in main, (
         "the watermark must not be overwritten with a placeholder empty set"
+    )
+    assert "local localList = plan.list" in main
+
+    # And the negative half: the call site must own none of this. Each of these
+    # is a route by which authority could be re-derived locally — which is the
+    # bug, in whatever shape it comes back.
+    assert "SyncLogic.computeDeletions" not in main, (
+        "naming deletions is the resolver's job; computing them at the call "
+        "site is how an unreadable device came to delete everything (#920)"
+    )
+    assert "provider.readAll" not in main, (
+        "the device must be read through the resolver, which pcalls it and "
+        "rejects a non-table result"
+    )
+    assert "local_set_known" not in main, (
+        "the local authority flag is gone; reintroducing one invites deriving "
+        "it from a capability flag again"
     )

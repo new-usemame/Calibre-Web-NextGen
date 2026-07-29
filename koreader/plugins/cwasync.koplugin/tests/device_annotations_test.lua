@@ -86,9 +86,53 @@ local function testBookmarkRowToPortable()
     assertEqual(p.chapter_progress, 0.42, "chapter progress carried")
 end
 
+-- The read contract both providers owe their caller: nil when the device could
+-- not be read, {} only when it genuinely holds no highlights. The caller turns
+-- a list into "the user deleted everything they are missing", so answering an
+-- impossible read with {} is what makes a transient failure permanent (#920).
+--
+-- Both failure paths are reachable from a plain Lua host, which is the point:
+-- off-device is exactly where the DB is absent and the reader does not exist,
+-- so the unreadable case is the one this harness can execute for real.
+local function testUnreadableProvidersReportNil()
+    -- The native provider imports two KOReader modules at load time, and both
+    -- are only reached from the id/portable helpers, not from the read contract
+    -- under test. Stubbing them at the loader keeps `available()` and
+    -- `readAll()` themselves real rather than re-implemented here.
+    package.preload["json"] = function()
+        return { encode = function(v) return tostring(v) end }
+    end
+    package.preload["ffi/sha2"] = function()
+        return { md5 = function(s) return "md5-" .. tostring(s) end }
+    end
+
+    -- KoboReader.sqlite: `open_db` requires KOReader's lua-ljsqlite3, which is
+    -- not here, so this exercises the genuine "the database would not open"
+    -- exit rather than a stub of it.
+    assertEqual(KP.readAll("vol-1"), nil,
+        "a KoboReader.sqlite that will not open has read nothing, not an empty device")
+
+    -- The KOReader-native provider with no reader attached -- the state the
+    -- plugin lands in when the user closes the book while the pull is in flight.
+    local Native = require("koreader_annotations_provider")
+    Native.setContext(nil, nil)
+    assertEqual(Native.available(), false, "no reader means the provider cannot read")
+    assertEqual(Native.readAll(), nil,
+        "a torn-down reader has read nothing, not an empty device")
+
+    -- And with a reader holding no highlights, the same provider says {} --
+    -- a real answer, which the caller may act on.
+    Native.setContext({ annotation = { annotations = {} } }, "digest")
+    local live = Native.readAll()
+    assertEqual(type(live), "table", "an attached reader returns a real list")
+    assertEqual(#live, 0, "which is empty when the book has no highlights")
+    Native.setContext(nil, nil)
+end
+
 testColorMapping()
 testSelectorEscaping()
 testBuildBookmarkRow()
 testBookmarkRowToPortable()
+testUnreadableProvidersReportNil()
 
 print("device_annotations (kobo_sqlite_provider) tests passed")

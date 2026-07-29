@@ -840,13 +840,38 @@ def _acsm_plugin_failure_reason(converter_output):
             # reports why the attempt failed, and the failure is the part
             # the user can act on.
             reason = stripped
-    return reason
+    return _sanitise_for_log(reason)
 
 
-# How many lines of converter output to keep for diagnosis. Bounded so a
-# chatty conversion cannot grow this without limit; the tail is the useful
-# end, because a plugin prints its error last.
+# The reason is quoted back into a log line, and it comes from converter
+# output — which can carry whatever a crafted file put into a title or a
+# plugin diagnostic. Control characters there would let that content forge
+# line structure or drive terminal escapes in whatever reads the log, so
+# they are dropped and the length is capped before it is interpolated.
+_LOG_REASON_MAX_CHARS = 300
+
+
+def _sanitise_for_log(text):
+    """Strip control characters and cap length. None passes through."""
+    if text is None:
+        return None
+    cleaned = ''.join(
+        ch for ch in text
+        if not (ord(ch) < 0x20 or 0x7f <= ord(ch) <= 0x9f)
+    )
+    if len(cleaned) > _LOG_REASON_MAX_CHARS:
+        cleaned = cleaned[:_LOG_REASON_MAX_CHARS] + '…'
+    return cleaned
+
+
+# How much converter output to keep for diagnosis. The tail is the useful
+# end, because a plugin prints its error last. Bounded on both axes: a line
+# cap as well as a line count, since 400 unbounded lines is not a bound. The
+# retained tail is therefore ~1.6 MB worst case. One pathological line is
+# still materialised transiently by the read below — that is inherent to
+# reading newline-delimited output, and is not retained.
 _CONVERTER_LOG_TAIL_LINES = 400
+_CONVERTER_LOG_LINE_CHARS = 4096
 
 
 def _run_converter_streaming(cmd, env, timeout=None):
@@ -865,13 +890,22 @@ def _run_converter_streaming(cmd, env, timeout=None):
     proc = subprocess.Popen(
         cmd, env=env,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1,
+        # errors='replace' is load-bearing, not defensive. Under the default
+        # strict policy one undecodable byte — a latin-1 title echoed by a
+        # plugin, say — raises inside the pump, which stops draining; the pipe
+        # then fills, the converter blocks on write, and a conversion that
+        # would have exited 0 instead burns the whole budget and fails. The
+        # old subprocess.run() inherited the fd and never decoded, so nothing
+        # here may reintroduce a decode that can raise.
+        text=True, encoding='utf-8', errors='replace', bufsize=1,
     )
     tail = collections.deque(maxlen=_CONVERTER_LOG_TAIL_LINES)
 
     def _pump():
         try:
             for line in proc.stdout:
+                if len(line) > _CONVERTER_LOG_LINE_CHARS:
+                    line = line[:_CONVERTER_LOG_LINE_CHARS] + ' …[truncated]\n'
                 print(line, end='', flush=True)
                 tail.append(line)
         except (ValueError, OSError):

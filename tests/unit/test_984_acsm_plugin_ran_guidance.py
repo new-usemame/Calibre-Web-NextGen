@@ -162,3 +162,66 @@ class TestConverterStreamingTee:
         assert len(captured.splitlines()) <= limit
         # The tail is what matters — a plugin's error is printed last.
         assert "line 4999" in captured
+
+    def test_undecodable_byte_does_not_stall_a_conversion(self):
+        """The regression this tee could introduce, and the reason it is the
+        happy path that matters: under a strict decode one bad byte kills the
+        reader, the pipe fills, the converter blocks on write, and a run that
+        would have exited 0 burns the whole budget instead.
+
+        A latin-1 title echoed by a plugin is enough to trigger it, so the
+        decode must never raise. The padding has to exceed the pipe buffer
+        (64 KiB) or a stalled reader is invisible — the child just exits.
+        """
+        script = (
+            "import os\n"
+            "os.write(1, b'Title: caf\\xe9 (latin-1)\\n')\n"
+            "for i in range(6000):\n"
+            "    os.write(1, b'progress line %d padding-padding-padding\\n' % i)\n"
+            "os.write(1, b'CONVERSION_FINISHED\\n')\n"
+        )
+        captured = self._run(script, timeout=20)
+        # Reaching the last line at all is the assertion: a stalled reader
+        # blocks the child mid-run, so this never arrives.
+        assert "CONVERSION_FINISHED" in captured
+
+    def test_an_undecodable_byte_is_replaced_not_dropped(self):
+        """Short enough to stay inside the tail, so the byte itself is
+        observable rather than evicted by the padding above."""
+        captured = self._run(
+            "import os; os.write(1, b'DeACSM: caf\\xe9 broken\\n')")
+        assert "DeACSM" in captured and "broken" in captured
+        assert "�" in captured
+
+    def test_a_single_enormous_line_is_capped(self):
+        """400 unbounded lines is not a bound. The retained tail is capped on
+        length as well as count, so pathological output cannot accumulate."""
+        cap = ingest_processor._CONVERTER_LOG_LINE_CHARS
+        captured = self._run(f"print('X' * {cap * 20})")
+        assert len(captured) < cap * 2
+        assert "truncated" in captured
+
+
+class TestSurfacedReasonIsSafeToLog:
+    """The reason is quoted into a log line and derives from file content."""
+
+    def test_control_characters_are_stripped_from_the_reason(self):
+        out = "DeACSM v0.0.16: ADE auth\x1b[31m broken\x07\x00"
+        text = ingest_processor.conversion_failure_guidance(
+            "acsm", "x.acsm", converter_output=out)
+        assert "ADE auth" in text and "broken" in text
+        assert "\x1b" not in text and "\x07" not in text and "\x00" not in text
+
+    def test_an_overlong_reason_is_capped(self):
+        out = "DeACSM: " + ("A" * 5000)
+        text = ingest_processor.conversion_failure_guidance(
+            "acsm", "x.acsm", converter_output=out)
+        assert len(text) < len(out)
+        assert "…" in text
+
+    def test_a_normal_reason_is_passed_through_unchanged(self):
+        """Sanitising must not mangle the message users actually get."""
+        out = "DeACSM v0.0.16: ADE auth is missing or broken"
+        text = ingest_processor.conversion_failure_guidance(
+            "acsm", "x.acsm", converter_output=out)
+        assert out in text

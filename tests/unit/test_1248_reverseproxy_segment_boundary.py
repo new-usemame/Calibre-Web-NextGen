@@ -248,6 +248,103 @@ def test_root_mount_is_not_treated_as_a_prefix(monkeypatch):
     )
 
 
+def test_prefix_without_a_leading_slash_is_normalized(monkeypatch):
+    """Cross-family review finding (Terra, medium). `rstrip('/')` alone fixed
+    the trailing-slash half of PEP 3333 and left the leading-slash half broken:
+    `PROXY_SCRIPT_NAME=cwa/` became SCRIPT_NAME='cwa', which is spec-illegal and
+    matches no path, so the strip silently never fired."""
+    environ = _call_middleware(
+        monkeypatch,
+        {"PROXY_SCRIPT_NAME": "cwa/"},
+        _make_environ(PATH_INFO="/cwa/books"),
+    )
+    assert environ["SCRIPT_NAME"] == "/cwa", (
+        "A non-empty SCRIPT_NAME must start with exactly one '/' (PEP 3333)."
+    )
+    assert environ["PATH_INFO"] == "/books"
+
+
+def test_bare_prefix_without_slashes_is_normalized(monkeypatch):
+    environ = _call_middleware(
+        monkeypatch,
+        {"PROXY_SCRIPT_NAME": "cwa"},
+        _make_environ(PATH_INFO="/cwa/books"),
+    )
+    assert environ["SCRIPT_NAME"] == "/cwa"
+    assert environ["PATH_INFO"] == "/books"
+
+
+@pytest.mark.parametrize("prefix", ["/", "//", "///"])
+def test_all_slash_prefix_means_root_mount(monkeypatch, prefix):
+    """Any all-slash value is a root mount, not a prefix. Pre-fix, '/' set
+    SCRIPT_NAME='/' and stripped the leading slash off every single request."""
+    environ = _call_middleware(
+        monkeypatch,
+        {"PROXY_SCRIPT_NAME": prefix},
+        _make_environ(PATH_INFO="/cwa-settings"),
+    )
+    assert environ["PATH_INFO"] == "/cwa-settings"
+    assert environ.get("SCRIPT_NAME", "") in ("", None)
+
+
+def test_multiple_trailing_slashes_collapse(monkeypatch):
+    environ = _call_middleware(
+        monkeypatch,
+        {"PROXY_SCRIPT_NAME": "/cwa///"},
+        _make_environ(PATH_INFO="/cwa/books"),
+    )
+    assert environ["SCRIPT_NAME"] == "/cwa"
+    assert environ["PATH_INFO"] == "/books"
+
+
+def test_scheme_relative_prefix_cannot_survive_as_a_double_slash(monkeypatch):
+    """A spoofed `X-Script-Name: //host` must not reach url_for() as '//host',
+    which browsers read as a scheme-relative URL to another origin. Collapsing
+    the leading slash run keeps the prefix host-relative. (cps/spa.py sanitises
+    again where it reflects the prefix into HTML — this is defence in depth, and
+    the forgeable-header trust boundary itself predates and outlives this test.)"""
+    environ = _call_middleware(
+        monkeypatch,
+        {},
+        _make_environ(HTTP_X_SCRIPT_NAME="//evil.example", PATH_INFO="/books"),
+    )
+    assert not environ["SCRIPT_NAME"].startswith("//"), (
+        f"SCRIPT_NAME {environ['SCRIPT_NAME']!r} is scheme-relative; generated "
+        f"links would point off-origin."
+    )
+    assert environ["SCRIPT_NAME"] == "/evil.example"
+
+
+def test_nested_prefix_still_strips_at_the_boundary(monkeypatch):
+    """A multi-segment mount is the ordinary case for a shared host."""
+    environ = _call_middleware(
+        monkeypatch,
+        {"PROXY_SCRIPT_NAME": "/parent/cwa"},
+        _make_environ(PATH_INFO="/parent/cwa/books"),
+    )
+    assert environ["SCRIPT_NAME"] == "/parent/cwa"
+    assert environ["PATH_INFO"] == "/books"
+
+
+def test_nested_prefix_does_not_strip_a_sibling(monkeypatch):
+    environ = _call_middleware(
+        monkeypatch,
+        {"PROXY_SCRIPT_NAME": "/parent/cwa"},
+        _make_environ(PATH_INFO="/parent/cwa-settings"),
+    )
+    assert environ["PATH_INFO"] == "/parent/cwa-settings"
+
+
+def test_empty_path_info_is_left_empty(monkeypatch):
+    environ = _call_middleware(
+        monkeypatch,
+        {"PROXY_SCRIPT_NAME": "/cwa"},
+        _make_environ(PATH_INFO=""),
+    )
+    assert environ["PATH_INFO"] == ""
+    assert environ["SCRIPT_NAME"] == "/cwa"
+
+
 def test_no_proxy_config_leaves_environ_alone(monkeypatch):
     environ = _call_middleware(monkeypatch, {}, _make_environ(PATH_INFO="/cwa-settings"))
     assert environ["PATH_INFO"] == "/cwa-settings"

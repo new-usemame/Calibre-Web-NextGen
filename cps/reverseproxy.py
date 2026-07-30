@@ -88,13 +88,20 @@ class ReverseProxied(object):
     def __call__(self, environ, start_response):
         self.proxied = False
 
-        # PEP 3333: SCRIPT_NAME must not end in '/', and a non-empty PATH_INFO
-        # must start with one. Operators routinely write PROXY_SCRIPT_NAME=/cwa/
-        # (and proxies are configured with X-Script-Name: /cwa/), which without
-        # this normalisation yielded SCRIPT_NAME='/cwa/' and PATH_INFO='books'.
-        # A bare '/' means "mounted at root", i.e. no prefix at all.
+        # Normalise the mount prefix to the one shape PEP 3333 allows: a
+        # non-empty SCRIPT_NAME starts with exactly one '/' and does not end in
+        # one. Operators write PROXY_SCRIPT_NAME=/cwa/ and PROXY_SCRIPT_NAME=cwa
+        # about as often as they write /cwa, and proxies get configured with
+        # X-Script-Name: /cwa/ ; un-normalised those produced SCRIPT_NAME='/cwa/'
+        # with PATH_INFO='books', or SCRIPT_NAME='cwa' which matches no path at
+        # all — each 404ing every page in its own way. Any all-slash value ('/',
+        # '//') means "mounted at root", i.e. no prefix. Collapsing the leading
+        # run also keeps a spoofed 'X-Script-Name: //host' from becoming a
+        # scheme-relative '//host/...' prefix in generated URLs; cps/spa.py
+        # sanitises again at the point it reflects the prefix into HTML.
         script_name = (environ.get('HTTP_X_SCRIPT_NAME', '') or self.env_script).rstrip('/')
         if script_name:
+            script_name = '/' + script_name.lstrip('/')
             self.proxied = True
             environ['SCRIPT_NAME'] = script_name
             path_info = environ.get('PATH_INFO', '')

@@ -136,6 +136,77 @@ def test_publish_is_skipped_when_the_plugin_did_not_change():
     assert re.search(r"AUTO == 1", body), "--auto must actually branch on skip"
 
 
+def test_publish_path_attaches_the_zip_to_the_application_release():
+    """fork #1253: the application-release download must not depend on a human.
+
+    v4.1.16 publicly restored ``cwasync.koplugin.zip`` on the application release
+    after it went missing, but as a one-off manual upload. v4.1.17 through
+    v4.1.25 then shipped no asset at all, so a device pointed at the application
+    repository saw v4.1.16 as the newest release carrying one and answered "no new
+    release available" indefinitely while newer plugins existed.
+    """
+    body = PUBLISH_SCRIPT.read_text()
+    assert (
+        'gh release upload "$TAG" "$tmp/repo/cwasync.koplugin.zip"' in body
+        and "--repo new-usemame/Calibre-Web-NextGen" in body
+    ), (
+        "a plugin-changing release must attach the validated zip to the "
+        "application release too; leaving it to a manual step is what stranded "
+        "devices for nine consecutive releases"
+    )
+    assert "--clobber" in body, (
+        "the upload must be idempotent — without --clobber a re-run of the "
+        "release workflow fails on an already-present asset"
+    )
+
+
+def test_application_release_asset_is_confined_to_the_publish_path():
+    """The asset must ride the *plugin changed* decision, nothing weaker.
+
+    This is the invariant that separates this from the deleted
+    plugin-release-asset.yml. That workflow attached a zip to every application
+    tag, so Updates Manager pointed at the application repository reported an
+    update on releases that never touched the plugin. Attaching only after the
+    owed-check's early exit keeps an unchanged plugin assetless, and therefore
+    silent.
+    """
+    body = PUBLISH_SCRIPT.read_text()
+    unowed_exit = body.index("Nothing owed")
+    app_upload = body.index('gh release upload "$TAG"')
+    assert unowed_exit < app_upload, (
+        "the application-release upload must sit after the not-owed early exit; "
+        "attaching a zip on a release that did not change the plugin recreates "
+        "the false-update problem that removed the old asset workflow"
+    )
+    dry_run_exit = body.index("DRY RUN: validated")
+    assert dry_run_exit < app_upload, (
+        "a dry run must never mutate a published release"
+    )
+
+
+def test_update_manager_repository_is_documented_where_users_look():
+    """fork #1253: an update path documented only in an issue thread is undocumented.
+
+    The reporter's complaint was literally "there's no documentation for setting
+    up Updates Manager with Calibre-Web NextGen". The dedicated repository was
+    named only in comments on fork #400, while README sends users to /kosync for
+    install instructions and that page described nothing but the manual
+    download-and-copy route.
+    """
+    kosync_page = REPO_ROOT / "cps" / "templates" / "kosync_plugin.html"
+    readme = REPO_ROOT / "README.md"
+    for surface in (kosync_page, readme):
+        text = surface.read_text()
+        assert "new-usemame/cwasync.koplugin" in text, (
+            f"{surface.name} must name the plugin's own repository — an update "
+            "manager pointed at the application repository only sees releases "
+            "that happened to carry an asset"
+        )
+        assert "Updates Manager" in text or "updatesmanager" in text, (
+            f"{surface.name} must name the update manager the instructions are for"
+        )
+
+
 def test_owed_check_runs_before_the_version_check():
     """The ordering IS the fix — reversing it re-breaks fork #400.
 

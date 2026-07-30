@@ -157,4 +157,23 @@ gh release create "$TAG" "$tmp/repo/cwasync.koplugin.zip" \
     --title "NextGen Progress Sync $TAG" \
     --notes "Built from the published Calibre-Web NextGen $TAG source tag."
 
+# The application release gets the same validated zip — but only from here, inside
+# the publish path, which is reached only when the plugin actually changed. That
+# distinction is the whole reason plugin-release-asset.yml was deleted: it
+# attached a zip to EVERY app tag, so Updates Manager pointed at the application
+# repository reported an update on releases that never touched the plugin (the
+# concern @SpookyUSAF raised on fork #400).
+#
+# Why attach at all, when the dedicated repository is the update source: devices
+# configured before the plugin moved are still pointed at the application
+# repository, and v4.1.16 publicly restored this download. Without automation that
+# restore lasted exactly one release — v4.1.17 through v4.1.25 shipped no asset at
+# all, so Updates Manager saw v4.1.16 as the newest release carrying one and
+# answered "no new release available" while newer plugins existed (fork #1253).
+# --clobber keeps a re-run idempotent; a failure here is loud because a silently
+# missing asset is precisely the regression being fixed.
+gh release upload "$TAG" "$tmp/repo/cwasync.koplugin.zip" \
+    --repo new-usemame/Calibre-Web-NextGen --clobber
+
 printf 'Published %s to https://github.com/%s/releases/tag/%s\n' "$TAG" "$TARGET_REPO" "$TAG"
+printf 'Attached cwasync.koplugin.zip to https://github.com/new-usemame/Calibre-Web-NextGen/releases/tag/%s\n' "$TAG"

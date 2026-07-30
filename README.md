@@ -510,6 +510,8 @@ CWA has built-in KOReader progress sync; no separate kosync server is needed.
 2. Point the plugin at `http://your-cwa:8083` and log in with your CWA username and password.
 3. Read on any device. Progress syncs back to CWA, and from there to Kobo if Kobo sync is enabled.
 
+**Keeping the plugin updated.** KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) and [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) can both update the plugin in place. Point either at the plugin's own repository, [`new-usemame/cwasync.koplugin`](https://github.com/new-usemame/cwasync.koplugin/releases) — not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version. If your update manager reports no new release, you already have the current plugin. The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
+
 **Matching filenames across devices (OPDS downloads).** If you download books to KOReader over OPDS and sync progress by filename across several e-readers, turn on **Use server filenames** in KOReader's OPDS catalog settings (the checkbox when you add or edit the catalog). By default KOReader names a downloaded file `Author - Title.epub` from the catalog entry, which differs from the on-disk library name `Title - Author.epub` and forces a manual rename. CWA already sends the library name in the download's `Content-Disposition` header; with **Use server filenames** on, KOReader uses that name, so the file matches your library and your other devices without renaming.
 
 ### Kobo sync

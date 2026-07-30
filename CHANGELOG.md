@@ -18,6 +18,25 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **KOReader's plugin updater kept saying "no new release available" when a newer
+  sync plugin existed.** If you had pointed Updates Manager (or
+  appstore.koplugin) at the main Calibre-Web NextGen repository, it stopped
+  finding updates after v4.1.16 — nine releases in a row shipped no plugin
+  download for it to see, so it reported you were current while three plugin
+  fixes went out without reaching your device. Plugin-changing releases now
+  attach the plugin download automatically, so that setup updates itself again.
+  Releases that don't touch the plugin still publish nothing, so you won't be
+  prompted to reinstall an identical plugin.
+
+### Added
+
+- **The KOReader page now explains how to auto-update the sync plugin.** Visiting
+  `/kosync` only ever described the manual download-and-copy route, so the
+  in-place update path existed but was undiscoverable — the repository to point
+  an update manager at was written down nowhere a user would look. That page and
+  the README now name it, and spell out why the plugin's version can sit behind
+  your server version without anything being wrong.
+
 - **Every CWA settings page 404'd when the app was mounted under a subpath.** If
   you run Calibre-Web NextGen behind a reverse proxy on a prefix that starts the
   same way as its own pages — `/cwa` being the obvious one — then "CWA settings

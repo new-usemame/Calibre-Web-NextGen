@@ -137,6 +137,7 @@ class _Settings(_Base):
     config_goodreads_api_key = Column(String)
     config_hardcover_token = Column(String)
     config_google_books_api_key = Column(String)
+    config_comicvine_api_key = Column(String)
     
     config_register_email = Column(Boolean, default=False)
     config_login_type = Column(Integer, default=0)
@@ -464,6 +465,31 @@ class ConfigSQL(object):
     def hardcover_token_source(self):
         """Return the active global token source without exposing its value."""
         return self._resolved_hardcover_token_and_source()[1]
+
+    def resolved_comicvine_api_key(self):
+        """The install's OWN ComicVine API key, or "" when none is set.
+
+        Precedence: the admin-configured value, else COMICVINE_API_KEY, else
+        the file named by COMICVINE_API_KEY_FILE (docker-secrets style) — the
+        same three sources Hardcover accepts, resolved per call so container
+        level rotation keeps working and a form save never persists an env
+        value into the DB.
+
+        Deliberately returns "" rather than the shared key the provider ships
+        with: this is the "has an own key" question, which is what the Keys
+        panel badge reports. The provider falls back to its shared key on its
+        own, so an empty answer here means "using the shared quota", never
+        "ComicVine is broken" — fork #1242, credit @tomaioo.
+        """
+        # getattr with a default for the same reason the Hardcover resolver
+        # uses one: in an unloaded/CLI context (ingest subprocess) the wrapper
+        # has no mapped column attribute yet, and the env/file fallbacks must
+        # still resolve instead of raising — fork #819.
+        for raw in (getattr(self, "config_comicvine_api_key", None),
+                    os.environ.get("COMICVINE_API_KEY")):
+            if isinstance(raw, str) and raw.strip():
+                return raw.strip()
+        return _read_secret_file(os.environ.get("COMICVINE_API_KEY_FILE"))
 
     def hardcover_token_from_env(self):
         """True when the active global token comes from the environment —

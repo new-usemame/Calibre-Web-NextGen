@@ -168,6 +168,11 @@ services:
       # provider. Free; sign up at https://hardcover.app/account/api
       # - HARDCOVER_TOKEN=eyJhbGciOiJIUzI1NiI...
 
+      # Optional: your own ComicVine API key. ComicVine works without
+      # one, on a key shared by every install, so it can hit the rate
+      # limit. Free; sign up at https://comicvine.gamespot.com/api/
+      # - COMICVINE_API_KEY=...
+
     volumes:
       # Settings, user database, logs. Empty folder for new installs;
       # for existing CWA users, point at your existing /config.

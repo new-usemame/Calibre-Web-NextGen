@@ -165,6 +165,18 @@ PROVIDER_KEY_REGISTRY = {
         "signup": "https://console.cloud.google.com/apis/library/books.googleapis.com",
         "help":   "Enable 'Books API' in any Google Cloud project, then create an API key under Credentials.",
     },
+    "comicvine": {
+        "name":   "ComicVine",
+        "config": "config_comicvine_api_key",
+        # Resolver, not the raw column: COMICVINE_API_KEY and
+        # COMICVINE_API_KEY_FILE are never persisted to the column, so the
+        # column alone under-reports them — same shape as Hardcover (#896).
+        "resolver": "resolved_comicvine_api_key",
+        "signup": "https://comicvine.gamespot.com/api/",
+        "help":   "Optional. ComicVine works without a key on a shared one that "
+                  "every install sends, so it can hit the rate limit. A free key "
+                  "gives you your own quota.",
+    },
 }
 
 
@@ -332,6 +344,18 @@ def _classify_empty_provider(provider) -> tuple:
                     "No matches. If this happens consistently, Google Books "
                     "may be rate-limiting your IP — set a Google Books API key "
                     "in Configuration to lift the quota.")
+    if pid == "comicvine":
+        # Same shape as Google: ComicVine works without a key, on one shared
+        # key that every install sends, so a consistently-empty ComicVine is
+        # usually that shared quota rather than a genuine no-match. Resolve
+        # like the provider does so an env/file key suppresses the hint —
+        # fork #1242.
+        if not config.resolved_comicvine_api_key():
+            return ("empty",
+                    "No matches. If this happens consistently, ComicVine may "
+                    "be rate-limiting the shared key every install uses — add "
+                    "your own free ComicVine key in the 🔑 Keys panel to get a "
+                    "separate quota.")
     return ("empty", "No results for this query")
 
 

@@ -226,8 +226,8 @@ msgstr "Einstellungsdatenbank ist nicht schreibbar"
 msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
-msgstr "Die Regel für die Titelsortierung wurde gespeichert, aber das Neusortieren der bestehenden Bibliothek ist fehlgeschlagen – 
-Bücher behalten möglicherweise ihre vorherige Reihenfolge bei, bis Sie es erneut versuchen oder sie bearbeiten."
+msgstr "Die Regel für die Titelsortierung wurde gespeichert, aber das Neusortieren der bestehenden Bibliothek ist fehlgeschlagen –"
+"Bücher behalten möglicherweise ihre vorherige Reihenfolge bei, bis Sie es erneut versuchen oder sie bearbeiten."
 
 #: cps/admin.py:991
 msgid "Invalid Read Column"

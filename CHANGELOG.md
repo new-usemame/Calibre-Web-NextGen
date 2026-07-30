@@ -16,6 +16,22 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The interface now reads in Polish throughout, instead of leaving about two
+  thirds of its labels in English.** With the language set to Polish, the admin
+  screens, metadata editing, upload, shelves, the reader and a long tail of task
+  and error messages still showed in English. A further 273 phrases were worse
+  than untranslated: gettext had guessed them from a similar English sentence and
+  marked the guess provisional, and a provisional entry is dropped when the
+  catalog is compiled — so those rendered in English while Polish that said
+  something else sat in the file waiting for somebody to confirm it. Polish was
+  covering 950 of 2,609 phrases and now covers all 2,609, which makes it the most
+  complete translation the project ships. Contributed by
+  [@bywciu](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1249)
+  ([#1249](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1249)),
+  building on the original Polish translation by Radosław Kierznowski.
+
 ## [v4.1.25] - 2026-07-30
 
 ### Added

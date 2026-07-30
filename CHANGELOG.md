@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.25] - 2026-07-30
+
 ### Added
 
 - **You can give ComicVine your own API key.** ComicVine searches have always
@@ -30,6 +32,15 @@ is for things you can see or feel when running the app.
   simply wasn't found. Reported by
   [@tomaioo](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1242)
   ([#1242](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1242)).
+
+- **Custom columns are editable in the new UI.** Your own calibre columns — page
+  counts, reading status, notes, shelf location — showed up on a book's page but
+  there was nowhere to change them, so setting one meant switching back to the
+  classic view. The edit screen now has a Custom columns section with the right
+  control for each column type: a number box for integers, a date picker, a
+  yes/no menu, a star rating, a text area for long notes, and a dropdown of the
+  allowed values for enumerated columns. Reported by @jasonxbergman (#997) and
+  by mx.meredith on Discord.
 
 ### Fixed
 
@@ -92,19 +103,6 @@ is for things you can see or feel when running the app.
   properly, which takes Brazilian Portuguese to 1,409 of 2,609 phrases.
   Contributed by [@pedronora](https://github.com/pedronora)
   ([#1227](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1227)).
-
-### Added
-
-- **Custom columns are editable in the new UI.** Your own calibre columns — page
-  counts, reading status, notes, shelf location — showed up on a book's page but
-  there was nowhere to change them, so setting one meant switching back to the
-  classic view. The edit screen now has a Custom columns section with the right
-  control for each column type: a number box for integers, a date picker, a
-  yes/no menu, a star rating, a text area for long notes, and a dropdown of the
-  allowed values for enumerated columns. Reported by @jasonxbergman (#997) and
-  by mx.meredith on Discord.
-
-### Fixed
 
 - **Ingest told you to install an ACSM plugin you already had.** When an `.acsm`
   fulfillment ticket failed to convert, the log always said no ACSM-capable

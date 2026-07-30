@@ -56,6 +56,55 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.25',
+    date: '2026-07-30',
+    items: [
+      {
+        title: 'Removing a highlight in KOReader now removes it everywhere',
+        body: 'Highlights you created synced fine, but deleting one reported "Server push failed" and the highlight stayed on the server — reopen the book on another device and it was still there. The plugin was refusing its own delete request before it ever reached the network, which is why nothing appeared in the server log either. Update the NextGen Progress Sync plugin to 4.1.25 on each device; updating the container alone will not fix it.',
+        category: 'Sync',
+        link: { to: '/account', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Edit your own calibre columns in the new interface',
+        body: 'Your custom columns — page counts, reading status, notes, shelf location — appeared on a book\'s page but there was nowhere to change them, so setting one meant switching back to the classic view. The edit screen now has a Custom columns section with the right control for each type: a number box, a date picker, a yes/no menu, a star rating, a text area for long notes, and a dropdown for enumerated columns.',
+        category: 'Library',
+      },
+      {
+        title: 'A column containing the word "None" no longer erases itself',
+        body: 'Type None into a notes or comments column, on its own, and the column came back empty after saving — in both the new and the classic editor, with the save reporting success. Anything already in that column was lost. Number and date columns are deliberately unchanged: there the word still clears the field, as it always has.',
+        category: 'Library',
+      },
+      {
+        title: 'Use your own ComicVine key for comic metadata',
+        body: 'ComicVine searches have always gone out on a single key shared by every install, so one busy library can use up the allowance for everyone and searches quietly come back empty. You can now enter your own free key in the Keys panel of the metadata search window and get an allowance of your own. Nothing changes if you would rather not — ComicVine keeps working out of the box.',
+        category: 'Library',
+      },
+      {
+        title: 'Brazilian Portuguese now covers much more of the interface',
+        body: 'With the language set to Brazilian Portuguese, the Hardcover match screens, the announcement email form, backup and restore messages and a long tail of task and error messages still read in English. Worse, 57 phrases held provisional guesses that said something else entirely: "Hardcover ID applied successfully" was carrying the text for "{} user(s) removed successfully". All 57 are corrected and 120 more phrases are now translated.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'The admin page no longer links to a release that does not exist',
+        body: 'On a build that was never stamped with a version — running from a source checkout rather than a published Docker image — the version read v0.0.0, and because that looks like an ordinary version it became a link to a release tag of that name, which 404s. It now renders as plain text when there is nothing real to point at, and it agrees with the version the app reports to other services.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'A mistyped API-key file path can no longer hang the server',
+        body: 'If you supply a provider token by pointing HARDCOVER_TOKEN_FILE or COMICVINE_API_KEY_FILE at a file, the app reads that file when it needs the token. Point it at something that is not a plain file — a named pipe nothing is writing to, or a device like /dev/zero — and the read never finished: the whole app froze, or memory climbed until it was killed. Both now fail cleanly with a log line naming the file.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Ingest stops blaming a plugin you already installed',
+        body: 'When an .acsm fulfillment ticket failed to convert, the log always said no ACSM-capable plugin was installed — even when one had run and had printed the actual reason it gave up. That sent people looking for a missing plugin instead of at the real problem. The log now repeats the plugin\'s own reason, and suggests installing one only when nothing handled the file.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.24',
     date: '2026-07-29',
     items: [

@@ -18,6 +18,17 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A custom column holding just the word "None" no longer erases itself when
+  you save.** Type `None` into a notes or comments column — on its own, as the
+  whole value — and the column came back empty, in both the new UI and the
+  classic editor, with the save reporting success. Anything already in the
+  column was lost. `None` is the value the yes/no dropdown uses behind the
+  scenes to mean "not set", and that meaning was being applied to every kind
+  of column, including free-text ones where it is ordinary writing. Number and
+  date columns are deliberately unchanged: there the word still empties the
+  field, as it always has
+  ([#1233](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1233)).
+
 - **Deleting a highlight in KOReader now actually removes it from the server.**
   Creating highlights synced fine, but deleting one reported "Server push
   failed" and the deletion never went anywhere — reopen the book on another

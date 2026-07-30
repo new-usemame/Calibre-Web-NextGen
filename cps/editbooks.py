@@ -1824,7 +1824,15 @@ def edit_book_publisher(publishers, book):
 
 def edit_cc_data_value(book_id, book, c, to_save, cc_db_value, cc_string):
     changed = False
-    if to_save[cc_string] == 'None':
+    # 'None' is the unset sentinel emitted by the yes/no <select> in
+    # book_edit.html (<option value="None">) — the only control in the app that
+    # sends it. It must not be applied to 'comments', where the value is free
+    # prose and "None" is a legitimate note (#1233). It is kept for
+    # int/float/datetime: no control emits it there (number inputs cannot
+    # submit it, and the datepicker's delete button clears via '', which is
+    # handled by the caller), so it is unparseable input and clearing beats
+    # storing the text "None" in a numeric column or defaulting a date.
+    if c.datatype != 'comments' and to_save[cc_string] == 'None':
         to_save[cc_string] = None
     elif c.datatype == 'bool':
         to_save[cc_string] = 1 if to_save[cc_string] == 'True' else 0

@@ -226,8 +226,10 @@ msgstr "Einstellungsdatenbank ist nicht schreibbar"
 msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
-msgstr "Die Regel für die Titelsortierung wurde gespeichert, aber das Neusortieren der bestehenden Bibliothek ist fehlgeschlagen –"
-"Bücher behalten möglicherweise ihre vorherige Reihenfolge bei, bis Sie es erneut versuchen oder sie bearbeiten."
+msgstr "" 
+"Die Regel für die Titelsortierung wurde gespeichert, aber das Neusortieren der bestehenden Bibliothek ist" 
+"fehlgeschlagen – Bücher behalten möglicherweise ihre vorherige Reihenfolge bei, bis Sie es erneut versuchen" 
+"oder sie bearbeiten."
 
 #: cps/admin.py:991
 msgid "Invalid Read Column"
@@ -308,7 +310,9 @@ msgstr ""
 
 #: cps/admin.py:1061
 msgid "Are you sure you want to change Calibre library location?"
-msgstr "Sind Sie sicher, dass Sie den Speicherort für die Calibre Bibliothek ändern möchten?"
+msgstr ""
+"Sind Sie sicher, dass Sie den Speicherort für die" 
+"Calibre Bibliothek ändern möchten?"
 
 #: cps/admin.py:1063
 msgid ""
@@ -3183,7 +3187,9 @@ msgstr "Metadaten zu {n} Büchern hinzugefügt."
 #: cps/spa_strings.py:236
 #, python-brace-format
 msgid "New password for “{label}” — copy it now, it won’t be shown again:"
-msgstr "Neues Passwort für "{label}" - kopieren Sie es jetzt, es wird nicht noch einmal angezeigt.
+msgstr ""
+"Neues Passwort für “{label}” - kopieren Sie es jetzt," 
+"es wird nicht noch einmal angezeigt."
 
 #: cps/spa_strings.py:237
 msgid "New passwords do not match."

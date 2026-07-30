@@ -728,10 +728,17 @@ def test_changed_paths_treats_tests_yml_as_frontend_relevant():
 #      PRs. Without (c) the job runs, goes red, and the summary is still
 #      green — a gate that reports its own failure as success.
 #
-# Plus one enabling constraint: fork PRs get no secrets, so they cannot
-# read the private pbs-cache mirror. The build must fall back to the
-# public CDN for them or every community Dockerfile PR dies on a 401
-# that has nothing to do with the change.
+# One deliberate limit, recorded rather than glossed: fork PRs RUN the job
+# but do not hard-gate on it yet. The build pins the private pbs-cache
+# mirror, and whether a fork PR's read-only GITHUB_TOKEN can pull that
+# package is not established either way. Blocking community PRs on an
+# unverified infrastructure question is worse than surfacing the result
+# and reading it before merge. Tracked in #1263.
+#
+# What this must NOT become: making the mirror or its login conditional to
+# accommodate forks. test_dockerfile_contributor_build.py owns that pair of
+# invariants — a conditional login against an unconditional mirror is the
+# exact shape that silently broke release dry-runs.
 
 
 def _detect_step() -> dict:
@@ -939,60 +946,97 @@ def test_summary_hard_fails_on_red_integration_for_build_prs():
     assert "changed_paths" in needs, "summary must depend on changed_paths to read `build`"
 
 
-def test_integration_build_falls_back_to_cdn_for_fork_prs():
-    """Fork PRs get no secrets, so they cannot pull the private
-    ghcr.io/new-usemame/pbs-cache mirror. With PBS_SOURCE hardcoded to
-    `ghcr`, turning this job on for community PRs would fail every one of
-    them at the first COPY with a 401 unrelated to their change.
+def test_fork_prs_run_the_build_job_but_do_not_hard_gate_on_it_yet():
+    """Fork build PRs must RUN integration-tests — that is the whole point —
+    but must not hard-gate on it while one question is unresolved.
 
-    The Dockerfile already ships the `upstream` (public CDN) path — use it.
+    The build selects the private pbs-cache mirror, and the login falls back
+    to GITHUB_TOKEN when GH_PAT is out of scope (fork PRs get no secrets).
+    Whether that read-only token can pull the package is not established
+    either way. Hard-gating on an unverified infrastructure question would
+    block community PRs for a reason that has nothing to do with their
+    change; skipping the job entirely is the bug this module exists to fix.
+    So: run it, surface it, read it before merging — and promote to a hard
+    gate once a real fork run answers the question (#1263).
+
+    This test is the tripwire on that decision: if someone widens the hard
+    gate to forks, they must come here and record why it is now safe.
     """
     wf = _load(WF_DIR / "tests.yml")
     job = (wf.get("jobs") or {}).get("integration-tests")
+
+    condition = str(job.get("if") or "")
+    assert "fork" not in condition, (
+        "integration-tests must still RUN on fork build PRs — excluding forks "
+        "from the `if:` restores the original hole for exactly the "
+        "contributions that need the check most"
+    )
+
+    coe = str(job.get("continue-on-error", ""))
+    assert "fork" in coe, (
+        "the hard gate must exclude fork PRs while mirror access from a fork "
+        "is unverified (#1263)"
+    )
+
+
+def test_gate_hardness_agrees_between_the_job_and_the_summary():
+    """The job's continue-on-error and the summary's IS_BUILD_PR decide the
+    same thing from two places. If they drift, one says 'advisory' while the
+    other fails the run (or worse, both go soft and nothing gates)."""
+    wf = _load(WF_DIR / "tests.yml")
+    jobs = wf.get("jobs") or {}
+    coe = str((jobs.get("integration-tests") or {}).get("continue-on-error", ""))
+    summary = next(
+        (j for _n, j in jobs.items() if isinstance(j, dict) and j.get("name") == "Test Suite Summary"),
+        None,
+    )
+    assert summary is not None
+    is_build = ""
+    for step in _steps(summary):
+        env = step.get("env") or {}
+        if "IS_BUILD_PR" in env:
+            is_build = str(env["IS_BUILD_PR"])
+    assert is_build, "summary must define IS_BUILD_PR"
+
+    # Both must key on the build output AND both must carve out forks.
+    for name, expr in (("continue-on-error", coe), ("IS_BUILD_PR", is_build)):
+        assert "needs.changed_paths.outputs.build" in expr, f"{name} ignores the build output"
+        assert "fork" in expr, (
+            f"{name} does not carve out fork PRs, but the other one does — the "
+            "job and the summary would disagree about what is gated"
+        )
+
+
+def test_ci_image_build_still_pins_the_mirror_unconditionally():
+    """Guard against 'fixing' the fork case by making the mirror conditional.
+
+    `test_dockerfile_contributor_build.py` already owns both halves of this
+    (every CI build pins PBS_SOURCE=ghcr; a job selecting the mirror has an
+    UNCONDITIONAL ghcr login — a conditional one is what broke release
+    dry-runs). Restated here because this module is what a future change to
+    the integration gate will be read alongside: if you find yourself adding
+    an `if:` to that login, you are reintroducing a known bug.
+    """
+    wf = _load(WF_DIR / "tests.yml")
+    job = (wf.get("jobs") or {}).get("integration-tests")
+
     build_step = next(
-        (
-            s
-            for s in _steps(job)
-            if str(s.get("uses", "")).startswith("docker/build-push-action")
-        ),
+        (s for s in _steps(job) if str(s.get("uses", "")).startswith("docker/build-push-action")),
         None,
     )
     assert build_step is not None, "integration-tests must build the image"
-    build_args = str((build_step.get("with") or {}).get("build-args", ""))
-
-    assert "PBS_SOURCE" in build_args, "the build must pass PBS_SOURCE explicitly"
-    assert build_args.count("ghcr") == 0 or "${{" in build_args, (
-        "PBS_SOURCE is hardcoded — fork PRs cannot read the private mirror and "
-        "will 401 before running a single test"
-    )
-    assert "fork" in build_args or "head.repo" in build_args, (
-        "PBS_SOURCE must switch on whether the PR comes from a fork; forks need "
-        "the public CDN path (PBS_SOURCE=upstream)"
+    assert "PBS_SOURCE=ghcr" in str((build_step.get("with") or {}).get("build-args", "")), (
+        "the CI build must pin PBS_SOURCE=ghcr; unpinned sends it back to the "
+        "release CDN that 404s the Actions egress"
     )
 
-
-def test_ghcr_login_is_skipped_when_there_is_no_secret_to_log_in_with():
-    """Companion to the CDN fallback: docker/login-action with an empty
-    password fails the step. On a fork PR both GH_PAT and a usable
-    packages-read token are absent, so the login must be conditional —
-    while staying present and ordered before the build for same-repo runs
-    (Wall 5 still applies)."""
-    wf = _load(WF_DIR / "tests.yml")
-    job = (wf.get("jobs") or {}).get("integration-tests")
     login = next(
-        (
-            s
-            for s in _steps(job)
-            if str(s.get("uses", "")).startswith("docker/login-action")
-        ),
+        (s for s in _steps(job) if str(s.get("uses", "")).startswith("docker/login-action")),
         None,
     )
-    assert login is not None, "integration-tests must still define the GHCR login step"
-    condition = str(login.get("if") or "")
-    assert condition, (
-        "the GHCR login step runs unconditionally; on a fork PR it has no "
-        "password and fails the job before the build"
-    )
-    assert "fork" in condition or "head.repo" in condition, (
-        "the login step's condition must key on whether the head repo is a fork"
+    assert login is not None, "integration-tests must define the GHCR login step"
+    assert "if" not in login, (
+        "the GHCR login must stay UNCONDITIONAL while the build pins the "
+        "private mirror — a conditional login with an unconditional mirror is "
+        "the exact shape that broke release dry-runs"
     )

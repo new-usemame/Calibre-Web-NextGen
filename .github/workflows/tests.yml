@@ -202,14 +202,23 @@ jobs:
     # don't block downstream auto-revert decisions. On tier-2 PRs the job
     # is mandatory.
     #
-    # ...and so is it on build-definition PRs. Gating on the tier label
-    # alone meant the Dockerfile — which pins the Calibre/Python/kepubify
-    # versions the runtime is assembled from — was exempt from the only
-    # job that builds it. A community PR bumping Calibre 9.1.0 → 9.11.0
-    # (#1261) reported a green Test Suite Summary with the image never
-    # built. Running the job is not enough on its own: left advisory, a
-    # failed build would still not block the merge.
-    continue-on-error: ${{ !(contains(github.event.pull_request.labels.*.name, 'safe-tier-2') || needs.changed_paths.outputs.build == 'true') }}
+    # ...and so is it on build-definition PRs from this repo. Gating on the
+    # tier label alone meant the Dockerfile — which pins the
+    # Calibre/Python/kepubify versions the runtime is assembled from — was
+    # exempt from the only job that builds it. A community PR bumping
+    # Calibre 9.1.0 → 9.11.0 (#1261) reported a green Test Suite Summary
+    # with the image never built. Running the job is not enough on its own:
+    # left advisory, a failed build would still not block the merge.
+    #
+    # Fork PRs run the job but stay ADVISORY for now. The build selects the
+    # private pbs-cache mirror, and whether a fork PR's read-only
+    # GITHUB_TOKEN can pull it is not established either way — the login
+    # falls back to GITHUB_TOKEN when GH_PAT is out of scope, which may or
+    # may not carry package read. Hard-gating on that unknown would block
+    # community PRs on an infrastructure question rather than their change.
+    # The job result is still visible and is read before any merge. Tracked
+    # in #1263; promote to a hard gate once a real fork run answers it.
+    continue-on-error: ${{ !(contains(github.event.pull_request.labels.*.name, 'safe-tier-2') || (needs.changed_paths.outputs.build == 'true' && github.event.pull_request.head.repo.fork != true)) }}
     # Run on:
     # - merge to main / dev (advisory)
     # - manual dispatch with flag
@@ -244,11 +253,6 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR (pbs-cache mirror pull)
-        # Fork PRs receive no secrets and a GITHUB_TOKEN that cannot read
-        # our private pbs-cache package, so there is nothing to log in
-        # with — and login-action fails the step on an empty password.
-        # Those runs take the public-CDN path instead (PBS_SOURCE below).
-        if: github.event.pull_request.head.repo.fork != true
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -281,14 +285,8 @@ jobs:
           # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
           # than the release CDN, which intermittently 404s the Actions egress.
           # Contributors build without it and fall back to the CDN (see Dockerfile).
-          #
-          # Fork PRs must take that CDN path: the mirror is private and their
-          # run holds no credential for it, so `ghcr` would 401 at the first
-          # COPY --from, failing every community Dockerfile PR for a reason
-          # unrelated to the change. `fork` is null on push/tag events, which
-          # correctly leaves those on the mirror.
           build-args: |
-            PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true && 'upstream' || 'ghcr' }}
+            PBS_SOURCE=ghcr
 
       - name: Set test UID/GID
         run: |
@@ -763,11 +761,14 @@ jobs:
           # contains() evaluates to a 'true' / 'false' string; we pass
           # it through env to keep the shell predicate readable.
           IS_TIER2_PR: ${{ contains(github.event.pull_request.labels.*.name, 'safe-tier-2') }}
-          # Build-definition PRs (Dockerfile / requirements / the integration
-          # harness itself) gate on Integration Tests exactly like tier-2 PRs.
-          # Without this the job runs, goes red, and the summary still reports
-          # success — a gate that reports its own failure as a pass.
-          IS_BUILD_PR: ${{ needs.changed_paths.outputs.build == 'true' }}
+          # Build-definition PRs (Dockerfile / requirements / root/ / the
+          # integration harness itself) gate on Integration Tests exactly like
+          # tier-2 PRs. Without this the job runs, goes red, and the summary
+          # still reports success — a gate that reports its own failure as a
+          # pass. Mirrors the job's own continue-on-error: fork PRs are
+          # excluded while the mirror-access question is open (#1263), so the
+          # two cannot disagree about what is being gated.
+          IS_BUILD_PR: ${{ needs.changed_paths.outputs.build == 'true' && github.event.pull_request.head.repo.fork != true }}
         run: |
           echo "Fast Tests:        ${{ needs.fast-tests.result }}"
           echo "Frontend Build:    ${{ needs.frontend-build.result }}"

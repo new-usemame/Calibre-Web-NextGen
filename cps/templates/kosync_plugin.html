@@ -216,8 +216,16 @@
           <tr>
             <td class="kosync-step-number">Versions</td>
             <td>The plugin's version is the server version it last changed in, so it can sit
-            legitimately behind your server. If your update manager says there is no new release,
-            you already have the current plugin.</td>
+            legitimately behind your server version — that on its own is not a sign anything is
+            wrong.</td>
+          </tr>
+          <tr>
+            <td class="kosync-step-number">Pointed<br>elsewhere?</td>
+            <td>If your update manager is set to the main
+            <code>Calibre-Web-NextGen</code> repository, switch it to the one above. That older
+            setup still receives the plugin, but it only appears on server releases that changed
+            the plugin, so it is easy to misread as "no update". A check that reports no new
+            release means the plugin stream has nothing newer — not that a check failed.</td>
           </tr>
         </tbody>
       </table>

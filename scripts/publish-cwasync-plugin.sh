@@ -208,11 +208,12 @@ gh release create "$TAG" "$tmp/repo/cwasync.koplugin.zip" \
 # restore lasted exactly one release — v4.1.17 through v4.1.25 shipped no asset at
 # all, so Updates Manager saw v4.1.16 as the newest release carrying one and
 # answered "no new release available" while newer plugins existed (fork #1253).
-# --clobber keeps a re-run idempotent; a failure here is loud because a silently
-# missing asset is precisely the regression being fixed. Replacing an asset is a
-# mutation of a published release, so say so rather than doing it quietly — the
-# only asset that should already be here is one an earlier run of this same tag
-# put there.
+# A failure here is loud because a silently missing asset is precisely the
+# regression being fixed; the retry is handled by reconcile_app_release_asset()
+# above, which is what makes a failed upload recoverable — not --clobber. What
+# --clobber covers is an asset this script did not place, such as the manual
+# v4.1.16 upload. Replacing one is a mutation of a published release, so say so
+# rather than doing it quietly.
 if [[ -n "$(gh release view "$TAG" --repo new-usemame/Calibre-Web-NextGen \
     --json assets --jq '.assets[] | select(.name=="cwasync.koplugin.zip") | .name' 2>/dev/null)" ]]; then
     printf 'NOTE: replacing the existing cwasync.koplugin.zip on application release %s.\n' "$TAG"

@@ -86,6 +86,23 @@
       margin-top: 3rem;
   }
 
+  /* .kosync-info and .kosync-warning hardcode a light background with dark text,
+     so they do not follow the active theme. A link inside them keeps the theme's
+     link colour, and caliBlur's is translucent white — measured at 1.24:1 against
+     the info background, i.e. present but unreadable. Inheriting the block's own
+     text colour keeps any link in them legible under either theme (6.92:1), and
+     the underline carries the affordance that colour alone no longer can. */
+  .kosync-info a,
+  .kosync-info a:hover,
+  .kosync-info a:focus,
+  .kosync-warning a,
+  .kosync-warning a:hover,
+  .kosync-warning a:focus {
+      color: inherit;
+      text-decoration: underline;
+      font-weight: 600;
+  }
+
   .kosync-table {
     width: 100%;
     border-left: 4px solid var(--color-secondary);

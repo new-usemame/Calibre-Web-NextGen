@@ -160,28 +160,18 @@ def test_publish_path_attaches_the_zip_to_the_application_release():
     )
 
 
-def test_application_release_asset_is_confined_to_the_publish_path():
-    """The asset must ride the *plugin changed* decision, nothing weaker.
-
-    This is the invariant that separates this from the deleted
-    plugin-release-asset.yml. That workflow attached a zip to every application
-    tag, so Updates Manager pointed at the application repository reported an
-    update on releases that never touched the plugin. Attaching only after the
-    owed-check's early exit keeps an unchanged plugin assetless, and therefore
-    silent.
-    """
-    body = PUBLISH_SCRIPT.read_text()
-    unowed_exit = body.index("Nothing owed")
-    app_upload = body.index('gh release upload "$TAG"')
-    assert unowed_exit < app_upload, (
-        "the application-release upload must sit after the not-owed early exit; "
-        "attaching a zip on a release that did not change the plugin recreates "
-        "the false-update problem that removed the old asset workflow"
-    )
-    dry_run_exit = body.index("DRY RUN: validated")
-    assert dry_run_exit < app_upload, (
-        "a dry run must never mutate a published release"
-    )
+# The invariant "the application asset rides the *plugin changed* decision and
+# nothing weaker" is NOT pinned here. It was, by comparing the character offsets
+# of "Nothing owed" and the upload command — and that pin broke the moment the
+# upload also became reachable from a helper function defined earlier in the file,
+# on a change that was correct. Offsets model line order, not control flow, so
+# they answer a different question than the one that matters.
+#
+# It now lives in tests/unit/test_1253_plugin_release_asset_publish_paths.py,
+# which executes this script against recording fakes for gh and git and asserts
+# which releases each invocation actually mutates — dry run, unchanged plugin
+# under --auto and --publish, version mismatch, missing application release,
+# happy path, failed-upload retry, and a re-run after a complete publish.
 
 
 def test_update_manager_repository_is_documented_where_users_look():

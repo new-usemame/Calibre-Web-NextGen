@@ -377,6 +377,21 @@ class TestKeyResolutionReachesTheRequest:
 
         assert "key%20with%20space" in box["url"]
 
+    def test_a_crafted_key_cannot_inject_query_parameters(self, monkeypatch):
+        """The key lands in a query string. An admin pasting a mangled value
+        (or a compromised settings row) must not be able to append parameters
+        of its own and change what is being asked for."""
+        _set_resolved_key(monkeypatch, "abc&resources=volume&limit=100")
+        box = _capture_request(monkeypatch)
+
+        _provider().search("Batman")
+
+        assert "api_key=abc%26resources%3Dvolume%26limit%3D100" in box["url"]
+        assert "resources=volume" not in box["url"], (
+            "the injected parameter survived as a real parameter"
+        )
+        assert box["url"].count("resources=") == 1
+
     def test_no_class_attribute_bakes_a_key_into_a_url(self):
         """Source-pin: if a future edit moves the key back into a class-body
         f-string, the runtime resolution above is silently dead again."""

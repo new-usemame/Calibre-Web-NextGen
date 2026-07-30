@@ -36,6 +36,7 @@ whole issue is about was indistinguishable from "no matches"
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import types
 from pathlib import Path
@@ -107,6 +108,77 @@ class TestResolver:
     def test_missing_secret_file_degrades_to_empty(self, monkeypatch, tmp_path):
         monkeypatch.setenv("COMICVINE_API_KEY_FILE", str(tmp_path / "nope"))
         assert _bare_config().resolved_comicvine_api_key() == ""
+
+
+@pytest.mark.unit
+class TestSecretFileCannotStallOrExhaustTheProcess:
+    """`GET /metadata/keys` is reachable by any logged-in user and resolves
+    every provider's key, so it reads the secret file named by the environment.
+    This app runs gevent **without** monkey-patching, so one blocking syscall
+    there freezes the whole process, not one greenlet. Raised by the security
+    review of #1242; the defect is in the shared helper, so fixing it here fixes
+    it for Hardcover (#743) too.
+    """
+
+    def test_a_fifo_does_not_block_forever(self, monkeypatch, tmp_path):
+        """`open()` on a FIFO with no writer blocks indefinitely, and it does
+        not raise OSError, so the existing guard did not catch it."""
+        from cps.config_sql import _read_secret_file
+
+        fifo = tmp_path / "cv.fifo"
+        os.mkfifo(fifo)
+
+        # If this regresses the test hangs rather than fails, which is itself
+        # the signal — a bounded alarm turns it into a failure instead.
+        assert _read_secret_file(str(fifo)) == ""
+
+    def test_a_character_device_is_refused(self, monkeypatch):
+        """Reading /dev/zero never finds a newline, so an unbounded readline
+        grows until the worker is killed."""
+        from cps.config_sql import _read_secret_file
+
+        assert _read_secret_file("/dev/zero") == ""
+
+    def test_an_oversized_file_is_read_bounded(self, tmp_path):
+        """A misconfigured path (a log, /proc/self/environ) must not pull an
+        unbounded amount into memory."""
+        from cps.config_sql import _read_secret_file, _SECRET_FILE_MAX_BYTES
+
+        big = tmp_path / "big"
+        big.write_bytes(b"x" * (_SECRET_FILE_MAX_BYTES * 4))
+
+        got = _read_secret_file(str(big))
+        assert len(got) <= _SECRET_FILE_MAX_BYTES
+
+    def test_a_directory_is_refused(self, tmp_path):
+        from cps.config_sql import _read_secret_file
+
+        assert _read_secret_file(str(tmp_path)) == ""
+
+    def test_an_ordinary_secret_file_still_works(self, tmp_path):
+        """The whole point of the helper — do not break #743's use case."""
+        from cps.config_sql import _read_secret_file
+
+        secret = tmp_path / "tok"
+        secret.write_text("the-token\nsecond line\n", encoding="utf-8")
+
+        assert _read_secret_file(str(secret)) == "the-token"
+
+    def test_a_file_without_a_trailing_newline_still_works(self, tmp_path):
+        from cps.config_sql import _read_secret_file
+
+        secret = tmp_path / "tok"
+        secret.write_text("no-newline-token", encoding="utf-8")
+
+        assert _read_secret_file(str(secret)) == "no-newline-token"
+
+    def test_undecodable_bytes_do_not_raise(self, tmp_path):
+        from cps.config_sql import _read_secret_file
+
+        secret = tmp_path / "tok"
+        secret.write_bytes(b"\xff\xfe-token\n")
+
+        assert isinstance(_read_secret_file(str(secret)), str)
 
     def test_unloaded_config_wrapper_does_not_raise(self, monkeypatch):
         """The ingest subprocess runs an unloaded wrapper with no mapped
@@ -582,6 +654,24 @@ class TestHttpRefusalChannel:
         assert secret not in seen[0], "the install's API key leaked into the log"
         assert "api_key=***" in seen[0]
         assert "401" in seen[0], "redaction must not swallow the diagnosis"
+
+    def test_a_key_echoed_back_by_the_api_is_redacted(self, monkeypatch):
+        """Raised by the security review: the URL pattern only matches
+        `api_key=<value>`. If ComicVine (or a proxy, or a future error format)
+        quotes the key back in its own words inside a 200 body, the pattern
+        does not touch it and the key reaches the log."""
+        secret = "s3cret-install-key"
+        _set_resolved_key(monkeypatch, secret)
+        _capture_request(
+            monkeypatch,
+            payload={"error": f"Invalid credential: {secret}",
+                     "status_code": 100, "results": []},
+        )
+        seen = self._warnings(monkeypatch)
+
+        assert _provider().search("Batman") == []
+        assert secret not in seen[0], "the key leaked via the upstream error text"
+        assert "***" in seen[0]
 
     def test_shared_key_is_redacted_too(self, monkeypatch):
         """No exemption for the shared key: one rule is easier to keep than a

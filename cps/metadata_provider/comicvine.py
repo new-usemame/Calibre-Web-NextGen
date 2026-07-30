@@ -22,9 +22,20 @@ log = logger.create()
 _API_KEY_IN_URL = re.compile(r"(api_key=)[^&\s]*")
 
 
-def _scrub(text) -> str:
-    """Redact any API key in a string bound for the log."""
-    return _API_KEY_IN_URL.sub(r"\1***", str(text))
+def _scrub(text, api_key: str = "") -> str:
+    """Redact the API key from a string bound for the log.
+
+    Two passes, because the key reaches the log in two different shapes. The
+    pattern handles the URL that ``requests`` embeds in its exception messages.
+    Replacing the literal value handles anything else — notably an upstream
+    error body that quotes the key back at us ("Invalid credential: <key>"),
+    which the URL pattern would not touch.
+    """
+    scrubbed = _API_KEY_IN_URL.sub(r"\1***", str(text))
+    if api_key:
+        scrubbed = scrubbed.replace(api_key, "***")
+        scrubbed = scrubbed.replace(quote(api_key.encode("utf-8")), "***")
+    return scrubbed
 
 
 class ComicVine(Metadata):
@@ -107,12 +118,12 @@ class ComicVine(Metadata):
                 # Calm" and 429 are the throttling variants. Anything else is
                 # an ordinary transport failure and stays a bare warning.
                 if getattr(e.response, "status_code", None) in (401, 403, 420, 429):
-                    self._log_refusal(_scrub(e), api_key)
+                    self._log_refusal(_scrub(e, api_key), api_key)
                 else:
-                    log.warning(_scrub(e))
+                    log.warning(_scrub(e, api_key))
                 return []
             except Exception as e:
-                log.warning(_scrub(e))
+                log.warning(_scrub(e, api_key))
                 return []
             payload = result.json()
             # The other refusal channel: ComicVine also reports failures in an
@@ -122,7 +133,7 @@ class ComicVine(Metadata):
             status_code = payload.get("status_code")
             if status_code is not None and status_code != 1:
                 self._log_refusal(
-                    _scrub(payload.get("error") or f"status_code {status_code}"),
+                    _scrub(payload.get("error") or f"status_code {status_code}", api_key),
                     api_key,
                 )
                 return []

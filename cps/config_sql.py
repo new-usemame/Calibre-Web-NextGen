@@ -6,6 +6,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import os
+import stat
 import sys
 import json
 
@@ -227,6 +228,12 @@ class _Settings(_Base):
         return self.__class__.__name__
 
 
+# A secret file holds one token on one line. 4 KiB is far more than any
+# provider token needs and small enough that reading it can never be the
+# reason a request is slow.
+_SECRET_FILE_MAX_BYTES = 4096
+
+
 # Class holds all application specific settings in calibre-web automated
 def _read_secret_file(path):
     """Read a docker-secrets-style token file (fork #743).
@@ -234,14 +241,42 @@ def _read_secret_file(path):
     Returns the stripped first line, or "" when the variable is unset, the
     file is missing, or it is unreadable — a broken secret mount must
     degrade to "no token", never crash config loading.
+
+    Resolvers call this on request paths (``/metadata/keys`` is reachable by
+    any logged-in user), and this app runs gevent **without** monkey-patching,
+    so one blocking syscall here freezes the whole process rather than a single
+    greenlet. A plain ``open()`` + unbounded ``readline()`` is not safe for
+    that: opening a FIFO with no writer blocks forever, and reading
+    ``/dev/zero`` never finds a newline, so it grows until the worker dies.
+    ``except OSError`` catches neither — both succeed. So:
+
+    * open with ``O_NONBLOCK``, which makes opening a FIFO fail instead of hang,
+    * ``fstat`` the descriptor we actually hold and require a regular file,
+      which rejects devices and FIFOs without a path-swap window between the
+      check and the open,
+    * bound the read.
     """
     if not path:
         return ""
+    fd = None
     try:
-        with open(path, "r", encoding="utf-8") as fh:
-            return fh.readline().strip()
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            log.warning(
+                "Ignoring secret file %s: not a regular file. A secret file "
+                "must be a plain file containing the token on one line.", path
+            )
+            return ""
+        data = os.read(fd, _SECRET_FILE_MAX_BYTES)
     except OSError:
         return ""
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+    return data.decode("utf-8", "replace").split("\n", 1)[0].strip()
 
 
 class ConfigSQL(object):

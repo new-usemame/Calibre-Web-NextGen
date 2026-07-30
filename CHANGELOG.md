@@ -18,6 +18,16 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **KOReader's plugin updater kept saying "no new release available" when a newer
+  sync plugin existed.** If you had pointed Updates Manager (or
+  appstore.koplugin) at the main Calibre-Web NextGen repository, it stopped
+  finding updates after v4.1.16 — nine releases in a row shipped no plugin
+  download for it to see, so it reported you were current while three plugin
+  fixes went out without reaching your device. Plugin-changing releases now
+  attach the plugin download automatically, so that setup updates itself again.
+  Releases that don't touch the plugin still publish nothing, so you won't be
+  prompted to reinstall an identical plugin.
+
 - **The interface now reads in Polish throughout, instead of leaving about two
   thirds of its labels in English.** With the language set to Polish, the admin
   screens, metadata editing, upload, shelves, the reader and a long tail of task
@@ -31,6 +41,33 @@ is for things you can see or feel when running the app.
   [@bywciu](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1249)
   ([#1249](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1249)),
   building on the original Polish translation by Radosław Kierznowski.
+
+### Added
+
+- **The KOReader page now explains how to auto-update the sync plugin.** Visiting
+  `/kosync` only ever described the manual download-and-copy route, so the
+  in-place update path existed but was undiscoverable — the repository to point
+  an update manager at was written down nowhere a user would look. That page and
+  the README now name it, and spell out why the plugin's version can sit behind
+  your server version without anything being wrong.
+
+- **Every CWA settings page 404'd when the app was mounted under a subpath.** If
+  you run Calibre-Web NextGen behind a reverse proxy on a prefix that starts the
+  same way as its own pages — `/cwa` being the obvious one — then "CWA settings
+  (ingest/convert)", "Duplicate detection settings", the statistics dashboard,
+  and the library-refresh button all came back as Not Found, while the ordinary
+  Admin links right beside them worked. That mismatch was the tell: the mount
+  prefix was being removed from any address that merely *began* with the same
+  letters, so `/cwa-settings` was cut down to `-settings`, which is not a page.
+  All 37 CWA pages and actions were affected — settings, duplicate detection,
+  library refresh, log viewing and downloads, the EPUB fixer, library conversion,
+  scheduled tasks and the statistics screens. The prefix is now only removed at a
+  real path boundary, so both styles of proxy setup work: one that strips the
+  prefix before passing the request on, and one that leaves it in place. A prefix
+  written with a trailing slash (`PROXY_SCRIPT_NAME=/cwa/`) is also accepted now
+  — it used to break every page in a second, separate way. Reported by
+  [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1248)
+  ([#1248](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1248)).
 
 ## [v4.1.25] - 2026-07-30
 

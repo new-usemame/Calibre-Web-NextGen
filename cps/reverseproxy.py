@@ -88,12 +88,36 @@ class ReverseProxied(object):
     def __call__(self, environ, start_response):
         self.proxied = False
 
-        script_name = environ.get('HTTP_X_SCRIPT_NAME', '') or self.env_script
+        # Normalise the mount prefix to the one shape PEP 3333 allows: a
+        # non-empty SCRIPT_NAME starts with exactly one '/' and does not end in
+        # one. Operators write PROXY_SCRIPT_NAME=/cwa/ and PROXY_SCRIPT_NAME=cwa
+        # about as often as they write /cwa, and proxies get configured with
+        # X-Script-Name: /cwa/ ; un-normalised those produced SCRIPT_NAME='/cwa/'
+        # with PATH_INFO='books', or SCRIPT_NAME='cwa' which matches no path at
+        # all — each 404ing every page in its own way. Any all-slash value ('/',
+        # '//') means "mounted at root", i.e. no prefix. Collapsing the leading
+        # run also keeps a spoofed 'X-Script-Name: //host' from becoming a
+        # scheme-relative '//host/...' prefix in generated URLs; cps/spa.py
+        # sanitises again at the point it reflects the prefix into HTML.
+        script_name = (environ.get('HTTP_X_SCRIPT_NAME', '') or self.env_script).rstrip('/')
         if script_name:
+            script_name = '/' + script_name.lstrip('/')
             self.proxied = True
             environ['SCRIPT_NAME'] = script_name
             path_info = environ.get('PATH_INFO', '')
-            if path_info and path_info.startswith(script_name):
+            # Strip the mount prefix only on a path-SEGMENT boundary (#1248).
+            # A bare startswith() also fires on sibling paths that merely share
+            # the prefix's characters: with a /cwa mount it rewrote every one of
+            # the 37 /cwa-* routes ('/cwa-settings' -> '-settings') into a path
+            # matching no rule, so the whole CWA surface 404'd while the
+            # neighbouring /admin/* links worked. Equality is the mount root;
+            # prefix + '/' is a genuine child path. Keeping the strip narrow
+            # also means a prefix-stripping proxy (nginx `proxy_pass …:8083/;`,
+            # which hands us an already-stripped PATH_INFO) is left alone,
+            # while a non-stripping one still gets its prefix removed.
+            if path_info == script_name:
+                environ['PATH_INFO'] = ''
+            elif path_info.startswith(script_name + '/'):
                 environ['PATH_INFO'] = path_info[len(script_name):]
 
         scheme = (

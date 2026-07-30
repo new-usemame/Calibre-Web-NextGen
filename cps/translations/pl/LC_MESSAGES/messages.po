@@ -9575,8 +9575,8 @@ msgid ""
 "Add these two services to your docker-compose file and run \"docker compose "
 "up -d\". After that you stay up to date automatically — no button to press."
 msgstr ""
-"Dodaj te dwie usługi do pliku docker-compose i uruchom \"docker compose up "
-"-d\". Od tej pory aktualizacje odbywają się automatycznie — bez klikania "
+"Dodaj te dwie usługi do pliku docker-compose i uruchom \"docker compose up -"
+"d\". Od tej pory aktualizacje odbywają się automatycznie — bez klikania "
 "żadnego przycisku."
 
 #: cps/templates/cwa_settings.html:770 cps/templates/update_now_modal.html:36
@@ -10895,11 +10895,11 @@ msgstr "Ukryj półkę"
 msgid "Add Series to Shelf"
 msgstr "Dodaj cykl do półki"
 
-#: cps/templates/kosync_plugin.html:112
+#: cps/templates/kosync_plugin.html:129
 msgid "KOReader Sync is disabled."
 msgstr "Synchronizacja KOReader jest wyłączona."
 
-#: cps/templates/kosync_plugin.html:113
+#: cps/templates/kosync_plugin.html:130
 msgid ""
 "Enable it in NextGen Settings to activate the /kosync endpoints and checksum "
 "generation."
@@ -10907,11 +10907,11 @@ msgstr ""
 "Włącz to w Ustawieniach NextGen, aby aktywować punkty końcowe /kosync i "
 "generowanie sum kontrolnych."
 
-#: cps/templates/kosync_plugin.html:115
+#: cps/templates/kosync_plugin.html:132
 msgid "Open NextGen Settings"
 msgstr "Otwórz Ustawienia NextGen"
 
-#: cps/templates/kosync_plugin.html:139
+#: cps/templates/kosync_plugin.html:156
 msgid "Download is available after enabling KOReader Sync in NextGen Settings."
 msgstr ""
 "Pobieranie jest dostępne po włączeniu synchronizacji KOReader w Ustawieniach "

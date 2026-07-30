@@ -86,6 +86,23 @@
       margin-top: 3rem;
   }
 
+  /* .kosync-info and .kosync-warning hardcode a light background with dark text,
+     so they do not follow the active theme. A link inside them keeps the theme's
+     link colour, and caliBlur's is translucent white — measured at 1.24:1 against
+     the info background, i.e. present but unreadable. Inheriting the block's own
+     text colour keeps any link in them legible under either theme (6.92:1), and
+     the underline carries the affordance that colour alone no longer can. */
+  .kosync-info a,
+  .kosync-info a:hover,
+  .kosync-info a:focus,
+  .kosync-warning a,
+  .kosync-warning a:hover,
+  .kosync-warning a:focus {
+      color: inherit;
+      text-decoration: underline;
+      font-weight: 600;
+  }
+
   .kosync-table {
     width: 100%;
     border-left: 4px solid var(--color-secondary);
@@ -169,6 +186,54 @@
       <div style="margin-top: 4rem;" class="kosync-warning">
         <strong>Important:</strong> Extract the zip file directly to the <code>/koreader/plugins/</code> directory.
         The extraction will automatically create the <code>cwasync.koplugin</code> folder with the correct structure.
+      </div>
+    </div>
+  </div>
+
+  <div class="kosync-container">
+    <div class="kosync-section">
+      <h3 class="kosync-heading">🔄&nbsp;&nbsp;&nbsp;Keeping the Plugin Up to Date</h3>
+      <p>
+        KOReader can update this plugin for you. Both
+        <a href="https://github.com/advokatb/updatesmanager.koplugin" target="_blank" rel="noopener noreferrer">Updates&nbsp;Manager</a>
+        and <a href="https://github.com/kaz-utashiro/appstore.koplugin" target="_blank" rel="noopener noreferrer">appstore.koplugin</a>
+        work — point either one at the plugin's own repository:
+      </p>
+
+      <div class="kosync-info">
+        <strong>Repository:</strong>
+        <code>new-usemame/cwasync.koplugin</code>
+        &nbsp;(<a href="https://github.com/new-usemame/cwasync.koplugin/releases" target="_blank" rel="noopener noreferrer">releases</a>)
+      </div>
+
+      <table class="kosync-table">
+        <tbody>
+          <tr>
+            <td class="kosync-step-number" style="width: 16%;">Note</td>
+            <td>The plugin has its own release stream, so it only publishes a release when the
+            plugin itself changes. A server update does not always mean a plugin update.</td>
+          </tr>
+          <tr>
+            <td class="kosync-step-number">Versions</td>
+            <td>The plugin's version is the server version it last changed in, so it can sit
+            legitimately behind your server version — that on its own is not a sign anything is
+            wrong.</td>
+          </tr>
+          <tr>
+            <td class="kosync-step-number">Pointed<br>elsewhere?</td>
+            <td>If your update manager is set to the main
+            <code>Calibre-Web-NextGen</code> repository, switch it to the one above. That older
+            setup still receives the plugin, but it only appears on server releases that changed
+            the plugin, so it is easy to misread as "no update". Once you are on the repository
+            above, a check that completes and reports nothing newer means that plugin stream has
+            nothing newer.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top: 2rem;" class="kosync-info">
+        Prefer not to use an update manager? The download button above always serves the plugin
+        that ships with this server, so re-downloading and replacing the folder also works.
       </div>
     </div>
   </div>

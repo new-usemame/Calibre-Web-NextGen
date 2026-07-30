@@ -77,6 +77,31 @@ active_account=$(gh api user --jq .login)
     exit 1
 }
 
+# Bring the application release's asset up to what the dedicated repository has
+# already shipped for this tag. Copies the asset down from the dedicated release
+# rather than rebuilding it, so the two streams are byte-identical by
+# construction. Skips when the asset is already present: a re-run must not mutate
+# a published release it has nothing to change.
+reconcile_app_release_asset() {
+    local present
+    present=$(gh release view "$TAG" --repo new-usemame/Calibre-Web-NextGen \
+        --json assets --jq '[.assets[].name] | index("cwasync.koplugin.zip") // "no"' 2>/dev/null \
+        || printf 'no')
+    if [[ "$present" != "no" && -n "$present" ]]; then
+        printf 'Application release %s already carries cwasync.koplugin.zip; nothing to reconcile.\n' \
+            "$TAG"
+        return 0
+    fi
+    printf 'Dedicated release %s exists but the application release carries no asset — reconciling.\n' \
+        "$TAG"
+    mkdir -p "$tmp/reconcile"
+    gh release download "$TAG" --repo "$TARGET_REPO" \
+        --pattern cwasync.koplugin.zip --dir "$tmp/reconcile"
+    gh release upload "$TAG" "$tmp/reconcile/cwasync.koplugin.zip" \
+        --repo new-usemame/Calibre-Web-NextGen
+    printf 'Attached cwasync.koplugin.zip to application release %s.\n' "$TAG"
+}
+
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/cwasync-release.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 git clone --quiet "https://github.com/$TARGET_REPO.git" "$tmp/repo"
@@ -93,6 +118,19 @@ git -C "$tmp/repo" diff --cached --quiet && publish_owed=0
 
 if ((publish_owed == 0)); then
     if ((AUTO == 1)); then
+        # An unchanged plugin means one of two things and the owed-check alone
+        # cannot tell them apart: either this tag never touched the plugin — the
+        # common case, nothing to publish and nothing to attach — or an earlier
+        # run for THIS tag already pushed the plugin and then died before the
+        # application asset landed. The second case used to exit 0 right here with
+        # the asset still missing, so one transient upload failure stranded the
+        # release *and* reported success on every retry: the same silently-missing
+        # asset this script exists to prevent. A dedicated release for this exact
+        # tag is the discriminator, so reconcile instead of assuming.
+        if gh release view "$TAG" --repo "$TARGET_REPO" >/dev/null 2>&1; then
+            reconcile_app_release_asset
+            exit 0
+        fi
         printf 'Nothing owed: plugin is identical to the one %s already ships. Skipping.\n' \
             "$TARGET_REPO"
         exit 0
@@ -157,4 +195,31 @@ gh release create "$TAG" "$tmp/repo/cwasync.koplugin.zip" \
     --title "NextGen Progress Sync $TAG" \
     --notes "Built from the published Calibre-Web NextGen $TAG source tag."
 
+# The application release gets the same validated zip — but only from here, inside
+# the publish path, which is reached only when the plugin actually changed. That
+# distinction is the whole reason plugin-release-asset.yml was deleted: it
+# attached a zip to EVERY app tag, so Updates Manager pointed at the application
+# repository reported an update on releases that never touched the plugin (the
+# concern @SpookyUSAF raised on fork #400).
+#
+# Why attach at all, when the dedicated repository is the update source: devices
+# configured before the plugin moved are still pointed at the application
+# repository, and v4.1.16 publicly restored this download. Without automation that
+# restore lasted exactly one release — v4.1.17 through v4.1.25 shipped no asset at
+# all, so Updates Manager saw v4.1.16 as the newest release carrying one and
+# answered "no new release available" while newer plugins existed (fork #1253).
+# A failure here is loud because a silently missing asset is precisely the
+# regression being fixed; the retry is handled by reconcile_app_release_asset()
+# above, which is what makes a failed upload recoverable — not --clobber. What
+# --clobber covers is an asset this script did not place, such as the manual
+# v4.1.16 upload. Replacing one is a mutation of a published release, so say so
+# rather than doing it quietly.
+if [[ -n "$(gh release view "$TAG" --repo new-usemame/Calibre-Web-NextGen \
+    --json assets --jq '.assets[] | select(.name=="cwasync.koplugin.zip") | .name' 2>/dev/null)" ]]; then
+    printf 'NOTE: replacing the existing cwasync.koplugin.zip on application release %s.\n' "$TAG"
+fi
+gh release upload "$TAG" "$tmp/repo/cwasync.koplugin.zip" \
+    --repo new-usemame/Calibre-Web-NextGen --clobber
+
 printf 'Published %s to https://github.com/%s/releases/tag/%s\n' "$TAG" "$TARGET_REPO" "$TAG"
+printf 'Attached cwasync.koplugin.zip to https://github.com/new-usemame/Calibre-Web-NextGen/releases/tag/%s\n' "$TAG"

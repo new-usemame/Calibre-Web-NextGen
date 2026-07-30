@@ -12,6 +12,14 @@ name: Publish cwasync plugin
 # the plugin against what the dedicated repository already ships and skips when
 # they match, so an unchanged plugin still never surfaces as an update.
 #
+# On a release that DID change the plugin, the script also attaches the same
+# validated zip to the application release. Devices configured before the plugin
+# moved still point at the application repository, and v4.1.16 publicly restored
+# that download — but as a manual one-off, so v4.1.17 through v4.1.25 shipped no
+# asset and those devices were told "no new release available" while newer plugins
+# existed (fork #1253). Attaching from the publish path keeps both audiences
+# current without reintroducing the false-update problem.
+#
 # Why a workflow instead of a runbook step: the publish used to be a manual
 # `scripts/publish-cwasync-plugin.sh --publish` tracked as prose in
 # notes/org/LEDGER.md. It was missed for v4.1.12, v4.1.13 and v4.1.14 — the

@@ -10459,21 +10459,21 @@ msgstr "Змінити книжкову полицю"
 msgid "Add Series to Shelf"
 msgstr "Додати на книжкову полицю"
 
-#: cps/templates/kosync_plugin.html:112
+#: cps/templates/kosync_plugin.html:129
 msgid "KOReader Sync is disabled."
 msgstr ""
 
-#: cps/templates/kosync_plugin.html:113
+#: cps/templates/kosync_plugin.html:130
 msgid ""
 "Enable it in NextGen Settings to activate the /kosync endpoints and checksum "
 "generation."
 msgstr ""
 
-#: cps/templates/kosync_plugin.html:115
+#: cps/templates/kosync_plugin.html:132
 msgid "Open NextGen Settings"
 msgstr ""
 
-#: cps/templates/kosync_plugin.html:139
+#: cps/templates/kosync_plugin.html:156
 msgid "Download is available after enabling KOReader Sync in NextGen Settings."
 msgstr ""
 

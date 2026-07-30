@@ -136,6 +136,67 @@ def test_publish_is_skipped_when_the_plugin_did_not_change():
     assert re.search(r"AUTO == 1", body), "--auto must actually branch on skip"
 
 
+def test_publish_path_attaches_the_zip_to_the_application_release():
+    """fork #1253: the application-release download must not depend on a human.
+
+    v4.1.16 publicly restored ``cwasync.koplugin.zip`` on the application release
+    after it went missing, but as a one-off manual upload. v4.1.17 through
+    v4.1.25 then shipped no asset at all, so a device pointed at the application
+    repository saw v4.1.16 as the newest release carrying one and answered "no new
+    release available" indefinitely while newer plugins existed.
+    """
+    body = PUBLISH_SCRIPT.read_text()
+    assert (
+        'gh release upload "$TAG" "$tmp/repo/cwasync.koplugin.zip"' in body
+        and "--repo new-usemame/Calibre-Web-NextGen" in body
+    ), (
+        "a plugin-changing release must attach the validated zip to the "
+        "application release too; leaving it to a manual step is what stranded "
+        "devices for nine consecutive releases"
+    )
+    assert "--clobber" in body, (
+        "the upload must be idempotent — without --clobber a re-run of the "
+        "release workflow fails on an already-present asset"
+    )
+
+
+# The invariant "the application asset rides the *plugin changed* decision and
+# nothing weaker" is NOT pinned here. It was, by comparing the character offsets
+# of "Nothing owed" and the upload command — and that pin broke the moment the
+# upload also became reachable from a helper function defined earlier in the file,
+# on a change that was correct. Offsets model line order, not control flow, so
+# they answer a different question than the one that matters.
+#
+# It now lives in tests/unit/test_1253_plugin_release_asset_publish_paths.py,
+# which executes this script against recording fakes for gh and git and asserts
+# which releases each invocation actually mutates — dry run, unchanged plugin
+# under --auto and --publish, version mismatch, missing application release,
+# happy path, failed-upload retry, and a re-run after a complete publish.
+
+
+def test_update_manager_repository_is_documented_where_users_look():
+    """fork #1253: an update path documented only in an issue thread is undocumented.
+
+    The reporter's complaint was literally "there's no documentation for setting
+    up Updates Manager with Calibre-Web NextGen". The dedicated repository was
+    named only in comments on fork #400, while README sends users to /kosync for
+    install instructions and that page described nothing but the manual
+    download-and-copy route.
+    """
+    kosync_page = REPO_ROOT / "cps" / "templates" / "kosync_plugin.html"
+    readme = REPO_ROOT / "README.md"
+    for surface in (kosync_page, readme):
+        text = surface.read_text()
+        assert "new-usemame/cwasync.koplugin" in text, (
+            f"{surface.name} must name the plugin's own repository — an update "
+            "manager pointed at the application repository only sees releases "
+            "that happened to carry an asset"
+        )
+        assert "Updates Manager" in text or "updatesmanager" in text, (
+            f"{surface.name} must name the update manager the instructions are for"
+        )
+
+
 def test_owed_check_runs_before_the_version_check():
     """The ordering IS the fix — reversing it re-breaks fork #400.
 

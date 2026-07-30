@@ -6,6 +6,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 # ComicVine api document: https://comicvine.gamespot.com/api/documentation
+import re
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
@@ -14,6 +15,16 @@ from cps import config, logger
 from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
 
 log = logger.create()
+
+# The key travels in the query string, and requests puts the full URL into its
+# exception messages. Once an install can configure its OWN key that turns every
+# logged failure into a secret leak, and admins paste logs into bug reports.
+_API_KEY_IN_URL = re.compile(r"(api_key=)[^&\s]*")
+
+
+def _scrub(text) -> str:
+    """Redact any API key in a string bound for the log."""
+    return _API_KEY_IN_URL.sub(r"\1***", str(text))
 
 
 class ComicVine(Metadata):
@@ -96,12 +107,12 @@ class ComicVine(Metadata):
                 # Calm" and 429 are the throttling variants. Anything else is
                 # an ordinary transport failure and stays a bare warning.
                 if getattr(e.response, "status_code", None) in (401, 403, 420, 429):
-                    self._log_refusal(str(e), api_key)
+                    self._log_refusal(_scrub(e), api_key)
                 else:
-                    log.warning(e)
+                    log.warning(_scrub(e))
                 return []
             except Exception as e:
-                log.warning(e)
+                log.warning(_scrub(e))
                 return []
             payload = result.json()
             # The other refusal channel: ComicVine also reports failures in an
@@ -111,7 +122,8 @@ class ComicVine(Metadata):
             status_code = payload.get("status_code")
             if status_code is not None and status_code != 1:
                 self._log_refusal(
-                    payload.get("error") or f"status_code {status_code}", api_key
+                    _scrub(payload.get("error") or f"status_code {status_code}"),
+                    api_key,
                 )
                 return []
             for result in payload.get("results", []):

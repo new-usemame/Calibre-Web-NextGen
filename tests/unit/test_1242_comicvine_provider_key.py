@@ -540,6 +540,53 @@ class TestHttpRefusalChannel:
         assert len(seen) == 1
         assert "Keys panel" not in seen[0]
 
+    def test_the_configured_key_is_never_written_to_the_log(self, monkeypatch):
+        """The key travels in the query string and requests puts the full URL
+        in its exception message, so every logged failure used to print it.
+        Harmless while the only key was the public shared one; a real leak now
+        that an install can configure its own, because admins paste logs into
+        bug reports.
+        """
+        secret = "s3cret-install-key"
+        _set_resolved_key(monkeypatch, secret)
+        err = comicvine.requests.HTTPError(
+            "401 Client Error: Unauthorized for url: "
+            f"https://comicvine.gamespot.com/api/search/?api_key={secret}"
+            "&resources=issue&query=Batman"
+        )
+        err.response = types.SimpleNamespace(status_code=401)
+
+        def fake_get(*_a, **_k):
+            raise err
+
+        monkeypatch.setattr(comicvine.requests, "get", fake_get)
+        seen = self._warnings(monkeypatch)
+
+        assert _provider().search("Batman") == []
+        assert len(seen) == 1
+        assert secret not in seen[0], "the install's API key leaked into the log"
+        assert "api_key=***" in seen[0]
+        assert "401" in seen[0], "redaction must not swallow the diagnosis"
+
+    def test_shared_key_is_redacted_too(self, monkeypatch):
+        """No exemption for the shared key: one rule is easier to keep than a
+        rule with an exception, and the log stays readable either way."""
+        _set_resolved_key(monkeypatch, "")
+        err = comicvine.requests.HTTPError(
+            "500 Server Error for url: "
+            f"https://comicvine.gamespot.com/api/search/?api_key={SHARED_KEY}"
+        )
+        err.response = types.SimpleNamespace(status_code=500)
+
+        def fake_get(*_a, **_k):
+            raise err
+
+        monkeypatch.setattr(comicvine.requests, "get", fake_get)
+        seen = self._warnings(monkeypatch)
+
+        assert _provider().search("Batman") == []
+        assert SHARED_KEY not in seen[0]
+
     def test_canonical_url_avoids_the_redirect_hop(self, monkeypatch):
         """ComicVine 301s /api/search to /api/search/ — observed on the wire,
         so every search paid an extra round trip."""

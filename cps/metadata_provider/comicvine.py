@@ -9,6 +9,8 @@
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
+import os
+
 import requests
 from cps import logger
 from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
@@ -21,7 +23,7 @@ class ComicVine(Metadata):
     __id__ = "comicvine"
     DESCRIPTION = "ComicVine Books"
     META_URL = "https://comicvine.gamespot.com/"
-    API_KEY = "57558043c53943d5d1e96a9ad425b0eb85532ee6"
+    API_KEY = os.environ.get("COMICVINE_API_KEY", "")
     BASE_URL = (
         f"https://comicvine.gamespot.com/api/search?api_key={API_KEY}"
         f"&resources=issue&query="
@@ -33,7 +35,7 @@ class ComicVine(Metadata):
         self, query: str, generic_cover: str = "", locale: str = "en"
     ) -> Optional[List[MetaRecord]]:
         val = list()
-        if self.active:
+        if self.active and self.API_KEY:
             title_tokens = list(self.get_title_tokens(query, strip_joiners=False))
             if title_tokens:
                 tokens = [quote(t.encode("utf-8")) for t in title_tokens]

@@ -701,3 +701,298 @@ def test_changed_paths_treats_tests_yml_as_frontend_relevant():
         "changed_paths does not treat .github/workflows/tests.yml as frontend-relevant, "
         "so a PR that changes the e2e seed/setup will skip the e2e job that it changes."
     )
+
+
+# ─── Wall 10: integration coverage follows CONTENT, not a label ────────
+#
+# `integration-tests` is the only job in the tree that builds the Docker
+# image and runs the real ingest/Calibre flow. Until now it fired only
+# when a PR carried the `safe-tier-2` label (plus main/dev pushes and
+# manual dispatch). Nothing keyed on what the PR actually touched.
+#
+# So the single highest-blast-radius change class in the repo — the
+# Dockerfile, which pins CALIBRE_RELEASE / PYTHON_VERSION /
+# KEPUBIFY_RELEASE, i.e. the binaries every conversion and ingest runs
+# on — sailed through with the image never built, Calibre never
+# downloaded, the container never started. And because a *skipped* job's
+# result is `skipped` rather than `failure`, Test Suite Summary reported
+# SUCCESS. Observed on #1261 (community PR bumping Calibre 9.1.0 →
+# 9.11.0): green summary, zero Docker validation behind it.
+#
+# Three properties restore the gate, and all three are needed — fixing
+# any one alone still leaves a hole:
+#
+#   a. changed_paths classifies build-definition edits (`build` output).
+#   b. integration-tests runs, and *gates*, when that output is true.
+#   c. Test Suite Summary hard-fails on a red integration job for those
+#      PRs. Without (c) the job runs, goes red, and the summary is still
+#      green — a gate that reports its own failure as success.
+#
+# Plus one enabling constraint: fork PRs get no secrets, so they cannot
+# read the private pbs-cache mirror. The build must fall back to the
+# public CDN for them or every community Dockerfile PR dies on a 401
+# that has nothing to do with the change.
+
+
+def _detect_step() -> dict:
+    wf = _load(WF_DIR / "tests.yml")
+    step = next(
+        (
+            s
+            for s in ((wf.get("jobs") or {}).get("changed_paths") or {}).get("steps", [])
+            if isinstance(s, dict) and s.get("id") == "detect"
+        ),
+        None,
+    )
+    assert step is not None, "changed_paths has no `detect` step"
+    return step
+
+
+def _run_detect(repo: Path, base: str, head: str) -> dict[str, str]:
+    """Execute the detect step's REAL shell script against a throwaway git
+    repo and return the key/values it wrote to $GITHUB_OUTPUT.
+
+    This runs the shipped script rather than re-implementing its regex, so
+    the test cannot drift from the workflow the way a source-pin can.
+    """
+    script = _detect_step().get("run") or ""
+    out_file = repo / "_gh_output"
+    out_file.write_text("")
+    env = dict(os.environ)
+    env.update(
+        {
+            "BASE_SHA": base,
+            "HEAD_SHA": head,
+            "GITHUB_OUTPUT": str(out_file),
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "HOME": str(repo),
+        }
+    )
+    # `bash -e` mirrors the default shell GitHub Actions uses for `run:`.
+    subprocess.run(
+        ["bash", "-e", "-c", script],
+        cwd=repo,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    out: dict[str, str] = {}
+    for line in out_file.read_text().splitlines():
+        if "=" in line:
+            key, _, value = line.partition("=")
+            out[key] = value
+    return out
+
+
+def _repo_touching(repo: Path, paths: list[str]) -> tuple[str, str]:
+    """Build a git repo whose PR branch changes exactly `paths`."""
+    _git(repo, "init", "-b", "main")
+    (repo / "seed.txt").write_text("base\n")
+    _git(repo, "add", "seed.txt")
+    _git(repo, "commit", "-m", "base")
+    base = _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    _git(repo, "checkout", "-b", "pr")
+    for rel in paths:
+        target = repo / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("changed\n")
+        _git(repo, "add", rel)
+    _git(repo, "commit", "-m", "pr change")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    return base, head
+
+
+# Each row is (changed files, expected `build`, expected `frontend`).
+_DETECT_MATRIX = [
+    # The motivating case: the Dockerfile pins the Calibre/Python/kepubify
+    # versions the whole runtime is built from.
+    (["Dockerfile"], "true", "false"),
+    (["requirements.txt"], "true", "false"),
+    (["requirements-dev.txt"], "true", "false"),
+    # optional-requirements.txt is pip-installed into the image next to
+    # requirements.txt. A `^requirements` pattern misses it silently.
+    (["optional-requirements.txt"], "true", "false"),
+    # root/ is copied to / at build time — the s6 service definitions that
+    # decide whether the container boots at all. A break here is a total
+    # outage, and only booting the image catches it.
+    (["root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run"], "true", "false"),
+    # A PR that edits the integration suite must run the integration suite,
+    # for the same reason tests.yml counts as frontend-relevant: otherwise
+    # the fix for a broken gate never runs the gate.
+    (["tests/docker/test_container_boot.py"], "true", "false"),
+    (["tests/integration/test_ingest_flow.py"], "true", "false"),
+    # tests.yml houses both harnesses' setup, so it is relevant to both.
+    ([".github/workflows/tests.yml"], "true", "true"),
+    # Negative cases — these must NOT pay the ~15-minute Docker build.
+    (["cps/admin.py"], "false", "false"),
+    (["README.md"], "false", "false"),
+    # The requirements pattern was widened to catch optional-requirements.txt;
+    # pin that the widening stays bounded to the repo root, where the image's
+    # pip install reads from. A nested one is not a build input.
+    (["docs/requirements.txt"], "false", "false"),
+    (["cps/translations/de/LC_MESSAGES/messages.po"], "false", "false"),
+    (["frontend/src/App.tsx"], "false", "true"),
+    # Mixed PR: one build-relevant path anywhere in the diff is enough.
+    (["README.md", "Dockerfile"], "true", "false"),
+]
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git not on PATH")
+@pytest.mark.parametrize("changed,want_build,want_frontend", _DETECT_MATRIX)
+def test_changed_paths_classifies_build_definition_edits(changed, want_build, want_frontend):
+    """Behavioural: run the shipped detect script over a real diff.
+
+    RED before the fix — the script emitted no `build` key at all, so a
+    Dockerfile PR had nothing that could turn the integration gate on.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        base, head = _repo_touching(repo, changed)
+        out = _run_detect(repo, base, head)
+
+    assert "build" in out, (
+        "changed_paths emits no `build` output, so nothing can gate the Docker "
+        f"integration suite on content. Changed: {changed}"
+    )
+    assert out["build"] == want_build, (
+        f"changed={changed} → build={out['build']!r}, expected {want_build!r}. "
+        "A Dockerfile/requirements/integration-suite edit must run the Docker "
+        "integration job; anything else must not pay for it."
+    )
+    assert out["frontend"] == want_frontend, (
+        f"changed={changed} → frontend={out['frontend']!r}, expected {want_frontend!r}"
+    )
+
+
+def test_integration_tests_gate_keys_on_changed_paths():
+    """The integration job must consume the `build` output — and keep
+    working on non-PR events, where changed_paths is skipped."""
+    wf = _load(WF_DIR / "tests.yml")
+    job = (wf.get("jobs") or {}).get("integration-tests")
+    assert isinstance(job, dict), "tests.yml must define an integration-tests job"
+
+    needs = job.get("needs") or []
+    needs = [needs] if isinstance(needs, str) else needs
+    assert "changed_paths" in needs, (
+        "integration-tests must depend on changed_paths to read its `build` output"
+    )
+
+    condition = str(job.get("if") or "")
+    assert "needs.changed_paths.outputs.build" in condition, (
+        "integration-tests still gates only on the safe-tier-2 label. A Dockerfile "
+        "PR without that label skips the only job that builds the image."
+    )
+    # changed_paths is PR-only, so a plain `needs` would drag main/dev pushes
+    # and tag runs into `skipped` — silently turning integration coverage off
+    # everywhere. Same trap the e2e job documents.
+    assert "always()" in condition, (
+        "integration-tests needs `always()` in its `if:` — changed_paths is "
+        "PR-only, and a skipped dependency would otherwise skip this job on "
+        "main/dev pushes too"
+    )
+    assert "refs/heads/main" in condition, (
+        "the main-push path must survive: integration coverage on main is what "
+        "auto-revert reads"
+    )
+
+
+def test_integration_tests_actually_blocks_build_prs():
+    """Running is not gating. On a build-definition PR the job must be
+    mandatory (continue-on-error false), not advisory."""
+    wf = _load(WF_DIR / "tests.yml")
+    job = (wf.get("jobs") or {}).get("integration-tests")
+    coe = str(job.get("continue-on-error", ""))
+    assert "needs.changed_paths.outputs.build" in coe, (
+        "integration-tests stays advisory (continue-on-error) for any PR without "
+        "the safe-tier-2 label — including Dockerfile PRs. A red build would not "
+        "block the merge."
+    )
+    assert "safe-tier-2" in coe, "the existing tier-2 hard gate must be preserved"
+
+
+def test_summary_hard_fails_on_red_integration_for_build_prs():
+    """Layer 3: the summary is what branch protection reads. If it only
+    hard-fails for tier-2, a Dockerfile PR whose image fails to build still
+    reports a green Test Suite Summary."""
+    wf = _load(WF_DIR / "tests.yml")
+    jobs = wf.get("jobs") or {}
+    summary = next(
+        (j for name, j in jobs.items() if isinstance(j, dict) and j.get("name") == "Test Suite Summary"),
+        None,
+    )
+    assert summary is not None, "tests.yml must define a Test Suite Summary job"
+
+    text = _job_text(summary)
+    env_blob = "\n".join(str((s.get("env") or {})) for s in _steps(summary))
+    combined = text + "\n" + env_blob
+
+    assert "needs.changed_paths.outputs.build" in combined, (
+        "Test Suite Summary decides pass/fail using only the safe-tier-2 label. "
+        "A build-definition PR with a FAILED integration job is reported as "
+        "'advisory' and the summary goes green — the gate reports its own "
+        "failure as success."
+    )
+    needs = summary.get("needs") or []
+    needs = [needs] if isinstance(needs, str) else needs
+    assert "changed_paths" in needs, "summary must depend on changed_paths to read `build`"
+
+
+def test_integration_build_falls_back_to_cdn_for_fork_prs():
+    """Fork PRs get no secrets, so they cannot pull the private
+    ghcr.io/new-usemame/pbs-cache mirror. With PBS_SOURCE hardcoded to
+    `ghcr`, turning this job on for community PRs would fail every one of
+    them at the first COPY with a 401 unrelated to their change.
+
+    The Dockerfile already ships the `upstream` (public CDN) path — use it.
+    """
+    wf = _load(WF_DIR / "tests.yml")
+    job = (wf.get("jobs") or {}).get("integration-tests")
+    build_step = next(
+        (
+            s
+            for s in _steps(job)
+            if str(s.get("uses", "")).startswith("docker/build-push-action")
+        ),
+        None,
+    )
+    assert build_step is not None, "integration-tests must build the image"
+    build_args = str((build_step.get("with") or {}).get("build-args", ""))
+
+    assert "PBS_SOURCE" in build_args, "the build must pass PBS_SOURCE explicitly"
+    assert build_args.count("ghcr") == 0 or "${{" in build_args, (
+        "PBS_SOURCE is hardcoded — fork PRs cannot read the private mirror and "
+        "will 401 before running a single test"
+    )
+    assert "fork" in build_args or "head.repo" in build_args, (
+        "PBS_SOURCE must switch on whether the PR comes from a fork; forks need "
+        "the public CDN path (PBS_SOURCE=upstream)"
+    )
+
+
+def test_ghcr_login_is_skipped_when_there_is_no_secret_to_log_in_with():
+    """Companion to the CDN fallback: docker/login-action with an empty
+    password fails the step. On a fork PR both GH_PAT and a usable
+    packages-read token are absent, so the login must be conditional —
+    while staying present and ordered before the build for same-repo runs
+    (Wall 5 still applies)."""
+    wf = _load(WF_DIR / "tests.yml")
+    job = (wf.get("jobs") or {}).get("integration-tests")
+    login = next(
+        (
+            s
+            for s in _steps(job)
+            if str(s.get("uses", "")).startswith("docker/login-action")
+        ),
+        None,
+    )
+    assert login is not None, "integration-tests must still define the GHCR login step"
+    condition = str(login.get("if") or "")
+    assert condition, (
+        "the GHCR login step runs unconditionally; on a fork PR it has no "
+        "password and fails the job before the build"
+    )
+    assert "fork" in condition or "head.repo" in condition, (
+        "the login step's condition must key on whether the head repo is a fork"
+    )

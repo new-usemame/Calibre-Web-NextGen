@@ -327,6 +327,51 @@ def test_failed_application_upload_is_repaired_by_a_rerun(sandbox):
     ), "reconcile must copy the asset the dedicated release actually shipped"
 
 
+def test_primary_path_announces_replacing_an_existing_application_asset(sandbox):
+    """Replacing an asset on a published release must not happen quietly.
+
+    The only asset that should already be there is one an earlier run of the same
+    tag placed — but the manual v4.1.16 upload proves other things can put one
+    there, and `--clobber` will replace it either way.
+    """
+    sandbox.ships(_plugin_files(PLUGIN_VERSION, extra="-- previously shipped\n"))
+    proc, calls = sandbox.run("--auto", FAKE_APP_ASSET_PRESENT=1)
+    assert proc.returncode == 0, proc.stderr
+    assert "replacing the existing cwasync.koplugin.zip" in proc.stdout, (
+        "a publish that overwrites an existing public asset must say so"
+    )
+    assert len(_app_uploads(calls)) == 1
+
+
+def test_no_workflow_attaches_a_release_asset_outside_the_publish_script():
+    """The guarded script must stay the only thing that can attach the plugin.
+
+    The behavioural tests above prove the *script* confines the upload to a
+    genuine plugin change. They say nothing about a workflow doing it directly:
+    a `gh release upload` step, or a release-asset action, added to any workflow
+    would attach the plugin on every application tag and reproduce the
+    false-update problem with the script untouched and every test green.
+
+    The older guard in test_cwasync_updates_manager_compat.py only asserts that
+    one specific filename (plugin-release-asset.yml) stays deleted, which a file
+    with any other name walks straight past. This pins the behaviour instead of
+    the filename.
+    """
+    workflows = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml"))
+    assert workflows, "no workflows found — the guard would be vacuous"
+    offenders = []
+    for wf in workflows:
+        body = wf.read_text()
+        for needle in ("gh release upload", "upload-release-asset", "action-gh-release"):
+            if needle in body:
+                offenders.append(f"{wf.name}: {needle}")
+    assert offenders == [], (
+        "release assets must be attached only by scripts/publish-cwasync-plugin.sh, "
+        "which attaches the plugin exclusively on releases that changed it; these "
+        f"workflows attach assets directly: {offenders}"
+    )
+
+
 def test_rerun_after_a_complete_publish_mutates_nothing(sandbox):
     """Idempotent means idempotent: nothing to fix, so touch nothing."""
     sandbox.ships(_plugin_files(PLUGIN_VERSION))

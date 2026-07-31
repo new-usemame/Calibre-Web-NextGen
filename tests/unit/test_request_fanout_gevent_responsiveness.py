@@ -105,15 +105,26 @@ def _worst_stall_while(run) -> float:
     hb = gevent.spawn(heartbeat)
     gevent.sleep(0)  # let the heartbeat take its first sample
 
+    # Whatever `run` raised has to reach the caller. gevent.joinall() does not
+    # re-raise a greenlet's exception, so without this a `run` that blew up
+    # immediately would be measured as "no stall" and the test would go GREEN
+    # on code where the function under test does not even exist. Caught doing
+    # exactly that while adding the run_blocking guard (fork #1111).
+    failed = []
+
     def runner():
         try:
             run()
+        except BaseException as exc:  # noqa: BLE001 - re-raised below
+            failed.append(exc)
         finally:
             done.append(True)
 
     gevent.joinall([gevent.spawn(runner)])
     hb.join(timeout=1)
     hb.kill(block=True)
+    if failed:
+        raise failed[0]
     assert gaps, "heartbeat never sampled"
     return max(gaps)
 
@@ -299,3 +310,107 @@ class TestRequestPathCallersUseTheSharedHelper:
                     f"{rel_path} imports from {node.module} (line {node.lineno}); "
                     "use cps.services.parallel.fan_out (fork #954)"
                 )
+
+
+class TestRunBlockingKeepsHubResponsive:
+    """``fan_out`` only guards fan-outs. The same #954 root cause also reaches
+    the app through plain inline calls — a cover download on the edit-book
+    POST, one provider on the metadata preview — which is fork #1111."""
+
+    def test_run_blocking_yields_to_other_greenlets(self):
+        """The invariant: one slow inline call must not freeze other users.
+
+        Measured on the pre-fix code path (a bare call on the request
+        greenlet) this stalls for the full job duration.
+        """
+        returned = []
+        worst = _worst_stall_while(
+            lambda: returned.append(parallel.run_blocking(_blocking_job("x"))))
+        # Not decoration: without it a run_blocking that never ran would be
+        # measured as a zero-length stall and pass.
+        assert returned == ["x"], "the offloaded job never produced its result"
+        assert worst < _MAX_TOLERABLE_STALL, (
+            f"run_blocking froze the gevent hub for {worst * 1000:.0f}ms; every other "
+            f"user's request stalls for the whole call (fork #1111)"
+        )
+
+    def test_bare_call_does_freeze_the_hub(self):
+        """Pins that the harness can actually see the bug it is guarding.
+
+        Without this, a run_blocking that silently degraded to a direct call
+        would keep the test above green and the guard would be worthless.
+        """
+        worst = _worst_stall_while(_blocking_job("x"))
+        assert worst >= _MAX_TOLERABLE_STALL, (
+            f"a bare blocking call only stalled the hub {worst * 1000:.0f}ms — the "
+            "measurement is not sensitive enough to prove the fix does anything"
+        )
+
+    def test_run_blocking_returns_the_value(self):
+        assert parallel.run_blocking(lambda: "cover-bytes") == "cover-bytes"
+
+    def test_run_blocking_passes_tuples_through_unpacked(self):
+        """editbooks does ``result, error = run_blocking(...)`` — the tuple
+        must survive the thread hop intact, not arrive wrapped."""
+        result, error = parallel.run_blocking(lambda: (True, None))
+        assert result is True and error is None
+
+    def test_run_blocking_reraises_in_the_caller(self):
+        """Both call sites keep their existing ``try/except`` around the call,
+        so the exception has to surface in the caller rather than be captured
+        the way fan_out captures one."""
+        boom = RuntimeError("cover CDN exploded")
+
+        def _raise():
+            raise boom
+
+        with pytest.raises(RuntimeError) as excinfo:
+            parallel.run_blocking(_raise)
+        assert excinfo.value is boom
+
+
+class TestInlineRequestPathBlockingIsOffloaded:
+    """Guard: the two inline blocking calls that froze the app must stay
+    offloaded. Pins fork #1111, whose root cause was the CALL SITE rather
+    than anything inside the providers — the providers' own stdlib pools run
+    on a real worker thread and never touch the hub."""
+
+    # (module, callee that must not be invoked directly on the request greenlet)
+    INLINE_BLOCKING_CALLS = [
+        ("cps/editbooks.py", "save_cover_from_url"),
+        ("cps/search_metadata.py", "search"),
+    ]
+
+    @pytest.mark.parametrize("rel_path,callee", INLINE_BLOCKING_CALLS)
+    def test_callee_is_never_invoked_directly(self, rel_path, callee):
+        """Both sites pass a bare reference through ``functools.partial`` into
+        ``run_blocking``/``fan_out``, so a *direct call* node is exactly the
+        regression: it means someone put the blocking work back on the hub."""
+        tree = ast.parse((REPO_ROOT / rel_path).read_text(encoding="utf-8"))
+
+        offenders = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Attribute) and func.attr == callee:
+                # `provider.search(...)` is the request-path one; a `.search(`
+                # on anything else (re, a db query) is unrelated.
+                if callee != "search" or (
+                    isinstance(func.value, ast.Name) and func.value.id == "provider"
+                ):
+                    offenders.append(f"line {node.lineno}")
+
+        assert not offenders, (
+            f"{rel_path} calls {callee}() directly at {', '.join(offenders)}. That runs a "
+            "blocking socket read on the request greenlet, and gevent runs without "
+            "monkey.patch_all(), so the whole app stops answering for the duration — "
+            "fork #1111. Pass it through cps.services.parallel.run_blocking instead."
+        )
+
+    def test_editbooks_offloads_the_cover_download(self):
+        """Positive half of the guard: prove the call is not merely deleted."""
+        source = (REPO_ROOT / "cps/editbooks.py").read_text(encoding="utf-8")
+        assert "run_blocking" in source and "save_cover_from_url" in source, (
+            "the edit-book cover download is no longer routed through run_blocking"
+        )

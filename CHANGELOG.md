@@ -16,6 +16,17 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Saving a book from the edit-metadata screen, or switching on a metadata
+  source, made the server stop answering everyone.** Not only the tab doing the
+  work — every other person's page load hung for as long as the cover download
+  or the metadata lookup took, which on a slow cover host is up to 30 seconds.
+  Both actions now do their network work off the request handler, so the rest of
+  the site keeps responding while they run. Measured on a real server during a
+  1.5s cover download: other page loads went from 1 request served with a
+  1254ms worst-case wait, to 201 served with an 18ms worst case.
+
 ## [v4.1.26] - 2026-07-31
 
 ### Changed

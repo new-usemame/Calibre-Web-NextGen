@@ -306,7 +306,15 @@ def metadata_change_active_provider(prov_name):
         if provider is not None:
             if bool(global_enabled.get(provider.__id__, True)):
                 try:
-                    data = provider.search(new_state.get("query", ""))
+                    # parallel.run_blocking, not a bare call: this runs on the
+                    # request greenlet and the provider blocks on its own
+                    # socket reads, so calling it inline froze the whole app
+                    # until that one provider answered (fork #1111). Same root
+                    # cause as the fan-out above, reached through the
+                    # per-provider preview instead of "Search metadata".
+                    data = parallel.run_blocking(functools.partial(
+                        copy_current_request_context(provider.search),
+                        new_state.get("query", "")))
                 except Exception as exc:
                     log.warning("Metadata provider %s failed: %s", provider.__class__.__name__, exc)
                     data = []

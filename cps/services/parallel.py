@@ -114,6 +114,43 @@ def fan_out(
         yield from _fan_out_stdlib(jobs, workers, fanout_started)
 
 
+def run_blocking(fn: Callable[[], Any]) -> Any:
+    """Run ONE blocking callable without stalling the gevent hub.
+
+    ``fan_out`` covers the many-jobs case. This is the single-job one, and it
+    exists because the #954 root cause reaches the app through plain
+    sequential calls too, not only through fan-outs (fork #1111):
+
+    * ``cps/editbooks.py`` downloads the cover inline on the edit-book POST,
+      so a slow cover CDN froze every other user's page load for up to the
+      ``requests`` read timeout of 30s.
+    * ``cps/search_metadata.py`` runs a single provider inline for the
+      per-provider preview search, which blocks on the provider's own socket
+      reads for as long as that provider takes.
+
+    Neither is a fan-out, so neither was reachable by ``fan_out`` — but both
+    sit on the request greenlet, which is the only thing that matters here.
+
+    The return value is passed through and exceptions are re-raised in the
+    caller (with the worker frame kept in the traceback), so wrapping a call
+    site does not change its control flow.
+    """
+    if not _HAVE_GEVENT_POOL:
+        # No hub to protect (bare test runners, the tornado fallback in
+        # server.py): the thread hop would only add latency.
+        return fn()
+
+    # A pool per call rather than a shared module-level one: a shared pool
+    # would be a fixed number of slots that concurrent requests queue behind,
+    # which trades this freeze for a subtler one. Pool setup is ~0ms next to
+    # the network wait being offloaded.
+    pool = _GeventThreadPool(1)
+    try:
+        return pool.spawn(fn).get()
+    finally:
+        pool.kill()
+
+
 def _timed(fn, fanout_started):
     """Wrap ``fn`` so the finish time is captured in the worker, the instant
     the job returns — see FanOutResult.elapsed_ms for why the consumer's

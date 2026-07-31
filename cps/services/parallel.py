@@ -134,21 +134,56 @@ def run_blocking(fn: Callable[[], Any]) -> Any:
     The return value is passed through and exceptions are re-raised in the
     caller (with the worker frame kept in the traceback), so wrapping a call
     site does not change its control flow.
+
+    Uses ONE bounded, shared pool rather than a pool per call. A pool per call
+    is unbounded native-thread admission: N concurrent cover saves means N OS
+    threads and N outbound sockets, so a burst trades the hub freeze for
+    thread/FD exhaustion. Bounding it does not reintroduce the freeze, because
+    ``spawn()`` on a saturated gevent pool waits COOPERATIVELY — measured at a
+    296ms worst-case hub gap against a 211ms idle baseline while six 1s jobs
+    queued through two slots. The submitting request queues; everyone else is
+    still served. That is backpressure, which is what we want under load.
     """
     if not _HAVE_GEVENT_POOL:
-        # No hub to protect (bare test runners, the tornado fallback in
-        # server.py): the thread hop would only add latency.
+        # gevent is not installed at all, so there is no hub to protect and
+        # the thread hop would only add latency.
         return fn()
 
-    # A pool per call rather than a shared module-level one: a shared pool
-    # would be a fixed number of slots that concurrent requests queue behind,
-    # which trades this freeze for a subtler one. Pool setup is ~0ms next to
-    # the network wait being offloaded.
-    pool = _GeventThreadPool(1)
-    try:
-        return pool.spawn(fn).get()
-    finally:
-        pool.kill()
+    pool = _offload_pool()
+    if pool is None:
+        # Already off the hub's thread — e.g. a provider reached through
+        # fan_out, whose workers are real OS threads. Blocking here harms
+        # nobody, and hopping again would only add a thread.
+        return fn()
+
+    return pool.spawn(fn).get()
+
+
+# Bound on concurrent offloaded blocking calls. These are network waits, so
+# the number is about capping OS threads and sockets under a burst, not about
+# CPU. Past it, requests queue cooperatively instead of spawning more threads.
+_MAX_OFFLOAD_WORKERS = 16
+
+_OFFLOAD_POOL = None
+_OFFLOAD_POOL_THREAD = None
+
+
+def _offload_pool():
+    """The shared pool, or ``None`` when the caller is not on the thread that
+    owns it.
+
+    A ``gevent.threadpool.ThreadPool`` belongs to the hub of the thread that
+    created it, so it must not be driven from another OS thread. Returning
+    ``None`` for that case lets ``run_blocking`` degrade to a direct call,
+    which is correct there: off the hub's thread nothing is being frozen.
+    """
+    global _OFFLOAD_POOL, _OFFLOAD_POOL_THREAD
+    import threading
+
+    if _OFFLOAD_POOL is None:
+        _OFFLOAD_POOL = _GeventThreadPool(_MAX_OFFLOAD_WORKERS)
+        _OFFLOAD_POOL_THREAD = threading.get_ident()
+    return _OFFLOAD_POOL if _OFFLOAD_POOL_THREAD == threading.get_ident() else None
 
 
 def _timed(fn, fanout_started):

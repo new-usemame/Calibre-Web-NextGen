@@ -15,7 +15,7 @@ from shutil import copyfile
 from markupsafe import escape, Markup  # dependency of flask
 from functools import partial, wraps
 
-from flask import Blueprint, request, flash, redirect, url_for, abort, Response, jsonify
+from flask import Blueprint, request, flash, redirect, url_for, abort, Response, jsonify, copy_current_request_context
 from flask_babel import gettext as _
 from flask_babel import lazy_gettext as N_
 from flask_babel import get_locale
@@ -995,8 +995,14 @@ def do_edit_book(book_id, upload_formats=None):
                 # blocking socket read on the request greenlet, and gevent
                 # runs unpatched, so a slow cover CDN froze every other user's
                 # page load for the whole read timeout (fork #1111).
-                result, error = parallel.run_blocking(partial(
-                    helper.save_cover_from_url, to_save["cover_url"].strip(), book.path))
+                #
+                # copy_current_request_context is load-bearing, not decoration:
+                # save_cover_from_url returns flask_babel `_("...")` on all of
+                # its error paths, and off-context gettext does not raise — it
+                # silently returns the English msgid. Without this wrapper every
+                # non-English user gets "Error Downloading Cover" in English.
+                result, error = parallel.run_blocking(copy_current_request_context(partial(
+                    helper.save_cover_from_url, to_save["cover_url"].strip(), book.path)))
                 if result:
                     book.has_cover = 1
                     modify_date = True

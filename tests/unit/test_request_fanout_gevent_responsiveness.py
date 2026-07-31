@@ -23,6 +23,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import sys
+import threading
 import time
 import types
 from pathlib import Path
@@ -414,3 +415,65 @@ class TestInlineRequestPathBlockingIsOffloaded:
         assert "run_blocking" in source and "save_cover_from_url" in source, (
             "the edit-book cover download is no longer routed through run_blocking"
         )
+
+
+class TestRunBlockingUsesOneBoundedPool:
+    """A pool per call is unbounded native-thread admission: N concurrent
+    cover saves means N OS threads and N sockets, so a burst trades the hub
+    freeze for thread/FD exhaustion. Bounding it is safe because a saturated
+    gevent pool queues COOPERATIVELY (fork #1111 review)."""
+
+    def test_the_pool_is_shared_across_calls_not_created_per_call(self):
+        parallel.run_blocking(lambda: 1)
+        first = parallel._OFFLOAD_POOL
+        parallel.run_blocking(lambda: 2)
+        assert first is not None
+        assert parallel._OFFLOAD_POOL is first, (
+            "run_blocking created a second pool; per-call pools mean one OS thread "
+            "per in-flight request with no ceiling"
+        )
+
+    def test_the_pool_is_bounded(self):
+        parallel.run_blocking(lambda: 1)
+        assert parallel._OFFLOAD_POOL.maxsize == parallel._MAX_OFFLOAD_WORKERS
+        assert parallel._MAX_OFFLOAD_WORKERS <= 64, "ceiling is too high to be a ceiling"
+
+    def test_saturating_the_pool_queues_instead_of_freezing_the_hub(self, monkeypatch):
+        """The property that makes bounding safe. More jobs than slots must
+        still leave other requests served — the submitting greenlet queues,
+        the hub keeps turning."""
+        from gevent.threadpool import ThreadPool
+
+        small = ThreadPool(2)
+        monkeypatch.setattr(parallel, "_OFFLOAD_POOL", small)
+        monkeypatch.setattr(parallel, "_OFFLOAD_POOL_THREAD", threading.get_ident())
+        try:
+            results = []
+
+            def oversubscribe():
+                # 6 jobs through 2 slots => three waves of queueing.
+                greenlets = [small.spawn(_blocking_job(i)) for i in range(6)]
+                results.extend(g.get() for g in greenlets)
+
+            worst = _worst_stall_while(oversubscribe)
+            assert sorted(results) == list(range(6)), "queued jobs were dropped"
+            assert worst < _MAX_TOLERABLE_STALL, (
+                f"a saturated pool froze the hub for {worst * 1000:.0f}ms — bounding the "
+                "pool would then be trading one freeze for another"
+            )
+        finally:
+            small.kill()
+
+    def test_caller_already_off_the_hub_thread_runs_inline(self):
+        """A provider reached through fan_out is already on a real worker
+        thread. Driving the main thread's pool from there would be a
+        cross-hub call, so run_blocking must degrade to a direct call."""
+        box = {}
+
+        def on_worker_thread():
+            box["value"] = parallel.run_blocking(lambda: "ran")
+
+        t = threading.Thread(target=on_worker_thread)
+        t.start()
+        t.join()
+        assert box["value"] == "ran"

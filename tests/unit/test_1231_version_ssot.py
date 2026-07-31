@@ -33,6 +33,7 @@ move can't update the writer and leave a reader behind.
 
 import importlib.util
 import re
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -209,24 +210,61 @@ def test_only_constants_reads_the_release_file():
 def test_no_calibre_release_stamp_file_is_written_or_read_anywhere():
     """No build step writes the stamp file and no code reads it.
 
+    Sweeps **every tracked runtime and build file** rather than a hand-listed
+    few: the way this regresses is a consumer appearing somewhere nobody
+    thought to list — a helper under ``scripts/``, a workflow, an entrypoint,
+    a packaging file.
+
+    Two categories are deliberately exempt because naming the retired path is
+    their job: ``tests/`` (this module has to name it to assert on it) and
+    Markdown (``CHANGELOG.md`` and ``CHANGES-vs-upstream.md`` are the historical
+    record of the removal). Neither is executed, so neither can resurrect the
+    dependency.
+
     Matches the *path* form only. ``ARG CALIBRE_RELEASE`` and ``$CALIBRE_RELEASE``
     in the Dockerfile are the build arg that pins which calibre gets downloaded —
     that is still the SSOT for the build and must survive.
     """
-    searched = [
-        _REPO_ROOT / "Dockerfile",
-        *(_REPO_ROOT / "cps").rglob("*.py"),
-        *(p for p in (_REPO_ROOT / "root").rglob("*") if p.is_file()),
-    ]
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=_REPO_ROOT, capture_output=True, check=True,
+    ).stdout.decode("utf-8", errors="ignore").split("\0")
+
     offenders = []
-    for path in searched:
-        text = path.read_text(encoding="utf-8", errors="ignore")
+    for relative_path in tracked:
+        if not relative_path:
+            continue
+        if relative_path.startswith("tests/") or relative_path.endswith(".md"):
+            continue
+        path = _REPO_ROOT / relative_path
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except (OSError, UnicodeDecodeError):
+            continue  # binary asset or a symlink to nowhere
         if re.search(r"/CALIBRE_RELEASE\b", text):
-            offenders.append(path.relative_to(_REPO_ROOT).as_posix())
+            offenders.append(relative_path)
+
     assert offenders == [], (
         "the /app/CALIBRE_RELEASE stamp file was retired in #1274; these files "
         f"reference it again: {offenders}"
     )
+
+
+def test_the_stamp_file_sweep_actually_searches_the_repository():
+    """A sweep that silently matched nothing would pass forever.
+
+    ``git ls-files`` returning an empty list (wrong cwd, no git) would make the
+    test above vacuous, so pin that it really is walking the tree.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=_REPO_ROOT, capture_output=True, check=True,
+    ).stdout.decode("utf-8", errors="ignore").split("\0")
+    tracked = [p for p in tracked if p]
+
+    assert len(tracked) > 500, len(tracked)
+    for expected in ("Dockerfile", "cps/admin.py", "cps/converter.py"):
+        assert expected in tracked, expected
 
 
 def test_dockerfile_still_pins_the_calibre_build_arg():

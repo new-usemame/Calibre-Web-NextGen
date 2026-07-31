@@ -26,7 +26,7 @@ from flask import Blueprint, flash, redirect, url_for, abort, request, make_resp
 from markupsafe import Markup
 from .cw_login import current_user
 from flask_babel import gettext as _
-from flask_babel import get_locale, format_time, format_datetime, format_timedelta
+from flask_babel import get_locale, format_time, format_datetime, format_timedelta, LazyString
 from sqlalchemy import and_
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
@@ -555,7 +555,9 @@ def calibre_version_label():
     return 'v' + match.group(1) if match else raw
 
 
-def cwa_get_package_versions() -> tuple[str, str, str]:
+def cwa_get_package_versions() -> tuple[str, str, "str | LazyString"]:
+    # The third member is a LazyString when calibre could not be probed — the
+    # diagnostic is deliberately left translatable rather than flattened here.
     try:
         with open("/app/KEPUBIFY_RELEASE", "r") as f:
             kepubify_version = f.read()

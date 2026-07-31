@@ -177,6 +177,68 @@ def test_failures_are_never_cached(monkeypatch):
     assert len(calls) == 2
 
 
+def test_upgrading_calibre_in_place_re_probes(monkeypatch, tmp_path):
+    """The stale case the path key alone does not cover.
+
+    Upgrading calibre leaves ``config_converterpath`` identical, so a memo keyed
+    only on the path keeps serving the old banner until the process restarts —
+    which is the very "reports a version it is not running" bug this change
+    exists to fix.
+    """
+    binary = tmp_path / "ebook-convert"
+    binary.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(converter.config, "config_converterpath", str(binary), raising=False)
+
+    state = {"value": "ebook-convert (calibre 9.11.0)"}
+    calls = _count_probes(monkeypatch, lambda _p: state["value"])
+
+    assert converter.get_calibre_version() == "ebook-convert (calibre 9.11.0)"
+    assert converter.get_calibre_version() == "ebook-convert (calibre 9.11.0)"
+    assert len(calls) == 1
+
+    # Same path, different file underneath.
+    binary.write_text("#!/bin/sh\n# upgraded\n")
+    state["value"] = "ebook-convert (calibre 10.2.0)"
+
+    assert converter.get_calibre_version() == "ebook-convert (calibre 10.2.0)", (
+        "replacing the binary at the configured path must invalidate the memo"
+    )
+    assert len(calls) == 2
+
+
+def test_a_missing_binary_is_not_memoised_as_present(monkeypatch, tmp_path):
+    """Deleting the binary must not leave the last good banner on the page."""
+    binary = tmp_path / "ebook-convert"
+    binary.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(converter.config, "config_converterpath", str(binary), raising=False)
+
+    state = {"value": "ebook-convert (calibre 9.11.0)"}
+    _count_probes(monkeypatch, lambda _p: state["value"])
+    assert converter.get_calibre_version() == "ebook-convert (calibre 9.11.0)"
+
+    binary.unlink()
+    state["value"] = N_("not installed")
+    assert str(converter.get_calibre_version()) == "not installed"
+
+
+def test_the_probe_never_runs_on_the_request_greenlet(monkeypatch):
+    """cps runs gevent without monkey.patch_all(), so the blocking fork has to
+    go through the bounded offload pool #1270 introduced. Memoising is not
+    enough on its own — the *first* probe still lands on a real page load."""
+    monkeypatch.setattr(converter.config, "config_converterpath", "/usr/bin/ebook-convert", raising=False)
+    _count_probes(monkeypatch, _BANNER)
+
+    offloaded = []
+    real = converter.parallel.run_blocking
+    monkeypatch.setattr(
+        converter.parallel, "run_blocking",
+        lambda fn: (offloaded.append(fn), real(fn))[1],
+    )
+
+    assert converter.get_calibre_version() == _BANNER
+    assert len(offloaded) == 1, "the subprocess probe must be offloaded, not run inline"
+
+
 def test_a_none_converter_path_does_not_crash_or_poison_the_cache(monkeypatch):
     """config_converterpath is nullable in the settings table."""
     monkeypatch.setattr(converter.config, "config_converterpath", None, raising=False)
@@ -255,13 +317,33 @@ def test_admin_module_compiles_without_syntax_warnings():
     assert offenders == [], [str(w.message) for w in offenders]
 
 
-def test_package_versions_returns_the_three_values_it_annotates():
+def test_package_versions_returns_exactly_what_its_caller_unpacks():
     """The annotation said 4-wide while the function returned 3 — the kind of
-    drift that makes an unpack at the call site look safe when it is not."""
-    import inspect
+    drift that makes an unpack at the call site look safe when it is not.
 
-    sig = inspect.signature(admin.cwa_get_package_versions)
-    assert str(sig.return_annotation).count("str") == 3, sig.return_annotation
+    Asserted against the runtime contract and the real call site, not against
+    the spelling of the annotation: the third member is legitimately a
+    LazyString when calibre could not be probed, so counting ``str`` in the
+    annotation would pin the wrong thing.
+    """
+    import inspect
 
     versions = admin.cwa_get_package_versions()
     assert len(versions) == 3
+
+    src = inspect.getsource(admin.admin)
+    assert "cwa_version, kepubify_version, calibre_version = cwa_get_package_versions()" in src, (
+        "the caller's unpack width must match what the function returns"
+    )
+
+
+def test_the_annotation_admits_the_translated_diagnostic(monkeypatch):
+    """The declared type has to allow the LazyString the function deliberately
+    returns, or the next reader 'fixes' the passthrough to satisfy it."""
+    import inspect
+
+    annotation = str(inspect.signature(admin.cwa_get_package_versions).return_annotation)
+    assert "LazyString" in annotation, annotation
+
+    monkeypatch.setattr(converter, "get_calibre_version", lambda: N_("not installed"))
+    assert not isinstance(admin.cwa_get_package_versions()[2], str)

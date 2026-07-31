@@ -318,14 +318,16 @@ msgstr ""
 msgid ""
 "Calibre-Web NextGen will search for updated Covers and update Cover "
 "Thumbnails, this may take a while?"
-msgstr "Calibre-Web NextGen wird nach aktualisierten Covern suchen und die Cover-Miniaturansichten aktualisieren."
+msgstr ""
+"Calibre-Web NextGen wird nach aktualisierten Covern suchen und die Cover-Miniaturansichten aktualisieren. "
 "Dies kann eine Weile dauern."
 
 #: cps/admin.py:1066
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
-msgstr "Sind Sie sicher, dass Sie die Synchronisationsdatenbank von Calibre-Web NextGen löschen möchten," 
+msgstr ""
+"Sind Sie sicher, dass Sie die Synchronisationsdatenbank von Calibre-Web NextGen löschen möchten, "
 "um eine vollständige Synchronisation mit Ihrem Kobo-Reader zu erzwingen?"
 
 #: cps/admin.py:1305 cps/admin.py:1311 cps/admin.py:1321 cps/admin.py:1331
@@ -355,7 +357,8 @@ msgstr "Buch wurde nicht gefunden."
 msgid ""
 "Cleared sync state for book {0} (user {1}); the device will re-receive the "
 "book on next sync"
-msgstr "Synchronisationsstatus für Buch {0} (Benutzer {1}) zurückgesetzt;"
+msgstr ""
+"Synchronisationsstatus für Buch {0} (Benutzer {1}) zurückgesetzt; "
 "das Gerät wird das Buch bei der nächsten Synchronisation erneut einlesen."
 
 #: cps/admin.py:1399
@@ -363,7 +366,8 @@ msgstr "Synchronisationsstatus für Buch {0} (Benutzer {1}) zurückgesetzt;"
 msgid ""
 "Book {0} was not in the sync record for user {1}; last_modified bumped so "
 "the device will receive on next sync"
-msgstr "Buch {0} war nicht im Synchronisationsprotokoll für Benutzer {1};" 
+msgstr ""
+"Buch {0} war nicht im Synchronisationsprotokoll für Benutzer {1}; "
 "der Zeitstempel für last_modified wurde erhöht, sodass das Gerät es bei der nächsten Synchronisation empfangen wird."
 
 #: cps/admin.py:1443 cps/api/browse.py:79 cps/spa_strings.py:84
@@ -2319,7 +2323,8 @@ msgstr "Calibre-Web NextGen %(latest)s ist verfügbar - Sie sind auf Version %(c
 msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
 "strings in your language still need translating."
-msgstr "Helfen Sie, Calibre-Web NextGens %(language)s zu übersetzen -"
+msgstr ""
+"Helfen Sie, Calibre-Web NextGens %(language)s zu übersetzen - "
 "%(count)s müssen noch übersetzt werden."
 
 #: cps/search.py:204
@@ -2718,7 +2723,8 @@ msgstr "Mehr von {name}"
 msgid ""
 "Merge {n} books into the first selected? The others are removed after their "
 "formats are copied over."
-msgstr "{n} Bücher mit dem ersten Ausgewählten zusammenführen? Die anderen werden"
+msgstr ""
+"{n} Bücher mit dem ersten Ausgewählten zusammenführen? Die anderen werden "
 "entfernt, wenn die Formate umkopiert wurden."
 
 #: cps/spa_strings.py:109
@@ -3030,7 +3036,8 @@ msgstr "Buch löschen"
 msgid ""
 "Delete \"{title}\"? This permanently removes the book and all its files from "
 "your library. This cannot be undone."
-msgstr "Wirklich löschen \"{title}\"? Das Buch und alle Dateien werden aus der"
+msgstr ""
+"Wirklich löschen \"{title}\"? Das Buch und alle Dateien werden aus der "
 "Bibliothek entfernt. Dies kann nicht rückgängig gemacht werden."
 
 #: cps/spa_strings.py:196
@@ -3513,7 +3520,8 @@ msgstr "Noch keine Versionshinweise - nach dem nächsten Update noch einmal prü
 msgid ""
 "The interface is translated into your language; these update notes are "
 "written in English."
-msgstr "Die Oberfläche wurde in Ihre Sprache übersetzt. Diese Update-Hinweise"
+msgstr ""
+"Die Oberfläche wurde in Ihre Sprache übersetzt. Diese Update-Hinweise "
 "sind in Englisch"
 
 #: cps/spa_strings.py:320 cps/templates/image.html:27
@@ -3695,7 +3703,8 @@ msgstr "Bearbeiten abgebrochen."
 #: cps/spa_strings.py:369
 msgid ""
 "Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused handle."
-msgstr "Ziehen um umzusortieren. Klicke X um einen Abschnitt zu verstecken. Pfeiltasten bewegen"
+msgstr ""
+"Ziehen um umzusortieren. Klicke X um einen Abschnitt zu verstecken. Pfeiltasten bewegen "
 "den ausgewählten Abschnitt."
 
 #: cps/spa_strings.py:370
@@ -3777,7 +3786,8 @@ msgstr "Ein paar zufällige Titel aus deiner Bibliothek"
 msgid ""
 "A one-time full duplicate scan is needed. Run it from CWA settings, then "
 "return here."
-msgstr "Ein einmaliger Duplikat-Scan wird benötigt. Von CWA-Einstellungen ausführen, dann"
+msgstr ""
+"Ein einmaliger Duplikat-Scan wird benötigt. Von CWA-Einstellungen ausführen, dann "
 "hierher zurückkehren."
 
 #: cps/spa_strings.py:403 cps/templates/cover_picker.html:81

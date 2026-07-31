@@ -36,8 +36,36 @@ def _get_command_version(path, pattern, argument=None):
     return _NOT_INSTALLED
 
 
+# Successful calibre probes, keyed by the converter path that produced them.
+# Not an lru_cache: the key is a mutable admin setting, and failures must stay
+# uncached (see get_calibre_version).
+_calibre_version_cache = {}
+
+
 def get_calibre_version():
-    return _get_command_version(config.config_converterpath, r'ebook-convert.*\(calibre', '--version')
+    """Version banner of the configured ``ebook-convert`` binary.
+
+    Successful probes are memoised per converter path. ``_get_command_version``
+    forks a subprocess and blocks on ``wait()``, and cps runs gevent *without*
+    ``monkey.patch_all()`` — so an uncached probe on a request handler stalls
+    every other greenlet for as long as calibre takes to start (the failure
+    mode fixed in #1270). The admin Version Information table and the SPA
+    ``/stats`` page both land here on an ordinary page load.
+
+    The cache is keyed on ``config.config_converterpath`` so that correcting a
+    wrong path takes effect immediately, and failures are never cached — an
+    admin who installs calibre or fixes its execute bit must see the change
+    without restarting the container.
+    """
+    path = config.config_converterpath or ""
+    cached = _calibre_version_cache.get(path)
+    if cached is not None:
+        return cached
+    version = _get_command_version(path, r'ebook-convert.*\(calibre', '--version')
+    # The failure sentinels are LazyStrings, not str — that is the discriminator.
+    if isinstance(version, str):
+        _calibre_version_cache[path] = version
+    return version
 
 
 def get_unrar_version():

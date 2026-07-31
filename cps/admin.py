@@ -15,7 +15,7 @@ import string
 import requests
 from datetime import datetime, timedelta, timezone
 from datetime import time as datetime_time
-from functools import cache, wraps
+from functools import wraps
 from urllib.parse import urlparse
 import shutil
 import subprocess
@@ -527,22 +527,42 @@ def update_thumbnails():
         })
 
 
-@cache
-def cwa_get_package_versions() -> tuple[str, str, str, str]:
+_CALIBRE_BANNER_RE = re.compile(r'\(calibre (.+?)\)')
+
+
+def calibre_version_label():
+    """Render the Calibre version for the admin Version Information table.
+
+    ``converter.get_calibre_version()`` returns one of two shapes: the full
+    ``ebook-convert (calibre 9.11.0)`` banner, or a translated diagnostic
+    (``not installed`` / ``Execution permissions missing``) as a LazyString.
+    Only the banner is reduced to a tag; a diagnostic is passed through
+    untouched so the admin keeps the actionable, translated message instead of
+    an opaque, untranslated "Unknown".
+    """
+    try:
+        raw = converter.get_calibre_version()
+    except Exception as e:
+        # Neither documented return shape raises; something else is wrong.
+        # The version row must never take the admin page down with it, but the
+        # reason belongs in the log rather than behind a silent "Unknown".
+        log.warning("Could not determine the Calibre version: %s", e)
+        return "Unknown"
+    if not isinstance(raw, str):
+        # A LazyString diagnostic. Returning it as-is keeps it translatable.
+        return raw
+    match = _CALIBRE_BANNER_RE.search(raw)
+    return 'v' + match.group(1) if match else raw
+
+
+def cwa_get_package_versions() -> tuple[str, str, str]:
     try:
         with open("/app/KEPUBIFY_RELEASE", "r") as f:
             kepubify_version = f.read()
     except Exception:
         kepubify_version = "Unknown"
 
-    try:
-        pattern = re.compile('.*calibre (.*)\)')
-        match = pattern.match(converter.get_calibre_version())
-        calibre_version = 'v' + match.group(1)
-    except Exception:
-        calibre_version = "Unknown"
-
-    return constants.INSTALLED_VERSION, kepubify_version, calibre_version
+    return constants.INSTALLED_VERSION, kepubify_version, calibre_version_label()
 
 
 def cwa_get_update_indicator() -> tuple[bool, str]:

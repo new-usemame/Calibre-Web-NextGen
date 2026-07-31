@@ -197,45 +197,59 @@ def test_only_constants_reads_the_release_file():
     assert readers == ["cps/constants.py"], readers
 
 
-# --- cross-file: every CALIBRE_RELEASE reference agrees on one path ----------
+# --- cross-file: the CALIBRE_RELEASE stamp file is gone entirely -------------
+#
+# #1274 (@chloeroform) retired the file. The old invariant was "the writer and
+# all three readers agree on one path"; the new one is "nobody writes or reads
+# it at all, and the version comes from the binary that is actually installed".
+# The pair below replaces that pin — dropping it outright would let the file
+# creep back in one file at a time.
 
-def test_dockerfile_writes_calibre_release_under_app():
-    dockerfile = (_REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
-    assert f'echo "$CALIBRE_RELEASE" > {_CALIBRE_RELEASE_PATH}' in dockerfile
 
+def test_no_calibre_release_stamp_file_is_written_or_read_anywhere():
+    """No build step writes the stamp file and no code reads it.
 
-def test_every_calibre_release_consumer_uses_the_same_path():
-    """The writer and all three readers must agree.
-
-    This is the failure this move invites: update the Dockerfile, forget the
-    s6 script, and the container logs 'unknown' forever without erroring.
+    Matches the *path* form only. ``ARG CALIBRE_RELEASE`` and ``$CALIBRE_RELEASE``
+    in the Dockerfile are the build arg that pins which calibre gets downloaded —
+    that is still the SSOT for the build and must survive.
     """
-    consumers = {
-        "cps/admin.py": r'open\("(/[^"]*CALIBRE_RELEASE)"',
-        "root/etc/s6-overlay/s6-rc.d/calibre-binaries-setup/run": r"cat (/\S*CALIBRE_RELEASE)",
-        "root/etc/s6-overlay/s6-rc.d/cwa-init/run": r'"(/\S*CALIBRE_RELEASE)"',
-    }
-    for relative_path, pattern in consumers.items():
-        text = (_REPO_ROOT / relative_path).read_text(encoding="utf-8")
-        found = re.findall(pattern, text)
-        assert found, f"{relative_path}: no CALIBRE_RELEASE reference matched"
-        assert set(found) == {_CALIBRE_RELEASE_PATH}, f"{relative_path}: {found}"
+    searched = [
+        _REPO_ROOT / "Dockerfile",
+        *(_REPO_ROOT / "cps").rglob("*.py"),
+        *(p for p in (_REPO_ROOT / "root").rglob("*") if p.is_file()),
+    ]
+    offenders = []
+    for path in searched:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if re.search(r"/CALIBRE_RELEASE\b", text):
+            offenders.append(path.relative_to(_REPO_ROOT).as_posix())
+    assert offenders == [], (
+        "the /app/CALIBRE_RELEASE stamp file was retired in #1274; these files "
+        f"reference it again: {offenders}"
+    )
 
 
-def test_no_root_level_calibre_release_references_remain():
-    """Nothing may still point at the old ``/CALIBRE_RELEASE`` location."""
-    stale = []
-    for relative_path in (
-        "Dockerfile",
-        "cps/admin.py",
-        "root/etc/s6-overlay/s6-rc.d/calibre-binaries-setup/run",
-        "root/etc/s6-overlay/s6-rc.d/cwa-init/run",
-    ):
-        text = (_REPO_ROOT / relative_path).read_text(encoding="utf-8")
-        # A bare /CALIBRE_RELEASE not preceded by "app"
-        if re.search(r"(?<!app)/CALIBRE_RELEASE", text):
-            stale.append(relative_path)
-    assert stale == [], stale
+def test_dockerfile_still_pins_the_calibre_build_arg():
+    """Retiring the stamp file must not disturb the build arg it came from."""
+    dockerfile = (_REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert re.search(r"^ARG CALIBRE_RELEASE=\d", dockerfile, re.MULTILINE), (
+        "ARG CALIBRE_RELEASE is the SSOT for which calibre the image downloads"
+    )
+
+
+def test_classic_admin_and_spa_share_one_calibre_version_source():
+    """Both UIs must read the running binary, not a build-time stamp.
+
+    That is the point of #1274: the stamp recorded what the *build* pinned, so
+    an image whose calibre was replaced (or a custom converter path) reported a
+    version it was not running.
+    """
+    admin_src = (_REPO_ROOT / "cps" / "admin.py").read_text(encoding="utf-8")
+    about_src = (_REPO_ROOT / "cps" / "about.py").read_text(encoding="utf-8")
+    for name, src in (("cps/admin.py", admin_src), ("cps/about.py", about_src)):
+        assert "converter.get_calibre_version()" in src, (
+            f"{name} must source the calibre version from the shared helper"
+        )
 
 
 # --- packaging: the SSOT the pyproject dynamic version points at -------------

@@ -16,6 +16,17 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- **The admin "Version Information" table now reports the Calibre you are
+  actually running.** It used to show a value stamped into the image at build
+  time, so if the Calibre binaries had been replaced, or the converter path
+  pointed somewhere else, the number on the page was not the number in use.
+  It is now read from the binary itself — the same source the Statistics page
+  already used — and formatted as `v9.11.0` to match the rows above it. When
+  Calibre can't be found or can't be run, the row now says which of the two it
+  is instead of "Unknown". Thanks to @chloeroform for the change.
+
 ### Fixed
 
 - **Marking a book unread left its "Started reading" and "Last synced" dates on

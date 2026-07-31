@@ -527,52 +527,62 @@ def update_thumbnails():
         })
 
 
+# The banners the two probes print, and the digits to lift out of each.
+#
+# They are not the same shape, which is why the patterns stay separate while
+# the rendering below is shared. Calibre's is fenced — ``(calibre 9.11.0)`` —
+# so a lazy quantifier terminates on the closing paren. kepubify prints
+# ``kepubify v4.0.4`` with nothing after the digits, so the same lazy pattern
+# would stop at the first character it can and render ``vv4``; it needs a
+# greedy run of non-space instead. kepubify also supplies its own ``v`` where
+# calibre does not, so the optional ``v?`` is consumed rather than captured and
+# the caller prepends exactly one.
 _CALIBRE_BANNER_RE = re.compile(r'\(calibre (.+?)\)')
+_KEPUBIFY_BANNER_RE = re.compile(r'kepubify\s+v?(\S+)')
 
 
-def calibre_version_label():
-    """Render the Calibre version for the admin Version Information table.
+def _version_label(probe, banner_re, name):
+    """Render one row of the admin Version Information table.
 
-    ``converter.get_calibre_version()`` returns one of two shapes: the full
-    ``ebook-convert (calibre 9.11.0)`` banner, or a translated diagnostic
-    (``not installed`` / ``Execution permissions missing``) as a LazyString.
-    Only the banner is reduced to a tag; a diagnostic is passed through
-    untouched so the admin keeps the actionable, translated message instead of
-    an opaque, untranslated "Unknown".
+    ``probe`` returns one of two shapes: the binary's full version banner, or a
+    translated diagnostic (``not installed`` / ``Execution permissions
+    missing``) as a LazyString. Only the banner is reduced to a tag; a
+    diagnostic is passed through untouched so the admin keeps the actionable,
+    translated message instead of an opaque, untranslated "Unknown".
+
+    Shared rather than copied per binary: the discriminator, the passthrough
+    and the degrade-to-"Unknown" path are the three things #1274 established
+    are easy to get subtly wrong, and a second copy is where one of them drifts.
     """
     try:
-        raw = converter.get_calibre_version()
+        raw = probe()
     except Exception as e:
         # Neither documented return shape raises; something else is wrong.
         # The version row must never take the admin page down with it, but the
         # reason belongs in the log rather than behind a silent "Unknown".
-        log.warning("Could not determine the Calibre version: %s", e)
+        log.warning("Could not determine the %s version: %s", name, e)
         return "Unknown"
     if not isinstance(raw, str):
         # A LazyString diagnostic. Returning it as-is keeps it translatable.
         return raw
-    match = _CALIBRE_BANNER_RE.search(raw)
+    match = banner_re.search(raw)
     return 'v' + match.group(1) if match else raw
 
 
-__KEPUBIFYANNER_RE = re.compile(r'kepubify (v.+?)')
+def calibre_version_label():
+    """Render the Calibre version for the admin Version Information table."""
+    return _version_label(converter.get_calibre_version, _CALIBRE_BANNER_RE, "Calibre")
 
 
 def kepubify_version_label():
     """Render the Kepubify version for the admin Version Information table."""
-    try:
-        raw = converter.get_kepubify_version()
-    except Exception as e:
-        log.warning("Could not determine the Kepubify version: %s", e)
-        return "Unknown"
-    if not isinstance(raw, str):
-        # A LazyString diagnostic. Returning it as-is keeps it translatable.
-        return raw
-    match = _KEPUBIFY_BANNER_RE.search(raw)
-    return 'v' + match.group(1) if match else raw
+    return _version_label(converter.get_kepubify_version, _KEPUBIFY_BANNER_RE, "Kepubify")
 
 
 def cwa_get_package_versions() -> tuple[str, "str | LazyString", "str | LazyString"]:
+    # Members two and three are LazyStrings when the binary could not be
+    # probed — the diagnostics are deliberately left translatable rather than
+    # flattened here.
     return constants.INSTALLED_VERSION, kepubify_version_label(), calibre_version_label()
 
 

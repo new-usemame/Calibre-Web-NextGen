@@ -360,10 +360,21 @@ def test_an_unexpected_error_degrades_to_unknown_and_is_logged(monkeypatch, capl
 def test_the_str_lazystring_discriminator_is_what_guards_the_regex():
     """Pinned at source because the failure is silent: without it the regex
     raises TypeError on every diagnostic and the except turns it into
-    "Unknown" — green tests, wrong page."""
+    "Unknown" — green tests, wrong page.
+
+    #1284 moved the guard from this function into the renderer both version
+    labels now share, so the pin follows it there. Asserting on the shared
+    renderer alone would go vacuous the moment a label stopped routing through
+    it, so the delegation is pinned in the same breath.
+    """
     import inspect
 
-    src = inspect.getsource(admin.calibre_version_label)
+    assert "_version_label" in inspect.getsource(admin.calibre_version_label), (
+        "calibre_version_label has to route through the shared renderer, or "
+        "the guard pinned below is no longer the one it uses"
+    )
+
+    src = inspect.getsource(admin._version_label)
     assert "isinstance" in src, (
         "the str/LazyString discriminator is what stops the regex from raising"
     )

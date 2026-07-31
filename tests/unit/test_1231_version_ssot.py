@@ -285,7 +285,13 @@ def test_classic_admin_and_spa_share_one_calibre_version_source():
     admin_src = (_REPO_ROOT / "cps" / "admin.py").read_text(encoding="utf-8")
     about_src = (_REPO_ROOT / "cps" / "about.py").read_text(encoding="utf-8")
     for name, src in (("cps/admin.py", admin_src), ("cps/about.py", about_src)):
-        assert "converter.get_calibre_version()" in src, (
+        # Matched without the call parens: #1284 factored the two admin labels
+        # onto one renderer, so admin.py now hands the probe over as a callable
+        # (``_version_label(converter.get_calibre_version, ...)``) rather than
+        # invoking it inline. What has to hold is that the source of the value
+        # is still the shared converter helper, not a stamp file — the call
+        # syntax is not the invariant.
+        assert "converter.get_calibre_version" in src, (
             f"{name} must source the calibre version from the shared helper"
         )
 

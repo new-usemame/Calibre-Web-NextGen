@@ -51,9 +51,9 @@ def _clear_probe_cache():
     # getattr-with-default so these tests still *run* (and fail on behaviour)
     # against a build that has no probe cache at all, rather than erroring out
     # at setup and hiding which defect they catch.
-    getattr(converter, "_calibre_version_cache", {}).clear()
+    getattr(converter, "_version_probe_cache", {}).clear()
     yield
-    getattr(converter, "_calibre_version_cache", {}).clear()
+    getattr(converter, "_version_probe_cache", {}).clear()
 
 
 # --- the label rendered into the admin table ---------------------------------
@@ -125,7 +125,7 @@ def _count_probes(monkeypatch, results):
         calls.append(path)
         return results(path) if callable(results) else results
 
-    monkeypatch.setattr(converter, "_get_command_version", fake)
+    monkeypatch.setattr(converter, "_run_command_version", fake)
     return calls
 
 
@@ -239,6 +239,58 @@ def test_the_probe_never_runs_on_the_request_greenlet(monkeypatch):
     assert len(offloaded) == 1, "the subprocess probe must be offloaded, not run inline"
 
 
+def test_every_version_probe_is_protected_not_just_calibre(monkeypatch, tmp_path):
+    """``/stats`` forks three probes, not one.
+
+    Protecting only the calibre probe would leave unrar and kepubify still
+    forking uncached on the request greenlet from the same page — half the fix.
+    The memo and the offload therefore live in the shared helper.
+    """
+    binary = tmp_path / "tool"
+    binary.write_text("#!/bin/sh\n")
+    for setting in ("config_converterpath", "config_rarfile_location", "config_kepubifypath"):
+        monkeypatch.setattr(converter.config, setting, str(binary), raising=False)
+
+    banners = {
+        r'ebook-convert.*\(calibre': "ebook-convert (calibre 9.11.0)",
+        r'UNRAR.*\d': "UNRAR 7.01 freeware",
+        r'kepubify\s': "kepubify 4.0.4",
+    }
+    calls = []
+
+    def fake(path, pattern, argument=None):
+        calls.append(pattern)
+        return banners.get(pattern, N_("not installed"))
+
+    monkeypatch.setattr(converter, "_run_command_version", fake)
+
+    for _ in range(3):
+        converter.get_calibre_version()
+        converter.get_unrar_version()
+        converter.get_kepubify_version()
+
+    assert sorted(calls) == sorted(banners), (
+        f"each probe should have run exactly once across three page loads, got {calls}"
+    )
+
+
+def test_the_two_unrar_probes_are_cached_separately(monkeypatch, tmp_path):
+    """get_unrar_version probes the same path twice with different patterns on
+    a miss. A memo keyed on the path alone would serve the first probe's answer
+    to the second and break the fallback."""
+    binary = tmp_path / "unrar"
+    binary.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(converter.config, "config_rarfile_location", str(binary), raising=False)
+
+    def fake(path, pattern, argument=None):
+        return "unrar 7.01" if argument == "-V" else N_("not installed")
+
+    monkeypatch.setattr(converter, "_run_command_version", fake)
+
+    assert converter.get_unrar_version() == "unrar 7.01"
+    assert converter.get_unrar_version() == "unrar 7.01"
+
+
 def test_a_none_converter_path_does_not_crash_or_poison_the_cache(monkeypatch):
     """config_converterpath is nullable in the settings table."""
     monkeypatch.setattr(converter.config, "config_converterpath", None, raising=False)
@@ -246,7 +298,7 @@ def test_a_none_converter_path_does_not_crash_or_poison_the_cache(monkeypatch):
 
     assert str(converter.get_calibre_version()) == "not installed"
     assert calls == [""]
-    assert converter._calibre_version_cache == {}
+    assert converter._version_probe_cache == {}
 
 
 def test_the_admin_table_is_not_frozen_for_the_life_of_the_process(monkeypatch):

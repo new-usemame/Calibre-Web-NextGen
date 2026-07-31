@@ -26,9 +26,12 @@ version table would link to ``/releases/tag/v0.0.0`` — a tag that was never
 published. That is the regression these tests pin.
 
 Separately, ``CALIBRE_RELEASE`` moved from ``/`` to ``/app`` to sit alongside
-``CWA_RELEASE`` and ``KEPUBIFY_RELEASE``. It is written by the Dockerfile and
-read back from three places; the cross-file test pins all four so a future
-move can't update the writer and leave a reader behind.
+``CWA_RELEASE`` and ``KEPUBIFY_RELEASE`` — and was then **retired outright** in
+#1274, because a build-time stamp cannot describe a binary that was replaced
+afterwards. The cross-file tests at the bottom moved with it: they used to pin
+that the writer and all three readers agreed on one path, and now pin that
+nothing writes or reads the stamp at all, that the build ARG which selects the
+download survives, and that both UIs share one runtime source.
 """
 
 import importlib.util
@@ -43,9 +46,6 @@ import pytest
 pytestmark = pytest.mark.unit
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-
-_CALIBRE_RELEASE_PATH = "/app/CALIBRE_RELEASE"
-
 
 def _load(module_name: str, relative_path: str):
     """Load a leaf ``cps`` module without paying for ``cps/__init__.py``.

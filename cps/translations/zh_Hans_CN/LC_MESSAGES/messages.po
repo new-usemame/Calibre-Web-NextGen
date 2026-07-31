@@ -206,7 +206,7 @@ msgstr "无可用本地化"
 msgid "No Valid Book Language Given"
 msgstr "无有效书籍语言"
 
-#: cps/admin.py:920 cps/editbooks.py:682
+#: cps/admin.py:920 cps/editbooks.py:683
 msgid "Parameter not found"
 msgstr "参数未找到"
 
@@ -416,8 +416,8 @@ msgid "Success! Gmail Account Verified."
 msgstr "Gmail 账户验证成功"
 
 #: cps/admin.py:1915 cps/admin.py:1918 cps/admin.py:2527 cps/admin.py:2763
-#: cps/admin.py:2888 cps/admin.py:3149 cps/editbooks.py:1157
-#: cps/editbooks.py:2048 cps/shelf.py:148 cps/shelf.py:226 cps/shelf.py:297
+#: cps/admin.py:2888 cps/admin.py:3149 cps/editbooks.py:1169
+#: cps/editbooks.py:2060 cps/shelf.py:148 cps/shelf.py:226 cps/shelf.py:297
 #: cps/shelf.py:332 cps/shelf.py:389 cps/shelf.py:464 cps/shelf.py:547
 #: cps/shelf.py:672 cps/tasks/convert.py:145 cps/web.py:3106
 #, python-format
@@ -1302,188 +1302,188 @@ msgstr "重复扫描已完成（回退模式）"
 msgid "Invalid resolution strategy"
 msgstr "无效角色"
 
-#: cps/editbooks.py:121 cps/editbooks.py:178
+#: cps/editbooks.py:122 cps/editbooks.py:179
 msgid ""
 "Ingest folder is not writable. Check your /cwa-book-ingest volume "
 "permissions."
 msgstr "导入文件夹不可写。请检查您的 /cwa-book-ingest 卷权限。"
 
-#: cps/editbooks.py:130
+#: cps/editbooks.py:131
 msgid "Missing or invalid book id for format upload"
 msgstr "格式上传缺少或无效的书籍 ID"
 
-#: cps/editbooks.py:136
+#: cps/editbooks.py:137
 msgid "Cannot upload format: Book no longer exists in library"
 msgstr "无法上传格式：书库中已不存在该书籍"
 
-#: cps/api/upload.py:75 cps/api/upload.py:117 cps/editbooks.py:161
-#: cps/editbooks.py:192 cps/templates/book_edit.html:94
+#: cps/api/upload.py:75 cps/api/upload.py:117 cps/editbooks.py:162
+#: cps/editbooks.py:193 cps/templates/book_edit.html:94
 #: cps/templates/layout.html:362
 msgid "Upload done, processing, please wait..."
 msgstr "上传完成，正在处理，请稍候..."
 
-#: cps/editbooks.py:166 cps/editbooks.py:196
+#: cps/editbooks.py:167 cps/editbooks.py:197
 #, fuzzy
 msgid "Failed to queue upload for processing"
 msgstr "创建封面路径失败"
 
-#: cps/editbooks.py:212
+#: cps/editbooks.py:213
 msgid "Source or destination format for conversion missing"
 msgstr "转换的源格式或目的格式缺失"
 
-#: cps/editbooks.py:220
+#: cps/editbooks.py:221
 #, python-format
 msgid "Book successfully queued for converting to %(book_format)s"
 msgstr "书籍已经被成功加入 %(book_format)s 格式转换队列"
 
-#: cps/editbooks.py:224
+#: cps/editbooks.py:225
 #, python-format
 msgid "There was an error converting this book: %(res)s"
 msgstr "转换此书籍时出现错误： %(res)s"
 
-#: cps/editbooks.py:377 cps/editbooks.py:1408 cps/editbooks.py:1995
+#: cps/editbooks.py:378 cps/editbooks.py:1420 cps/editbooks.py:2007
 #, fuzzy
 msgid "File type isn't allowed to be uploaded to this server"
 msgstr "不能上传文件扩展名为“%(ext)s”的文件到此服务器"
 
-#: cps/editbooks.py:382 cps/editbooks.py:1414 cps/editbooks.py:2006
+#: cps/editbooks.py:383 cps/editbooks.py:1426 cps/editbooks.py:2018
 #, python-format
 msgid "File extension '%(ext)s' is not allowed to be uploaded to this server"
 msgstr "不能上传文件扩展名为“%(ext)s”的文件到此服务器"
 
-#: cps/editbooks.py:386 cps/editbooks.py:1418 cps/editbooks.py:2011
+#: cps/editbooks.py:387 cps/editbooks.py:1430 cps/editbooks.py:2023
 msgid "File to be uploaded must have an extension"
 msgstr "要上传的文件必须具有扩展名"
 
-#: cps/editbooks.py:940 cps/editbooks.py:1679 cps/web.py:783 cps/web.py:3287
+#: cps/editbooks.py:941 cps/editbooks.py:1691 cps/web.py:783 cps/web.py:3287
 #: cps/web.py:3468 cps/web.py:3618
 msgid ""
 "Oops! Selected book is unavailable. File does not exist or is not accessible"
 msgstr "糟糕！选择书名无法打开。文件不存在或者文件不可访问"
 
-#: cps/editbooks.py:980 cps/editbooks.py:2078
+#: cps/editbooks.py:981 cps/editbooks.py:2090
 msgid "User has no rights to upload cover"
 msgstr "用户没有权限上传封面"
 
-#: cps/editbooks.py:988
+#: cps/editbooks.py:989
 msgid "Cover is locked. Unlock it on the cover-picker page first."
 msgstr ""
 
-#: cps/editbooks.py:1011 cps/editbooks.py:1396
+#: cps/editbooks.py:1023 cps/editbooks.py:1408
 msgid "Identifiers are not Case Sensitive, Overwriting Old Identifier"
 msgstr "标识符不区分大小写，覆盖旧标识符"
 
-#: cps/editbooks.py:1023 cps/editbooks.py:1370 cps/editbooks.py:1798
+#: cps/editbooks.py:1035 cps/editbooks.py:1382 cps/editbooks.py:1810
 #, python-format
 msgid "'%(langname)s' is not a valid language"
 msgstr "'%(langname)s' 不是一种有效语言"
 
-#: cps/editbooks.py:1142
+#: cps/editbooks.py:1154
 msgid "Metadata successfully updated"
 msgstr "已成功更新元数据"
 
-#: cps/editbooks.py:1162
+#: cps/editbooks.py:1174
 #, python-brace-format
 msgid "Error editing book: {}"
 msgstr "编辑书籍时出错: {}"
 
-#: cps/editbooks.py:1255 cps/editbooks.py:1305 cps/editbooks.py:2096
+#: cps/editbooks.py:1267 cps/editbooks.py:1317 cps/editbooks.py:2108
 #: cps/updater.py:685 cps/uploader.py:142 cps/uploader.py:151
 msgid "Unknown"
 msgstr "未知"
 
-#: cps/editbooks.py:1309
+#: cps/editbooks.py:1321
 msgid ""
 "Uploaded book probably exists in the library, consider to change before "
 "upload new: "
 msgstr "上传的书籍可能已经存在，建议修改后重新上传： "
 
-#: cps/editbooks.py:1426
+#: cps/editbooks.py:1438
 #, python-format
 msgid "File %(filename)s could not saved to temp dir"
 msgstr "文件 %(filename)s 无法保存到临时目录"
 
-#: cps/editbooks.py:1446
+#: cps/editbooks.py:1458
 #, python-format
 msgid "Failed to Move Cover File %(file)s: %(error)s"
 msgstr "移动封面文件失败 %(file)s：%(error)s"
 
-#: cps/editbooks.py:1534 cps/editbooks.py:1536
+#: cps/editbooks.py:1546 cps/editbooks.py:1548
 msgid "Book Format Successfully Deleted"
 msgstr "书籍的此格式副本已成功删除"
 
-#: cps/editbooks.py:1543 cps/editbooks.py:1545
+#: cps/editbooks.py:1555 cps/editbooks.py:1557
 msgid "Book Successfully Deleted"
 msgstr "书籍已成功删除"
 
-#: cps/editbooks.py:1660
+#: cps/editbooks.py:1672
 msgid "You are missing permissions to delete books"
 msgstr "您没有删除书籍的权限"
 
-#: cps/editbooks.py:1703
+#: cps/editbooks.py:1715
 msgid "edit metadata"
 msgstr "编辑元数据"
 
-#: cps/editbooks.py:1757
+#: cps/editbooks.py:1769
 #, fuzzy, python-format
 msgid "Seriesindex: %(seriesindex)s is not a valid number, skipping"
 msgstr "%(seriesindex)s 不是一个有效的数值，忽略"
 
-#: cps/editbooks.py:2000
+#: cps/editbooks.py:2012
 msgid "User has no rights to upload additional file formats"
 msgstr "用户没有权限上传其他文件格式"
 
-#: cps/editbooks.py:2024
+#: cps/editbooks.py:2036
 #, python-format
 msgid "Failed to create path %(path)s (Permission denied)."
 msgstr "创建路径 %(path)s 失败 (权限不足)"
 
-#: cps/editbooks.py:2031
+#: cps/editbooks.py:2043
 #, python-format
 msgid "Failed to store file %(file)s."
 msgstr "保存文件 %(file)s 失败"
 
-#: cps/editbooks.py:2055
+#: cps/editbooks.py:2067
 #, python-format
 msgid "File format %(ext)s added to %(book)s"
 msgstr "已添加 %(ext)s 格式到 %(book)s"
 
-#: cps/editbooks.py:2357
+#: cps/editbooks.py:2369
 #, fuzzy
 msgid "Book not found"
 msgstr "找不到令牌"
 
-#: cps/editbooks.py:2361
+#: cps/editbooks.py:2373
 msgid "Book has no file formats on disk to reload from"
 msgstr ""
 
-#: cps/editbooks.py:2382
+#: cps/editbooks.py:2394
 #, fuzzy, python-format
 msgid "Book file not found on disk: %(path)s"
 msgstr "硬盘上找不到 %(format)s 格式"
 
-#: cps/editbooks.py:2402
+#: cps/editbooks.py:2414
 #, python-format
 msgid "Could not parse metadata from %(format)s file: %(err)s"
 msgstr ""
 
-#: cps/editbooks.py:2523
+#: cps/editbooks.py:2535
 #, python-format
 msgid ""
 "Could not rename the book folder to match the reloaded metadata: %(err)s"
 msgstr ""
 
-#: cps/editbooks.py:2545
+#: cps/editbooks.py:2557
 #, python-format
 msgid "Could not save reloaded metadata: %(err)s"
 msgstr ""
 
-#: cps/editbooks.py:2551
+#: cps/editbooks.py:2563
 #, python-format
 msgid "Reloaded %(n)d field(s) from on-disk %(fmt)s"
 msgstr ""
 
-#: cps/editbooks.py:2554
+#: cps/editbooks.py:2566
 msgid "On-disk metadata matches current — no fields updated"
 msgstr ""
 

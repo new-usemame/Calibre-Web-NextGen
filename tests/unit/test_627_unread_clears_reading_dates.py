@@ -132,12 +132,19 @@ def test_display_degrades_to_no_progress_when_the_lookup_fails():
     after the parent one succeeded. A book page must render without progress
     rather than 500 — the behaviour both call sites had before this helper
     existed."""
-    class _ExplodingBookmark:
+    class _ExplodingState:
+        """Raises on the relationship access itself — this is the real shape of
+        the failure: SQLAlchemy emits the second SELECT lazily, at attribute
+        access time, after the parent query already returned."""
+
         @property
-        def progress_percent(self):
-            raise RuntimeError("connection invalidated mid-request")
+        def current_bookmark(self):
+            raise RuntimeError("connection invalidated before lazy load")
 
     class _Session:
+        def __init__(self, row):
+            self._row = row
+
         def query(self, *_a, **_kw):
             return self
 
@@ -145,10 +152,21 @@ def test_display_degrades_to_no_progress_when_the_lookup_fails():
             return self
 
         def first(self):
-            from types import SimpleNamespace
-            return SimpleNamespace(current_bookmark=_ExplodingBookmark())
+            return self._row
 
-    assert helper.get_kosync_progress_display(_Session(), 1, 42) == (None, None, None)
+    assert helper.get_kosync_progress_display(
+        _Session(_ExplodingState()), 1, 42) == (None, None, None)
+
+    # ...and a failure one step later, reading a column off the loaded row.
+    class _ExplodingBookmark:
+        @property
+        def progress_percent(self):
+            raise RuntimeError("connection invalidated mid-request")
+
+    from types import SimpleNamespace
+    assert helper.get_kosync_progress_display(
+        _Session(SimpleNamespace(current_bookmark=_ExplodingBookmark())),
+        1, 42) == (None, None, None)
 
 
 @pytest.mark.unit

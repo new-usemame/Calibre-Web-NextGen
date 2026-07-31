@@ -688,16 +688,15 @@ def reset_reading_position(session, user_id, book_id):
             bookmark.location_type = None
             bookmark.location_source = None
             cleared += 1
-        # Accumulated session statistics are part of the same reading position:
-        # a book you have just marked unread should not still report three and
-        # a half hours spent reading it, on the page or on the device.
-        statistics = kobo_state.statistics
-        if statistics is not None and (
-                statistics.spent_reading_minutes is not None
-                or statistics.remaining_time_minutes is not None):
-            statistics.spent_reading_minutes = None
-            statistics.remaining_time_minutes = None
-            cleared += 1
+        # ``KoboStatistics`` (spent/remaining reading minutes) is deliberately
+        # NOT cleared here, and clearing it would be worse than leaving it.
+        # ``kobo.get_statistics_response`` omits a counter whose value is None,
+        # and the PUT handler reads each counter with ``.get()`` and only writes
+        # it when it is not None — so on this protocol an absent field means
+        # "unchanged", not "cleared". Nulling the columns would emit a
+        # statistics object the device reads as a no-op, keep its own 212
+        # minutes, and push them straight back on its next PUT. It is also out
+        # of scope: those are historical reading-time totals, not position.
     # #683 follow-up: the "Currently reading" tri-state lives ONLY in
     # ub.ReadBook.read_status (STATUS_IN_PROGRESS) — KOReader/Kobo sync and the
     # web-reader open write it there regardless of a configured custom read
@@ -750,20 +749,26 @@ def get_kosync_progress_display(session, user_id, book_id):
     to one silently missed the other. Timestamps come back as stored (naive
     UTC); callers do their own formatting.
     """
+    # The whole resolution stays inside one defensive boundary, not just the
+    # parent query: ``current_bookmark`` is a lazily-loaded relationship, so it
+    # can issue a second SELECT and raise (locked DB, invalidated connection)
+    # after the first one already succeeded. Both call sites previously wrapped
+    # this in their own broad try/except and degraded to "no progress"; a book
+    # page must not 500 because the reading position could not be read.
     try:
         kobo_state = (session.query(ub.KoboReadingState)
                       .filter(ub.KoboReadingState.user_id == int(user_id),
                               ub.KoboReadingState.book_id == book_id)
                       .first())
-    except Exception as ex:  # pragma: no cover - defensive around DB errors
-        log.debug("Could not load KOReader progress for book %s: %s", book_id, ex)
+        if kobo_state is None or kobo_state.current_bookmark is None:
+            return None, None, None
+        bookmark = kobo_state.current_bookmark
+        if bookmark.progress_percent is None:
+            return None, None, None
+        return bookmark.progress_percent, bookmark.last_modified, bookmark.created_at
+    except Exception:  # pragma: no cover - defensive around DB/session errors
+        log.debug("Could not load KOReader progress for book %s", book_id, exc_info=True)
         return None, None, None
-    if kobo_state is None or kobo_state.current_bookmark is None:
-        return None, None, None
-    bookmark = kobo_state.current_bookmark
-    if bookmark.progress_percent is None:
-        return None, None, None
-    return bookmark.progress_percent, bookmark.last_modified, bookmark.created_at
 
 
 def _get_kosync_checksums_for_book(book_id):

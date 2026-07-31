@@ -103,8 +103,18 @@ def test_reset_clears_device_resume_location(session):
 
 
 @pytest.mark.unit
-def test_reset_clears_reading_statistics(session):
-    """"Unread" should not keep reporting 212 minutes spent reading."""
+def test_reset_leaves_reading_statistics_alone(session):
+    """The reading-time counters are deliberately NOT cleared.
+
+    An earlier revision of this fix cleared them; the cross-family review
+    showed that is both out of scope and actively ineffective.
+    ``kobo.get_statistics_response`` omits a counter that is None, and the PUT
+    handler only writes a counter it actually receives — so on this protocol an
+    absent field means "unchanged". Nulling the columns emits a statistics
+    object the device reads as a no-op, and the device pushes its retained
+    values straight back on the next sync. Pinned so nobody re-adds it without
+    a wire representation that actually clears.
+    """
     _make_synced_book(session, 1, 42)
     session.commit()
 
@@ -112,8 +122,42 @@ def test_reset_clears_reading_statistics(session):
     session.commit()
 
     stats = session.query(ub.KoboReadingState).filter_by(user_id=1, book_id=42).first().statistics
-    assert stats.spent_reading_minutes is None
-    assert stats.remaining_time_minutes is None
+    assert stats.spent_reading_minutes == 212
+    assert stats.remaining_time_minutes == 48
+
+
+@pytest.mark.unit
+def test_display_degrades_to_no_progress_when_the_lookup_fails():
+    """``current_bookmark`` is lazily loaded, so it can raise on a second query
+    after the parent one succeeded. A book page must render without progress
+    rather than 500 — the behaviour both call sites had before this helper
+    existed."""
+    class _ExplodingBookmark:
+        @property
+        def progress_percent(self):
+            raise RuntimeError("connection invalidated mid-request")
+
+    class _Session:
+        def query(self, *_a, **_kw):
+            return self
+
+        def filter(self, *_a, **_kw):
+            return self
+
+        def first(self):
+            from types import SimpleNamespace
+            return SimpleNamespace(current_bookmark=_ExplodingBookmark())
+
+    assert helper.get_kosync_progress_display(_Session(), 1, 42) == (None, None, None)
+
+
+@pytest.mark.unit
+def test_display_degrades_when_the_parent_query_fails():
+    class _Session:
+        def query(self, *_a, **_kw):
+            raise RuntimeError("database is locked")
+
+    assert helper.get_kosync_progress_display(_Session(), 1, 42) == (None, None, None)
 
 
 @pytest.mark.unit

@@ -51,8 +51,14 @@ import cps.converter as converter
 pytestmark = pytest.mark.unit
 
 
-# What `kepubify --version` actually prints. `_run_command_version` returns
-# `match.string`, i.e. the whole matched line, not the capture.
+# What `kepubify --version` actually prints. Confirmed against upstream source
+# rather than inferred: cmd/kepubify/kepubify.go does
+# ``fmt.Printf("kepubify %s\n", version)``, with ``version`` defaulting to
+# "v4-dev" and set to the tag on a release build. So the token carries its own
+# ``v`` — unlike calibre's, which does not.
+#
+# `_run_command_version` returns `match.string`, i.e. the whole matched line,
+# not the capture.
 _BANNER = "kepubify v4.0.4"
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -83,6 +89,11 @@ def test_banner_is_reduced_to_a_version_tag(monkeypatch):
         ("kepubify v4.0.4-rc1", "v4.0.4-rc1"),
         # Trailing build metadata must not be swallowed into the tag.
         ("kepubify v4.0.4 (go1.21)", "v4.0.4"),
+        # An unreleased build. `version` defaults to "v4-dev" in
+        # cmd/kepubify/kepubify.go, so this is a real shape, not a hypothetical
+        # — and it is the one a greedy `(\d[\d.]*)` would silently truncate to
+        # "v4", reporting a dev build as a release.
+        ("kepubify v4-dev", "v4-dev"),
         # If a future release drops the `v`, the row still reads `vX.Y.Z`
         # rather than gaining or losing one.
         ("kepubify 4.0.4", "v4.0.4"),

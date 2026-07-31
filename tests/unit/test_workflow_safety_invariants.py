@@ -1073,3 +1073,177 @@ def test_ci_image_build_never_selects_the_mirror_without_credentials():
         "build that can still select the private mirror is the exact shape "
         "that broke release dry-runs"
     )
+
+
+# --- Layer 2 promotion: the SPA e2e suite must actually gate (#1130) ---------
+
+
+def _run_summary_script(summary: dict, results: dict, env: dict) -> tuple[int, str]:
+    """Execute the Test Suite Summary script the way Actions would.
+
+    `${{ needs.<job>.result }}` is replaced with the supplied result (anything
+    unspecified defaults to `success`, i.e. the job passed), and the `IS_*`
+    predicates are passed as real environment variables — which is how the
+    workflow already supplies them. Returns (exit code, combined output).
+
+    Running the script beats grepping it: the gate is a shell decision, and
+    only executing it proves which way the decision goes.
+    """
+    step = next(
+        (s for s in _steps(summary) if "needs.e2e-tests.result" in str(s.get("run", ""))),
+        None,
+    )
+    assert step is not None, "summary must have a step that reads needs.e2e-tests.result"
+    script = str(step["run"])
+
+    def _sub(match: "re.Match[str]") -> str:
+        return results.get(match.group(1), "success")
+
+    script = re.sub(r"\$\{\{\s*needs\.([a-z0-9_-]+)\.result\s*\}\}", _sub, script)
+    # Any remaining ${{ … }} would be an unmodelled input; surface it loudly
+    # rather than letting bash interpret it as a brace expansion.
+    leftover = re.findall(r"\$\{\{.*?\}\}", script)
+    assert not leftover, f"unmodelled workflow expressions in the summary script: {leftover}"
+
+    proc = subprocess.run(
+        ["bash", "-c", script],
+        capture_output=True,
+        text=True,
+        env={**os.environ, **env},
+    )
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def test_e2e_actually_blocks_frontend_prs():
+    """Running is not gating — the same lesson integration-tests learned.
+
+    The SPA e2e matrix is Layer 2 of the verification system. It ran on every
+    frontend PR while `continue-on-error` was a blanket
+    `github.event_name == 'pull_request'`, so a fully red suite reported a
+    green job and `needs.e2e-tests.result` came back `success`. #1130 is the
+    write-up: 19 specs failed on every run for weeks and nobody saw them,
+    which made the "earn the release" gate decorative rather than protective.
+
+    The suite has since been repaired and is green (9 consecutive runs
+    including the v4.1.25 and v4.1.26 tag runs), so it has earned the
+    promotion the original comment asked for. Forks stay advisory — see the
+    tripwire below.
+    """
+    wf = _load(WF_DIR / "tests.yml")
+    job = (wf.get("jobs") or {}).get("e2e-tests")
+    assert isinstance(job, dict), "tests.yml must define an e2e-tests job"
+
+    coe = str(job.get("continue-on-error", ""))
+    assert coe.strip() != "${{ github.event_name == 'pull_request' }}", (
+        "e2e-tests is advisory for EVERY pull request. A frontend PR that "
+        "breaks the SPA reports a green job and merges. That is the exact "
+        "hole #1130 exists to close."
+    )
+    assert "fork" in coe, (
+        "the e2e advisory carve-out must be scoped to fork PRs (which have no "
+        "run history to justify hard-gating), not to all pull requests"
+    )
+
+
+def test_summary_hard_fails_on_red_e2e_for_frontend_prs():
+    """Layer 3: the summary is the check branch protection reads.
+
+    Even with the job promoted, the summary used to swallow the result:
+
+        if [[ "${{ needs.e2e-tests.result }}" == "failure" ]]; then
+          echo "⛔ E2E tests failed - do not release!"
+          # Don't fail the summary, just warn.
+        fi
+
+    `Test Suite Summary` is the single required check, and auto-merge.yml
+    fires on it. Warning-and-continuing means a red SPA suite still satisfies
+    merge-gate condition (a). Both layers have to agree or the gate reports
+    its own failure as a pass.
+    """
+    wf = _load(WF_DIR / "tests.yml")
+    jobs = wf.get("jobs") or {}
+    summary = next(
+        (j for name, j in jobs.items() if isinstance(j, dict) and j.get("name") == "Test Suite Summary"),
+        None,
+    )
+    assert summary is not None, "tests.yml must define a Test Suite Summary job"
+
+    env_blob = "\n".join(str((s.get("env") or {})) for s in _steps(summary))
+    assert "needs.changed_paths.outputs.frontend" in env_blob, (
+        "Test Suite Summary never consults `frontend`, so it cannot tell a "
+        "frontend PR from a .po-only one and treats every red e2e result as "
+        "advisory."
+    )
+
+    # Behavioural, not a source pin. An earlier version of this test scraped
+    # the script for `exit 1` near the e2e branch and passed against the
+    # warn-only original, because the regex ran on to fast-tests' exit. So run
+    # the real script instead: substitute the job results GitHub would
+    # interpolate and assert the exit code the gate is supposed to produce.
+    for scenario, results, env, want_rc, why in [
+        (
+            "frontend PR from this repo, SPA suite red",
+            {"e2e-tests": "failure"},
+            {"IS_FRONTEND_PR": "true"},
+            1,
+            "a broken SPA must block the merge — this is the whole of #1130",
+        ),
+        (
+            "fork frontend PR / main push, SPA suite red",
+            {"e2e-tests": "failure"},
+            {"IS_FRONTEND_PR": "false"},
+            0,
+            "forks and main pushes stay advisory; failing them would block "
+            "community PRs and auto-revert decisions",
+        ),
+        (
+            "frontend PR, SPA suite green",
+            {"e2e-tests": "success"},
+            {"IS_FRONTEND_PR": "true"},
+            0,
+            "a green suite must not block",
+        ),
+        (
+            "translations-only PR, e2e skipped entirely",
+            {"e2e-tests": "skipped"},
+            {"IS_FRONTEND_PR": "false"},
+            0,
+            "`skipped` is not `failure` — a .po-only PR must not be gated on a "
+            "job that never ran",
+        ),
+    ]:
+        rc, out = _run_summary_script(summary, results, env)
+        assert rc == want_rc, (
+            f"{scenario}: expected exit {want_rc}, got {rc}. {why}\n--- output ---\n{out}"
+        )
+
+
+def test_fork_prs_run_e2e_but_do_not_hard_gate_on_it_yet():
+    """Fork frontend PRs must RUN the suite but not block on it yet.
+
+    Same reasoning as the integration-tests tripwire: the job pulls a
+    published image and overlays the PR's own SPA bundle, and no fork PR has
+    exercised that path yet (#1274, the only recent fork PR, touched no
+    frontend files and skipped the job). Hard-gating on an unmeasured
+    infrastructure path would block community contributions for a reason
+    unrelated to their change. Excluding forks from the `if:` instead would
+    restore the original hole for exactly the contributions that need the
+    check most.
+
+    If someone widens the hard gate to forks, they must come here and record
+    why it is now safe.
+    """
+    wf = _load(WF_DIR / "tests.yml")
+    job = (wf.get("jobs") or {}).get("e2e-tests")
+
+    condition = str(job.get("if") or "")
+    assert "fork" not in condition, (
+        "e2e-tests must still RUN on fork frontend PRs — surfacing the result "
+        "is the point; only the hard gate is deferred"
+    )
+
+    coe = str(job.get("continue-on-error", ""))
+    assert "fork" in coe, (
+        "fork PRs must stay advisory until a real fork run shows the "
+        "image-pull + bundle-overlay path works without repo secrets"
+    )

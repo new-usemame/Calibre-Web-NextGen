@@ -437,8 +437,14 @@ jobs:
     # push trigger never delivers tag events). The dev-branch condition is
     # forward wiring: no dev branch exists today, so per-merge canary coverage
     # is a follow-up (workflow_run after the :dev image build).
-    # ADVISORY: a failure warns in test-summary + alerts Discord on tag runs,
-    # but does not block. Promote to a hard gate once several tag runs are green.
+    # GATING (promoted 2026-07-31, #1130). This was advisory on every PR, and
+    # the promotion condition written here — "once several tag runs are green"
+    # — has been met: the harness step is green on 9 consecutive runs that
+    # actually executed it, including the v4.1.25 and v4.1.26 tag runs, with no
+    # failure in the last 60 workflow runs. While it was advisory, 19 specs
+    # failed on every run for weeks and nobody read them, because a red job
+    # still reported `success` to the summary. That made Layer 2 of the
+    # verification system decorative rather than protective.
     #
     # PRs touching frontend/** now run too (#953). They cannot be handled the
     # same way: the resolver below tests a PUBLISHED image, and a pull request
@@ -462,9 +468,16 @@ jobs:
       )
     # Tag runs may wait up to ~40 min for the GHCR release build to publish
     # the image (see the pull loop below) before the ~15 min harness run.
-    # Advisory on PRs until several runs are green, matching the ADVISORY
-    # stance above. Promote to a hard gate once it has earned it.
-    continue-on-error: ${{ github.event_name == 'pull_request' }}
+    #
+    # Advisory ONLY for fork PRs now. A fork's runner gets no repo secrets, and
+    # the resolve/pull/overlay path above has never been exercised from one —
+    # #1274, the only recent fork PR, touched no frontend files and skipped
+    # this job. Hard-gating an unmeasured infrastructure path would block
+    # community PRs for a reason unrelated to their change, which is the same
+    # trade integration-tests documents. Forks still RUN the suite and the
+    # result is still surfaced; only the block is deferred. Promote (drop the
+    # fork clause) once a real fork run shows the path works.
+    continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
     timeout-minutes: 75
     permissions:
       contents: read
@@ -781,6 +794,10 @@ jobs:
           # excluded while the mirror-access question is open (#1263), so the
           # two cannot disagree about what is being gated.
           IS_BUILD_PR: ${{ needs.changed_paths.outputs.build == 'true' && github.event.pull_request.head.repo.fork != true }}
+          # Frontend PRs gate on the SPA e2e suite the same way (#1130). The
+          # fork carve-out mirrors the e2e job's own continue-on-error, so the
+          # two cannot disagree about what is being gated.
+          IS_FRONTEND_PR: ${{ needs.changed_paths.outputs.frontend == 'true' && github.event.pull_request.head.repo.fork != true }}
         run: |
           echo "Fast Tests:        ${{ needs.fast-tests.result }}"
           echo "Frontend Build:    ${{ needs.frontend-build.result }}"
@@ -788,6 +805,7 @@ jobs:
           echo "E2E Tests:         ${{ needs.e2e-tests.result }}"
           echo "Is tier-2 PR:      $IS_TIER2_PR"
           echo "Is build PR:       $IS_BUILD_PR"
+          echo "Is frontend PR:    $IS_FRONTEND_PR"
 
           if [[ "${{ needs.fast-tests.result }}" == "failure" ]]; then
             echo "❌ Fast tests failed"
@@ -820,9 +838,21 @@ jobs:
             echo "⚠️ Integration tests failed (advisory; not a tier-2 or build PR)"
           fi
 
+          # The SPA e2e matrix is a hard gate for frontend PRs from this repo
+          # (#1130). Warning-and-continuing is how a red suite kept satisfying
+          # merge-gate condition (a): this summary is the single required
+          # check, and auto-merge.yml fires on it, so "just warn" meant the
+          # gate reported its own failure as a pass. Tag and main runs stay
+          # advisory here — the job itself is already non-advisory there, and
+          # failing the summary too would block auto-revert decisions.
           if [[ "${{ needs.e2e-tests.result }}" == "failure" ]]; then
-            echo "⛔ E2E tests failed - do not release!"
-            # Don't fail the summary, just warn.
+            if [[ "$IS_FRONTEND_PR" == "true" ]]; then
+              echo "❌ SPA e2e suite failed on a frontend PR — this is a hard gate."
+              echo "   The specs assert the behaviour this PR changes. Read the"
+              echo "   uploaded Playwright report before touching the gate."
+              exit 1
+            fi
+            echo "⛔ E2E tests failed - do not release! (advisory; not a frontend PR)"
           fi
 
           echo "✅ Test suite completed"

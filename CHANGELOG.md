@@ -27,6 +27,14 @@ is for things you can see or feel when running the app.
   Calibre can't be found or can't be run, the row now says which of the two it
   is instead of "Unknown". Thanks to @chloeroform for the change.
 
+- **The Kepubify row of that same table now reports the running binary too.**
+  It had the same problem for the same reason, and it was the more visible of
+  the pair: the Statistics page already read the real binary, so the two pages
+  could show different Kepubify versions on the same install with no way to
+  tell which one was right. Both now read the same source. As with Calibre, a
+  Kepubify that can't be found or can't be run says so rather than showing
+  "Unknown". Thanks again to @chloeroform.
+
 ### Fixed
 
 - **Marking a book unread left its "Started reading" and "Last synced" dates on

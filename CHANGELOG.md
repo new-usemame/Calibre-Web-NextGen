@@ -51,6 +51,20 @@ is for things you can see or feel when running the app.
   ([#1249](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1249)),
   building on the original Polish translation by Radosław Kierznowski.
 
+- **German now reads in German across several hundred more labels and
+  messages.** With the language set to German, a long tail of admin screens,
+  task and error messages, and much of the new interface still showed in
+  English. German was covering 1,584 of 2,609 phrases and now covers 1,891.
+  Two of those were previously worse than untranslated: the *Email Your Users*
+  admin heading said "Benutzer bearbeiten" ("edit user") and the warning for
+  sending mail with nobody chosen said "select a book" rather than "select a
+  recipient". Both are now correct, and both now actually appear — gettext had
+  them marked as unconfirmed guesses, and an unconfirmed entry is dropped when
+  the catalog is compiled, so the German sat in the file while the screen
+  showed English. Contributed by
+  [@monimkxl-web](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1264)
+  ([#1264](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1264)).
+
 ### Added
 
 - **The KOReader page now explains how to auto-update the sync plugin.** Visiting

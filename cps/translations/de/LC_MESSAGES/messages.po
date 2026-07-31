@@ -482,9 +482,8 @@ msgid "Email Server Settings updated"
 msgstr "Einstellungen des E-Mail-Servers aktualisiert"
 
 #: cps/admin.py:1972 cps/templates/admin.html:106
-#, fuzzy
 msgid "Email Your Users"
-msgstr "Schicken Sie Ihren Benutzern eine eMail"
+msgstr "Schicken Sie Ihren Benutzern eine E-Mail"
 
 #: cps/admin.py:1998
 #, fuzzy
@@ -507,7 +506,6 @@ msgid "Please set an email address on your own account first..."
 msgstr "Bitte zuerst E-Mail-Adresse konfigurieren..."
 
 #: cps/admin.py:2025
-#, fuzzy
 msgid "Please select at least one recipient."
 msgstr "Bitte zuerst einen Empfänger auswählen"
 

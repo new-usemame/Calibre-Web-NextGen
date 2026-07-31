@@ -16,6 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- **Ebook conversion and metadata reading now run on Calibre 9.11.0**, up from
+  9.1.0. Ten minor versions of Calibre fixes land in one step, covering format
+  conversion, metadata extraction and the ingest path — so books that previously
+  converted badly, imported with wrong or missing metadata, or failed to ingest
+  at all are worth retrying. Thanks to @chloeroform for the upgrade and
+  @darkmatterpelican for reporting it.
+
 ### Fixed
 
 - **KOReader's plugin updater kept saying "no new release available" when a newer
@@ -27,6 +36,20 @@ is for things you can see or feel when running the app.
   attach the plugin download automatically, so that setup updates itself again.
   Releases that don't touch the plugin still publish nothing, so you won't be
   prompted to reinstall an identical plugin.
+
+- **The interface now reads in Polish throughout, instead of leaving about two
+  thirds of its labels in English.** With the language set to Polish, the admin
+  screens, metadata editing, upload, shelves, the reader and a long tail of task
+  and error messages still showed in English. A further 273 phrases were worse
+  than untranslated: gettext had guessed them from a similar English sentence and
+  marked the guess provisional, and a provisional entry is dropped when the
+  catalog is compiled — so those rendered in English while Polish that said
+  something else sat in the file waiting for somebody to confirm it. Polish was
+  covering 950 of 2,609 phrases and now covers all 2,609, which makes it the most
+  complete translation the project ships. Contributed by
+  [@bywciu](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1249)
+  ([#1249](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1249)),
+  building on the original Polish translation by Radosław Kierznowski.
 
 ### Added
 

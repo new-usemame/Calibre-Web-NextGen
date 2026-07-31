@@ -115,9 +115,13 @@ def _live_catalog(locale):
 # locale we ship" — gating all 28 would put a 28-translation step in front of
 # every new label (#1217).
 #
-# Russian is at 100% too but is intentionally NOT gated: it is maintained by a
-# community translator on their own cadence, and gating it would stall our
-# release train on someone else's availability rather than on our own work.
+# Russian and Polish are at 100% too but are intentionally NOT gated: both are
+# maintained by community translators on their own cadence, and gating them
+# would stall our release train on someone else's availability rather than on
+# our own work. The distinction is who holds the catalog, not how complete it
+# is — fr and nl we filled ourselves (#615, #886), so they are ours to keep at
+# 100%; ru (@sinyawskiy) and pl (@bywciu, #1249) are not. Don't add a locale
+# here just because the README shows it at 100%.
 COMPLETE_LOCALES = ("fr", "nl")
 
 

@@ -15,7 +15,7 @@ import string
 import requests
 from datetime import datetime, timedelta, timezone
 from datetime import time as datetime_time
-from functools import wraps
+from functools import cache, wraps
 from urllib.parse import urlparse
 import shutil
 import subprocess
@@ -527,6 +527,7 @@ def update_thumbnails():
         })
 
 
+@cache
 def cwa_get_package_versions() -> tuple[str, str, str, str]:
     try:
         with open("/app/KEPUBIFY_RELEASE", "r") as f:

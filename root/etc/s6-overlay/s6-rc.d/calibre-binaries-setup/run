@@ -50,7 +50,7 @@ if [[ ! "$CALIBRE_INSTALLED_TEST" =~ calibredb.*calibre\ [0-9]+\.[0-9]+ ]]; then
         }
     fi
     
-    echo "[calibre-binaries-setup] Installing Calibre version $(cat /app/CALIBRE_RELEASE 2>/dev/null || echo 'unknown')..."
+    echo "[calibre-binaries-setup] Installing Calibre..."
     echo "[calibre-binaries-setup] This may take several minutes, please wait..."
 
     # Fork #769: calibre_postinstall's desktop-integration step shells out to

@@ -555,16 +555,25 @@ def calibre_version_label():
     return 'v' + match.group(1) if match else raw
 
 
-def cwa_get_package_versions() -> tuple[str, str, "str | LazyString"]:
-    # The third member is a LazyString when calibre could not be probed — the
-    # diagnostic is deliberately left translatable rather than flattened here.
-    try:
-        with open("/app/KEPUBIFY_RELEASE", "r") as f:
-            kepubify_version = f.read()
-    except Exception:
-        kepubify_version = "Unknown"
+__KEPUBIFYANNER_RE = re.compile(r'kepubify (v.+?)')
 
-    return constants.INSTALLED_VERSION, kepubify_version, calibre_version_label()
+
+def kepubify_version_label():
+    """Render the Kepubify version for the admin Version Information table."""
+    try:
+        raw = converter.get_kepubify_version()
+    except Exception as e:
+        log.warning("Could not determine the Kepubify version: %s", e)
+        return "Unknown"
+    if not isinstance(raw, str):
+        # A LazyString diagnostic. Returning it as-is keeps it translatable.
+        return raw
+    match = _KEPUBIFY_BANNER_RE.search(raw)
+    return 'v' + match.group(1) if match else raw
+
+
+def cwa_get_package_versions() -> tuple[str, "str | LazyString", "str | LazyString"]:
+    return constants.INSTALLED_VERSION, kepubify_version_label(), calibre_version_label()
 
 
 def cwa_get_update_indicator() -> tuple[bool, str]:

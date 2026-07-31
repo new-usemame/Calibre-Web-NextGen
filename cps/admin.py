@@ -32,7 +32,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 from sqlalchemy.sql.expression import func, or_, text
 
-from . import constants, logger, helper, services, cli_param, apply_https_runtime_config
+from . import constants, converter, logger, helper, services, cli_param, apply_https_runtime_config
 from . import user_book_data
 from . import db, calibre_db, ub, web_server, config, updater_thread, gdriveutils, \
     kobo_sync_status, schedule
@@ -535,8 +535,9 @@ def cwa_get_package_versions() -> tuple[str, str, str, str]:
         kepubify_version = "Unknown"
 
     try:
-        with open("/app/CALIBRE_RELEASE", "r") as f:
-            calibre_version = f.read()
+        pattern = re.compile('.*calibre (.*)\)')
+        match = pattern.match(converter.get_calibre_version())
+        calibre_version = 'v' + match.group(1)
     except Exception:
         calibre_version = "Unknown"
 

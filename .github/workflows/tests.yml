@@ -812,6 +812,21 @@ jobs:
             exit 1
           fi
 
+          # Both path-derived gates read changed_paths outputs: IS_BUILD_PR
+          # (integration) and IS_FRONTEND_PR (SPA e2e). If that job fails its
+          # outputs come back empty, every dependent job's `if:` evaluates
+          # false, both gates read as "not applicable", and this summary goes
+          # green having gated nothing — the same class of silent-off failure
+          # #1130 is about, one level up. Fail loudly instead of inferring
+          # "nothing changed" from "we could not tell what changed".
+          if [[ "${{ github.event_name }}" == "pull_request" \
+                && "${{ needs.changed_paths.result }}" == "failure" ]]; then
+            echo "❌ Detect changed paths failed — the build and SPA e2e gates"
+            echo "   are both derived from its outputs, so neither can be"
+            echo "   trusted on this run."
+            exit 1
+          fi
+
           # The SPA bundle is a hard gate: a broken TypeScript/Vite build ships
           # an empty/broken frontend, so it blocks the merge like fast-tests.
           if [[ "${{ needs.frontend-build.result }}" == "failure" ]]; then

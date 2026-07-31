@@ -1078,7 +1078,9 @@ def test_ci_image_build_never_selects_the_mirror_without_credentials():
 # --- Layer 2 promotion: the SPA e2e suite must actually gate (#1130) ---------
 
 
-def _run_summary_script(summary: dict, results: dict, env: dict) -> tuple[int, str]:
+def _run_summary_script(
+    summary: dict, results: dict, env: dict, event_name: str = "pull_request"
+) -> tuple[int, str]:
     """Execute the Test Suite Summary script the way Actions would.
 
     `${{ needs.<job>.result }}` is replaced with the supplied result (anything
@@ -1100,6 +1102,7 @@ def _run_summary_script(summary: dict, results: dict, env: dict) -> tuple[int, s
         return results.get(match.group(1), "success")
 
     script = re.sub(r"\$\{\{\s*needs\.([a-z0-9_-]+)\.result\s*\}\}", _sub, script)
+    script = re.sub(r"\$\{\{\s*github\.event_name\s*\}\}", event_name, script)
     # Any remaining ${{ … }} would be an unmodelled input; surface it loudly
     # rather than letting bash interpret it as a brace expansion.
     leftover = re.findall(r"\$\{\{.*?\}\}", script)
@@ -1216,6 +1219,50 @@ def test_summary_hard_fails_on_red_e2e_for_frontend_prs():
         assert rc == want_rc, (
             f"{scenario}: expected exit {want_rc}, got {rc}. {why}\n--- output ---\n{out}"
         )
+
+
+def test_summary_fails_when_path_detection_itself_failed():
+    """The gates are only as trustworthy as the job they derive from.
+
+    `IS_BUILD_PR` and `IS_FRONTEND_PR` are both computed from
+    `needs.changed_paths.outputs.*`. When that job fails its outputs come back
+    empty, so every dependent job's `if:` evaluates false, both predicates read
+    false, and the summary would report a green required check having gated
+    nothing — "we could not tell what changed" silently becoming "nothing
+    changed". That is the #1130 failure class one level up, and it disables the
+    build gate as well as the SPA one.
+
+    Surfaced by a cross-family review pass on PR #1281.
+    """
+    wf = _load(WF_DIR / "tests.yml")
+    jobs = wf.get("jobs") or {}
+    summary = next(
+        (j for name, j in jobs.items() if isinstance(j, dict) and j.get("name") == "Test Suite Summary"),
+        None,
+    )
+    assert summary is not None, "tests.yml must define a Test Suite Summary job"
+
+    rc, out = _run_summary_script(
+        summary, {"changed_paths": "failure"}, {"IS_FRONTEND_PR": "false", "IS_BUILD_PR": "false"}
+    )
+    assert rc == 1, (
+        "changed_paths failed on a PR and the summary still went green. Both "
+        f"path-derived gates were silently disabled.\n--- output ---\n{out}"
+    )
+
+    # A push/tag run has no changed_paths job at all (it is `if:`-gated to
+    # pull_request), so `skipped` there must stay benign — otherwise every
+    # main push and every release tag fails this summary.
+    rc, out = _run_summary_script(
+        summary,
+        {"changed_paths": "skipped"},
+        {"IS_FRONTEND_PR": "false", "IS_BUILD_PR": "false"},
+        event_name="push",
+    )
+    assert rc == 0, (
+        "a push/tag run must not be failed by changed_paths being skipped — it "
+        f"is PR-only by design.\n--- output ---\n{out}"
+    )
 
 
 def test_fork_prs_run_e2e_but_do_not_hard_gate_on_it_yet():

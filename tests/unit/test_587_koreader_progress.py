@@ -10,6 +10,7 @@ follows.
 """
 import inspect
 import pathlib
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
@@ -35,8 +36,14 @@ def test_detail_endpoint_surfaces_kosync_progress():
     def query_side_effect(model):
         q = MagicMock()
         if model is ub.KoboReadingState:
+            # Faithful to the real KoboBookmark, which always carries these
+            # three columns — the endpoint reports the percentage and the two
+            # timestamps as one unit (#627).
             q.filter.return_value.first.return_value = SimpleNamespace(
-                current_bookmark=SimpleNamespace(progress_percent=45.0))
+                current_bookmark=SimpleNamespace(
+                    progress_percent=45.0,
+                    last_modified=datetime(2026, 7, 20, 18, 30, 0),
+                    created_at=datetime(2026, 7, 1, 9, 0, 0)))
         else:  # FavoriteBook / UserHiddenBook — not present
             q.filter.return_value.first.return_value = None
         return q

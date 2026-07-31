@@ -39,7 +39,7 @@ from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
     get_book_cover, get_series_cover_thumbnail, get_download_link, send_mail, generate_random_password, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
-    edit_book_read_status, valid_password
+    edit_book_read_status, valid_password, get_kosync_progress_display
 from .pagination import Pagination
 from .redirect import get_redirect_location
 from .cw_babel import get_available_locale
@@ -3549,17 +3549,13 @@ def show_book(book_id):
         kosync_progress_timestamp = None
         kosync_progress_created_at = None
         if current_user.is_authenticated:
-            try:
-                kobo_state = (ub.session.query(ub.KoboReadingState)
-                              .filter(ub.KoboReadingState.user_id == int(current_user.id),
-                                      ub.KoboReadingState.book_id == book_id)
-                              .first())
-                if kobo_state and kobo_state.current_bookmark:
-                    kosync_progress = kobo_state.current_bookmark.progress_percent
-                    kosync_progress_timestamp = kobo_state.current_bookmark.last_modified
-                    kosync_progress_created_at = kobo_state.current_bookmark.created_at
-            except Exception as e:
-                log.debug(f"Failed to load KOReader progress for book {book_id}: {e}")
+            # #627: resolved as one unit — with no position the two timestamps
+            # describe nothing, and showing them left a book the user had just
+            # marked unread still reporting when it was started and synced.
+            (kosync_progress,
+             kosync_progress_timestamp,
+             kosync_progress_created_at) = get_kosync_progress_display(
+                ub.session, current_user.id, book_id)
 
         cwa_db = CWA_DB()
         cwa_settings = cwa_db.cwa_settings

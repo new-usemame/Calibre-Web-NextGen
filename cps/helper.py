@@ -664,10 +664,39 @@ def reset_reading_position(session, user_id, book_id):
         ub.KoboReadingState.book_id == book_id).first()
     if kobo_state is not None and kobo_state.current_bookmark is not None:
         bookmark = kobo_state.current_bookmark
-        if (bookmark.progress_percent is not None
-                or bookmark.content_source_progress_percent is not None):
+        # #627: this used to null only the two percentages, which left the rest
+        # of the position behind. ``created_at`` renders as "Started reading",
+        # and ``location_*`` is serialised straight back to the device by
+        # ``kobo.get_current_bookmark_response`` as ``Location`` — so a Kobo
+        # could restore the exact position the user had just cleared. Clear the
+        # whole payload so "unread" means unread on every surface.
+        #
+        # ``last_modified`` is deliberately NOT cleared: its ``onupdate`` bump
+        # is the mechanism by which this reset reaches the device as the newest
+        # reading state on the next sync (see the note above).
+        if any(value is not None for value in (
+                bookmark.progress_percent,
+                bookmark.content_source_progress_percent,
+                bookmark.created_at,
+                bookmark.location_value,
+                bookmark.location_type,
+                bookmark.location_source)):
             bookmark.progress_percent = None
             bookmark.content_source_progress_percent = None
+            bookmark.created_at = None
+            bookmark.location_value = None
+            bookmark.location_type = None
+            bookmark.location_source = None
+            cleared += 1
+        # Accumulated session statistics are part of the same reading position:
+        # a book you have just marked unread should not still report three and
+        # a half hours spent reading it, on the page or on the device.
+        statistics = kobo_state.statistics
+        if statistics is not None and (
+                statistics.spent_reading_minutes is not None
+                or statistics.remaining_time_minutes is not None):
+            statistics.spent_reading_minutes = None
+            statistics.remaining_time_minutes = None
             cleared += 1
     # #683 follow-up: the "Currently reading" tri-state lives ONLY in
     # ub.ReadBook.read_status (STATUS_IN_PROGRESS) — KOReader/Kobo sync and the
@@ -699,6 +728,42 @@ def reset_reading_position(session, user_id, book_id):
         KOSyncProgress.document.in_(tuple(kosync_keys))).delete(
             synchronize_session=False)
     return cleared
+
+
+def get_kosync_progress_display(session, user_id, book_id):
+    """Return ``(progress_percent, last_synced, started_reading)`` for one
+    user's book, or ``(None, None, None)`` when there is no synced position.
+
+    The three values are one unit. They all describe a synced reading position,
+    so they appear and disappear together: without a percentage the two
+    timestamps describe nothing. Rendering them independently is how a book the
+    user had just marked unread kept showing "Started reading", next to a "Last
+    synced" that ``KoboBookmark.last_modified``'s ``onupdate`` had just moved
+    forward to the moment of the reset (#627).
+
+    Gating on the percentage here, rather than only clearing the columns in
+    ``reset_reading_position``, is also what repairs rows an older build already
+    half-reset — no migration needed.
+
+    Resolving this in one place keeps the classic detail page and the SPA book
+    API from drifting apart; both previously inlined this same query, so a fix
+    to one silently missed the other. Timestamps come back as stored (naive
+    UTC); callers do their own formatting.
+    """
+    try:
+        kobo_state = (session.query(ub.KoboReadingState)
+                      .filter(ub.KoboReadingState.user_id == int(user_id),
+                              ub.KoboReadingState.book_id == book_id)
+                      .first())
+    except Exception as ex:  # pragma: no cover - defensive around DB errors
+        log.debug("Could not load KOReader progress for book %s: %s", book_id, ex)
+        return None, None, None
+    if kobo_state is None or kobo_state.current_bookmark is None:
+        return None, None, None
+    bookmark = kobo_state.current_bookmark
+    if bookmark.progress_percent is None:
+        return None, None, None
+    return bookmark.progress_percent, bookmark.last_modified, bookmark.created_at
 
 
 def _get_kosync_checksums_for_book(book_id):

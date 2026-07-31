@@ -13,7 +13,8 @@ from . import api_v1
 from .serializers import serialize_book_list_item, serialize_book_detail
 from .. import calibre_db, config, db, ub, isoLanguages, logger
 from ..cw_login import current_user
-from ..helper import edit_book_read_status, book_is_in_progress, get_convert_options
+from ..helper import edit_book_read_status, book_is_in_progress, get_convert_options, \
+    get_kosync_progress_display
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
@@ -408,20 +409,15 @@ def book_detail(book_id):
         # KOReader/Kobo synced reading progress (#587) — surfaced on the new-UI
         # book page like the classic detail view. Same source as web.show_book:
         # KoboReadingState.current_bookmark.progress_percent (None when unsynced).
-        try:
-            kobo_state = (ub.session.query(ub.KoboReadingState)
-                          .filter(ub.KoboReadingState.user_id == uid,
-                                  ub.KoboReadingState.book_id == book_id)
-                          .first())
-            if kobo_state and kobo_state.current_bookmark:
-                bm = kobo_state.current_bookmark
-                kosync_progress = bm.progress_percent
-                if bm.last_modified:
-                    kosync_progress_timestamp = bm.last_modified.replace(tzinfo=timezone.utc).isoformat()
-                if bm.created_at:
-                    kosync_progress_created_at = bm.created_at.replace(tzinfo=timezone.utc).isoformat()
-        except Exception:
-            log.debug("Failed to load KOReader progress for book %s", book_id, exc_info=True)
+        # #627: the percentage and the two timestamps are resolved together, so
+        # a book with no position reports none of them. Previously this view
+        # inlined the same query as the classic detail page and the two drifted.
+        kosync_progress, last_synced, started_reading = get_kosync_progress_display(
+            ub.session, uid, book_id)
+        if last_synced:
+            kosync_progress_timestamp = last_synced.replace(tzinfo=timezone.utc).isoformat()
+        if started_reading:
+            kosync_progress_created_at = started_reading.replace(tzinfo=timezone.utc).isoformat()
 
     # With a custom read column, get_book_read_archived returns the column's value
     # (truthy = read); otherwise the built-in ub.ReadBook.read_status. Match the

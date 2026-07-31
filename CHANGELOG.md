@@ -18,6 +18,17 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Marking a book unread left its "Started reading" and "Last synced" dates on
+  the page.** The percentage cleared, but the two dates stayed — and "Last
+  synced" jumped forward to the moment you pressed the button, so a book you had
+  just marked unread looked like it had synced seconds ago. The reading position
+  the device holds was also left behind, which meant a Kobo could quietly restore
+  the exact spot you had just cleared on its next sync. Marking a book unread now
+  clears the whole position: both dates, the device resume point, and the
+  accumulated reading-time statistics. Books that were already left in this state
+  by an earlier version display correctly again without any migration. Thanks to
+  @uschi1 for catching it and following up.
+
 - **Saving a book from the edit-metadata screen, or switching on a metadata
   source, made the server stop answering everyone.** Not only the tab doing the
   work — every other person's page load hung for as long as the cover download

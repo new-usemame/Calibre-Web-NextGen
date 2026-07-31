@@ -265,9 +265,12 @@ def test_every_version_probe_is_protected_not_just_calibre(monkeypatch, tmp_path
     monkeypatch.setattr(converter, "_run_command_version", fake)
 
     for _ in range(3):
-        converter.get_calibre_version()
-        converter.get_unrar_version()
-        converter.get_kepubify_version()
+        # Each must keep returning ITS OWN banner. All three settings point at
+        # the same file here, so a memo keyed on the path alone would serve
+        # whichever probe ran first to the other two.
+        assert converter.get_calibre_version() == "ebook-convert (calibre 9.11.0)"
+        assert converter.get_unrar_version() == "UNRAR 7.01 freeware"
+        assert converter.get_kepubify_version() == "kepubify 4.0.4"
 
     assert sorted(calls) == sorted(banners), (
         f"each probe should have run exactly once across three page loads, got {calls}"
@@ -276,19 +279,31 @@ def test_every_version_probe_is_protected_not_just_calibre(monkeypatch, tmp_path
 
 def test_the_two_unrar_probes_are_cached_separately(monkeypatch, tmp_path):
     """get_unrar_version probes the same path twice with different patterns on
-    a miss. A memo keyed on the path alone would serve the first probe's answer
-    to the second and break the fallback."""
+    a miss, and only the second one succeeds. Keying the memo on the path alone
+    would cache the fallback's answer under the first probe's key, so the next
+    call would short-circuit on it and never exercise the fallback again."""
     binary = tmp_path / "unrar"
     binary.write_text("#!/bin/sh\n")
     monkeypatch.setattr(converter.config, "config_rarfile_location", str(binary), raising=False)
 
+    probes = []
+
     def fake(path, pattern, argument=None):
+        probes.append((pattern, argument))
         return "unrar 7.01" if argument == "-V" else N_("not installed")
 
     monkeypatch.setattr(converter, "_run_command_version", fake)
 
     assert converter.get_unrar_version() == "unrar 7.01"
     assert converter.get_unrar_version() == "unrar 7.01"
+
+    # Three probes, not four: the failing first probe re-runs on the second
+    # call (failures are never cached), then the fallback answers from its own
+    # cache entry. A path-only key would have collapsed those two entries.
+    assert probes == [
+        (r'UNRAR.*\d', None), (r'unrar.*\d', '-V'),
+        (r'UNRAR.*\d', None),
+    ], probes
 
 
 def test_a_none_converter_path_does_not_crash_or_poison_the_cache(monkeypatch):

@@ -56,6 +56,40 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.26',
+    date: '2026-07-31',
+    items: [
+      {
+        title: 'Conversion and metadata now run on a much newer Calibre',
+        body: 'The engine behind format conversion, metadata reading and the ingest folder moved from Calibre 9.1 to 9.11, so ten releases of fixes land at once. If a book converted badly, arrived with the wrong details, or never made it out of the ingest folder at all, it is worth adding again.',
+        category: 'Library',
+      },
+      {
+        title: 'KOReader finds new versions of the sync plugin again',
+        body: 'If you had pointed an update manager at this project to keep the Progress Sync plugin current, it stopped finding anything after v4.1.16 — nine releases in a row published no plugin file for it to see, so it kept reporting you were up to date while three plugin fixes went out without reaching your device. Releases that change the plugin now attach it automatically, and the KOReader page spells out which repository to point an update manager at.',
+        category: 'Sync',
+        link: { to: '/account', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Settings pages work again behind a reverse proxy on a subpath',
+        body: 'If you reach your library through a prefix that starts with the same letters as one of its own pages — /cwa being the obvious one — then CWA settings, duplicate detection, the statistics dashboard and the library-refresh button all came back as Not Found, while the ordinary Admin links beside them worked. All 37 of those pages and actions are reachable again, and a prefix written with a trailing slash is now accepted too.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Polish is now the most complete translation the project ships',
+        body: 'With the language set to Polish, the admin screens, metadata editing, upload, shelves, the reader and a long tail of task and error messages still read in English. A further 273 phrases were worse than untranslated: they held unconfirmed guesses, which are dropped when the catalog is built, so English showed while Polish that said something else sat unused in the file. Polish covered 950 of 2,609 phrases and now covers all of them.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'German reads in German across several hundred more labels',
+        body: 'With the language set to German, much of the new interface and a long tail of admin, task and error messages still showed in English. German covered 1,584 of 2,609 phrases and now covers 1,891. Two were actively wrong rather than missing — the Email Your Users heading read "edit user", and the warning for sending mail with nobody chosen asked you to select a book rather than a recipient.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.25',
     date: '2026-07-30',
     items: [

@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.26] - 2026-07-31
+
 ### Changed
 
 - **Ebook conversion and metadata reading now run on Calibre 9.11.0**, up from
@@ -65,15 +67,6 @@ is for things you can see or feel when running the app.
   [@monimkxl-web](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1264)
   ([#1264](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1264)).
 
-### Added
-
-- **The KOReader page now explains how to auto-update the sync plugin.** Visiting
-  `/kosync` only ever described the manual download-and-copy route, so the
-  in-place update path existed but was undiscoverable — the repository to point
-  an update manager at was written down nowhere a user would look. That page and
-  the README now name it, and spell out why the plugin's version can sit behind
-  your server version without anything being wrong.
-
 - **Every CWA settings page 404'd when the app was mounted under a subpath.** If
   you run Calibre-Web NextGen behind a reverse proxy on a prefix that starts the
   same way as its own pages — `/cwa` being the obvious one — then "CWA settings
@@ -91,6 +84,15 @@ is for things you can see or feel when running the app.
   — it used to break every page in a second, separate way. Reported by
   [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1248)
   ([#1248](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1248)).
+
+### Added
+
+- **The KOReader page now explains how to auto-update the sync plugin.** Visiting
+  `/kosync` only ever described the manual download-and-copy route, so the
+  in-place update path existed but was undiscoverable — the repository to point
+  an update manager at was written down nowhere a user would look. That page and
+  the README now name it, and spell out why the plugin's version can sit behind
+  your server version without anything being wrong.
 
 ## [v4.1.25] - 2026-07-30
 

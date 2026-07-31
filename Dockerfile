@@ -382,9 +382,8 @@ RUN \
   else \
   echo "Warning: koplugin.zip not found, skipping move to static directory"; \
   fi && \
-  # STEP 7.5 - ADD files referencing the versions of the installed main packages
-  echo "$VERSION" >| /app/CWA_RELEASE && \
-  echo "$KEPUBIFY_RELEASE" >| /app/KEPUBIFY_RELEASE
+  # STEP 7.5 - ADD file referencing the version of the installed main package
+  echo "$VERSION" >| /app/CWA_RELEASE
 
 # Add unrar from unrar stage
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar

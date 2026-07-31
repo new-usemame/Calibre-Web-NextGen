@@ -210,14 +210,17 @@ jobs:
     # with the image never built. Running the job is not enough on its own:
     # left advisory, a failed build would still not block the merge.
     #
-    # Fork PRs run the job but stay ADVISORY for now. The build selects the
-    # private pbs-cache mirror, and whether a fork PR's read-only
-    # GITHUB_TOKEN can pull it is not established either way — the login
-    # falls back to GITHUB_TOKEN when GH_PAT is out of scope, which may or
-    # may not carry package read. Hard-gating on that unknown would block
-    # community PRs on an infrastructure question rather than their change.
-    # The job result is still visible and is read before any merge. Tracked
-    # in #1263; promote to a hard gate once a real fork run answers it.
+    # Fork PRs run the job but stay ADVISORY. #1263 answered the open question
+    # — a fork's read-only GITHUB_TOKEN cannot pull the private pbs-cache
+    # mirror; the login step succeeds and the manifest HEAD still 403s — and
+    # the build-args below now route fork builds to the credential-free
+    # upstream source so they get past it. They stay advisory for one more
+    # step because that path is the release CDN whose intermittent 404s are
+    # the whole reason the mirror exists: hard-gating now would trade a
+    # guaranteed 403 block for an occasional flake block, on exactly the
+    # community PRs this is meant to unblock. Promote to a hard gate (drop the
+    # `head.repo.fork != true` clause) once fork runs have shown they build
+    # reliably.
     continue-on-error: ${{ !(contains(github.event.pull_request.labels.*.name, 'safe-tier-2') || (needs.changed_paths.outputs.build == 'true' && github.event.pull_request.head.repo.fork != true)) }}
     # Run on:
     # - merge to main / dev (advisory)
@@ -285,8 +288,17 @@ jobs:
           # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
           # than the release CDN, which intermittently 404s the Actions egress.
           # Contributors build without it and fall back to the CDN (see Dockerfile).
+          #
+          # Fork PRs take that same contributor fallback. The mirror package is
+          # private and a fork's GITHUB_TOKEN is read-only and scoped to the
+          # fork, so `packages: read` does not reach it: the GHCR login above
+          # succeeds and the manifest HEAD still 403s, failing the build at the
+          # Python base image before the Dockerfile is read (#1263). Everything
+          # else — pushes, tags, workflow_dispatch, same-repo PRs — has no
+          # `pull_request` payload or `fork == false`, so it still resolves to
+          # `ghcr`. Pinned byte-for-byte by tests/unit/test_dockerfile_contributor_build.py.
           build-args: |
-            PBS_SOURCE=ghcr
+            PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true && 'upstream' || 'ghcr' }}
 
       - name: Set test UID/GID
         run: |

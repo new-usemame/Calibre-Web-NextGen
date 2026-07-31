@@ -1007,16 +1007,41 @@ def test_gate_hardness_agrees_between_the_job_and_the_summary():
         )
 
 
-def test_ci_image_build_still_pins_the_mirror_unconditionally():
-    """Guard against 'fixing' the fork case by making the mirror conditional.
+def test_ci_image_build_never_selects_the_mirror_without_credentials():
+    """The mirror may only be selected where credentials actually exist.
 
-    `test_dockerfile_contributor_build.py` already owns both halves of this
-    (every CI build pins PBS_SOURCE=ghcr; a job selecting the mirror has an
-    UNCONDITIONAL ghcr login — a conditional one is what broke release
-    dry-runs). Restated here because this module is what a future change to
-    the integration gate will be read alongside: if you find yourself adding
-    an `if:` to that login, you are reintroducing a known bug.
+    `test_dockerfile_contributor_build.py` owns the exact-value pinning; the
+    approved selector is imported from there so the two cannot drift. Restated
+    in this module because it is what a future change to the integration gate
+    gets read alongside.
+
+    The bug this guards is one specific shape: **the build selects the private
+    mirror while the credentials step is skipped**. That is what broke release
+    `workflow_dispatch` dry-runs, and it is why the login below must stay
+    unconditional.
+
+    A fork-conditional *source* is the inverse of that shape and is allowed.
+    #1262 reverted one on the grounds that its premise was unverified — whether
+    a fork's read-only token could pull the mirror was not established either
+    way, and the walls were kept rather than weakened on a hunch. #1263 then
+    established it empirically: the login succeeds and the manifest HEAD still
+    403s, because `packages: read` on a fork token does not reach a private
+    package in this owner's scope. So the mirror is deselected exactly where
+    the credentials provably cannot work, and the login is never skipped while
+    the mirror is selected. Credentials-present contexts are untouched.
     """
+    # Load the sibling module by path rather than by name: `tests/unit` is not
+    # a package on sys.path, so a bare import resolves only by accident of
+    # rootdir. Importing the constant (rather than restating it) is the point —
+    # a restated copy is what lets the two modules drift.
+    import importlib.util
+
+    _sibling = Path(__file__).resolve().parent / "test_dockerfile_contributor_build.py"
+    _spec = importlib.util.spec_from_file_location("_pbs_pins", _sibling)
+    _mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    FORK_AWARE_PBS_SOURCE = _mod.FORK_AWARE_PBS_SOURCE
+
     wf = _load(WF_DIR / "tests.yml")
     job = (wf.get("jobs") or {}).get("integration-tests")
 
@@ -1025,9 +1050,17 @@ def test_ci_image_build_still_pins_the_mirror_unconditionally():
         None,
     )
     assert build_step is not None, "integration-tests must build the image"
-    assert "PBS_SOURCE=ghcr" in str((build_step.get("with") or {}).get("build-args", "")), (
-        "the CI build must pin PBS_SOURCE=ghcr; unpinned sends it back to the "
-        "release CDN that 404s the Actions egress"
+    selector = [
+        line.strip()
+        for line in str((build_step.get("with") or {}).get("build-args", "")).splitlines()
+        if line.strip().startswith("PBS_SOURCE=")
+    ]
+    assert selector in (["PBS_SOURCE=ghcr"], [FORK_AWARE_PBS_SOURCE]), (
+        f"the CI build must select the mirror explicitly — either the bare "
+        f"`PBS_SOURCE=ghcr` pin or the approved fork-aware selector. Found "
+        f"{selector}. Unpinned sends it back to the release CDN that 404s the "
+        f"Actions egress; an ad-hoc conditional is how the fork/non-fork split "
+        f"gets it wrong."
     )
 
     login = next(
@@ -1036,7 +1069,7 @@ def test_ci_image_build_still_pins_the_mirror_unconditionally():
     )
     assert login is not None, "integration-tests must define the GHCR login step"
     assert "if" not in login, (
-        "the GHCR login must stay UNCONDITIONAL while the build pins the "
-        "private mirror — a conditional login with an unconditional mirror is "
-        "the exact shape that broke release dry-runs"
+        "the GHCR login must stay UNCONDITIONAL — a conditional login with a "
+        "build that can still select the private mirror is the exact shape "
+        "that broke release dry-runs"
     )

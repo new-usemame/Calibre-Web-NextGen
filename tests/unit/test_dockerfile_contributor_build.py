@@ -46,6 +46,38 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 
 PRIVATE_MIRROR = "ghcr.io/new-usemame/pbs-cache"
 
+# The one approved deviation from a bare `PBS_SOURCE=ghcr`, pinned byte-for-byte
+# so a *different* conditional cannot slip in unreviewed (#1263).
+#
+# A fork PR's `GITHUB_TOKEN` is read-only and scoped to the fork, and `packages:
+# read` on it does not extend to a private package in this owner's scope — the
+# GHCR login step succeeds and the manifest pull still 403s. So a fork build
+# takes the credential-free upstream path, the same one a contributor's local
+# `docker build .` already uses.
+#
+# Every non-fork context still resolves to `ghcr`: on pushes, tags and
+# `workflow_dispatch` there is no `pull_request` payload, so the left operand is
+# null, `null == true` is false, and the `||` returns `'ghcr'`. Same-repo PRs
+# have `fork == false`.
+FORK_AWARE_PBS_SOURCE = (
+    "PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true "
+    "&& 'upstream' || 'ghcr' }}"
+)
+
+
+def _workflow_triggers(workflow: str) -> set[str]:
+    """The event names a workflow is registered for.
+
+    `on:` is the YAML 1.1 boolean `True` after parsing, not the string "on".
+    """
+    import yaml
+
+    data = yaml.safe_load((WORKFLOWS / workflow).read_text()) or {}
+    on = data.get(True, data.get("on")) or {}
+    if isinstance(on, str):
+        return {on}
+    return set(on)
+
 
 def _image_build_steps() -> list[tuple[str, str, dict]]:
     """Every `docker/build-push-action` step in every workflow.
@@ -189,26 +221,102 @@ def test_upstream_fallback_produces_what_downstream_copies(dockerfile_text: str)
     )
 
 
-def test_every_ci_image_build_pins_the_ghcr_mirror() -> None:
-    """Every `docker/build-push-action` step must pass PBS_SOURCE=ghcr.
+def _pbs_source_selector(step: dict) -> list[str]:
+    """The `PBS_SOURCE=` lines a build step passes, verbatim."""
+    build_args = str((step.get("with") or {}).get("build-args", ""))
+    return [
+        line.strip()
+        for line in build_args.splitlines()
+        if line.strip().startswith("PBS_SOURCE=")
+    ]
+
+
+def test_every_ci_image_build_selects_a_pbs_source_explicitly() -> None:
+    """Every `docker/build-push-action` step must set `PBS_SOURCE` exactly once.
 
     Omitting it does not fail anything — it silently sends that build back to
     the release CDN that 404d the Actions egress and broke every image build.
     Asserted per discovered build step, so a newly added build job (or one that
     a hand-maintained allowlist would miss) cannot quietly ship unpinned.
+
+    Only two values are allowed: the bare `ghcr` pin, or the fork-aware selector
+    pinned above. Anything else — including a differently-worded conditional —
+    fails here and has to be reviewed rather than absorbed.
     """
     steps = _image_build_steps()
     assert steps, "found no docker/build-push-action steps to check"
 
-    unpinned = [
-        f"{workflow}:{job}"
-        for workflow, job, step in steps
-        if "PBS_SOURCE=ghcr" not in str((step.get("with") or {}).get("build-args", ""))
+    offenders: list[str] = []
+    for workflow, job, step in steps:
+        selectors = _pbs_source_selector(step)
+        if len(selectors) != 1:
+            offenders.append(
+                f"{workflow}:{job}: expected exactly one PBS_SOURCE= line, "
+                f"found {len(selectors)}"
+            )
+        elif selectors[0] not in ("PBS_SOURCE=ghcr", FORK_AWARE_PBS_SOURCE):
+            offenders.append(f"{workflow}:{job}: {selectors[0]!r}")
+
+    assert not offenders, (
+        f"Unapproved PBS_SOURCE selection: {offenders}. A build with no "
+        f"PBS_SOURCE silently falls back to the flaky release CDN; a build with "
+        f"an ad-hoc conditional is how the fork/non-fork split gets it wrong."
+    )
+
+
+def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror() -> None:
+    """A build reachable from `pull_request` must use the fork-aware selector (#1263).
+
+    A fork PR cannot pull the private mirror — the GHCR login succeeds and the
+    manifest HEAD still 403s, because `packages: read` on a fork's read-only
+    token does not reach a private package in this owner's scope. Pinning the
+    bare mirror on a PR-triggered build therefore fails every community build PR
+    on infrastructure rather than on their change, before the Dockerfile is even
+    read.
+
+    Discovered from the workflow triggers, not from a job allowlist: a new
+    PR-triggered image build inherits this requirement automatically.
+    """
+    pr_builds = [
+        (workflow, job, step)
+        for workflow, job, step in _image_build_steps()
+        if "pull_request" in _workflow_triggers(workflow)
     ]
-    assert not unpinned, (
-        f"These image builds do not pin PBS_SOURCE=ghcr: {unpinned}. Each one "
-        f"silently falls back to the flaky release CDN. Add PBS_SOURCE=ghcr to "
-        f"the step's build-args."
+    assert pr_builds, (
+        "found no pull_request-triggered image build; if the integration build "
+        "stopped running on PRs, community build PRs lost their only coverage"
+    )
+
+    offenders = [
+        f"{workflow}:{job}: {selectors}"
+        for workflow, job, step in pr_builds
+        for selectors in [_pbs_source_selector(step)]
+        if selectors != [FORK_AWARE_PBS_SOURCE]
+    ]
+    assert not offenders, (
+        f"These PR-triggered image builds do not use the fork-aware PBS_SOURCE "
+        f"selector: {offenders}. Fork PRs will 403 on the private mirror (#1263)."
+    )
+
+
+def test_non_pull_request_image_builds_keep_the_bare_mirror_pin() -> None:
+    """Builds that never see a fork must stay on the literal `ghcr` pin.
+
+    The fork-aware selector is a concession to a credential boundary that only
+    exists on `pull_request`. Spreading it to the dev/release builds would let
+    a published image quietly come from the flaky CDN if the expression ever
+    evaluated wrong.
+    """
+    offenders = [
+        f"{workflow}:{job}: {selectors}"
+        for workflow, job, step in _image_build_steps()
+        if "pull_request" not in _workflow_triggers(workflow)
+        for selectors in [_pbs_source_selector(step)]
+        if selectors != ["PBS_SOURCE=ghcr"]
+    ]
+    assert not offenders, (
+        f"These builds never run on a fork PR and must pin PBS_SOURCE=ghcr "
+        f"literally: {offenders}."
     )
 
 

@@ -244,19 +244,44 @@ def test_both_version_labels_share_one_implementation():
     boundary. Pinned so a future edit re-forks them deliberately, not by
     accident.
     """
+    import ast
     import inspect
+    import textwrap
 
-    calibre_src = inspect.getsource(admin.calibre_version_label)
-    kepubify_src = inspect.getsource(admin.kepubify_version_label)
+    for name, fn in (
+        ("calibre", admin.calibre_version_label),
+        ("kepubify", admin.kepubify_version_label),
+    ):
+        tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
 
-    for name, src in (("calibre", calibre_src), ("kepubify", kepubify_src)):
-        assert "except" not in src, (
+        # Asserted as a real call node, not as the presence of the string:
+        # a docstring saying "mirrors _version_label" would satisfy a substring
+        # check while the function had re-inlined its own copy.
+        assert any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_version_label"
+            for node in ast.walk(tree)
+        ), f"{name}_version_label must call the shared renderer"
+
+        # And no second implementation alongside it. Structural rather than
+        # keyword-based, so a fork written with different syntax — a bare
+        # `except:`, `type(x) is str`, a match statement — is still caught.
+        assert not any(
+            isinstance(node, (ast.Try, ast.ExceptHandler, ast.Match))
+            for node in ast.walk(tree)
+        ), (
             f"{name}_version_label re-implements the probe/except dance instead "
             "of delegating to the shared renderer"
         )
-        assert "isinstance" not in src, (
-            f"{name}_version_label carries its own str/LazyString discriminator"
-        )
+        assert not any(
+            isinstance(node, ast.Compare) or (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in ("isinstance", "type")
+            )
+            for node in ast.walk(tree)
+        ), f"{name}_version_label carries its own str/LazyString discriminator"
 
     shared = inspect.getsource(admin._version_label)
     assert "isinstance" in shared, (

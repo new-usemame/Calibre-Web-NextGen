@@ -365,12 +365,24 @@ def test_the_str_lazystring_discriminator_is_what_guards_the_regex():
     #1284 moved the guard from this function into the renderer both version
     labels now share, so the pin follows it there. Asserting on the shared
     renderer alone would go vacuous the moment a label stopped routing through
-    it, so the delegation is pinned in the same breath.
+    it, so the delegation is pinned in the same breath — and pinned through the
+    AST rather than a substring, because a docstring or a comment reading
+    "mirrors _version_label" would satisfy the substring while the function had
+    quietly re-inlined its own copy.
     """
+    import ast
     import inspect
+    import textwrap
 
-    assert "_version_label" in inspect.getsource(admin.calibre_version_label), (
-        "calibre_version_label has to route through the shared renderer, or "
+    tree = ast.parse(textwrap.dedent(inspect.getsource(admin.calibre_version_label)))
+    delegates = any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_version_label"
+        for node in ast.walk(tree)
+    )
+    assert delegates, (
+        "calibre_version_label has to actually call the shared renderer, or "
         "the guard pinned below is no longer the one it uses"
     )
 

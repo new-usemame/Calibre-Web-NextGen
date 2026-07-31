@@ -282,17 +282,27 @@ def test_classic_admin_and_spa_share_one_calibre_version_source():
     an image whose calibre was replaced (or a custom converter path) reported a
     version it was not running.
     """
-    admin_src = (_REPO_ROOT / "cps" / "admin.py").read_text(encoding="utf-8")
-    about_src = (_REPO_ROOT / "cps" / "about.py").read_text(encoding="utf-8")
-    for name, src in (("cps/admin.py", admin_src), ("cps/about.py", about_src)):
-        # Matched without the call parens: #1284 factored the two admin labels
-        # onto one renderer, so admin.py now hands the probe over as a callable
-        # (``_version_label(converter.get_calibre_version, ...)``) rather than
-        # invoking it inline. What has to hold is that the source of the value
-        # is still the shared converter helper, not a stamp file — the call
-        # syntax is not the invariant.
-        assert "converter.get_calibre_version" in src, (
-            f"{name} must source the calibre version from the shared helper"
+    # Matched through the AST, not as a substring. #1284 factored the two admin
+    # labels onto one renderer, so admin.py now hands the probe over as a
+    # callable (``_version_label(converter.get_calibre_version, ...)``) rather
+    # than invoking it inline — the call parens stopped being part of the
+    # invariant. Grepping for the bare name instead would let a comment, a
+    # docstring or a dead annotation hold this green while the label went back
+    # to reading a stamp file, which is the exact regression it exists to stop.
+    import ast
+
+    for name in ("admin", "about"):
+        tree = ast.parse((_REPO_ROOT / "cps" / f"{name}.py").read_text(encoding="utf-8"))
+        references = any(
+            isinstance(node, ast.Attribute)
+            and node.attr == "get_calibre_version"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "converter"
+            for node in ast.walk(tree)
+        )
+        assert references, (
+            f"cps/{name}.py must source the calibre version from the shared "
+            "helper (a real converter.get_calibre_version reference, not a mention)"
         )
 
 

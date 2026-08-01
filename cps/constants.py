@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
+from importlib import metadata
 import sys
 import os
 from collections import namedtuple
@@ -169,13 +170,12 @@ def selected_roles(dictionary):
 BookMeta = namedtuple('BookMeta', 'file_path, extension, title, author, cover, description, tags, series, '
                                   'series_id, languages, publisher, pubdate, identifiers')
 
-def _read_text(path: str, default: str = "") -> str:
-    # An empty file falls back too: a zero-byte /app/CWA_RELEASE used to make
+def _get_version(default: str = "") -> str:
+    # If the Python package version cannot be retrieved, it makes
     # INSTALLED_VERSION the empty string, which silently disables the update
     # indicator instead of reading as an unknown version.
     try:
-        with open(path, 'r') as f:
-            return f.read().strip() or default
+        return 'v' + metadata.version("calibre-web-automated")
     except Exception:
         return default
 
@@ -187,12 +187,12 @@ def _read_text(path: str, default: str = "") -> str:
 # never published (fork #1231).
 UNKNOWN_VERSION = "v0.0.0"
 
-# The installed version is baked at build time and surfaced by cwa-init via
+# The installed version comes from the Python package, unless overridden by the
 # env; avoid any network or slow I/O during module import. The *latest
 # published* version deliberately does NOT live here — a module-level binding
 # read once at import can never go anything but stale (fork #1108). It is
 # resolved on demand and cached by cps/services/latest_release.py.
-_stamped_version = os.environ.get("CWA_INSTALLED_VERSION") or _read_text("/app/CWA_RELEASE", "")
+_stamped_version = os.environ.get("CWA_INSTALLED_VERSION") or _get_version("")
 
 # Whether the build actually stamped a version, as opposed to us falling back
 # to the sentinel. The version string alone cannot answer this: UNKNOWN_VERSION

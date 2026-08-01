@@ -125,11 +125,16 @@ kobo = [
 ]
 
 [project.scripts]
-cps = "calibreweb:main"
+cps = "cps.main:main"
 
 [tool.setuptools]
 include-package-data = true
 license-files = ["LICENSE"]
 
 [tool.setuptools.dynamic]
-version = {attr = "calibreweb.cps.constants.INSTALLED_VERSION"}
+version = {file = ["VERSION"]}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cps", "cps.*"]
+exclude = ["tests", "tests.*"]

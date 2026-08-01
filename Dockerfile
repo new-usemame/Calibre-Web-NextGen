@@ -208,18 +208,20 @@ RUN \
   pip \
   wheel
 
-# STEP 3 - Copy requirements files and install Python packages
-# Copy only requirements files first to leverage Docker layer caching
-COPY --chown=abc:abc requirements.txt optional-requirements.txt /app/calibre-web-automated/
+# STEP 3 - Copy pyproject.toml and install Python dependencies
+# Copy only pyproject.toml first to leverage Docker layer caching
+COPY --chown=abc:abc pyproject.toml /app/calibre-web-automated/
 
 RUN \
-  # STEP 3.1 - Installing the required python packages listed in 'requirements.txt' and 'optional-requirements.txt'
+  # STEP 3.1 - Installing Python dependencies without installing the package
+  # itself, to avoid triggering a rebuild (see STEP 6).
   # HOWEVER, they are not pulled from PyPi directly, they are pulled from linuxserver's Ubuntu Wheel Index
   # This is essentially a repository of precompiled some of the most popular packages with C/C++ source code
   # This provides the install maximum compatibility with multiple different architectures including: x86_64, armv71 and aarch64
   # You can read more about python wheels here: https://realpython.com/python-wheels/
-  /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ -r \
-  /app/calibre-web-automated/requirements.txt -r /app/calibre-web-automated/optional-requirements.txt
+  # The `--only-deps` flag was requires pip ≥ 26.2.
+  /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ \
+    --only-deps /app/calibre-web-automated
 
 # STEP 4 - Install kepubify from the kepubify_mirror stage (GHCR mirror in CI,
 # public release CDN by default). Either way /kepubify arrives mode 0755 for the
@@ -341,6 +343,11 @@ RUN \
 # STEP 6 - Copy application files
 # Copy the rest of the application code (changes most frequently)
 COPY --chown=abc:abc . /app/calibre-web-automated/
+
+# Install our Python package. The dependencies were installed in STEP 3.1.
+RUN \
+  /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ \
+    -e /app/calibre-web-automated
 
 # STEP 6.1 - Copy the Vite-built SPA bundle from the frontend-build stage.
 # The source tree's cps/static/app is .dockerignore'd, so this COPY is the

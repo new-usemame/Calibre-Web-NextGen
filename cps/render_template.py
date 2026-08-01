@@ -63,15 +63,25 @@ def _build_duplicate_notification(duplicate_groups, user_id, notifications_enabl
         "stale": bool(scan_pending),
     }
     groups = duplicate_groups or []
+    # The two filters degrade independently and deliberately: a dismissal is an
+    # explicit user preference, so a failure in the (later, DB-heavier)
+    # visibility check must not discard it and resurrect groups the user
+    # already dismissed. Only a failure of the dismissal filter itself leaves
+    # the raw cache as the sole option.
     try:
-        from .duplicates import filter_dismissed_groups, filter_visible_duplicate_groups
+        from .duplicates import filter_dismissed_groups
         groups = filter_dismissed_groups(groups, user_id)
+    except Exception as e:
+        log.debug("[cwa-duplicates] Failed to filter dismissed duplicate groups: %s", str(e))
+        groups = duplicate_groups or []
+
+    try:
+        from .duplicates import filter_visible_duplicate_groups
         groups = filter_visible_duplicate_groups(groups, user_id)
     except Exception as e:
-        # This runs on every page render — degrade to the cached groups rather
-        # than 500-ing the whole site.
+        # This runs on every page render — keep the dismissal-filtered groups
+        # rather than 500-ing the whole site.
         log.debug("[cwa-duplicates] Failed to re-validate duplicate cache: %s", str(e))
-        groups = duplicate_groups or []
 
     payload["count"] = len(groups)
     payload["preview"] = [

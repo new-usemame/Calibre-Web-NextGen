@@ -45,9 +45,15 @@ is for things you can see or feel when running the app.
   library, so it was the one place still remembering the deleted books. It now
   re-checks before it shows, and a group whose books are gone (or archived, or
   hidden from you) drops out. Groups that merely lost one copy now show the
-  real remaining count instead of the stale one. The same fix also stops a
-  duplicate you had dismissed from reappearing after a metadata edit. Thanks to
-  @blahblah57 for the report.
+  real remaining count instead of the stale one. The sidebar duplicate badge
+  reads the same number, so it was wrong in the same way and is fixed too.
+
+- **A duplicate you dismissed could come back on its own.** Dismissals were
+  being matched against a label built from the title and author of whichever
+  copy happened to sort first, so editing a book's metadata — or importing
+  another copy — quietly changed the label and the dismissal stopped applying.
+  Dismissals now hold onto a stable identity that metadata edits don't move.
+  Thanks to @blahblah57, whose report on the duplicates popup led here.
 
 - **Marking a book unread left its "Started reading" and "Last synced" dates on
   the page.** The percentage cleared, but the two dates stayed — and "Last

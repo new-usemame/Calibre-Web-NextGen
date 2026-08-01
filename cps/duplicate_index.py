@@ -461,6 +461,15 @@ def _serialize_group_for_cache(group):
         "author": group.get("author", ""),
         "count": group.get("count", 0),
         "group_hash": group.get("group_hash", ""),
+        # D5: duplicate_key is the stable dismissal identity; group_hash drifts
+        # whenever an ingest or metadata edit changes which book supplies the
+        # display title/author. Dropping the key here (as this did until #1167)
+        # left every cache reader — the /duplicates/status badge and the
+        # page-render popup alike — falling back to hash matching, so a
+        # dismissed group resurfaced the moment its hash rotated. Groups
+        # serialized before this shipped simply have no key and degrade to the
+        # legacy hash path, which is what they did before anyway.
+        "duplicate_key": group.get("duplicate_key"),
         "book_ids": book_ids,
     }
 

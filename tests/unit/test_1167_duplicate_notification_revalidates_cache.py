@@ -298,6 +298,109 @@ class TestDegradesGracefully:
         assert payload["count"] == 1
         assert payload["preview"][0]["title"] == "Dune"
 
+    def test_visibility_failure_does_not_resurrect_dismissed_groups(self, mocker):
+        """A dismissal is an explicit user preference. If the later, DB-heavier
+        visibility check fails, the already-dismissed-filtered result must be
+        kept — degrading all the way back to the raw cache would put a group
+        the user dismissed back in their face."""
+        from cps import render_template as rt
+
+        mocker.patch(
+            "cps.duplicates.filter_dismissed_groups",
+            lambda groups, user_id=None: [
+                g for g in groups if g.get("duplicate_key") != "K-Dune"
+            ],
+        )
+        mocker.patch(
+            "cps.duplicates.filter_visible_duplicate_groups",
+            side_effect=RuntimeError("calibre session gone"),
+        )
+        payload = rt._build_duplicate_notification(
+            [_group(1, 2, title="Dune"), _group(3, 4, title="Neuromancer")],
+            user_id=9,
+            notifications_enabled=True,
+        )
+        assert [p["title"] for p in payload["preview"]] == ["Neuromancer"], (
+            "a visibility-check failure discarded the dismissal filtering and "
+            "resurrected a group the user had dismissed"
+        )
+        assert payload["count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# The cache must carry the stable dismissal identity (D5)
+# ---------------------------------------------------------------------------
+
+class TestCachePreservesDuplicateKey:
+    def test_serialized_cache_group_keeps_duplicate_key(self):
+        """``_serialize_group_for_cache`` dropped ``duplicate_key``, so every
+        reader of ``cwa_duplicate_cache`` — the status badge and the popup
+        alike — silently fell back to volatile ``group_hash`` matching."""
+        from cps import duplicate_index
+
+        group = {
+            "title": "Dune",
+            "author": "Herbert",
+            "count": 2,
+            "group_hash": "H-Dune",
+            "duplicate_key": "STABLE-KEY-1",
+            "book_ids": [1, 2],
+        }
+        out = duplicate_index._serialize_group_for_cache(group)
+        assert out["duplicate_key"] == "STABLE-KEY-1", (
+            "the duplicate cache dropped the stable dismissal key, so a "
+            "dismissed group resurfaced as soon as its group_hash rotated"
+        )
+        assert out["book_ids"] == [1, 2]
+        assert out["group_hash"] == "H-Dune"
+
+    def test_legacy_group_without_a_key_still_serializes(self):
+        """Pre-#1167 caches and any group built without a key must not crash;
+        they degrade to the legacy hash path, as they did before."""
+        from cps import duplicate_index
+
+        out = duplicate_index._serialize_group_for_cache(
+            {"title": "T", "author": "A", "count": 2, "group_hash": "H", "book_ids": [1, 2]}
+        )
+        assert out["duplicate_key"] is None
+
+    def test_real_cache_shape_supports_stable_dismissal(self, mocker, visibility):
+        """End-to-end on the REAL cache shape: a group serialized for the cache
+        and then rotated (metadata edit changes the display hash) must still be
+        recognised as dismissed by ``duplicate_key``."""
+        from cps import duplicate_index
+        from cps import render_template as rt
+
+        cached = duplicate_index._serialize_group_for_cache(
+            {
+                "title": "Dune",
+                "author": "Herbert",
+                "count": 2,
+                "group_hash": "H-BEFORE-EDIT",
+                "duplicate_key": "STABLE-KEY-1",
+                "book_ids": [1, 2],
+            }
+        )
+        # A metadata edit rotates the display-derived hash; the stable key does
+        # not move.
+        cached["group_hash"] = "H-AFTER-EDIT"
+
+        mocker.patch(
+            "cps.duplicates.filter_dismissed_groups",
+            lambda groups, user_id=None: [
+                g for g in groups if g.get("duplicate_key") != "STABLE-KEY-1"
+            ],
+        )
+        visibility({1, 2})
+
+        payload = rt._build_duplicate_notification(
+            [cached], user_id=9, notifications_enabled=True
+        )
+        assert payload["count"] == 0, (
+            "a dismissed group came back through the cache after a metadata "
+            "edit rotated its group_hash — the cache must carry duplicate_key"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Source pins — these are the lines missing on main

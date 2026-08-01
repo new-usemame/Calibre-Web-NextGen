@@ -33,6 +33,59 @@ def _duplicate_setup_notice_dismissed():
     return duplicate_setup_notice_dismissed(getattr(current_user, 'id', 'unknown'))
 
 
+def _build_duplicate_notification(duplicate_groups, user_id, notifications_enabled,
+                                  scan_pending=False):
+    """Build the "Duplicates found" popup payload from the duplicate cache.
+
+    ``cwa_duplicate_cache`` is serialized at scan time, so it does not reflect
+    books the user has since archived or hidden, or that were deleted from the
+    library entirely (e.g. in Calibre desktop). ``/duplicates/status`` already
+    re-validates it against the user's live view; this render path is the
+    cache's *second* consumer — injected into every classic page render — and
+    did not, so the popup kept naming books a fresh scan and the /duplicates
+    page both agreed were gone (fork #1167).
+
+    Route through the same two helpers the status endpoint uses so the two
+    consumers cannot drift again: ``filter_dismissed_groups`` (matches on the
+    stable ``duplicate_key``, not the volatile ``group_hash``) and then
+    ``filter_visible_duplicate_groups`` (drops groups with fewer than two books
+    still visible, and trims the count of those that merely shrank).
+
+    The import is deliberately lazy: ``cps.duplicates`` imports
+    ``render_title_template`` from this module, so a module-level import would
+    be circular.
+    """
+    payload = {
+        "enabled": bool(notifications_enabled),
+        "count": 0,
+        "preview": [],
+        "cached": True,
+        "stale": bool(scan_pending),
+    }
+    groups = duplicate_groups or []
+    try:
+        from .duplicates import filter_dismissed_groups, filter_visible_duplicate_groups
+        groups = filter_dismissed_groups(groups, user_id)
+        groups = filter_visible_duplicate_groups(groups, user_id)
+    except Exception as e:
+        # This runs on every page render — degrade to the cached groups rather
+        # than 500-ing the whole site.
+        log.debug("[cwa-duplicates] Failed to re-validate duplicate cache: %s", str(e))
+        groups = duplicate_groups or []
+
+    payload["count"] = len(groups)
+    payload["preview"] = [
+        {
+            'title': group.get('title', ''),
+            'author': group.get('author', ''),
+            'count': group.get('count', 0),
+            'hash': group.get('group_hash', ''),
+        }
+        for group in groups[:3]
+    ]
+    return payload
+
+
 def duplicate_index_setup_notification(settings, cwa_db=None):
     if duplicate_setup_notice_dismissed(getattr(current_user, 'id', 'unknown')):
         return False
@@ -421,36 +474,12 @@ def render_title_template(*args, **kwargs):
                         "stale": True,
                     }
                 elif cache_data and cache_data.get('duplicate_groups') is not None:
-                    duplicate_groups = cache_data.get('duplicate_groups') or []
-                    try:
-                        dismissed_groups = ub.session.query(ub.DismissedDuplicateGroup.group_hash)\
-                            .filter(ub.DismissedDuplicateGroup.user_id == current_user.id)\
-                            .all()
-                        dismissed_hashes = {row[0] for row in dismissed_groups}
-                        if dismissed_hashes:
-                            duplicate_groups = [
-                                group for group in duplicate_groups
-                                if group.get('group_hash') not in dismissed_hashes
-                            ]
-                    except Exception:
-                        pass
-
-                    preview = []
-                    for group in duplicate_groups[:3]:
-                        preview.append({
-                            'title': group.get('title', ''),
-                            'author': group.get('author', ''),
-                            'count': group.get('count', 0),
-                            'hash': group.get('group_hash', '')
-                        })
-
-                    duplicate_notification = {
-                        "enabled": notifications_enabled,
-                        "count": len(duplicate_groups),
-                        "preview": preview,
-                        "cached": True,
-                        "stale": bool(cache_data.get('scan_pending')),
-                    }
+                    duplicate_notification = _build_duplicate_notification(
+                        cache_data.get('duplicate_groups') or [],
+                        getattr(current_user, 'id', None),
+                        notifications_enabled,
+                        scan_pending=bool(cache_data.get('scan_pending')),
+                    )
                 else:
                     duplicate_notification = {
                         "enabled": notifications_enabled,

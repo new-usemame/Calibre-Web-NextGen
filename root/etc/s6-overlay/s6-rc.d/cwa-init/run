@@ -24,16 +24,6 @@ for dir in "/app/calibre-web-automated" "/config" "/calibre-library" "/app/calib
   echo "[cwa-init] Directory $dir verified"
 done
 
-# Verify essential files exist
-echo "[cwa-init] Verifying essential files..."
-for file in "/app/CWA_RELEASE"; do
-  if [[ ! -f "$file" ]]; then
-    echo "[cwa-init] WARNING: Expected file $file does not exist"
-  else
-    echo "[cwa-init] File $file verified"
-  fi
-done
-
 echo "[cwa-init] Environment verification complete"
 
 # FROM lscio/docker-calibre-web - init-calibre-web-config.sh
@@ -324,16 +314,3 @@ if [ ! -f "$QT_SENTINEL" ]; then
 else
   echo "[cwa-init][qt6] Qt6 compatibility already confirmed; skipping."
 fi
-#------------------------------------------------------------------------------------------------------------------------
-#  Resolve the installed CWA version once at container initialization
-#------------------------------------------------------------------------------------------------------------------------
-
-# Installed version, baked into the image at build time. The *latest
-# published* version is deliberately not probed here any more (fork #1108):
-# a value fetched once at boot is stale for the entire life of the container,
-# and long-lived deployments therefore stopped being told about updates.
-# cps/services/latest_release.py resolves it on demand instead, with caching.
-CWA_INSTALLED_VERSION="$(cat /app/CWA_RELEASE 2>/dev/null || true)"
-[ -n "$CWA_INSTALLED_VERSION" ] || CWA_INSTALLED_VERSION="v0.0.0"
-export CWA_INSTALLED_VERSION
-echo "[cwa-init] Installed version: $CWA_INSTALLED_VERSION"

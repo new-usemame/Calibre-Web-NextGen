@@ -185,6 +185,38 @@ def test_admin_config_route_serves_the_translated_options_over_http():
     assert resp.get_json()["languages"][0] == {"id": "all", "name": "Alle talen"}
 
 
+@pytest.mark.unit
+def test_account_payload_serves_the_translated_options():
+    """The other form that renders this select.
+
+    The structural tests below prove _serialize_account() *calls* the shared
+    builders; this proves the result actually reaches the payload. A refactor
+    could satisfy the former while assigning something else to "languages".
+    """
+    from cps.api import account as mod
+    from cps.api import options as opt_mod
+
+    user = SimpleNamespace(
+        name="alice", email="a@x.com", kindle_mail="", kindle_mail_subject="",
+        kobo_only_shelves_sync=False, opds_only_shelves_sync=False,
+        locale="nl", default_language="all", theme=0,
+        ui_font_body="", ui_font_display="",
+        role_admin=lambda: False, role_upload=lambda: False,
+        role_edit=lambda: False, role_download=lambda: True,
+        role_delete_books=lambda: False, role_edit_shelfs=lambda: False,
+        role_viewer=lambda: True, role_passwd=lambda: True)
+
+    with patch.object(opt_mod, "_", _dutch), \
+         patch.object(opt_mod, "calibre_db", _library(("nld", "Nederlands"))), \
+         patch.object(opt_mod, "get_available_locale", lambda: [_Locale("nl", "Nederlands")]), \
+         patch.object(mod, "current_user", user), \
+         patch.object(mod, "_app_passwords", lambda: []):
+        payload = mod._serialize_account()
+
+    assert payload["languages"][0] == {"id": "all", "name": "Alle talen"}
+    assert payload["locales"] == [{"id": "nl", "name": "Nederlands"}]
+
+
 # ── structure: the two forms cannot drift apart again ────────────────────────
 
 @pytest.mark.unit

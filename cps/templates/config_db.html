@@ -7,8 +7,13 @@
 {% block body %}
 <div class="discover">
   <h2>{{title}}</h2>
-  <form style="width: -webkit-fill-available;" role="form" method="POST" class="col-md-10 col-lg-6" action="{{ url_for('admin.db_configuration') }}" autocomplete="off">
+  <div style="width: -webkit-fill-available;" class="col-md-10 col-lg-6">
     <div class="settings-container" style="padding-top: 2rem;">
+    <!-- The DB-config form and the Restore form further down are SIBLINGS,
+         never nested. HTML5 forbids nested <form>: the parser drops the inner
+         <form> tag and re-parents its button onto the outer form, so the
+         button silently submits to the outer action. See CWA #1444. -->
+    <form role="form" method="POST" action="{{ url_for('admin.db_configuration') }}" autocomplete="off">
 
       <h2 style="margin-bottom: 3rem;">{{ _('Troubleshooting your DB') }}</h2>
       <p>{{ _('If you have been sent to this page after updating or migrating, there was a problem mounting your Calibre Database (metadata.db), or less likely, a problem with your app.db.') }}</p>
@@ -110,6 +115,7 @@
       <a href="{{ url_for('admin.admin') }}" id="config_back" class="btn btn-secondary">{{_('Cancel')}}</a>
       <div id="db_submit" name="submit" class="btn btn-default">{{_('Save')}}</div>
     </div>
+    </form>
 
     <hr style="margin: 3rem 0;">
 
@@ -122,7 +128,7 @@
       </form>
     </div>
     </div>
-  </form>
+  </div>
 </div>
 {% endblock %}
 {% block modal %}

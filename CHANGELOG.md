@@ -18,6 +18,15 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The emergency "Restore Calibre Database (Last Resort)" button now actually
+  restores.** On Admin → Database Configuration, clicking it did nothing at all —
+  no message, no error, no restore. It was quietly saving the database settings
+  again instead, so anyone reaching for it during a real library corruption got
+  a button that looked like it worked and didn't. It now rebuilds your Calibre
+  database from the OPF files in your library, as the page describes. The rest of
+  the page is unchanged, and the Save button is unaffected. Spotted and diagnosed
+  upstream by @luisalduucin.
+
 - **Typing a page address with a slash on the end no longer gives you "404 Not
   Found".** `/kosync/` failed while `/kosync` worked, and the same was true of
   156 other pages — admin settings, your profile, statistics, search, the shelf

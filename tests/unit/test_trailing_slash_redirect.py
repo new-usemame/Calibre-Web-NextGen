@@ -161,7 +161,7 @@ def _app():
         if request.url_rule is None:
             target = url_policy.trailing_slash_redirect_url()
             if target:
-                return redirect(target, code=308)
+                return redirect(target, code=307)
         return "not found", 404
 
     return app
@@ -169,13 +169,13 @@ def _app():
 
 def test_get_with_trailing_slash_redirects_to_the_page():
     response = _app().test_client().get("/kosync/")
-    assert response.status_code == 308
+    assert response.status_code == 307
     assert response.headers["Location"].endswith("/kosync")
 
 
 def test_redirect_preserves_the_query_string():
     response = _app().test_client().get("/kosync/?page=2&sort=new")
-    assert response.status_code == 308
+    assert response.status_code == 307
     assert response.headers["Location"].endswith("/kosync?page=2&sort=new")
 
 
@@ -185,14 +185,14 @@ def test_redirect_preserves_a_reverse_proxy_subpath():
     response = _app().test_client().get(
         "/kosync/", environ_overrides={"SCRIPT_NAME": "/cwa"}
     )
-    assert response.status_code == 308
+    assert response.status_code == 307
     assert response.headers["Location"].endswith("/cwa/kosync")
 
 
 def test_redirect_is_method_preserving_for_post():
-    """308, not 301/302 — a POST must not be silently downgraded to a GET."""
+    """307, not 301/302 — a POST must not be silently downgraded to a GET."""
     response = _app().test_client().post("/only-post/")
-    assert response.status_code == 308
+    assert response.status_code == 307
     assert response.headers["Location"].endswith("/only-post")
 
 
@@ -262,3 +262,18 @@ def test_error_http_guards_on_404_and_unmatched_rule():
         "error_http has no `error.code == 404` branch guarding the "
         "trailing-slash policy (fork #628)"
     )
+
+
+def test_redirect_is_temporary_not_permanent():
+    """A permanent redirect is cached by the browser indefinitely. This app has
+    routes where a trailing slash is meaningful (the SPA registers both /app and
+    /app/), so a cached permanent mapping could strand a client on the
+    slash-less form with no way to correct it from the server."""
+    response = _app().test_client().get("/kosync/")
+    assert response.status_code == 307, "must not be 301 or 308 (permanent)"
+
+
+def test_error_handler_issues_a_temporary_redirect():
+    source = ast.unparse(_error_http_ast())
+    assert "code=307" in source
+    assert "308" not in source and "301" not in source

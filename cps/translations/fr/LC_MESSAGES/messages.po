@@ -6106,6 +6106,7 @@ msgstr "{field} (séparés par des virgules)"
 #: cps/spa_strings.py:958
 msgid "Uploading is not available for your account on this server."
 msgstr ""
+"Le téléversement n'est pas disponible pour votre compte sur ce serveur."
 
 #: cps/tasks_status.py:54
 msgid "Waiting"

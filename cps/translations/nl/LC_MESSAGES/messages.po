@@ -5987,7 +5987,7 @@ msgstr "{field} (door komma's gescheiden)"
 
 #: cps/spa_strings.py:958
 msgid "Uploading is not available for your account on this server."
-msgstr ""
+msgstr "Uploaden is niet beschikbaar voor je account op deze server."
 
 #: cps/tasks_status.py:54
 msgid "Waiting"

@@ -27,6 +27,25 @@ def _uploader(role_upload=True, anon=False):
                            role_upload=lambda: role_upload, id=1, name="alice")
 
 
+def _cfg(uploading=1):
+    """A config with the admin's "Enable Uploads" switch ON (#1288).
+
+    ``uploads_enabled`` fails closed on an absent ``config_uploading`` (see
+    ``config_sql.uploads_enabled`` — a config object without it is a defect, not
+    consent), so every test below that means to exercise something *past* the
+    switch has to say so explicitly. Without it the endpoint 403s before it ever
+    reaches the no-files, per-file-validation or ingest-writability paths these
+    tests are actually about. The switch itself is pinned in
+    ``test_1288_upload_config_gate.py``.
+
+    Patched per-test rather than read off the module: ``cps.api.upload.config``
+    is a shared object, so leaving it unpatched makes the outcome depend on
+    whatever ran earlier in the same xdist worker.
+    """
+    return SimpleNamespace(config_uploading=uploading,
+                           config_upload_formats="epub,pdf")
+
+
 @pytest.mark.unit
 def test_upload_anonymous_401():
     from cps.api import upload as mod
@@ -50,6 +69,7 @@ def test_upload_no_files_400():
     from cps.api import upload as mod
     with _ctx(files=None):
         with patch.object(mod, "current_user", _uploader()), \
+             patch.object(mod, "config", _cfg()), \
              patch.object(mod, "_ensure_ingest_dir_writable", return_value=None):
             resp = inspect.unwrap(mod.upload_books)()
     assert resp[1] == 400
@@ -68,7 +88,7 @@ def test_upload_valid_file_queued():
              patch("builtins.open", mock_open()) as manifest_open, \
              patch.object(mod, "os") as mock_os, \
              patch.object(mod, "WorkerThread") as worker, \
-             patch.object(mod, "config", SimpleNamespace(config_upload_formats="epub,pdf")):
+             patch.object(mod, "config", _cfg()):
             resp = inspect.unwrap(mod.upload_books)()
     body = json.loads(resp.get_data())
     assert body["queued"] == ["book.epub"]
@@ -85,7 +105,7 @@ def test_upload_invalid_file_reported_not_queued():
              patch.object(mod, "_ensure_ingest_dir_writable", return_value=None), \
              patch.object(mod, "_validate_uploaded_file", return_value=False), \
              patch.object(mod, "WorkerThread") as worker, \
-             patch.object(mod, "config", SimpleNamespace(config_upload_formats="epub,pdf")):
+             patch.object(mod, "config", _cfg()):
             resp = inspect.unwrap(mod.upload_books)()
     body = json.loads(resp.get_data())
     assert body["queued"] == []
@@ -98,6 +118,7 @@ def test_upload_ingest_unwritable_500():
     from cps.api import upload as mod
     with _ctx(files=[(io.BytesIO(b"x"), "a.epub")]):
         with patch.object(mod, "current_user", _uploader()), \
+             patch.object(mod, "config", _cfg()), \
              patch.object(mod, "_ensure_ingest_dir_writable", side_effect=PermissionError("ro")):
             resp = inspect.unwrap(mod.upload_books)()
     assert resp[1] == 500

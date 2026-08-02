@@ -85,7 +85,18 @@ def trailing_slash_redirect_url():
     if stripped is None:
         return None
 
+    # The mount prefix is request-derived too. ``ReverseProxied`` collapses the
+    # leading slash run on ``X-Script-Name``, but ``ProxyFix(x_prefix=...)``
+    # wraps it and writes ``SCRIPT_NAME`` straight from ``X-Forwarded-Prefix``
+    # with no such normalisation — so a spoofed ``//evil.example`` prefix would
+    # otherwise make this a protocol-relative, off-host redirect. Validate what
+    # we actually emit, not just the part we derived ourselves, and fail closed
+    # to the original 404: a hostile prefix means something upstream is wrong,
+    # and no redirect is the safe answer.
     target = request.script_root + stripped
+    if not _is_same_origin_path(target):
+        return None
+
     if request.query_string:
         target += "?" + request.query_string.decode("latin-1")
     return target

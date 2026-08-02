@@ -58,6 +58,12 @@ def _adapter():
         Rule("/admin/view", endpoint="admin_view"),
         Rule("/branch/", endpoint="branch"),
         Rule("/only-post", endpoint="only_post", methods=["POST"]),
+        # These exist so the open-redirect cases below are stopped by the
+        # same-origin guard and NOT merely by "no such route". Without them
+        # "//evil.example/" strips to "/evil.example", fails to match, and
+        # returns None — which would pass even with the hardening deleted.
+        Rule("/evil.example", endpoint="decoy"),
+        Rule("/\\evil.example", endpoint="decoy_backslash"),
     ]).bind("example.org")
 
 
@@ -115,23 +121,41 @@ def test_method_match_is_rescued():
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("hostile", [
-    "//evil.example/",
     "/\\evil.example/",
-    "//evil.example/kosync/",
     "/kosync\\@evil.example/",
     "/kosync\r\nSet-Cookie: x=1/",
 ])
-def test_never_redirects_off_host(hostile):
-    """The target is built from the request line, so a path a browser could
-    read as absolute, protocol-relative, or header-splitting must never become
-    a Location."""
+def test_rejects_backslash_and_control_characters(hostile):
+    """A backslash is folded into "/" by some browsers, which would turn
+    "/\\evil.example" into a protocol-relative URL; CR/LF would split headers.
+    Both are rejected before matching.
+
+    The decoy rule "/\\evil.example" in the map above makes the first case
+    genuinely resolvable, so the guard — not a missing route — is what stops
+    it. Deleting _is_same_origin_path fails this test.
+    """
     assert url_policy.canonical_slashless_path(_adapter(), hostile, "GET") is None
 
 
-def test_leading_slashes_cannot_produce_a_protocol_relative_target():
-    """"////kosync/" collapses to exactly one leading slash, never two."""
-    result = url_policy.canonical_slashless_path(_adapter(), "////kosync/", "GET")
-    assert result is None or not result.startswith("//")
+def test_the_backslash_case_is_stopped_by_the_guard_not_by_a_missing_route():
+    """Keeps the test above from going false-green: prove the decoy resolves."""
+    adapter = _adapter()
+    assert adapter.match("/\\evil.example", method="GET")[0] == "decoy_backslash"
+
+
+@pytest.mark.parametrize("collapsing", [
+    "//evil.example/",
+    "///evil.example/",
+    "//evil.example/kosync/",
+])
+def test_leading_slash_runs_collapse_to_a_single_same_origin_slash(collapsing):
+    """A run of leading slashes is NOT an attack once collapsed — it becomes an
+    ordinary path on this host. What matters is that the result can never keep
+    two leading slashes, which a browser would read as an authority."""
+    result = url_policy.canonical_slashless_path(_adapter(), collapsing, "GET")
+    if result is not None:
+        assert result.startswith("/") and not result.startswith("//")
+
 
 
 # --------------------------------------------------------------------------
@@ -277,3 +301,47 @@ def test_error_handler_issues_a_temporary_redirect():
     source = ast.unparse(_error_http_ast())
     assert "code=307" in source
     assert "308" not in source and "301" not in source
+
+
+# --------------------------------------------------------------------------
+# the mount prefix is request-derived too (cross-family review finding)
+# --------------------------------------------------------------------------
+
+def _proxied_app():
+    """The production wrapping: ProxyFix with x_prefix, as cps/__init__.py:91
+    configures it. ProxyFix writes SCRIPT_NAME straight from X-Forwarded-Prefix
+    without the leading-slash collapse that ReverseProxied applies to
+    X-Script-Name, so the prefix reaches us unnormalised."""
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app = _app()
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    return app
+
+
+@pytest.mark.parametrize("prefix", [
+    "//evil.example",
+    "//evil.example/x",
+    "///evil.example",
+])
+def test_spoofed_forwarded_prefix_cannot_send_the_user_off_host(prefix):
+    """A protocol-relative X-Forwarded-Prefix must not become the Location.
+    Before this guard, `X-Forwarded-Prefix: //evil.example` on a request to
+    /kosync/ produced `Location: //evil.example/kosync` — a working open
+    redirect on any deployment reachable outside its proxy."""
+    response = _proxied_app().test_client().get(
+        "/kosync/", headers={"X-Forwarded-Prefix": prefix}
+    )
+    location = response.headers.get("Location", "")
+    assert not location.startswith("//"), f"off-host redirect via prefix {prefix!r}"
+    assert "evil.example" not in location
+    assert response.status_code == 404, "a hostile prefix must fail closed"
+
+
+def test_legitimate_forwarded_prefix_still_redirects_within_the_mount():
+    """The guard must not break the real subpath deployment it protects."""
+    response = _proxied_app().test_client().get(
+        "/kosync/", headers={"X-Forwarded-Prefix": "/cwa"}
+    )
+    assert response.status_code == 307
+    assert response.headers["Location"].endswith("/cwa/kosync")

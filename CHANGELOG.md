@@ -25,7 +25,8 @@ is for things you can see or feel when running the app.
   people who typed an address, bookmarked one, or followed a link from a forum
   post that happened to end in a slash. Addresses that end in a slash now take
   you to the page instead of an error, including behind a reverse proxy on a
-  sub-path. Reported by @iroQuai. With the
+  sub-path. Reported by @iroQuai.
+- **The admin settings page no longer leaves one option in English.** With the
   interface in another language, the "Default book language" dropdown still
   opened on "Show All" while every other label on the page was translated. It
   now reads in your own language — "Alle talen" in Dutch, "Montrer tout" in

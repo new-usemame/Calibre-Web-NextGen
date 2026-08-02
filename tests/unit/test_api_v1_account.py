@@ -118,15 +118,16 @@ def test_profile_update_invalid_email_400():
 @pytest.mark.unit
 def test_profile_update_locale_and_language():
     from cps.api import account as mod
+    from cps.api import options as opts
     user = _user()
     mock_session = MagicMock()
     mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
     with _ctx("/api/v1/account/profile", body={"locale": "de", "default_language": "eng"}):
         with patch.object(mod, "current_user", user), \
              patch.object(mod, "ub", SimpleNamespace(session=mock_session, UserAppPassword=MagicMock())), \
-             patch.object(mod, "calibre_db", SimpleNamespace(speaking_language=lambda: [])), \
-             patch.object(mod, "get_available_locale", return_value=[]), \
-             patch.object(mod, "_", lambda s: s):  # flask_babel not initialized on the bare test app
+             patch.object(opts, "calibre_db", SimpleNamespace(speaking_language=lambda: [])), \
+             patch.object(opts, "get_available_locale", return_value=[]), \
+             patch.object(opts, "_", lambda s: s):  # flask_babel not initialized on the bare test app
             resp = inspect.unwrap(mod.update_profile)()
     # returns the serialized account (a Response, 200)
     assert user.locale == "de"
@@ -252,12 +253,15 @@ def test_email_body_is_admin_only_and_none_clears():
 def _profile_ctx(user, body):
     """Shared harness for update_profile happy/validation paths."""
     from cps.api import account as mod
+    # The locale/language selects moved to cps.api.options (#886) so the admin
+    # and account forms share one builder — stub them where they now live.
+    from cps.api import options as opts
     mock_session = MagicMock()
     return mod, _ctx("/api/v1/account/profile", body=body), patch.object(mod, "current_user", user), \
         patch.object(mod, "ub", SimpleNamespace(session=mock_session, UserAppPassword=MagicMock())), \
-        patch.object(mod, "calibre_db", SimpleNamespace(speaking_language=lambda: [])), \
-        patch.object(mod, "get_available_locale", return_value=[]), \
-        patch.object(mod, "_", lambda s: s)
+        patch.object(opts, "calibre_db", SimpleNamespace(speaking_language=lambda: [])), \
+        patch.object(opts, "get_available_locale", return_value=[]), \
+        patch.object(opts, "_", lambda s: s)
 
 
 @pytest.mark.unit

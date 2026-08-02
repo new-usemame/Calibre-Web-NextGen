@@ -12,9 +12,9 @@ from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from . import api_v1
-from .. import ub, constants, config, calibre_db
+from .. import ub, constants, config
 from ..cw_login import current_user
-from ..cw_babel import get_available_locale
+from .options import locale_options, book_language_options
 from ..usermanagement import login_required_if_no_ano
 from ..helper import (valid_email, check_email, check_username, valid_password,
                       generate_password_hash, reset_password)
@@ -123,13 +123,6 @@ def admin_reset_user_password(user_id):
 
 
 def _ui_config_payload():
-    locales = [{"id": str(loc), "name": loc.display_name} for loc in get_available_locale()]
-    languages = [{"id": "all", "name": "Show All"}]
-    try:
-        languages += [{"id": l.lang_code, "name": l.name}
-                      for l in calibre_db.speaking_language()]
-    except Exception:
-        pass
     return {
         "config_calibre_web_title": config.config_calibre_web_title,
         "config_books_per_page": config.config_books_per_page,
@@ -140,8 +133,10 @@ def _ui_config_payload():
         "config_default_language": config.config_default_language,
         "config_default_locale": config.config_default_locale,
         "config_server_announcement": config.config_server_announcement or "",
-        "locales": locales,
-        "languages": languages,
+        # Shared with the account form so the two settings pages can never
+        # disagree about these options again (#886).
+        "locales": locale_options(),
+        "languages": book_language_options(),
     }
 
 

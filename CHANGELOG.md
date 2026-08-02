@@ -18,6 +18,13 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The admin settings page no longer leaves one option in English.** With the
+  interface in another language, the "Default book language" dropdown still
+  opened on "Show All" while every other label on the page was translated. It
+  now reads in your own language — "Alle talen" in Dutch, "Montrer tout" in
+  French. The same dropdown in your account settings was already correct; both
+  pages now build it from one place, so they cannot drift apart again. Reported
+  by @iroQuai.
 - **The Upload button no longer disappears once you browse anywhere.** In the
   new UI it only ever showed on the plain Library page, so the moment you opened
   an author, a series, a tag, Hot, Discover, Top Rated or a book, there was no

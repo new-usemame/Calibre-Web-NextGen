@@ -11,13 +11,12 @@ flag for /security-review before this branch merges.
 import secrets
 
 from flask import jsonify, request
-from flask_babel import gettext as _
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
-from .. import calibre_db, config, logger, ub
+from .. import config, logger, ub
 from ..cw_login import current_user
-from ..cw_babel import get_available_locale
+from .options import locale_options, book_language_options
 from ..helper import valid_password, valid_email, check_email
 from ..kobo_sync_status import needs_shelf_reconciliation, reconcile_shelves_safely
 from ..ui_themes import ALLOWED_THEME_SLUGS, theme_slug, theme_code
@@ -65,10 +64,9 @@ def _require_real_user():
 
 
 def _serialize_account():
-    locales = [{"id": str(loc), "name": loc.display_name} for loc in get_available_locale()]
-    languages = calibre_db.speaking_language()  # sets .name to the display name
-    lang_options = [{"id": "all", "name": _("Show All")}]
-    lang_options += [{"id": l.lang_code, "name": l.name} for l in languages]
+    # Shared with the admin form (#886) — same two selects, one builder.
+    locales = locale_options()
+    lang_options = book_language_options()
     return {
         "name": current_user.name,
         "email": current_user.email or "",

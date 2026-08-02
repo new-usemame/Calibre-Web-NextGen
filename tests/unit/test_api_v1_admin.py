@@ -412,11 +412,15 @@ def _ui_config():
 ])
 def test_update_config_stores_a_valid_theme_slug_as_its_code(slug, expected_code):
     from cps.api import admin as mod
+    # The locale/language selects moved to cps.api.options (#886) so the admin
+    # and account forms share one builder — stub them where they now live.
+    from cps.api import options as opts
     cfg = _ui_config()
     with _ctx("/api/v1/admin/config", body={"config_theme": slug}):
         with patch.object(mod, "current_user", _admin()), \
              patch.object(mod, "config", cfg), \
-             patch.object(mod, "get_available_locale", return_value=[]):
+             patch.object(opts, "get_available_locale", return_value=[]), \
+             patch.object(opts, "_", lambda s: s):
             # The 200 path echoes the config payload, which enumerates locales
             # through babel; this test is about what gets stored, so stub it.
             resp = inspect.unwrap(mod.admin_update_config)()

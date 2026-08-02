@@ -280,13 +280,26 @@
       @media (min-width: 768px) {
         body.cwng-has-newui-banner .cwa-toast-stack { bottom: calc(20px + var(--cwng-banner-gap)) !important; }
         body.cwng-has-newui-banner .alert { bottom: calc(20px + var(--cwng-banner-gap)) !important; }
-        /* 2. Reserve scroll space so the last content rows / sidebar items clear the
-              banner. caliBlur (body.blur) scrolls the content column (.col-sm-10) and
-              the sidebar list (#scnd-nav, inside .col-sm-2) as separate panes —
-              #main-nav is the top navbar, not the sidebar, so pad #scnd-nav. */
-        body.cwng-has-newui-banner.blur > div.container-fluid > div.row-fluid > div.col-sm-10 { padding-bottom: var(--cwng-banner-gap) !important; }
-        body.cwng-has-newui-banner.blur #scnd-nav { padding-bottom: var(--cwng-banner-gap) !important; }
       }
+      /* 2. Reserve scroll space so the last content rows / sidebar items clear the
+            banner. caliBlur (body.blur) scrolls the content column (.col-sm-10) and
+            the sidebar list (#scnd-nav, inside .col-sm-2) as separate panes —
+            #main-nav is the top navbar, not the sidebar, so pad #scnd-nav.
+            ALL WIDTHS, deliberately: this reserve used to sit inside the desktop-only
+            block above, so phones got none at all — and there the banner wraps to
+            ~133px and buried the whole of a trailing button, not just its bottom edge.
+            The ::after is load-bearing, not a cosmetic clearfix. caliBlur's content
+            column is a float (div.col-md-10) inside a static .discover wrapper that
+            never clears it, so the wrapper collapses to height 0 and the pane's
+            scrollable extent comes entirely from an *overflowing float*. A scroll
+            container's bottom padding does not extend the scrollable region past
+            overflowing floats, so padding-bottom here computed as "applied" while
+            reserving nothing: 0px, 63px and 200px all produced an identical
+            scrollHeight. Clearing the float puts the padding back in normal flow,
+            where it does what it says. Fork #1310. */
+      body.cwng-has-newui-banner.blur > div.container-fluid > div.row-fluid > div.col-sm-10 { padding-bottom: var(--cwng-banner-gap) !important; }
+      body.cwng-has-newui-banner.blur > div.container-fluid > div.row-fluid > div.col-sm-10::after { content: ''; display: block; clear: both; }
+      body.cwng-has-newui-banner.blur #scnd-nav { padding-bottom: var(--cwng-banner-gap) !important; }
       /* Standard (non-caliBlur) theme scrolls <body>; reserve there at all widths. */
       body.cwng-has-newui-banner:not(.blur) { padding-bottom: var(--cwng-banner-gap); }
     </style>

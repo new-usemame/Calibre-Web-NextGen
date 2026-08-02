@@ -18,6 +18,19 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The button at the bottom of a page works again while the "new interface"
+  notice is on screen.** The notice sits along the bottom of the window, and it
+  was covering the last thing on the page — so clicking the middle of that
+  button did nothing at all, and only a thin sliver along its top edge
+  responded. Scrolling all the way down did not help. The clearest case was the
+  emergency "Restore Calibre Database (Last Resort)" button on Admin → Database
+  Configuration, but it applied to any page ending in a button or a link. On
+  phones it was worse: the notice is taller there because it wraps onto two
+  lines, and it hid the last button completely rather than just its lower edge.
+  Pages now keep enough space clear at the bottom for the notice, at every
+  screen size. Dismissing the notice was always a workaround and still is; you
+  no longer need it.
+
 - **The emergency "Restore Calibre Database (Last Resort)" button now actually
   restores.** On Admin → Database Configuration, clicking it did nothing at all —
   no message, no error, no restore. It was quietly saving the database settings

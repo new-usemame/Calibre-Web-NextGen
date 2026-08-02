@@ -25,8 +25,10 @@ fixed backend enums (login types, LDAP levels; see ``_LOGIN_TYPES`` in
 """
 from flask_babel import gettext as _
 
-from .. import calibre_db
+from .. import calibre_db, logger
 from ..cw_babel import get_available_locale
+
+log = logger.create()
 
 __all__ = ["locale_options", "book_language_options"]
 
@@ -42,12 +44,16 @@ def book_language_options():
     present in the library with its name already localised.
 
     Fail-soft on the library read: a missing or locked Calibre DB yields the
-    sentinel alone rather than a 500 on an otherwise-working settings form.
+    sentinel alone rather than a 500 on an otherwise-working settings form. It
+    is logged rather than swallowed silently — an empty language list is a
+    symptom worth finding in the log, not a state to discover by squinting at a
+    dropdown.
     """
     options = [{"id": "all", "name": _("Show All")}]
     try:
         options += [{"id": lang.lang_code, "name": lang.name}
                     for lang in calibre_db.speaking_language()]
-    except Exception:
-        pass
+    except Exception as ex:
+        log.warning("Could not read the library's languages; offering only the "
+                    "'all' option: %s", ex)
     return options

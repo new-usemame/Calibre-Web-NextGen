@@ -403,13 +403,20 @@ export function BookDetail() {
                 href={resourceUrl(fmt.download_url)}
                 className={styles.downloadBtn}
                 download
-                // iOS Safari ignores the `download` hint and the server serves book
-                // files with `Content-Disposition: inline` (needed for byte-range /
-                // in-browser reading), so a same-tab tap navigates the SPA away to a
-                // file the browser can't render — stranding the user on a dead page
-                // until they force-restart (#716). Opening in a new tab preserves the
-                // app tab; desktop browsers still honour `download` and don't spawn a
-                // stray tab. `noopener` keeps the download context from reaching back.
+                // NOTE: the comment that used to sit here said this route serves
+                // `Content-Disposition: inline`. That is wrong, and it sent #717 after
+                // the wrong fix. `download_url` hits cps/helper.py get_download_link,
+                // which sets `attachment`; `inline` is on the reader route `/show/`
+                // (cps/web.py). The download itself works — #716 is that an iOS
+                // standalone Home Screen app has no browser chrome, so a top-level
+                // navigation to an attachment leaves the user with no way back.
+                //
+                // `target` below is therefore inert on this element: per the HTML
+                // "following hyperlinks" algorithm, a present `download` attribute
+                // means the UA downloads and never consults `target`. It is left in
+                // place only because removing it is a behaviour change that needs a
+                // real standalone iOS run to verify, which #716 is still blocked on.
+                // Full diagnosis and the reproduction plan are on issue #716.
                 target="_blank"
                 rel="noopener"
               >

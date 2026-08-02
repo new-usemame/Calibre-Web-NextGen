@@ -18,7 +18,14 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
-- **The admin settings page no longer leaves one option in English.** With the
+- **Typing a page address with a slash on the end no longer gives you "404 Not
+  Found".** `/kosync/` failed while `/kosync` worked, and the same was true of
+  156 other pages — admin settings, your profile, statistics, search, the shelf
+  and author pages. Links inside the app were always fine, so this only bit
+  people who typed an address, bookmarked one, or followed a link from a forum
+  post that happened to end in a slash. Addresses that end in a slash now take
+  you to the page instead of an error, including behind a reverse proxy on a
+  sub-path. Reported by @iroQuai. With the
   interface in another language, the "Default book language" dropdown still
   opened on "Show All" while every other label on the page was translated. It
   now reads in your own language — "Alle talen" in Dutch, "Montrer tout" in

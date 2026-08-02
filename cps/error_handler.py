@@ -7,7 +7,7 @@
 
 import traceback
 
-from flask import render_template
+from flask import redirect, render_template, request
 from werkzeug.exceptions import default_exceptions
 try:
     from werkzeug.exceptions import FailedDependency
@@ -16,6 +16,7 @@ except ImportError:
 
 from . import config, app, logger, services
 from .cw_login import current_user
+from .url_policy import trailing_slash_redirect_url
 
 
 log = logger.create()
@@ -23,6 +24,14 @@ log = logger.create()
 # custom error page
 
 def error_http(error):
+    # A 404 with no matched rule came from routing, not from a view calling
+    # abort(404). If the only thing wrong with the URL is a trailing slash,
+    # send the user to the page they meant instead of an error page.
+    if error.code == 404 and request.url_rule is None:
+        target = trailing_slash_redirect_url()
+        if target:
+            return redirect(target, code=308)
+
     headers = {'WWW-Authenticate': f'Basic realm="{config.config_calibre_web_title or "calibre-web-automated"}"'} if error.code == 401 else {}
     return render_template('http_error.html',
                            error_code="Error {0}".format(error.code),

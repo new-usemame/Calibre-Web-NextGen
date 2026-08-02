@@ -56,6 +56,46 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.28',
+    date: '2026-08-02',
+    items: [
+      {
+        title: 'Upload stays with you as you browse',
+        body: 'In the new interface the Upload button only appeared on the plain Library page, so opening an author, a series, a tag, Discover or a book left you with no way to add one. It now stays in place wherever you are, and it also sits in the account menu next to Admin so you can reach it on a phone.',
+        category: 'Library',
+        link: { to: '/upload', label: 'Go to Upload' },
+      },
+      {
+        title: 'The button at the bottom of a page is clickable again',
+        body: 'The "new interface is ready" notice runs along the bottom of the window and was sitting on top of the last thing on the page, so clicking the middle of a button there did nothing and only a sliver along its top edge responded — and scrolling to the end did not help. Phones had it worse, because the notice wraps onto two lines and hid the last button outright. Pages now keep enough room clear at the bottom at every screen size.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The emergency database restore actually restores',
+        body: 'On Admin, "Restore Calibre Database (Last Resort)" did nothing at all when clicked — no message, no error — because it was quietly re-saving the database settings instead. Anyone reaching for it during a real library corruption got a button that looked like it worked. It now rebuilds your Calibre database from the OPF files in your library, as the page describes.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Turning off "Enable Uploads" now turns off uploads',
+        body: 'Switching it off in Admin hid the button in the classic view and stopped there — the new interface still offered Upload, and the upload itself went through either way. The setting is now enforced on the server and the button is hidden in both views. Uploading stays on by default, so nothing changes unless you deliberately turned it off.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'An address typed with a slash on the end no longer gives you "404 Not Found"',
+        body: 'Reaching /kosync/ failed while /kosync worked, and 156 other pages behaved the same way — admin settings, your profile, statistics, search, shelf and author pages. Links inside the app were always fine, so this only bit you if you typed an address, used a bookmark, or followed one from a forum post. Both spellings now work, including behind a reverse proxy on a subpath.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The last English word on the admin settings page is translated',
+        body: 'With the interface in another language, the "Default book language" dropdown still opened on "Show All" while every other label around it was translated. It now reads in your own language. The same dropdown in your account settings was already right; both pages now build it from one place, so they cannot drift apart again.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.27',
     date: '2026-08-02',
     items: [

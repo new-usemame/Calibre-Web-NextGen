@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.28] - 2026-08-02
+
 ### Fixed
 
 - **The button at the bottom of a page works again while the "new interface"

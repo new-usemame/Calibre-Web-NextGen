@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.27] - 2026-08-02
+
 ### Changed
 
 - **The admin "Version Information" table now reports the Calibre you are
@@ -34,6 +36,15 @@ is for things you can see or feel when running the app.
   tell which one was right. Both now read the same source. As with Calibre, a
   Kepubify that can't be found or can't be run says so rather than showing
   "Unknown". Thanks again to @chloeroform.
+
+- **The Russian interface is complete again — the custom-columns section of the
+  edit-metadata screen now reads in Russian.** Three phrases there were still in
+  English on an otherwise fully Russian page: the "Custom columns" heading, the
+  "Not set" placeholder shown for an empty column, and the hint telling you a
+  field takes comma-separated values. Russian is back to every string
+  translated. Contributed by
+  [@standhaftsohnsergius](https://github.com/standhaftsohnsergius)
+  ([#1269](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1269)).
 
 ### Fixed
 

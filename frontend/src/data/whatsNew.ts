@@ -56,6 +56,46 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.27',
+    date: '2026-08-02',
+    items: [
+      {
+        title: 'The duplicates popup no longer names books you already deleted',
+        body: 'If you removed duplicate copies in Calibre itself rather than in the web app, the popup carried on listing them, while the Duplicates page and a fresh scan both correctly said there was nothing left. It now re-checks your library before it appears, so a group whose books are gone drops out and a group that merely lost a copy shows the real remaining count. The sidebar duplicate badge counts the same way, so it was wrong in the same way and is fixed too.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'A duplicate you dismissed stays dismissed',
+        body: 'Dismissals were matched against a label built from the title and author of whichever copy happened to sort first, so editing a book\'s metadata — or importing another copy — quietly changed the label and the duplicate came back on its own. Dismissals now hold on to an identity that metadata edits do not move.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Marking a book unread now clears the dates and the device position too',
+        body: 'The percentage reset, but "Started reading" and "Last synced" stayed on the page — and "Last synced" jumped forward to the moment you pressed the button, so a book you had just marked unread looked like it had synced seconds ago. The reading position your e-reader holds was left behind as well, which let a Kobo quietly restore the exact spot you had just cleared on its next sync. Books already left in that state by an earlier version display correctly again, with no migration.',
+        category: 'Reading',
+      },
+      {
+        title: 'Editing a book no longer freezes the site for everyone else',
+        body: 'Saving from the edit-metadata screen, or switching on a metadata source, stopped the server answering anyone — not just the tab doing the work — for as long as the cover download or the lookup took, which on a slow host is up to 30 seconds. Both now do their network work off the request handler, so the rest of the site keeps responding. Measured during a 1.5 second cover download, other page loads went from 1 served with a 1.25 second worst case to 201 served with an 18 millisecond worst case.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The admin version table reports the Calibre and Kepubify you are actually running',
+        body: 'Both rows showed a value stamped into the image when it was built, so if the binaries had been replaced or the converter path pointed somewhere else, the numbers on the page were not the ones in use — and the Statistics page, which read the real binaries, could disagree with no way to tell which was right. Both rows now read the binary itself. One that cannot be found, or cannot be run, now says which of the two it is instead of "Unknown".',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Russian is complete again on the edit-metadata screen',
+        body: 'Three phrases in the custom-columns section were still in English on an otherwise fully Russian page: the "Custom columns" heading, the "Not set" placeholder shown for an empty column, and the hint telling you a field takes comma-separated values. Russian is back to every string translated.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.26',
     date: '2026-07-31',
     items: [

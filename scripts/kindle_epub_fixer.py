@@ -678,9 +678,12 @@ class EPUBFixer:
                                 f"Preserved language {original_language} as {language} (not in Amazon list; case standardization)"
                             )
                         else:
-                            self.fixed_problems.append(
-                                f"Preserved language '{original_language}' (not in Amazon list)"
-                            )
+                            # Nothing changed: the code is already what will be
+                            # written, so the write below is declined. Appending
+                            # here would report a fix that never happens — the
+                            # #1304 symptom this module exists to remove — and
+                            # would do so on every run, forever.
+                            pass
                 else:
                     # Doesn't look like a language tag at all (e.g., "Unknown", "garbage")
                     detected = self._detect_language_from_metadata(epub_path)
@@ -1251,17 +1254,30 @@ def get_library_location() -> str:
         library_dir = f"{dirs['calibre_library_dir']}/"
         return library_dir
 
+# Calibre's own bookkeeping directories inside the library root. Matched by
+# exact name so that a book whose author or title legitimately begins with a
+# dot is still swept (see get_all_epubs_in_library).
+CALIBRE_INTERNAL_DIRS = frozenset({".caltrash", ".calnotes", ".calibre"})
+
+
 def get_all_epubs_in_library() -> list[str]:
     """Returns every EPUB in the user's library.
 
-    Calibre's own hidden directories are skipped: `.caltrash` holds books the
-    user has deleted, so processing them is wasted work and makes the log read
-    as though deleted books were being modified.
+    Calibre's own bookkeeping directories are skipped: `.caltrash` holds books
+    the user has deleted, so processing them is wasted work and makes the log
+    read as though deleted books were being modified.
+
+    They are matched by name, not by a leading dot. The library layout takes its
+    directory names from the book's author and title via `get_valid_filename`,
+    which preserves a leading dot — ".NET Core in Action" comes back unchanged —
+    so pruning every dot-directory silently drops real books from the sweep.
+    Silently, because a book that is never walked produces no log line and no
+    error; it simply stops being repaired.
     """
     library_location = get_library_location()
     epubs_in_library = []
     for dirpath, dirnames, filenames in os.walk(library_location):
-        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        dirnames[:] = [d for d in dirnames if d not in CALIBRE_INTERNAL_DIRS]
         epubs_in_library.extend(
             os.path.join(dirpath, f) for f in filenames if f.endswith('.epub')
         )

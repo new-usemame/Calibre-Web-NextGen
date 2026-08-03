@@ -373,3 +373,78 @@ def test_library_walk_skips_caltrash_and_other_hidden_dirs(fixer_module, tmp_pat
     assert [os.path.basename(f) for f in found] == ["Wonderland.epub"], (
         f"hidden Calibre directories must not be processed, got {found}"
     )
+
+
+# --------------------------------------------------------------------------
+# Defect 4 — the hidden-directory prune is wider than Calibre's own folders
+# --------------------------------------------------------------------------
+#
+# The prune was written as "skip anything starting with a dot", but the library
+# layout takes its directory names from the book's author and title through
+# ``get_valid_filename``, which PRESERVES a leading dot — ".NET Core in Action"
+# comes back unchanged. So the prune silently dropped real books from the sweep,
+# with no log line and no error, which is worse than the false-positive
+# reporting this file exists to fix: those books simply stop being repaired.
+
+
+def test_library_walk_keeps_books_whose_folder_starts_with_a_dot(
+        fixer_module, tmp_path, monkeypatch):
+    """A dot is legal in an author/title directory; only Calibre's own folders
+    are bookkeeping."""
+    library = tmp_path / "calibre-library"
+    (library / "Chris Sainty" / ".NET Core in Action (42)").mkdir(parents=True)
+    (library / "Chris Sainty" / ".NET Core in Action (42)" / "dotnet.epub").write_bytes(b"x")
+    (library / ".hack__SIGN" / "Volume 1 (7)").mkdir(parents=True)
+    (library / ".hack__SIGN" / "Volume 1 (7)" / "hack.epub").write_bytes(b"x")
+    (library / ".caltrash" / "b" / "2").mkdir(parents=True)
+    (library / ".caltrash" / "b" / "2" / "Deleted.epub").write_bytes(b"x")
+
+    monkeypatch.setattr(fixer_module, "get_library_location",
+                        lambda: str(library) + os.sep)
+
+    found = sorted(os.path.basename(f) for f in fixer_module.get_all_epubs_in_library())
+
+    assert found == ["dotnet.epub", "hack.epub"], (
+        f"a book whose folder begins with a dot must still be swept; "
+        f"only Calibre's own bookkeeping folders are skipped, got {found}"
+    )
+
+
+# --------------------------------------------------------------------------
+# Defect 5 — a "preserved" language is reported as a fix on every run
+# --------------------------------------------------------------------------
+#
+# The #1304 symptom in its original form: a line appended to ``fixed_problems``
+# on a path whose OPF write is then declined, so the run reports "1 issues
+# fixed" and, one line later, "No changes needed, leaving file untouched."
+# ``und`` is what Calibre writes for a book with no language set, so this is an
+# ordinary library, not a contrived one.
+
+
+LANG_OPF = CONTENT_OPF.replace(
+    "<dc:language>en</dc:language>", "<dc:language>und</dc:language>")
+
+
+def _build_epub_with_language(path: Path, opf: str) -> Path:
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("mimetype", b"application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        zf.writestr("META-INF/container.xml", CONTAINER_XML)
+        zf.writestr("OEBPS/content.opf", opf)
+        zf.writestr("OEBPS/text.xhtml", TEXT_XHTML)
+        zf.writestr("OEBPS/page_styles.css", PAGE_STYLES_CSS.encode("ascii"))
+    return path
+
+
+def test_a_language_that_is_only_preserved_is_not_reported_as_a_fix(
+        fixer_module, tmp_path):
+    """Reporting a fix the writer then declines to make is the whole #1304 bug."""
+    book = _build_epub_with_language(tmp_path / "und.epub", LANG_OPF)
+    before = epub_payload(book)
+
+    for run in range(1, 4):
+        fixer = fixer_module.EPUBFixer()
+        fixer.process(input_path=str(book))
+        assert fixer.fixed_problems == [], (
+            f"run {run} reported {fixer.fixed_problems!r} but wrote nothing")
+
+    assert epub_payload(book) == before

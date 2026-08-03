@@ -1056,6 +1056,13 @@ class EPUBFixer:
         if set(self.files) | set(self.binary_files) != set(self.entries):
             return True
 
+        if len(self.entries) != len(set(self.entries)):
+            # The archive carries the same name more than once. Reading is keyed
+            # by name so the duplicates collapsed, and write_epub emits one entry
+            # per name — so rewriting really does repair the archive here, even
+            # though every surviving payload matches.
+            return True
+
         for filename, content in self.files.items():
             original = self.file_original_bytes.get(filename)
             if original is None:
@@ -1072,7 +1079,20 @@ class EPUBFixer:
             if new_bytes != original:
                 return True
 
-        return self._zip_layout_needs_rewrite(epub_path)
+        return False
+
+    def _same_file(self, first, second) -> bool:
+        """Whether two paths name the same file on disk.
+
+        Comparing absolute paths is not enough: a symlinked library path spells
+        the same book two ways, and treating those as different destinations
+        would rewrite the very file the no-op check exists to leave alone.
+        """
+        try:
+            return os.path.samefile(str(first), str(second))
+        except OSError:
+            # One of them does not exist yet — a genuinely separate destination.
+            return os.path.abspath(str(first)) == os.path.abspath(str(second))
 
     def _zip_layout_needs_rewrite(self, epub_path) -> bool:
         """EPUB requires `mimetype` to be the first entry and stored uncompressed.
@@ -1171,6 +1191,16 @@ class EPUBFixer:
         print_and_log("[cwa-kindle-epub-fixer] Checking for stray images...", log=self.manually_triggered)
         self.fix_stray_img()
 
+        # An archive whose mimetype entry is misplaced or compressed is malformed
+        # even when every payload is fine, and write_epub lays it out correctly.
+        # Record it as the repair it is, so the summary can never read
+        # "No issues found" immediately before rewriting the file.
+        layout_repaired = self._zip_layout_needs_rewrite(input_path)
+        if layout_repaired:
+            self.fixed_problems.append(
+                "Normalized archive layout (mimetype must be the first, uncompressed entry)"
+            )
+
         # Notify user and/or write to log
         self.export_issue_summary(input_path)
 
@@ -1178,9 +1208,9 @@ class EPUBFixer:
         if Path(output_path).is_dir():
             output_path = output_path + os.path.basename(input_path)
 
-        writing_in_place = os.path.abspath(str(output_path)) == os.path.abspath(str(input_path))
+        writing_in_place = self._same_file(output_path, input_path)
         modified = True
-        if writing_in_place and not self._content_changed(input_path):
+        if writing_in_place and not (layout_repaired or self._content_changed(input_path)):
             # Rewriting a book we did not change would churn its mtime and
             # checksum — re-syncing it to every device — and take another copy
             # into fixed_originals, on every library-wide run.

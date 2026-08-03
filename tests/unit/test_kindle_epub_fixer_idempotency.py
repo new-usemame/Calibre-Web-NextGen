@@ -24,6 +24,7 @@ labels and bookkeeping rather than from the bytes.
 
 import hashlib
 import os
+import warnings
 import zipfile
 from pathlib import Path
 
@@ -277,6 +278,78 @@ def test_checksum_is_not_recalculated_when_nothing_changed(fixer_module, tmp_pat
     fixer_module.EPUBFixer().process(str(book), str(book))
 
     assert calls == [], "the file was not modified, so its checksum cannot have changed"
+
+
+# --------------------------------------------------------------------------
+# Skipping the write must never skip a real repair (cross-family review, Terra)
+# --------------------------------------------------------------------------
+
+
+def test_duplicate_archive_entries_are_still_repaired(fixer_module, tmp_path):
+    """Reading is keyed by name, so duplicates collapse and every surviving
+    payload matches — but write_epub emits one entry per name, so rewriting is
+    a genuine repair. Comparing name *sets* would call this file unchanged."""
+    book = tmp_path / "dupes.epub"
+    build_epub(book)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # zipfile warns on the duplicate name
+        with zipfile.ZipFile(book, "a", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("OEBPS/page_styles.css", PAGE_STYLES_CSS.encode("ascii"))
+
+    with zipfile.ZipFile(book, "r") as zf:
+        assert len(zf.namelist()) != len(set(zf.namelist())), "fixture is not duplicated"
+
+    fixer_module.EPUBFixer().process(str(book), str(book))
+
+    with zipfile.ZipFile(book, "r") as zf:
+        names = zf.namelist()
+    assert len(names) == len(set(names)), (
+        "the duplicate entry survived; the archive was left malformed"
+    )
+
+
+def test_symlinked_output_path_is_treated_as_writing_in_place(fixer_module, tmp_path):
+    """A symlink spells the same book two ways. Comparing absolute paths would
+    call them different destinations and rewrite the file anyway, defeating the
+    idempotency this whole change exists to provide."""
+    book = build_epub(tmp_path / "book.epub")
+    past = 1_500_000_000
+    os.utime(book, (past, past))
+    link = tmp_path / "linked.epub"
+    link.symlink_to(book)
+
+    fixer_module.EPUBFixer().process(str(book), str(link))
+
+    assert int(os.stat(book).st_mtime) == past, (
+        "a symlinked output path aliased the input and rewrote it"
+    )
+    assert backups_taken(fixer_module) == []
+
+
+def test_misplaced_mimetype_is_repaired_and_reported(fixer_module, tmp_path):
+    """EPUB requires mimetype first and stored. write_epub enforces that, so the
+    summary must not say 'No issues found' immediately before rewriting."""
+    book = tmp_path / "badlayout.epub"
+    with zipfile.ZipFile(book, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("META-INF/container.xml", CONTAINER_XML)
+        zf.writestr("OEBPS/content.opf", CONTENT_OPF)
+        zf.writestr("OEBPS/text.xhtml", TEXT_XHTML)
+        zf.writestr("OEBPS/page_styles.css", PAGE_STYLES_CSS.encode("ascii"))
+        zf.writestr("mimetype", b"application/epub+zip")  # last, and deflated
+
+    problems = fixer_module.EPUBFixer().process(str(book), str(book))
+
+    assert any("layout" in p for p in problems), (
+        f"a malformed archive layout was repaired but never reported: {problems}"
+    )
+    with zipfile.ZipFile(book, "r") as zf:
+        first = zf.infolist()[0]
+    assert first.filename == "mimetype"
+    assert first.compress_type == zipfile.ZIP_STORED
+
+    assert fixer_module.EPUBFixer().process(str(book), str(book)) == [], (
+        "the repaired archive must go quiet on the next run"
+    )
 
 
 # --------------------------------------------------------------------------

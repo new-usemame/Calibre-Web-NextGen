@@ -24,7 +24,7 @@ about = flask.Blueprint('about', __name__)
 
 modules = dict()
 req = dep_check.load_dependencies(False)
-opt = dep_check.load_dependencies(True)
+opt = []
 for i in (req + opt):
     modules[i[1]] = i[0]
 modules['Jinja2'] = importlib.metadata.version("jinja2")

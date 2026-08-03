@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import json
+import tomllib
 
 from .constants import BASE_DIR
 try:
@@ -37,13 +38,14 @@ def load_dependencies(optional=False):
         else:
             return deps
     if importlib or pkgresources:
-        if optional:
-            req_path = os.path.join(BASE_DIR, "optional-requirements.txt")
-        else:
-            req_path = os.path.join(BASE_DIR, "requirements.txt")
-        if os.path.exists(req_path):
-            with open(req_path, 'r') as f:
-                for line in f:
+        with open(os.path.join(BASE_DIR, "pyproject.toml"), "rb") as f:
+            toml = tomllib.load(f)
+            if optional:
+                req = toml["project"]["optional-dependencies"]["dev"]
+            else:
+                req = toml["project"]["dependencies"]
+
+            for line in req:
                     if not line.startswith('#') and not line == '\n' and not line.startswith('git'):
                         res = re.match(r'(.*?)([<=>\s]+)([\d\.]+),?\s?([<=>\s]+)?([\d\.]+)?(?:\s?;\s?'
                                        r'(?:(python_version)\s?([<=>]+)\s?\'([\d\.]+)\'|'

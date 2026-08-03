@@ -1978,7 +1978,7 @@ msgstr "Alfabetische Boeken"
 msgid "Books sorted alphabetically"
 msgstr "Boeken Alfabetisch gesorteerd"
 
-#: cps/opds.py:170 cps/render_template.py:139
+#: cps/opds.py:170 cps/render_template.py:150
 msgid "Hot Books"
 msgstr "Populaire boeken"
 
@@ -1986,7 +1986,7 @@ msgstr "Populaire boeken"
 msgid "Popular publications from this catalog based on Downloads."
 msgstr "Populaire publicaties uit deze catalogus, gebaseerd op Downloads."
 
-#: cps/opds.py:176 cps/render_template.py:153 cps/web.py:686
+#: cps/opds.py:176 cps/render_template.py:164 cps/web.py:686
 msgid "Top Rated Books"
 msgstr "Best beoordeelde boeken"
 
@@ -2007,12 +2007,12 @@ msgstr "Nieuwe boeken"
 msgid "Random Books"
 msgstr "Willekeurige boeken"
 
-#: cps/opds.py:189 cps/render_template.py:165 cps/templates/user_table.html:161
+#: cps/opds.py:189 cps/render_template.py:176 cps/templates/user_table.html:161
 #: cps/templates/user_table.html:164
 msgid "Show Random Books"
 msgstr "Willekeurige boeken tonen"
 
-#: cps/opds.py:194 cps/opds.py:195 cps/render_template.py:156 cps/web.py:1051
+#: cps/opds.py:194 cps/opds.py:195 cps/render_template.py:167 cps/web.py:1051
 msgid "Read Books"
 msgstr "Gelezen boeken"
 
@@ -2021,11 +2021,11 @@ msgstr "Gelezen boeken"
 msgid "Books currently being read"
 msgstr "Huidige versie"
 
-#: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:160 cps/web.py:1054
+#: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:171 cps/web.py:1054
 msgid "Unread Books"
 msgstr "Ongelezen boeken"
 
-#: cps/opds.py:212 cps/render_template.py:172 cps/spa_strings.py:432
+#: cps/opds.py:212 cps/render_template.py:183 cps/spa_strings.py:432
 #: cps/templates/book_table.html:109 cps/templates/cwa_settings.html:334
 #: cps/templates/cwa_settings.html:336
 #: cps/templates/hardcover_review_matches.html:134
@@ -2036,7 +2036,7 @@ msgstr "Auteurs"
 msgid "Books ordered by Author"
 msgstr "Boeken gesorteerd op auteur"
 
-#: cps/opds.py:218 cps/render_template.py:176 cps/spa_strings.py:732
+#: cps/opds.py:218 cps/render_template.py:187 cps/spa_strings.py:732
 #: cps/templates/book_table.html:115 cps/web.py:2019
 msgid "Publishers"
 msgstr "Uitgevers"
@@ -2045,7 +2045,7 @@ msgstr "Uitgevers"
 msgid "Books ordered by publisher"
 msgstr "Boeken gesorteerd op uitgever"
 
-#: cps/opds.py:224 cps/render_template.py:166 cps/spa_strings.py:456
+#: cps/opds.py:224 cps/render_template.py:177 cps/spa_strings.py:456
 #: cps/templates/book_table.html:110 cps/web.py:2171
 msgid "Categories"
 msgstr "Categorieën"
@@ -2054,7 +2054,7 @@ msgstr "Categorieën"
 msgid "Books ordered by category"
 msgstr "Boeken gesorteerd op categorie"
 
-#: cps/opds.py:230 cps/render_template.py:169 cps/spa_strings.py:279
+#: cps/opds.py:230 cps/render_template.py:180 cps/spa_strings.py:279
 #: cps/templates/book_edit.html:143 cps/templates/book_table.html:111
 #: cps/templates/cwa_settings.html:362 cps/templates/cwa_settings.html:364
 #: cps/templates/cwa_settings.html:1134
@@ -2067,7 +2067,7 @@ msgstr "Boekenreeksen"
 msgid "Books ordered by series"
 msgstr "Boeken gesorteerd op reeks"
 
-#: cps/opds.py:236 cps/render_template.py:179 cps/spa_strings.py:628
+#: cps/opds.py:236 cps/render_template.py:190 cps/spa_strings.py:628
 #: cps/templates/book_table.html:113 cps/templates/detail.html:930
 #: cps/templates/search_form.html:108 cps/web.py:2143
 msgid "Languages"
@@ -2077,7 +2077,7 @@ msgstr "Talen"
 msgid "Books ordered by Languages"
 msgstr "Boeken gesorteerd op taal"
 
-#: cps/opds.py:242 cps/render_template.py:183 cps/spa_strings.py:736
+#: cps/opds.py:242 cps/render_template.py:194 cps/spa_strings.py:736
 #: cps/web.py:2103
 msgid "Ratings"
 msgstr "Beoordelingen"
@@ -2086,7 +2086,7 @@ msgstr "Beoordelingen"
 msgid "Books ordered by Rating"
 msgstr "Boeken gesorteerd op beoordeling"
 
-#: cps/opds.py:248 cps/render_template.py:186
+#: cps/opds.py:248 cps/render_template.py:197
 msgid "File formats"
 msgstr "Bestandsformaten"
 
@@ -2148,124 +2148,124 @@ msgstr "Toegangssleutel is verlopen"
 msgid "Success! Please return to your device"
 msgstr "Gelukt! Ga terug naar je apparaat"
 
-#: cps/render_template.py:116
+#: cps/render_template.py:127
 msgid ""
 "Duplicate scanning needs a one-time full scan before fast duplicate checks "
 "can run after imports and metadata changes. "
 msgstr ""
 
-#: cps/render_template.py:136 cps/spa_strings.py:444
+#: cps/render_template.py:147 cps/spa_strings.py:444
 msgid "Books"
 msgstr "Boeken"
 
-#: cps/render_template.py:138
+#: cps/render_template.py:149
 msgid "Show recent books"
 msgstr "Recent toegevoegde boeken tonen"
 
-#: cps/render_template.py:141
+#: cps/render_template.py:152
 msgid "Show Hot Books"
 msgstr "Populaire boeken tonen"
 
-#: cps/render_template.py:143 cps/render_template.py:148
+#: cps/render_template.py:154 cps/render_template.py:159
 msgid "Downloaded Books"
 msgstr "Gedownloade boeken"
 
-#: cps/render_template.py:145 cps/render_template.py:150
+#: cps/render_template.py:156 cps/render_template.py:161
 #: cps/templates/user_table.html:169
 msgid "Show Downloaded Books"
 msgstr "Gedownloade boeken tonen"
 
-#: cps/render_template.py:155 cps/templates/user_table.html:163
+#: cps/render_template.py:166 cps/templates/user_table.html:163
 msgid "Show Top Rated Books"
 msgstr "Best beoordeelde boeken tonen"
 
-#: cps/render_template.py:158
+#: cps/render_template.py:169
 msgid "Show Read and Unread"
 msgstr "Gelezen/Ongelezen boeken tonen"
 
-#: cps/render_template.py:162
+#: cps/render_template.py:173
 msgid "Show unread"
 msgstr "Ongelezen boeken tonen"
 
-#: cps/render_template.py:163 cps/spa_strings.py:540
+#: cps/render_template.py:174 cps/spa_strings.py:540
 msgid "Discover"
 msgstr "Willekeurige boeken"
 
-#: cps/render_template.py:168 cps/templates/user_table.html:160
+#: cps/render_template.py:179 cps/templates/user_table.html:160
 #, fuzzy
 msgid "Show Category Section"
 msgstr "Categoriekeuze tonen"
 
-#: cps/render_template.py:171 cps/templates/user_table.html:159
+#: cps/render_template.py:182 cps/templates/user_table.html:159
 #, fuzzy
 msgid "Show Series Section"
 msgstr "Boekenreeksenkeuze tonen"
 
-#: cps/render_template.py:174 cps/templates/user_table.html:162
+#: cps/render_template.py:185 cps/templates/user_table.html:162
 #, fuzzy
 msgid "Show Author Section"
 msgstr "Auteurkeuze tonen"
 
-#: cps/render_template.py:178 cps/templates/user_table.html:165
+#: cps/render_template.py:189 cps/templates/user_table.html:165
 #, fuzzy
 msgid "Show Publisher Section"
 msgstr "Uitgeverskeuze tonen"
 
-#: cps/render_template.py:182 cps/templates/user_table.html:157
+#: cps/render_template.py:193 cps/templates/user_table.html:157
 #, fuzzy
 msgid "Show Language Section"
 msgstr "Taalkeuze tonen"
 
-#: cps/render_template.py:185 cps/templates/user_table.html:166
+#: cps/render_template.py:196 cps/templates/user_table.html:166
 #, fuzzy
 msgid "Show Ratings Section"
 msgstr "Beoordelingen tonen"
 
-#: cps/render_template.py:188 cps/templates/user_table.html:167
+#: cps/render_template.py:199 cps/templates/user_table.html:167
 #, fuzzy
 msgid "Show File Formats Section"
 msgstr "Bestandsformaten tonen"
 
-#: cps/render_template.py:190 cps/web.py:1077
+#: cps/render_template.py:201 cps/web.py:1077
 msgid "Archived Books"
 msgstr "Gearchiveerde boeken"
 
-#: cps/render_template.py:192 cps/templates/user_table.html:168
+#: cps/render_template.py:203 cps/templates/user_table.html:168
 #, fuzzy
 msgid "Show Archived Books"
 msgstr "Gearchiveerde boeken tonen"
 
-#: cps/render_template.py:194 cps/spa_strings.py:574
+#: cps/render_template.py:205 cps/spa_strings.py:574
 msgid "Favorites"
 msgstr "Favorieten"
 
-#: cps/render_template.py:196
+#: cps/render_template.py:207
 msgid "Show Favorites"
 msgstr ""
 
-#: cps/render_template.py:199 cps/web.py:1825
+#: cps/render_template.py:210 cps/web.py:1825
 msgid "Books List"
 msgstr "Boekenlijst"
 
-#: cps/render_template.py:201 cps/templates/user_table.html:170
+#: cps/render_template.py:212 cps/templates/user_table.html:170
 msgid "Show Books List"
 msgstr "Boekenlijst tonen"
 
-#: cps/render_template.py:204 cps/spa_strings.py:551
+#: cps/render_template.py:215 cps/spa_strings.py:551
 msgid "Duplicates"
 msgstr "Duplicaten"
 
-#: cps/render_template.py:206
+#: cps/render_template.py:217
 #, fuzzy
 msgid "Show Duplicate Books"
 msgstr "Best beoordeelde boeken tonen"
 
-#: cps/render_template.py:322
+#: cps/render_template.py:333
 #, python-format
 msgid "Calibre-Web NextGen %(latest)s is available — you're on %(current)s."
 msgstr ""
 
-#: cps/render_template.py:332
+#: cps/render_template.py:343
 #, python-format
 msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "

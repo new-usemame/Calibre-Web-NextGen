@@ -2090,7 +2090,7 @@ msgstr "Livres alphabétiques"
 msgid "Books sorted alphabetically"
 msgstr "Livres triés dans l’ordre alphabétique"
 
-#: cps/opds.py:170 cps/render_template.py:139
+#: cps/opds.py:170 cps/render_template.py:150
 msgid "Hot Books"
 msgstr "Livres populaires"
 
@@ -2099,7 +2099,7 @@ msgid "Popular publications from this catalog based on Downloads."
 msgstr ""
 "Publications populaires depuis le catalogue basées sur les téléchargements."
 
-#: cps/opds.py:176 cps/render_template.py:153 cps/web.py:686
+#: cps/opds.py:176 cps/render_template.py:164 cps/web.py:686
 msgid "Top Rated Books"
 msgstr "Livres les mieux notés"
 
@@ -2120,12 +2120,12 @@ msgstr "Les derniers livres"
 msgid "Random Books"
 msgstr "Livres au hasard"
 
-#: cps/opds.py:189 cps/render_template.py:165 cps/templates/user_table.html:161
+#: cps/opds.py:189 cps/render_template.py:176 cps/templates/user_table.html:161
 #: cps/templates/user_table.html:164
 msgid "Show Random Books"
 msgstr "Montrer des livres au hasard"
 
-#: cps/opds.py:194 cps/opds.py:195 cps/render_template.py:156 cps/web.py:1051
+#: cps/opds.py:194 cps/opds.py:195 cps/render_template.py:167 cps/web.py:1051
 msgid "Read Books"
 msgstr "Livres lus"
 
@@ -2134,11 +2134,11 @@ msgstr "Livres lus"
 msgid "Books currently being read"
 msgstr "Version actuelle"
 
-#: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:160 cps/web.py:1054
+#: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:171 cps/web.py:1054
 msgid "Unread Books"
 msgstr "Livres non-lus"
 
-#: cps/opds.py:212 cps/render_template.py:172 cps/spa_strings.py:432
+#: cps/opds.py:212 cps/render_template.py:183 cps/spa_strings.py:432
 #: cps/templates/book_table.html:109 cps/templates/cwa_settings.html:334
 #: cps/templates/cwa_settings.html:336
 #: cps/templates/hardcover_review_matches.html:134
@@ -2149,7 +2149,7 @@ msgstr "Auteurs"
 msgid "Books ordered by Author"
 msgstr "Livres classés par auteur"
 
-#: cps/opds.py:218 cps/render_template.py:176 cps/spa_strings.py:732
+#: cps/opds.py:218 cps/render_template.py:187 cps/spa_strings.py:732
 #: cps/templates/book_table.html:115 cps/web.py:2019
 msgid "Publishers"
 msgstr "Éditeurs"
@@ -2158,7 +2158,7 @@ msgstr "Éditeurs"
 msgid "Books ordered by publisher"
 msgstr "Livres classés par éditeur"
 
-#: cps/opds.py:224 cps/render_template.py:166 cps/spa_strings.py:456
+#: cps/opds.py:224 cps/render_template.py:177 cps/spa_strings.py:456
 #: cps/templates/book_table.html:110 cps/web.py:2171
 msgid "Categories"
 msgstr "Catégories"
@@ -2167,7 +2167,7 @@ msgstr "Catégories"
 msgid "Books ordered by category"
 msgstr "Livres classés par catégorie"
 
-#: cps/opds.py:230 cps/render_template.py:169 cps/spa_strings.py:279
+#: cps/opds.py:230 cps/render_template.py:180 cps/spa_strings.py:279
 #: cps/templates/book_edit.html:143 cps/templates/book_table.html:111
 #: cps/templates/cwa_settings.html:362 cps/templates/cwa_settings.html:364
 #: cps/templates/cwa_settings.html:1134
@@ -2180,7 +2180,7 @@ msgstr "Séries"
 msgid "Books ordered by series"
 msgstr "Livres classés par série"
 
-#: cps/opds.py:236 cps/render_template.py:179 cps/spa_strings.py:628
+#: cps/opds.py:236 cps/render_template.py:190 cps/spa_strings.py:628
 #: cps/templates/book_table.html:113 cps/templates/detail.html:930
 #: cps/templates/search_form.html:108 cps/web.py:2143
 msgid "Languages"
@@ -2190,7 +2190,7 @@ msgstr "Langues"
 msgid "Books ordered by Languages"
 msgstr "Livres classés par langue"
 
-#: cps/opds.py:242 cps/render_template.py:183 cps/spa_strings.py:736
+#: cps/opds.py:242 cps/render_template.py:194 cps/spa_strings.py:736
 #: cps/web.py:2103
 msgid "Ratings"
 msgstr "Évaluations"
@@ -2199,7 +2199,7 @@ msgstr "Évaluations"
 msgid "Books ordered by Rating"
 msgstr "Livres classés par évaluation"
 
-#: cps/opds.py:248 cps/render_template.py:186
+#: cps/opds.py:248 cps/render_template.py:197
 msgid "File formats"
 msgstr "Formats de fichier"
 
@@ -2261,115 +2261,115 @@ msgstr "Jeton expiré"
 msgid "Success! Please return to your device"
 msgstr "Réussite! Merci de vous tourner vers votre appareil"
 
-#: cps/render_template.py:116
+#: cps/render_template.py:127
 msgid ""
 "Duplicate scanning needs a one-time full scan before fast duplicate checks "
 "can run after imports and metadata changes. "
 msgstr ""
 
-#: cps/render_template.py:136 cps/spa_strings.py:444
+#: cps/render_template.py:147 cps/spa_strings.py:444
 msgid "Books"
 msgstr "Livres"
 
-#: cps/render_template.py:138
+#: cps/render_template.py:149
 msgid "Show recent books"
 msgstr "Afficher les livres récents"
 
-#: cps/render_template.py:141
+#: cps/render_template.py:152
 msgid "Show Hot Books"
 msgstr "Montrer les livres populaires"
 
-#: cps/render_template.py:143 cps/render_template.py:148
+#: cps/render_template.py:154 cps/render_template.py:159
 msgid "Downloaded Books"
 msgstr "Livres téléchargés"
 
-#: cps/render_template.py:145 cps/render_template.py:150
+#: cps/render_template.py:156 cps/render_template.py:161
 #: cps/templates/user_table.html:169
 msgid "Show Downloaded Books"
 msgstr "Montrer les livres téléchargés"
 
-#: cps/render_template.py:155 cps/templates/user_table.html:163
+#: cps/render_template.py:166 cps/templates/user_table.html:163
 msgid "Show Top Rated Books"
 msgstr "Montrer les livres les mieux notés"
 
-#: cps/render_template.py:158
+#: cps/render_template.py:169
 msgid "Show Read and Unread"
 msgstr "Montrer lus et non-lus"
 
-#: cps/render_template.py:162
+#: cps/render_template.py:173
 msgid "Show unread"
 msgstr "Afficher non-lus"
 
-#: cps/render_template.py:163 cps/spa_strings.py:540
+#: cps/render_template.py:174 cps/spa_strings.py:540
 msgid "Discover"
 msgstr "Découvrir"
 
-#: cps/render_template.py:168 cps/templates/user_table.html:160
+#: cps/render_template.py:179 cps/templates/user_table.html:160
 msgid "Show Category Section"
 msgstr "Montrer la section Catégories"
 
-#: cps/render_template.py:171 cps/templates/user_table.html:159
+#: cps/render_template.py:182 cps/templates/user_table.html:159
 msgid "Show Series Section"
 msgstr "Montrer la section Séries"
 
-#: cps/render_template.py:174 cps/templates/user_table.html:162
+#: cps/render_template.py:185 cps/templates/user_table.html:162
 msgid "Show Author Section"
 msgstr "Montrer la section Auteurs"
 
-#: cps/render_template.py:178 cps/templates/user_table.html:165
+#: cps/render_template.py:189 cps/templates/user_table.html:165
 msgid "Show Publisher Section"
 msgstr "Montrer la section Éditeurs"
 
-#: cps/render_template.py:182 cps/templates/user_table.html:157
+#: cps/render_template.py:193 cps/templates/user_table.html:157
 msgid "Show Language Section"
 msgstr "Montrer la section Langues"
 
-#: cps/render_template.py:185 cps/templates/user_table.html:166
+#: cps/render_template.py:196 cps/templates/user_table.html:166
 msgid "Show Ratings Section"
 msgstr "Afficher la section Évaluations"
 
-#: cps/render_template.py:188 cps/templates/user_table.html:167
+#: cps/render_template.py:199 cps/templates/user_table.html:167
 msgid "Show File Formats Section"
 msgstr "Afficher la section Formats de fichiers"
 
-#: cps/render_template.py:190 cps/web.py:1077
+#: cps/render_template.py:201 cps/web.py:1077
 msgid "Archived Books"
 msgstr "Livres archivés"
 
-#: cps/render_template.py:192 cps/templates/user_table.html:168
+#: cps/render_template.py:203 cps/templates/user_table.html:168
 msgid "Show Archived Books"
 msgstr "Afficher les livres archivés"
 
-#: cps/render_template.py:194 cps/spa_strings.py:574
+#: cps/render_template.py:205 cps/spa_strings.py:574
 msgid "Favorites"
 msgstr "Favoris"
 
-#: cps/render_template.py:196
+#: cps/render_template.py:207
 msgid "Show Favorites"
 msgstr ""
 
-#: cps/render_template.py:199 cps/web.py:1825
+#: cps/render_template.py:210 cps/web.py:1825
 msgid "Books List"
 msgstr "Liste des livres"
 
-#: cps/render_template.py:201 cps/templates/user_table.html:170
+#: cps/render_template.py:212 cps/templates/user_table.html:170
 msgid "Show Books List"
 msgstr "Montrer la liste des livres"
 
-#: cps/render_template.py:204 cps/spa_strings.py:551
+#: cps/render_template.py:215 cps/spa_strings.py:551
 msgid "Duplicates"
 msgstr "Doubles"
 
-#: cps/render_template.py:206
+#: cps/render_template.py:217
 msgid "Show Duplicate Books"
 msgstr "Montrer les livres en double"
 
-#: cps/render_template.py:322
+#: cps/render_template.py:333
 #, python-format
 msgid "Calibre-Web NextGen %(latest)s is available — you're on %(current)s."
 msgstr ""
 
-#: cps/render_template.py:332
+#: cps/render_template.py:343
 #, python-format
 msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "

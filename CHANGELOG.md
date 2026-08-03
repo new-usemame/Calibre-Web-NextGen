@@ -16,6 +16,24 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Your reading position is no longer lost without warning when the database
+  is busy.** Both readers save your place constantly — the classic reader on
+  every page turn, the new one every second or so — and if that save failed
+  because something else was writing to the database at that moment, the
+  browser was told it had worked. It hadn't: the position was thrown away, and
+  because the browser thought it was saved, it never tried again. You would
+  come back to the book and find yourself pages behind, with nothing in the log
+  to explain it. Saves that fail now say so, and the reader retries instead of
+  quietly dropping your place.
+  The same "said it worked when it didn't" answer turned up in three other
+  places, all now fixed: changing an admin password from the command line could
+  print "Password for user X changed" and exit successfully when the change had
+  in fact been rolled back; revoking a Kobo sync token could report success
+  while the token stayed valid; and editing an allowed-registration domain in
+  the admin panel could show the new value in the table without it being saved.
+
 ### Added
 
 - **Reading in your browser now counts towards your reading progress

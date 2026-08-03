@@ -223,7 +223,8 @@ def set_bookmark(book_id, book_format):
                                               ub.Bookmark.book_id == book_id,
                                               ub.Bookmark.format == book_format)).delete()
     if not bookmark_key:
-        ub.session_commit()
+        if not ub.session_commit():
+            return "", 500
         return "", 204
 
     l_bookmark = ub.Bookmark(user_id=current_user.id,
@@ -231,6 +232,15 @@ def set_bookmark(book_id, book_format):
                              format=book_format,
                              bookmark_key=bookmark_key)
     ub.session.merge(l_bookmark)
+
+    # #1318: settle the user's own write here, before the optional one below.
+    # This flush IS the bookmark; performed inside the progress helper it landed
+    # under the `except Exception` guard a few lines down and a genuine bookmark
+    # failure got logged as an optional progress-sharing failure — and answered
+    # 201 anyway. Settling first also keeps the bookmark out of the savepoint the
+    # helper opens, so a rollback there cannot take it.
+    if not ub.session_flush():
+        return "", 500
 
     # #324: the CFI above is opaque and read by nothing but the readers, so a
     # browser reading session was invisible to the user's other devices. The
@@ -245,7 +255,10 @@ def set_bookmark(book_id, book_format):
             # Position sharing must never cost the user their bookmark.
             log.warning("Could not share web reader progress for book %s: %s", book_id, e)
 
-    ub.session_commit("Bookmark for user {} in book {} created".format(current_user.id, book_id))
+    # The classic reader posts on every page turn, so a client told 201 after a
+    # rolled-back write simply loses the position with no reason to retry.
+    if not ub.session_commit("Bookmark for user {} in book {} created".format(current_user.id, book_id)):
+        return "", 500
     return "", 201
 
 

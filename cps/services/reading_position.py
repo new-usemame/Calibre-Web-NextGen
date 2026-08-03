@@ -101,23 +101,12 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     # authoritative *within this transaction* — cheap, and strictly better than
     # comparing against whatever happens to be in memory.
     #
-    # ``no_autoflush`` is load-bearing, not tidiness. The caller has a pending
-    # bookmark write on this session; a bare query would autoflush it here, so a
-    # failure belonging to the caller's REQUIRED write would surface inside this
+    # ``no_autoflush`` is load-bearing, not tidiness. Should a caller still have
+    # a pending write on this session, a bare query would autoflush it here, so
+    # a failure belonging to that REQUIRED write would surface inside this
     # best-effort helper and be logged (and swallowed) by the routes as an
     # optional progress-sharing failure. Reading without flushing keeps a read
-    # from being the thing that trips the caller's write.
-    #
-    # Residual, stated plainly: the settling ``flush()`` below is still the
-    # caller's write, so a failure there is still misattributed by the routes'
-    # broad handler. That flush cannot simply move — the savepoint only contains
-    # what is flushed after it, so the bookmark must settle first or a rollback
-    # would take it too. The underlying hazard predates #324: ``session_commit``
-    # swallows OperationalError/InvalidRequestError and returns normally, so a
-    # failing bookmark write already answered 201/204 before this file existed.
-    # Fixing that means changing what those routes report on a failed write,
-    # which is a wider behaviour change than a progress bridge should make;
-    # filed separately rather than smuggled in here.
+    # from being the thing that trips someone else's write.
     #
     # Honest limit: this is not cross-connection atomicity. The read-then-write
     # below can still interleave with a writer on another connection, because
@@ -152,15 +141,20 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     # service is imported from cps.web / cps.api.reader at request time.
     from ..progress_syncing.protocols.kosync import update_book_read_status
 
-    # Sharing a position must never cost the user their bookmark. The caller's
-    # bookmark write is already pending, so settle it BEFORE opening the
-    # savepoint — otherwise it would flush inside the savepoint and a rollback
-    # would take it with us. ``update_book_read_status`` creates ReadBook and
-    # KoboReadingState rows that carry UNIQUE(user_id, book_id), so a first-ever
+    # Sharing a position must never cost the user their bookmark, so this write
+    # goes in a SAVEPOINT: ``update_book_read_status`` creates ReadBook and
+    # KoboReadingState rows carrying UNIQUE(user_id, book_id), and a first-ever
     # write racing a Kobo state PUT can raise IntegrityError at flush time —
-    # which ``ub.session_commit`` does not catch. The SAVEPOINT confines that
-    # failure to the progress write and leaves the bookmark commit intact.
-    ub.session.flush()
+    # which ``ub.session_commit`` does not catch. The savepoint confines that
+    # failure to the progress write and leaves the caller's commit intact.
+    #
+    # PRECONDITION (#1318): the caller must have settled its own pending writes
+    # first — ``ub.session_flush()`` — for two reasons. A savepoint only contains
+    # what is flushed after it, so an unsettled caller write would roll back with
+    # us; and settling it here would mean a failure of the caller's REQUIRED
+    # write raising inside this best-effort helper, where the routes' broad
+    # handler logs it as an optional progress-sharing failure and answers success
+    # anyway. Both bookmark routes settle before calling in.
     try:
         with ub.session.begin_nested():
             update_book_read_status(user, book_id, percentage)

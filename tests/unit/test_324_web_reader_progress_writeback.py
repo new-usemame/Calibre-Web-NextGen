@@ -467,15 +467,24 @@ def test_spa_reader_is_keyed_by_book_id():
 
 @pytest.mark.unit
 def test_progress_lookup_does_not_autoflush_the_callers_bookmark():
-    """The caller has a pending bookmark write when this runs. A bare query
-    would autoflush it, making a failure of the user's REQUIRED write surface
-    inside this best-effort helper — where both routes log and swallow it as an
-    optional progress failure."""
+    """A bare query here would autoflush whatever the caller still has pending,
+    making a failure of the user's REQUIRED write surface inside this
+    best-effort helper — where both routes log and swallow it as an optional
+    progress failure.
+
+    This originally also asserted that the lookup preceded a settling
+    ``ub.session.flush()`` inside this helper. #1318 moved that settle out to
+    the routes that own the write, so the ordering half now lives in
+    ``test_1318_honest_commit_status.py``
+    (``test_bookmark_routes_settle_before_sharing_progress`` and
+    ``test_progress_helper_does_not_settle_the_callers_write``). The
+    no_autoflush guard is still this file's to keep.
+    """
     src = (REPO / "cps/services/reading_position.py").read_text(encoding="utf-8")
     assert "with ub.session.no_autoflush:" in src, \
-        "the KoboReadingState lookup must not autoflush the caller's pending write"
+        "the KoboReadingState lookup must not autoflush a caller's pending write"
     lookup = src.index("query(ub.KoboReadingState)")
     guard = src.index("with ub.session.no_autoflush:")
-    settle = src.index("ub.session.flush()")
-    assert guard < lookup < settle, \
-        "the no_autoflush guard must wrap the lookup, which must precede the settling flush"
+    savepoint = src.index("with ub.session.begin_nested():")
+    assert guard < lookup < savepoint, \
+        "the no_autoflush guard must wrap the lookup, which must precede the savepoint"

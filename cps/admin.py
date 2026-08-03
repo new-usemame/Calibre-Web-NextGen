@@ -1122,7 +1122,12 @@ def edit_domain(allow):
     vals = request.form.to_dict()
     answer = ub.session.query(ub.Registration).filter(ub.Registration.id == vals['pk']).first()
     answer.domain = vals['value'].replace('*', '%').replace('?', '_').lower()
-    return ub.session_commit("Registering Domains edited {}".format(answer.domain))
+    # #1318: x-editable takes any 2xx as "saved" and paints the new value into
+    # the table, so a rolled-back edit used to leave the admin looking at a
+    # domain rule that is not in the database.
+    if not ub.session_commit("Registering Domains edited {}".format(answer.domain)):
+        return "", 500
+    return ""
 
 
 @admi.route("/ajax/adddomain/<int:allow>", methods=['POST'])

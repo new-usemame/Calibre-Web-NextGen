@@ -122,7 +122,12 @@ def delete_auth_token(user_id):
     ub.session.query(ub.RemoteAuthToken).filter(ub.RemoteAuthToken.user_id == user_id)\
         .filter(ub.RemoteAuthToken.token_type==1).delete()
 
-    return ub.session_commit()
+    # #1318: returning the helper's value used to answer 200 whether or not the
+    # revocation landed. Telling someone their Kobo token is gone when it is
+    # still valid is the wrong way round to be wrong about a credential.
+    if not ub.session_commit():
+        return "", 500
+    return ""
 
 
 def disable_failed_auth_redirect_for_blueprint(bp):

@@ -72,6 +72,12 @@ def save_bookmark(book_id):
             format=fmt,
             bookmark_key=bookmark_key,
         ))
+        # #1318: settle the required write before the optional one, so a bookmark
+        # failure is not reported in the vocabulary of a progress-sharing failure
+        # (and so the savepoint below cannot roll the bookmark back with it).
+        if not ub.session_flush():
+            return "", 500
+
         # #324: share the portable half of the position (the percentage) with the
         # user's other devices. Mirrors the legacy route so both readers behave
         # the same. Only on a save — an empty bookmark is a clear.
@@ -82,7 +88,11 @@ def save_bookmark(book_id):
             except Exception as e:
                 # Position sharing must never cost the user their bookmark.
                 log.warning("Could not share web reader progress for book %s: %s", book_id, e)
-    ub.session_commit("Bookmark for user {} in book {} via api".format(current_user.id, book_id))
+
+    # The SPA debounces one of these every 800ms; answering 204 on a rolled-back
+    # write drops the position silently and tells the client not to retry.
+    if not ub.session_commit("Bookmark for user {} in book {} via api".format(current_user.id, book_id)):
+        return "", 500
     return "", 204
 
 

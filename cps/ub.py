@@ -3093,7 +3093,11 @@ def password_change(user_credentials=None):
             except Exception:
                 print("Password doesn't comply with password validation rules")
                 sys.exit(4)
-            if session_commit() == "":
+            # #1318: this used to read `session_commit() == ""`, which was
+            # unconditionally true, so the failure branch below was dead and an
+            # admin whose write rolled back was told the password changed and
+            # got exit 0 — locked out, believing otherwise.
+            if session_commit():
                 print("Password for user '{}' changed".format(username))
                 sys.exit(0)
             else:
@@ -3132,12 +3136,48 @@ def dispose():
                 pass
 
 def session_commit(success=None, _session=None):
+    """Commit, reporting honestly whether the write landed.
+
+    Returns ``True`` when the transaction committed and ``False`` when it was
+    rolled back.  Most callers commit-and-forget and can keep ignoring this;
+    callers whose answer to the user depends on the write actually landing MUST
+    check it (#1318 — the previous ``""`` return could not express failure, so
+    a rolled-back bookmark was still answered 201 and a failed admin password
+    reset still exited 0).
+
+    The caught set is deliberately unchanged: anything else — an
+    ``IntegrityError`` from a racing writer, say — still propagates, because
+    callers such as ``services/reading_position`` contain exactly that in a
+    savepoint of their own.
+    """
     s = _session if _session else session
     try:
         s.commit()
         if success:
             log.info(success)
+        return True
     except (exc.OperationalError, exc.InvalidRequestError) as e:
         s.rollback()
         log.error_or_exception(e)
-    return ""
+        return False
+
+
+def session_flush(_session=None):
+    """Settle pending writes, reporting honestly whether they landed.
+
+    The ``session_commit`` shape, one step earlier.  A route that needs its own
+    write settled before opening a savepoint for an optional follow-up write
+    uses this, so a failure belonging to the required write is raised where it
+    is owned rather than inside the optional write's guard (#1318).
+
+    Broader than ``session_commit`` on purpose: a flush is where constraint
+    violations surface, and any flush failure means the write did not land.
+    """
+    s = _session if _session else session
+    try:
+        s.flush()
+        return True
+    except exc.SQLAlchemyError as e:
+        s.rollback()
+        log.error_or_exception(e)
+        return False

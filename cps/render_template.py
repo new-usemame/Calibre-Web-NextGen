@@ -28,6 +28,17 @@ from cwa_db import CWA_DB
 
 log = logger.create()
 
+# Where the "update available" banner remembers the date it last fired, so it
+# can hold itself to once per calendar day.
+#
+# This has to live under /config. That is the declared VOLUME; /app is part of
+# the image and its writable layer is thrown away whenever the container is
+# recreated, which is precisely what a user does when they pull a new image.
+# Keeping the throttle there reset it at the one moment the banner had most
+# likely already been shown (#1333, @chloeroform). Siblings on the same volume:
+# cwa_ingest_status, cwa_ingest_retry_queue, and the logs.
+CWA_UPDATE_NOTICE_PATH = "/config/cwa_update_notice"
+
 
 def _duplicate_setup_notice_dismissed():
     return duplicate_setup_notice_dismissed(getattr(current_user, 'id', 'unknown'))
@@ -305,12 +316,12 @@ def cwa_update_available() -> tuple[bool, str, str]:
 # Gets the date the last cwa update notification was displayed
 def get_cwa_last_notification() -> str:
     current_date = datetime.now().strftime("%Y-%m-%d")
-    if not os.path.isfile('/config/cwa_update_notice'):
-        with open('/config/cwa_update_notice', 'w') as f:
+    if not os.path.isfile(CWA_UPDATE_NOTICE_PATH):
+        with open(CWA_UPDATE_NOTICE_PATH, 'w') as f:
             f.write(current_date)
         return "0001-01-01"
     else:
-        with open('/config/cwa_update_notice', 'r') as f:
+        with open(CWA_UPDATE_NOTICE_PATH, 'r') as f:
             last_notification = f.read()
     return last_notification
 
@@ -352,7 +363,7 @@ def cwa_update_notification() -> None:
             flash(message, category="cwa_update")
             print(f"[cwa-update-notification-service] {message}", flush=True)
 
-        with open('/config/cwa_update_notice', 'w') as f:
+        with open(CWA_UPDATE_NOTICE_PATH, 'w') as f:
             f.write(current_date)
         return
     else:

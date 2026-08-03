@@ -59,6 +59,17 @@ is for things you can see or feel when running the app.
   walks Calibre's hidden `.caltrash` folder, so books you deleted are no longer
   processed and reported alongside the ones in your library.
 
+- **The "update available" banner stops re-appearing every time you restart.**
+  The banner is meant to show at most once a day, and it remembered the date it
+  last appeared in a file. That file was kept in a part of the container that
+  gets wiped whenever the container is recreated, which is exactly what happens
+  when you pull a new image. So the reminder forgot itself at the one moment it
+  was most likely to be redundant, and admins saw it again on the next page
+  load. It now lives in your `/config` folder alongside the logs, so the
+  once-a-day promise holds across restarts and upgrades. You may see the banner
+  one extra time on the first start after updating, then it settles.
+  Thanks to @chloeroform for finding and fixing this.
+
 ### Added
 
 - **Reading in your browser now counts towards your reading progress

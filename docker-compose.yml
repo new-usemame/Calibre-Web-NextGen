@@ -3,7 +3,7 @@ services:
   calibre-web-automated:
     # Calibre-Web-NextGen images are published to GHCR by the release CI.
     # Pin to a version tag (e.g. :v4.0.7) for production. Upstream image still pullable
-    # at crocodilestick/calibre-web-automated:latest if you prefer to track upstream.
+    # at ghcr.io/new-usemame/calibre-web-nextgen:latest if you prefer to track upstream.
     image: ghcr.io/new-usemame/calibre-web-nextgen:latest
     container_name: calibre-web-nextgen
     environment:

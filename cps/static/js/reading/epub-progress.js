@@ -24,6 +24,24 @@ function calculateProgress(){
 }
 
 /**
+ * The same position, UNROUNDED. calculateProgress() rounds for display, which
+ * is wrong to sync: the server marks a book finished at >= 99%, so a reader at
+ * an actual 98.5% would round to 99 and have the book marked read with the last
+ * chapter still ahead of them (#324 review finding). Rounding stays a display
+ * concern; the shared position keeps its precision.
+ */
+function calculateProgressExact(){
+    if (!reader || !reader.rendition || !reader.rendition.location || !reader.rendition.location.end) {
+        return null;
+    }
+    let data=reader.rendition.location.end;
+    if (!data || !data.cfi || !epub || !epub.locations) {
+        return null;
+    }
+    return epub.locations.percentageFromCfi(data.cfi)*100;
+}
+
+/**
  * Compute the user's progress within the CURRENT spine section (chapter),
  * complementing the book-wide calculateProgress() above. Backport of
  * janeczku/calibre-web#3370 (@ryan-c-scott) adapted to our split
@@ -227,10 +245,11 @@ window.addEventListener('locationchange',()=>{
         localStorage.setItem("calibre.reader.progress." + bookKey, newPos);
         let cfi = reader && reader.rendition && reader.rendition.currentLocation
             ? reader.rendition.currentLocation()?.start?.cfi : null;
-        // newPos is trustworthy here: this branch already required generated
-        // locations, which is the guard that makes it a real percentage and not
-        // the pre-generate() 0 that CWA #1364 was about.
-        if (cfi) scheduleCfiSave(cfi, newPos);
+        // This branch already required generated locations, which is the guard
+        // that makes the percentage real and not the pre-generate() 0 that CWA
+        // #1364 was about. Send the UNROUNDED value — newPos is the rounded
+        // display figure and would turn 98.5% into a finished book.
+        if (cfi) scheduleCfiSave(cfi, calculateProgressExact());
     }
 });
 

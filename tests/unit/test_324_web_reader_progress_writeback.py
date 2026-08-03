@@ -144,14 +144,23 @@ def test_backward_progress_never_regresses_another_device(monkeypatch):
 
 
 @pytest.mark.unit
-def test_equal_progress_is_a_no_op(monkeypatch):
-    """Percentages are integers for most of a page — re-writing an unchanged
-    value would bump KoboReadingState.last_modified and churn the Kobo feed."""
+@pytest.mark.parametrize("incoming", [50.0, 20.0])
+def test_rejected_write_does_not_touch_parent_last_modified(monkeypatch, incoming):
+    """A rejected write must be inert. KoboReadingState.last_modified is what
+    gates the Kobo sync feed (cps/kobo.py:544, :691), so bumping it on an equal
+    or backward position would push the device a payload carrying no news."""
     session = _session()
     mod = _service(monkeypatch, session)
     _seed_progress(session, user_id=7, book_id=42, percent=50.0)
+    before = (session.query(ub.KoboReadingState)
+              .filter(ub.KoboReadingState.book_id == 42).first().last_modified)
 
-    assert mod.record_web_reader_progress(SimpleNamespace(id=7), 42, 50.0) is False
+    assert mod.record_web_reader_progress(SimpleNamespace(id=7), 42, incoming) is False
+    session.commit()
+
+    state = (session.query(ub.KoboReadingState)
+             .filter(ub.KoboReadingState.book_id == 42).first())
+    assert state.last_modified == before, "rejected write must not churn the Kobo feed"
     assert _stored_percent(session, 7, 42) == 50.0
 
 
@@ -218,6 +227,69 @@ def test_writeback_bumps_parent_last_modified_for_the_kobo_feed(monkeypatch):
     after = (session.query(ub.KoboReadingState)
              .filter(ub.KoboReadingState.book_id == 42).first().last_modified)
     assert after > before, "parent last_modified must advance or Kobo never syncs it"
+
+
+@pytest.mark.unit
+def test_progress_failure_does_not_cost_the_user_their_bookmark(monkeypatch):
+    """The savepoint is the whole promise of the try/except in the routes: an
+    IntegrityError from the concurrent-first-write race surfaces at FLUSH time,
+    which ub.session_commit does not catch. The progress write must roll back
+    alone, leaving the caller's bookmark committable."""
+    session = _session()
+    mod = _service(monkeypatch, session)
+
+    # The caller's pending bookmark write, exactly as the routes leave it.
+    session.merge(ub.Bookmark(user_id=7, book_id=42, format="epub",
+                              bookmark_key="epubcfi(/6/8!/4/2)"))
+
+    boom = sys.modules["cps.progress_syncing.protocols.kosync"]
+    monkeypatch.setattr(boom, "update_book_read_status",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("flush blew up")))
+
+    assert mod.record_web_reader_progress(SimpleNamespace(id=7), 42, 55.0) is False
+    session.commit()  # must not raise
+
+    row = (session.query(ub.Bookmark)
+           .filter(ub.Bookmark.user_id == 7, ub.Bookmark.book_id == 42).first())
+    assert row is not None, "a failed progress share must not lose the bookmark"
+    assert row.bookmark_key == "epubcfi(/6/8!/4/2)"
+
+
+# ── the finished threshold must not be reachable by display rounding ─────────
+
+@pytest.mark.unit
+def test_clients_sync_the_unrounded_percentage():
+    """The server finishes a book at >= 99%. Both readers round for display, so
+    syncing the rounded figure would mark a book read for someone at an actual
+    98.5%. The synced value must be the unrounded one."""
+    js = (REPO / "cps/static/js/reading/epub-progress.js").read_text(encoding="utf-8")
+    assert "calculateProgressExact" in js, \
+        "classic reader must sync an unrounded percentage"
+    assert re.search(r"scheduleCfiSave\(\s*cfi\s*,\s*calculateProgressExact\(\)\s*\)", js), \
+        "the save call must use the exact value, not the rounded display figure"
+
+    tsx = (REPO / "frontend/src/pages/Reader.tsx").read_text(encoding="utf-8")
+    assert re.search(r"persistCfi\(\s*cfi\s*,\s*exact\s*\)", tsx), \
+        "SPA reader must persist the unrounded percentage"
+    assert re.search(r"setProgress\(\s*Math\.round\(\s*exact\s*\)\s*\)", tsx), \
+        "rounding must remain a display concern"
+
+
+@pytest.mark.unit
+def test_a_position_below_the_threshold_does_not_finish_the_book(monkeypatch):
+    """98.5% is 'nearly done', not 'done'. Pinning the boundary the rounding
+    fix protects."""
+    session = _session()
+    mod = _service(monkeypatch, session)
+    _seed_progress(session, user_id=7, book_id=42, percent=10.0)
+
+    assert mod.record_web_reader_progress(SimpleNamespace(id=7), 42, 98.5) is True
+    session.commit()
+
+    read = (session.query(ub.ReadBook)
+            .filter(ub.ReadBook.user_id == 7, ub.ReadBook.book_id == 42).first())
+    assert read.read_status == ub.ReadBook.STATUS_IN_PROGRESS
+    assert _stored_percent(session, 7, 42) == 98.5
 
 
 # ── route wiring: both bookmark writers thread the field ─────────────────────

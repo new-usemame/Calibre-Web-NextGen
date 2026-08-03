@@ -376,11 +376,14 @@ export function Reader({ id }: { id: string }) {
           if (!cfi) return;
           // Locations must exist for percentageFromCfi to mean anything; without
           // them the position still saves, just without the shareable percentage.
-          const pct = epubBook.locations.length()
-            ? Math.round(epubBook.locations.percentageFromCfi(cfi) * 100)
+          // Sync the UNROUNDED value: the server marks a book finished at >= 99%,
+          // so rounding first would finish a book for a reader at 98.5%.
+          // Rounding stays a display concern.
+          const exact = epubBook.locations.length()
+            ? epubBook.locations.percentageFromCfi(cfi) * 100
             : undefined;
-          persistCfi(cfi, pct);
-          if (pct !== undefined) setProgress(pct);
+          persistCfi(cfi, exact);
+          if (exact !== undefined) setProgress(Math.round(exact));
         });
 
         // Render existing highlights (the CFI-anchored ones we can place). Each

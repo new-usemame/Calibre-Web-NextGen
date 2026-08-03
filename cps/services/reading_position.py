@@ -92,12 +92,29 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     except (AttributeError, TypeError, ValueError):
         return False
 
+    # ``ub.session`` is a single long-lived Session shared across requests
+    # (``init_db`` builds it once), so a plain query can answer from the identity
+    # map rather than the row. ``populate_existing`` + ``refresh`` make this read
+    # authoritative *within this transaction* — cheap, and strictly better than
+    # comparing against whatever happens to be in memory.
+    #
+    # Honest limit: this is not cross-connection atomicity. The read-then-write
+    # below can still interleave with a writer on another connection, because
+    # acceptance is decided in Python rather than by the UPDATE itself. That is
+    # a pre-existing property of this subsystem, not something introduced here —
+    # KOSync's own furthest-wins check (kosync.py:1106) has exactly the same
+    # shape. Fixing it properly means one shared conditional-UPDATE primitive
+    # used by both writers; tracked separately rather than half-done here.
+    # The failure mode is self-correcting: the next sync from the further device
+    # re-advances the value, because its percentage is still the larger one.
     stored = None
     state = (ub.session.query(ub.KoboReadingState)
+             .populate_existing()
              .filter(ub.KoboReadingState.user_id == user_id,
                      ub.KoboReadingState.book_id == book_id)
              .first())
     if state is not None and state.current_bookmark is not None:
+        ub.session.refresh(state.current_bookmark)
         stored = state.current_bookmark.progress_percent
 
     if stored is not None and percentage <= stored:
@@ -110,7 +127,23 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     # service is imported from cps.web / cps.api.reader at request time.
     from ..progress_syncing.protocols.kosync import update_book_read_status
 
-    update_book_read_status(user, book_id, percentage)
+    # Sharing a position must never cost the user their bookmark. The caller's
+    # bookmark write is already pending, so settle it BEFORE opening the
+    # savepoint — otherwise it would flush inside the savepoint and a rollback
+    # would take it with us. ``update_book_read_status`` creates ReadBook and
+    # KoboReadingState rows that carry UNIQUE(user_id, book_id), so a first-ever
+    # write racing a Kobo state PUT can raise IntegrityError at flush time —
+    # which ``ub.session_commit`` does not catch. The SAVEPOINT confines that
+    # failure to the progress write and leaves the bookmark commit intact.
+    ub.session.flush()
+    try:
+        with ub.session.begin_nested():
+            update_book_read_status(user, book_id, percentage)
+    except Exception as e:
+        log.warning("Could not share web reader progress for user %s book %s: %s",
+                    user_id, book_id, e)
+        return False
+
     log.debug("Web reader advanced progress for user %s book %s to %.2f%%",
               user_id, book_id, percentage)
     return True

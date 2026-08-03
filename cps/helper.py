@@ -703,11 +703,17 @@ def reset_reading_position(session, user_id, book_id):
     # column (fork #634/#509). Clearing the percentage above is not enough: the
     # "Currently reading" badge/shelf reads that tri-state, so leaving it at
     # IN_PROGRESS keeps the marker on after "mark unread". This bit the reporter
-    # on a custom-read-column install, where the unread toggle flips only the
-    # custom column and never touched ub.ReadBook at all. Fold the marker back to
-    # UNREAD here so "unread" is a genuine reset everywhere. FINISHED is left
-    # alone (only IN_PROGRESS is filtered), and a device that still holds a
-    # position re-establishes it on its next sync — the device owns its state.
+    # on a custom-read-column install, where the unread toggle flipped only the
+    # custom column. Fold the marker back to UNREAD here so "unread" is a
+    # genuine reset everywhere, and a device that still holds a position
+    # re-establishes it on its next sync — the device owns its state.
+    #
+    # FINISHED is deliberately left alone (only IN_PROGRESS is filtered): this
+    # function resets a *position*, and both callers set the read status
+    # themselves around it — the default branch before, the custom-column branch
+    # after via ``mirror_read_status_to_readbook`` (#1343). Filtering FINISHED
+    # here too would make a position reset silently un-read a book for any
+    # future caller that only wanted the percentage cleared.
     read_row = session.query(ub.ReadBook).filter(
         ub.ReadBook.user_id == uid,
         ub.ReadBook.book_id == book_id,
@@ -782,6 +788,47 @@ def _get_kosync_checksums_for_book(book_id):
         return []
 
 
+def mirror_read_status_to_readbook(session, user_id, book_id, finished):
+    """Mirror a custom-read-column toggle into ``ub.ReadBook.read_status`` (#1343).
+
+    When an admin designates a Calibre custom column as the read marker, the
+    detail page reads read-status from *that* column — but ``ub.ReadBook`` is
+    not thereby unused. KOReader/Kobo sync and the web reader write the
+    tri-state there unconditionally (``kosync.update_book_read_status``), the
+    "Currently reading" marker reads it (``book_is_in_progress``), and since
+    #1340 the web reader refuses to share a position for a book whose row says
+    FINISHED. Leaving the column and the row to disagree therefore produced two
+    bugs at once: "mark read" protected nothing because no FINISHED row existed,
+    and "mark unread" could not clear a FINISHED row the browser had written —
+    wedging every later reader save with no way back through the UI.
+
+    So the column is the display carrier, and this keeps the sync carrier in
+    step with it. Both directions matter: FINISHED on set is what makes the
+    guard fire, UNREAD on clear is the escape hatch that keeps it temporary.
+
+    ``kosync._mark_custom_read_column`` is the same mirror in the other
+    direction (a device completion reaching the column). That one is
+    deliberately sticky — a sync must not un-read a book — whereas this one
+    follows the toggle both ways, because here the user is the one asking.
+
+    Only ``read_status`` is touched. ``times_started_reading`` and the position
+    rows belong to ``reset_reading_position``, which the caller runs on clear.
+
+    Marking unread when no row exists writes nothing: absent already means
+    unread, and inventing a row per never-read book is just churn.
+    """
+    uid = int(user_id)
+    row = session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == uid,
+        ub.ReadBook.book_id == book_id).first()
+    if row is None:
+        if not finished:
+            return
+        row = ub.ReadBook(user_id=uid, book_id=book_id)
+        session.add(row)
+    row.read_status = ub.ReadBook.STATUS_FINISHED if finished else ub.ReadBook.STATUS_UNREAD
+
+
 def edit_book_read_status(book_id, read_status=None):
     if not config.config_read_column:
         book = ub.session.query(ub.ReadBook).filter(and_(ub.ReadBook.user_id == int(current_user.id),
@@ -823,10 +870,18 @@ def edit_book_read_status(book_id, read_status=None):
                 calibre_db.session.commit()
                 now_unread = not book_read_status[0].value
             else:
+                # ``value=read_status or 1`` marked the book READ for an
+                # explicit ``read_status=False`` — asking to un-read a book that
+                # had no column row yet did the opposite of what was asked, and
+                # would now push that same inversion into ub.ReadBook below.
+                # Absent means unread, so an explicit request is honoured and a
+                # bare toggle (None) still means "mark read".
+                new_value = True if read_status is None else bool(read_status)
                 cc_class = db.cc_classes[config.config_read_column]
-                new_cc = cc_class(value=read_status or 1, book=book_id)
+                new_cc = cc_class(value=new_value, book=book_id)
                 calibre_db.session.add(new_cc)
                 calibre_db.session.commit()
+                now_unread = not new_value
         except (KeyError, AttributeError, IndexError):
             log.error(
                 "Custom Column No.{} does not exist in calibre database".format(config.config_read_column))
@@ -839,7 +894,14 @@ def edit_book_read_status(book_id, read_status=None):
         # marking unread there also clears the ghost "% read".
         if now_unread:
             reset_reading_position(ub.session, current_user.id, book_id)
-            ub.session_commit("Reading progress reset for book {}".format(book_id))
+        # #1343: the custom column is the *display* carrier; ub.ReadBook is the
+        # *sync* carrier that KOReader/Kobo and the web reader write regardless
+        # of it. Left unmirrored the two disagree, and since #1340 that
+        # disagreement is user-visible in both directions — see
+        # mirror_read_status_to_readbook. Runs after the reset above so that
+        # keeps owning the position rows and its own accounting.
+        mirror_read_status_to_readbook(ub.session, current_user.id, book_id, not now_unread)
+        ub.session_commit("Read status updated for book {}".format(book_id))
     return ""
 
 

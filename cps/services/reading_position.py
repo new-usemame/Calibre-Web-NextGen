@@ -41,7 +41,10 @@ deliberately, because acceptance is decided in Python rather than in the
 UPDATE, so it is not proof against a device committing inside the read-write
 window.  See ``record_web_reader_progress`` for that limit in full.
 Deliberately restarting a book stays a "mark unread" action, which clears every
-carrier via ``helper.reset_reading_position``.
+carrier — the position rows via ``helper.reset_reading_position`` and the
+read-status tri-state via ``helper.mirror_read_status_to_readbook``, so the
+finished-book guard below stays clearable on a custom-read-column install too
+(#1343).
 """
 
 import math
@@ -140,8 +143,12 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
             ub.session.refresh(state.current_bookmark)
             stored = state.current_bookmark.progress_percent
 
-    # "Finished" IS the furthest position, so a sample from the browser has
-    # nothing to contribute to a book the user has already marked Read.
+    # Imported lazily: the KOSync protocol module pulls in cps.kobo, and this
+    # service is imported from cps.web / cps.api.reader at request time.
+    from ..progress_syncing.protocols.kosync import (read_status_for_percentage,
+                                                     update_book_read_status)
+
+    # A sample from the browser must not un-finish a book the user marked Read.
     #
     # Checking the status is not belt-and-braces on the percentage check below,
     # it is the only thing that covers this case: ``edit_book_read_status``
@@ -156,11 +163,21 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     #
     # The reader-open path already refuses to touch a FINISHED status for the
     # same reason (``cps/web.py``); this keeps the two consistent. Restarting a
-    # book stays "mark as unread", which clears every carrier and is the
-    # documented way back to 0.
-    if already_finished:
+    # book stays "mark as unread", which clears every carrier — including
+    # ``ReadBook.read_status`` on a custom-read-column install (#1343) — and is
+    # the documented way back to 0.
+    #
+    # Scoped to writes that would actually DOWNGRADE the status, not every write
+    # to a finished book (#1343). ``update_book_read_status`` finishes a book at
+    # ``FINISHED_PERCENT_THRESHOLD``, so the save that crossed the line marked it
+    # FINISHED and a blanket refusal then dropped the *next* one: the stored
+    # percentage stuck just under 100 and the device was told "99%"
+    # indefinitely. A sample that still means "finished" costs the user nothing
+    # and is not what this guard is for; furthest-wins below keeps it honest.
+    if already_finished and read_status_for_percentage(percentage) != ub.ReadBook.STATUS_FINISHED:
         log.debug("Web reader position not shared for user %s book %s: "
-                  "the book is already marked finished", user_id, book_id)
+                  "%.2f%% would un-finish a book already marked finished",
+                  user_id, book_id, percentage)
         return False
 
     if stored is not None and percentage <= stored:
@@ -168,10 +185,6 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
                   "incoming %.2f%% <= stored %.2f%%",
                   user_id, book_id, percentage, stored)
         return False
-
-    # Imported lazily: the KOSync protocol module pulls in cps.kobo, and this
-    # service is imported from cps.web / cps.api.reader at request time.
-    from ..progress_syncing.protocols.kosync import update_book_read_status
 
     # Sharing a position must never cost the user their bookmark, so this write
     # goes in a SAVEPOINT: ``update_book_read_status`` creates ReadBook and

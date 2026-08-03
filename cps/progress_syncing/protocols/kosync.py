@@ -387,6 +387,29 @@ def _ensure_visible_reading_state(book_read, user_id: int, book_id: int):
     return reading_state.current_bookmark
 
 
+#: Percentage at or above which a stored position means "finished".
+#: Single source of truth on purpose (#1343): the web-reader guard in
+#: ``cps.services.reading_position`` has to ask "would this sample still leave
+#: the book finished?" before refusing it, and a second copy of this number is
+#: exactly how two carriers of the same fact drift apart.
+FINISHED_PERCENT_THRESHOLD = 99.0
+
+
+def read_status_for_percentage(percentage: float) -> int:
+    """Map a reading percentage onto the ``ub.ReadBook`` tri-state status.
+
+    Thresholds: 0% is UNREAD, anything above it is IN_PROGRESS until
+    ``FINISHED_PERCENT_THRESHOLD``, at and above which the book is FINISHED.
+    The tail of a book is front matter, notes and index, so a reader that
+    reaches 99% has finished it in every sense the user cares about.
+    """
+    if percentage >= FINISHED_PERCENT_THRESHOLD:
+        return ub.ReadBook.STATUS_FINISHED
+    if percentage > 0:
+        return ub.ReadBook.STATUS_IN_PROGRESS
+    return ub.ReadBook.STATUS_UNREAD
+
+
 def update_book_read_status(user, book_id: int, percentage: float) -> None:
     """
     Update the user's ReadBook status based on reading progress percentage.
@@ -413,13 +436,7 @@ def update_book_read_status(user, book_id: int, percentage: float) -> None:
     Note:
         Caller is responsible for committing the session.
     """
-    # Determine the new read status based on percentage
-    if percentage >= 99.0:
-        new_status = ub.ReadBook.STATUS_FINISHED
-    elif percentage > 0:
-        new_status = ub.ReadBook.STATUS_IN_PROGRESS
-    else:
-        new_status = ub.ReadBook.STATUS_UNREAD
+    new_status = read_status_for_percentage(percentage)
 
     user_id = user.id
 

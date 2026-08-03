@@ -2,11 +2,14 @@ import { Info, BookOpen, Users, Layers, Tag } from 'lucide-react';
 import { useAbout } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import styles from './About.module.css';
 
 export function About() {
   const { data, isLoading, error } = useAbout();
+  const me = useMe().data;
+  const isAdmin = !!me?.role?.admin;
   const t = useT();
 
   if (isLoading) return <SpinnerCentered size={40} />;
@@ -42,6 +45,8 @@ export function About() {
         ))}
       </div>
 
+      {isAdmin && (
+      <div>
       <h2 className={styles.subTitle}>{t('Versions')}</h2>
       <dl className={styles.versions}>
         {Object.entries(data.versions).map(([name, ver]) => (
@@ -51,6 +56,8 @@ export function About() {
           </div>
         ))}
       </dl>
+      </div>
+      )}
     </main>
   );
 }

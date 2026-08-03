@@ -62,3 +62,14 @@ cps/static/app/
 app.db
 *.db-wal
 *.db-shm
+
+# Local developer artifacts. All four are git-ignored, so a CI checkout never
+# has them and published images were never affected -- but a local `docker
+# build` copied them straight into /app/calibre-web-automated/. Measured with a
+# `FROM scratch` + `COPY . /` probe, excluding just these four took the copied
+# layer from 299,311,528 to 17,832,889 bytes -- 281 MB. Same class as the .cwa_migrations note
+# above: a developer's tree must not end up inside the image.
+.venv
+.claude
+.coverage
+calibre-web.log

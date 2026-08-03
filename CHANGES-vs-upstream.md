@@ -501,6 +501,8 @@ Regression coverage for the testable subset of these backports lives in `tests/u
 
 Published to `ghcr.io/new-usemame/calibre-web-nextgen` instead of upstream's `crocodilestick/calibre-web-automated`. Same data layout, same compose file shape — drop-in swap.
 
+**Build context.** The Dockerfile copies the whole context (`COPY . /app/calibre-web-automated/`), so `.dockerignore` alone decides what ships. Development-only paths — docs, notes, wiki sources, CI and deployment config — are excluded (#1332, by @chloeroform), as are local developer artifacts (`.venv`, `.claude`, `.coverage`, `calibre-web.log`) that a clean CI checkout never has but a local `docker build` was copying into the image. `tests/unit/test_dockerignore_build_context.py` pins both directions: the junk stays out, and every path the runtime needs stays in — notably `empty_library/app.db`, the seed database a fresh install copies to `/config`, which the existing root-anchored `app.db` rule must never start matching.
+
 ## Patch hygiene
 
 Every entry in the "Backports" section is a clean cherry-pick of an upstream PR with the original author preserved as committer in the squash-merge message. Original-fork patches in the bottom section are landed as their own commits with focused titles. The squash-merge SHAs above are stable references on this fork's `main`.

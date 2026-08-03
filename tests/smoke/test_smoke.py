@@ -23,8 +23,8 @@ class TestBasicFunctionality:
     """Verify core application can start and basic functions work."""
     
     def test_python_version(self):
-        """Verify Python 3.10+ is being used."""
-        assert sys.version_info >= (3, 10), "Python 3.10 or higher required"
+        """Verify Python 3.11+ is being used."""
+        assert sys.version_info >= (3, 11), "Python 3.11 or higher required"
     
     def test_required_directories_exist(self):
         """Verify critical directories exist."""

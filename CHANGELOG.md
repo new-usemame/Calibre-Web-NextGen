@@ -16,6 +16,31 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Reading in your browser now counts towards your reading progress
+  everywhere else.** Until now the web reader kept its position to itself: it
+  could *show* you how far your Kobo or KOReader had got, but reading a few
+  chapters in the browser left no trace. Your Kobo still thought you were where
+  you left it, and the book still showed the old percentage in your library.
+  Picking a book up on the web during a lunch break and then going back to your
+  device meant finding your place by hand. Now the position you reach in the
+  browser travels the other way too — your Kobo picks it up on its next sync,
+  the progress shown on the book updates, and finishing a book in the browser
+  marks it read. Both the classic reader and the new interface do this.
+
+  Reading backwards never costs you anything: if your Kobo is at 80% and you
+  flip back to chapter 1 in the browser, your own place in the browser follows
+  you, but the furthest point stays 80% so nothing on your device is lost.
+  Starting a book over is still "mark as unread", which clears it everywhere as
+  it always has.
+
+  One honest limit: this covers the Kobo direction and the progress shown in
+  your library. KOReader reads its position from a separate store in a format
+  only KOReader understands, so it doesn't pick up browser reading yet — that
+  half needs a position translation and is still tracked on
+  [#324](https://github.com/new-usemame/Calibre-Web-NextGen/issues/324).
+
 ## [v4.1.28] - 2026-08-02
 
 ### Fixed

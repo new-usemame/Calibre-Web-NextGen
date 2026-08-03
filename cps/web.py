@@ -34,6 +34,7 @@ from . import constants, logger, isoLanguages, services, helper, spa
 from . import db, ub, config, app
 from . import calibre_db, kobo_sync_status
 from .services.ereader_send import send_includes_own_address
+from .services import reading_position
 from .search import render_search_results, render_adv_search_results
 from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
@@ -230,6 +231,20 @@ def set_bookmark(book_id, book_format):
                              format=book_format,
                              bookmark_key=bookmark_key)
     ub.session.merge(l_bookmark)
+
+    # #324: the CFI above is opaque and read by nothing but the readers, so a
+    # browser reading session was invisible to the user's other devices. The
+    # percentage the reader already computes IS portable — hand it to the shared
+    # carrier so the Kobo (and the book-detail progress row) pick it up. Absent
+    # for the comic/audio readers, which reuse this route.
+    percentage = reading_position.coerce_percentage(request.form.get("percentage"))
+    if percentage is not None:
+        try:
+            reading_position.record_web_reader_progress(current_user, book_id, percentage)
+        except Exception as e:
+            # Position sharing must never cost the user their bookmark.
+            log.warning("Could not share web reader progress for book %s: %s", book_id, e)
+
     ub.session_commit("Bookmark for user {} in book {} created".format(current_user.id, book_id))
     return "", 201
 

@@ -101,6 +101,7 @@ function calculateSectionProgress(){
 
 let cfiSaveTimer = null;
 let pendingCfi = null;
+let pendingPercentage = null;
 
 function cfiStorageKey() {
     return window.calibre && window.calibre.bookUrl
@@ -114,16 +115,25 @@ function storeCfi(cfi, dirty) {
     }
 }
 
-function persistCfi(cfi, keepalive) {
+// #324: the CFI is only meaningful to this reader. The percentage travels —
+// the server hands it to the shared Kobo/KOReader progress carrier so reading
+// in the browser shows up on the user's devices. Only ever sent alongside a
+// percentage the caller has already validated against generated locations
+// (a pre-generate() sample is a meaningless 0 — CWA #1364).
+function persistCfi(cfi, keepalive, percentage) {
     if (!cfi || !window.calibre || !window.calibre.bookmarkUrl) return Promise.resolve();
     let token = window.calibre.csrfToken || document.querySelector("input[name='csrf_token']")?.value;
+    let body = 'bookmark=' + encodeURIComponent(cfi);
+    if (typeof percentage === 'number' && isFinite(percentage) && percentage > 0) {
+        body += '&percentage=' + encodeURIComponent(percentage);
+    }
     return fetch(window.calibre.bookmarkUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-CSRFToken': token || ''
         },
-        body: 'bookmark=' + encodeURIComponent(cfi),
+        body: body,
         credentials: 'same-origin',
         keepalive: !!keepalive
     }).then((response) => {
@@ -134,14 +144,17 @@ function persistCfi(cfi, keepalive) {
     });
 }
 
-function scheduleCfiSave(cfi) {
+function scheduleCfiSave(cfi, percentage) {
     pendingCfi = cfi;
+    pendingPercentage = percentage;
     if (cfiSaveTimer) clearTimeout(cfiSaveTimer);
     cfiSaveTimer = setTimeout(() => {
         cfiSaveTimer = null;
         let currentCfi = pendingCfi;
+        let currentPercentage = pendingPercentage;
         pendingCfi = null;
-        persistCfi(currentCfi, false);
+        pendingPercentage = null;
+        persistCfi(currentCfi, false, currentPercentage);
     }, 800);
 }
 
@@ -149,8 +162,10 @@ function flushCfiSave() {
     if (cfiSaveTimer) clearTimeout(cfiSaveTimer);
     cfiSaveTimer = null;
     let currentCfi = pendingCfi || reader?.rendition?.currentLocation?.()?.start?.cfi;
+    let currentPercentage = pendingPercentage;
     pendingCfi = null;
-    if (currentCfi) persistCfi(currentCfi, true);
+    pendingPercentage = null;
+    if (currentCfi) persistCfi(currentCfi, true, currentPercentage);
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -212,7 +227,10 @@ window.addEventListener('locationchange',()=>{
         localStorage.setItem("calibre.reader.progress." + bookKey, newPos);
         let cfi = reader && reader.rendition && reader.rendition.currentLocation
             ? reader.rendition.currentLocation()?.start?.cfi : null;
-        if (cfi) scheduleCfiSave(cfi);
+        // newPos is trustworthy here: this branch already required generated
+        // locations, which is the guard that makes it a real percentage and not
+        // the pre-generate() 0 that CWA #1364 was about.
+        if (cfi) scheduleCfiSave(cfi, newPos);
     }
 });
 

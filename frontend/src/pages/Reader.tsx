@@ -105,6 +105,7 @@ export function Reader({ id }: { id: string }) {
   const settingsSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settingsPendingRef = useRef<Partial<ReaderSettings>>({});
   const lastCfiRef = useRef<string | null>(null);
+  const lastPercentRef = useRef<number | null>(null);
   // Hold the freshest saved CFI so it survives re-renders without re-running the effect.
   const savedCfiRef = useRef<string | null>(null);
 
@@ -244,12 +245,20 @@ export function Reader({ id }: { id: string }) {
   }, [saveSettings, announce, t]);
 
   const persistCfi = useCallback(
-    (cfi: string) => {
+    (cfi: string, percentage?: number) => {
       lastCfiRef.current = cfi;
+      // #324: the CFI is private to this reader; the percentage is what the
+      // server can share with the user's Kobo and the book-detail row. Only
+      // sent once epub.js has generated locations, so it is never a phantom 0.
+      if (typeof percentage === 'number' && percentage > 0) lastPercentRef.current = percentage;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         saveTimer.current = null;
-        saveBookmark.mutate({ format: 'epub', bookmark: cfi });
+        const pct = lastPercentRef.current;
+        saveBookmark.mutate(
+          pct != null ? { format: 'epub', bookmark: cfi, percentage: pct }
+                      : { format: 'epub', bookmark: cfi },
+        );
       }, 800);
     },
     [saveBookmark],
@@ -365,10 +374,13 @@ export function Reader({ id }: { id: string }) {
         rendition.on('relocated', (location: any) => {
           const cfi = location?.start?.cfi;
           if (!cfi) return;
-          persistCfi(cfi);
-          if (epubBook.locations.length()) {
-            setProgress(Math.round(epubBook.locations.percentageFromCfi(cfi) * 100));
-          }
+          // Locations must exist for percentageFromCfi to mean anything; without
+          // them the position still saves, just without the shareable percentage.
+          const pct = epubBook.locations.length()
+            ? Math.round(epubBook.locations.percentageFromCfi(cfi) * 100)
+            : undefined;
+          persistCfi(cfi, pct);
+          if (pct !== undefined) setProgress(pct);
         });
 
         // Render existing highlights (the CFI-anchored ones we can place). Each
@@ -407,7 +419,13 @@ export function Reader({ id }: { id: string }) {
         saveTimer.current = null;
         const cfi = lastCfiRef.current;
         if (cfi) {
-          void apiPost(`/api/v1/books/${id}/bookmark`, { format: 'epub', bookmark: cfi }, { keepalive: true });
+          const pct = lastPercentRef.current;
+          void apiPost(
+            `/api/v1/books/${id}/bookmark`,
+            pct != null ? { format: 'epub', bookmark: cfi, percentage: pct }
+                        : { format: 'epub', bookmark: cfi },
+            { keepalive: true },
+          );
         }
       }
       try { renditionRef.current?.destroy(); } catch { /* noop */ }

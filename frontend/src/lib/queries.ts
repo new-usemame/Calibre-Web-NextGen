@@ -884,7 +884,10 @@ export function useBookmark(bookId: string | number, format = 'epub') {
 
 export function useSaveBookmark(bookId: string | number) {
   return useMutation({
-    mutationFn: (vars: { format: string; bookmark: string }) =>
+    // `percentage` (#324) is the portable half of the position: the server hands
+    // it to the shared Kobo/KOReader carrier so browser reading reaches the
+    // user's devices. Omitted until epub.js has generated locations.
+    mutationFn: (vars: { format: string; bookmark: string; percentage?: number }) =>
       apiPost(`/api/v1/books/${bookId}/bookmark`, vars),
   });
 }

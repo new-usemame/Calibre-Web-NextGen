@@ -12,10 +12,13 @@ from sqlalchemy import and_
 from sqlalchemy.orm.attributes import flag_modified
 
 from . import api_v1
-from .. import ub
+from .. import logger, ub
 from ..cw_login import current_user
+from ..services import reading_position
 from ..usermanagement import login_required_if_no_ano
 from ..reader_settings import merged_reader_settings, resolved_reader_settings
+
+log = logger.create()
 
 
 def _err(code, message, status):
@@ -69,6 +72,16 @@ def save_bookmark(book_id):
             format=fmt,
             bookmark_key=bookmark_key,
         ))
+        # #324: share the portable half of the position (the percentage) with the
+        # user's other devices. Mirrors the legacy route so both readers behave
+        # the same. Only on a save — an empty bookmark is a clear.
+        percentage = reading_position.coerce_percentage(data.get("percentage"))
+        if percentage is not None:
+            try:
+                reading_position.record_web_reader_progress(current_user, book_id, percentage)
+            except Exception as e:
+                # Position sharing must never cost the user their bookmark.
+                log.warning("Could not share web reader progress for book %s: %s", book_id, e)
     ub.session_commit("Bookmark for user {} in book {} via api".format(current_user.id, book_id))
     return "", 204
 

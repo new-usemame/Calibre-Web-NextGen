@@ -1603,12 +1603,12 @@ msgstr "%(book)s sendes til E-Reader"
 msgid "The requested file could not be read. Maybe wrong permissions?"
 msgstr "Den forespurte filen kunne ikke leses. Kanskje feil tillatelser?"
 
-#: cps/helper.py:837
+#: cps/helper.py:900
 #, python-brace-format
 msgid "Read status could not set: {}"
 msgstr "Lesestatus kunne ikke angis: {}"
 
-#: cps/helper.py:865
+#: cps/helper.py:935
 #, python-format
 msgid ""
 "Deleting bookfolder for book %(id)s failed, path has subfolders: %(path)s"
@@ -1616,12 +1616,12 @@ msgstr ""
 "Sletting av bokmappe for bok %(id)s mislyktes, banen har undermapper: "
 "%(path)s"
 
-#: cps/helper.py:877
+#: cps/helper.py:947
 #, python-format
 msgid "Deleting book %(id)s failed: %(message)s"
 msgstr "Sletting av bok %(id)s mislyktes: %(message)s"
 
-#: cps/helper.py:888
+#: cps/helper.py:958
 #, python-format
 msgid ""
 "Deleting book %(id)s from database only, book path in database not valid: "
@@ -1630,7 +1630,7 @@ msgstr ""
 "Sletter bok %(id)s kun fra databasen, bokbanen i databasen er ikke gyldig: "
 "%(path)s"
 
-#: cps/helper.py:978
+#: cps/helper.py:1048
 #, python-format
 msgid ""
 "Rename author from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
@@ -1638,66 +1638,66 @@ msgstr ""
 "Endre navn på forfatter fra: '%(src)s' til '%(dest)s' mislyktes med feil: "
 "%(error)s"
 
-#: cps/helper.py:1047 cps/helper.py:1056
+#: cps/helper.py:1117 cps/helper.py:1126
 #, python-format
 msgid "File %(file)s not found on Google Drive"
 msgstr "Fil %(file)s ikke funnet på Google Disk"
 
-#: cps/helper.py:1146
+#: cps/helper.py:1216
 #, python-format
 msgid "Rename title from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr ""
 "Endre navn på tittel fra: '%(src)s' til '%(dest)s' mislyktes med feil: "
 "%(error)s"
 
-#: cps/helper.py:1185
+#: cps/helper.py:1255
 #, python-format
 msgid "Book path %(path)s not found on Google Drive"
 msgstr "Finner ikke bokbane %(path)s på Google Disk"
 
-#: cps/helper.py:1246
+#: cps/helper.py:1316
 #, fuzzy
 msgid "Found an existing account for this Email address"
 msgstr "Fant en eksisterende konto for denne e-postadressen"
 
-#: cps/helper.py:1254
+#: cps/helper.py:1324
 msgid "This username is already taken"
 msgstr "Dette brukernavnet er allerede tatt"
 
-#: cps/helper.py:1268
+#: cps/helper.py:1338
 #, fuzzy
 msgid "Invalid Email address format"
 msgstr "Ugyldig format for e-postadresse"
 
-#: cps/helper.py:1290
+#: cps/helper.py:1360
 msgid "Password doesn't comply with password validation rules"
 msgstr ""
 
-#: cps/helper.py:1634
+#: cps/helper.py:1704
 msgid ""
 "Python module 'advocate' is not installed but is needed for cover uploads"
 msgstr ""
 "Python-modulen 'advocate' er ikke installert, men er nødvendig for "
 "omslagsopplastinger"
 
-#: cps/helper.py:1642 cps/helper.py:1677
+#: cps/helper.py:1712 cps/helper.py:1747
 msgid "Error Downloading Cover"
 msgstr "Feil ved nedlasting av cover"
 
-#: cps/helper.py:1646 cps/helper.py:1654
+#: cps/helper.py:1716 cps/helper.py:1724
 #, python-format
 msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr ""
 
-#: cps/helper.py:1663 cps/helper.py:1710 cps/helper.py:1723 cps/helper.py:1726
+#: cps/helper.py:1733 cps/helper.py:1780 cps/helper.py:1793 cps/helper.py:1796
 msgid "Cover-file is not a valid image file, or could not be stored"
 msgstr "Cover-filen er ikke en gyldig bildefil, eller kunne ikke lagres"
 
-#: cps/helper.py:1680
+#: cps/helper.py:1750
 msgid "Cover Format Error"
 msgstr "Omslagsformatfeil"
 
-#: cps/helper.py:1683
+#: cps/helper.py:1753
 msgid ""
 "You are not allowed to access localhost or the local network for cover "
 "uploads"
@@ -1705,70 +1705,70 @@ msgstr ""
 "Du har ikke tilgang til localhost eller det lokale nettverket for "
 "coveropplastinger"
 
-#: cps/helper.py:1699
+#: cps/helper.py:1769
 msgid "Failed to create path for cover"
 msgstr "Kunne ikke opprette bane for dekning"
 
-#: cps/helper.py:1743
+#: cps/helper.py:1813
 msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 msgstr "Bare jpg/jpeg/png/webp/bmp-filer støttes som coverfile"
 
-#: cps/helper.py:1759 cps/helper.py:1764
+#: cps/helper.py:1829 cps/helper.py:1834
 msgid "Invalid cover file content"
 msgstr "Ugyldig omslagsfilinnhold"
 
-#: cps/helper.py:1768
+#: cps/helper.py:1838
 msgid "Only jpg/jpeg files are supported as coverfile"
 msgstr "Bare jpg/jpeg-filer støttes som coverfile"
 
-#: cps/helper.py:1990 cps/helper.py:2242 cps/spa_strings.py:184
+#: cps/helper.py:2060 cps/helper.py:2312 cps/spa_strings.py:184
 msgid "Cover"
 msgstr "Dekke"
 
-#: cps/helper.py:2007
+#: cps/helper.py:2077
 msgid "UnRar binary file not found"
 msgstr "UnRar binær fil ikke funnet"
 
-#: cps/helper.py:2018
+#: cps/helper.py:2088
 msgid "Error executing UnRar"
 msgstr "Feil ved kjøring av UnRar"
 
-#: cps/helper.py:2024
+#: cps/helper.py:2094
 #, python-format
 msgid ""
 "Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is "
 "optimized for x86_64 and aarch64."
 msgstr ""
 
-#: cps/helper.py:2033
+#: cps/helper.py:2103
 msgid "Could not find the specified directory"
 msgstr ""
 
-#: cps/helper.py:2036
+#: cps/helper.py:2106
 msgid "Please specify a directory, not a file"
 msgstr ""
 
-#: cps/helper.py:2050
+#: cps/helper.py:2120
 #, fuzzy
 msgid "Calibre binaries not viable"
 msgstr "DB er ikke skrivbar"
 
-#: cps/helper.py:2059
+#: cps/helper.py:2129
 #, python-format
 msgid "Missing calibre binaries: %(missing)s"
 msgstr ""
 
-#: cps/helper.py:2061
+#: cps/helper.py:2131
 #, fuzzy, python-format
 msgid "Missing executable permissions: %(missing)s"
 msgstr "Utførelsestillatelser mangler"
 
-#: cps/helper.py:2066
+#: cps/helper.py:2136
 #, fuzzy
 msgid "Error executing Calibre"
 msgstr "Feil ved kjøring av UnRar"
 
-#: cps/helper.py:2244 cps/templates/admin.html:242
+#: cps/helper.py:2314 cps/templates/admin.html:242
 msgid "Queue all books for metadata backup"
 msgstr "Sett alle bøker i kø for sikkerhetskopiering av metadata"
 
@@ -6361,7 +6361,7 @@ msgstr ""
 msgid "Invalid book ID."
 msgstr "Ugyldig rolle"
 
-#: cps/progress_syncing/protocols/kosync.py:632
+#: cps/progress_syncing/protocols/kosync.py:649
 msgid "KOReader Sync Plugin"
 msgstr ""
 

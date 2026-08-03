@@ -1609,12 +1609,12 @@ msgstr ""
 "要求されたファイルを読み込めませんでした。権限設定が正しいか確認してくださ"
 "い。"
 
-#: cps/helper.py:837
+#: cps/helper.py:900
 #, python-brace-format
 msgid "Read status could not set: {}"
 msgstr "読み込みステータスを設定できません: {}"
 
-#: cps/helper.py:865
+#: cps/helper.py:935
 #, python-format
 msgid ""
 "Deleting bookfolder for book %(id)s failed, path has subfolders: %(path)s"
@@ -1622,12 +1622,12 @@ msgstr ""
 "書籍 %(id)s のフォルダ削除に失敗しました。パスにサブフォルダがあります："
 "%(path)s"
 
-#: cps/helper.py:877
+#: cps/helper.py:947
 #, python-format
 msgid "Deleting book %(id)s failed: %(message)s"
 msgstr "本 %(id)s の削除に失敗しました: %(message)s"
 
-#: cps/helper.py:888
+#: cps/helper.py:958
 #, python-format
 msgid ""
 "Deleting book %(id)s from database only, book path in database not valid: "
@@ -1636,47 +1636,47 @@ msgstr ""
 "書籍 %(id)s をデータベースからのみ削除します。データベース内の書籍パスが無効"
 "です：%(path)s"
 
-#: cps/helper.py:978
+#: cps/helper.py:1048
 #, python-format
 msgid ""
 "Rename author from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr ""
 "著者名を '%(src)s' から '%(dest)s' に変更できませんでした。エラー：%(error)s"
 
-#: cps/helper.py:1047 cps/helper.py:1056
+#: cps/helper.py:1117 cps/helper.py:1126
 #, python-format
 msgid "File %(file)s not found on Google Drive"
 msgstr "ファイル %(file)s はGoogleドライブ上にありません"
 
-#: cps/helper.py:1146
+#: cps/helper.py:1216
 #, python-format
 msgid "Rename title from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr ""
 "エラー: %(error)s により、タイトルを %(src)s から %(dest)s に変更できませんで"
 "した"
 
-#: cps/helper.py:1185
+#: cps/helper.py:1255
 #, python-format
 msgid "Book path %(path)s not found on Google Drive"
 msgstr "本のパス %(path)s はGoogleドライブ上にありません"
 
-#: cps/helper.py:1246
+#: cps/helper.py:1316
 msgid "Found an existing account for this Email address"
 msgstr "このメールアドレスで既存のアカウントが見つかりました"
 
-#: cps/helper.py:1254
+#: cps/helper.py:1324
 msgid "This username is already taken"
 msgstr "このユーザー名はすでに使われています"
 
-#: cps/helper.py:1268
+#: cps/helper.py:1338
 msgid "Invalid Email address format"
 msgstr "メールアドレスの形式が無効です"
 
-#: cps/helper.py:1290
+#: cps/helper.py:1360
 msgid "Password doesn't comply with password validation rules"
 msgstr "パスワードがパスワード検証ルールに準拠していません"
 
-#: cps/helper.py:1634
+#: cps/helper.py:1704
 msgid ""
 "Python module 'advocate' is not installed but is needed for cover uploads"
 msgstr ""
@@ -1684,24 +1684,24 @@ msgstr ""
 "ドに必要です表紙のアップロードに必要なPythonモジュール 'advocate' がインス"
 "トールされていません"
 
-#: cps/helper.py:1642 cps/helper.py:1677
+#: cps/helper.py:1712 cps/helper.py:1747
 msgid "Error Downloading Cover"
 msgstr "表紙のダウンロードに失敗しました"
 
-#: cps/helper.py:1646 cps/helper.py:1654
+#: cps/helper.py:1716 cps/helper.py:1724
 #, python-format
 msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr "表紙画像が最大サイズ%(size)s MBを超えています"
 
-#: cps/helper.py:1663 cps/helper.py:1710 cps/helper.py:1723 cps/helper.py:1726
+#: cps/helper.py:1733 cps/helper.py:1780 cps/helper.py:1793 cps/helper.py:1796
 msgid "Cover-file is not a valid image file, or could not be stored"
 msgstr "表紙ファイルが有効な画像ファイルでないか、または保存できませんでした"
 
-#: cps/helper.py:1680
+#: cps/helper.py:1750
 msgid "Cover Format Error"
 msgstr "表紙形式エラー"
 
-#: cps/helper.py:1683
+#: cps/helper.py:1753
 msgid ""
 "You are not allowed to access localhost or the local network for cover "
 "uploads"
@@ -1710,68 +1710,68 @@ msgstr ""
 "とは許可されていません表紙アップロードのためにlocalhostやローカルネットワーク"
 "にアクセスすることは許可されていません"
 
-#: cps/helper.py:1699
+#: cps/helper.py:1769
 msgid "Failed to create path for cover"
 msgstr "表紙ファイルの作成に失敗しました"
 
-#: cps/helper.py:1743
+#: cps/helper.py:1813
 msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 msgstr "表紙ファイルは jpg/jpeg/png/webp/bmp のみ対応しています"
 
-#: cps/helper.py:1759 cps/helper.py:1764
+#: cps/helper.py:1829 cps/helper.py:1834
 msgid "Invalid cover file content"
 msgstr "表紙ファイルの内容が無効です"
 
-#: cps/helper.py:1768
+#: cps/helper.py:1838
 msgid "Only jpg/jpeg files are supported as coverfile"
 msgstr "表紙ファイルは jpg/jpeg のみ対応しています"
 
-#: cps/helper.py:1990 cps/helper.py:2242 cps/spa_strings.py:184
+#: cps/helper.py:2060 cps/helper.py:2312 cps/spa_strings.py:184
 msgid "Cover"
 msgstr "表紙"
 
-#: cps/helper.py:2007
+#: cps/helper.py:2077
 msgid "UnRar binary file not found"
 msgstr "UnRarのバイナリファイルが見つかりません"
 
-#: cps/helper.py:2018
+#: cps/helper.py:2088
 msgid "Error executing UnRar"
 msgstr "UnRarの実行中にエラーが発生しました"
 
-#: cps/helper.py:2024
+#: cps/helper.py:2094
 #, python-format
 msgid ""
 "Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is "
 "optimized for x86_64 and aarch64."
 msgstr ""
 
-#: cps/helper.py:2033
+#: cps/helper.py:2103
 msgid "Could not find the specified directory"
 msgstr "指定されたディレクトリが見つかりませんでした"
 
-#: cps/helper.py:2036
+#: cps/helper.py:2106
 msgid "Please specify a directory, not a file"
 msgstr "ファイルではなくディレクトリを指定してください"
 
-#: cps/helper.py:2050
+#: cps/helper.py:2120
 msgid "Calibre binaries not viable"
 msgstr "Calibreバイナリが使用できません"
 
-#: cps/helper.py:2059
+#: cps/helper.py:2129
 #, python-format
 msgid "Missing calibre binaries: %(missing)s"
 msgstr "Calibreバイナリがありません：%(missing)s"
 
-#: cps/helper.py:2061
+#: cps/helper.py:2131
 #, python-format
 msgid "Missing executable permissions: %(missing)s"
 msgstr "実行権限がありません: %(missing)s"
 
-#: cps/helper.py:2066
+#: cps/helper.py:2136
 msgid "Error executing Calibre"
 msgstr "Calibreの実行中にエラーが発生しました"
 
-#: cps/helper.py:2244 cps/templates/admin.html:242
+#: cps/helper.py:2314 cps/templates/admin.html:242
 msgid "Queue all books for metadata backup"
 msgstr "すべての書籍をメタデータバックアップのキューに追加"
 
@@ -6366,7 +6366,7 @@ msgstr ""
 msgid "Invalid book ID."
 msgstr "無効な書籍IDです。"
 
-#: cps/progress_syncing/protocols/kosync.py:632
+#: cps/progress_syncing/protocols/kosync.py:649
 msgid "KOReader Sync Plugin"
 msgstr "KOReader同期プラグイン"
 

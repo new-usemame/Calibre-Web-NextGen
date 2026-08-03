@@ -744,6 +744,12 @@ jobs:
           path: |
             frontend/e2e/.report
             frontend/e2e/.results
+          # Both paths are dot-directories, and upload-artifact skips hidden
+          # files by default — so this step ran on every failed e2e job and
+          # uploaded nothing ("No files were found with the provided path"),
+          # leaving no HTML report, screenshot, trace or video to debug from.
+          # Without this flag the gate can fail but never say why.
+          include-hidden-files: true
           retention-days: 14
 
       - name: Dump container logs

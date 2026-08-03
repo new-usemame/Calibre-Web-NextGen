@@ -174,10 +174,100 @@ def create_international_chars_epub(output_dir: Path) -> None:
         print(f"  ✗ Failed (filesystem may not support these chars): {e}")
 
 
+def create_rtl_epub(output_path: Path) -> None:
+    """
+    Create a valid EPUB 3 whose spine is right-to-left (#1303).
+
+    The one load-bearing attribute is `page-progression-direction="rtl"` on
+    <spine>: that is the only place epub.js reads the reading direction from
+    (`Packaging.parse` assigns it to `metadata.direction`), and it is what tells
+    a reader that "forward" runs leftward — the convention for Japanese and
+    Traditional Chinese books.
+
+    Three sections with distinct headings, so a test can assert that a page turn
+    moved FORWARD through the spine rather than merely that something happened.
+    """
+    print(f"Creating RTL (right-to-left) EPUB: {output_path.name}")
+
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as epub:
+        epub.writestr('mimetype', 'application/epub+zip',
+                      compress_type=zipfile.ZIP_STORED)
+
+        epub.writestr('META-INF/container.xml', '''<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>''')
+
+        epub.writestr('content.opf', '''<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">test-rtl-vertical-001</dc:identifier>
+    <dc:title>RTL Vertical Sample</dc:title>
+    <dc:creator>CWA Test Suite</dc:creator>
+    <dc:language>ja</dc:language>
+    <dc:date>2025-01-01</dc:date>
+    <meta property="dcterms:modified">2025-01-01T00:00:00Z</meta>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch2" href="ch2.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch3" href="ch3.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine page-progression-direction="rtl">
+    <itemref idref="ch1"/>
+    <itemref idref="ch2"/>
+    <itemref idref="ch3"/>
+  </spine>
+</package>''')
+
+        epub.writestr('nav.xhtml', '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Contents</title></head>
+<body>
+  <nav epub:type="toc" id="toc">
+    <ol>
+      <li><a href="ch1.xhtml">First Section</a></li>
+      <li><a href="ch2.xhtml">Second Section</a></li>
+      <li><a href="ch3.xhtml">Third Section</a></li>
+    </ol>
+  </nav>
+</body>
+</html>''')
+
+        # Vertical writing mode as well as RTL paging — the combination a
+        # Japanese book actually ships with. The ASCII marker in each heading is
+        # what tests assert on, so the spec stays readable in a diff.
+        sections = (
+            ('ch1', 'First Section', 'RTL-SECTION-1'),
+            ('ch2', 'Second Section', 'RTL-SECTION-2'),
+            ('ch3', 'Third Section', 'RTL-SECTION-3'),
+        )
+        for name, title, marker in sections:
+            epub.writestr(f'{name}.xhtml', f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+<head>
+  <title>{title}</title>
+  <style>html {{ writing-mode: vertical-rl; }}</style>
+</head>
+<body>
+  <h1>{marker}</h1>
+  <p>{title}</p>
+</body>
+</html>''')
+
+    size = output_path.stat().st_size
+    print(f"  ✓ Created ({size:,} bytes)")
+
+
 def create_missing_mimetype_epub(output_path: Path) -> None:
     """
     Create an EPUB without mimetype file (invalid but structurally ZIP-valid).
-    
+
     Tests validation logic that checks for required EPUB components.
     """
     print(f"Creating EPUB without mimetype: {output_path.name}")
@@ -335,7 +425,12 @@ def main():
         path = output_dir / "test_rich_metadata.epub"
         create_epub_with_metadata(path)
         files_created.append(path)
-        
+
+        # 9. Right-to-left spine (#1303 — RTL page-turn direction)
+        path = output_dir / "test_rtl_vertical.epub"
+        create_rtl_epub(path)
+        files_created.append(path)
+
     except Exception as e:
         print(f"\n❌ Error creating files: {e}")
         return 1

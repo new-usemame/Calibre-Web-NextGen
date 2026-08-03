@@ -18,6 +18,15 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Japanese and Chinese books now turn the page the right way in the new
+  reader.** Books that read right-to-left were paged as if they read
+  left-to-right: the button to go forward sat on the right of the screen, so
+  tapping the side you actually read towards took you backwards a page instead
+  of onwards. The arrow keys were reversed in the same way. Forward now sits on
+  the left for these books, where it belongs, and the buttons announce what they
+  really do for anyone using a screen reader. Books that read left-to-right are
+  unchanged.
+
 - **Your reading position is no longer lost without warning when the database
   is busy.** Both readers save your place constantly — the classic reader on
   every page turn, the new one every second or so — and if that save failed

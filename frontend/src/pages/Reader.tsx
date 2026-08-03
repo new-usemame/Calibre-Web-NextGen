@@ -47,6 +47,23 @@ const THEMES: Record<ReaderTheme, { body: Record<string, string> }> = {
   dark: { body: { background: '#15110c !important', color: '#cdc6bb !important' } },
 };
 
+// #1303: Japanese and Traditional Chinese books progress right-to-left, which
+// the EPUB declares as `page-progression-direction="rtl"` on <spine>. epub.js
+// surfaces it as `metadata.direction` and uses it for layout, but `next()` and
+// `prev()` always mean spine-FORWARD and spine-BACKWARD regardless — so it is
+// the reader's job to decide which side of the screen each one belongs on. For
+// an RTL book forward runs leftward, so the two zones swap. `packaging` is the
+// current field; `package` is its deprecated alias, kept as a fallback because
+// the classic reader still reads that one.
+function isRtlBook(book: any): boolean {
+  try {
+    const metadata = book?.packaging?.metadata || book?.package?.metadata;
+    return metadata?.direction === 'rtl';
+  } catch {
+    return false;
+  }
+}
+
 const FONT_MIN = 75;
 const FONT_MAX = 200;
 // #1318: how many times a failed position save is re-sent before the reader is
@@ -122,6 +139,8 @@ export function Reader({ id }: { id: string }) {
 
   const [rendered, setRendered] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
+  // #1303: true for a right-to-left book; swaps which screen side turns forward.
+  const [rtl, setRtl] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -385,12 +404,28 @@ export function Reader({ id }: { id: string }) {
   const goPrev = useCallback(() => renditionRef.current?.prev(), []);
   const goNext = useCallback(() => renditionRef.current?.next(), []);
 
+  // Which way the page physically turns. In an RTL book the left of the screen
+  // is forward, so the left zone advances and the right zone goes back. Labels
+  // travel with the action, not with the side, or a screen reader would
+  // announce the opposite of what the button does.
+  //
+  // Memoized on purpose: these are dependencies of the arrow-key effect below,
+  // and a fresh identity each render would re-run it on every render rather
+  // than only when the direction changes.
+  const goLeft = useCallback(() => (rtl ? goNext() : goPrev()), [rtl, goNext, goPrev]);
+  const goRight = useCallback(() => (rtl ? goPrev() : goNext()), [rtl, goPrev, goNext]);
+  const leftLabel = rtl ? t('Next page') : t('Previous page');
+  const rightLabel = rtl ? t('Previous page') : t('Next page');
+
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
     if (!epubFormat || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
     let cancelled = false;
     setRendered(false);
     setRenderError(null);
+    // Clear rather than carry: wouter reuses this component across an :id
+    // change, so a stale RTL flag would invert the next book's page turns.
+    setRtl(false);
 
     (async () => {
       try {
@@ -428,6 +463,9 @@ export function Reader({ id }: { id: string }) {
 
         await rendition.display(savedCfiRef.current || undefined);
         if (cancelled) return;
+        // display() resolves only after the package document is parsed, so the
+        // spine's page-progression-direction is readable by here.
+        setRtl(isRtlBook(epubBook));
         setRendered(true);
 
         epubBook.loaded.navigation.then((nav: any) => {
@@ -531,13 +569,22 @@ export function Reader({ id }: { id: string }) {
   // Arrow-key navigation (the iframe also forwards keys via rendition).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') goPrev();
-      if (e.key === 'ArrowRight') goNext();
+      // Arrow keys follow the same physical convention as the zones: left is
+      // forward in an RTL book.
+      if (e.key === 'ArrowLeft') goLeft();
+      if (e.key === 'ArrowRight') goRight();
     };
+    const rendition = renditionRef.current;
     document.addEventListener('keyup', onKey);
-    renditionRef.current?.on('keyup', onKey);
-    return () => document.removeEventListener('keyup', onKey);
-  }, [goPrev, goNext, rendered]);
+    rendition?.on('keyup', onKey);
+    return () => {
+      document.removeEventListener('keyup', onKey);
+      // The rendition registration was previously never undone, so each re-run
+      // left another handler attached to it. Harmless while this effect ran
+      // once or twice; balancing it keeps that true as the deps change.
+      rendition?.off('keyup', onKey);
+    };
+  }, [goLeft, goRight, rendered]);
 
   const goToc = (href: string) => {
     const rendition = renditionRef.current;
@@ -696,11 +743,11 @@ export function Reader({ id }: { id: string }) {
 
       {/* Viewer + page-turn zones */}
       <div className={styles.stage}>
-        <button className={`${styles.navZone} ${styles.navPrev}`} onClick={goPrev} aria-label={t('Previous page')}>
+        <button className={styles.navZone} onClick={goLeft} aria-label={leftLabel}>
           <ChevronLeft size={28} aria-hidden="true" focusable={false} />
         </button>
         <div ref={viewerRef} className={styles.viewer} />
-        <button className={`${styles.navZone} ${styles.navNext}`} onClick={goNext} aria-label={t('Next page')}>
+        <button className={styles.navZone} onClick={goRight} aria-label={rightLabel}>
           <ChevronRight size={28} aria-hidden="true" focusable={false} />
         </button>
 

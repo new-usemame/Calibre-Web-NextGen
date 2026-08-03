@@ -569,7 +569,12 @@ jobs:
           # never big enough is not a gate. pride_and_prejudice.epub is left out
           # deliberately: at 24 MB it dominates ingest time for no extra
           # coverage.
-          for book in alice_in_wonderland christmas_carol metamorphosis; do
+          #
+          # test_rtl_vertical.epub is the fourth: a 2 KB right-to-left spine
+          # (#1303). reader-rtl.spec.ts skips itself when the library has no RTL
+          # book, so this seed — and the count check below — is what keeps that
+          # spec a real gate rather than a silent pass.
+          for book in alice_in_wonderland christmas_carol metamorphosis test_rtl_vertical; do
             docker cp "tests/fixtures/sample_books/${book}.epub" \
               "cwn-e2e:/cwa-book-ingest/${book}.epub"
             docker exec -u 0 cwn-e2e chown 1000:1000 "/cwa-book-ingest/${book}.epub"
@@ -585,11 +590,11 @@ jobs:
             echo "  attempt $i: books total=$total"
             # Wait for ALL of them: breaking at the first import is what left
             # the library at one book while the step reported success.
-            [ "${total:-0}" -ge 3 ] && break
+            [ "${total:-0}" -ge 4 ] && break
             sleep 5
           done
-          if [ "${total:-0}" -lt 3 ]; then
-            echo "::error::ingest imported only ${total:-0} of 3 seed books — dumping ingest logs"
+          if [ "${total:-0}" -lt 4 ]; then
+            echo "::error::ingest imported only ${total:-0} of 4 seed books — dumping ingest logs"
             docker logs cwn-e2e 2>&1 | grep -iE 'ingest|convert|import|error|watch' | tail -40 || true
             exit 1
           fi

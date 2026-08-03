@@ -46,6 +46,7 @@ Pinned here:
 """
 
 import ast
+import re
 import inspect
 import sys
 from pathlib import Path
@@ -341,6 +342,47 @@ def test_progress_helper_does_not_settle_the_callers_write():
         "settling the caller's write inside the helper re-opens #1318's "
         "misattribution: the failure surfaces under the routes' progress-sharing guard"
     )
+
+
+# ── the client half: retrying must not reintroduce a lost position ───────────
+
+@pytest.mark.unit
+def test_spa_position_save_is_single_flight():
+    """Answering 5xx only helps if the client re-sends — but the route is
+    replace-on-write and its CFI carries no ordering or compare-and-set guard,
+    so two saves in flight at once can land in the wrong order and move the
+    reader BACKWARDS. Retrying without this would make that commonplace: under a
+    lock held near SQLite's busy timeout, a reader turning pages would pile up
+    dozens of waiting writes, and the oldest could commit last.
+
+    One request at a time, each reading the position refs as it goes out."""
+    tsx = (REPO / "frontend/src/pages/Reader.tsx").read_text(encoding="utf-8")
+    flush = tsx[tsx.index("const flushCfiSave"):tsx.index("const persistCfi")]
+
+    assert re.search(r"if\s*\(\s*saveInFlight\.current\s*\)\s*\{[^}]*return", flush), \
+        "a save starting while one is in flight must coalesce, not race it"
+    assert "saveInFlight.current = true" in flush and "saveInFlight.current = false" in flush, \
+        "the in-flight flag must be both set and cleared or saving wedges permanently"
+    assert ".finally(" in flush, \
+        "the flag must clear on failure too, or one failed save stops all saving"
+    assert "mutateAsync" in flush, (
+        "per-call mutate callbacks only fire for the latest observed mutation and "
+        "are dropped on unmount, so the retry bookkeeping would silently stop"
+    )
+
+
+@pytest.mark.unit
+def test_spa_announces_a_failing_save_once_not_per_page_turn():
+    """The announcer deliberately re-announces identical assertive messages, so
+    announcing per failed save would talk over a screen-reader user continuously
+    for as long as the condition lasts. Latch on the way in, clear on success."""
+    tsx = (REPO / "frontend/src/pages/Reader.tsx").read_text(encoding="utf-8")
+    flush = tsx[tsx.index("const flushCfiSave"):tsx.index("const persistCfi")]
+
+    assert re.search(r"if\s*\(\s*!\s*saveFailureAnnounced\.current\s*\)", flush), \
+        "the failure announcement must be latched"
+    assert "saveFailureAnnounced.current = false" in flush, \
+        "the latch must clear on a later success or the reader is told only once, ever"
 
 
 @pytest.mark.unit

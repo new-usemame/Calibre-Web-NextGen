@@ -513,3 +513,116 @@ def test_progress_lookup_does_not_autoflush_the_callers_bookmark():
     savepoint = src.index("with ub.session.begin_nested():")
     assert guard < lookup < savepoint, \
         "the no_autoflush guard must wrap the lookup, which must precede the savepoint"
+
+
+# ── a book the user marked Read must stay Read (regression, v4.1.29 gate) ────
+#
+# The furthest-wins guard compares ``KoboBookmark.progress_percent`` and nothing
+# else, so it is skipped entirely when that column is NULL — and
+# ``helper.edit_book_read_status`` creates a *bare* ``ub.KoboBookmark()`` when it
+# marks a book read (cps/helper.py:803-805), which is exactly that case.
+# ``update_book_read_status`` then recomputes the status from the incoming
+# percentage and writes it unconditionally (kosync.py:448-450), so a 3% sample
+# from simply reopening the book downgraded FINISHED -> IN_PROGRESS, incremented
+# ``times_started_reading``, and — because the ``before_flush`` listener bumps
+# the parent — pushed ``StatusInfo: "Reading"` to the user's Kobo.
+#
+# "Finished" IS the furthest position, so a web-reader sample below 100% has
+# nothing to contribute to a finished book. Restarting one is "mark as unread",
+# which clears every carrier; that is the documented way back to 0.
+
+def _seed_finished(session, user_id, book_id, percent=None):
+    """The graph ``helper.edit_book_read_status`` leaves behind when a user
+    marks a book Read: FINISHED, with a bare bookmark unless a device had
+    already reported a position."""
+    read = ub.ReadBook(user_id=user_id, book_id=book_id,
+                       read_status=ub.ReadBook.STATUS_FINISHED)
+    state = ub.KoboReadingState(user_id=user_id, book_id=book_id)
+    state.current_bookmark = ub.KoboBookmark(progress_percent=percent)
+    read.kobo_reading_state = state
+    session.add(read)
+    session.commit()
+    return read
+
+
+def _read_row(session, user_id, book_id):
+    return (session.query(ub.ReadBook)
+            .filter(ub.ReadBook.user_id == user_id,
+                    ub.ReadBook.book_id == book_id).first())
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("seeded_percent", [None, 40.0],
+                         ids=["bare-bookmark", "device-reported-percent"])
+def test_finished_book_is_not_unfinished_by_browser_reading(monkeypatch, seeded_percent):
+    """Reopening a book you marked Read must not flip it back to Reading.
+
+    Both shapes reach it: the bare bookmark left by marking read, and a real
+    device percentage the browser then reads past.
+    """
+    session = _session()
+    mod = _service(monkeypatch, session)
+    _seed_finished(session, user_id=7, book_id=42, percent=seeded_percent)
+
+    advanced = mod.record_web_reader_progress(SimpleNamespace(id=7), 42, 55.0)
+    session.commit()
+
+    row = _read_row(session, 7, 42)
+    assert row.read_status == ub.ReadBook.STATUS_FINISHED, (
+        "a book the user marked Read was silently un-finished by opening it "
+        "in the web reader; this syncs to the Kobo as StatusInfo=Reading")
+    assert advanced is False
+
+
+@pytest.mark.unit
+def test_finished_book_does_not_count_as_a_new_reading_session(monkeypatch):
+    """``times_started_reading`` is user-visible on the book detail page."""
+    session = _session()
+    mod = _service(monkeypatch, session)
+    _seed_finished(session, user_id=7, book_id=42)
+
+    mod.record_web_reader_progress(SimpleNamespace(id=7), 42, 3.0)
+    session.commit()
+
+    assert (_read_row(session, 7, 42).times_started_reading or 0) == 0
+
+
+@pytest.mark.unit
+def test_finished_book_write_causes_no_kobo_sync_churn(monkeypatch):
+    """A refused write must not dirty the parent, or every page turn re-pushes
+    the whole book to the device."""
+    session = _session()
+    mod = _service(monkeypatch, session)
+    _seed_finished(session, user_id=7, book_id=42, percent=40.0)
+
+    state = (session.query(ub.KoboReadingState)
+             .filter(ub.KoboReadingState.user_id == 7,
+                     ub.KoboReadingState.book_id == 42).first())
+    before = state.last_modified
+
+    mod.record_web_reader_progress(SimpleNamespace(id=7), 42, 55.0)
+    session.commit()
+
+    session.refresh(state)
+    assert state.last_modified == before
+    assert _stored_percent(session, 7, 42) == 40.0
+
+
+@pytest.mark.unit
+def test_unread_and_in_progress_books_still_advance(monkeypatch):
+    """The guard is scoped to FINISHED — the headline feature must still work."""
+    session = _session()
+    mod = _service(monkeypatch, session)
+    for book_id, status in ((42, ub.ReadBook.STATUS_IN_PROGRESS),
+                            (43, ub.ReadBook.STATUS_UNREAD)):
+        read = ub.ReadBook(user_id=7, book_id=book_id, read_status=status)
+        state = ub.KoboReadingState(user_id=7, book_id=book_id)
+        state.current_bookmark = ub.KoboBookmark(progress_percent=None)
+        read.kobo_reading_state = state
+        session.add(read)
+    session.commit()
+
+    for book_id in (42, 43):
+        assert mod.record_web_reader_progress(SimpleNamespace(id=7), book_id, 55.0) is True
+        session.commit()
+        assert _stored_percent(session, 7, book_id) == 55.0

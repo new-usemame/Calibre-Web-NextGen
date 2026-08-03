@@ -121,7 +121,16 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     # check the affected-row count) used by BOTH writers, so the two cannot
     # drift; that is tracked separately rather than half-done here.
     stored = None
+    already_finished = False
     with ub.session.no_autoflush:
+        read_row = (ub.session.query(ub.ReadBook)
+                    .populate_existing()
+                    .filter(ub.ReadBook.user_id == user_id,
+                            ub.ReadBook.book_id == book_id)
+                    .first())
+        already_finished = (read_row is not None
+                            and read_row.read_status == ub.ReadBook.STATUS_FINISHED)
+
         state = (ub.session.query(ub.KoboReadingState)
                  .populate_existing()
                  .filter(ub.KoboReadingState.user_id == user_id,
@@ -130,6 +139,29 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
         if state is not None and state.current_bookmark is not None:
             ub.session.refresh(state.current_bookmark)
             stored = state.current_bookmark.progress_percent
+
+    # "Finished" IS the furthest position, so a sample from the browser has
+    # nothing to contribute to a book the user has already marked Read.
+    #
+    # Checking the status is not belt-and-braces on the percentage check below,
+    # it is the only thing that covers this case: ``edit_book_read_status``
+    # creates a *bare* ``ub.KoboBookmark()`` when it marks a book read
+    # (``cps/helper.py``), so ``progress_percent`` is NULL and the comparison
+    # below is skipped entirely. ``update_book_read_status`` would then recompute
+    # the status from the incoming percentage and write it unconditionally, so
+    # simply reopening a finished book downgraded it to IN_PROGRESS, counted a
+    # new reading session, and — via the ``before_flush`` parent bump — pushed
+    # ``StatusInfo: "Reading"`` to the user's Kobo. Destroying state the user set
+    # deliberately is the worst thing this best-effort helper could do.
+    #
+    # The reader-open path already refuses to touch a FINISHED status for the
+    # same reason (``cps/web.py``); this keeps the two consistent. Restarting a
+    # book stays "mark as unread", which clears every carrier and is the
+    # documented way back to 0.
+    if already_finished:
+        log.debug("Web reader position not shared for user %s book %s: "
+                  "the book is already marked finished", user_id, book_id)
+        return False
 
     if stored is not None and percentage <= stored:
         log.debug("Web reader position not advanced for user %s book %s: "

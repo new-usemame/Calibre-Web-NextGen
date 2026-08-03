@@ -44,15 +44,32 @@ async function clearSavedPosition(page: Page, bookId: number) {
 }
 
 /**
- * Open the reader at the start of the book and wait for its first section to
- * paint. The two waits have to fit inside the 45s per-test timeout together, or
- * a genuine failure would surface as an unhelpful "test timed out" instead of
- * naming what it was waiting for.
+ * Open the reader on the book's first section and wait for it to paint.
+ *
+ * It jumps there through the table of contents rather than trusting the book to
+ * open on it, because ingest reshapes the spine: the cover-metadata-enforcer
+ * runs `ebook-polish --cover`, which inserts a generated `titlepage` ahead of
+ * `ch1`. Every book that reaches a real library this way opens on a cover image
+ * — an empty body with one `<img>` — so waiting for the section text on the
+ * first painted page waits forever. The fixture as authored has no such page,
+ * which is exactly why this passed locally and failed in CI.
+ *
+ * The TOC is not the control under test, so using it to reach a known section
+ * keeps the page-turn assertions honest while making them independent of how
+ * many cover or nav pages sit in front of the text.
+ *
+ * The waits have to fit inside the 45s per-test timeout together, or a genuine
+ * failure would surface as an unhelpful "test timed out" instead of naming what
+ * it was waiting for.
  */
 async function openReader(page: Page, bookId: number, firstSectionText: RegExp) {
   await clearSavedPosition(page, bookId);
   await page.goto(`/app/read/${bookId}`);
   await page.locator('iframe').first().waitFor({ state: 'visible', timeout: 20_000 });
+
+  await page.getByRole('button', { name: 'Table of contents', exact: true }).click();
+  await page.getByRole('button', { name: 'First Section', exact: true }).click();
+
   await expect(page.frameLocator('iframe').first().locator('body'))
     .toContainText(firstSectionText, { timeout: 20_000 });
 }

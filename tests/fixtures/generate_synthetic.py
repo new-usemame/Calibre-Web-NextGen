@@ -174,20 +174,31 @@ def create_international_chars_epub(output_dir: Path) -> None:
         print(f"  ✗ Failed (filesystem may not support these chars): {e}")
 
 
-def create_rtl_epub(output_path: Path) -> None:
+def _create_directional_epub(
+    output_path: Path,
+    *,
+    book_id: str,
+    title: str,
+    language: str,
+    marker_prefix: str,
+    direction: str | None,
+    vertical: bool,
+) -> None:
     """
-    Create a valid EPUB 3 whose spine is right-to-left (#1303).
+    Build a small, valid EPUB 3 whose spine direction is explicit (#1303).
 
-    The one load-bearing attribute is `page-progression-direction="rtl"` on
-    <spine>: that is the only place epub.js reads the reading direction from
-    (`Packaging.parse` assigns it to `metadata.direction`), and it is what tells
-    a reader that "forward" runs leftward — the convention for Japanese and
-    Traditional Chinese books.
+    `direction` becomes `page-progression-direction` on <spine>, or is omitted
+    entirely when None — that omission is the ordinary left-to-right case, and
+    is the shape most real books ship. It is the only place epub.js reads the
+    reading direction from (`Packaging.parse` assigns it to `metadata.direction`).
 
-    Three sections with distinct headings, so a test can assert that a page turn
-    moved FORWARD through the spine rather than merely that something happened.
+    Three sections with distinct ASCII markers, so a test can assert that a page
+    turn moved FORWARD through the spine rather than merely that something
+    happened. RTL and LTR fixtures come from this one builder so the pair cannot
+    drift apart and quietly stop being a matched control.
     """
-    print(f"Creating RTL (right-to-left) EPUB: {output_path.name}")
+    spine_attr = f' page-progression-direction="{direction}"' if direction else ''
+    print(f"Creating {direction or 'default (ltr)'} EPUB: {output_path.name}")
 
     with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as epub:
         epub.writestr('mimetype', 'application/epub+zip',
@@ -200,13 +211,13 @@ def create_rtl_epub(output_path: Path) -> None:
   </rootfiles>
 </container>''')
 
-        epub.writestr('content.opf', '''<?xml version="1.0" encoding="UTF-8"?>
+        epub.writestr('content.opf', f'''<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <dc:identifier id="bookid">test-rtl-vertical-001</dc:identifier>
-    <dc:title>RTL Vertical Sample</dc:title>
+    <dc:identifier id="bookid">{book_id}</dc:identifier>
+    <dc:title>{title}</dc:title>
     <dc:creator>CWA Test Suite</dc:creator>
-    <dc:language>ja</dc:language>
+    <dc:language>{language}</dc:language>
     <dc:date>2025-01-01</dc:date>
     <meta property="dcterms:modified">2025-01-01T00:00:00Z</meta>
   </metadata>
@@ -216,7 +227,7 @@ def create_rtl_epub(output_path: Path) -> None:
     <item id="ch2" href="ch2.xhtml" media-type="application/xhtml+xml"/>
     <item id="ch3" href="ch3.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
-  <spine page-progression-direction="rtl">
+  <spine{spine_attr}>
     <itemref idref="ch1"/>
     <itemref idref="ch2"/>
     <itemref idref="ch3"/>
@@ -238,30 +249,63 @@ def create_rtl_epub(output_path: Path) -> None:
 </body>
 </html>''')
 
-        # Vertical writing mode as well as RTL paging — the combination a
-        # Japanese book actually ships with. The ASCII marker in each heading is
-        # what tests assert on, so the spec stays readable in a diff.
+        style = 'html { writing-mode: vertical-rl; }' if vertical else ''
         sections = (
-            ('ch1', 'First Section', 'RTL-SECTION-1'),
-            ('ch2', 'Second Section', 'RTL-SECTION-2'),
-            ('ch3', 'Third Section', 'RTL-SECTION-3'),
+            ('ch1', 'First Section'),
+            ('ch2', 'Second Section'),
+            ('ch3', 'Third Section'),
         )
-        for name, title, marker in sections:
+        for index, (name, section_title) in enumerate(sections, start=1):
             epub.writestr(f'{name}.xhtml', f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="{language}" xml:lang="{language}">
 <head>
-  <title>{title}</title>
-  <style>html {{ writing-mode: vertical-rl; }}</style>
+  <title>{section_title}</title>
+  <style>{style}</style>
 </head>
 <body>
-  <h1>{marker}</h1>
-  <p>{title}</p>
+  <h1>{marker_prefix}-{index}</h1>
+  <p>{section_title}</p>
 </body>
 </html>''')
 
     size = output_path.stat().st_size
-    print(f"  ✓ Created ({size:,} bytes)")
+    print(f"  \u2713 Created ({size:,} bytes)")
+
+
+def create_rtl_epub(output_path: Path) -> None:
+    """Right-to-left spine, vertical Japanese text — the #1303 reproduction."""
+    _create_directional_epub(
+        output_path,
+        book_id='test-rtl-vertical-001',
+        title='RTL Vertical Sample',
+        language='ja',
+        marker_prefix='RTL-SECTION',
+        direction='rtl',
+        vertical=True,
+    )
+
+
+def create_ltr_epub(output_path: Path) -> None:
+    """
+    The matched left-to-right control for #1303.
+
+    Deliberately omits `page-progression-direction` rather than setting "ltr":
+    an absent attribute is what ordinary books ship, and it is the case a
+    direction-aware reader must leave alone. Having a deterministic LTR book
+    lets the e2e control assert what the two zones DO, not merely where their
+    labels sit — a reader that flipped every book's page turns while keeping
+    the labels conditional would otherwise pass.
+    """
+    _create_directional_epub(
+        output_path,
+        book_id='test-ltr-horizontal-001',
+        title='LTR Horizontal Sample',
+        language='en',
+        marker_prefix='LTR-SECTION',
+        direction=None,
+        vertical=False,
+    )
 
 
 def create_missing_mimetype_epub(output_path: Path) -> None:
@@ -429,6 +473,11 @@ def main():
         # 9. Right-to-left spine (#1303 — RTL page-turn direction)
         path = output_dir / "test_rtl_vertical.epub"
         create_rtl_epub(path)
+        files_created.append(path)
+
+        # 10. Left-to-right control for the same test (#1303)
+        path = output_dir / "test_ltr_horizontal.epub"
+        create_ltr_epub(path)
         files_created.append(path)
 
     except Exception as e:

@@ -17,6 +17,7 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 const RTL_TITLE = 'RTL Vertical Sample';
+const LTR_TITLE = 'LTR Horizontal Sample';
 
 async function findBookIdByTitle(page: Page, title: string): Promise<number | null> {
   const response = await page.request.get('/api/v1/books?page=1&per_page=200&sort=new');
@@ -109,25 +110,40 @@ test.describe('reader page-turn direction', () => {
   });
 
   test('a left-to-right book still turns forward on the RIGHT', async ({ page }) => {
-    // The control that would catch a blanket flip: only RTL books may swap.
+    // The control that catches a blanket flip: only RTL books may swap. It has
+    // to assert what the zones DO, not just where their labels sit — an
+    // implementation that swapped the actions for every book while leaving the
+    // labels conditional on `rtl` would keep the LTR labels and coordinates
+    // correct and still send every left-to-right reader backwards.
     await page.goto('/app');
-    const response = await page.request.get('/api/v1/books?page=1&per_page=200&sort=new');
-    const payload = await response.json();
-    const books = (payload.items || payload.books || []) as { id: number; title: string }[];
+    const bookId = await findBookIdByTitle(page, LTR_TITLE);
+    test.skip(bookId === null, `library has no "${LTR_TITLE}" — seed test_ltr_horizontal.epub`);
 
-    let checked = false;
-    // Capped: a handful of candidates is enough to find one readable EPUB, and
-    // an uncapped sweep would open every book in the library on a miss.
-    for (const book of books.filter((b) => b.title !== RTL_TITLE).slice(0, 5)) {
-      await page.goto(`/app/read/${book.id}`);
-      const rendered = await page.locator('iframe').first()
-        .waitFor({ state: 'visible', timeout: 8_000 }).then(() => true).catch(() => false);
-      if (!rendered) continue;
-      await expect(page.getByRole('button', { name: 'Next page', exact: true })).toBeVisible();
-      expect(await zoneX(page, 'Previous page')).toBeLessThan(await zoneX(page, 'Next page'));
-      checked = true;
-      break;
-    }
-    test.skip(!checked, 'no loadable left-to-right EPUB in this library');
+    await openReader(page, bookId!, /LTR-SECTION-1/);
+    const body = page.frameLocator('iframe').first().locator('body');
+
+    // Placement: forward on the right, back on the left.
+    expect(await zoneX(page, 'Previous page')).toBeLessThan(await zoneX(page, 'Next page'));
+
+    // Behaviour: the right zone really advances and the left really goes back.
+    await page.getByRole('button', { name: 'Next page', exact: true }).click();
+    await expect(body).toContainText(/LTR-SECTION-2/, { timeout: 15_000 });
+    await page.getByRole('button', { name: 'Previous page', exact: true }).click();
+    await expect(body).toContainText(/LTR-SECTION-1/, { timeout: 15_000 });
+  });
+
+  test('arrow keys are not flipped in a left-to-right book', async ({ page }) => {
+    await page.goto('/app');
+    const bookId = await findBookIdByTitle(page, LTR_TITLE);
+    test.skip(bookId === null, `library has no "${LTR_TITLE}" — seed test_ltr_horizontal.epub`);
+
+    await openReader(page, bookId!, /LTR-SECTION-1/);
+    const body = page.frameLocator('iframe').first().locator('body');
+
+    await page.keyboard.press('ArrowRight');
+    await expect(body).toContainText(/LTR-SECTION-2/, { timeout: 15_000 });
+
+    await page.keyboard.press('ArrowLeft');
+    await expect(body).toContainText(/LTR-SECTION-1/, { timeout: 15_000 });
   });
 });

@@ -88,12 +88,7 @@ def test_upload_valid_file_queued():
              patch("builtins.open", mock_open()) as manifest_open, \
              patch.object(mod, "os") as mock_os, \
              patch.object(mod, "WorkerThread") as worker, \
-<<<<<<< Updated upstream
              patch.object(mod, "config", _cfg()):
-=======
-             patch.object(mod, "config", SimpleNamespace(config_upload_formats="epub,pdf",
-                                                         config_uploading=1)):
->>>>>>> Stashed changes
             resp = inspect.unwrap(mod.upload_books)()
     body = json.loads(resp.get_data())
     assert body["queued"] == ["book.epub"]
@@ -110,12 +105,7 @@ def test_upload_invalid_file_reported_not_queued():
              patch.object(mod, "_ensure_ingest_dir_writable", return_value=None), \
              patch.object(mod, "_validate_uploaded_file", return_value=False), \
              patch.object(mod, "WorkerThread") as worker, \
-<<<<<<< Updated upstream
              patch.object(mod, "config", _cfg()):
-=======
-             patch.object(mod, "config", SimpleNamespace(config_upload_formats="epub,pdf",
-                                                         config_uploading=1)):
->>>>>>> Stashed changes
             resp = inspect.unwrap(mod.upload_books)()
     body = json.loads(resp.get_data())
     assert body["queued"] == []

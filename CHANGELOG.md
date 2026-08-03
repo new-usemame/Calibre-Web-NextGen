@@ -20,21 +20,21 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
-- **If you track "read" with your own Calibre column, marking a book unread no
-  longer marks it read instead.** On a library where an admin has pointed
-  Calibre-Web at a custom column for read status, telling a book it was unread —
-  from the book editor, a bulk edit, or the API — set it to *read* whenever that
-  book had no value in the column yet. The opposite of what was asked, and the
-  only way to notice was to look at the checkmark afterwards. It now records
-  what you actually asked for.
+- **Marking a book unread no longer marks it read instead.** Telling a book you
+  had not read it — from the book editor, a bulk edit, or the API — set it to
+  *read* whenever that book had never been marked either way before. The
+  opposite of what was asked, and the only way to notice was to look at the
+  checkmark afterwards. It happened on ordinary libraries and on ones where an
+  admin has pointed Calibre-Web at a custom column for read status. Both now
+  record what you actually asked for.
 
-  Read status is also kept in step for these libraries now. Calibre-Web tracks
-  reading in two places — your custom column, and an internal record the Kobo
-  and KOReader sync both write to — and only the column was being updated. So
-  the "Currently reading" marker and the progress your devices see could drift
-  away from the checkmark on the book, and a book you had marked Read could
-  still be reported to your Kobo as one you were part-way through. Both now
-  follow the same toggle.
+  Read status is also kept in step now if you use a custom column for it.
+  Calibre-Web tracks reading in two places — your column, and an internal record
+  the Kobo and KOReader sync both write to — and only the column was being
+  updated when you toggled a book. So the "Currently reading" marker and the
+  progress your devices see could drift away from the checkmark on the book, and
+  a book you had marked Read could still be reported to your Kobo as one you
+  were part-way through. Both now follow the same toggle.
 
 - **Japanese and Chinese books now turn the page the right way in the new
   reader.** Books that read right-to-left were paged as if they read

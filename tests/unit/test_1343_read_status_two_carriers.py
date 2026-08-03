@@ -437,6 +437,35 @@ class TestDefaultInstallUnchanged:
         )
 
     @pytest.mark.unit
+    @pytest.mark.parametrize("read_status,expected_name", [
+        (False, "STATUS_UNREAD"),    # explicit "mark unread" — the bug
+        (True, "STATUS_FINISHED"),
+        (None, "STATUS_FINISHED"),   # bare toggle on an absent row = mark read
+    ])
+    def test_first_write_on_a_never_read_book_honours_the_request(
+            self, monkeypatch, read_status, expected_name):
+        """The default branch set FINISHED unconditionally when no row existed,
+        so an explicit 'mark unread' marked the book READ — the same inversion
+        the custom-column branch had, on the install most people run.
+
+        Reachable from `POST /api/v1/books/<id>/read {"read": false}` and bulk
+        edit; the #1340 guard then blocks the user's reading progress on a book
+        they never said they had finished.
+        """
+        from cps import helper
+
+        session = _session()
+        monkeypatch.setattr(helper.config, "config_read_column", 0, raising=False)
+        monkeypatch.setattr(helper, "current_user", SimpleNamespace(id=7))
+        monkeypatch.setattr(helper.ub, "session", session)
+        monkeypatch.setattr(helper.ub, "session_commit", lambda *a, **k: True)
+        monkeypatch.setattr(ub, "session", session)
+
+        assert helper.edit_book_read_status(42, read_status) == ""
+        session.commit()
+        assert _read_status(session, 7, 42) == getattr(ub.ReadBook, expected_name)
+
+    @pytest.mark.unit
     def test_default_install_guard_and_writes_are_unaffected(self, monkeypatch):
         session = _session()
         mod = _service(monkeypatch, session, read_column=0)

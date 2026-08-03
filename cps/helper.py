@@ -842,8 +842,16 @@ def edit_book_read_status(book_id, read_status=None):
             else:
                 book.read_status = ub.ReadBook.STATUS_FINISHED if read_status else ub.ReadBook.STATUS_UNREAD
         else:
+            # The same inversion the custom-column branch had: this used to set
+            # FINISHED unconditionally, so an explicit "mark unread" for a book
+            # with no row yet marked it READ. Reachable from the API
+            # (`cps/api/books.py`), bulk edit (`cps/editbooks.py`) and anywhere
+            # else that passes read_status=False. A bare toggle (None) on an
+            # absent row still means "mark read".
             read_book = ub.ReadBook(user_id=current_user.id, book_id=book_id)
-            read_book.read_status = ub.ReadBook.STATUS_FINISHED
+            read_book.read_status = (ub.ReadBook.STATUS_FINISHED
+                                     if read_status is None or read_status
+                                     else ub.ReadBook.STATUS_UNREAD)
             book = read_book
         now_unread = book.read_status == ub.ReadBook.STATUS_UNREAD
         if not book.kobo_reading_state:

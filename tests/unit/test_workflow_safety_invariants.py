@@ -1294,3 +1294,93 @@ def test_fork_prs_run_e2e_but_do_not_hard_gate_on_it_yet():
         "fork PRs must stay advisory until a real fork run shows the "
         "image-pull + bundle-overlay path works without repo secrets"
     )
+
+
+# ─── Wall 11: failure evidence actually gets uploaded ──────────────────
+#
+# `actions/upload-artifact` skips hidden files unless told otherwise, and
+# "hidden" includes any path component starting with a dot. The SPA e2e
+# job uploads `frontend/e2e/.report` + `frontend/e2e/.results` — both
+# dot-directories — so the step ran on every failed run and uploaded
+# nothing but a "No files were found with the provided path" warning.
+# The gate could fail and never say why: no HTML report, no screenshot,
+# no trace, no video. Each hypothesis then cost a full CI round trip.
+#
+# This is the "gate with no signal" class from notes/verify: a check that
+# can block a merge has to be able to explain itself.
+
+
+def _artifact_paths(step: dict) -> list[str]:
+    raw = (step.get("with") or {}).get("path")
+    if raw is None:
+        return []
+    return [line.strip() for line in str(raw).splitlines() if line.strip()]
+
+
+def _has_hidden_component(path: str) -> bool:
+    """True when any component of the path starts with a dot.
+
+    `.report`, `a/.results/**` → hidden. `./out`, `..`, `x.y` → not.
+    """
+    return any(
+        part.startswith(".") and part not in (".", "..")
+        for part in path.replace("\\", "/").split("/")
+    )
+
+
+def test_upload_artifact_with_hidden_paths_includes_hidden_files():
+    """Any upload whose path reaches into a dot-directory must set
+    `include-hidden-files: true`, or it silently uploads nothing."""
+    offenders = []
+    for path in all_workflows():
+        wf = _load(path)
+        for job_name, step in _every_step(wf):
+            uses = str(step.get("uses") or "")
+            if not uses.startswith("actions/upload-artifact"):
+                continue
+            hidden = [p for p in _artifact_paths(step) if _has_hidden_component(p)]
+            if not hidden:
+                continue
+            flag = (step.get("with") or {}).get("include-hidden-files")
+            if str(flag).lower() not in ("true", "yes", "on"):
+                offenders.append(
+                    f"{path.name}:{job_name}:{step.get('name') or uses} "
+                    f"uploads hidden path(s) {hidden} without include-hidden-files: true"
+                )
+    assert not offenders, (
+        "upload-artifact skips dot-directories by default, so these steps upload "
+        "nothing and the failure they were meant to explain stays invisible: "
+        f"{offenders}"
+    )
+
+
+def test_spa_e2e_uploads_its_playwright_report():
+    """Pin the specific artifact the e2e gate needs to be debuggable.
+
+    Not just "some upload exists" — the report AND the per-test results
+    directory (screenshots, traces, video) have to be in it, on
+    `if: always()` so a failing run is the one that keeps them.
+    """
+    wf = _load(WF_DIR / "tests.yml")
+    steps = [s for _, s in _every_step(wf)
+             if str(s.get("uses") or "").startswith("actions/upload-artifact")
+             and (s.get("with") or {}).get("name") == "playwright-report"]
+    assert steps, "the SPA e2e job must upload a playwright-report artifact"
+
+    for step in steps:
+        paths = _artifact_paths(step)
+        assert any(p.endswith("e2e/.report") for p in paths), (
+            f"playwright-report upload must include the HTML report; got {paths}"
+        )
+        assert any(p.endswith("e2e/.results") for p in paths), (
+            "playwright-report upload must include e2e/.results — that is where "
+            f"screenshots, traces and video live; got {paths}"
+        )
+        assert str((step.get("with") or {}).get("include-hidden-files")).lower() == "true", (
+            "both paths are dot-directories; without include-hidden-files the "
+            "artifact is empty"
+        )
+        assert "always()" in str(step.get("if") or ""), (
+            "the upload must run on failure — that is the only run whose "
+            "evidence anyone needs"
+        )

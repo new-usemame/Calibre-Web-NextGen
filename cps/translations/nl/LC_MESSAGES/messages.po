@@ -2800,6 +2800,10 @@ msgstr "Volg de lichte of donkere instelling van je apparaat"
 msgid "Theme saved."
 msgstr "Thema opgeslagen."
 
+#: cps/spa_strings.py:1050
+msgid "Could not save your reading position."
+msgstr "Kan je leespositie niet opslaan."
+
 #: cps/spa_strings.py:145
 msgid "Could not save theme."
 msgstr "Kan thema niet opslaan."

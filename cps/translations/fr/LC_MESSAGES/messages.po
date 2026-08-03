@@ -2910,6 +2910,10 @@ msgstr "Suivre le réglage clair ou sombre de votre appareil"
 msgid "Theme saved."
 msgstr "Thème enregistré."
 
+#: cps/spa_strings.py:1050
+msgid "Could not save your reading position."
+msgstr "Impossible d’enregistrer votre position de lecture."
+
 #: cps/spa_strings.py:145
 msgid "Could not save theme."
 msgstr "Impossible d’enregistrer le thème."

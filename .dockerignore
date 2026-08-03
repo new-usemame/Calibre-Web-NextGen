@@ -18,6 +18,25 @@ changelogs
 cwa-wiki
 wiki_images
 .devcontainer
+.editorconfig
+AI_README.md
+CHANGELOG.md
+CHANGES-vs-upstream.md
+CONTRIBUTING.md
+CONTRIBUTORS
+docs
+drafts
+examples
+feedback-server
+GOVERNANCE.md
+greptile.json
+homepage
+kubernetes
+notes
+run_tests.sh
+SECURITY.md
+state
+wiki-src
 
 # Test infrastructure (not needed in production image)
 tests/

@@ -43,6 +43,22 @@ is for things you can see or feel when running the app.
   while the token stayed valid; and editing an allowed-registration domain in
   the admin panel could show the new value in the table without it being saved.
 
+- **The Epub Fixer stops reporting the same fixes every time you run it, and
+  stops touching books you deleted.** Running it over the same library
+  repeatedly kept listing conversions like "Converted page_styles.css from
+  ascii to utf-8" — on every run, for books it had already been through. The
+  conversion was never real: a stylesheet that is plain ASCII is *already*
+  valid UTF-8, so nothing was being changed, but it was counted and announced
+  as a fix anyway. Worse, every book was rewritten and copied into the backup
+  folder whether or not anything about it changed, so a library-wide run
+  restamped every file — which pushes the whole library back through Kobo,
+  KOReader and any file-sync you have set up, and grew the backup folder every
+  time. Books that genuinely need fixing are still fixed, backed up and
+  rewritten exactly as before; books that don't are now left alone, and the log
+  says "No issues found" instead of inventing two. The fixer also no longer
+  walks Calibre's hidden `.caltrash` folder, so books you deleted are no longer
+  processed and reported alongside the ones in your library.
+
 ### Added
 
 - **Reading in your browser now counts towards your reading progress

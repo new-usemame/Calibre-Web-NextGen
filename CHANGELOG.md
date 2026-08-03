@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.29] - 2026-08-03
+
 ### Fixed
 
 - **Japanese and Chinese books now turn the page the right way in the new

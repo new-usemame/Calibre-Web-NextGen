@@ -56,6 +56,43 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.29',
+    date: '2026-08-03',
+    items: [
+      {
+        title: 'Reading in your browser now counts everywhere else',
+        body: 'Until now the web reader kept its position to itself: it could show you how far your Kobo or KOReader had got, but reading a few chapters in the browser left no trace, so your device still thought you were where you left it. The place you reach in the browser now travels the other way too — your Kobo picks it up on its next sync, the progress on the book updates, and finishing a book in the browser marks it read. Flipping back to an earlier chapter never costs you anything: your own place follows you, but the furthest point your device knows about stays put.',
+        category: 'Sync',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Japanese and Chinese books turn the page the right way',
+        body: 'Books that read right to left were paged as if they read left to right, so the button to go forward sat on the right of the screen and tapping the side you actually read towards took you backwards instead of onwards. The arrow keys were reversed in the same way. Forward now sits where it belongs for these books, and the buttons announce what they really do for anyone using a screen reader.',
+        category: 'Reading',
+      },
+      {
+        title: 'Your place in a book is no longer lost without warning',
+        body: 'Both readers save your position constantly, and if a save failed because something else was writing to the database at that moment, the browser was told it had worked. It had not: the position was thrown away, and because the browser believed it was saved it never tried again, so you would come back to the book pages behind with nothing in the log to explain it. Saves that fail now say so, and the reader retries instead of quietly dropping your place.',
+        category: 'Reading',
+      },
+      {
+        title: 'Three more actions that reported success without doing anything',
+        body: 'The same "said it worked when it did not" answer turned up in three other places, all now fixed. Changing an admin password from the command line could print that it had changed when it had in fact been rolled back; revoking a Kobo sync token could report success while the token stayed valid; and editing an allowed-registration domain could show the new value in the table without saving it.',
+        category: 'Admin',
+      },
+      {
+        title: 'The Epub Fixer stops reporting fixes it never made',
+        body: 'Running it over the same library kept announcing conversions like "Converted page_styles.css from ascii to utf-8" on every run, for books it had already been through — a stylesheet that is plain ASCII is already valid UTF-8, so nothing was being changed. Every book was also rewritten and copied to the backup folder whether or not anything changed, which pushed your whole library back through Kobo, KOReader and any file sync you have, and grew the backup folder each time. Books that genuinely need fixing are still fixed; the rest are left alone, and books you deleted are no longer processed.',
+        category: 'Admin',
+      },
+      {
+        title: 'The "update available" banner stops re-appearing every restart',
+        body: 'The banner is meant to show at most once a day, and it remembered the date in a file kept in a part of the container that gets wiped whenever the container is recreated — which is exactly what happens when you pull a new image. It now lives in your config folder alongside the logs, so the once-a-day promise holds across restarts and upgrades. You may see it one extra time on the first start after updating, then it settles.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
     version: 'v4.1.28',
     date: '2026-08-02',
     items: [

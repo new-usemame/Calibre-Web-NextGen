@@ -856,6 +856,16 @@ export interface ReaderSettings {
 const retryUnlessUnauthorized = (failureCount: number, error: unknown) =>
   !(error instanceof ApiError && error.status === 401) && failureCount < 3;
 
+/** Is re-sending this request capable of changing the answer? (#1318)
+ *
+ *  A 5xx from a write route means the server tried and the transaction did not
+ *  land — typically SQLite contention — so the same request a moment later
+ *  usually succeeds. A 4xx is a verdict on the request itself (unauthenticated,
+ *  CSRF, malformed) and re-sending it unchanged just repeats the answer. A
+ *  network-level failure carries no status at all and is worth another try. */
+export const isWorthResending = (error: unknown) =>
+  !(error instanceof ApiError) || error.status >= 500;
+
 export function useReaderSettings() {
   return useQuery<{ reader: ReaderSettings }>({
     queryKey: ['reader-settings'],
@@ -889,6 +899,13 @@ export function useSaveBookmark(bookId: string | number) {
     // user's devices. Omitted until epub.js has generated locations.
     mutationFn: (vars: { format: string; bookmark: string; percentage?: number }) =>
       apiPost(`/api/v1/books/${bookId}/bookmark`, vars),
+    // #1318: deliberately NO react-query `retry` here. The route now answers
+    // 5xx when the write did not land, which is worth re-sending — but a
+    // built-in retry re-sends the SAME variables, and the reader fires a save
+    // every 800ms while paging. A retry of the position from three pages ago
+    // can therefore land after the current one and move the user backwards.
+    // The caller retries instead, re-reading the latest position each time
+    // (see Reader.tsx), so what goes out is never stale.
   });
 }
 

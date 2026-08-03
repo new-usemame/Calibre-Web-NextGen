@@ -6,7 +6,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import {
-  type ReaderSettings, useBook, useBookmark, useReaderSettings,
+  type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
   useSaveBookmark, useSaveReaderSettings,
 } from '../lib/queries';
 import { apiPost, apiDelete, apiPatch, apiUrl, resourceUrl } from '../lib/api';
@@ -49,6 +49,10 @@ const THEMES: Record<ReaderTheme, { body: Record<string, string> }> = {
 
 const FONT_MIN = 75;
 const FONT_MAX = 200;
+// #1318: how many times a failed position save is re-sent before the reader is
+// told. Three attempts over ~14s covers the SQLite contention window that causes
+// these; past that it is not transient and silence would be the wrong answer.
+const MAX_SAVE_RETRIES = 3;
 const LS_THEME = 'cwng.reader.theme';
 const LS_FONT = 'cwng.reader.font';
 
@@ -106,6 +110,7 @@ export function Reader({ id }: { id: string }) {
   const settingsPendingRef = useRef<Partial<ReaderSettings>>({});
   const lastCfiRef = useRef<string | null>(null);
   const lastPercentRef = useRef<number | null>(null);
+  const saveRetries = useRef(0);
   // Hold the freshest saved CFI so it survives re-renders without re-running the effect.
   const savedCfiRef = useRef<string | null>(null);
 
@@ -244,6 +249,39 @@ export function Reader({ id }: { id: string }) {
     }, 300);
   }, [saveSettings, announce, t]);
 
+  // #1318: send whatever position is current at the moment the request goes out,
+  // never the one captured when a failed attempt was made. The route now reports
+  // a write that did not land, and re-sending clears the SQLite contention that
+  // usually caused it — but the reader posts a save every 800ms while paging, so
+  // re-sending the *captured* position could land after a newer one and move the
+  // user backwards. Reading the refs here keeps a retry from ever being stale.
+  const flushCfiSave = useCallback(() => {
+    const cfi = lastCfiRef.current;
+    if (!cfi) return;
+    const pct = lastPercentRef.current;
+    saveBookmark.mutate(
+      pct != null ? { format: 'epub', bookmark: cfi, percentage: pct }
+                  : { format: 'epub', bookmark: cfi },
+      {
+        onSuccess: () => { saveRetries.current = 0; },
+        onError: (error) => {
+          if (isWorthResending(error) && saveRetries.current < MAX_SAVE_RETRIES) {
+            saveRetries.current += 1;
+            if (saveTimer.current) clearTimeout(saveTimer.current);
+            saveTimer.current = setTimeout(
+              flushCfiSave, Math.min(1000 * 2 ** saveRetries.current, 8000));
+            return;
+          }
+          // Out of attempts, or a refusal re-sending cannot change. Say so once:
+          // a reader who knows their place is not being kept can act on it, and
+          // this is the only moment they would otherwise never find out.
+          saveRetries.current = 0;
+          announce(t('Could not save your reading position.'), { assertive: true });
+        },
+      },
+    );
+  }, [saveBookmark, announce, t]);
+
   const persistCfi = useCallback(
     (cfi: string, percentage?: number) => {
       lastCfiRef.current = cfi;
@@ -260,16 +298,16 @@ export function Reader({ id }: { id: string }) {
         ? percentage
         : null;
       lastPercentRef.current = valid;
+      // A fresh position supersedes any pending retry: the newest place is what
+      // we want on the server, and it resets the attempt budget.
+      saveRetries.current = 0;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         saveTimer.current = null;
-        saveBookmark.mutate(
-          valid != null ? { format: 'epub', bookmark: cfi, percentage: valid }
-                        : { format: 'epub', bookmark: cfi },
-        );
+        flushCfiSave();
       }, 800);
     },
-    [saveBookmark],
+    [flushCfiSave],
   );
 
   const applyTheme = useCallback((t: ReaderTheme) => {

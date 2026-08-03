@@ -238,9 +238,14 @@ def test_progress_failure_does_not_cost_the_user_their_bookmark(monkeypatch):
     session = _session()
     mod = _service(monkeypatch, session)
 
-    # The caller's pending bookmark write, exactly as the routes leave it.
+    # The caller's bookmark write, SETTLED — which is the routes' contract since
+    # #1318 moved the settling flush out to the caller that owns it. Leaving it
+    # pending here would not test anything stronger: begin_nested() flushes
+    # before it opens the savepoint, so an unsettled write is dragged inside
+    # either way, and the assertion below would pass for the wrong reason.
     session.merge(ub.Bookmark(user_id=7, book_id=42, format="epub",
                               bookmark_key="epubcfi(/6/8!/4/2)"))
+    session.flush()
 
     boom = sys.modules["cps.progress_syncing.protocols.kosync"]
     monkeypatch.setattr(boom, "update_book_read_status",
@@ -446,13 +451,33 @@ def test_spa_percentage_is_not_sticky_across_relocations():
         "a guarded assignment leaves the previous percentage behind on a 0/undefined sample"
     assert re.search(r"lastPercentRef\.current\s*=\s*valid\s*;", tsx), \
         "the ref must be assigned unconditionally so an unusable sample clears it"
-    # Scoped to persistCfi: the unmount flush legitimately reads both refs, and
-    # they now always correspond because persistCfi writes them together.
-    body = tsx[tsx.index("const persistCfi"):tsx.index("}, 800);")]
-    assert "lastPercentRef.current" not in body.split("saveTimer.current = setTimeout")[1], \
-        "the debounced save must use the value computed for THIS cfi, not re-read the ref"
-    assert re.search(r"percentage:\s*valid", body), \
-        "the posted percentage must be the one validated alongside this cfi"
+
+    # The real safety property is PAIRING: a posted percentage must belong to the
+    # CFI it is posted with. This used to be enforced by having the debounced save
+    # close over the two locals rather than re-read the refs. #1318 gave the save
+    # a retry, and a retry that replays captured locals re-sends a position the
+    # user has since left — so the save now re-reads the refs deliberately, and
+    # the pairing is enforced at the write end instead: both refs are assigned
+    # together, in persistCfi, with nothing in between that can throw or await.
+    persist = tsx[tsx.index("const persistCfi"):tsx.index("}, 800);")]
+    assert re.search(
+        r"lastCfiRef\.current\s*=\s*cfi;.*?lastPercentRef\.current\s*=\s*valid;",
+        persist, re.S), \
+        "cfi and its percentage must be written as a pair, so any reader of both matches"
+    writers = re.findall(r"lastCfiRef\.current\s*=", tsx)
+    assert len(writers) == 1, \
+        "a second writer of lastCfiRef could desynchronise it from lastPercentRef"
+    assert re.search(r"lastPercentRef\.current\s*=", tsx) and \
+        len(re.findall(r"lastPercentRef\.current\s*=", tsx)) == 1, \
+        "likewise for lastPercentRef"
+
+    # And the send path must take BOTH from the refs — never one ref plus one
+    # captured local, which is the mismatch this test exists to prevent.
+    flush = tsx[tsx.index("const flushCfiSave"):tsx.index("const persistCfi")]
+    assert "lastCfiRef.current" in flush and "lastPercentRef.current" in flush, \
+        "the send path must read both refs, not mix a ref with a captured value"
+    assert not re.search(r"percentage:\s*valid", flush), \
+        "reading one value from a ref and the other from a closure re-opens the mismatch"
 
 
 @pytest.mark.unit

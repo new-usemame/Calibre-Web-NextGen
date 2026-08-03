@@ -264,6 +264,54 @@ def test_save_bookmark_answers_500_when_the_commit_fails(monkeypatch):
     assert response.status_code == 500
 
 
+@pytest.mark.unit
+def test_set_bookmark_answers_500_when_the_settling_flush_fails(monkeypatch):
+    """The OTHER 500 path, and the one this issue is really about: the bookmark
+    write itself failing while being settled. Distinct from a failed final
+    commit — a test that only stubs session_commit False would still pass if the
+    route ignored session_flush's result entirely."""
+    from cps import web
+
+    session = _session()
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(ub, "session_flush", lambda *a, **k: False)
+    monkeypatch.setattr(ub, "session_commit", lambda *a, **k: True)
+    shared = MagicMock()
+    monkeypatch.setattr(web.reading_position, "record_web_reader_progress", shared)
+
+    app = _mini_app(web.set_bookmark, "/ajax/bookmark/<int:book_id>/<book_format>")
+    with app.test_client() as client:
+        with patch.object(web, "current_user", SimpleNamespace(id=7)):
+            response = client.post("/ajax/bookmark/42/epub",
+                                   data={"bookmark": "epubcfi(/6/2)", "percentage": "42.5"})
+
+    assert response.status_code == 500
+    shared.assert_not_called()  # a bookmark that did not settle must not be shared as progress
+
+
+@pytest.mark.unit
+def test_save_bookmark_answers_500_when_the_settling_flush_fails(monkeypatch):
+    from cps.api import reader as reader_api
+
+    session = _session()
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(ub, "session_flush", lambda *a, **k: False)
+    monkeypatch.setattr(ub, "session_commit", lambda *a, **k: True)
+    monkeypatch.setattr(reader_api, "_require_real_user", lambda: None)
+    shared = MagicMock()
+    monkeypatch.setattr(reader_api.reading_position, "record_web_reader_progress", shared)
+
+    app = _mini_app(reader_api.save_bookmark, "/api/v1/books/<int:book_id>/bookmark")
+    with app.test_client() as client:
+        with patch.object(reader_api, "current_user", SimpleNamespace(id=7)):
+            response = client.post("/api/v1/books/42/bookmark",
+                                   json={"bookmark": "epubcfi(/6/2)", "format": "epub",
+                                         "percentage": 42.5})
+
+    assert response.status_code == 500
+    shared.assert_not_called()
+
+
 def _mini_app(view, rule):
     """Mount one view on a bare Flask app: these routes are what we are pinning,
     and a full app init would drag in config/DB/blueprint state the assertion

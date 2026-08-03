@@ -956,4 +956,9 @@ _("{field} (comma separated)")
 # upload role or the admin has switched "Enable Uploads" off. ("Back to library"
 # and "Upload books" are already anchored above.)
 _("Uploading is not available for your account on this server.")
+# #1318 — announced by the web reader when saving the reading position keeps
+# failing. Only reachable once the bookmark route's bounded retries are spent,
+# so it is rare, but it is the one moment the user needs to know their place is
+# not being kept.
+_("Could not save your reading position.")
 # ==== END AUTOGEN ====

@@ -248,16 +248,24 @@ export function Reader({ id }: { id: string }) {
     (cfi: string, percentage?: number) => {
       lastCfiRef.current = cfi;
       // #324: the CFI is private to this reader; the percentage is what the
-      // server can share with the user's Kobo and the book-detail row. Only
-      // sent once epub.js has generated locations, so it is never a phantom 0.
-      if (typeof percentage === 'number' && percentage > 0) lastPercentRef.current = percentage;
+      // server can share with the user's Kobo and the book-detail row.
+      //
+      // The percentage belongs to THIS cfi, so it is never sticky: a relocation
+      // that cannot produce one (locations not generated yet, or a genuine 0%)
+      // CLEARS the ref rather than leaving the previous value behind. Carrying
+      // it forward would post a position the user is not at — and, across a
+      // book change, would post the previous book's percentage under this
+      // book's id, which the server would accept as real cross-device progress.
+      const valid = typeof percentage === 'number' && Number.isFinite(percentage) && percentage > 0
+        ? percentage
+        : null;
+      lastPercentRef.current = valid;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         saveTimer.current = null;
-        const pct = lastPercentRef.current;
         saveBookmark.mutate(
-          pct != null ? { format: 'epub', bookmark: cfi, percentage: pct }
-                      : { format: 'epub', bookmark: cfi },
+          valid != null ? { format: 'epub', bookmark: cfi, percentage: valid }
+                        : { format: 'epub', bookmark: cfi },
         );
       }, 800);
     },

@@ -415,3 +415,67 @@ def test_spa_reader_sends_percentage():
 def test_service_module_has_spdx_header():
     src = (REPO / "cps/services/reading_position.py").read_text(encoding="utf-8")
     assert "SPDX-License-Identifier: GPL-3.0-or-later" in src
+
+
+# ── the synced percentage must belong to the CFI it is sent with ─────────────
+#
+# Cross-family review (Terra, 2026-08-03) found the SPA carried the percentage
+# forward as sticky state. Two reachable ways that corrupts a position:
+#
+#   1. Different book. `<Reader id={p.id} />` had no `key`, so wouter reuses the
+#      component instance across an id change and every ref survives. Book B's
+#      first `relocated` fires before `locations.generate()` resolves, so the
+#      new percentage is undefined, the ref still holds Book A's — and the save
+#      posts Book A's percentage under Book B's id. At 100% that marks a book
+#      the user never opened as FINISHED, and the Kobo feed distributes it.
+#   2. Same book. A genuine 0% left the previous positive value in the ref, so
+#      the client re-sent a position the reader is not at — which resurrects a
+#      cleared position if the carrier was reset while the reader stayed open.
+#
+# Both are client-side, and the frontend has no vitest harness yet (SPA
+# behavioural coverage is the tracked Layer-2 gap), so these pin the structure
+# that makes the bug impossible rather than the rendered behaviour.
+
+@pytest.mark.unit
+def test_spa_percentage_is_not_sticky_across_relocations():
+    """A relocation that yields no usable percentage must CLEAR the ref, never
+    leave the previous value to be posted against the new CFI."""
+    tsx = (REPO / "frontend/src/pages/Reader.tsx").read_text(encoding="utf-8")
+
+    assert not re.search(r"if\s*\([^)]*\)\s*lastPercentRef\.current\s*=\s*percentage", tsx), \
+        "a guarded assignment leaves the previous percentage behind on a 0/undefined sample"
+    assert re.search(r"lastPercentRef\.current\s*=\s*valid\s*;", tsx), \
+        "the ref must be assigned unconditionally so an unusable sample clears it"
+    # Scoped to persistCfi: the unmount flush legitimately reads both refs, and
+    # they now always correspond because persistCfi writes them together.
+    body = tsx[tsx.index("const persistCfi"):tsx.index("}, 800);")]
+    assert "lastPercentRef.current" not in body.split("saveTimer.current = setTimeout")[1], \
+        "the debounced save must use the value computed for THIS cfi, not re-read the ref"
+    assert re.search(r"percentage:\s*valid", body), \
+        "the posted percentage must be the one validated alongside this cfi"
+
+
+@pytest.mark.unit
+def test_spa_reader_is_keyed_by_book_id():
+    """A different book is a different reading session. Without a key, React
+    reuses the Reader instance across an id change and its refs (last CFI, last
+    percentage, pending save timer) leak into the next book."""
+    app = (REPO / "frontend/src/App.tsx").read_text(encoding="utf-8")
+    assert re.search(r"<Reader\s+key=\{p\.id\}\s+id=\{p\.id\}\s*/>", app), \
+        "Reader must be keyed by book id so a book change remounts it"
+
+
+@pytest.mark.unit
+def test_progress_lookup_does_not_autoflush_the_callers_bookmark():
+    """The caller has a pending bookmark write when this runs. A bare query
+    would autoflush it, making a failure of the user's REQUIRED write surface
+    inside this best-effort helper — where both routes log and swallow it as an
+    optional progress failure."""
+    src = (REPO / "cps/services/reading_position.py").read_text(encoding="utf-8")
+    assert "with ub.session.no_autoflush:" in src, \
+        "the KoboReadingState lookup must not autoflush the caller's pending write"
+    lookup = src.index("query(ub.KoboReadingState)")
+    guard = src.index("with ub.session.no_autoflush:")
+    settle = src.index("ub.session.flush()")
+    assert guard < lookup < settle, \
+        "the no_autoflush guard must wrap the lookup, which must precede the settling flush"

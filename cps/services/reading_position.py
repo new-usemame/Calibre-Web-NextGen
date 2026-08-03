@@ -35,10 +35,13 @@ that direction needs a real CFI <-> xpointer canonicalization, which is tracked
 separately on #324.
 
 Conflict policy: **furthest wins**, matching the rule KOSync already applies
-across devices (``kosync.py:1106``).  Opening a book in the browser can
-therefore never regress a position pushed from a device.  Deliberately
-restarting a book stays a "mark unread" action, which clears every carrier via
-``helper.reset_reading_position``.
+across devices (``kosync.py:1106``).  Opening a book in the browser therefore
+does not regress a device position this request can observe — scoped
+deliberately, because acceptance is decided in Python rather than in the
+UPDATE, so it is not proof against a device committing inside the read-write
+window.  See ``record_web_reader_progress`` for that limit in full.
+Deliberately restarting a book stays a "mark unread" action, which clears every
+carrier via ``helper.reset_reading_position``.
 """
 
 import math
@@ -98,24 +101,46 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     # authoritative *within this transaction* — cheap, and strictly better than
     # comparing against whatever happens to be in memory.
     #
+    # ``no_autoflush`` is load-bearing, not tidiness. The caller has a pending
+    # bookmark write on this session; a bare query would autoflush it here, so a
+    # failure belonging to the caller's REQUIRED write would surface inside this
+    # best-effort helper and be logged (and swallowed) by the routes as an
+    # optional progress-sharing failure. Reading without flushing keeps a read
+    # from being the thing that trips the caller's write.
+    #
+    # Residual, stated plainly: the settling ``flush()`` below is still the
+    # caller's write, so a failure there is still misattributed by the routes'
+    # broad handler. That flush cannot simply move — the savepoint only contains
+    # what is flushed after it, so the bookmark must settle first or a rollback
+    # would take it too. The underlying hazard predates #324: ``session_commit``
+    # swallows OperationalError/InvalidRequestError and returns normally, so a
+    # failing bookmark write already answered 201/204 before this file existed.
+    # Fixing that means changing what those routes report on a failed write,
+    # which is a wider behaviour change than a progress bridge should make;
+    # filed separately rather than smuggled in here.
+    #
     # Honest limit: this is not cross-connection atomicity. The read-then-write
     # below can still interleave with a writer on another connection, because
-    # acceptance is decided in Python rather than by the UPDATE itself. That is
-    # a pre-existing property of this subsystem, not something introduced here —
-    # KOSync's own furthest-wins check (kosync.py:1106) has exactly the same
-    # shape. Fixing it properly means one shared conditional-UPDATE primitive
-    # used by both writers; tracked separately rather than half-done here.
-    # The failure mode is self-correcting: the next sync from the further device
-    # re-advances the value, because its percentage is still the larger one.
+    # acceptance is decided in Python rather than by the UPDATE itself. So the
+    # guarantee this gives is "never regresses a position it can observe", NOT
+    # an absolute no-regression guarantee: a device that commits a further
+    # position inside this window can still be rolled back to ours, and it only
+    # recovers if that device pushes again. That is a pre-existing property of
+    # this subsystem, not something introduced here — KOSync's own furthest-wins
+    # check (kosync.py:1106) has exactly the same shape. Closing it means one
+    # shared conditional-UPDATE primitive (accept in the WHERE clause, then
+    # check the affected-row count) used by BOTH writers, so the two cannot
+    # drift; that is tracked separately rather than half-done here.
     stored = None
-    state = (ub.session.query(ub.KoboReadingState)
-             .populate_existing()
-             .filter(ub.KoboReadingState.user_id == user_id,
-                     ub.KoboReadingState.book_id == book_id)
-             .first())
-    if state is not None and state.current_bookmark is not None:
-        ub.session.refresh(state.current_bookmark)
-        stored = state.current_bookmark.progress_percent
+    with ub.session.no_autoflush:
+        state = (ub.session.query(ub.KoboReadingState)
+                 .populate_existing()
+                 .filter(ub.KoboReadingState.user_id == user_id,
+                         ub.KoboReadingState.book_id == book_id)
+                 .first())
+        if state is not None and state.current_bookmark is not None:
+            ub.session.refresh(state.current_bookmark)
+            stored = state.current_bookmark.progress_percent
 
     if stored is not None and percentage <= stored:
         log.debug("Web reader position not advanced for user %s book %s: "

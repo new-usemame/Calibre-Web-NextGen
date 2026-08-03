@@ -145,7 +145,15 @@ export function App() {
         <Route path={SPA_ROUTES.reader}>
           {(p) => (
             <Suspense fallback={<SpinnerCentered size={40} />}>
-              <Reader id={p.id} />
+              {/* Keyed by book id: a different book is a different reading
+                  session, so it must get a fresh component instance. Without
+                  this, wouter reuses the element across an id change and the
+                  reader's refs (last CFI, last percentage, pending save timer)
+                  survive into the next book — which would post one book's
+                  position under another book's id (#324). A format switch on
+                  the SAME book keeps the key and reuses the instance, which is
+                  the behaviour the rendition-rebuild effect already expects. */}
+              <Reader key={p.id} id={p.id} />
             </Suspense>
           )}
         </Route>

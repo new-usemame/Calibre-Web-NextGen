@@ -106,11 +106,17 @@ _BASE = "https://github.com/" + _updater._REPOSITORY_SLUG
 
 # --- behavioural: the unknown-version sentinel must not become a dead link ---
 
-def test_unknown_sentinel_returns_no_link():
+def test_unknown_sentinel_returns_no_link(monkeypatch):
     """The whole point of #1231's regression: v0.0.0 parses as a tag."""
-    # The suite runs unstamped (no /app/CWA_RELEASE, no env override), which
-    # is exactly the state this guards.
-    assert _constants.VERSION_IS_STAMPED is False
+    # Force the unstamped state rather than reading it off the ambient
+    # environment. It used to be ambient — the suite ran with no
+    # /app/CWA_RELEASE and no env override, so nothing had stamped a version.
+    # Once the test job installs the package (`pip install -e '.[dev]'`),
+    # importlib.metadata resolves a version from the checked-in VERSION file
+    # and the suite is stamped, so asserting the ambient state was really
+    # asserting "the package is not installed" — a property of the runner,
+    # not of the code under test.
+    monkeypatch.setattr(_updater.constants, "VERSION_IS_STAMPED", False)
     assert release_url_for_version(_constants.UNKNOWN_VERSION) is None
 
 
@@ -139,7 +145,16 @@ def test_stamped_flag_is_false_exactly_when_nothing_was_stamped(monkeypatch):
     assert reloaded.VERSION_IS_STAMPED is True
     assert reloaded.INSTALLED_VERSION == "v0.0.0"
 
+    # Nothing stamped at all: no env, and no installed package to fall back to.
+    # The metadata leg has to be suppressed explicitly — a source checkout that
+    # has ever been `pip install -e`'d keeps a .egg-info/.dist-info on sys.path,
+    # so importlib.metadata resolves a version there too.
+    from importlib import metadata as _metadata
     monkeypatch.delenv("CWA_INSTALLED_VERSION", raising=False)
+    monkeypatch.setattr(
+        _metadata, "version",
+        lambda _name: (_ for _ in ()).throw(_metadata.PackageNotFoundError()),
+    )
     reloaded = _load("cps.constants", "cps/constants.py")
     assert reloaded.VERSION_IS_STAMPED is False
     assert reloaded.INSTALLED_VERSION == reloaded.UNKNOWN_VERSION
@@ -151,8 +166,12 @@ def test_unknown_sentinel_is_the_literal_we_think_it_is():
     assert _constants.UNKNOWN_VERSION == "v0.0.0"
 
 
-def test_unknown_sentinel_with_whitespace_returns_no_link():
+def test_unknown_sentinel_with_whitespace_returns_no_link(monkeypatch):
     # INSTALLED_VERSION is stripped, but a caller may hand us a raw file read.
+    # Force the unstamped state rather than inheriting it from the runner —
+    # see test_unknown_sentinel_returns_no_link for why that is no longer
+    # ambient once the test job installs the package.
+    monkeypatch.setattr(_updater.constants, "VERSION_IS_STAMPED", False)
     assert release_url_for_version("  v0.0.0\n") is None
 
 
@@ -188,14 +207,38 @@ def test_admin_reports_the_installed_version_constant():
     )
 
 
-def test_only_constants_reads_the_release_file():
-    """Exactly one module in cps/ may open /app/CWA_RELEASE."""
+def test_nothing_reads_the_release_file_any_more():
+    """/app/CWA_RELEASE is gone; nothing in cps/ may reach for it.
+
+    #1231 collapsed three hand-rolled readers down to one (constants.py).
+    The file itself has since been retired: the build stamps
+    CWA_INSTALLED_VERSION as an env var instead, and constants.py falls back
+    to installed-package metadata. A new reader would be reading a path that
+    no longer exists in the image and silently getting the unknown sentinel.
+    """
     readers = [
         path.relative_to(_REPO_ROOT).as_posix()
         for path in (_REPO_ROOT / "cps").rglob("*.py")
         if "/app/CWA_RELEASE" in path.read_text(encoding="utf-8", errors="ignore")
     ]
-    assert readers == ["cps/constants.py"], readers
+    assert readers == [], readers
+
+
+def test_the_installed_version_has_exactly_one_definition():
+    """constants.INSTALLED_VERSION stays the single runtime definition.
+
+    Scoped to *our own* distribution on purpose: cps/web.py, cps/about.py and
+    cps/debug_info.py all legitimately call importlib.metadata.version() to
+    report third-party package versions. What must not spread is a second
+    place resolving the version of calibre-web-automated itself.
+    """
+    resolvers = [
+        path.relative_to(_REPO_ROOT).as_posix()
+        for path in (_REPO_ROOT / "cps").rglob("*.py")
+        if 'metadata.version("calibre-web-automated")'
+        in path.read_text(encoding="utf-8", errors="ignore")
+    ]
+    assert resolvers == ["cps/constants.py"], resolvers
 
 
 # --- cross-file: the CALIBRE_RELEASE stamp file is gone entirely -------------
@@ -308,13 +351,18 @@ def test_classic_admin_and_spa_share_one_calibre_version_source():
 
 # --- packaging: the SSOT the pyproject dynamic version points at -------------
 
-def test_pyproject_still_resolves_version_from_the_constant():
-    """#1231 proposed reading the file directly from pyproject instead.
+def test_pyproject_resolves_version_from_a_relative_file():
+    """#1231 rejected ``file =`` pointing at ``/app/CWA_RELEASE``.
 
     ``file =`` takes a path relative to the project root and rejects one that
     escapes it, so an absolute ``/app/CWA_RELEASE`` cannot build from a source
-    checkout at all. The attr form keeps constants.py the one definition.
+    checkout at all. That objection was to the *absolute path*, not to the
+    file form: a repo-relative VERSION builds fine everywhere, and it is now
+    the only definition setuptools reads. The attr form is no longer usable —
+    constants.py reads the version back out of package metadata, so deriving
+    the package version from constants.py would be circular.
     """
     pyproject = (_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'attr = "calibreweb.cps.constants.INSTALLED_VERSION"' in pyproject
+    assert 'version = {file = ["VERSION"]}' in pyproject
     assert "/app/CWA_RELEASE" not in pyproject
+    assert (_REPO_ROOT / "VERSION").is_file()

@@ -180,7 +180,8 @@ def _get_version(default: str = "") -> str:
         return default
 
 # What INSTALLED_VERSION reads as when the build never stamped a version —
-# a source checkout, a bare-metal install, or a zero-byte /app/CWA_RELEASE.
+# a source checkout or a bare-metal install with the package not installed,
+# so neither the env stamp nor package metadata resolves.
 # It has to parse as a version so ordering comparisons keep working, which
 # also means it parses as a *release tag*: consumers that turn a version into
 # a release link must special-case it or they emit a link to a tag that was

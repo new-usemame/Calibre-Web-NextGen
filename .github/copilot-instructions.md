@@ -199,7 +199,7 @@ Pluggable providers in `cps/metadata_provider/`:
 8. **Session protection errors**: Behind multiple proxies? Set `TRUSTED_PROXY_COUNT` to match your proxy chain depth
 
 ## Version Management
-- **Installed version**: `/app/CWA_RELEASE` (baked at build time)
+- **Installed version**: `CWA_INSTALLED_VERSION` env var, stamped from the `VERSION` build arg in the Dockerfile's final stage. `cps/constants.py` falls back to installed-package metadata (the repo-root `VERSION` file) for source checkouts.
 - **Latest stable**: resolved on demand and cached by `cps/services/latest_release.py` (GitHub releases API)
 - **Update notifications**: Shown in UI when installed < stable (admin users only)
 - **Build args**: `VERSION` and `BUILD_DATE` in Dockerfile

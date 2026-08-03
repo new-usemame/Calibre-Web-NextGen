@@ -268,6 +268,27 @@ LABEL build_version="Version:- ${VERSION}"
 LABEL build_date="${BUILD_DATE}"
 LABEL maintainer="CrocodileStick"
 
+# The version this image was actually built from, stamped straight off the
+# build arg the release workflow passes (`VERSION=${{ steps.ver.outputs.tag }}`)
+# and the dev workflow passes as `DEV_BUILD-dev-<n>`. Like CALIBRE_DBPATH
+# below, one ENV in the final stage reaches every s6 service, so this replaces
+# both the /app/CWA_RELEASE file and the cwa-init block that used to read it.
+#
+# It deliberately does NOT come from the package metadata that
+# cps.constants._get_version() falls back to. That metadata is fixed when pip
+# installs the package (STEP 6) from the checked-in VERSION file, so it can
+# only ever report the version that file happened to hold at commit time —
+# stale for every release after it, which reads at runtime as a permanent
+# "update available" nag on a container that is already current (#1108 in
+# reverse). It also cannot represent a dev build at all: DEV_BUILD-dev-<n> is
+# not a PEP 440 version, so setuptools rejects it outright.
+#
+# So: the build stamps the truth here, and VERSION-file metadata stays a
+# fallback for source checkouts. That keeps the release train free of a
+# "remember to bump VERSION" step, which is the kind of manual gate that
+# silently goes stale.
+ENV CWA_INSTALLED_VERSION=${VERSION}
+
 # Where this install keeps its own state. cps.constants.CONFIG_DIR reads this
 # and otherwise falls back to BASE_DIR — the read-only app tree — so anything
 # derived from it (migration markers in .cwa_migrations/, caches, per-user

@@ -71,9 +71,45 @@ class TestRootCauseIsGone:
     def test_cwa_init_no_longer_persists_a_stable_release_file(self):
         run = (REPO_ROOT / "root/etc/s6-overlay/s6-rc.d/cwa-init/run").read_text()
         assert "CWA_STABLE_RELEASE" not in run
-        # The installed version is still resolved there — that one is baked at
-        # build time and genuinely cannot change while the container runs.
-        assert "CWA_INSTALLED_VERSION" in run
+
+    def test_the_build_still_stamps_the_installed_version(self):
+        """The stamp moved from cwa-init to a final-stage ENV, not away.
+
+        cwa-init used to `cat /app/CWA_RELEASE` and export the result. The
+        file and that block are both gone; the build now sets the env var
+        directly, which reaches every s6 service the same way CALIBRE_DBPATH
+        does. What must not change is that *something in the build* still
+        stamps it — without that, cps.constants falls back to package
+        metadata, which is frozen at the checked-in VERSION file and is
+        therefore stale for every release after the one that touched it.
+        """
+        dockerfile = (REPO_ROOT / "Dockerfile").read_text()
+        assert "ENV CWA_INSTALLED_VERSION=${VERSION}" in dockerfile, (
+            "the image must stamp the version it was built from; package "
+            "metadata cannot, because it is fixed at pip-install time"
+        )
+        # And it has to be stamped from the build arg the workflows pass,
+        # not hardcoded.
+        assert "ARG VERSION" in dockerfile
+
+    def test_dev_build_version_strings_are_not_forced_through_pep440(self):
+        """A dev image reports DEV_BUILD-dev-<n>, which is not a PEP 440
+        version. Routing the installed version through package metadata (i.e.
+        through setuptools' VERSION file) would reject that string and fail
+        the dev image build outright, so the env stamp must take precedence
+        over the metadata fallback.
+        """
+        constants_src = (REPO_ROOT / "cps/constants.py").read_text()
+        stamp_line = next(
+            line for line in constants_src.splitlines()
+            if line.startswith("_stamped_version")
+        )
+        env_pos = stamp_line.index("CWA_INSTALLED_VERSION")
+        pkg_pos = stamp_line.index("_get_version")
+        assert env_pos < pkg_pos, (
+            "the env stamp must be the first operand of the `or` — package "
+            "metadata cannot represent a DEV_BUILD-dev-<n> version at all"
+        )
 
 
 @pytest.mark.unit
@@ -218,21 +254,44 @@ class TestInstalledVersionReporting:
         assert "INSTALLED_VERSION" in src
         assert "STABLE_VERSION" not in src
 
-    def test_packaging_version_reads_the_installed_version(self):
-        pyproject = (REPO_ROOT / "pyproject.toml").read_text()
-        assert 'attr = "calibreweb.cps.constants.INSTALLED_VERSION"' in pyproject
+    def test_packaging_version_reads_a_file_not_the_constant(self):
+        """The dependency direction is now pyproject -> VERSION, not
+        pyproject -> constants.
 
-    def test_empty_release_file_falls_back_instead_of_blanking(self, tmp_path):
-        """A zero-byte /app/CWA_RELEASE used to yield an empty
-        INSTALLED_VERSION, which silently disables the indicator."""
-        from cps.constants import _read_text
-        empty = tmp_path / "CWA_RELEASE"
-        empty.write_text("")
-        assert _read_text(str(empty), "v0.0.0") == "v0.0.0"
-        assert _read_text(str(tmp_path / "missing"), "v0.0.0") == "v0.0.0"
-        populated = tmp_path / "populated"
-        populated.write_text("v4.1.23\n")
-        assert _read_text(str(populated), "v0.0.0") == "v4.1.23"
+        constants.py resolves the version *from installed package metadata*,
+        so a pyproject that derived its version from constants.py would be
+        circular: setuptools would have to import the module whose value it is
+        supposed to be producing. The VERSION file breaks the cycle and is the
+        only definition setuptools reads.
+        """
+        pyproject = (REPO_ROOT / "pyproject.toml").read_text()
+        assert 'version = {file = ["VERSION"]}' in pyproject
+        assert 'attr = "calibreweb.cps.constants.INSTALLED_VERSION"' not in pyproject, (
+            "reading the version back out of constants.py reintroduces the "
+            "cycle; constants.py now reads it from package metadata"
+        )
+        assert (REPO_ROOT / "VERSION").read_text().strip(), "VERSION must not be empty"
+
+    def test_failed_version_lookup_falls_back_instead_of_blanking(self):
+        """An unresolvable version used to yield an empty INSTALLED_VERSION,
+        which silently disables the update indicator instead of reading as an
+        unknown version.
+
+        The mechanism changed (file read -> importlib.metadata) but the
+        invariant did not: never return the empty string.
+        """
+        from cps.constants import _get_version
+        from importlib import metadata
+        import unittest.mock as mock
+
+        with mock.patch.object(
+            metadata, "version", side_effect=metadata.PackageNotFoundError
+        ):
+            assert _get_version("v0.0.0") == "v0.0.0"
+            assert _get_version() == ""
+
+        with mock.patch.object(metadata, "version", return_value="4.1.23"):
+            assert _get_version("v0.0.0") == "v4.1.23"
 
 
 @pytest.mark.unit

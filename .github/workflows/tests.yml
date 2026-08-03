@@ -77,8 +77,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          python -m pip install -e '.[dev]'
 
       - name: Create test environment structure
         run: |
@@ -278,8 +277,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          python -m pip install -e '.[dev]'
 
       - name: Build Docker image
         uses: docker/build-push-action@v7

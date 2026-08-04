@@ -576,10 +576,33 @@ jobs:
           # reader-rtl.spec.ts skips itself when either is missing, so this seed
           # — and the count check below — is what keeps it a real gate rather
           # than a silent pass.
+          # Stage into /tmp and `mv` into the watched folder, rather than
+          # `docker cp`-ing straight into it. The ingest service watches
+          # `close_write`, `moved_to` and `create` (cwa-ingest-service/run), and
+          # a rename into the folder is guaranteed to emit one of them: same
+          # filesystem gives `moved_to`, and a cross-device fallback copy gives
+          # `create` then `close_write`. `docker cp` instead relies on the
+          # daemon's write producing an inotify event inside the container's
+          # mount namespace, which is not guaranteed across storage drivers.
+          #
+          # A missed `close_write` is fatal here rather than merely late,
+          # because handle_event() drops a bare CREATE unless the file has
+          # nlink > 1 and non-zero size (the hardlink path) -- a plain copied-in
+          # file that fires only CREATE is ignored forever, with no log line.
+          # That is exactly the observed signature: watches established, zero
+          # ingest activity, 0 of 5 imported.
+          #
+          # It is nondeterministic, not a standing break: run 30868527022 ran
+          # this same seed and imported 5/5, while 30866805515 imported 0/5
+          # 34 minutes earlier on a diff of two docs files. Harness
+          # determinism, not a product bug -- ingest works on this commit.
+          docker exec -u 0 cwn-e2e mkdir -p /tmp/seed
           for book in alice_in_wonderland christmas_carol metamorphosis test_rtl_vertical test_ltr_horizontal; do
             docker cp "tests/fixtures/sample_books/${book}.epub" \
-              "cwn-e2e:/cwa-book-ingest/${book}.epub"
-            docker exec -u 0 cwn-e2e chown 1000:1000 "/cwa-book-ingest/${book}.epub"
+              "cwn-e2e:/tmp/seed/${book}.epub"
+            docker exec -u 0 cwn-e2e chown 1000:1000 "/tmp/seed/${book}.epub"
+            docker exec -u 0 cwn-e2e mv "/tmp/seed/${book}.epub" \
+              "/cwa-book-ingest/${book}.epub"
           done
           echo "Polling for the imported book via the API..."
           jar=$(mktemp); total=0

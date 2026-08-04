@@ -31,12 +31,17 @@ is for things you can see or feel when running the app.
   Read status is also kept in step now if you use a custom column for it.
   Calibre-Web tracks reading in two places — your column, and an internal record
   the Kobo and KOReader sync both write to — and only the column was being
-  updated when you toggled a book. So the "Currently reading" marker and the
-  progress your devices see could drift away from the checkmark on the book, and
-  a book you had marked Read could still be reported to your Kobo as one you
-  were part-way through. Both now follow the same toggle.
+  updated when you toggled a book. So the "Currently reading" marker could drift
+  away from the checkmark on the book, and a book you had marked Read could
+  still be reported to your Kobo as one you were part-way through. Both records
+  now follow the toggle.
 
-- **Japanese and Chinese books now turn the page the right way in the new
+  One limit worth knowing if you use a custom read column: the toggle reaches
+  your Kobo for books it has already synced, but not yet for a book the device
+  has never seen. That gap is tracked on
+  [#1350](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1350).
+
+- **Japanese and Chinese ebooks now turn the page the right way in the new
   reader.** Books that read right-to-left were paged as if they read
   left-to-right: the button to go forward sat on the right of the screen, so
   tapping the side you actually read towards took you backwards a page instead
@@ -45,15 +50,31 @@ is for things you can see or feel when running the app.
   really do for anyone using a screen reader. Books that read left-to-right are
   unchanged.
 
-- **Your reading position is no longer lost without warning when the database
-  is busy.** Both readers save your place constantly — the classic reader on
-  every page turn, the new one every second or so — and if that save failed
-  because something else was writing to the database at that moment, the
-  browser was told it had worked. It hadn't: the position was thrown away, and
-  because the browser thought it was saved, it never tried again. You would
-  come back to the book and find yourself pages behind, with nothing in the log
-  to explain it. Saves that fail now say so, and the reader retries instead of
-  quietly dropping your place.
+  This covers epub. Comics and manga read as CBZ or CBR still page
+  left-to-right — they carry no equivalent marker for reading direction, so that
+  needs its own detection and is tracked on
+  [#1354](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1354).
+
+- **Your reading position survives a busy database instead of being dropped.**
+  Both readers save your place constantly — the classic reader on every page
+  turn, the new one every second or so — and if that save failed because
+  something else was writing to the database at that moment, the browser was
+  told it had worked. It hadn't: the position was thrown away, and because the
+  browser thought it was saved, nothing ever went back for it. You would come
+  back to the book and find yourself pages behind, with nothing in the log to
+  explain it. A save that fails now reports the failure instead of a success,
+  and both readers act on it: the new reader retries a few times, and the
+  classic reader keeps your place locally and sends it the next time you open
+  the book.
+
+  Two honest limits. There is still no on-screen warning when a save fails for
+  good — the new reader announces it to screen readers only
+  ([#1352](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1352)) —
+  and if you close the tab within a few seconds of turning a page, the new
+  reader can still lose that last page turn. Neither is a step back from the
+  previous release; the new reader did not send your position anywhere at all
+  before this one.
+
   The same "said it worked when it didn't" answer turned up in three other
   places, all now fixed: changing an admin password from the command line could
   print "Password for user X changed" and exit successfully when the change had
@@ -115,6 +136,15 @@ is for things you can see or feel when running the app.
   only KOReader understands, so it doesn't pick up browser reading yet — that
   half needs a position translation and is still tracked on
   [#324](https://github.com/new-usemame/Calibre-Web-NextGen/issues/324).
+
+  Worth knowing if your server has several users *and* an admin has pointed
+  Calibre-Web at a custom column for read status: that column belongs to the
+  book rather than to each reader, so one person finishing a book in the
+  browser now shows it as read for everyone. Marking a book read by hand always
+  worked that way on those libraries; what is new is that reading to the end
+  does it too. Ordinary libraries keep read status per person and are
+  unaffected. Discussion of what the right behaviour should be is on
+  [#1351](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1351).
 
 ## [v4.1.28] - 2026-08-02
 

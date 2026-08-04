@@ -61,18 +61,18 @@ export const WHATS_NEW: WhatsNewRelease[] = [
     items: [
       {
         title: 'Reading in your browser now counts everywhere else',
-        body: 'Until now the web reader kept its position to itself: it could show you how far your Kobo or KOReader had got, but reading a few chapters in the browser left no trace, so your device still thought you were where you left it. The place you reach in the browser now travels the other way too — your Kobo picks it up on its next sync, the progress on the book updates, and finishing a book in the browser marks it read. Flipping back to an earlier chapter never costs you anything: your own place follows you, but the furthest point your device knows about stays put.',
+        body: 'Until now the web reader kept its position to itself: it could show you how far your Kobo or KOReader had got, but reading a few chapters in the browser left no trace, so your device still thought you were where you left it. The place you reach in the browser now travels the other way too — your Kobo picks it up on its next sync, the progress on the book updates, and finishing a book in the browser marks it read. Flipping back to an earlier chapter never costs you anything: your own place follows you, but the furthest point your device knows about stays put. One thing to know if your server has several users and an admin has set a custom column for read status: that column belongs to the book rather than to each reader, so one person finishing a book in the browser shows it as read for everyone. Ordinary libraries keep read status per person and are unaffected.',
         category: 'Sync',
         link: { to: '/', label: 'Open your library' },
       },
       {
-        title: 'Japanese and Chinese books turn the page the right way',
-        body: 'Books that read right to left were paged as if they read left to right, so the button to go forward sat on the right of the screen and tapping the side you actually read towards took you backwards instead of onwards. The arrow keys were reversed in the same way. Forward now sits where it belongs for these books, and the buttons announce what they really do for anyone using a screen reader.',
+        title: 'Japanese and Chinese ebooks turn the page the right way',
+        body: 'Books that read right to left were paged as if they read left to right, so the button to go forward sat on the right of the screen and tapping the side you actually read towards took you backwards instead of onwards. The arrow keys were reversed in the same way. Forward now sits where it belongs for these books, and the buttons announce what they really do for anyone using a screen reader. This covers epub — comics and manga read as CBZ or CBR still page left to right, since they carry no equivalent marker for reading direction.',
         category: 'Reading',
       },
       {
-        title: 'Your place in a book is no longer lost without warning',
-        body: 'Both readers save your position constantly, and if a save failed because something else was writing to the database at that moment, the browser was told it had worked. It had not: the position was thrown away, and because the browser believed it was saved it never tried again, so you would come back to the book pages behind with nothing in the log to explain it. Saves that fail now say so, and the reader retries instead of quietly dropping your place.',
+        title: 'Your place in a book survives a busy database',
+        body: 'Both readers save your position constantly, and if a save failed because something else was writing to the database at that moment, the browser was told it had worked. It had not: the position was thrown away, and because the browser believed it was saved, nothing ever went back for it, so you would come back to the book pages behind with nothing in the log to explain it. A save that fails now reports the failure instead of a success, and both readers act on it — this reader retries a few times, and the classic reader keeps your place locally and sends it the next time you open the book. Two limits remain: there is still no on-screen warning when a save fails for good, and closing the tab within a few seconds of turning a page can still lose that last turn.',
         category: 'Reading',
       },
       {

@@ -29,6 +29,21 @@ is for things you can see or feel when running the app.
   left in the retry queue by a previous run are also picked back up instead of
   waiting for an unrelated file to arrive.
 
+### Security
+
+- **The Statistics page no longer shows your server's version details to
+  everyone.** It listed the exact Calibre-Web NextGen release, the host kernel
+  build, the Python build and the version of every library the server uses —
+  around 70 entries — to any visitor who could open the page. On an instance
+  with guest browsing turned on, that included people who were not signed in at
+  all. It is enough detail to look up known vulnerabilities for the exact
+  software you are running, which matters if your instance is reachable from
+  the internet. Those details now go to admins only, and the server withholds
+  them rather than just hiding them on the page, so they are no longer sent to
+  anyone else. Book, author, series and category counts are unchanged for
+  everyone. Reported by @kabili207; @chloeroform sent the first fix and the
+  page-side change.
+
 ## [v4.1.29] - 2026-08-03
 
 ### Fixed

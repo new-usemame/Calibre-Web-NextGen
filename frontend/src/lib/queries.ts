@@ -100,6 +100,13 @@ export function useLogin() {
       noteSessionIdentity(!!data.role?.anonymous);
       queryClient.setQueryData(['me'], data);
       void queryClient.invalidateQueries({ queryKey: ['me'] });
+      // Signing in here does not reload the page, so anything cached under the
+      // previous identity survives. /about is one of those now -- the server
+      // withholds versions from non-admins (#1287), so a guest's empty map
+      // would otherwise stick for staleTime and hide the section from the admin
+      // who just signed in. Logging out is a full navigation, so that direction
+      // clears itself.
+      void queryClient.invalidateQueries({ queryKey: ['about'] });
     },
   });
 }
@@ -139,6 +146,8 @@ export function useMagicLinkPoll() {
         noteSessionIdentity(!!data.user.role?.anonymous);
         queryClient.setQueryData(['me'], data.user);
         void queryClient.invalidateQueries({ queryKey: ['me'] });
+        // Same in-place identity switch as useLogin — drop the guest's /about.
+        void queryClient.invalidateQueries({ queryKey: ['about'] });
       }
     },
   });

@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import {
-  apiGet, apiPost, apiUpload, apiPostForm, ApiError,
+  apiGet, apiPost, apiDelete, apiUpload, apiPostForm, ApiError,
   navigateToLogout, noteSessionIdentity,
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
@@ -262,16 +262,52 @@ export function useEntityList(plural: string) {
   });
 }
 
+/** The tag a rename collided with, carried on the 409 so the caller can offer
+ *  to merge into it rather than showing a dead end (#973). */
+export interface TagConflict { id: number; name: string; count: number }
+
+export interface TagWriteResult {
+  id: number;
+  name: string;
+  /** Present when the rename was resolved by folding this tag into another. */
+  merged?: boolean;
+  deleted?: boolean;
+  /** How many books moved (merge) or lost the tag (delete). */
+  books?: number;
+}
+
+/** Read the conflicting tag off a failed rename, or null if this wasn't one. */
+export function tagConflictOf(error: unknown): TagConflict | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const conflict = error.detail?.conflict as TagConflict | undefined;
+  return conflict && typeof conflict.id === 'number' ? conflict : null;
+}
+
+function invalidateTagViews(qc: ReturnType<typeof useQueryClient>) {
+  // 'entities' un-suffixed: a merge or delete REMOVES a row from the all-tags
+  // browse list, so that list must refetch too — not just the tag's own page.
+  void qc.invalidateQueries({ queryKey: ['entities'] });
+  void qc.invalidateQueries({ queryKey: ['books'] });
+  void qc.invalidateQueries({ queryKey: ['book'] });
+  void qc.invalidateQueries({ queryKey: ['metadata'] });
+}
+
 export function useRenameTag(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => apiPost<{ id: number; name: string }>(`/api/v1/tags/${id}`, { name }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['entities', 'tags'] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
-      void qc.invalidateQueries({ queryKey: ['book'] });
-      void qc.invalidateQueries({ queryKey: ['metadata'] });
-    },
+    // `merge` is only sent when explicitly true — the server refuses anything
+    // else, and a merge cannot be undone.
+    mutationFn: ({ name, merge }: { name: string; merge?: boolean }) =>
+      apiPost<TagWriteResult>(`/api/v1/tags/${id}`, merge === true ? { name, merge: true } : { name }),
+    onSuccess: () => invalidateTagViews(qc),
+  });
+}
+
+export function useDeleteTag(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete<TagWriteResult>(`/api/v1/tags/${id}`),
+    onSuccess: () => invalidateTagViews(qc),
   });
 }
 

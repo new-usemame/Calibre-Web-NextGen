@@ -961,4 +961,20 @@ _("Uploading is not available for your account on this server.")
 # so it is rare, but it is the one moment the user needs to know their place is
 # not being kept.
 _("Could not save your reading position.")
+# #973 — SPA-only strings for consolidating tags from the Tag view. Renaming a
+# tag onto its near-duplicate is how you de-duplicate, so the collision offers a
+# merge instead of dead-ending, and a tag can now be deleted. Singular/plural are
+# separate msgids because the SPA has no ngettext.
+_("Merge")
+_("Merge into {name}")
+_("Merged into {name}")
+_("Delete")
+_("Delete tag {name}")
+_("Confirm delete tag {name}")
+_("Deleted tag {name}")
+_("Could not delete tag")
+_("\u201c{name}\u201d already exists on {count} book. Merge this tag into it?")
+_("\u201c{name}\u201d already exists on {count} books. Merge this tag into it?")
+_("Delete \u201c{name}\u201d? It is removed from {count} book, which is kept.")
+_("Delete \u201c{name}\u201d? It is removed from {count} books, which are kept.")
 # ==== END AUTOGEN ====

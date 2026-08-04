@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useSearch } from 'wouter';
-import { ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw, UploadCloud, LayoutGrid, List, Pencil, Check, X } from 'lucide-react';
+import { Link, useSearch, useLocation } from 'wouter';
+import { ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw, UploadCloud, LayoutGrid, List, Pencil, Check, X, Trash2, Merge } from 'lucide-react';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { BookCard } from '../components/BookCard';
 import { BookCover } from '../components/BookCover';
@@ -9,7 +9,8 @@ import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { DiscoverSection } from '../components/DiscoverSection';
-import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag } from '../lib/queries';
+import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf } from '../lib/queries';
+import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
@@ -228,9 +229,15 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [showingAll, setShowingAll] = useState(false);
   const isSeries = entityKind === 'series';
   const renameTag = useRenameTag(entityId ?? '');
+  const deleteTag = useDeleteTag(entityId ?? '');
+  const [, navigate] = useLocation();
   const [renamingTag, setRenamingTag] = useState(false);
   const [tagNameDraft, setTagNameDraft] = useState('');
   const [tagRenameError, setTagRenameError] = useState('');
+  // The tag a rename collided with. Set means "offer to merge", not "failed".
+  const [tagMergeTarget, setTagMergeTarget] = useState<TagConflict | null>(null);
+  const [deletingTag, setDeletingTag] = useState(false);
+  const [tagDeleteError, setTagDeleteError] = useState('');
   // Series views expose two extra series-order options and default to ascending
   // series order so the list reads 1, 2, 3… instead of newest-first (#573).
   const sortOptions = isSeries ? [...SERIES_SORT_OPTIONS, ...SORT_OPTIONS] : SORT_OPTIONS;
@@ -555,36 +562,73 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const renameTriggerRef = useRef<HTMLButtonElement>(null);
   const closeTagRename = () => {
     setRenamingTag(false);
+    setTagMergeTarget(null);
     requestAnimationFrame(() => renameTriggerRef.current?.focus());
   };
   const beginTagRename = () => {
     setTagNameDraft(entityName ?? '');
     setTagRenameError('');
+    setTagMergeTarget(null);
     setRenamingTag(true);
   };
+  const closeTagDelete = () => {
+    setDeletingTag(false);
+    setTagDeleteError('');
+    requestAnimationFrame(() => renameTriggerRef.current?.focus());
+  };
+  const tagWriteError = (error: unknown, fallback: string) => {
+    if (error instanceof ApiError) {
+      const messages: Record<number, string> = {
+        400: t('Enter a valid tag name'),
+        401: t('You must be signed in'),
+        403: t('You are not allowed to edit metadata'),
+        404: t('Tag not found'),
+      };
+      return messages[error.status] ?? fallback;
+    }
+    return fallback;
+  };
+
+  const runTagRename = (next: string, merge?: boolean) => {
+    renameTag.mutate({ name: next, merge }, {
+      onSuccess: (result) => {
+        closeTagRename();
+        if (result.merged) {
+          announce(t('Merged into {name}', { name: result.name }));
+          // The tag this page was scoped to no longer exists — land on the
+          // survivor rather than a 404 of our own making.
+          navigate(`/tags/${result.id}`);
+        } else {
+          announce(t('Tag renamed to {name}', { name: result.name }));
+        }
+      },
+      onError: (error) => {
+        // A 409 that names the colliding tag is the de-dup case (#973), not a
+        // dead end: offer to merge instead of just restating the error.
+        const conflict = tagConflictOf(error);
+        if (conflict && !merge) { setTagMergeTarget(conflict); setTagRenameError(''); return; }
+        setTagMergeTarget(null);
+        setTagRenameError(tagWriteError(error, t('Could not rename tag')));
+      },
+    });
+  };
+
   const submitTagRename = (event: React.FormEvent) => {
     event.preventDefault();
     const next = tagNameDraft.trim();
+    setTagMergeTarget(null);
     if (!next) { setTagRenameError(t('Tag name cannot be empty')); return; }
-    renameTag.mutate(next, {
-      onSuccess: () => {
-        closeTagRename();
-        announce(t('Tag renamed to {name}', { name: next }));
+    runTagRename(next);
+  };
+
+  const confirmTagDelete = () => {
+    deleteTag.mutate(undefined, {
+      onSuccess: (result) => {
+        setDeletingTag(false);
+        announce(t('Deleted tag {name}', { name: result.name }));
+        navigate('/tags');
       },
-      onError: (error) => {
-        if (error instanceof ApiError) {
-          const messages: Record<number, string> = {
-            400: t('Enter a valid tag name'),
-            401: t('You must be signed in'),
-            403: t('You are not allowed to edit metadata'),
-            404: t('Tag not found'),
-            409: t('A tag with that name already exists'),
-          };
-          setTagRenameError(messages[error.status] ?? t('Could not rename tag'));
-        } else {
-          setTagRenameError(t('Could not rename tag'));
-        }
-      },
+      onError: (error) => setTagDeleteError(tagWriteError(error, t('Could not delete tag'))),
     });
   };
   const countLabel = total > 0
@@ -632,13 +676,54 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             <button type="button" className={styles.renameButton} onClick={closeTagRename}
               aria-label={t('Cancel')}><X size={18} aria-hidden="true" focusable={false} /></button>
             {tagRenameError && <span id="tag-rename-error" className={styles.renameError} role="alert">{tagRenameError}</span>}
+            {/* #973: renaming a tag onto its near-duplicate IS the de-dup the
+                reporter wants. A bare "already exists" error is a dead end, so
+                offer the merge the server will accept. */}
+            {tagMergeTarget && (
+              <div className={styles.mergePrompt} role="alert">
+                <span>{tagMergeTarget.count === 1
+                  ? t('“{name}” already exists on {count} book. Merge this tag into it?',
+                    { name: tagMergeTarget.name, count: tagMergeTarget.count })
+                  : t('“{name}” already exists on {count} books. Merge this tag into it?',
+                    { name: tagMergeTarget.name, count: tagMergeTarget.count })}</span>
+                <button type="button" className={styles.renameButton} disabled={renameTag.isPending}
+                  onClick={() => runTagRename(tagMergeTarget.name, true)}
+                  aria-label={t('Merge into {name}', { name: tagMergeTarget.name })}>
+                  <Merge size={16} aria-hidden="true" focusable={false} />
+                  <span className={styles.confirmLabel}>{t('Merge')}</span>
+                </button>
+                <button type="button" className={styles.renameButton} onClick={() => setTagMergeTarget(null)}
+                  aria-label={t('Cancel')}><X size={16} aria-hidden="true" focusable={false} /></button>
+              </div>
+            )}
           </form>
+        ) : deletingTag ? (
+          <div className={styles.mergePrompt} role="alert">
+            <span>{total === 1
+              ? t('Delete “{name}”? It is removed from {count} book, which is kept.', { name: entityName ?? '', count: total })
+              : t('Delete “{name}”? It is removed from {count} books, which are kept.', { name: entityName ?? '', count: total })}</span>
+            <button type="button" className={styles.dangerButton} disabled={deleteTag.isPending}
+              onClick={confirmTagDelete} aria-label={t('Confirm delete tag {name}', { name: entityName ?? '' })}>
+              <Trash2 size={16} aria-hidden="true" focusable={false} />
+              <span className={styles.confirmLabel}>{t('Delete')}</span>
+            </button>
+            <button type="button" className={styles.renameButton} onClick={closeTagDelete}
+              aria-label={t('Cancel')}><X size={16} aria-hidden="true" focusable={false} /></button>
+            {tagDeleteError && <span className={styles.renameError} role="alert">{tagDeleteError}</span>}
+          </div>
         ) : (
           canRenameTag && entityName ? (
-            <button ref={renameTriggerRef} type="button" className={styles.renameButton} onClick={beginTagRename}
-              aria-label={t('Rename tag {name}', { name: entityName })}>
-              <Pencil size={16} aria-hidden="true" focusable={false} />
-            </button>
+            <>
+              <button ref={renameTriggerRef} type="button" className={styles.renameButton} onClick={beginTagRename}
+                aria-label={t('Rename tag {name}', { name: entityName })}>
+                <Pencil size={16} aria-hidden="true" focusable={false} />
+              </button>
+              {/* Two-step: this button only opens the confirm above (#973). */}
+              <button type="button" className={styles.renameButton} onClick={() => { setTagDeleteError(''); setDeletingTag(true); }}
+                aria-label={t('Delete tag {name}', { name: entityName })}>
+                <Trash2 size={16} aria-hidden="true" focusable={false} />
+              </button>
+            </>
           ) : null
         )}
         {/* role=status so the result count is announced when filters/search

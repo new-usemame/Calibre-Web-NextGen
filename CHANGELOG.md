@@ -16,6 +16,22 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Tags can be merged and deleted from the Tags page.** Tidying up a library
+  meant living with whatever tags had accumulated. Renaming a tag onto a
+  near-duplicate — "Sci-Fi" onto "SciFi", which is how you merge two tags into
+  one — was refused with "A tag with that name already exists", so consolidating
+  them was impossible, and there was no way to delete a tag at all, not from the
+  Tags list and not from a tag's own page. Now the rename tells you which tag it
+  clashed with and how many books that one has, and offers to merge into it; the
+  books move across and the leftover tag disappears. Delete removes a tag from
+  every book that carries it, and the books themselves are kept. Both are on the
+  Tags list itself, so you can spot near-duplicates side by side and fix them
+  without opening each tag first, and both ask before they change anything.
+  Editing metadata is required, so read-only accounts and guests see the plain
+  list as before. Reported by @magdalar.
+
 ### Fixed
 
 - **Books already sitting in the ingest folder when the container starts are

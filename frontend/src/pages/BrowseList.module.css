@@ -126,3 +126,21 @@
   border-radius: var(--r-full);
   padding: 2px var(--sp-2);
 }
+
+/* #973 — per-row tag maintenance on the all-tags list. The link and the action
+   buttons are siblings inside the row; the buttons keep 40px touch targets and
+   the row wraps rather than overflowing on a narrow phone. */
+.rowWithActions { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
+.rowWithActions .item { flex: 1 1 auto; min-width: 0; }
+.rowActions { display: flex; align-items: center; gap: var(--sp-1); flex: 0 0 auto; }
+.rowEditing { display: flex; min-width: 0; }
+.rowForm { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); width: 100%; min-width: 0; }
+.rowInput { flex: 1 1 8rem; min-width: 0; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface-1); color: var(--text); font: inherit; }
+.rowAction { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding-inline: var(--sp-2); border-radius: var(--r-md); color: var(--accent); background: var(--surface-1); border: 1px solid var(--border); }
+.rowAction:hover:not(:disabled) { background: var(--accent-soft); }
+.rowDanger { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding-inline: var(--sp-2); border-radius: var(--r-md); color: var(--danger); background: var(--surface-1); border: 1px solid var(--danger); }
+.rowDanger:hover:not(:disabled) { background: var(--danger); color: var(--surface-1); }
+.rowInput:focus-visible, .rowAction:focus-visible, .rowDanger:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.rowConfirm { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); flex-basis: 100%; min-width: 0; font-size: var(--fs-sm); color: var(--text); }
+.rowError { flex-basis: 100%; color: var(--danger); font-size: var(--fs-sm); }
+.actionLabel { margin-inline-start: var(--sp-1); }

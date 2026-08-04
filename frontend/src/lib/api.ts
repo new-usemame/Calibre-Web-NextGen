@@ -393,11 +393,32 @@ export interface TaskItem {
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** The parsed `error` object from the response body, when there was one.
+   *  Errors are shaped `{ error: { code, message, ...extra } }` and some carry
+   *  fields the UI must act on rather than merely display — #973's tag-rename
+   *  conflict names the colliding tag so the client can offer to merge into it.
+   *  Dropping the body left callers with nothing but the message string. */
+  detail?: Record<string, unknown>;
+  constructor(status: number, message: string, detail?: Record<string, unknown>) {
     super(message);
     this.status = status;
+    this.detail = detail;
     this.name = 'ApiError';
   }
+}
+
+/** Read an error response into `{ message, detail }`. Single source of truth so
+ *  every verb surfaces structured error fields identically. */
+async function readApiError(res: Response): Promise<{ message: string; detail?: Record<string, unknown> }> {
+  try {
+    const d = await res.json() as { error?: string | Record<string, unknown> };
+    if (typeof d.error === 'string') return { message: d.error };
+    if (d.error && typeof d.error === 'object') {
+      const message = typeof d.error.message === 'string' ? d.error.message : res.statusText;
+      return { message, detail: d.error };
+    }
+  } catch { /* non-JSON body — fall through to statusText */ }
+  return { message: res.statusText };
 }
 
 /** Stable signal that a protected request has already started the canonical
@@ -591,15 +612,8 @@ function clearCsrf() {
 export async function apiGet<T>(path: string, options?: ApiRequestOptions): Promise<T> {
   const res = await classifiedFetch(path, { credentials: 'include' }, options);
   if (!res.ok) {
-    let msg = res.statusText;
-    // API errors are shaped { error: { code, message } }; fall back to a bare
-    // string error or the HTTP status text if the body isn't that shape.
-    try {
-      const d = await res.json() as { error?: string | { message?: string } };
-      if (typeof d.error === 'string') msg = d.error;
-      else if (d.error?.message) msg = d.error.message;
-    } catch { /* non-JSON body — keep statusText */ }
-    throw new ApiError(res.status, msg);
+    const parsed = await readApiError(res);
+    throw new ApiError(res.status, parsed.message, parsed.detail);
   }
   return res.json() as Promise<T>;
 }
@@ -641,15 +655,8 @@ export async function apiPost<T>(
   }
 
   if (!res.ok) {
-    let msg = res.statusText;
-    // API errors are shaped { error: { code, message } }; fall back to a bare
-    // string error or the HTTP status text if the body isn't that shape.
-    try {
-      const d = await res.json() as { error?: string | { message?: string } };
-      if (typeof d.error === 'string') msg = d.error;
-      else if (d.error?.message) msg = d.error.message;
-    } catch { /* non-JSON body — keep statusText */ }
-    throw new ApiError(res.status, msg);
+    const parsed = await readApiError(res);
+    throw new ApiError(res.status, parsed.message, parsed.detail);
   }
 
   if (res.status === 204) return undefined as unknown as T;
@@ -683,13 +690,8 @@ export async function apiDelete<T>(path: string, options?: ApiRequestOptions): P
   }
 
   if (!res.ok) {
-    let msg = res.statusText;
-    try {
-      const d = await res.json() as { error?: string | { message?: string } };
-      if (typeof d.error === 'string') msg = d.error;
-      else if (d.error?.message) msg = d.error.message;
-    } catch { /* non-JSON body — keep statusText */ }
-    throw new ApiError(res.status, msg);
+    const parsed = await readApiError(res);
+    throw new ApiError(res.status, parsed.message, parsed.detail);
   }
 
   // 204 No Content, or any empty body → resolve undefined. A JSON body is parsed.
@@ -728,13 +730,8 @@ export async function apiPatch<T>(path: string, body?: unknown, options?: ApiReq
   }
 
   if (!res.ok) {
-    let msg = res.statusText;
-    try {
-      const d = await res.json() as { error?: string | { message?: string } };
-      if (typeof d.error === 'string') msg = d.error;
-      else if (d.error?.message) msg = d.error.message;
-    } catch { /* non-JSON body — keep statusText */ }
-    throw new ApiError(res.status, msg);
+    const parsed = await readApiError(res);
+    throw new ApiError(res.status, parsed.message, parsed.detail);
   }
 
   if (res.status === 204) return undefined as unknown as T;
@@ -763,13 +760,8 @@ export async function apiPostForm<T>(path: string, fields: Record<string, string
     res = await doPost(csrf);
   }
   if (!res.ok) {
-    let msg = res.statusText;
-    try {
-      const d = await res.json() as { error?: string | { message?: string } };
-      if (typeof d.error === 'string') msg = d.error;
-      else if (d.error?.message) msg = d.error.message;
-    } catch { /* keep statusText */ }
-    throw new ApiError(res.status, msg);
+    const parsed = await readApiError(res);
+    throw new ApiError(res.status, parsed.message, parsed.detail);
   }
   return res.json() as Promise<T>;
 }
@@ -836,13 +828,8 @@ export async function apiUpload<T>(path: string, formData: FormData, options?: A
   }
 
   if (!res.ok) {
-    let msg = res.statusText;
-    try {
-      const d = await res.json() as { error?: string | { message?: string } };
-      if (typeof d.error === 'string') msg = d.error;
-      else if (d.error?.message) msg = d.error.message;
-    } catch { /* non-JSON body — keep statusText */ }
-    throw new ApiError(res.status, msg);
+    const parsed = await readApiError(res);
+    throw new ApiError(res.status, parsed.message, parsed.detail);
   }
   return res.json() as Promise<T>;
 }

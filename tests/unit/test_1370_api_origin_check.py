@@ -228,6 +228,59 @@ def test_real_proxyfix_forwarded_host_deployment_passes(fwd_host):
 
 
 @pytest.mark.unit
+def test_tls_terminating_proxy_that_forwards_no_proto_is_rejected():
+    """Pin the one deployment this hook does NOT infer, so it is a documented
+    behaviour rather than a surprise 403 in someone's logs.
+
+    A proxy can forward the public host correctly and still leave Flask believing
+    the request arrived over HTTP, because it sends no X-Forwarded-Proto (and no
+    X-Scheme, and PROXY_SCHEME is unset). host_url is then http://books.example.com
+    while the browser states https://books.example.com, the schemes differ, and
+    every write is refused.
+
+    Scheme is deliberately kept in the comparison — it is a real origin boundary,
+    unlike the port. Such a deployment is already visibly wrong today (url_for
+    emits http:// links for it, per the note at cps/__init__.py:86), and it has
+    three fixes: forward X-Forwarded-Proto, set PROXY_SCHEME, or name the public
+    address in CWNG_TRUSTED_ORIGINS. The CHANGELOG entry says so.
+    """
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    from cps.api import api_v1
+    app = flask.Flask(__name__)
+    app.testing = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["SECRET_KEY"] = "test"
+    app.config["RATELIMIT_ENABLED"] = False
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    app.register_blueprint(api_v1)
+
+    with patch("cps.api.current_user") as cu, patch("cps.api.config") as cfg:
+        cu.is_authenticated = True
+        cfg.config_allow_reverse_proxy_header_login = False
+        cfg.config_anonbrowse = 0
+        resp = app.test_client().post(
+            "/api/v1/tags/1",
+            headers={"Origin": "https://books.example.com",
+                     "X-Forwarded-Host": "books.example.com"},   # no -Proto
+            base_url="http://calibre-web:8083/")
+    assert resp.status_code == 403
+
+    # And the documented remedy actually clears it.
+    with patch("cps.api.current_user") as cu, patch("cps.api.config") as cfg, \
+            patch("cps.api._EXTRA_TRUSTED_ORIGINS", ("https://books.example.com",)):
+        cu.is_authenticated = True
+        cfg.config_allow_reverse_proxy_header_login = False
+        cfg.config_anonbrowse = 0
+        resp = app.test_client().post(
+            "/api/v1/tags/1",
+            headers={"Origin": "https://books.example.com",
+                     "X-Forwarded-Host": "books.example.com"},
+            base_url="http://calibre-web:8083/")
+    assert resp.status_code != 403, (
+        "CWNG_TRUSTED_ORIGINS did not rescue the no-X-Forwarded-Proto deployment")
+
+
+@pytest.mark.unit
 def test_port_is_not_part_of_the_comparison():
     """Explicit, since a proxy stripping the port is the common breakage. Also pins
     that an explicit `:0` cannot be coerced into matching the scheme default."""

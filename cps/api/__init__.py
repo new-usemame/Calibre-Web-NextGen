@@ -64,10 +64,12 @@ def _origin_key(value):
     The port is deliberately NOT compared. A reverse proxy very commonly forwards
     `X-Forwarded-Host: books.example.com` with the port stripped while the browser
     states `Origin: https://books.example.com:8443`; comparing ports would 403 every
-    write for that entirely ordinary deployment. Nothing is given up by ignoring it:
-    the property being enforced is "same host", and an attacker who can serve content
-    on another port of the operator's own hostname is already past a bigger boundary
-    than this hook. (Ignoring the port also sidesteps `port or default` coercing an
+    write for that entirely ordinary deployment. This does relax the check: the port is
+    genuinely part of a browser's origin, so what is enforced here is deliberately
+    "same host" rather than exact same-origin. The trade is worth it — an attacker who
+    can serve content on another port of the operator's own hostname is already past a
+    bigger boundary than this hook, while a port-stripping proxy is common enough that
+    comparing ports would break real installs. (Ignoring the port also sidesteps `port or default` coercing an
     explicit `:0` to the scheme default.)
     """
     try:

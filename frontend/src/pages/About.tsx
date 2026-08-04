@@ -2,14 +2,11 @@ import { Info, BookOpen, Users, Layers, Tag } from 'lucide-react';
 import { useAbout } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import { useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import styles from './About.module.css';
 
 export function About() {
   const { data, isLoading, error } = useAbout();
-  const me = useMe().data;
-  const isAdmin = !!me?.role?.admin;
   const t = useT();
 
   if (isLoading) return <SpinnerCentered size={40} />;
@@ -20,6 +17,11 @@ export function About() {
       </main>
     );
   }
+
+  // Versions are admin-only and the server enforces that (#1287) -- it sends an
+  // empty map to everyone else. Deriving the section from the payload keeps one
+  // source of truth for the rule, so the UI cannot disagree with the API.
+  const versions = Object.entries(data.versions ?? {});
 
   const stats = [
     { label: t('Books'), value: data.counts.books, icon: BookOpen },
@@ -45,18 +47,18 @@ export function About() {
         ))}
       </div>
 
-      {isAdmin && (
-      <div>
-      <h2 className={styles.subTitle}>{t('Versions')}</h2>
-      <dl className={styles.versions}>
-        {Object.entries(data.versions).map(([name, ver]) => (
-          <div key={name} className={styles.verRow}>
-            <dt className={styles.verName}>{name}</dt>
-            <dd className={styles.verVal}>{ver}</dd>
-          </div>
-        ))}
-      </dl>
-      </div>
+      {versions.length > 0 && (
+        <>
+          <h2 className={styles.subTitle}>{t('Versions')}</h2>
+          <dl className={styles.versions}>
+            {versions.map(([name, ver]) => (
+              <div key={name} className={styles.verRow}>
+                <dt className={styles.verName}>{name}</dt>
+                <dd className={styles.verVal}>{ver}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
       )}
     </main>
   );

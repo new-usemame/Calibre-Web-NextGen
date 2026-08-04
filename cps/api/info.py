@@ -19,7 +19,23 @@ from ..services.worker import WorkerThread
 @api_v1.route("/about")
 @login_required_if_no_ano
 def about_info():
-    """Library counts + component versions (the legacy Statistics page)."""
+    """Library counts + component versions (the legacy Statistics page).
+
+    Counts are for everyone; versions are admin-only (#1287). collect_stats()
+    reports the host kernel build string, the Python build and every installed
+    dependency version -- a fingerprint an attacker can match against known
+    CVEs on a publicly reachable instance.
+
+    The Jinja page has always gated that block on role_admin() (stats.html),
+    but the SPA's API was written without the check, so on an instance with
+    anonymous browsing enabled the whole map was one unauthenticated GET away.
+    Gating here rather than in the client is what actually closes it: a UI
+    conditional still ships the data over the wire.
+
+    The key stays present-but-empty for non-admins so AboutInfo.versions holds
+    its shape for every caller, and the client can treat "server sent versions"
+    as the single source of truth for whether to render the section.
+    """
     return jsonify({
         "counts": {
             "books": calibre_db.session.query(db.Books).count(),
@@ -28,7 +44,7 @@ def about_info():
             "series": calibre_db.session.query(db.Series).count(),
         },
         # collect_stats() returns an ordered {name: version} map.
-        "versions": collect_stats(),
+        "versions": collect_stats() if current_user.role_admin() else {},
     })
 
 

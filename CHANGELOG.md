@@ -34,6 +34,20 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Series and other metadata edits now reach your Kobo.** Setting a series name
+  and number on a book saved fine in the library, and the change showed up in the
+  web interface, but the book on a Kobo still had no series — and downloading the
+  file back confirmed the series was missing from it. Books converted for Kobo are
+  stored as `.kepub` files, and those were the one format the metadata writer
+  skipped, so every edit reached the `.epub` and the library while the file your
+  reader actually opens was left untouched. Re-saving did not help, because
+  nothing was wrong with the edit. `.kepub` files are now written too, so series,
+  tags, description and cover changes turn up on the device after the next sync.
+  Existing books pick up their metadata the next time you edit them, or in one
+  pass from Settings if you run the cover and metadata enforcement over the whole
+  library. Reading positions and bookmarks already on your reader are preserved.
+  Reported by @bjekel.
+
 - **Books already sitting in the ingest folder when the container starts are
   now imported.** If a book was waiting in the ingest folder at the moment
   Calibre-Web NextGen started — you copied files in while it was stopped, the

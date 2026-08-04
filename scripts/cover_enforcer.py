@@ -232,7 +232,11 @@ class Enforcer:
         self.db = CWA_DB()
         self.cwa_settings = self.db.cwa_settings
         self.enforcer_on = self.cwa_settings["auto_metadata_enforcement"]
-        self.supported_formats = ["epub", "azw3"]
+        # kepub is enforced too (fork #1372) — Kobo sync serves the .kepub, so
+        # leaving it out meant metadata edits reached the .epub and metadata.db
+        # but never the file the reader actually opens. Note "book.kepub" does
+        # not end with ".epub", so it needs its own entry here.
+        self.supported_formats = ["epub", "azw3", "kepub"]
 
         self.args = args
         self.calibre_library = self.get_calibre_library()
@@ -590,26 +594,37 @@ class Enforcer:
                 # Add small delay to ensure any file locks are released
                 time.sleep(0.5)
                 
-                try:
+                # kepub carries Kobo reading positions in its koboSpan ids, and
+                # ebook-polish re-segments those (measured 7016 -> ~13.5k spans
+                # on calibre 9.1, with and without -U) because calibre re-applies
+                # its own KEPUB spans over kepubify's. That would shift every
+                # bookmark in an already-synced book, so kepub gets a
+                # metadata-only write instead, which leaves content untouched.
+                if book.file_format.lower() == "kepub":
+                    tool = 'ebook-meta'
+                    cmd = [tool, file, '--from-opf', book.new_metadata_path]
                     if Path(book.cover_path).exists():
-                        result = subprocess.run(
-                            ['ebook-polish', '-c', book.cover_path, '-o', book.new_metadata_path, '-U', file, file],
-                            capture_output=True, text=True, timeout=120, check=False
-                        )
+                        cmd += ['--cover', book.cover_path]
+                else:
+                    tool = 'ebook-polish'
+                    if Path(book.cover_path).exists():
+                        cmd = [tool, '-c', book.cover_path, '-o', book.new_metadata_path, '-U', file, file]
                     else:
-                        result = subprocess.run(
-                            ['ebook-polish', '-o', book.new_metadata_path, '-U', file, file],
-                            capture_output=True, text=True, timeout=120, check=False
-                        )
-                    
+                        cmd = [tool, '-o', book.new_metadata_path, '-U', file, file]
+
+                try:
+                    result = subprocess.run(
+                        cmd, capture_output=True, text=True, timeout=120, check=False
+                    )
+
                     if result.returncode != 0:
-                        print(f"[cover-metadata-enforcer] Warning: ebook-polish returned {result.returncode} for {file}", flush=True)
+                        print(f"[cover-metadata-enforcer] Warning: {tool} returned {result.returncode} for {file}", flush=True)
                         if result.stderr:
                             print(f"[cover-metadata-enforcer] Error output: {result.stderr.strip()}", flush=True)
                 except subprocess.TimeoutExpired:
-                    print(f"[cover-metadata-enforcer] Error: ebook-polish timed out for {file}", flush=True)
+                    print(f"[cover-metadata-enforcer] Error: {tool} timed out for {file}", flush=True)
                 except Exception as e:
-                    print(f"[cover-metadata-enforcer] Error running ebook-polish for {file}: {e}", flush=True)
+                    print(f"[cover-metadata-enforcer] Error running {tool} for {file}: {e}", flush=True)
                 
                 self.empty_metadata_temp()
                 print(f"[cover-metadata-enforcer]: DONE: '{book.title_author}.{book.file_format}': Cover & Metadata updated", flush=True)

@@ -21,8 +21,11 @@ all 24 content files byte-identical in span count (7016 -> 7016).
 """
 
 import ast
+import atexit
 import importlib.util
+import shutil
 import sys
+import tempfile
 import types
 from pathlib import Path
 
@@ -33,7 +36,14 @@ SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "cover_enforcer.py"
 
 
 def _load_module():
-    """Import cover_enforcer.py with its DB dependency stubbed out."""
+    """Import cover_enforcer.py with its DB dependency stubbed out.
+
+    The stub is installed only for the duration of the import and then removed,
+    restoring whatever was there before. Leaving a fake ``cwa_db`` behind in
+    ``sys.modules`` is visible to every test that runs after this file in the
+    same process -- it broke test_802's enforcer invocation when this pin was
+    first written.
+    """
     stub = types.ModuleType("cwa_db")
 
     class _StubDB:  # pragma: no cover - only needs to exist for import
@@ -41,11 +51,37 @@ def _load_module():
             self.cwa_settings = {"auto_metadata_enforcement": 1}
 
     stub.CWA_DB = _StubDB
-    sys.modules.setdefault("cwa_db", stub)
+    sentinel = object()
+    previous = sys.modules.get("cwa_db", sentinel)
+    sys.modules["cwa_db"] = stub
 
-    spec = importlib.util.spec_from_file_location("cover_enforcer_under_test", SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Importing cover_enforcer takes a lock file at module scope ("x" mode,
+    # sys.exit(2) if it already exists) keyed on tempfile.gettempdir(), and only
+    # drops it via atexit. Shared with the real module that test_802 imports,
+    # that is a collision in both directions: our import would strand the lock
+    # and make theirs exit 2, and theirs would make ours die during fixture
+    # setup. pytest-randomly shuffles file order, so either way round is
+    # reachable in CI. Point the import at a private temp dir so the two never
+    # contend, then unregister the atexit hook -- it resolves gettempdir() at
+    # call time and would otherwise delete the real module's lock at shutdown.
+    private_tmp = tempfile.mkdtemp(prefix="cover_enforcer_test_")
+    real_gettempdir = tempfile.gettempdir
+    tempfile.gettempdir = lambda: private_tmp
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "cover_enforcer_under_test", SCRIPT
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        tempfile.gettempdir = real_gettempdir
+        if previous is sentinel:
+            sys.modules.pop("cwa_db", None)
+        else:
+            sys.modules["cwa_db"] = previous
+
+    atexit.unregister(module.removeLock)
+    shutil.rmtree(private_tmp, ignore_errors=True)
     return module
 
 
@@ -57,9 +93,9 @@ def enforcer_module():
 def _bare_enforcer(module):
     """An Enforcer instance without __init__ (which would touch the real DB)."""
     inst = object.__new__(module.Enforcer)
-    inst.supported_formats = module.Enforcer.__init__.__globals__.get("_", None)
-    # Mirror the production default rather than hand-setting it, so this test
-    # fails when the production list stops covering kepub.
+    # Read the production default out of the source rather than hand-setting it,
+    # so these tests fail when that list stops covering kepub. Enforcer.__init__
+    # builds a real CWA_DB, so it cannot be called here.
     src = SCRIPT.read_text(encoding="utf-8")
     tree = ast.parse(src)
     formats = None

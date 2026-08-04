@@ -12546,3 +12546,35 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"
+
+# #973 — consolidating tags from the Tag view (merge on rename collision, delete).
+msgid "Confirm delete tag {name}"
+msgstr "Verwijderen van label {name} bevestigen"
+
+msgid "Could not delete tag"
+msgstr "Kan label niet verwijderen"
+
+msgid "Delete tag {name}"
+msgstr "Label {name} verwijderen"
+
+msgid "Delete “{name}”? It is removed from {count} book, which is kept."
+msgstr "„{name}” verwijderen? Het wordt van {count} boek verwijderd; het boek blijft behouden."
+
+msgid "Delete “{name}”? It is removed from {count} books, which are kept."
+msgstr "„{name}” verwijderen? Het wordt van {count} boeken verwijderd; de boeken blijven behouden."
+
+msgid "Deleted tag {name}"
+msgstr "Label {name} verwijderd"
+
+msgid "Merge into {name}"
+msgstr "Samenvoegen met {name}"
+
+msgid "Merged into {name}"
+msgstr "Samengevoegd met {name}"
+
+msgid "“{name}” already exists on {count} book. Merge this tag into it?"
+msgstr "„{name}” bestaat al op {count} boek. Dit label daarmee samenvoegen?"
+
+msgid "“{name}” already exists on {count} books. Merge this tag into it?"
+msgstr "„{name}” bestaat al op {count} boeken. Dit label daarmee samenvoegen?"
+

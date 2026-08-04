@@ -13010,3 +13010,35 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr ""
 #~ "Cliquer sur la couverture pour importer les métadonnées dans le formulaire"
+
+# #973 — consolidating tags from the Tag view (merge on rename collision, delete).
+msgid "Confirm delete tag {name}"
+msgstr "Confirmer la suppression de l’étiquette {name}"
+
+msgid "Could not delete tag"
+msgstr "Impossible de supprimer l’étiquette"
+
+msgid "Delete tag {name}"
+msgstr "Supprimer l’étiquette {name}"
+
+msgid "Delete “{name}”? It is removed from {count} book, which is kept."
+msgstr "Supprimer « {name} » ? Elle sera retirée de {count} livre, qui sera conservé."
+
+msgid "Delete “{name}”? It is removed from {count} books, which are kept."
+msgstr "Supprimer « {name} » ? Elle sera retirée de {count} livres, qui seront conservés."
+
+msgid "Deleted tag {name}"
+msgstr "Étiquette {name} supprimée"
+
+msgid "Merge into {name}"
+msgstr "Fusionner avec {name}"
+
+msgid "Merged into {name}"
+msgstr "Fusionnée avec {name}"
+
+msgid "“{name}” already exists on {count} book. Merge this tag into it?"
+msgstr "« {name} » existe déjà sur {count} livre. Fusionner cette étiquette avec celle-ci ?"
+
+msgid "“{name}” already exists on {count} books. Merge this tag into it?"
+msgstr "« {name} » existe déjà sur {count} livres. Fusionner cette étiquette avec celle-ci ?"
+

@@ -92,6 +92,65 @@ def test_about_gate_is_server_side():
     assert "role_admin" in src
 
 
+def _get_about_over_http(role):
+    """GET /api/v1/about through the real blueprint, with anonymous browsing on.
+
+    The tests above call the unwrapped function with a stubbed current_user,
+    which pins the gate but proves nothing about the stack in front of it. This
+    goes through real routing, the api_v1 before_request gate and the real
+    @login_required_if_no_ano, and carries a real ub.User so role_admin() runs
+    the actual ROLE_ADMIN bitmask check rather than a lambda that answers.
+    """
+    import flask
+    from cps import ub
+    from cps.api import api_v1, info as mod
+
+    app = flask.Flask(__name__)
+    app.testing = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["SECRET_KEY"] = "test"
+    app.config["RATELIMIT_ENABLED"] = False
+    app.register_blueprint(api_v1)
+
+    user = ub.User()
+    user.id, user.name, user.role = 5, "tester", role
+
+    calibre = MagicMock()
+    calibre.session.query.return_value.count.return_value = 7
+    with patch.object(mod, "calibre_db", calibre), \
+         patch.object(mod, "collect_stats", lambda: dict(_SENSITIVE)), \
+         patch.object(mod, "current_user", user), \
+         patch("cps.api.config") as api_cfg, \
+         patch("cps.usermanagement.config") as um_cfg:
+        api_cfg.config_anonbrowse = 1
+        api_cfg.config_allow_reverse_proxy_header_login = False
+        um_cfg.config_anonbrowse = 1
+        um_cfg.config_allow_reverse_proxy_header_login = False
+        return app.test_client().get("/api/v1/about")
+
+
+@pytest.mark.unit
+def test_about_over_real_http_withholds_versions_from_plain_user():
+    """End of the wire, not just the ternary: a real request from a real
+    non-admin user must come back without the version map."""
+    from cps import constants
+    resp = _get_about_over_http(constants.ROLE_USER)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["versions"] == {}
+    for value in _SENSITIVE.values():
+        assert value not in json.dumps(body)
+
+
+@pytest.mark.unit
+def test_about_over_real_http_serves_versions_to_real_admin():
+    """Same request path, ROLE_ADMIN set -- the map comes back."""
+    from cps import constants
+    resp = _get_about_over_http(constants.ROLE_ADMIN | constants.ROLE_USER)
+    assert resp.status_code == 200
+    assert resp.get_json()["versions"] == _SENSITIVE
+
+
 @pytest.mark.unit
 def test_anonymous_user_is_never_admin():
     """/about is login_required_if_no_ano, so guests reach the handler when

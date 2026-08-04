@@ -4,9 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "calibre-web-automated"
-description = "Calibre-Web but Automated and with Many New Features! Fully automate and simplify your eBook set up!"
-authors = [{name = "CrocodileStick", email = "crocodilestick@users.noreply.github.com"}]
-maintainers = [{name = "CrocodileStick"}]
+description = "Community continuation of Calibre-Web-Automated."
+authors = [
+  {name = "CrocodileStick", email ="crocodilestick@users.noreply.github.com"},
+  {name = "new-usemame", email ="new-usemame@users.noreply.github.com"},
+]
+maintainers = [{name = "new-usemame"}]
 license = {text = "GPLv3+"}
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -146,11 +149,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/crocodilestick/Calibre-Web-Automated"
-"Bug Tracker" = "https://github.com/crocodilestick/Calibre-Web-Automated/issues"
-"Release Management" = "https://github.com/crocodilestick/Calibre-Web-Automated/releases"
-Documentation = "https://github.com/crocodilestick/Calibre-Web-Automated/wiki"
-"Source Code" = "https://github.com/crocodilestick/Calibre-Web-Automated"
+Homepage = "https://github.com/new-usemame/Calibre-Web-NextGen"
+"Bug Tracker" = "https://github.com/new-usemame/Calibre-Web-NextGen/issues"
+"Release Management" = "https://github.com/new-usemame/Calibre-Web-NextGen/releases"
+Documentation = "https://github.com/new-usemame/Calibre-Web-NextGen/wiki"
+"Source Code" = "https://github.com/new-usemame/Calibre-Web-NextGen/releases"
 
 [project.readme]
 file = "README.md"

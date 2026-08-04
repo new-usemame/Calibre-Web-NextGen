@@ -73,9 +73,12 @@ is for things you can see or feel when running the app.
   KOReader and any file-sync you have set up, and grew the backup folder every
   time. Books that genuinely need fixing are still fixed, backed up and
   rewritten exactly as before; books that don't are now left alone, and the log
-  says "No issues found" instead of inventing two. The fixer also no longer
-  walks Calibre's hidden `.caltrash` folder, so books you deleted are no longer
-  processed and reported alongside the ones in your library.
+  says "No issues found" instead of inventing two. A book whose language
+  Calibre never set was counted the same way: the fixer left the language
+  exactly as it found it and still recorded that as a repair, adding a row to
+  the Epub Fixer history on every run. It no longer does. The fixer also no
+  longer walks Calibre's hidden `.caltrash` folder, so books you deleted are no
+  longer processed and reported alongside the ones in your library.
 
 - **The "update available" banner stops re-appearing every time you restart.**
   The banner is meant to show at most once a day, and it remembered the date it

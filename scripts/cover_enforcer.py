@@ -730,6 +730,16 @@ class Enforcer:
             for file in supported_files:
                 book_dirs.append(os.path.dirname(file))
 
+            # One book dir holds one entry per supported format, and enforce_cover()
+            # already enforces every supported file in the dir it is handed. Without
+            # this dedup the whole book is re-enforced once per format: an .epub
+            # beside its .kepub -- the normal layout once Kobo sync is on -- took
+            # four file rewrites instead of two, ran the checksum recalculation
+            # twice per file, and wrote a duplicate enforcement-log row. Adding
+            # kepub (#1372) is what moved that from an .azw3 edge case to the
+            # common one. Order-preserving so the log still reads library-order.
+            book_dirs = list(dict.fromkeys(book_dirs))
+
             print(f"[cover-metadata-enforcer]: {len(book_dirs)} books detected in Library")
             print(f"[cover-metadata-enforcer]: Enforcing covers for {len(supported_files)} supported file(s) in {self.calibre_library} ...")
 

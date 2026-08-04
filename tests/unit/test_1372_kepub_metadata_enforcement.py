@@ -326,3 +326,39 @@ def test_no_user_facing_message_hardcodes_a_format_name():
         "print() restates the supported-format list instead of calling "
         f"supported_formats_label(): {offenders}"
     )
+
+
+@pytest.mark.unit
+def test_enforce_all_covers_enforces_a_dual_format_book_once(enforcer_module, tmp_path):
+    """Whole-library enforcement visits a book dir once, not once per format.
+
+    ``enforce_all_covers`` appended one dir per supported FILE while
+    ``enforce_cover`` already enforces every supported file in the dir it is
+    given, so a book was fully re-enforced once per format it carried. Adding
+    kepub made that the normal layout rather than an .azw3 edge case: an .epub
+    beside its .kepub meant four file rewrites instead of two, the checksum
+    recalculated twice per file, and a duplicate enforcement-log row.
+    """
+    module = enforcer_module
+    book_dir = tmp_path / "Some Book (1)"
+    book_dir.mkdir()
+    (book_dir / "book.epub").write_text("x", encoding="utf-8")
+    (book_dir / "book.kepub").write_text("x", encoding="utf-8")
+
+    inst = _bare_enforcer(module)
+    inst.calibre_library = str(tmp_path)
+    inst.db = types.SimpleNamespace(enforce_add_entry_from_all=lambda *a, **kw: None)
+
+    calls = []
+
+    def _fake_enforce_cover(book_dir_arg):
+        calls.append(book_dir_arg)
+        return []
+
+    inst.enforce_cover = _fake_enforce_cover
+
+    inst.enforce_all_covers()
+
+    assert calls == [str(book_dir)], (
+        f"expected the dual-format book dir to be enforced once, got {calls}"
+    )

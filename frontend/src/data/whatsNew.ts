@@ -56,6 +56,39 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.30',
+    date: '2026-08-04',
+    items: [
+      {
+        title: 'Merge and delete tags from the Tags page',
+        body: 'Near-duplicate tags like "Sci-Fi" and "SciFi" could not be consolidated — renaming one onto the other was refused because the name was already taken — and there was no way to delete a tag at all. Renaming onto an existing tag now tells you which one it clashed with and how many books that one holds, then offers to merge into it; delete removes a tag from every book that carries it and keeps the books themselves. Both sit on the Tags list so you can spot near-duplicates side by side, and both ask before they change anything.',
+        category: 'Library',
+        link: { to: '/tags', label: 'Browse tags' },
+      },
+      {
+        title: 'Series and other metadata edits now reach your Kobo',
+        body: 'Setting a series name and number saved fine in the library and showed up in the web interface, but the book on the device still had no series — books converted for Kobo are stored as .kepub files, and those were the one format the metadata writer skipped. Series, tags and covers are now written to .kepub too, so edits turn up on the device after the next sync. Existing books pick this up the next time you edit them, or in one pass if you run the cover and metadata enforcement over the whole library from Admin; clearing a field is not covered yet.',
+        category: 'Sync',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Books waiting in the ingest folder at startup are imported',
+        body: 'If a book was sitting in the ingest folder the moment the server started — you copied files in while it was stopped, or it rebooted mid-copy — it was never picked up, with no error and nothing in the log, and the only way out was to touch or re-copy every file. The folder is now swept once at startup, so anything waiting there gets imported. Books left in the retry queue by a previous run are picked back up as well.',
+        category: 'Library',
+      },
+      {
+        title: 'Requests that change your library are refused when they come from another website',
+        body: 'Every change the new interface makes already had to carry a one-time token that a page on another site cannot read, but if one were ever obtained the server would have carried out the write without noticing the request came from somewhere else entirely. It now checks the whole API surface at once, rather than route by route, and refuses anything that says it came from a site other than yours. Ordinary use is unaffected — but if you reach your library through a reverse proxy it has to forward both the address and whether the connection is https, or you can name the address you actually use in the new optional CWNG_TRUSTED_ORIGINS setting.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The Statistics page no longer shows your server version to everyone',
+        body: 'It listed the exact release, the host kernel build, the Python build and the version of every library the server uses — around 70 entries — to any visitor who could open the page, including people not signed in at all where guest browsing is turned on. That is enough detail to look up known vulnerabilities for the exact software you are running. Those details now go to admins only, and the server withholds them rather than just hiding them on the page; book, author, series and category counts are unchanged for everyone.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.29',
     date: '2026-08-03',
     items: [

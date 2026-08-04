@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.30] - 2026-08-04
+
 ### Added
 
 - **Tags can be merged and deleted from the Tags page.** Tidying up a library

@@ -113,15 +113,28 @@ wait_for_stable_file() {
                 fi
                 sleep "$STABLE_INTERVAL"
         done
-        return 0
+        # Exhausted every check without two consecutive identical sizes: the
+        # file is still growing. Report failure so callers leave it alone --
+        # both of them then wait for the close_write that will arrive when the
+        # writer finishes. This used to `return 0`, which told the caller a
+        # still-growing file was settled and invited a partial import; a
+        # file that stabilises normally returns from inside the loop on the
+        # second check and never reaches here.
+        return 1
 }
 
 run_fallback() {
         echo "[cwa-ingest-service] Falling back to polling watcher" >&2
         s6-setuidgid abc python3 /app/calibre-web-automated/scripts/watch_fallback.py --path "$WATCH_FOLDER" --interval 5 |
-        while read -r events filepath; do
-                handle_event "$filepath" "$events"
-        done
+        {
+                # Drain anything a previous run left queued (#1360). No startup
+                # sweep here: watch_fallback.py walks the whole tree on its
+                # first pass, so pre-existing files already arrive as events.
+                process_retry_queue < /dev/null
+                while read -r events filepath; do
+                        handle_event "$filepath" "$events"
+                done
+        }
 }
 
 cleanup_stale_temps() {
@@ -447,23 +460,35 @@ startup_ingest_sweep() {
         # take the fallback, so it only bit the default native-Linux inotify
         # path, which is also the most common production deployment.
         #
-        # Ordering: this runs before the watch is established, matching the
-        # fallback's own first-pass semantics. A file arriving *during* a long
-        # sweep is still picked up by the next restart's sweep, so the residual
-        # window is bounded -- unlike today's blind spot, which is permanent.
+        # Ordering matters and is the caller's job: this MUST run only after the
+        # watcher is already established, so that anything arriving while the
+        # sweep is working is captured as an event rather than falling into the
+        # very gap being closed. Sweeping first would recreate the same
+        # lost-file bug in a window as long as the sweep itself -- which, with a
+        # large backlog, is minutes or hours rather than milliseconds.
         [ -d "$WATCH_FOLDER" ] || return 0
         local candidate found=0
-        while IFS= read -r candidate; do
+        # -H dereferences a symlinked WATCH_FOLDER (the default -P would walk
+        # the link itself and find nothing, while inotifywait does follow it),
+        # without following links inside the tree. -print0 because a newline is
+        # legal in a filename and a line-based read would split one path into
+        # two -- the second fragment could look like an unrelated absolute path.
+        while IFS= read -r -d '' candidate; do
                 # Same filters as the event path -- reusing is_supported_ingest_file
                 # keeps the temp-suffix/sidecar/extension rules in one place.
                 is_supported_ingest_file "$candidate" || continue
                 # A restart can interrupt a copy, leaving a partially written
-                # file with no temp suffix; settle it as the CREATE path does.
-                wait_for_stable_file "$candidate" || continue
+                # file with no temp suffix. If it is still growing, skip it --
+                # the watcher is already live by now, so its close_write will
+                # bring it in complete rather than us importing half a book.
+                wait_for_stable_file "$candidate" || {
+                        echo "[cwa-ingest-service] Startup sweep: still being written, leaving to the watcher: $candidate"
+                        continue
+                }
                 found=$((found+1))
                 echo "[cwa-ingest-service] Startup sweep: found pre-existing file: $candidate"
                 handle_event "$candidate" "STARTUP"
-        done < <(find "$WATCH_FOLDER" -type f -print 2>/dev/null | sort)
+        done < <(find -H "$WATCH_FOLDER" -type f -print0 2>/dev/null | sort -z)
         if [ "$found" -gt 0 ]; then
                 echo "[cwa-ingest-service] Startup sweep complete ($found pre-existing file(s) processed)"
         fi
@@ -608,13 +633,6 @@ POST_BATCH_FOLLOW_UP_PID=$!
 trap cleanup_background_jobs EXIT
 trap terminate_service TERM HUP INT
 
-# The retry queue is written to /config specifically so it survives a restart,
-# but nothing ever read it back: process_retry_queue was only reachable from
-# inside handle_event, so anything queued before a restart stayed stranded
-# until some *unrelated* file happened to arrive (#1360). Drain it at boot,
-# on both watch paths.
-process_retry_queue
-
 if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
         echo "[cwa-ingest-service] NETWORK_SHARE_MODE=true -> using fallback watcher"
         run_fallback; exit 0
@@ -644,13 +662,31 @@ if [ -n "$(get_stale_temp_interval_from_db)" ]; then
         ) &
 fi
 
-# Only the inotify path needs this -- run_fallback's first poll already walks
-# the tree, so sweeping there too would double-process every pending file.
-startup_ingest_sweep
-
 ( set -o pipefail
         s6-setuidgid abc inotifywait -m -r --format="%e %w%f" -e close_write -e moved_to -e create "$WATCH_FOLDER" | \
-        while read -r events filepath; do
-                handle_event "$filepath" "$events"
-        done
+        {
+                # Both ends of a pipeline start together, so by the time this
+                # block runs inotifywait is already establishing its watches
+                # and anything arriving from here on is buffered in the pipe
+                # rather than lost. That ordering is the whole point: doing
+                # this work *before* the pipeline would leave a blind spot as
+                # long as the work itself (#1360).
+                #
+                # stdin is /dev/null for both so nothing they invoke can
+                # consume a buffered inotify event out of the pipe.
+                #
+                # The retry queue is written to /config specifically so it
+                # survives a restart, but nothing ever read it back:
+                # process_retry_queue was only reachable from inside
+                # handle_event, so a queued file stayed stranded until some
+                # *unrelated* file happened to arrive.
+                process_retry_queue < /dev/null
+                # Only the inotify path needs the sweep -- run_fallback's first
+                # poll already walks the tree, so sweeping there too would
+                # double-process every pending file.
+                startup_ingest_sweep < /dev/null
+                while read -r events filepath; do
+                        handle_event "$filepath" "$events"
+                done
+        }
 ) || run_fallback

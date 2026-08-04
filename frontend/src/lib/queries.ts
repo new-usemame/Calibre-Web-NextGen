@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import {
   apiGet, apiPost, apiUpload, apiPostForm, ApiError,
   navigateToLogout, noteSessionIdentity,
@@ -85,6 +86,18 @@ export function useUpdateSidebar() {
   });
 }
 
+/** Queries whose response body depends on *who* is asking, and so must not
+ *  survive an identity change that happens without a page load. Today that is
+ *  /about, which withholds component versions from non-admins (#1287).
+ *
+ *  Cancel first, then remove: an in-flight request issued under the previous
+ *  identity would otherwise land after the switch and repopulate the cache with
+ *  the wrong identity's answer. */
+async function dropIdentityScopedQueries(queryClient: QueryClient) {
+  await queryClient.cancelQueries({ queryKey: ['about'] });
+  queryClient.removeQueries({ queryKey: ['about'] });
+}
+
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -101,12 +114,17 @@ export function useLogin() {
       queryClient.setQueryData(['me'], data);
       void queryClient.invalidateQueries({ queryKey: ['me'] });
       // Signing in here does not reload the page, so anything cached under the
-      // previous identity survives. /about is one of those now -- the server
+      // previous identity survives. /about is one of those now — the server
       // withholds versions from non-admins (#1287), so a guest's empty map
       // would otherwise stick for staleTime and hide the section from the admin
       // who just signed in. Logging out is a full navigation, so that direction
       // clears itself.
-      void queryClient.invalidateQueries({ queryKey: ['about'] });
+      //
+      // Cancel before dropping, rather than invalidating: invalidation only
+      // refetches *active* queries, so a guest request still in flight when
+      // login lands would resolve afterwards, write its empty map and clear the
+      // stale flag — leaving the admin with a fresh-looking wrong answer.
+      void dropIdentityScopedQueries(queryClient);
     },
   });
 }
@@ -147,7 +165,7 @@ export function useMagicLinkPoll() {
         queryClient.setQueryData(['me'], data.user);
         void queryClient.invalidateQueries({ queryKey: ['me'] });
         // Same in-place identity switch as useLogin — drop the guest's /about.
-        void queryClient.invalidateQueries({ queryKey: ['about'] });
+        void dropIdentityScopedQueries(queryClient);
       }
     },
   });

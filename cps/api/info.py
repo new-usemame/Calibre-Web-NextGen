@@ -36,16 +36,25 @@ def about_info():
     its shape for every caller, and the client can treat "server sent versions"
     as the single source of truth for whether to render the section.
     """
-    return jsonify({
+    is_admin = current_user.role_admin()
+    resp = jsonify({
         "counts": {
             "books": calibre_db.session.query(db.Books).count(),
             "authors": calibre_db.session.query(db.Authors).count(),
             "categories": calibre_db.session.query(db.Tags).count(),
             "series": calibre_db.session.query(db.Series).count(),
         },
-        # collect_stats() returns an ordered {name: version} map.
-        "versions": collect_stats() if current_user.role_admin() else {},
+        # collect_stats() returns an ordered {name: version} map. Not called at
+        # all for a non-admin, so there is nothing to leak into a log or a
+        # traceback on the way to being discarded.
+        "versions": collect_stats() if is_admin else {},
     })
+    # The body now depends on who asked, so a shared cache must never hand an
+    # admin's copy to anyone else. Flask sets Vary: Cookie when the session is
+    # touched, but reverse-proxy header login resolves the user from
+    # g.flask_httpauth_user without touching it, so that is not guaranteed here.
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
 
 
 @api_v1.route("/tasks")

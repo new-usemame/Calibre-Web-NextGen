@@ -92,7 +92,7 @@ def test_about_gate_is_server_side():
     assert "role_admin" in src
 
 
-def _get_about_over_http(role):
+def _get_about_over_http(role, anonbrowse=1, authenticated=True):
     """GET /api/v1/about through the real blueprint, with anonymous browsing on.
 
     The tests above call the unwrapped function with a stubbed current_user,
@@ -114,19 +114,26 @@ def _get_about_over_http(role):
 
     user = ub.User()
     user.id, user.name, user.role = 5, "tester", role
+    # ub.User.is_authenticated is a read-only property (always True for a real
+    # row), so the unauthenticated case needs its own stand-in for the gate.
+    gate_user = user if authenticated else SimpleNamespace(is_authenticated=False)
 
     calibre = MagicMock()
     calibre.session.query.return_value.count.return_value = 7
+    stats = MagicMock(return_value=dict(_SENSITIVE))
     with patch.object(mod, "calibre_db", calibre), \
-         patch.object(mod, "collect_stats", lambda: dict(_SENSITIVE)), \
+         patch.object(mod, "collect_stats", stats), \
          patch.object(mod, "current_user", user), \
+         patch("cps.api.current_user", gate_user), \
          patch("cps.api.config") as api_cfg, \
          patch("cps.usermanagement.config") as um_cfg:
-        api_cfg.config_anonbrowse = 1
+        api_cfg.config_anonbrowse = anonbrowse
         api_cfg.config_allow_reverse_proxy_header_login = False
-        um_cfg.config_anonbrowse = 1
+        um_cfg.config_anonbrowse = anonbrowse
         um_cfg.config_allow_reverse_proxy_header_login = False
-        return app.test_client().get("/api/v1/about")
+        resp = app.test_client().get("/api/v1/about")
+    resp.collect_stats_spy = stats
+    return resp
 
 
 @pytest.mark.unit
@@ -149,6 +156,36 @@ def test_about_over_real_http_serves_versions_to_real_admin():
     resp = _get_about_over_http(constants.ROLE_ADMIN | constants.ROLE_USER)
     assert resp.status_code == 200
     assert resp.get_json()["versions"] == _SENSITIVE
+
+
+@pytest.mark.unit
+def test_about_never_computes_versions_for_a_non_admin():
+    """Withholding is not filtering: collect_stats() must not run at all, so the
+    map cannot reach a log line or a traceback on its way to being discarded."""
+    from cps import constants
+    resp = _get_about_over_http(constants.ROLE_USER)
+    resp.collect_stats_spy.assert_not_called()
+
+
+@pytest.mark.unit
+def test_about_marks_the_response_private_and_uncacheable():
+    """The body depends on who asked. Reverse-proxy header login resolves the
+    user without touching the session, so Flask's Vary: Cookie is not
+    guaranteed -- say private/no-store outright rather than trusting it."""
+    from cps import constants
+    cc = _get_about_over_http(constants.ROLE_ADMIN | constants.ROLE_USER).headers.get("Cache-Control", "")
+    assert "private" in cc and "no-store" in cc
+
+
+@pytest.mark.unit
+def test_about_fails_closed_when_anonymous_browsing_is_off():
+    """With anonbrowse off an unauthenticated caller gets a JSON 401 and no
+    body to mine -- the gate in front of the handler still does its job."""
+    from cps import constants
+    resp = _get_about_over_http(constants.ROLE_USER, anonbrowse=0, authenticated=False)
+    assert resp.status_code == 401
+    for value in _SENSITIVE.values():
+        assert value not in resp.get_data(as_text=True)
 
 
 @pytest.mark.unit

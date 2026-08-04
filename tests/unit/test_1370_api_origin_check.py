@@ -181,13 +181,63 @@ def test_malformed_origin_is_rejected_not_crashed():
 # --- reverse-proxy deployments -------------------------------------------
 
 @pytest.mark.unit
-def test_x_forwarded_host_deployment_passes_via_host_url():
-    """ProxyFix (x_host=1, cps/__init__.py) folds X-Forwarded-Host into host_url, so
-    the public origin the browser used is what we compare against."""
-    verdict = _gate("/api/v1/tags/1", "POST",
-                    {"Origin": "https://books.example.com"},
-                    base="https://books.example.com/")
-    assert verdict is None
+@pytest.mark.parametrize("fwd_host", ["books.example.com", "books.example.com:8443"])
+def test_real_proxyfix_forwarded_host_deployment_passes(fwd_host):
+    """Drive the actual ProxyFix middleware, from an internal base URL, so this
+    stays honest: it fails if the production wrapping is removed. Both forms are
+    covered because a proxy very often strips the port from X-Forwarded-Host while
+    the browser still states it — comparing ports would 403 that deployment.
+    """
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    from cps.api import api_v1
+    app = flask.Flask(__name__)
+    app.testing = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["SECRET_KEY"] = "test"
+    app.config["RATELIMIT_ENABLED"] = False
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    app.register_blueprint(api_v1)
+
+    with patch("cps.api.current_user") as cu, patch("cps.api.config") as cfg:
+        cu.is_authenticated = True
+        cfg.config_allow_reverse_proxy_header_login = False
+        cfg.config_anonbrowse = 0
+        # Internal base URL: only the forwarded headers can make this match.
+        resp = app.test_client().post(
+            "/api/v1/tags/1",
+            headers={"Origin": "https://books.example.com:8443",
+                     "X-Forwarded-Host": fwd_host,
+                     "X-Forwarded-Proto": "https"},
+            base_url="http://calibre-web:8083/")
+    assert resp.status_code != 403, (
+        f"legitimate proxied write rejected with X-Forwarded-Host: {fwd_host}")
+
+    # Control: the same middleware still rejects a genuinely foreign origin.
+    with patch("cps.api.current_user") as cu, patch("cps.api.config") as cfg:
+        cu.is_authenticated = True
+        cfg.config_allow_reverse_proxy_header_login = False
+        cfg.config_anonbrowse = 0
+        resp = app.test_client().post(
+            "/api/v1/tags/1",
+            headers={"Origin": "https://evil.example",
+                     "X-Forwarded-Host": fwd_host,
+                     "X-Forwarded-Proto": "https"},
+            base_url="http://calibre-web:8083/")
+    assert resp.status_code == 403
+    assert resp.get_json()["error"]["code"] == "cross_site_request"
+
+
+@pytest.mark.unit
+def test_port_is_not_part_of_the_comparison():
+    """Explicit, since a proxy stripping the port is the common breakage. Also pins
+    that an explicit `:0` cannot be coerced into matching the scheme default."""
+    assert _gate("/api/v1/tags/1", "POST",
+                 {"Origin": "http://cwng.local:8443"}) is None
+    assert _gate("/api/v1/tags/1", "POST",
+                 {"Origin": "http://cwng.local:0"}) is None
+    # Host still governs, whatever the port.
+    verdict = _gate("/api/v1/tags/1", "POST", {"Origin": "http://evil.example:80"})
+    assert verdict is not None and verdict[1] == 403
 
 
 @pytest.mark.unit
@@ -248,13 +298,30 @@ def test_guard_is_registered_blueprint_wide():
 
 
 @pytest.mark.unit
-def test_guard_runs_before_the_auth_gate():
-    """Order matters: the cross-site verdict should not depend on whether the
-    forged request happened to be authenticated, and it must also cover the
-    public endpoints (a cross-site POST to auth_login is login-CSRF)."""
+def test_guard_runs_after_the_auth_gate():
+    """Order matters, and auth must come first. Running the origin guard first made
+    it an oracle — varying Origin on an unauthenticated request returns 403 for an
+    untrusted origin and 401 for a trusted one, disclosing which origins are
+    trusted — and it replaced the API's documented 401 with a 403."""
     app = _app()
     handlers = [f.__name__ for f in app.before_request_funcs.get("api_v1", [])]
-    assert handlers.index("_reject_cross_site_mutation") < handlers.index("_require_api_auth")
+    assert handlers.index("_require_api_auth") < handlers.index("_reject_cross_site_mutation")
+
+
+@pytest.mark.unit
+def test_unauthenticated_protected_route_still_answers_401_not_403():
+    """The auth gate's contract survives: an SPA fetch on an expired session must
+    get the JSON 401 it knows how to act on, even when it states a foreign origin."""
+    app = _app()
+    with patch("cps.api.current_user") as cu, patch("cps.api.config") as cfg:
+        cu.is_authenticated = False
+        cfg.config_allow_reverse_proxy_header_login = False
+        cfg.config_anonbrowse = 0
+        resp = app.test_client().post("/api/v1/tags/1",
+                                      headers={"Origin": "https://evil.example"},
+                                      base_url="http://cwng.local/")
+    assert resp.status_code == 401
+    assert resp.get_json()["error"]["code"] == "unauthorized"
 
 
 @pytest.mark.unit

@@ -432,6 +432,43 @@ process_retry_queue() {
         maybe_run_post_batch_follow_up
 }
 
+startup_ingest_sweep() {
+        # inotify only reports events that happen AFTER its watches are
+        # established, and inotifywait has no initial scan. Anything already
+        # sitting in the watch folder when the service starts is therefore
+        # never seen -- no error, no log line, the book simply never appears
+        # in the library, and restarting does not help because the next boot
+        # has the same blind spot (#1360). The user has to touch every file
+        # again to generate a fresh event.
+        #
+        # The polling fallback does not have this gap: watch_fallback.py walks
+        # the tree on its first pass. That asymmetry is why this stayed quiet
+        # -- NETWORK_SHARE_MODE, CWA_WATCH_MODE=poll and Docker Desktop all
+        # take the fallback, so it only bit the default native-Linux inotify
+        # path, which is also the most common production deployment.
+        #
+        # Ordering: this runs before the watch is established, matching the
+        # fallback's own first-pass semantics. A file arriving *during* a long
+        # sweep is still picked up by the next restart's sweep, so the residual
+        # window is bounded -- unlike today's blind spot, which is permanent.
+        [ -d "$WATCH_FOLDER" ] || return 0
+        local candidate found=0
+        while IFS= read -r candidate; do
+                # Same filters as the event path -- reusing is_supported_ingest_file
+                # keeps the temp-suffix/sidecar/extension rules in one place.
+                is_supported_ingest_file "$candidate" || continue
+                # A restart can interrupt a copy, leaving a partially written
+                # file with no temp suffix; settle it as the CREATE path does.
+                wait_for_stable_file "$candidate" || continue
+                found=$((found+1))
+                echo "[cwa-ingest-service] Startup sweep: found pre-existing file: $candidate"
+                handle_event "$candidate" "STARTUP"
+        done < <(find "$WATCH_FOLDER" -type f -print 2>/dev/null | sort)
+        if [ "$found" -gt 0 ]; then
+                echo "[cwa-ingest-service] Startup sweep complete ($found pre-existing file(s) processed)"
+        fi
+}
+
 handle_event() {
         local filepath="$1"
         local events="${2:-}"
@@ -571,6 +608,13 @@ POST_BATCH_FOLLOW_UP_PID=$!
 trap cleanup_background_jobs EXIT
 trap terminate_service TERM HUP INT
 
+# The retry queue is written to /config specifically so it survives a restart,
+# but nothing ever read it back: process_retry_queue was only reachable from
+# inside handle_event, so anything queued before a restart stayed stranded
+# until some *unrelated* file happened to arrive (#1360). Drain it at boot,
+# on both watch paths.
+process_retry_queue
+
 if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
         echo "[cwa-ingest-service] NETWORK_SHARE_MODE=true -> using fallback watcher"
         run_fallback; exit 0
@@ -599,6 +643,10 @@ if [ -n "$(get_stale_temp_interval_from_db)" ]; then
                 done
         ) &
 fi
+
+# Only the inotify path needs this -- run_fallback's first poll already walks
+# the tree, so sweeping there too would double-process every pending file.
+startup_ingest_sweep
 
 ( set -o pipefail
         s6-setuidgid abc inotifywait -m -r --format="%e %w%f" -e close_write -e moved_to -e create "$WATCH_FOLDER" | \

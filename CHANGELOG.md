@@ -16,6 +16,19 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Books already sitting in the ingest folder when the container starts are
+  now imported.** If a book was waiting in the ingest folder at the moment
+  Calibre-Web NextGen started — you copied files in while it was stopped, the
+  server rebooted mid-copy, or an import was still pending when the container
+  restarted — it was never picked up. No error appeared, nothing showed in the
+  log, and the book simply never arrived in the library. Restarting did not
+  help; the only way out was to touch or re-copy every file. The ingest folder
+  is now swept once at startup, so anything waiting there gets imported. Books
+  left in the retry queue by a previous run are also picked back up instead of
+  waiting for an unrelated file to arrive.
+
 ## [v4.1.29] - 2026-08-03
 
 ### Fixed

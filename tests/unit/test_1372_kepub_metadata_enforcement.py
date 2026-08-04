@@ -267,3 +267,62 @@ def _patch_enforce_dependencies(module, monkeypatch, book_dir, opf):
         module.Enforcer, "_reset_book_dir_ownership", staticmethod(lambda *a: None)
     )
     return calls
+
+
+# --- The messages that name the supported formats must derive from the list ---
+#
+# Adding kepub left three statements still reading "EPUB and AZW3": the
+# skipped-format notice in _write_metadata_backup_for_unsupported, the
+# no-supported-files line in main(), and a docstring. Two of those are printed
+# to the user, so the enforcer named kepub as unsupported in the same release
+# that started supporting it. These pin the messages to supported_formats.
+
+
+@pytest.mark.unit
+def test_supported_formats_label_names_every_supported_format(enforcer_module):
+    """The human-readable label covers the production list, whatever is in it."""
+    inst = _bare_enforcer(enforcer_module)
+    label = inst.supported_formats_label()
+    for fmt in inst.supported_formats:
+        assert fmt.upper() in label, f"{fmt} missing from {label!r}"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "formats, expected",
+    [
+        (["epub"], "EPUB"),
+        (["epub", "azw3"], "EPUB & AZW3"),
+        (["epub", "azw3", "kepub"], "EPUB, AZW3 & KEPUB"),
+        ([], "no"),
+    ],
+)
+def test_supported_formats_label_shape(enforcer_module, formats, expected):
+    """Rendering stays grammatical as the list grows or shrinks."""
+    inst = _bare_enforcer(enforcer_module)
+    inst.supported_formats = formats
+    assert inst.supported_formats_label() == expected
+
+
+@pytest.mark.unit
+def test_no_user_facing_message_hardcodes_a_format_name():
+    """No print() may restate the format list.
+
+    This is the pin that actually prevents the drift: a hardcoded 'AZW3' in a
+    printed string is a second source of truth for supported_formats, and it is
+    how all three statements silently went stale. Docstrings are exempt -- they
+    are not shown to users -- so this walks print() call arguments only.
+    """
+    tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+    offenders = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and getattr(node.func, "id", None) == "print"):
+            continue
+        for const in ast.walk(node):
+            if isinstance(const, ast.Constant) and isinstance(const.value, str):
+                if "AZW3" in const.value or "KEPUB" in const.value:
+                    offenders.append((getattr(node, "lineno", "?"), const.value.strip()))
+    assert not offenders, (
+        "print() restates the supported-format list instead of calling "
+        f"supported_formats_label(): {offenders}"
+    )

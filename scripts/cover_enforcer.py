@@ -271,6 +271,21 @@ class Enforcer:
         except Exception:
             self.unicode_filename = False
 
+    def supported_formats_label(self) -> str:
+        """Render supported_formats for humans, e.g. 'EPUB, AZW3 & KEPUB'.
+
+        The messages telling a user which formats get in-file enforcement are
+        built from the list itself rather than restating it. Three of them still
+        read 'EPUB and AZW3' once kepub was added (fork #1372), so the enforcer
+        was naming a format it had just started supporting as unsupported.
+        """
+        names = [fmt.upper() for fmt in self.supported_formats]
+        if not names:
+            return "no"
+        if len(names) == 1:
+            return names[0]
+        return f"{', '.join(names[:-1])} & {names[-1]}"
+
     def _ascii_transliterate(self, s: str) -> str:
         """Transliterate non-English characters to ASCII when configured.
         Prefer unidecode if available; otherwise use NFKD normalization and drop diacritics."""
@@ -439,7 +454,7 @@ class Enforcer:
     def get_book_dir_from_log(self, log_info: dict) -> str:
         """Resolve the on-disk book directory prioritizing ones that contain supported files.
         Order of preference: DB path -> any (id)-suffix dirs -> reconstructed ASCII/raw (based on config).
-        Within each, prefer the one that actually contains EPUB/AZW3. When config_unicode_filename is True,
+        Within each, prefer the one that actually contains a supported format (self.supported_formats). When config_unicode_filename is True,
         prefer the ASCII path over a diacritic sibling if both exist."""
         book_id = str(log_info['book_id']).strip()
 
@@ -672,8 +687,8 @@ class Enforcer:
         )
         print(
             f"[cover-metadata-enforcer] INFO: Metadata embedding into the "
-            f"{book.file_format.upper()} book file was skipped; only EPUB and "
-            "AZW3 support in-file enforcement.",
+            f"{book.file_format.upper()} book file was skipped; only "
+            f"{self.supported_formats_label()} support in-file enforcement.",
             flush=True,
         )
         return [book]
@@ -930,7 +945,7 @@ def main():
         print('[cover-metadata-enforcer]: Enforcing metadata and covers for all books in library...')
         n_enforced, completion_time, n_supported_files = enforcer.enforce_all_covers()
         if n_enforced == False:
-            print(f"\n[cover-metadata-enforcer]: No supported ebook files found in library (only EPUB & AZW3 formats are currently supported)")
+            print(f"\n[cover-metadata-enforcer]: No supported ebook files found in library (only {enforcer.supported_formats_label()} formats are currently supported)")
         elif n_enforced == n_supported_files:
             print(f"\n[cover-metadata-enforcer]: SUCCESS: All covers & metadata successfully updated for all {n_enforced} supported ebooks in the library in {completion_time:.2f} seconds!")
         elif n_enforced == 0:

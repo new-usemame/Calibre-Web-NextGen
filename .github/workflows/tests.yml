@@ -576,26 +576,26 @@ jobs:
           # reader-rtl.spec.ts skips itself when either is missing, so this seed
           # — and the count check below — is what keeps it a real gate rather
           # than a silent pass.
-          # Stage into /tmp and `mv` into the watched folder, rather than
-          # `docker cp`-ing straight into it. The ingest service watches
-          # `close_write`, `moved_to` and `create` (cwa-ingest-service/run), and
-          # a rename into the folder is guaranteed to emit one of them: same
-          # filesystem gives `moved_to`, and a cross-device fallback copy gives
-          # `create` then `close_write`. `docker cp` instead relies on the
-          # daemon's write producing an inotify event inside the container's
-          # mount namespace, which is not guaranteed across storage drivers.
+          # This seed intermittently imported 0 of 5, which reds the gate on
+          # diffs that cannot reach ingest at all. The cause is a startup race,
+          # not the copy mechanism: the previous step waits only for the web app
+          # to answer HTTP, but s6 brings cwa-ingest-service up after it, and
+          # inotifywait reports only events that happen once its watches exist.
+          # cwa-ingest-service/run has no startup scan of the folder, so a book
+          # that lands in that gap is never seen -- watches established, no
+          # ingest activity, 0 of 5. Nothing retries it, because from the
+          # service's point of view nothing ever happened.
           #
-          # A missed `close_write` is fatal here rather than merely late,
-          # because handle_event() drops a bare CREATE unless the file has
-          # nlink > 1 and non-zero size (the hardlink path) -- a plain copied-in
-          # file that fires only CREATE is ignored forever, with no log line.
-          # That is exactly the observed signature: watches established, zero
-          # ingest activity, 0 of 5 imported.
-          #
-          # It is nondeterministic, not a standing break: run 30868527022 ran
-          # this same seed and imported 5/5, while 30866805515 imported 0/5
-          # 34 minutes earlier on a diff of two docs files. Harness
-          # determinism, not a product bug -- ingest works on this commit.
+          # So: wait for the watcher, then keep nudging whatever it still
+          # missed. Ingest deletes each file once it has imported it, so a book
+          # still sitting in the folder is by definition one the watcher never
+          # picked up -- renaming it away and back fires a fresh event for it.
+          # That second half is what makes this deterministic rather than a
+          # narrower race: it recovers a lost event whatever the reason for it.
+          echo "Waiting for the ingest watcher to establish its watches..."
+          timeout 180 bash -c 'until docker logs cwn-e2e 2>&1 | grep -q "\[cwa-ingest-service\] Watching folder:"; do sleep 2; done' \
+            || echo "::warning::ingest watcher banner never appeared; relying on the re-nudge below"
+          sleep 5
           docker exec -u 0 cwn-e2e mkdir -p /tmp/seed
           for book in alice_in_wonderland christmas_carol metamorphosis test_rtl_vertical test_ltr_horizontal; do
             docker cp "tests/fixtures/sample_books/${book}.epub" \
@@ -616,6 +616,17 @@ jobs:
             # Wait for ALL of them: breaking at the first import is what left
             # the library at one book while the step reported success.
             [ "${total:-0}" -ge 5 ] && break
+            # Ingest removes each file once it has imported it, so anything
+            # still sitting in the folder is a book the watcher never saw.
+            # Rename it away and back to fire a fresh event. The intermediate
+            # name is deliberately not a book extension, so only the move back
+            # is acted on. Every 30s, so a lost event costs a little time
+            # rather than the whole run.
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "  re-nudging books the watcher has not picked up yet"
+              docker exec -u 0 cwn-e2e sh -c \
+                'for f in /cwa-book-ingest/*.epub; do [ -e "$f" ] || continue; mv "$f" "$f.renudge" && mv "$f.renudge" "$f"; done' || true
+            fi
             sleep 5
           done
           if [ "${total:-0}" -lt 5 ]; then

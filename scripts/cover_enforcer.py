@@ -615,7 +615,14 @@ class Enforcer:
                 # its own KEPUB spans over kepubify's. That would shift every
                 # bookmark in an already-synced book, so kepub gets a
                 # metadata-only write instead, which leaves content untouched.
-                if book.file_format.lower() == "kepub":
+                # Match on the filename, not just the suffix: kepubify's DEFAULT
+                # output is "<name>.kepub.epub", and Path(...).suffix reports that
+                # as "epub", which would send an already-kepubified file down the
+                # polish path this branch exists to avoid. Our own ingest passes
+                # --calibre so library files are normally ".kepub", but a file
+                # kepubified outside CWNG keeps the default shape.
+                lower_name = os.path.basename(file).lower()
+                if lower_name.endswith(".kepub") or lower_name.endswith(".kepub.epub"):
                     tool = 'ebook-meta'
                     cmd = [tool, file, '--from-opf', book.new_metadata_path]
                     if Path(book.cover_path).exists():

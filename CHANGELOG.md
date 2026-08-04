@@ -41,12 +41,14 @@ is for things you can see or feel when running the app.
   stored as `.kepub` files, and those were the one format the metadata writer
   skipped, so every edit reached the `.epub` and the library while the file your
   reader actually opens was left untouched. Re-saving did not help, because
-  nothing was wrong with the edit. `.kepub` files are now written too, so series,
-  tags, description and cover changes turn up on the device after the next sync.
-  Existing books pick up their metadata the next time you edit them, or in one
-  pass from Settings if you run the cover and metadata enforcement over the whole
-  library. Reading positions and bookmarks already on your reader are preserved.
-  Reported by @bjekel.
+  nothing was wrong with the edit. `.kepub` files are now written too, so setting
+  or changing a series, adding tags and updating the cover turn up on the device
+  after the next sync. Clearing a field is not covered yet — remove a series or a
+  tag and the `.kepub` keeps the old value, tracked in #1376. Existing books pick
+  up their metadata the next time you edit them, or in one pass from Settings if
+  you run the cover and metadata enforcement over the whole library. Reading
+  positions and bookmarks already on your reader are preserved. Reported by
+  @bjekel.
 
 - **Books already sitting in the ingest folder when the container starts are
   now imported.** If a book was waiting in the ingest folder at the moment

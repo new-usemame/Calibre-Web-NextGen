@@ -362,3 +362,36 @@ def test_enforce_all_covers_enforces_a_dual_format_book_once(enforcer_module, tm
     assert calls == [str(book_dir)], (
         f"expected the dual-format book dir to be enforced once, got {calls}"
     )
+
+
+@pytest.mark.unit
+def test_default_kepubify_output_takes_the_metadata_only_path(
+    enforcer_module, tmp_path, monkeypatch
+):
+    """``book.kepub.epub`` must not be polished.
+
+    kepubify's DEFAULT output extension is ``.kepub.epub``; ``--calibre`` (which
+    our ingest passes) is what produces ``.kepub``. A file kepubified outside
+    CWNG therefore keeps the default shape, and ``Path(...).suffix`` reports it
+    as ``epub`` -- so selecting the tool by suffix sent an already-kepubified
+    file down the polish path, re-segmenting its koboSpans and moving the
+    reader's bookmarks. That is the exact harm the kepub branch exists to avoid.
+    """
+    module = enforcer_module
+    book_dir = tmp_path / "Some Book (1)"
+    book_dir.mkdir()
+    target = book_dir / "book.kepub.epub"
+    target.write_text("x", encoding="utf-8")
+    opf = book_dir / "metadata.opf"
+    opf.write_text("<opf/>", encoding="utf-8")
+
+    calls = _patch_enforce_dependencies(module, monkeypatch, str(book_dir), str(opf))
+
+    inst = _bare_enforcer(module)
+    inst.enforce_cover(str(book_dir))
+
+    assert calls, "no subprocess was issued"
+    tools = [c[0] for c in calls]
+    assert tools == ["ebook-meta"], (
+        f"a default-named kepubify file must take the metadata-only path, got {tools}"
+    )

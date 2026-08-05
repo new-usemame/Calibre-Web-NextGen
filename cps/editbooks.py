@@ -362,7 +362,10 @@ def edit_selected_books():
                     }
 
                     now = datetime.now()
-                    log_path = constants.METADATA_CHANGE_LOGS / f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json'
+                    os.makedirs(constants.CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
+                    log_path = os.path.join(
+                        constants.CWA_METADATA_CHANGE_LOGS_DIR,
+                        f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json')
                     with open(log_path, 'w', encoding='utf-8') as f:
                         json.dump(log_payload, f, indent=4, ensure_ascii=False)
                     log.debug(f"Created metadata change log for book {book.id} with changes: {list(log_payload.keys())}")
@@ -705,7 +708,10 @@ def edit_book_param(param, vals):
                 }
 
                 now = datetime.now()
-                log_path = constants.METADATA_CHANGE_LOGS / f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json'
+                os.makedirs(constants.CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
+                log_path = os.path.join(
+                    constants.CWA_METADATA_CHANGE_LOGS_DIR,
+                    f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json')
                 with open(log_path, 'w', encoding='utf-8') as f:
                     json.dump(payload, f, indent=4, ensure_ascii=False)
                 log.debug(f"Created metadata change log for book {book.id} with changes: {list(payload.keys())}")
@@ -1140,7 +1146,10 @@ def do_edit_book(book_id, upload_formats=None):
                 }
 
                 now = datetime.now()
-                log_path = constants.METADATA_CHANGE_LOGS / f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json'
+                os.makedirs(constants.CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
+                log_path = os.path.join(
+                    constants.CWA_METADATA_CHANGE_LOGS_DIR,
+                    f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json')
                 with open(log_path, 'w', encoding='utf-8') as f:
                     json.dump(payload, f, indent=4, ensure_ascii=False)
                 log.debug(f"Created metadata change log for book {book.id} with changes: {list(meaningful_changes.keys())}")

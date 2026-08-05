@@ -95,6 +95,34 @@ install -d -o abc -g abc /config/processed_books/duplicate_resolutions
 install -d -o abc -g abc /config/log_archive
 install -d -o abc -g abc /config/.cwa_conversion_tmp
 
+# The metadata dirs moved out of the app tree into /config (#995). They have to be created
+# HERE, at runtime, not in setup-cwa.sh: that script runs at image build time, so on the
+# common bind-mounted /config the user's mount shadows whatever the build put there and
+# the dirs are simply absent. Resolve them the same way cps/constants.py does, honouring
+# the same knobs in the same order, so the writer and the watcher cannot drift apart.
+CWA_CHANGE_LOGS_DIR="${CWA_METADATA_CHANGE_LOGS_DIR:-${CALIBRE_DBPATH:-/config}/metadata_change_logs}"
+CWA_TEMP_DIR="${CWA_METADATA_TEMP_DIR:-${CALIBRE_DBPATH:-/config}/metadata_temp}"
+install -d -o abc -g abc "${CWA_CHANGE_LOGS_DIR}"
+install -d -o abc -g abc "${CWA_TEMP_DIR}"
+
+# Pre-#995 installs kept these inside the app tree, which an upgrade replaces wholesale.
+# Move anything still sitting there so a change log written just before the upgrade is
+# still enforced after it. One-time, idempotent, and -n so an existing file always wins.
+migrate_legacy_metadata_dir () {
+  local old="$1" new="$2"
+  [ -d "$old" ] || return 0
+  [ "$old" = "$new" ] && return 0
+  if find "$old" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
+    echo "[cwa-init] Migrating leftover files from ${old} to ${new} (#995)"
+    find "$old" -mindepth 1 -maxdepth 1 -exec mv -n {} "${new}/" \; 2>/dev/null || true
+    chown -R abc:abc "${new}" 2>/dev/null || true
+  fi
+  rmdir "$old" 2>/dev/null || true
+}
+
+migrate_legacy_metadata_dir /app/calibre-web-automated/metadata_change_logs "${CWA_CHANGE_LOGS_DIR}"
+migrate_legacy_metadata_dir /app/calibre-web-automated/metadata_temp "${CWA_TEMP_DIR}"
+
 # Ensure ingest directory exists and is writable (matches dirs.json)
 INGEST_DIR=$(python3 - <<'PY'
 import json

@@ -19,12 +19,21 @@ from datetime import datetime
 from pathlib import Path
 import unicodedata
 
+# s6 launches this as `python3 <app>/scripts/cover_enforcer.py` with an empty PYTHONPATH,
+# so sys.path[0] is scripts/ and the project root that owns the `cps` package is not on
+# the path at all. Put it there before the first cps import, not after: an import that
+# runs earlier in the module body raises ModuleNotFoundError no matter what follows it.
+_this_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.abspath(os.path.join(_this_dir, os.pardir))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from cps import constants
 from cwa_db import CWA_DB
 try:
     from cps.utils.filename_sanitizer import get_valid_filename_shared
 except ModuleNotFoundError:
-    # Add project root (parent of scripts/) to sys.path and retry
+    # Retained as defence for any caller that reaches this module some other way.
     this_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(this_dir, '..'))
     if project_root not in sys.path:
@@ -183,6 +192,11 @@ class Book:
                     # Small initial delay to ensure database writes are flushed
                     time.sleep(0.5)
                 
+                # metadata_temp_dir now lives under /config (#995), which is user-mounted:
+                # on a bind mount it can be absent however carefully the image seeds it.
+                # Creating it here costs nothing and keeps the export from failing on a
+                # fresh volume.
+                os.makedirs(metadata_temp_dir, exist_ok=True)
                 result = subprocess.run(
                     ["calibredb", "export", "--with-library", self.calibre_library, "--to-dir", metadata_temp_dir, self.book_id],
                     env=self.calibre_env, check=False, capture_output=True, text=True, timeout=60

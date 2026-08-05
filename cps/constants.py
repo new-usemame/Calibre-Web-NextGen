@@ -51,7 +51,9 @@ CWA_METADATA_CHANGE_LOGS_DIR = os.environ.get(
     "CWA_METADATA_CHANGE_LOGS_DIR",
     os.path.join(CONFIG_DIR, "metadata_change_logs"))
 
-CWA_METADATA_TEMP_DIR = os.path.join(CONFIG_DIR, "metadata_temp")
+CWA_METADATA_TEMP_DIR = os.environ.get(
+    "CWA_METADATA_TEMP_DIR",
+    os.path.join(CONFIG_DIR, "metadata_temp"))
 
 DEFAULT_SETTINGS_FILE = "app.db"
 DEFAULT_GDRIVE_FILE = "gdrive.db"

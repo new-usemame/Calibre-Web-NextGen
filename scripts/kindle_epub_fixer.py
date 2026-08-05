@@ -26,7 +26,6 @@ from typing import Optional, Tuple
 import pwd
 import grp
 
-from cps import constants
 from cwa_db import CWA_DB
 
 try:
@@ -47,8 +46,10 @@ LANGUAGE_TAG_PATTERN = re.compile(r'^[a-z]{2,3}(-[a-z]{2,4})?$', re.IGNORECASE)
 
 ### Global Variables
 dirs_json = "/app/calibre-web-automated/dirs.json"
-change_logs_dir = constants.CWA_METADATA_CHANGE_LOGS_DIR
-metadata_temp_dir = constants.CWA_METADATA_TEMP_DIR
+# `change_logs_dir` / `metadata_temp_dir` used to be declared here and were never read by
+# anything in this module. Importing cps.constants just to define them pulled the whole
+# Flask web stack into a script that convert_library.py imports at module scope, so both
+# the globals and the import are gone rather than relocated (#995).
 # Log file path
 epub_fixer_log_file = "/config/epub-fixer.log"
 

@@ -16,6 +16,16 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- **Metadata working files moved onto your `/config` volume.** The change logs
+  and scratch space the cover/metadata enforcer uses used to live inside the
+  application folder, which is replaced wholesale every time you pull a new
+  image. They now sit alongside the rest of your per-install state, so an edit
+  saved moments before an upgrade still gets applied to the book file after it.
+  Anything left in the old location is moved across automatically on first
+  start; there is nothing to do. Thanks to @chloeroform for the patch.
+
 ### Fixed
 
 - **The whole library stops responding while a book is being imported.** Saving

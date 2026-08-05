@@ -51,11 +51,6 @@ CWA_OWNER_USER="${CWA_OWNER_USER:-abc}"
 CWA_CHOWN="${CWA_CHOWN:-chown}"
 CWA_PYTHON="${CWA_PYTHON:-python3}"
 
-# The app-tree directories the runtime user writes to. These, not the whole
-# tree, are the floor's app-tree contribution (#941). cps/cache is handled
-# earlier in cwa-init, so it is intentionally absent here.
-CWA_APP_WRITABLE_DIRS="${CWA_APP_WRITABLE_DIRS:-${CWA_CONFIG_ROOT}/metadata_change_logs ${CWA_CONFIG_ROOT}/metadata_temp}"
-
 log() { echo "[cwa-init] $*"; }
 
 # True when NETWORK_SHARE_MODE is set to any of the accepted truthy spellings.
@@ -138,15 +133,6 @@ dedupe_paths() {
 main() {
   local -a candidates=("${CWA_CONFIG_ROOT}")
   local dir
-
-  # The app tree is world-readable and never re-walked (#941); only the dirs the
-  # runtime user writes under it are chowned. They ship in the image but a
-  # missing one must not turn into a soft chown failure, so ensure they exist.
-  for dir in ${CWA_APP_WRITABLE_DIRS}; do
-    [ -n "$dir" ] || continue
-    mkdir -p "$dir" 2>/dev/null || true
-    candidates+=("$dir")
-  done
 
   while IFS= read -r dir; do
     [ -n "$dir" ] && candidates+=("$dir")

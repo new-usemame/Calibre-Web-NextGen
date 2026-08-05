@@ -539,6 +539,7 @@ def HandleSyncRequest():
     # the joined-load query twice per sync request.
     books_list = changed_entries.limit(SYNC_ITEM_LIMIT).all()
     log.debug("Kobo Sync: selected to sync: {}".format(len(books_list)))
+    synced_book_ids = []
     for book in books_list:
         kobo_reading_state = book.KoboReadingState  # None when no record exists yet
         entitlement = {
@@ -581,7 +582,12 @@ def HandleSyncRequest():
             new_books_last_modified = max(date_added, new_books_last_modified)
 
         new_books_last_created = max(ts_created, new_books_last_created)
-        kobo_sync_status.add_synced_books(book.Books.id)
+        synced_book_ids.append(book.Books.id)
+
+    # Persist the whole emitted page before response/token construction.  In
+    # particular, the next request must not observe zero synced rows and reset
+    # its token.  The batch helper also avoids one SQLite fsync per book.
+    kobo_sync_status.add_synced_books_batch(synced_book_ids)
 
     # Magic-shelf sub-cursor: advance to the highest magic-shelf book id
     # emitted this round. magic_shelf_book_ids may be empty when the arm

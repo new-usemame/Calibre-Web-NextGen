@@ -27,6 +27,29 @@ def add_synced_books(book_id):
         ub.session_commit()
 
 
+def add_synced_books_batch(book_ids):
+    """Record one sync page for the current user in a single transaction."""
+    page_book_ids = set(book_ids)
+    if not page_book_ids:
+        return
+
+    user_id = current_user.id
+    present_book_ids = {
+        row.book_id for row in
+        ub.session.query(ub.KoboSyncedBooks.book_id).filter(
+            ub.KoboSyncedBooks.user_id == user_id,
+            ub.KoboSyncedBooks.book_id.in_(page_book_ids),
+        ).all()
+    }
+    missing_book_ids = page_book_ids - present_book_ids
+    if missing_book_ids:
+        ub.session.bulk_save_objects([
+            ub.KoboSyncedBooks(user_id=user_id, book_id=book_id)
+            for book_id in missing_book_ids
+        ])
+    ub.session_commit()
+
+
 def record_book_deletion(book_id, book_uuid, session=None):
     """Record a book hard-deletion as a tombstone for each user who had
     it synced to a Kobo device.

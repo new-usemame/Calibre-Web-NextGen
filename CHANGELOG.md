@@ -48,6 +48,13 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Sending a large book to a Kobo briefly froze the site for everyone else.**
+  If you have "embed metadata" turned on, every book sent to a Kobo is rebuilt
+  on the way out so its details are up to date — and that rebuild was holding up
+  every other page in the meantime. On a 24 MB book, an unrelated page load went
+  from about 10 ms to 493 ms; it now stays at 21 ms, and the book still arrives
+  just as fast.
+
 - **Kobo syncs were slow on big libraries, and froze everything else while they
   ran.** Every sync re-opened and re-parsed each book's EPUB from disk just to
   check one rarely-used property, every single time — and because that reading

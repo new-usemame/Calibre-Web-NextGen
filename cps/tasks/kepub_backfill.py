@@ -119,3 +119,9 @@ def enqueue_startup_kepub_backfill():
     if not config.config_kobo_kepub_backfill_completed:
         return enqueue_kepub_backfill(hidden=True)
     return False
+
+
+def is_kepub_backfill_pending():
+    """Return whether the composite backfill is queued or running."""
+    with _enqueue_lock:
+        return _pending

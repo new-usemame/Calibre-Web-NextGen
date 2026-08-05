@@ -2206,15 +2206,24 @@ def get_download_link(book_id, book_format, client):
             and config.config_kobo_prefer_kepub):
         data1 = calibre_db.get_book_format(book.id, "EPUB")
         if data1:
-            log.info("KEPUB not found for book %d; converting on demand", book.id)
-            err = convert_book_format(
-                book.id, config.get_book_path(), 'EPUB', 'KEPUB', None,
-                blocking=True, timeout=25)
-            if not err:
-                data1 = calibre_db.get_book_format(book.id, "KEPUB")
-            else:
-                log.error("On-demand KEPUB conversion failed for book %d: %s", book.id, err)
+            # The worker is single-threaded, so an on-demand conversion cannot
+            # start until the composite startup backfill has finished. Serve
+            # EPUB immediately instead of waiting 25 seconds and enqueuing a
+            # duplicate conversion behind it.
+            from .tasks.kepub_backfill import is_kepub_backfill_pending
+            if is_kepub_backfill_pending():
+                log.info("KEPUB backfill is in flight for book %d; serving EPUB", book.id)
                 book_format = "epub"
+            else:
+                log.info("KEPUB not found for book %d; converting on demand", book.id)
+                err = convert_book_format(
+                    book.id, config.get_book_path(), 'EPUB', 'KEPUB', None,
+                    blocking=True, timeout=25)
+                if not err:
+                    data1 = calibre_db.get_book_format(book.id, "KEPUB")
+                else:
+                    log.error("On-demand KEPUB conversion failed for book %d: %s", book.id, err)
+                    book_format = "epub"
     if not data1:
         log.error("Requested format %s for book id %s not found in database", book_format.upper(), book_id)
         abort(404)

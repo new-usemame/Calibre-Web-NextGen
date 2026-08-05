@@ -19,7 +19,7 @@ def request_username():
 def main():
     app = create_app()
 
-    from .cwa_functions import switch_theme, library_refresh, convert_library, epub_fixer, cwa_stats, cwa_check_status, cwa_settings, cwa_logs, profile_pictures, cwa_internal
+    from .cwa_functions import switch_theme, library_refresh, convert_library, epub_fixer, cover_enforcer_ui, cwa_stats, cwa_check_status, cwa_settings, cwa_logs, profile_pictures, cwa_internal
     from .web import web
     from .opds import opds
     from .admin import admi
@@ -65,6 +65,7 @@ def main():
     app.register_blueprint(library_refresh)
     app.register_blueprint(convert_library)
     app.register_blueprint(epub_fixer)
+    app.register_blueprint(cover_enforcer_ui)
     app.register_blueprint(cwa_stats)
     app.register_blueprint(cwa_check_status)
     app.register_blueprint(cwa_settings)

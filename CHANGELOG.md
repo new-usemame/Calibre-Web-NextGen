@@ -18,6 +18,21 @@ is for things you can see or feel when running the app.
 
 ### Added
 
+- **You can now re-apply covers and metadata to your whole library from the
+  admin page, instead of a shell.** NextGen writes your edits into the ebook
+  files themselves, but only for the book you just edited — so anything changed
+  before a fix, or imported with bad metadata, kept the old values inside the
+  file even though the web page looked right. The only way to sweep the whole
+  library was a `docker exec` command that isn't in the docs. There's now a
+  **NextGen Cover & Metadata Enforcement** page, linked from the admin page next
+  to the EPUB Fixer, with a Start button, a live progress bar and log, a Cancel
+  button, and an archive of previous runs — the same shape as the convert and
+  EPUB-fixer pages. This is what you want after updating to v4.1.30, which
+  taught NextGen to write `.kepub` files: a single pass backfills every book you
+  sent to a Kobo before that release, so your series and tags finally show up on
+  the device. Reported by @stripeymonkey.
+  ([#1408](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1408))
+
 - **Your Kobo now gets books in Kobo's own format, automatically.** Kobo devices
   read two kinds of EPUB: a plain one, and a "kepub" that Kobo's own store always
   sends. The kepub is the one the device is built for — faster page turns,

@@ -752,7 +752,12 @@ class Enforcer:
 
             successful_enforcements = len(supported_files)
 
-            for book_dir in book_dirs:
+            # Per-book progress line printed BEFORE each book is enforced: the Web UI's
+            # status poller parses the LAST "n/n" in the log (extract_progress), so this
+            # is what drives the progress bar. flush=True keeps the log file live while
+            # stdout is redirected to it (block-buffered otherwise).
+            for index, book_dir in enumerate(book_dirs, start=1):
+                print(f"[cover-metadata-enforcer]: Enforcing book {index}/{len(book_dirs)} ...", flush=True)
                 try:
                     book_objects = self.enforce_cover(book_dir)
                     if book_objects:
@@ -969,6 +974,8 @@ def main():
             print("\n[cover-metadata-enforcer]: FAILURE: Supported files found but none we're successfully enforced. See the log above for details.")
         elif n_enforced < n_supported_files:
             print(f"\n[cover-metadata-enforcer]: PARTIAL SUCCESS: Out of {n_supported_files} supported files detected, {n_enforced} were successfully enforced. See log above for details")
+        # End marker the Web UI (is_cover_enforcer_finished / status poller) detects a completed run by
+        print(f"NextGen Cover & Metadata Enforcement Service - Run Ended: {datetime.now()}", flush=True)
     elif args.log is None and args.dir is not None and args.all is False and args.list is False and args.history is False:
         ### dir passed, no log, not all, no flags
         if args.dir[-1] == '/':

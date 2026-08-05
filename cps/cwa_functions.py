@@ -22,6 +22,9 @@ from time import sleep
 import json
 from threading import Thread, Lock, Timer
 import queue
+# The kill-watcher threads take their Queue as a parameter named `queue`, which shadows
+# the module inside those functions, so Empty has to be imported by name to be reachable.
+from queue import Empty
 import os
 import tempfile
 from datetime import datetime, timedelta
@@ -47,6 +50,7 @@ switch_theme = Blueprint('switch_theme', __name__)
 library_refresh = Blueprint('library_refresh', __name__)
 convert_library = Blueprint('convert_library', __name__)
 epub_fixer = Blueprint('epub_fixer', __name__)
+cover_enforcer_ui = Blueprint('cover_enforcer_ui', __name__)
 cwa_stats = Blueprint('cwa_stats', __name__)
 cwa_check_status = Blueprint('cwa_check_status', __name__)
 cwa_settings = Blueprint('cwa_settings', __name__)
@@ -2311,6 +2315,192 @@ def cancel_epub_fixer():
 def get_status():
     with open("/config/epub-fixer.log", 'r') as f:
         status = f.read()
+    progress = extract_progress(status)
+    statusList = {'status':status,
+                  'progress':progress}
+    return json.dumps(statusList)
+
+
+##————————————————————————————————————————————————————————————————————————————##
+##                                                                            ##
+##                 CWA COVER & METADATA ENFORCEMENT SERVICE                   ##
+##                                                                            ##
+##————————————————————————————————————————————————————————————————————————————##
+
+def cover_enforcer_start(queue):
+    # Unlike kindle_epub_fixer.py, cover_enforcer.py does NOT write its own log file -
+    # it prints to stdout. Redirect stdout+stderr into the run log so the status poller
+    # has a file to read.
+    #
+    # Append mode, not 'w', and the parent handle is closed straight after the spawn.
+    # start_cover_enforcer() has already truncated the file, so 'a' still gives a clean
+    # log per run. The reason it matters is that the kill thread appends the
+    # cancellation marker to this same file: with a 'w' handle each writer keeps its own
+    # offset, so the child's dying traceback lands on top of the marker and the page -
+    # which stops polling only when it sees that marker - spins forever after a cancel.
+    # O_APPEND makes every write go to the current end of file for both writers.
+    # Popen dups the fd into the child, so closing the parent copy here is safe and
+    # avoids leaking one descriptor per run.
+    log_file = open('/config/cover-enforcer.log', 'a')
+    try:
+        ce_process = subprocess.Popen(['python3', '/app/calibre-web-automated/scripts/cover_enforcer.py', '-all'], stdout=log_file, stderr=subprocess.STDOUT)
+    finally:
+        log_file.close()
+    queue.put(ce_process)
+
+def is_cover_enforcer_finished() -> bool:
+    log_path = "/config/cover-enforcer.log"
+    with open(log_path, 'r') as log:
+        if "NextGen Cover & Metadata Enforcement Service - Run Ended: " in log.read():
+            return True
+        else:
+            return False
+
+def kill_cover_enforcer(queue):
+    trigger_file = Path(tempfile.gettempdir() + "/.kill_cover_enforcer_trigger")
+    log_path = "/config/cover-enforcer.log"
+    while True:
+        sleep(0.05) # Required to prevent high cpu usage
+        if trigger_file.exists():
+            # Kill the cover_enforcer process, then WAIT for it. Two reasons the wait
+            # is load-bearing rather than tidiness: terminate() only sends the signal,
+            # so without a wait() the child is left defunct under the Flask process and
+            # one zombie accumulates per cancelled run; and until the child is reaped it
+            # can still write to the log, which would land after the cancellation marker
+            # and leave the page polling a run it thinks is live.
+            ce_process = queue.get()
+            ce_process.terminate()
+            try:
+                ce_process.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                # Enforcement spends most of its time blocked in calibredb/ebook-polish,
+                # so a SIGTERM can take a moment to surface. Escalate rather than hang.
+                ce_process.kill()
+                try:
+                    ce_process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    log.error("Cover enforcer did not exit after SIGKILL")
+            # Remove the trigger file that triggered this block
+            try:
+                os.remove(trigger_file)
+            except FileNotFoundError:
+                ...
+            # Clear the lock only AFTER the child is gone. cover_enforcer.py registers
+            # its own atexit removeLock(), so deleting it while the script is still alive
+            # makes that handler raise FileNotFoundError into this very log. This is the
+            # SIGKILL safety net (atexit does not run then), not the normal path.
+            try:
+                os.remove(tempfile.gettempdir() + '/cover_enforcer.lock')
+            except FileNotFoundError:
+                ...
+            # Add string to log to notify user of successful cancellation and to stop the JS update script
+            with open(log_path, 'a') as f:
+                f.write(f"\nNextGen COVER & METADATA ENFORCEMENT PROCESS TERMINATED BY USER AT {datetime.now()}")
+            # Add run log to log_archive
+            archive_run_log(log_path)
+            break
+        elif is_cover_enforcer_finished():
+            # Reap the finished child so a completed run leaves no defunct process
+            # either. It has already exited, so this does not block.
+            try:
+                queue.get_nowait().wait(timeout=5)
+            except (Empty, subprocess.TimeoutExpired):
+                ...
+            archive_run_log(log_path)
+            break
+
+@cover_enforcer_ui.route('/cwa-cover-enforcer-overview', methods=["GET"])
+@login_required_if_no_ano
+@admin_required
+def show_cover_enforcer_page():
+    return render_title_template('cwa_cover_enforcer.html', title=_("Calibre-Web NextGen - Cover & Metadata Enforcement"), page="cwa-cover-enforcer")
+
+@cover_enforcer_ui.route('/cwa-cover-enforcer/log-archive', methods=["GET"])
+@login_required_if_no_ano
+@admin_required
+def show_cover_enforcer_logs():
+    logs = get_logs_from_archive("cover-enforcer")
+    log_dates = get_log_dates(logs)
+    return render_title_template('cwa_list_logs.html', title=_("Calibre-Web NextGen - Cover & Metadata Enforcement"), page="cwa-cover-enforcer-logs",
+                                logs=logs, log_dates=log_dates)
+
+@cover_enforcer_ui.route('/cwa-cover-enforcer/download-current-log/<log_filename>')
+@login_required_if_no_ano
+@admin_required
+def download_current_log(log_filename):
+    log_filename = "cover-enforcer.log"
+    LOG_DIR = "/config"
+    try:
+        # Secure the filename to prevent directory traversal (e.g., '..')
+        safe_filename = secure_filename(log_filename)
+
+        # Join the logs directory with the filename and get the absolute path
+        file_path = os.path.abspath(os.path.join(LOG_DIR, safe_filename))
+
+        # Check if the file path is within the allowed directory
+        if not file_path.startswith(os.path.abspath(LOG_DIR)):
+            abort(403)  # Forbidden if it's not within the logs directory
+
+        # Check if the file exists
+        if not os.path.exists(file_path):
+            abort(404)  # Return a 404 if the file does not exist
+
+        # Send the file as an attachment (to trigger a download)
+        return send_from_directory(LOG_DIR, safe_filename, as_attachment=True)
+
+    except Exception as e:
+        # Handle any other errors
+        abort(400)  # Bad request for malformed or unsafe file paths
+
+@cover_enforcer_ui.route('/cwa-cover-enforcer-start', methods=["GET"])
+@login_required_if_no_ano
+@admin_required
+def start_cover_enforcer():
+    # Wipe enforcement log from previous runs
+    open('/config/cover-enforcer.log', 'w').close()
+    # Remove any left over kill file
+    try:
+        os.remove(tempfile.gettempdir() + "/.kill_cover_enforcer_trigger")
+    except FileNotFoundError:
+        ...
+    # Queue to share the subprocess reference
+    process_queue = queue.Queue()
+    # Create and start the subprocess thread
+    ce_thread = Thread(target=cover_enforcer_start, args=(process_queue,))
+    ce_thread.start()
+    # Create and start the kill thread
+    ce_kill_thread = Thread(target=kill_cover_enforcer, args=(process_queue,))
+    ce_kill_thread.start()
+    return redirect(url_for('cover_enforcer_ui.show_cover_enforcer_page'))
+
+@cover_enforcer_ui.route('/cover-enforcer-cancel', methods=["GET"])
+@login_required_if_no_ano
+@admin_required
+def cancel_cover_enforcer():
+    # Create kill trigger file
+    open(tempfile.gettempdir() + "/.kill_cover_enforcer_trigger", 'w').close()
+    try:
+        subprocess.run([
+            "pkill",
+            "-f",
+            "/app/calibre-web-automated/scripts/cover_enforcer.py"
+        ], check=False)
+    except Exception as e:
+        log.error(f"Failed to terminate cover enforcer process: {e}")
+    return redirect(url_for('cover_enforcer_ui.show_cover_enforcer_page'))
+
+@cover_enforcer_ui.route('/cover-enforcer-status', methods=["GET"])
+@login_required_if_no_ano
+@admin_required
+def get_status():
+    log_path = "/config/cover-enforcer.log"
+    # The log only exists once a run has been started - on a first-ever page load it
+    # isn't there yet, and the status poller must still get a valid response
+    if os.path.exists(log_path):
+        with open(log_path, 'r') as f:
+            status = f.read()
+    else:
+        status = ""
     progress = extract_progress(status)
     statusList = {'status':status,
                   'progress':progress}

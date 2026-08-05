@@ -1,0 +1,111 @@
+{% extends "layout.html" %}
+
+{% block body %}
+<div class="discover" style="">
+  <h2 style="color: white !important;">{{title}}</h2>
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center;"></div>
+        <div style="display: flex;
+                    justify-content: space-between;
+                    gap: 20px;
+                    flex-wrap: wrap;">
+          <div style="width: fit-content;
+                      display: flex;
+                      flex-direction: column;
+                      justify-content: space-between;">
+            <p style="font-size: 11px; max-width: max(50vw, 600px); width: -webkit-fill-available;">
+              {{ _('This service rewrites the covers and metadata stored inside the ebook files themselves for every book in your library, so the files on disk always match what you see in Calibre-Web. It is the library-wide version of the on-edit NextGen Automatic Cover & Metadata Enforcement Service toggled in CWA Settings.') }}
+              {{ _('Upon loading this page, if you have previously started a run of the NextGen Cover & Metadata Enforcement service either here in the Web UI or through the CLI, you will see the output of the most recent previous run below.') }}
+              {{ _("Once you start a run, you are free to leave the page and return whenever you want to check on the run's progress. If you wish to cancel a run that is still in progress, simply press the Cancel button above and the run will terminate ASAP.") }}
+            </p>
+          </div>
+          <div style="display: flex; flex-direction: column; align-content: flex-start; justify-content: flex-end;">
+            <div>
+              <a class="btn btn-default" href="{{ url_for('cover_enforcer_ui.show_cover_enforcer_logs') }}" style="background-color: #334148; vertical-align: top; float: right; margin-left: 10px;">{{_('Run Archive')}}</a>
+              <a class="btn btn-default" href="{{ url_for('cover_enforcer_ui.download_current_log', log_filename='cover-enforcer.log') }}" style="background-color: #334148; vertical-align: top; float: right;">{{_('Download Log')}}</a>
+            </div>
+            <h3>{{_('Bulk Processing')}}</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 2rem; margin-bottom: 1rem;">
+              <a class="btn btn-default" href="{{ url_for('cover_enforcer_ui.start_cover_enforcer') }}" style="width: 100px;">{{_('Start')}}</a>
+              <a class="btn btn-default" href="{{ url_for('cover_enforcer_ui.cancel_cover_enforcer') }}" style="width: 100px;">{{_('Cancel')}}</a>
+            </div>
+          </div>
+        </div>
+      <div class="progress-container" style="margin: 20px 0;">
+        <div id="progress-bar" style="width: 0%; height: 25px; background-color: green; text-align: center; color: white;"></div>
+      </div>
+      <div class="row">
+        <div class="logging_window" style="padding-left: 15px;
+                                          padding-right: 15px;
+                                          background: #0000003d;
+                                          padding-top: 11px;
+                                          padding-bottom: 1px;
+                                          max-height: calc(100vh - 40rem);
+                                          overflow-y: scroll;">
+          <p id="innerStatus" style="color: whitesmoke; font-size: small;">{{_('No current or previous run to display. Press the Start button above to initiate a run.')}}</p>
+        </div>
+      </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  var timeout;
+
+  async function getStatus() {
+
+    let get;
+
+    try {
+      const res = await cwaFetch("{{ url_for('cover_enforcer_ui.get_status')}}");
+      get = await res.json();
+    } catch (e) {
+      console.error("Error: ", e);
+    }
+
+    // Check if get.status is a non-empty string
+    if (get.status && get.status.trim() !== "") {
+      document.getElementById("innerStatus").innerHTML = get.status.replace(/\n/g, "<br>");
+    }
+
+    if (get.progress) {
+      const { current, total } = get.progress;
+      if (total > 0) {
+        const percentage = Math.round((current / total) * 100);
+        const progressBar = document.getElementById("progress-bar");
+        progressBar.style.width = percentage + "%";
+        progressBar.textContent = percentage + "%";
+      }
+    }
+
+    if (get.status.includes("NextGen COVER & METADATA ENFORCEMENT PROCESS TERMINATED BY USER AT")){
+      // Add finished log
+      document.getElementById("innerStatus").innerHTML;
+      // Check if run was cancelled, make progress bar red if so
+      const progressBar = document.getElementById("progress-bar");
+      progressBar.style.backgroundColor = "#D22B2B"; // Cadmium Red
+      // End script
+      clearTimeout(timeout);
+      return false;
+    }
+
+    if (get.status.includes("NextGen Cover & Metadata Enforcement Service - Run Ended:")){
+      // Add finished log
+      document.getElementById("innerStatus").innerHTML;
+      // Set the progress bar to 100%
+      const percentage = 100;
+      const progressBar = document.getElementById("progress-bar");
+      progressBar.style.width = percentage + "%";
+      progressBar.textContent = percentage + "%";
+      // End script
+      clearTimeout(timeout);
+      return false;
+    }
+
+    timeout = setTimeout(getStatus, 1000);
+  }
+
+  getStatus();
+  </script>
+{% endblock %}

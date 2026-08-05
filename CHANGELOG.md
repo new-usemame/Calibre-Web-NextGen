@@ -18,6 +18,21 @@ is for things you can see or feel when running the app.
 
 ### Added
 
+- **Your Kobo now gets books in Kobo's own format, automatically.** Kobo devices
+  read two kinds of EPUB: a plain one, and a "kepub" that Kobo's own store always
+  sends. The kepub is the one the device is built for — faster page turns,
+  working chapter progress, and highlights and annotations that actually stick.
+  Until now NextGen only made a kepub the first time a device asked for a
+  particular book, so most of your library sat in the plain format. There's now a
+  **Produce and prefer KEPUB for Kobo delivery** switch in Settings → Kobo, **on
+  by default** — on a fresh install and when you update to this version — and it
+  makes the kepub ahead of time for every book you've already sent to a Kobo, so
+  it's ready before the device asks. EPUB stays the source format and nothing is
+  replaced; the kepub is an extra file about the same size, so expect the books
+  you sync to your Kobo to take roughly twice the disk they do now. Turn the
+  switch off and you get the old behaviour. If kepubify isn't installed the
+  switch tells you so instead of silently doing nothing.
+
 - **You can turn off the "Read now" and edit buttons on book covers.** If you
   read on an ereader, the "Read now" link on every cover is just noise, and on a
   touchscreen both it and the edit pencil stay visible all the time rather than
@@ -32,6 +47,14 @@ is for things you can see or feel when running the app.
   detail about how the classic view handled this.
 
 ### Fixed
+
+- **The whole server paused whenever a Kobo asked for a book it hadn't converted
+  yet.** The first time a Kobo downloaded any book that didn't already have a
+  kepub, the conversion ran inside that request and froze every other page for
+  everyone until it finished — and because it queued behind whatever else the
+  server was doing, a download landing behind a long import or conversion held
+  the freeze for that job's whole duration too. Measured on a 24 MB book, an
+  unrelated page load went from 9 ms to 754 ms; it now stays at 21 ms.
 
 - **The whole library stops responding while a book is being imported.** Saving
   a metadata edit, renaming or merging a tag, or uploading while an import was

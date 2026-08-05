@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "`add_synced_books` (cps/kobo_sync_status.py:19-27) does SELECT-count -> INSERT ->\n`ub.session_commit()` and is called inside the per-book loop of the sync handler\n(cps/kobo.py:578). A full 100-book sync page is therefore 100 separate transactions — 100 fsyncs\non app.db — inside one request, on the request greenlet under gevent without monkey.patch_all().\n\nRoughly 100-300ms on local SSD; seconds on sqlite-over-NFS or a busy spinning disk. It fires\nprecisely when syncs are largest: a device's first sync, and the re-emission wave after a bulk\nconversion bumps many books' last_modified.\n\nFix: accumulate the page's book ids and do one bulk insert plus one commit.\n\nRelated, same file: `log.debug(\"...\".format(changed_entries.count()))` at cps/kobo.py:528\nevaluates `count()` — a full COUNT over the joined query — even when debug logging is off,\nbecause the argument is built before the call. Same eager-evaluation pattern at :674 and :697.",
+  "created": "2026-08-05",
+  "id": "F-c96bd6",
+  "refs": [],
+  "severity": "perf",
+  "source": "audit",
+  "status": "open",
+  "title": "Kobo sync commits once per emitted book inside the request"
+}

@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "`config_kobo_cover_padding_enabled` defaults TRUE (cps/config_sql.py:153). The Kobo cover route\n(cps/kobo.py:1839) calls `_serve_padded_cover_if_enabled` -> `pad_path_to_cache` -> `pad_blob`\n(cps/services/cover_preview.py:511-560): Wand decode, mirror/blur composite, JPEG re-encode.\nThat is roughly 100-500ms of C work per miss, on the request greenlet.\n\nThis app serves gevent WITHOUT monkey.patch_all(). Wand releases the GIL, but the hub's own\nthread is the one inside the C call, so no other greenlet runs until it returns.\n\nThe cache is keyed by (book, resolution, source mtime, settings hash) under the thumbnails dir\n(cover_preview.py:736+), so it is cold after container recreation when that dir is not\npersistent, after any cover change, and after any padding-settings change. On the maintainer's\ninstance the preview cache reports empty (`before=0 after=0 evicted=0`), so every cover fetch is\ncurrently a miss.\n\nA first sync of N books is therefore N serialized stalls — several seconds aggregate — during\nwhich the web UI is frozen too.\n\nFix: offload the miss path with `parallel.run_blocking`. The hit path is `send_from_directory`\nand is fine as-is. Build any Flask-context-dependent values before the hop.",
+  "created": "2026-08-05",
+  "id": "F-a6c145",
+  "refs": [],
+  "severity": "perf",
+  "source": "audit",
+  "status": "open",
+  "title": "Kobo cover padding runs ImageMagick on the request greenlet on every cache miss"
+}

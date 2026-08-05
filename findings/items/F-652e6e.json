@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "`make_request_to_kobo_store` (cps/kobo.py:95-103) issues a bare\n`requests.request(..., timeout=(2, 10))` on the request greenlet. This app serves gevent WITHOUT\nmonkey.patch_all(), and requests/urllib3 socket reads do not yield, so each call parks the hub\nfor up to 2s connect + 10s read — freezing every other request.\n\nReached from `redirect_or_proxy_request` (cps/kobo.py:108-119) for every non-GET request; GETs\nare cheap 307 redirects. Devices generate non-GETs during normal use — reading-state POSTs to\nunimplemented endpoints, preview POSTs and library mutations all land in\n`HandleUnimplementedRequest` (cps/kobo.py:1892-1899).\n\nGated on `config_kobo_proxy`, which defaults off — but it is ON on the maintainer's own\ninstance, and it produces exactly the \"the whole server stalls while my Kobo syncs\" symptom.\n\nMeasured from that instance's container, three calls to https://storeapi.kobo.com:\n\n    connect=0.139s total=0.240s\n    connect=0.021s total=0.125s\n    connect=0.025s total=1.077s\n\nSo 0.1-1.1s of whole-app freeze per proxied call in normal conditions, and up to 12s if the\nstore is slow or unreachable.\n\nFrequency on a real instance is UNKNOWN and could not be established: `HandleUnimplementedRequest`\nlogs at debug and the instance runs at INFO, so the absence of log lines proves nothing. Raising\nthe log level for one sync cycle would settle it.\n\nFix shape: offload via `parallel.run_blocking`, as `cps/search_metadata.py:315` already does for\nthe same class of call. Note that Flask contextvars do not cross that hop, so build the request\narguments on the greenlet and offload only the `requests.request(...)` call itself.",
+  "created": "2026-08-05",
+  "id": "F-652e6e",
+  "refs": [],
+  "severity": "perf",
+  "source": "audit",
+  "status": "open",
+  "title": "Kobo store proxying blocks the request greenlet for up to 12s per non-GET call"
+}

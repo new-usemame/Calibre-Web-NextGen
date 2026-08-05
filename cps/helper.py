@@ -16,6 +16,7 @@ import regex
 import shutil
 import socket
 import platform
+from functools import partial
 from datetime import datetime, timedelta, timezone
 import requests
 import unidecode
@@ -42,7 +43,7 @@ except ImportError as e:
     advocate = requests
     UnacceptableAddressException = MissingSchema = BaseException
 
-from . import calibre_db, cli_param
+from . import calibre_db, cli_param, constants
 from .string_helper import strip_whitespaces
 from .tasks.convert import TaskConvert
 from . import logger, config, db, ub, fs
@@ -51,6 +52,7 @@ from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBN
                         SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_FROM, EXTENSIONS_CONVERT_TO)
 from .subproc_wrapper import process_wait, process_open
 from .services.file_move import copy_with_metadata_fallback
+from .services import parallel
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
@@ -94,14 +96,6 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
         kobo_sync_status.remove_synced_book(book.id, all=True)
 
 
-# Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
-# metadata-change-detector s6 service) watches for change logs. Env-overridable
-# for tests.
-CWA_METADATA_CHANGE_LOGS_DIR = os.environ.get(
-    "CWA_METADATA_CHANGE_LOGS_DIR",
-    "/app/calibre-web-automated/metadata_change_logs")
-
-
 def log_metadata_change(book, changed=None):
     """Queue a CWA metadata/cover *file-level* enforcement for ``book`` (#707).
 
@@ -135,10 +129,10 @@ def log_metadata_change(book, changed=None):
         'timestamp': datetime.now().isoformat(),
     }
     try:
-        os.makedirs(CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
+        os.makedirs(constants.CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
         now = datetime.now()
         log_path = os.path.join(
-            CWA_METADATA_CHANGE_LOGS_DIR,
+            constants.CWA_METADATA_CHANGE_LOGS_DIR,
             f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json')
         with open(log_path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)
@@ -335,7 +329,7 @@ def get_convert_options(book):
 
 # Convert existing book entry to new format
 def convert_book_format(book_id, calibre_path, old_book_format, new_book_format, user_id,
-                        ereader_mail=None, subject=None, blocking=False):
+                        ereader_mail=None, subject=None, blocking=False, timeout=120):
     book = calibre_db.get_book(book_id)
     data = calibre_db.get_book_format(book.id, old_book_format)
     if not data:
@@ -372,7 +366,12 @@ def convert_book_format(book_id, calibre_path, old_book_format, new_book_format,
     task = TaskConvert(file_path, book.id, txt, settings, ereader_mail, user_id)
     WorkerThread.add(user_id, task)
     if blocking:
-        finished = task.done_event.wait(timeout=120)
+        # Only the context-free Event wait crosses onto the bounded native
+        # thread pool. url_for(), translations, DB access, and task creation
+        # above must remain on the request greenlet: Flask contextvars do not
+        # propagate through gevent.threadpool.ThreadPool.
+        from .services.parallel import run_blocking
+        finished = run_blocking(lambda: task.done_event.wait(timeout=timeout))
         if not finished:
             return _("Conversion timed out for book id: %(book)d", book=book_id)
         if task.stat != STAT_FINISH_SUCCESS:
@@ -2062,7 +2061,13 @@ def do_kepubify_metadata_replace(book, file_path):
     tmp_dir = get_temp_dir()
     temp_file_name = str(uuid4())
     # open zipfile and replace metadata block in content.opf
-    updateEpub(file_path, os.path.join(tmp_dir, temp_file_name + ".kepub"), cf_name, content)
+    parallel.run_blocking(partial(
+        updateEpub,
+        file_path,
+        os.path.join(tmp_dir, temp_file_name + ".kepub"),
+        cf_name,
+        content,
+    ))
     return tmp_dir, temp_file_name
 
 
@@ -2189,16 +2194,28 @@ def get_download_link(book_id, book_format, client):
         abort(404)
 
     data1 = calibre_db.get_book_format(book.id, book_format.upper())
-    if not data1 and book_format == "kepub" and config.config_kepubifypath:
+    if (not data1 and book_format == "kepub" and config.config_kepubifypath
+            and config.config_kobo_prefer_kepub):
         data1 = calibre_db.get_book_format(book.id, "EPUB")
         if data1:
-            log.info("KEPUB not found for book %d; converting on demand", book.id)
-            err = convert_book_format(book.id, config.get_book_path(), 'EPUB', 'KEPUB', None, blocking=True)
-            if not err:
-                data1 = calibre_db.get_book_format(book.id, "KEPUB")
-            else:
-                log.error("On-demand KEPUB conversion failed for book %d: %s", book.id, err)
+            # The worker is single-threaded, so an on-demand conversion cannot
+            # start until the composite startup backfill has finished. Serve
+            # EPUB immediately instead of waiting 25 seconds and enqueuing a
+            # duplicate conversion behind it.
+            from .tasks.kepub_backfill import is_kepub_backfill_pending
+            if is_kepub_backfill_pending():
+                log.info("KEPUB backfill is in flight for book %d; serving EPUB", book.id)
                 book_format = "epub"
+            else:
+                log.info("KEPUB not found for book %d; converting on demand", book.id)
+                err = convert_book_format(
+                    book.id, config.get_book_path(), 'EPUB', 'KEPUB', None,
+                    blocking=True, timeout=25)
+                if not err:
+                    data1 = calibre_db.get_book_format(book.id, "KEPUB")
+                else:
+                    log.error("On-demand KEPUB conversion failed for book %d: %s", book.id, err)
+                    book_format = "epub"
     if not data1:
         log.error("Requested format %s for book id %s not found in database", book_format.upper(), book_id)
         abort(404)

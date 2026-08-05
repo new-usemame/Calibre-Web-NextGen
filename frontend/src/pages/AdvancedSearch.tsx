@@ -11,6 +11,7 @@ import { EmptyState } from '../components/EmptyState';
 import { apiPost, type Book, type AdvancedSearchParams, type Me } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './AdvancedSearch.module.css';
+import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 
 type ReadStatus = 'all' | 'read' | 'unread';
 
@@ -50,6 +51,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
 }
 
 export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSearchParams } = {}) {
+  const [cardActionsHidden] = useCardActionsHidden();
   const t = useT();
   const qc = useQueryClient();
   const me = useMe().data;
@@ -251,6 +253,7 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
               <div className={styles.resultsGrid}>
                 {results.map((book, i) => (
                   <BookCard key={book.id} book={book} quickEdit={canEdit}
+                    hideActions={cardActionsHidden}
                     style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }} />
                 ))}
               </div>

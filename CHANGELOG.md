@@ -16,7 +16,120 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Your Kobo now gets books in Kobo's own format, automatically.** Kobo devices
+  read two kinds of EPUB: a plain one, and a "kepub" that Kobo's own store always
+  sends. The kepub is the one the device is built for — faster page turns,
+  working chapter progress, and highlights and annotations that actually stick.
+  Until now NextGen only made a kepub the first time a device asked for a
+  particular book, so most of your library sat in the plain format. There's now a
+  **Produce and prefer KEPUB for Kobo delivery** switch in Settings → Kobo, **on
+  by default** — on a fresh install and when you update to this version — and it
+  makes the kepub ahead of time for every book you've already sent to a Kobo, so
+  it's ready before the device asks. EPUB stays the source format and nothing is
+  replaced; the kepub is an extra file about the same size, so expect the books
+  you sync to your Kobo to take roughly twice the disk they do now. Turn the
+  switch off and you get the old behaviour. If kepubify isn't installed the
+  switch tells you so instead of silently doing nothing.
+
+- **You can turn off the "Read now" and edit buttons on book covers.** If you
+  read on an ereader, the "Read now" link on every cover is just noise, and on a
+  touchscreen both it and the edit pencil stay visible all the time rather than
+  appearing on hover — which made the library look busy. There's now a **Show
+  Read now and edit buttons** switch in the library's View settings (the gear
+  next to the sort control). Turn it off and the buttons come off every book
+  cover, everywhere they appear: the library, shelves, smart shelves, search
+  results, Discover and "More by this author". Both actions are still on the
+  book's own page, which is what the cover has always linked to. The setting is
+  remembered in your browser and is on by default, so nothing changes unless you
+  ask it to. Thanks to @Glennza1962 for the request and @chloeroform for the
+  detail about how the classic view handled this.
+
+### Changed
+
+- **Metadata working files moved onto your `/config` volume.** The change logs
+  and scratch space the cover/metadata enforcer uses used to live inside the
+  application folder, which is replaced wholesale every time you pull a new
+  image. They now sit alongside the rest of your per-install state, so an edit
+  saved moments before an upgrade still gets applied to the book file after it.
+  Anything left in the old location is moved across automatically on first
+  start; there is nothing to do. Thanks to @chloeroform for the patch.
+
 ### Fixed
+
+- **Kobo syncs wrote to the database once per book instead of once per batch.**
+  Each book a Kobo received was recorded in its own separate save, so a sync
+  carrying a hundred books did a hundred separate writes — and everyone else's
+  pages waited behind them. It's now one write per batch. You'll notice it most
+  on a device's first sync and on libraries kept on a NAS, where each write is
+  slow.
+
+- **Kobo book covers froze the site while they were being prepared.** Covers are
+  padded to your Kobo's screen shape the first time each one is needed, which is
+  a fraction of a second of image work — but it was holding up every other page
+  while it ran, and it happens once per cover, so a device catching up on a
+  shelf-full stacked those pauses back to back. The padding now happens out of
+  the way. This affects anyone with Kobo sync on, since cover padding is on by
+  default; nothing about the covers themselves changes.
+
+- **With "proxy unknown requests to Kobo Store" turned on, your Kobo could stall
+  the site for seconds at a time.** Some of what a Kobo asks for is passed
+  through to Kobo's own servers, and the site sat still waiting for their reply —
+  up to 12 seconds if they were slow to answer, with everyone else's pages
+  waiting too. Measured against the real store, individual calls took anywhere
+  from 0.1 to 1.1 seconds. The waiting now happens out of the way. Only affects
+  you if you turned that setting on; it's off by default.
+
+- **Sending a large book to a Kobo briefly froze the site for everyone else.**
+  If you have "embed metadata" turned on, every book sent to a Kobo is rebuilt
+  on the way out so its details are up to date — and that rebuild was holding up
+  every other page in the meantime. On a 24 MB book, an unrelated page load went
+  from about 10 ms to 493 ms; it now stays at 21 ms, and the book still arrives
+  just as fast.
+
+- **A book could end up permanently broken on your Kobo if the server was
+  restarted at the wrong moment.** While converting a book for Kobo, the new file
+  was written straight into place, so stopping the container mid-write left a
+  half-written book behind — and the next run would accept that half-written file
+  as finished and record it in the library. From then on your Kobo was handed a
+  file it couldn't finish opening, and nothing would ever repair it. Converted
+  books are now written aside and only swapped in once complete and verified as a
+  readable archive, and a damaged file is never accepted as finished.
+
+- **One unreadable or unwritable book could stop every other book being prepared
+  for Kobo — on every restart, forever.** If a single book failed to convert, for
+  instance because the library is mounted read-only, the whole preparation run
+  stopped at that book and started over from scratch at the next restart, getting
+  no further. It now skips what it can't do, reports how many failed, and finishes
+  the rest.
+
+- **Right after updating, books sent to a Kobo could arrive in the wrong format
+  and take 25 seconds each.** The first run after the update prepares your Kobo
+  books in the background, and a download arriving during that window queued up
+  behind the whole job, timed out, and fell back to the plain format. Downloads
+  now go through immediately while that background work is still running.
+
+- **Kobo syncs were slow on big libraries, and froze everything else while they
+  ran.** Every sync re-opened and re-parsed each book's EPUB from disk just to
+  check one rarely-used property, every single time — and because that reading
+  happened inside the sync request, nobody else could load a page until it
+  finished. That answer never changes unless the file itself does, so it's now
+  remembered. Measured on a 215-book library on local disk, the per-100-book cost
+  dropped from 400 ms to 11 ms; on a first sync after a restart it dropped from
+  about 6 seconds to the same 11 ms. Two honest caveats: the memory holds 4,096
+  books, and a sync walks the library in order, so libraries larger than that see
+  little benefit on a full sync; and on a NAS or network share each book still
+  costs one small filesystem check, so the saving is real but smaller than the
+  local-disk numbers above.
+
+- **The whole server paused whenever a Kobo asked for a book it hadn't converted
+  yet.** The first time a Kobo downloaded any book that didn't already have a
+  kepub, the conversion ran inside that request and froze every other page for
+  everyone until it finished — and because it queued behind whatever else the
+  server was doing, a download landing behind a long import or conversion held
+  the freeze for that job's whole duration too. Measured on a 24 MB book, an
+  unrelated page load went from 9 ms to 754 ms; it now stays at 21 ms.
 
 - **The whole library stops responding while a book is being imported.** Saving
   a metadata edit, renaming or merging a tag, or uploading while an import was

@@ -47,7 +47,7 @@ from .constants import COVER_THUMBNAIL_SMALL, COVER_THUMBNAIL_MEDIUM, COVER_THUM
 from .kobo_cover_cache import build_cover_image_id, normalize_cover_uuid
 from .helper import get_download_link
 from .services import SyncToken as SyncToken, hardcover
-from .services import cover_preview
+from .services import cover_preview, parallel
 from .fs import FileSystem
 from .web import download_required
 from .kobo_auth import requires_kobo_auth, get_auth_token
@@ -92,14 +92,20 @@ def make_request_to_kobo_store(sync_token=None):
     if sync_token:
         sync_token.set_kobo_store_header(outgoing_headers)
 
-    store_response = requests.request(
-        method=request.method,
-        url=get_store_url_for_current_request(),
+    # Flask's request/app context does not propagate to the real OS thread
+    # used by run_blocking. Materialize every request-bound value here, then
+    # offload only requests/urllib3's blocking socket work.
+    method = request.method
+    store_url = get_store_url_for_current_request()
+    body = request.get_data()
+    store_response = parallel.run_blocking(lambda: requests.request(
+        method=method,
+        url=store_url,
         headers=outgoing_headers,
-        data=request.get_data(),
+        data=body,
         allow_redirects=False,
         timeout=(2, 10)
-    )
+    ))
     log.debug("Content: " + str(store_response.content))
     log.debug("StatusCode: " + str(store_response.status_code))
     return store_response
@@ -533,6 +539,7 @@ def HandleSyncRequest():
     # the joined-load query twice per sync request.
     books_list = changed_entries.limit(SYNC_ITEM_LIMIT).all()
     log.debug("Kobo Sync: selected to sync: {}".format(len(books_list)))
+    synced_book_ids = []
     for book in books_list:
         kobo_reading_state = book.KoboReadingState  # None when no record exists yet
         entitlement = {
@@ -575,7 +582,12 @@ def HandleSyncRequest():
             new_books_last_modified = max(date_added, new_books_last_modified)
 
         new_books_last_created = max(ts_created, new_books_last_created)
-        kobo_sync_status.add_synced_books(book.Books.id)
+        synced_book_ids.append(book.Books.id)
+
+    # Persist the whole emitted page before response/token construction.  In
+    # particular, the next request must not observe zero synced rows and reset
+    # its token.  The batch helper also avoids one SQLite fsync per book.
+    kobo_sync_status.add_synced_books_batch(synced_book_ids)
 
     # Magic-shelf sub-cursor: advance to the highest magic-shelf book id
     # emitted this round. magic_shelf_book_ids may be empty when the arm
@@ -1132,7 +1144,7 @@ def get_metadata(book):
     # is supported
     if kepub_data:
         book_data, dl_format = kepub_data, 'kepub'
-    elif epub_data and config.config_kepubifypath:
+    elif epub_data and config.config_kepubifypath and config.config_kobo_prefer_kepub:
         book_data, dl_format = epub_data, 'kepub'
     elif epub_data:
         book_data, dl_format = epub_data, 'epub'

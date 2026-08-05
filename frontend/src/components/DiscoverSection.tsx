@@ -12,7 +12,8 @@ const STRIP_COUNT = 12;
 /** A boxed, visually-distinct strip of random book picks at the top of the
  *  library. Reshuffle for a fresh set, or dismiss with the × (the parent
  *  persists the hidden state and offers a "Show Discover section" toggle). */
-export function DiscoverSection({ onClose }: { onClose: () => void }) {
+export function DiscoverSection({ onClose, hideActions = false }:
+  { onClose: () => void; hideActions?: boolean }) {
   const t = useT();
   const announce = useAnnouncer();
   const [nonce, setNonce] = useState(0);
@@ -77,7 +78,7 @@ export function DiscoverSection({ onClose }: { onClose: () => void }) {
         <div className={styles.strip}>
           {books.map((b) => (
             <div className={styles.item} key={b.id}>
-              <BookCard book={b} />
+              <BookCard book={b} hideActions={hideActions} />
             </div>
           ))}
         </div>

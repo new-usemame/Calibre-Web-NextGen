@@ -32,7 +32,9 @@ class _FakeBook:
 
 
 def test_log_metadata_change_writes_enforcer_entry(monkeypatch, tmp_path):
-    monkeypatch.setattr(helper, "CWA_METADATA_CHANGE_LOGS_DIR", str(tmp_path))
+    from cps import constants
+
+    monkeypatch.setattr(constants, "CWA_METADATA_CHANGE_LOGS_DIR", str(tmp_path))
     out = helper.log_metadata_change(_FakeBook(), {"cover": True})
 
     assert out is not None
@@ -52,9 +54,11 @@ def test_log_metadata_change_writes_enforcer_entry(monkeypatch, tmp_path):
 def test_log_metadata_change_never_raises(monkeypatch, tmp_path):
     # An unwritable dir must not fail the user's cover change. Use a path whose
     # parent is a regular file, so os.makedirs reliably fails on every platform.
+    from cps import constants
+
     blocker = tmp_path / "iamafile"
     blocker.write_text("x")
-    monkeypatch.setattr(helper, "CWA_METADATA_CHANGE_LOGS_DIR", str(blocker / "sub"))
+    monkeypatch.setattr(constants, "CWA_METADATA_CHANGE_LOGS_DIR", str(blocker / "sub"))
     # Should swallow the error and return None, not raise.
     assert helper.log_metadata_change(_FakeBook(), {"cover": True}) is None
 

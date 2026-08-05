@@ -64,11 +64,6 @@ class Harness:
         self.library = tmp_path / "calibre-library"
         self.ingest = tmp_path / "cwa-book-ingest"
         self.conv_tmp = self.config_root / ".cwa_conversion_tmp"
-        # The app-tree dirs the runtime user writes; the default value of
-        # CWA_APP_WRITABLE_DIRS derives them from CWA_APP_ROOT, so overriding the
-        # app root (below, in run()) points them into this fake tree for free.
-        self.metadata_change_logs = self.app_root / "metadata_change_logs"
-        self.metadata_temp = self.app_root / "metadata_temp"
         for d in (self.app_root, self.config_root, self.library, self.ingest, self.conv_tmp):
             d.mkdir(parents=True, exist_ok=True)
 
@@ -243,12 +238,49 @@ def test_config_and_app_writables_are_always_walked(harness: Harness):
         "/config holds app.db and user_profiles.json, both written as root after "
         f"the early chown; got {walked}"
     )
-    assert str(harness.metadata_change_logs) in walked, (
-        "metadata_change_logs is written as abc by editbooks / kindle_epub_fixer "
-        f"and ships owned by the build-time uid; got {walked}"
+
+
+def test_metadata_dirs_are_covered_by_the_config_walk(harness: Harness):
+    """#995 moved metadata_change_logs / metadata_temp from the app tree into /config.
+
+    That is what let this script drop its explicit app-tree entries: the dirs are now
+    inside a tree it already walks recursively. Pin the property the deletion relies on,
+    so re-scoping the /config walk later cannot silently leave them unowned again.
+    """
+    change_logs = harness.config_root / "metadata_change_logs"
+    temp_dir = harness.config_root / "metadata_temp"
+    change_logs.mkdir(parents=True, exist_ok=True)
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    harness.run()
+    walked = harness.chowned_paths()
+
+    assert str(harness.config_root) in walked, (
+        "the metadata dirs are only owned because /config is walked recursively; "
+        f"got {walked}"
     )
-    assert str(harness.metadata_temp) in walked, (
-        f"metadata_temp is exported to as abc by kindle_epub_fixer; got {walked}"
+    for d in (change_logs, temp_dir):
+        covered = any(
+            d == Path(w) or Path(w) in d.parents for w in walked
+        )
+        assert covered, (
+            f"{d} is written by the runtime user but no recursive chown covers it; "
+            f"got {walked}"
+        )
+
+
+def test_app_tree_metadata_dirs_are_no_longer_walked(harness: Harness):
+    """The app-tree copies are gone (#995), so the script must not re-own them.
+
+    Walking them again would resurrect the per-boot app-tree chown that #941 removed.
+    """
+    legacy = harness.app_root / "metadata_change_logs"
+    legacy.mkdir(parents=True, exist_ok=True)
+
+    harness.run()
+    walked = harness.chowned_paths()
+    assert str(legacy) not in walked, (
+        f"the app-tree metadata dir is legacy and must not be chowned; got {walked}"
     )
 
 
@@ -264,22 +296,11 @@ def test_full_app_tree_is_not_recursively_walked(harness: Harness):
     )
 
 
-def test_app_writable_dirs_are_created_if_missing(harness: Harness):
-    """They ship in the image, but a missing one must be pre-created rather than
-    degrade to a soft chown failure that leaves it unwritable."""
-    # Fresh harness state: the dirs do not exist yet.
-    assert not harness.metadata_change_logs.exists()
-    harness.run()
-    assert harness.metadata_change_logs.is_dir()
-    assert harness.metadata_temp.is_dir()
-
-
 def test_missing_dirs_json_still_walks_the_floor(harness: Harness):
     harness.write_dirs_json(None)
     harness.run()
     walked = harness.chowned_paths()
     assert str(harness.config_root) in walked
-    assert str(harness.metadata_change_logs) in walked
     assert str(harness.app_root) not in walked
 
 
@@ -291,7 +312,6 @@ def test_truncated_dirs_json_still_walks_the_floor(harness: Harness):
     walked = harness.chowned_paths()
     assert result.returncode == 0
     assert str(harness.config_root) in walked
-    assert str(harness.metadata_change_logs) in walked
 
 
 def test_non_absolute_dirs_json_values_are_ignored(harness: Harness):
@@ -328,15 +348,6 @@ def test_network_share_mode_skips_bind_mounts(tmp_path: Path, truthy: str):
     walked = h.chowned_paths()
     assert "/calibre-library" not in walked
     assert "/cwa-book-ingest" not in walked
-
-
-def test_network_share_mode_still_walks_the_app_writables(harness: Harness):
-    """The app-tree writables live inside the image, never on the share, so the
-    share exemption must not skip them."""
-    harness.run(NETWORK_SHARE_MODE="true")
-    walked = harness.chowned_paths()
-    assert str(harness.metadata_change_logs) in walked
-    assert str(harness.metadata_temp) in walked
 
 
 def test_falsey_network_share_mode_walks_everything(harness: Harness):

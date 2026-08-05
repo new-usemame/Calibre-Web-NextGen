@@ -1,9 +1,14 @@
 #!/bin/bash
 
-# Make required directories and files for metadata enforcement
+# Make required directories and files for metadata enforcement.
+#
+# This script runs at IMAGE BUILD time (see the Dockerfile RUN), so these only seed the
+# image layer -- which is what a named volume is populated from, and what a bind-mounted
+# /config shadows entirely. The runtime creation that actually covers bind mounts, plus
+# the migration off the old app-tree location, lives in the cwa-init oneshot (#995).
 make_dirs () {
-    install -d -o abc -g abc /app/calibre-web-automated/metadata_change_logs
-    install -d -o abc -g abc /app/calibre-web-automated/metadata_temp
+    install -d -o abc -g abc /config/metadata_change_logs
+    install -d -o abc -g abc /config/metadata_temp
     install -d -o abc -g abc /cwa-book-ingest
     install -d -o abc -g abc /calibre-library
 }

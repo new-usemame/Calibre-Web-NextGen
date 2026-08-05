@@ -59,6 +59,13 @@ cps/static/app/
 # silently never runs it. CI builds from a clean checkout and was never
 # affected; local images were (#1162).
 .cwa_migrations/
+# Same reasoning for the metadata enforcement dirs (#995): they resolve under
+# CONFIG_DIR, which outside a container is the repo root, and cwa-init now
+# migrates anything left in the old location into the user's /config. A change
+# log baked into the image would be enforced onto whatever real book shares its
+# id on someone else's install.
+metadata_change_logs/
+metadata_temp/
 app.db
 *.db-wal
 *.db-shm

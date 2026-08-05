@@ -121,7 +121,17 @@ migrate_legacy_metadata_dir () {
 }
 
 migrate_legacy_metadata_dir /app/calibre-web-automated/metadata_change_logs "${CWA_CHANGE_LOGS_DIR}"
-migrate_legacy_metadata_dir /app/calibre-web-automated/metadata_temp "${CWA_TEMP_DIR}"
+
+# metadata_temp is deliberately NOT migrated. It is scratch for `calibredb export`,
+# and get_new_metadata_path() takes opf_files[0] from a walk of the whole directory --
+# so a leftover OPF from a container killed mid-enforcement could be embedded into the
+# *next* book instead of its own. Nothing in there is worth keeping; drop it.
+# Guarded on the paths differing: CALIBRE_DBPATH is operator-settable, and pointing it
+# at the app root would otherwise make this delete the live dir created just above.
+CWA_LEGACY_TEMP_DIR=/app/calibre-web-automated/metadata_temp
+if [ "${CWA_LEGACY_TEMP_DIR}" != "${CWA_TEMP_DIR}" ]; then
+  rm -rf "${CWA_LEGACY_TEMP_DIR}" 2>/dev/null || true
+fi
 
 # Ensure ingest directory exists and is writable (matches dirs.json)
 INGEST_DIR=$(python3 - <<'PY'

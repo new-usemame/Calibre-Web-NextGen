@@ -221,6 +221,15 @@ instance/
 # deployment state, not source.
 .cwa_migrations/
 
+# Metadata enforcement working dirs, same class as .cwa_migrations. These live
+# under CONFIG_DIR (#995), and outside a container CONFIG_DIR falls back to the
+# repo root -- so simply running the unit suite writes real change logs here.
+# Committing one is not cosmetic: cwa-init migrates whatever it finds into the
+# user's /config, and the enforcer then re-embeds that metadata into whichever
+# real books hold those ids.
+metadata_change_logs/
+metadata_temp/
+
 # Claude Code workspace cache (per-developer local skill state).
 .claude/
 

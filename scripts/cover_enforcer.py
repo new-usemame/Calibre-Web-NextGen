@@ -28,7 +28,21 @@ _project_root = os.path.abspath(os.path.join(_this_dir, os.pardir))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from cps import constants
+try:
+    from cps import constants
+    _CHANGE_LOGS_DIR = constants.CWA_METADATA_CHANGE_LOGS_DIR
+    _METADATA_TEMP_DIR = constants.CWA_METADATA_TEMP_DIR
+except Exception:
+    # cps is the single source for these paths, but this module also has to survive an
+    # environment where the Flask stack it drags in is not importable -- that is what the
+    # inline sanitizer fallback below exists for, and hard-failing here would take it out.
+    # Resolve through the same two knobs, in the same order, as cps/constants.py.
+    _config_root = os.environ.get("CALIBRE_DBPATH", "/config")
+    _CHANGE_LOGS_DIR = os.environ.get(
+        "CWA_METADATA_CHANGE_LOGS_DIR", os.path.join(_config_root, "metadata_change_logs"))
+    _METADATA_TEMP_DIR = os.environ.get(
+        "CWA_METADATA_TEMP_DIR", os.path.join(_config_root, "metadata_temp"))
+
 from cwa_db import CWA_DB
 try:
     from cps.utils.filename_sanitizer import get_valid_filename_shared
@@ -78,8 +92,8 @@ except Exception:
 
 # Global Variables
 dirs_json = "/app/calibre-web-automated/dirs.json"
-change_logs_dir = constants.CWA_METADATA_CHANGE_LOGS_DIR
-metadata_temp_dir = constants.CWA_METADATA_TEMP_DIR
+change_logs_dir = _CHANGE_LOGS_DIR
+metadata_temp_dir = _METADATA_TEMP_DIR
 
 
 # Creates a lock file unless one already exists meaning an instance of the script is

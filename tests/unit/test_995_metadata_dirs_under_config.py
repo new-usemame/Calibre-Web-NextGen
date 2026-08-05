@@ -41,20 +41,39 @@ STANDALONE_SCRIPTS = ["cover_enforcer.py", "kindle_epub_fixer.py"]
 
 
 def _module_level_cps_import_lineno(tree):
-    """First line at which the module body imports ``cps`` (None if it never does)."""
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name == "cps" or alias.name.startswith("cps."):
+    """First line at which the module body imports ``cps`` (None if it never does).
+
+    Descends into module-scope ``try``/``if`` blocks, because a ``cps`` import wrapped in
+    ``try: ... except ImportError`` still executes at import time -- but does not descend
+    into functions, whose imports run only when called.
+    """
+    container = (ast.If, ast.Try, ast.With, ast.For, ast.While)
+
+    def scan(body):
+        for node in body:
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "cps" or alias.name.startswith("cps."):
+                        return node.lineno
+            elif isinstance(node, ast.ImportFrom):
+                # `from cps import x` / `from cps.y import z`; level>0 is a relative
+                # import, which these standalone scripts never use.
+                if node.level == 0 and node.module and (
+                    node.module == "cps" or node.module.startswith("cps.")
+                ):
                     return node.lineno
-        elif isinstance(node, ast.ImportFrom):
-            # `from cps import x` / `from cps.y import z`; level>0 is a relative import,
-            # which these standalone scripts never use.
-            if node.level == 0 and node.module and (
-                node.module == "cps" or node.module.startswith("cps.")
-            ):
-                return node.lineno
-    return None
+            elif isinstance(node, container):
+                for attr in ("body", "orelse", "finalbody"):
+                    found = scan(getattr(node, attr, None) or [])
+                    if found is not None:
+                        return found
+                for handler in getattr(node, "handlers", None) or []:
+                    found = scan(handler.body)
+                    if found is not None:
+                        return found
+        return None
+
+    return scan(tree.body)
 
 
 def _is_sys_path_mutation(node):

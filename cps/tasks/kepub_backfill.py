@@ -83,7 +83,8 @@ class TaskKepubBackfill(CalibreTask):
 
     @property
     def name(self):
-        return N_(u"Kobo KEPUB backfill")
+        # Startup tasks are formatted before any Flask/Babel context exists.
+        return "Kobo KEPUB backfill"
 
     @property
     def is_cancellable(self):

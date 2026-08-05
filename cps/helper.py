@@ -372,7 +372,12 @@ def convert_book_format(book_id, calibre_path, old_book_format, new_book_format,
     task = TaskConvert(file_path, book.id, txt, settings, ereader_mail, user_id)
     WorkerThread.add(user_id, task)
     if blocking:
-        finished = task.done_event.wait(timeout=timeout)
+        # Only the context-free Event wait crosses onto the bounded native
+        # thread pool. url_for(), translations, DB access, and task creation
+        # above must remain on the request greenlet: Flask contextvars do not
+        # propagate through gevent.threadpool.ThreadPool.
+        from .services.parallel import run_blocking
+        finished = run_blocking(lambda: task.done_event.wait(timeout=timeout))
         if not finished:
             return _("Conversion timed out for book id: %(book)d", book=book_id)
         if task.stat != STAT_FINISH_SUCCESS:
@@ -2194,10 +2199,9 @@ def get_download_link(book_id, book_format, client):
         data1 = calibre_db.get_book_format(book.id, "EPUB")
         if data1:
             log.info("KEPUB not found for book %d; converting on demand", book.id)
-            from .services.parallel import run_blocking
-            err = run_blocking(lambda: convert_book_format(
+            err = convert_book_format(
                 book.id, config.get_book_path(), 'EPUB', 'KEPUB', None,
-                blocking=True, timeout=25))
+                blocking=True, timeout=25)
             if not err:
                 data1 = calibre_db.get_book_format(book.id, "KEPUB")
             else:

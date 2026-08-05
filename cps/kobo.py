@@ -1113,10 +1113,10 @@ def _get_cover_image_id(book):
         log.debug("Kobo Sync: failed to build cover image id for book %s: %s", book.id, exc)
         return base_id
 
-def build_download_url(book, book_data, download_format, declared_format):
+def build_download_url(book, book_data, download_format, declared_format, size=None):
     return {
             "Format": declared_format,
-            "Size": book_data.uncompressed_size,
+            "Size": book_data.uncompressed_size if size is None else size,
             "Url": get_download_url_for_book(book.id, download_format),
             "Platform": "Generic",
             "DrmType": "None",
@@ -1152,7 +1152,11 @@ def get_metadata(book):
             download_urls.append(build_download_url(book, book_data, dl_format, 'EPUB3FL'))
         else:
             if dl_format == 'kepub':
-                download_urls.append(build_download_url(book, book_data, dl_format, 'KEPUB'))
+                # A deferred conversion has no KEPUB Data row yet. Advertising
+                # the EPUB byte count as KEPUB is false; zero is the protocol's
+                # honest unknown-size value until the conversion lands.
+                kepub_size = None if kepub_data else 0
+                download_urls.append(build_download_url(book, book_data, dl_format, 'KEPUB', kepub_size))
             else:
                 # Send both EPUB and EPUB3 for epub files, in case legacy devices only support
                 # EPUB download urls

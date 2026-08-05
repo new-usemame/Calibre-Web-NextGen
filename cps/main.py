@@ -110,8 +110,13 @@ def main():
 
     # Upgrades receive the default-on preference through the settings-table
     # migration without an admin save, so give that path its one-time trigger.
-    from .tasks.kepub_backfill import enqueue_startup_kepub_backfill
-    enqueue_startup_kepub_backfill()
+    # This is a convenience job: failure must never prevent HTTP startup.
+    try:
+        from .tasks.kepub_backfill import enqueue_startup_kepub_backfill
+        enqueue_startup_kepub_backfill()
+    except Exception as ex:
+        from . import logger
+        logger.create().error_or_exception(f"Could not queue startup KEPUB backfill: {ex}")
 
     success = web_server.start()
     sys.exit(0 if success else 1)

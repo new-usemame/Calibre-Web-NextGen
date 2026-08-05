@@ -37,15 +37,14 @@ test('the Read now + edit row can be switched off from View settings (#1054)', a
   const toggle = page.getByTestId('show-card-actions');
   await expect(toggle, 'the preference ships on, so nobody loses the row by upgrading').toBeChecked();
 
-  // Switch it off.
+  // Switch it off. count() counts elements that are merely transparent or
+  // display:none too, so zero here means they left the DOM — which is the
+  // tab-order guarantee, not just a visual one.
   await toggle.uncheck();
-  await expect(page.locator(READ_NOW)).toHaveCount(0);
-  await expect(page.locator(PENCIL)).toHaveCount(0);
-
-  // Removed from the DOM, not merely transparent — otherwise these stay in the
-  // tab order for a user who explicitly turned them off.
-  const stillFocusable = await page.locator(`${READ_NOW}, ${PENCIL}`).count();
-  expect(stillFocusable, 'action controls must leave the tab order, not just go transparent').toBe(0);
+  await expect(page.locator(READ_NOW),
+    'the read link must leave the DOM, not just go transparent').toHaveCount(0);
+  await expect(page.locator(PENCIL),
+    'the edit pencil must leave the DOM, not just go transparent').toHaveCount(0);
 
   // Survives a reload (the whole point of persisting it).
   await page.reload();

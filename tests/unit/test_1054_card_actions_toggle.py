@@ -22,17 +22,25 @@ _FE = _ROOT / "frontend" / "src"
 
 pytestmark = pytest.mark.unit
 
-# Every surface that renders a BookCard. Keep in sync when a new one appears —
-# a card surface that ignores the preference is the bug this list exists to catch.
-_CARD_SURFACES = (
-    ("pages", "Catalog.tsx"),
-    ("pages", "Shelf.tsx"),
-    ("pages", "MagicShelfView.tsx"),
-    ("pages", "AdvancedSearch.tsx"),
-    ("pages", "BookDetail.tsx"),
-    ("components", "DiscoverSection.tsx"),
-    ("components", "MoreByAuthor.tsx"),
-)
+# Every surface that renders a BookCard, mapped to the exact expression it must
+# hand down. Asserting only that the string "hideActions" appears would pass on
+# `hideActions={false}` or a stale constant — the wiring, not its name, is what
+# a regression would break, and the e2e only drives the catalog grid.
+#
+# Pages own the state and pass the live hook value; the two rail components take
+# it as a prop and forward it unchanged.
+_CARD_SURFACES = {
+    ("pages", "Catalog.tsx"): "hideActions={cardActionsHidden}",
+    ("pages", "Shelf.tsx"): "hideActions={cardActionsHidden}",
+    ("pages", "MagicShelfView.tsx"): "hideActions={cardActionsHidden}",
+    ("pages", "AdvancedSearch.tsx"): "hideActions={cardActionsHidden}",
+    ("pages", "BookDetail.tsx"): "hideActions={cardActionsHidden}",
+    ("components", "DiscoverSection.tsx"): "hideActions={hideActions}",
+    ("components", "MoreByAuthor.tsx"): "hideActions={hideActions}",
+}
+
+# Only these five own the preference; the rails receive it.
+_STATE_OWNERS = tuple(k for k in _CARD_SURFACES if k[0] == "pages")
 
 
 def test_preference_key_has_exactly_one_definition():
@@ -69,24 +77,41 @@ def test_bookcard_removes_the_row_rather_than_hiding_it():
     assert "const hasActionRow = !hideActions && (Boolean(readTarget) || quickEdit);" in src
 
 
-def test_every_book_card_surface_honours_the_preference():
+def test_every_book_card_surface_passes_the_live_preference():
     """A BookCard rendered by a surface that never passes `hideActions` keeps its
-    buttons, so the preference would look broken on exactly that page."""
-    missing = []
-    for parts in _CARD_SURFACES:
+    buttons, so the preference looks broken on exactly that page — and the e2e
+    only covers the catalog grid, so nothing else would catch it."""
+    wrong = []
+    for parts, expected in _CARD_SURFACES.items():
         src = (_FE.joinpath(*parts)).read_text()
-        if "hideActions" not in src:
-            missing.append(parts[-1])
-    assert missing == [], f"these render a BookCard but ignore the preference: {missing}"
+        if expected not in src:
+            wrong.append(f"{parts[-1]} (expected `{expected}`)")
+    assert wrong == [], f"these render a BookCard without the live preference: {wrong}"
+
+
+def test_state_owners_read_the_shared_hook():
+    """Pinned separately from the pass-down: a page could name the right variable
+    while seeding it from something other than the shared hook, which is how the
+    seven surfaces would drift apart again."""
+    missing = [
+        parts[-1]
+        for parts in _STATE_OWNERS
+        if "useCardActionsHidden()" not in (_FE.joinpath(*parts)).read_text()
+    ]
+    assert missing == [], f"these pass hideActions but never read the hook: {missing}"
 
 
 def test_no_surface_renders_bookcard_without_being_in_the_list():
     """Guards the list above from going stale as new card surfaces are added."""
     known = {name for _, name in _CARD_SURFACES} | {"BookCard.tsx"}
+    # Test/story files render BookCard as a fixture, not as a user-facing
+    # surface, so they must not read as a missed call site.
     renderers = {
         path.name
         for path in _FE.rglob("*.tsx")
-        if "<BookCard" in path.read_text()
+        if not any(path.name.endswith(suffix)
+                   for suffix in (".test.tsx", ".spec.tsx", ".stories.tsx"))
+        and "<BookCard" in path.read_text()
     }
     assert renderers <= known, (
         f"new BookCard surface(s) {sorted(renderers - known)} — add to _CARD_SURFACES "

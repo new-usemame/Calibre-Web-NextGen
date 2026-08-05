@@ -16,6 +16,7 @@ import regex
 import shutil
 import socket
 import platform
+from functools import partial
 from datetime import datetime, timedelta, timezone
 import requests
 import unidecode
@@ -51,6 +52,7 @@ from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBN
                         SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_FROM, EXTENSIONS_CONVERT_TO)
 from .subproc_wrapper import process_wait, process_open
 from .services.file_move import copy_with_metadata_fallback
+from .services import parallel
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
@@ -2067,7 +2069,13 @@ def do_kepubify_metadata_replace(book, file_path):
     tmp_dir = get_temp_dir()
     temp_file_name = str(uuid4())
     # open zipfile and replace metadata block in content.opf
-    updateEpub(file_path, os.path.join(tmp_dir, temp_file_name + ".kepub"), cf_name, content)
+    parallel.run_blocking(partial(
+        updateEpub,
+        file_path,
+        os.path.join(tmp_dir, temp_file_name + ".kepub"),
+        cf_name,
+        content,
+    ))
     return tmp_dir, temp_file_name
 
 

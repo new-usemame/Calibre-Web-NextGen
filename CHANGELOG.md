@@ -16,6 +16,21 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **You can turn off the "Read now" and edit buttons on book covers.** If you
+  read on an ereader, the "Read now" link on every cover is just noise, and on a
+  touchscreen both it and the edit pencil stay visible all the time rather than
+  appearing on hover — which made the library look busy. There's now a **Show
+  Read now and edit buttons** switch in the library's View settings (the gear
+  next to the sort control). Turn it off and the buttons come off every book
+  cover, everywhere they appear: the library, shelves, smart shelves, search
+  results, Discover and "More by this author". Both actions are still on the
+  book's own page, which is what the cover has always linked to. The setting is
+  remembered in your browser and is on by default, so nothing changes unless you
+  ask it to. Thanks to @Glennza1962 for the request and @chloeroform for the
+  detail about how the classic view handled this.
+
 ### Fixed
 
 - **The whole library stops responding while a book is being imported.** Saving

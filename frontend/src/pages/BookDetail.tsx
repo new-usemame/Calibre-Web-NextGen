@@ -18,6 +18,7 @@ import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import styles from './BookDetail.module.css';
+import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 
 function formatBytes(bytes: number): string {
   const mb = bytes / (1024 * 1024);
@@ -235,6 +236,7 @@ function TagEditor({ bookId, tags, canEdit }:
 }
 
 export function BookDetail() {
+  const [cardActionsHidden] = useCardActionsHidden();
   const t = useT();
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -665,6 +667,7 @@ export function BookDetail() {
           refetches; renders nothing when the author has no other titles. */}
       {book.authors.length > 0 && (
         <MoreByAuthor
+          hideActions={cardActionsHidden}
           key={book.id}
           authorId={book.authors[0].id}
           authorName={book.authors[0].name}

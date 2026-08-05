@@ -13,6 +13,7 @@ import { useT } from '../lib/i18n';
 import type { Book } from '../lib/api';
 import { ApiError } from '../lib/api';
 import styles from './Shelf.module.css';
+import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const seen = new Set(prev.map((b) => b.id));
@@ -22,6 +23,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
 
 /** Native view of a saved smart shelf's matching books, with duplicate/delete. */
 export function MagicShelfView({ id }: { id: string }) {
+  const [cardActionsHidden] = useCardActionsHidden();
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -173,7 +175,8 @@ export function MagicShelfView({ id }: { id: string }) {
         <>
           <div className={styles.grid}>
             {books.map((b, i) => (
-              <BookCard key={b.id} book={b} style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }} />
+              <BookCard key={b.id} book={b} hideActions={cardActionsHidden}
+                style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }} />
             ))}
           </div>
           {hasMore && (

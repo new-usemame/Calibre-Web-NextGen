@@ -2,7 +2,7 @@
 
 import threading
 
-from cps.services import cover_preview, parallel
+from cps.services import cover_preview
 
 
 def _run_on_real_thread(job):
@@ -36,9 +36,15 @@ def test_cover_cache_miss_offloads_padding_but_hit_stays_on_caller(monkeypatch, 
         manual_color="#ffffff",
     )
     observed = []
+    dispatches = []
 
     monkeypatch.setattr(cover_preview, "use_IM", True)
-    monkeypatch.setattr(parallel, "run_blocking", _run_on_real_thread)
+
+    def run_in_pool(fn, *args):
+        dispatches.append((fn, args))
+        return _run_on_real_thread(lambda: fn(*args))
+
+    monkeypatch.setattr(cover_preview, "_run_in_pool", run_in_pool)
 
     def pad_blob(blob, received_settings):
         observed.append((threading.get_ident(), blob, received_settings))
@@ -51,6 +57,7 @@ def test_cover_cache_miss_offloads_padding_but_hit_stays_on_caller(monkeypatch, 
     )
     assert observed == [(observed[0][0], b"source-cover", settings)]
     assert observed[0][0] != caller_thread
+    assert len(dispatches) == 1
     assert target == str(cache_dir / "padded.jpg")
     assert (cache_dir / "padded.jpg").read_bytes() == b"padded-cover"
 
@@ -60,3 +67,4 @@ def test_cover_cache_miss_offloads_padding_but_hit_stays_on_caller(monkeypatch, 
     )
     assert hit == target
     assert observed == []
+    assert len(dispatches) == 1

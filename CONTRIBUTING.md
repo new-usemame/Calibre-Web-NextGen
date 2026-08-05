@@ -72,7 +72,7 @@ The mounted `cps/` directory then exposes the new bundle to the running containe
 Install Python development requirements, then run the same fast test class as CI:
 
 ```bash
-python -m pip install -r requirements.txt -r requirements-dev.txt
+python -m pip install -e '.[dev]'
 PYTHONPATH="$PWD:$PWD/scripts" pytest -m "smoke or unit" -n auto --dist=loadfile --maxfail=3 -v --tb=short
 ```
 

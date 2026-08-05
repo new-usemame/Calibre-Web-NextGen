@@ -31,7 +31,7 @@ This file pins:
    ``page2.png`` returns ``page2.png`` (natural-order would pick
    page2 first).
 
-Natsort is already a hard dependency in ``requirements.txt`` (used by
+Natsort is already a hard dependency in ``pyproject.toml`` (used by
 ``cps/web.py`` for the book listing). The fallback exists so a stripped-
 down deployment that drops it still gets lexicographic-sorted covers,
 which is strictly better than the unsorted status quo.

@@ -78,8 +78,13 @@ REQUIRED_IN_IMAGE = [
     "koreader/plugins/cwasync.koplugin/main.lua",
     "empty_library/app.db",
     "empty_library/metadata.db",
-    "requirements.txt",
-    "optional-requirements.txt",
+    # The image installs its dependencies with `pip install --only-deps` against
+    # this file (Dockerfile STEP 3), and installs the package itself from it in
+    # STEP 6. It replaced requirements.txt / optional-requirements.txt, which
+    # were listed here until they were deleted -- at which point this list went
+    # on guarding two paths that no longer exist, so the assertion passed while
+    # protecting nothing. Excluding pyproject.toml fails the build outright.
+    "pyproject.toml",
 ]
 
 

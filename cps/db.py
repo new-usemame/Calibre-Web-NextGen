@@ -33,11 +33,11 @@ from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql.expression import and_, true, false, text, func, or_
 try:
     # Scope key for the session registry, see _make_session_factory. greenlet is
-    # a pinned requirement (requirements.txt) and a hard dependency of gevent;
+    # a pinned dependency (pyproject.toml) and a hard dependency of gevent;
     # the fallback exists only for the tornado path, where there are no
     # greenlets and the default thread scope is already correct.
     from greenlet import getcurrent as _current_greenlet
-except ImportError:  # pragma: no cover - greenlet is pinned in requirements.txt
+except ImportError:  # pragma: no cover - greenlet is pinned in pyproject.toml
     _current_greenlet = None
 from sqlalchemy.ext.associationproxy import association_proxy
 from .cw_login import current_user

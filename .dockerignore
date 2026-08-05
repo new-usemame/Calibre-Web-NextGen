@@ -38,10 +38,12 @@ SECURITY.md
 state
 wiki-src
 
-# Test infrastructure (not needed in production image)
+# Test infrastructure (not needed in production image). Dev dependencies now
+# live in pyproject.toml's [project.optional-dependencies].dev extra, which the
+# image must keep (STEP 3 installs from it), so there is no dev requirements
+# file left to exclude here.
 tests/
 pytest.ini
-requirements-dev.txt
 TEST*.md
 TESTING*.md
 .pytest_cache/

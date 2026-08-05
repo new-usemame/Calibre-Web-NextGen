@@ -5,7 +5,7 @@
 ### 1. Install test dependencies:
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e '.[dev]'
 ```
 
 ### 2. Generate test fixtures (first time only):
@@ -135,8 +135,7 @@ See `.github/workflows/tests.yml` for CI configuration.
 cd /app/calibre-web-automated
 
 # Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+pip install -e '.[dev]'
 ```
 
 ### Tests timeout

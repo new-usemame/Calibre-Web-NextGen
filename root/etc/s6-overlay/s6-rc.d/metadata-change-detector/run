@@ -2,11 +2,17 @@
 
 echo "========== STARTING METADATA CHANGE DETECTOR ==========="
 
-# Folder to monitor. This has to resolve to the same path cps/constants.py computes for
-# CWA_METADATA_CHANGE_LOGS_DIR, or the writer writes where nobody is watching and metadata
-# enforcement stops with nothing in the logs to say why. Honour the same two knobs, in the
-# same order, as the Python side.
-WATCH_FOLDER="${CWA_METADATA_CHANGE_LOGS_DIR:-${CALIBRE_DBPATH:-/config}/metadata_change_logs}"
+# Folder to monitor. This has to resolve to the same path the writer uses, or the writer
+# writes where nobody is watching and metadata enforcement stops with nothing in the logs
+# to say why.
+#
+# Deliberately does NOT read CALIBRE_DBPATH. Both units that decide where the app actually
+# writes -- cwa-init and svc-calibre-web-automated -- `export CALIBRE_DBPATH=/config`
+# unconditionally before doing anything, so the app's CONFIG_DIR is /config no matter what
+# the operator set. This unit does not clobber it, so deriving from it here would make this
+# the single place that could disagree with everyone else: set CALIBRE_DBPATH=/foo in
+# compose and the app would still write /config while this watched /foo.
+WATCH_FOLDER="${CWA_METADATA_CHANGE_LOGS_DIR:-/config/metadata_change_logs}"
 echo "[metadata-change-detector] Watching folder: $WATCH_FOLDER"
 
 # Create the folder if it doesn't exist

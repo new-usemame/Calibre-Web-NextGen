@@ -335,13 +335,48 @@ def test_watcher_and_writer_agree_on_the_change_logs_path():
     assert "/app/calibre-web-automated/metadata_change_logs" not in watch_line, (
         "the watcher still points at the app tree while Python writes under CONFIG_DIR"
     )
-    # Python honours CWA_METADATA_CHANGE_LOGS_DIR first, then CONFIG_DIR (CALIBRE_DBPATH).
-    # The shell side must honour both or the two can be pointed apart.
     assert "CWA_METADATA_CHANGE_LOGS_DIR" in watch_line, (
         "WATCH_FOLDER ignores CWA_METADATA_CHANGE_LOGS_DIR, which Python honours; setting "
         f"it moves the writer and leaves the watcher behind. Got: {watch_line.strip()}"
     )
-    assert "CALIBRE_DBPATH" in watch_line, (
-        "WATCH_FOLDER hardcodes /config while Python derives it from CALIBRE_DBPATH; "
-        f"changing CALIBRE_DBPATH splits the two. Got: {watch_line.strip()}"
+    # Deliberately the opposite of what looks like the tidy answer. cwa-init and
+    # svc-calibre-web-automated both `export CALIBRE_DBPATH=/config` before doing anything,
+    # so the app's CONFIG_DIR is /config whatever the operator set -- but this unit does not
+    # clobber it. Deriving WATCH_FOLDER from it would make this the one place that can
+    # disagree with the writer.
+    assert "CALIBRE_DBPATH" not in watch_line, (
+        "WATCH_FOLDER derives from CALIBRE_DBPATH, but this unit inherits the operator's "
+        "value while cwa-init and svc-calibre-web-automated force it to /config. Setting "
+        f"CALIBRE_DBPATH would leave the watcher alone in the wrong place. Got: {watch_line.strip()}"
     )
+    assert "/config/metadata_change_logs" in watch_line, (
+        f"WATCH_FOLDER must default to /config/metadata_change_logs. Got: {watch_line.strip()}"
+    )
+
+
+def test_cwa_init_does_not_rederive_config_root_after_pinning_it():
+    """cwa-init exports CALIBRE_DBPATH=/config, so re-reading it below is a trap.
+
+    Anything resolved from `${CALIBRE_DBPATH}` after that export always yields /config,
+    which makes a guard written against an operator-set value read as if it covered a
+    case it cannot see.
+    """
+    init_run = (
+        PROJECT_ROOT / "root/etc/s6-overlay/s6-rc.d/cwa-init/run"
+    ).read_text(encoding="utf-8")
+    lines = init_run.splitlines()
+
+    export_idx = next(
+        (i for i, ln in enumerate(lines) if ln.strip().startswith("export CALIBRE_DBPATH=")),
+        None,
+    )
+    assert export_idx is not None, "cwa-init should still pin CALIBRE_DBPATH"
+
+    for i, ln in enumerate(lines[export_idx + 1:], start=export_idx + 2):
+        if ln.lstrip().startswith("#"):
+            continue
+        if "CWA_CHANGE_LOGS_DIR=" in ln or "CWA_TEMP_DIR=" in ln:
+            assert "CALIBRE_DBPATH" not in ln, (
+                f"line {i} resolves a metadata dir from CALIBRE_DBPATH after cwa-init pinned "
+                f"it to /config, so the knob it appears to honour is already gone: {ln.strip()}"
+            )

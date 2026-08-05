@@ -100,8 +100,11 @@ install -d -o abc -g abc /config/.cwa_conversion_tmp
 # common bind-mounted /config the user's mount shadows whatever the build put there and
 # the dirs are simply absent. Resolve them the same way cps/constants.py does, honouring
 # the same knobs in the same order, so the writer and the watcher cannot drift apart.
-CWA_CHANGE_LOGS_DIR="${CWA_METADATA_CHANGE_LOGS_DIR:-${CALIBRE_DBPATH:-/config}/metadata_change_logs}"
-CWA_TEMP_DIR="${CWA_METADATA_TEMP_DIR:-${CALIBRE_DBPATH:-/config}/metadata_temp}"
+# Not derived from CALIBRE_DBPATH: it is force-exported to /config above (and again in
+# svc-calibre-web-automated), so the app's CONFIG_DIR is /config regardless of what the
+# operator set. Reading it here would only introduce a way for these to disagree.
+CWA_CHANGE_LOGS_DIR="${CWA_METADATA_CHANGE_LOGS_DIR:-/config/metadata_change_logs}"
+CWA_TEMP_DIR="${CWA_METADATA_TEMP_DIR:-/config/metadata_temp}"
 install -d -o abc -g abc "${CWA_CHANGE_LOGS_DIR}"
 install -d -o abc -g abc "${CWA_TEMP_DIR}"
 
@@ -114,8 +117,11 @@ migrate_legacy_metadata_dir () {
   [ "$old" = "$new" ] && return 0
   if find "$old" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
     echo "[cwa-init] Migrating leftover files from ${old} to ${new} (#995)"
-    find "$old" -mindepth 1 -maxdepth 1 -exec mv -n {} "${new}/" \; 2>/dev/null || true
-    chown -R abc:abc "${new}" 2>/dev/null || true
+    # Symlinks are skipped rather than moved, and the chown is -h. `chown -R` without -h
+    # follows a symlink and re-owns its *target*, so a link planted in the old dir would
+    # hand root's chown an arbitrary path -- and this runs before anything validates it.
+    find "$old" -mindepth 1 -maxdepth 1 ! -type l -exec mv -n {} "${new}/" \; 2>/dev/null || true
+    chown -Rh abc:abc "${new}" 2>/dev/null || true
   fi
   rmdir "$old" 2>/dev/null || true
 }
@@ -126,10 +132,12 @@ migrate_legacy_metadata_dir /app/calibre-web-automated/metadata_change_logs "${C
 # and get_new_metadata_path() takes opf_files[0] from a walk of the whole directory --
 # so a leftover OPF from a container killed mid-enforcement could be embedded into the
 # *next* book instead of its own. Nothing in there is worth keeping; drop it.
-# Guarded on the paths differing: CALIBRE_DBPATH is operator-settable, and pointing it
-# at the app root would otherwise make this delete the live dir created just above.
+# Guarded on the paths differing, compared canonically: CWA_METADATA_TEMP_DIR is
+# operator-settable, and a trailing slash or a /./ spelling of the same directory would
+# slip past a string comparison and delete the live dir created just above.
 CWA_LEGACY_TEMP_DIR=/app/calibre-web-automated/metadata_temp
-if [ "${CWA_LEGACY_TEMP_DIR}" != "${CWA_TEMP_DIR}" ]; then
+if [ "$(realpath -m -- "${CWA_LEGACY_TEMP_DIR}" 2>/dev/null || echo "${CWA_LEGACY_TEMP_DIR}")" \
+     != "$(realpath -m -- "${CWA_TEMP_DIR}" 2>/dev/null || echo "${CWA_TEMP_DIR}")" ]; then
   rm -rf "${CWA_LEGACY_TEMP_DIR}" 2>/dev/null || true
 fi
 

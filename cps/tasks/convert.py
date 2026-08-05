@@ -8,6 +8,8 @@
 import os
 import re
 import glob
+import tempfile
+import zipfile
 from shutil import copyfile, copyfileobj
 from markupsafe import escape
 from time import time
@@ -29,6 +31,17 @@ from cps.constants import SUPPORTED_CALIBRE_BINARIES
 from cps.string_helper import strip_whitespaces
 
 log = logger.create()
+
+
+def _valid_archive(path, book_format):
+    """Return whether an EPUB-family conversion target is a readable archive."""
+    if book_format.upper() not in ("EPUB", "EPUB3", "KEPUB"):
+        return True
+    try:
+        with zipfile.ZipFile(path) as archive:
+            return bool(archive.infolist()) and archive.testzip() is None
+    except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile):
+        return False
 
 current_milli_time = lambda: int(round(time() * 1000))
 
@@ -120,8 +133,16 @@ class TaskConvert(CalibreTask):
         # check to see if destination format already exists - or if book is in database
         # if it does - mark the conversion task as complete and return a success
         # this will allow to send to E-Reader workflow to continue to work
-        if os.path.isfile(file_path + format_new_ext) or\
-                local_db.get_book_format(self.book_id, self.settings['new_book_format']):
+        target_path = file_path + format_new_ext
+        target_on_disk = os.path.isfile(target_path)
+        target_is_valid = target_on_disk and _valid_archive(
+            target_path, self.settings['new_book_format'])
+        if target_on_disk and not target_is_valid:
+            log.warning("Book id %d has an invalid %s on disk; conversion will replace it",
+                        book_id, format_new_ext)
+
+        if target_is_valid or local_db.get_book_format(
+                self.book_id, self.settings['new_book_format']):
             log.info("Book id %d already converted to %s", book_id, format_new_ext)
             cur_book = local_db.get_book(book_id)
             self.title = cur_book.title
@@ -235,8 +256,24 @@ class TaskConvert(CalibreTask):
         if check == 0:
             converted_file = glob.glob(glob.escape(os.path.splitext(filename)[0]) + "*.kepub.epub")
             if len(converted_file) == 1:
-                copyfile(converted_file[0], (file_path + format_new_ext))
-                os.unlink(converted_file[0])
+                destination = file_path + format_new_ext
+                temp_fd, temp_destination = tempfile.mkstemp(
+                    dir=os.path.dirname(destination),
+                    prefix="." + os.path.basename(destination) + ".",
+                    suffix=".tmp")
+                os.close(temp_fd)
+                try:
+                    copyfile(converted_file[0], temp_destination)
+                    if not _valid_archive(temp_destination, format_new_ext[1:]):
+                        return 1, N_("Kepubify produced an invalid KEPUB archive")
+                    os.replace(temp_destination, destination)
+                finally:
+                    if os.path.exists(temp_destination):
+                        os.unlink(temp_destination)
+                    try:
+                        os.unlink(converted_file[0])
+                    except OSError:
+                        pass
             else:
                 if config.config_embed_metadata and config.config_binariesdir and os.path.isfile(filename):
                     try:

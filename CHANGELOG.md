@@ -48,6 +48,13 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Kobo syncs wrote to the database once per book instead of once per batch.**
+  Each book a Kobo received was recorded in its own separate save, so a sync
+  carrying a hundred books did a hundred separate writes — and everyone else's
+  pages waited behind them. It's now one write per batch. You'll notice it most
+  on a device's first sync and on libraries kept on a NAS, where each write is
+  slow.
+
 - **Kobo book covers froze the site while they were being prepared.** Covers are
   padded to your Kobo's screen shape the first time each one is needed, which is
   a fraction of a second of image work — but it was holding up every other page

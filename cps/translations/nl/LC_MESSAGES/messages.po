@@ -23,7 +23,7 @@ msgstr ""
 "Generated-By: Babel 2.13.1\n"
 "X-Generator: Poedit 3.9\n"
 
-#: cps/about.py:59 cps/spa_strings.py:835
+#: cps/about.py:59 cps/spa_strings.py:836
 msgid "Statistics"
 msgstr "Statistieken"
 
@@ -2965,7 +2965,7 @@ msgstr "Maak je account aan"
 msgid "Dark theme"
 msgstr "Donker thema"
 
-#: cps/spa_strings.py:192 cps/spa_strings.py:971
+#: cps/spa_strings.py:192 cps/spa_strings.py:972
 #: cps/templates/_book_organizer.html:155 cps/templates/admin.html:27
 #: cps/templates/book_edit.html:59 cps/templates/book_table.html:66
 #: cps/templates/book_table.html:145 cps/templates/book_table.html:194
@@ -3131,7 +3131,7 @@ msgstr "Markeren als gelezen"
 msgid "Mark unread"
 msgstr "Markeren als ongelezen"
 
-#: cps/spa_strings.py:234 cps/spa_strings.py:968
+#: cps/spa_strings.py:234 cps/spa_strings.py:969
 #: cps/templates/book_table.html:48 cps/templates/book_table.html:175
 #: cps/templates/duplicates.html:745
 msgid "Merge"
@@ -3263,7 +3263,7 @@ msgstr "Profiel opslaan"
 msgid "Saved."
 msgstr "Opgeslagen."
 
-#: cps/spa_strings.py:263 cps/spa_strings.py:934
+#: cps/spa_strings.py:263 cps/spa_strings.py:935
 #: cps/templates/shelf_order.html:33
 msgid "Saving…"
 msgstr "Opslaan…"
@@ -4004,7 +4004,7 @@ msgstr "Kies velden"
 msgid "Choose your theme"
 msgstr "Kies je thema"
 
-#: cps/spa_strings.py:466 cps/spa_strings.py:805
+#: cps/spa_strings.py:466 cps/spa_strings.py:806
 msgid "Clear default"
 msgstr "Standaard wissen"
 
@@ -4132,7 +4132,7 @@ msgstr "Kan volgorde niet opslaan."
 msgid "Could not save reader settings."
 msgstr "Kan lezersinstellingen niet opslaan."
 
-#: cps/spa_strings.py:498 cps/spa_strings.py:806
+#: cps/spa_strings.py:498 cps/spa_strings.py:807
 msgid "Could not save the default library filter."
 msgstr "Kan het standaard bibliotheekfilter niet opslaan."
 
@@ -4140,7 +4140,7 @@ msgstr "Kan het standaard bibliotheekfilter niet opslaan."
 msgid "Could not save the shelf."
 msgstr "Kan de boekenplank niet opslaan."
 
-#: cps/spa_strings.py:500 cps/spa_strings.py:807
+#: cps/spa_strings.py:500 cps/spa_strings.py:808
 msgid "Could not save title."
 msgstr "Kan titel niet opslaan."
 
@@ -4226,7 +4226,7 @@ msgstr "Database- & bibliotheekpad"
 msgid "Date Added"
 msgstr "Datum toegevoegd"
 
-#: cps/spa_strings.py:522 cps/spa_strings.py:811 cps/templates/detail.html:904
+#: cps/spa_strings.py:522 cps/spa_strings.py:812 cps/templates/detail.html:904
 msgid "Date added"
 msgstr "Datum toegevoegd"
 
@@ -4242,11 +4242,11 @@ msgstr "Standaard boekentaal"
 msgid "Default interface language"
 msgstr "Standaard interfacetaal"
 
-#: cps/spa_strings.py:526 cps/spa_strings.py:809
+#: cps/spa_strings.py:526 cps/spa_strings.py:810
 msgid "Default library filter cleared."
 msgstr "Standaard bibliotheekfilter gewist."
 
-#: cps/spa_strings.py:527 cps/spa_strings.py:810
+#: cps/spa_strings.py:527 cps/spa_strings.py:811
 msgid "Default library filter saved."
 msgstr "Standaard bibliotheekfilter opgeslagen."
 
@@ -4384,7 +4384,7 @@ msgstr "Openbare boekenplanken bewerken"
 msgid "Edit smart shelf"
 msgstr "Slimme boekenplank bewerken"
 
-#: cps/spa_strings.py:559 cps/spa_strings.py:808
+#: cps/spa_strings.py:559 cps/spa_strings.py:809
 #, python-brace-format
 msgid "Edit title for {title}"
 msgstr "Titel bewerken voor {title}"
@@ -4754,7 +4754,7 @@ msgstr "Privé maken"
 msgid "Make public"
 msgstr "Openbaar maken"
 
-#: cps/spa_strings.py:650 cps/spa_strings.py:812
+#: cps/spa_strings.py:650 cps/spa_strings.py:813
 msgid "Make this my default library view"
 msgstr "Dit mijn standaard bibliotheekweergave maken"
 
@@ -5403,152 +5403,156 @@ msgstr "Verkennen-sectie tonen"
 msgid "Show hidden books"
 msgstr "Verborgen boeken tonen"
 
-#: cps/spa_strings.py:813
+#: cps/spa_strings.py:805
+msgid "Show Read now and edit buttons"
+msgstr "Knoppen Nu lezen en bewerken tonen"
+
+#: cps/spa_strings.py:814
 msgid "Show Table view"
 msgstr "Tabelweergave tonen"
 
-#: cps/spa_strings.py:814
+#: cps/spa_strings.py:815
 #, python-brace-format
 msgid "Show all {count} tags"
 msgstr "Alle {count} labels tonen"
 
-#: cps/spa_strings.py:815
+#: cps/spa_strings.py:816
 #, python-brace-format
 msgid "Show all {items}"
 msgstr "Alle {items} tonen"
 
-#: cps/spa_strings.py:816
+#: cps/spa_strings.py:817
 msgid "Show books in language"
 msgstr "Boeken in taal tonen"
 
-#: cps/spa_strings.py:817
+#: cps/spa_strings.py:818
 msgid "Show e-reader previews on each candidate"
 msgstr "E-reader-voorvertoningen tonen bij elke kandidaat"
 
-#: cps/spa_strings.py:818
+#: cps/spa_strings.py:819
 msgid "Show fewer tags"
 msgstr "Minder labels tonen"
 
-#: cps/spa_strings.py:819
+#: cps/spa_strings.py:820
 msgid "Show password"
 msgstr "Wachtwoord tonen"
 
-#: cps/spa_strings.py:820
+#: cps/spa_strings.py:821
 msgid "Shuffle picks"
 msgstr "Selectie schudden"
 
-#: cps/spa_strings.py:821
+#: cps/spa_strings.py:822
 msgid "Sign in with a magic link"
 msgstr "Inloggen met een magic link"
 
-#: cps/spa_strings.py:822
+#: cps/spa_strings.py:823
 msgid "Sign out"
 msgstr "Uitloggen"
 
-#: cps/spa_strings.py:823
+#: cps/spa_strings.py:824
 msgid "Signing in…"
 msgstr "Inloggen…"
 
-#: cps/spa_strings.py:824
+#: cps/spa_strings.py:825
 msgid "Site title"
 msgstr "Websitetitel"
 
-#: cps/spa_strings.py:825
+#: cps/spa_strings.py:826
 msgid "Smart shelf not found."
 msgstr "Slimme boekenplank niet gevonden."
 
-#: cps/spa_strings.py:826
+#: cps/spa_strings.py:827
 msgid "Smart shelves"
 msgstr "Slimme boekenplanken"
 
-#: cps/spa_strings.py:827
+#: cps/spa_strings.py:828
 msgid "Solid: average colour of the cover"
 msgstr "Effen: gemiddelde kleur van de omslag"
 
-#: cps/spa_strings.py:828
+#: cps/spa_strings.py:829
 msgid "Solid: custom colour"
 msgstr "Effen: aangepaste kleur"
 
-#: cps/spa_strings.py:829
+#: cps/spa_strings.py:830
 msgid "Solid: most-common colour in the cover"
 msgstr "Effen: meest voorkomende kleur in de omslag"
 
-#: cps/spa_strings.py:830
+#: cps/spa_strings.py:831
 msgid "Some sources need a key for better covers"
 msgstr "Sommige bronnen hebben een sleutel nodig voor betere omslagen"
 
-#: cps/spa_strings.py:831 cps/templates/cover_picker.html:226
+#: cps/spa_strings.py:832 cps/templates/cover_picker.html:226
 msgid "Something went wrong. Try again."
 msgstr "Er is iets misgegaan. Probeer het opnieuw."
 
-#: cps/spa_strings.py:832
+#: cps/spa_strings.py:833
 msgid "Sort order"
 msgstr "Sorteervolgorde"
 
-#: cps/spa_strings.py:833
+#: cps/spa_strings.py:834
 msgid "Source details"
 msgstr "Brondetails"
 
-#: cps/spa_strings.py:834 cps/templates/detail.html:1023
+#: cps/spa_strings.py:835 cps/templates/detail.html:1023
 msgid "Started reading"
 msgstr "Begonnen met lezen"
 
-#: cps/spa_strings.py:836
+#: cps/spa_strings.py:837
 msgid "Statistics dashboard"
 msgstr "Statistiekendashboard"
 
-#: cps/spa_strings.py:837 cps/templates/tasks.html:16
+#: cps/spa_strings.py:838 cps/templates/tasks.html:16
 msgid "Status"
 msgstr "Status"
 
-#: cps/spa_strings.py:838
+#: cps/spa_strings.py:839
 msgid "Sync only selected shelves to Kobo"
 msgstr "Alleen geselecteerde boekenplanken synchroniseren met Kobo"
 
-#: cps/spa_strings.py:839
+#: cps/spa_strings.py:840
 msgid "Table view"
 msgstr "Tabelweergave"
 
-#: cps/spa_strings.py:840
+#: cps/spa_strings.py:841
 msgid "Tag"
 msgstr "Label"
 
-#: cps/spa_strings.py:841 cps/templates/book_edit.html:139
+#: cps/spa_strings.py:842 cps/templates/book_edit.html:139
 #: cps/templates/search_form.html:52
 msgid "Tags"
 msgstr "Labels"
 
-#: cps/spa_strings.py:842
+#: cps/spa_strings.py:843
 msgid "Tags — exclude"
 msgstr "Labels — uitsluiten"
 
-#: cps/spa_strings.py:843
+#: cps/spa_strings.py:844
 msgid "Tags — include"
 msgstr "Labels — opnemen"
 
-#: cps/spa_strings.py:844 cps/templates/config_edit.html:231
+#: cps/spa_strings.py:845 cps/templates/config_edit.html:231
 #: cps/templates/cover_picker.html:104
 msgid "Target aspect ratio"
 msgstr "Doel-beeldverhouding"
 
-#: cps/spa_strings.py:845 cps/templates/tasks.html:15
+#: cps/spa_strings.py:846 cps/templates/tasks.html:15
 msgid "Task"
 msgstr "Taak"
 
-#: cps/spa_strings.py:846 cps/tasks_status.py:37 cps/templates/layout.html:386
+#: cps/spa_strings.py:847 cps/tasks_status.py:37 cps/templates/layout.html:386
 #: cps/templates/tasks.html:7
 msgid "Tasks"
 msgstr "Taken"
 
-#: cps/spa_strings.py:847
+#: cps/spa_strings.py:848
 msgid "Technical details"
 msgstr "Technische details"
 
-#: cps/spa_strings.py:848
+#: cps/spa_strings.py:849
 msgid "That URL is not a usable image."
 msgstr "Die URL is geen bruikbare afbeelding."
 
-#: cps/spa_strings.py:849
+#: cps/spa_strings.py:850
 msgid ""
 "These open the full configuration pages. Changes there apply to the whole "
 "server."
@@ -5556,20 +5560,20 @@ msgstr ""
 "Deze openen de volledige configuratiepagina’s. Wijzigingen daar gelden voor "
 "de hele server."
 
-#: cps/spa_strings.py:850
+#: cps/spa_strings.py:851
 msgid "This format opens in the full-screen reader."
 msgstr "Dit formaat wordt geopend in de lezer op volledig scherm."
 
-#: cps/spa_strings.py:851
+#: cps/spa_strings.py:852
 msgid "This magic link expired. Generate a new one to try again."
 msgstr ""
 "Deze magic link is verlopen. Genereer een nieuwe om het opnieuw te proberen."
 
-#: cps/spa_strings.py:852
+#: cps/spa_strings.py:853
 msgid "This page doesn't exist here."
 msgstr "Deze pagina bestaat hier niet."
 
-#: cps/spa_strings.py:853
+#: cps/spa_strings.py:854
 msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
@@ -5577,73 +5581,73 @@ msgstr ""
 "Deze pagina liep tegen een fout aan en kon niet worden weergegeven. Jouw "
 "bibliotheek is in orde — herladen lost het meestal op."
 
-#: cps/spa_strings.py:854
+#: cps/spa_strings.py:855
 msgid "This shelf is empty. Add books from any book's page."
 msgstr ""
 "Deze boekenplank is leeg. Voeg boeken toe vanaf de pagina van een boek."
 
-#: cps/spa_strings.py:855
+#: cps/spa_strings.py:856
 msgid "Title A–Z"
 msgstr "Titel A–Z"
 
-#: cps/spa_strings.py:856
+#: cps/spa_strings.py:857
 msgid "Title Z–A"
 msgstr "Titel Z–A"
 
-#: cps/spa_strings.py:857
+#: cps/spa_strings.py:858
 msgid "Title, author, or ISBN"
 msgstr "Titel, auteur of ISBN"
 
-#: cps/spa_strings.py:858
+#: cps/spa_strings.py:859
 msgid "Token URL"
 msgstr "Token URL"
 
-#: cps/spa_strings.py:859
+#: cps/spa_strings.py:860
 msgid "Top Rated"
 msgstr "Best beoordeeld"
 
-#: cps/spa_strings.py:860
+#: cps/spa_strings.py:861
 msgid "Trust authentication header"
 msgstr "Authenticatie-header vertrouwen"
 
-#: cps/spa_strings.py:861
+#: cps/spa_strings.py:862
 msgid "UI / display configuration"
 msgstr "UI / weergave-configuratie"
 
-#: cps/spa_strings.py:862 cps/templates/book_table.html:57
+#: cps/spa_strings.py:863 cps/templates/book_table.html:57
 #: cps/templates/book_table.html:234
 msgid "Unarchive"
 msgstr "Dearchiveren"
 
-#: cps/spa_strings.py:863
+#: cps/spa_strings.py:864
 msgid "Unhide"
 msgstr "Zichtbaar maken"
 
-#: cps/spa_strings.py:864
+#: cps/spa_strings.py:865
 msgid "Unlock the cover above to apply a new one."
 msgstr "Ontgrendel de omslag hierboven om een nieuwe toe te passen."
 
-#: cps/spa_strings.py:865
+#: cps/spa_strings.py:866
 msgid "Unlock the cover to change it"
 msgstr "Ontgrendel de omslag om deze te wijzigen"
 
-#: cps/spa_strings.py:866
+#: cps/spa_strings.py:867
 msgid "Untitled"
 msgstr "Zonder titel"
 
-#: cps/spa_strings.py:867
+#: cps/spa_strings.py:868
 msgid "Update failed."
 msgstr "Bijwerken mislukt."
 
-#: cps/spa_strings.py:868 cps/templates/cover_picker.html:74
+#: cps/spa_strings.py:869 cps/templates/cover_picker.html:74
 msgid "Upload as cover"
 msgstr "Uploaden als omslag"
 
-#: cps/spa_strings.py:869
+#: cps/spa_strings.py:870
 msgid "Upload books"
 msgstr "Boeken uploaden"
 
-#: cps/spa_strings.py:870
+#: cps/spa_strings.py:871
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
@@ -5651,263 +5655,263 @@ msgstr ""
 "Gebruik deze om OPDS-lezers of KOReader-synchronisatie te verbinden zonder "
 "jouw hoofdwachtwoord."
 
-#: cps/spa_strings.py:871 cps/templates/cover_picker.html:62
+#: cps/spa_strings.py:872 cps/templates/cover_picker.html:62
 #: cps/templates/cover_picker.html:191
 msgid "Use this cover"
 msgstr "Deze omslag gebruiken"
 
-#: cps/spa_strings.py:872 cps/templates/tasks.html:13
+#: cps/spa_strings.py:873 cps/templates/tasks.html:13
 #: cps/templates/tasks.html:42 cps/templates/tasks.html:65
 msgid "User"
 msgstr "Gebruiker"
 
-#: cps/spa_strings.py:873
+#: cps/spa_strings.py:874
 msgid "User administration"
 msgstr "Gebruikersbeheer"
 
-#: cps/spa_strings.py:874
+#: cps/spa_strings.py:875
 msgid "User object filter"
 msgstr "Gebruikersobject filter"
 
-#: cps/spa_strings.py:875
+#: cps/spa_strings.py:876
 msgid "Userinfo URL"
 msgstr "Userinfo URL"
 
-#: cps/spa_strings.py:876 cps/templates/admin.html:14
+#: cps/spa_strings.py:877 cps/templates/admin.html:14
 #: cps/templates/login.html:17 cps/templates/login.html:19
 #: cps/templates/register.html:9 cps/templates/user_edit.html:192
 #: cps/templates/user_table.html:134
 msgid "Username"
 msgstr "Gebruikersnaam"
 
-#: cps/spa_strings.py:877
+#: cps/spa_strings.py:878
 msgid "Username claim"
 msgstr "Gebruikersnaam claim"
 
-#: cps/spa_strings.py:878
+#: cps/spa_strings.py:879
 msgid "Versions"
 msgstr "Versies"
 
-#: cps/spa_strings.py:879 cps/templates/user_table.html:148
+#: cps/spa_strings.py:880 cps/templates/user_table.html:148
 msgid "View"
 msgstr "Toon"
 
-#: cps/spa_strings.py:880
+#: cps/spa_strings.py:881
 msgid "View settings"
 msgstr "Weergave-instellingen"
 
-#: cps/spa_strings.py:881
+#: cps/spa_strings.py:882
 msgid "Viewer"
 msgstr "Viewer"
 
-#: cps/spa_strings.py:882
+#: cps/spa_strings.py:883
 msgid "Waiting for you to authorise…"
 msgstr "Wachten tot je autoriseert…"
 
-#: cps/spa_strings.py:883 cps/templates/cover_picker.html:40
+#: cps/spa_strings.py:884 cps/templates/cover_picker.html:40
 msgid "When locked, fetching metadata will not overwrite this cover."
 msgstr ""
 "Indien vergrendeld zal het ophalen van metagegevens deze omslag niet "
 "overschrijven."
 
-#: cps/spa_strings.py:884 cps/templates/detail.html:1023
+#: cps/spa_strings.py:885 cps/templates/detail.html:1023
 msgid "When reading progress was first synced"
 msgstr "Wanneer de leesvoortgang voor het eerst is gesynchroniseerd"
 
-#: cps/spa_strings.py:885
+#: cps/spa_strings.py:886
 msgid "Your Library"
 msgstr "Jouw bibliotheek"
 
-#: cps/spa_strings.py:886
+#: cps/spa_strings.py:887
 msgid "Your browser cannot play this audio format."
 msgstr "Jouw browser kan dit audioformaat niet afspelen."
 
-#: cps/spa_strings.py:887
+#: cps/spa_strings.py:888
 msgid "Your personal digital library"
 msgstr "Jouw persoonlijke digitale bibliotheek"
 
-#: cps/spa_strings.py:888
+#: cps/spa_strings.py:889
 msgid "Your saved e-reader address is shown — change it for this send only."
 msgstr ""
 "Jouw opgeslagen e-readeradres wordt getoond — wijzig het alleen voor deze "
 "verzending."
 
-#: cps/spa_strings.py:889
+#: cps/spa_strings.py:890
 msgid "all rules"
 msgstr "alle regels"
 
-#: cps/spa_strings.py:890
+#: cps/spa_strings.py:891
 msgid "any rule"
 msgstr "elke regel"
 
-#: cps/spa_strings.py:891
+#: cps/spa_strings.py:892
 msgid "begins with"
 msgstr "begint met"
 
-#: cps/spa_strings.py:892
+#: cps/spa_strings.py:893
 msgid "books"
 msgstr "boeken"
 
-#: cps/spa_strings.py:893
+#: cps/spa_strings.py:894
 msgid "books match"
 msgstr "boeken komen overeen"
 
-#: cps/spa_strings.py:894
+#: cps/spa_strings.py:895
 msgid "contains"
 msgstr "bevat"
 
-#: cps/spa_strings.py:895
+#: cps/spa_strings.py:896
 msgid "copies"
 msgstr "exemplaren"
 
-#: cps/spa_strings.py:896
+#: cps/spa_strings.py:897
 msgid "does not contain"
 msgstr "bevat niet"
 
-#: cps/spa_strings.py:897
+#: cps/spa_strings.py:898
 msgid "e-reader"
 msgstr "e-reader"
 
-#: cps/spa_strings.py:898
+#: cps/spa_strings.py:899
 msgid "e.g. Unread sci-fi"
 msgstr "bijv. Ongelezen sci-fi"
 
-#: cps/spa_strings.py:899
+#: cps/spa_strings.py:900
 msgid "eReader email subject"
 msgstr "eReader e-mailonderwerp"
 
-#: cps/spa_strings.py:900
+#: cps/spa_strings.py:901
 msgid "ends with"
 msgstr "eindigt op"
 
-#: cps/spa_strings.py:901
+#: cps/spa_strings.py:902
 msgid "in the past N days"
 msgstr "in de afgelopen N dagen"
 
-#: cps/spa_strings.py:902
+#: cps/spa_strings.py:903
 msgid "is"
 msgstr "is"
 
-#: cps/spa_strings.py:903
+#: cps/spa_strings.py:904
 msgid "is not"
 msgstr "is niet"
 
-#: cps/spa_strings.py:904
+#: cps/spa_strings.py:905
 msgid "not in the past N days"
 msgstr "niet in de afgelopen N dagen"
 
-#: cps/spa_strings.py:905
+#: cps/spa_strings.py:906
 msgid "on or after"
 msgstr "op of na"
 
-#: cps/spa_strings.py:906
+#: cps/spa_strings.py:907
 msgid "on or before"
 msgstr "op of voor"
 
-#: cps/spa_strings.py:907
+#: cps/spa_strings.py:908
 msgid "shared"
 msgstr "gedeeld"
 
-#: cps/spa_strings.py:908
+#: cps/spa_strings.py:909
 msgid "to"
 msgstr "naar"
 
-#: cps/spa_strings.py:909
+#: cps/spa_strings.py:910
 msgid "type (isbn, amazon, doi…)"
 msgstr "type (isbn, amazon, doi…)"
 
-#: cps/spa_strings.py:910
+#: cps/spa_strings.py:911
 msgid "value"
 msgstr "waarde"
 
-#: cps/spa_strings.py:911
+#: cps/spa_strings.py:912
 msgid "you"
 msgstr "je"
 
-#: cps/spa_strings.py:912
+#: cps/spa_strings.py:913
 #, python-brace-format
 msgid "{count} book"
 msgstr "{count} boek"
 
-#: cps/spa_strings.py:913
+#: cps/spa_strings.py:914
 #, python-brace-format
 msgid "{count} books"
 msgstr "{count} boeken"
 
-#: cps/spa_strings.py:914
+#: cps/spa_strings.py:915
 #, python-brace-format
 msgid "{count} file queued for import"
 msgstr "{count} bestand in de wachtrij geplaatst voor import"
 
-#: cps/spa_strings.py:915
+#: cps/spa_strings.py:916
 #, python-brace-format
 msgid "{count} file rejected"
 msgstr "{count} bestand afgewezen"
 
-#: cps/spa_strings.py:916
+#: cps/spa_strings.py:917
 #, python-brace-format
 msgid "{count} files queued for import"
 msgstr "{count} bestanden in de wachtrij geplaatst voor import"
 
-#: cps/spa_strings.py:917
+#: cps/spa_strings.py:918
 #, python-brace-format
 msgid "{count} files rejected"
 msgstr "{count} bestanden afgewezen"
 
-#: cps/spa_strings.py:918
+#: cps/spa_strings.py:919
 #, python-brace-format
 msgid "{count} result"
 msgstr "{count} resultaat"
 
-#: cps/spa_strings.py:919
+#: cps/spa_strings.py:920
 #, python-brace-format
 msgid "{count} results"
 msgstr "{count} resultaten"
 
-#: cps/spa_strings.py:920
+#: cps/spa_strings.py:921
 #, python-brace-format
 msgid "{count} results for \"{query}\""
 msgstr "{count} resultaten voor \"{query}\""
 
-#: cps/spa_strings.py:921
+#: cps/spa_strings.py:922
 #, python-brace-format
 msgid "{n} found"
 msgstr "{n} gevonden"
 
-#: cps/spa_strings.py:922
+#: cps/spa_strings.py:923
 #, python-brace-format
 msgid "{ok} of {total} sources answered"
 msgstr "{ok} van de {total} bronnen hebben geantwoord"
 
-#: cps/spa_strings.py:923
+#: cps/spa_strings.py:924
 msgid "…or paste an image URL"
 msgstr "…of plak een afbeelding-URL"
 
-#: cps/spa_strings.py:924
+#: cps/spa_strings.py:925
 msgid "← Back to book"
 msgstr "← Terug naar boek"
 
-#: cps/spa_strings.py:925
+#: cps/spa_strings.py:926
 msgid "← Back to sign in"
 msgstr "← Terug naar inloggen"
 
-#: cps/spa_strings.py:926
+#: cps/spa_strings.py:927
 msgid "← Library"
 msgstr "← Bibliotheek"
 
-#: cps/spa_strings.py:927
+#: cps/spa_strings.py:928
 msgid "≤"
 msgstr "≤"
 
-#: cps/spa_strings.py:928
+#: cps/spa_strings.py:929
 msgid "≥"
 msgstr "≥"
 
-#: cps/spa_strings.py:931
+#: cps/spa_strings.py:932
 msgid "Account settings"
 msgstr "Accountinstellingen"
 
-#: cps/spa_strings.py:932
+#: cps/spa_strings.py:933
 msgid ""
 "Books that are not on a Kobo-sync shelf are then removed from the device on "
 "its next sync. They stay in your library here."
@@ -5916,15 +5920,15 @@ msgstr ""
 "bij de volgende synchronisatie van het apparaat verwijderd. Ze blijven wel "
 "in je bibliotheek hier."
 
-#: cps/spa_strings.py:933
+#: cps/spa_strings.py:934
 msgid "Could not update your account setting."
 msgstr "Kan je accountinstelling niet bijwerken."
 
-#: cps/spa_strings.py:935
+#: cps/spa_strings.py:936
 msgid "Sync only my selected shelves"
 msgstr "Alleen mijn geselecteerde boekenplanken synchroniseren"
 
-#: cps/spa_strings.py:936
+#: cps/spa_strings.py:937
 msgid ""
 "Your Kobo is still set to sync your whole library, so marking this shelf "
 "does nothing on its own. Switch your account to shelf-only syncing to make "
@@ -5935,14 +5939,14 @@ msgstr ""
 "account over naar synchronisatie van alleen boekenplanken om het van kracht "
 "te laten worden."
 
-#: cps/spa_strings.py:940
+#: cps/spa_strings.py:941
 msgid ""
 "A duplicate scan is already running. This list updates when it finishes."
 msgstr ""
 "Er is al een duplicatenscan bezig. Deze lijst wordt bijgewerkt zodra deze "
 "klaar is."
 
-#: cps/spa_strings.py:941
+#: cps/spa_strings.py:942
 msgid ""
 "A one-time full duplicate scan is needed. Use “Scan for duplicates” above to "
 "run it."
@@ -5950,15 +5954,15 @@ msgstr ""
 "Er is een eenmalige volledige duplicatenscan nodig. Gebruik hierboven "
 "\"Zoeken naar duplicaten\" om deze uit te voeren."
 
-#: cps/spa_strings.py:942
+#: cps/spa_strings.py:943
 msgid "Could not start the duplicate scan."
 msgstr "Kan de duplicatenscan niet starten."
 
-#: cps/spa_strings.py:943
+#: cps/spa_strings.py:944
 msgid "Duplicate detection settings"
 msgstr "Instellingen voor duplicatendetectie"
 
-#: cps/spa_strings.py:944
+#: cps/spa_strings.py:945
 msgid ""
 "Duplicate scan started. It runs in the background — this list updates when "
 "it finishes."
@@ -5966,83 +5970,83 @@ msgstr ""
 "Duplicatenscan gestart. De scan wordt op de achtergrond uitgevoerd — deze "
 "lijst wordt bijgewerkt zodra hij klaar is."
 
-#: cps/spa_strings.py:945
+#: cps/spa_strings.py:946
 msgid "Scan for duplicates"
 msgstr "Scan op duplicaten"
 
-#: cps/spa_strings.py:946
+#: cps/spa_strings.py:947
 msgid "Starting scan…"
 msgstr "Scan starten…"
 
-#: cps/spa_strings.py:951
+#: cps/spa_strings.py:952
 msgid "Custom columns"
 msgstr "Aangepaste kolommen"
 
-#: cps/spa_strings.py:952
+#: cps/spa_strings.py:953
 msgid "Not set"
 msgstr "Niet ingesteld"
 
-#: cps/spa_strings.py:953
+#: cps/spa_strings.py:954
 #, python-brace-format
 msgid "{field} (comma separated)"
 msgstr "{field} (door komma's gescheiden)"
 
-#: cps/spa_strings.py:958
+#: cps/spa_strings.py:959
 msgid "Uploading is not available for your account on this server."
 msgstr "Uploaden is niet beschikbaar voor je account op deze server."
 
-#: cps/spa_strings.py:963
+#: cps/spa_strings.py:964
 msgid "Could not save your reading position."
 msgstr "Kan je leespositie niet opslaan."
 
-#: cps/spa_strings.py:969
+#: cps/spa_strings.py:970
 #, python-brace-format
 msgid "Merge into {name}"
 msgstr "Samenvoegen met {name}"
 
-#: cps/spa_strings.py:970
+#: cps/spa_strings.py:971
 #, python-brace-format
 msgid "Merged into {name}"
 msgstr "Samengevoegd met {name}"
 
-#: cps/spa_strings.py:972
+#: cps/spa_strings.py:973
 #, python-brace-format
 msgid "Delete tag {name}"
 msgstr "Label {name} verwijderen"
 
 # #973 — consolidating tags from the Tag view (merge on rename collision, delete).
-#: cps/spa_strings.py:973
+#: cps/spa_strings.py:974
 #, python-brace-format
 msgid "Confirm delete tag {name}"
 msgstr "Verwijderen van label {name} bevestigen"
 
-#: cps/spa_strings.py:974
+#: cps/spa_strings.py:975
 #, python-brace-format
 msgid "Deleted tag {name}"
 msgstr "Label {name} verwijderd"
 
-#: cps/spa_strings.py:975
+#: cps/spa_strings.py:976
 msgid "Could not delete tag"
 msgstr "Kan label niet verwijderen"
 
-#: cps/spa_strings.py:976
+#: cps/spa_strings.py:977
 #, python-brace-format
 msgid "“{name}” already exists on {count} book. Merge this tag into it?"
 msgstr "„{name}” bestaat al op {count} boek. Dit label daarmee samenvoegen?"
 
-#: cps/spa_strings.py:977
+#: cps/spa_strings.py:978
 #, python-brace-format
 msgid "“{name}” already exists on {count} books. Merge this tag into it?"
 msgstr "„{name}” bestaat al op {count} boeken. Dit label daarmee samenvoegen?"
 
-#: cps/spa_strings.py:978
+#: cps/spa_strings.py:979
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} book, which is kept."
 msgstr ""
 "„{name}” verwijderen? Het wordt van {count} boek verwijderd; het boek blijft "
 "behouden."
 
-#: cps/spa_strings.py:979
+#: cps/spa_strings.py:980
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} books, which are kept."
 msgstr ""

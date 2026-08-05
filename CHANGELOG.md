@@ -55,15 +55,40 @@ is for things you can see or feel when running the app.
   from about 10 ms to 493 ms; it now stays at 21 ms, and the book still arrives
   just as fast.
 
+- **A book could end up permanently broken on your Kobo if the server was
+  restarted at the wrong moment.** While converting a book for Kobo, the new file
+  was written straight into place, so stopping the container mid-write left a
+  half-written book behind — and the next run would accept that half-written file
+  as finished and record it in the library. From then on your Kobo was handed a
+  file it couldn't finish opening, and nothing would ever repair it. Converted
+  books are now written aside and only swapped in once complete and verified as a
+  readable archive, and a damaged file is never accepted as finished.
+
+- **One unreadable or unwritable book could stop every other book being prepared
+  for Kobo — on every restart, forever.** If a single book failed to convert, for
+  instance because the library is mounted read-only, the whole preparation run
+  stopped at that book and started over from scratch at the next restart, getting
+  no further. It now skips what it can't do, reports how many failed, and finishes
+  the rest.
+
+- **Right after updating, books sent to a Kobo could arrive in the wrong format
+  and take 25 seconds each.** The first run after the update prepares your Kobo
+  books in the background, and a download arriving during that window queued up
+  behind the whole job, timed out, and fell back to the plain format. Downloads
+  now go through immediately while that background work is still running.
+
 - **Kobo syncs were slow on big libraries, and froze everything else while they
   ran.** Every sync re-opened and re-parsed each book's EPUB from disk just to
   check one rarely-used property, every single time — and because that reading
   happened inside the sync request, nobody else could load a page until it
   finished. That answer never changes unless the file itself does, so it's now
-  remembered. Measured on a 215-book library, the per-100-book cost dropped from
-  400 ms to 11 ms; on a first sync after a restart, or on a library kept on a NAS
-  or network share where every read is slow, it dropped from about 6 seconds to
-  the same 11 ms. The bigger your library, the more you'll notice.
+  remembered. Measured on a 215-book library on local disk, the per-100-book cost
+  dropped from 400 ms to 11 ms; on a first sync after a restart it dropped from
+  about 6 seconds to the same 11 ms. Two honest caveats: the memory holds 4,096
+  books, and a sync walks the library in order, so libraries larger than that see
+  little benefit on a full sync; and on a NAS or network share each book still
+  costs one small filesystem check, so the saving is real but smaller than the
+  local-disk numbers above.
 
 - **The whole server paused whenever a Kobo asked for a book it hadn't converted
   yet.** The first time a Kobo downloaded any book that didn't already have a

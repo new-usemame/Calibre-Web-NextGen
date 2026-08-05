@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "The memo added in #1404 (cps/epub.py) caches only successful parses, including the common\n\"no rendition:layout\" result. The `except` path returns None WITHOUT caching (cps/epub.py:85-87).\n\nSo a corrupt or unreadable EPUB re-opens, re-parses and re-logs an error line every time it is\nemitted in a sync page, forever. That is pre-#1404 behaviour for that book so it is not a\nregression, but the cache was the natural place to cap it, and the log spam is unbounded.\n\nFix: cache the failure under the same key. An mtime or size change already invalidates the entry,\nso a repaired file is picked up automatically.\n\nAlso worth recording about that cache, both by design rather than defects:\n- The bound is 4096 entries and a sync walks the library in `(last_modified, id)` order, so a\n  library larger than 4096 books gets close to a 0% hit rate across a full sync. The measured\n  \"400ms -> 11ms per page\" figure is a <=4096-book number. The CHANGELOG was corrected to say so.\n- On NFS/SMB every call still pays one `os.stat` on the greenlet — a network round trip per book\n  — so the win there is real but smaller than the local-disk numbers.",
+  "created": "2026-08-05",
+  "id": "F-5c2758",
+  "refs": [],
+  "severity": "perf",
+  "source": "audit",
+  "status": "open",
+  "title": "EPUB layout cache does not remember failures, so a corrupt book re-parses and re-logs on every sync page"
+}

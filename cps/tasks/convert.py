@@ -21,8 +21,6 @@ from cps import db
 from cps import logger, config
 from cps.subproc_wrapper import process_open
 from flask_babel import gettext as _
-from cps.kobo_sync_status import remove_synced_book
-from cps.ub import init_db_thread
 from cps.file_helper import get_temp_dir
 
 from cps.tasks.mail import TaskEmail
@@ -175,11 +173,9 @@ class TaskConvert(CalibreTask):
                                          book=book_id, uncompressed_size=os.path.getsize(file_path + format_new_ext))
                     try:
                         local_db.session.merge(new_format)
-                        local_db.session.commit()
                         if self.settings['new_book_format'].upper() in ['KEPUB', 'EPUB', 'EPUB3']:
-                            ub_session = init_db_thread()
-                            remove_synced_book(book_id, True, ub_session)
-                            ub_session.close()
+                            helper.mark_book_modified(cur_book, set_dirty=False)
+                        local_db.session.commit()
                     except SQLAlchemyError as e:
                         local_db.session.rollback()
                         log.error("Database error: %s", e)

@@ -1132,7 +1132,7 @@ def get_metadata(book):
     # is supported
     if kepub_data:
         book_data, dl_format = kepub_data, 'kepub'
-    elif epub_data and config.config_kepubifypath:
+    elif epub_data and config.config_kepubifypath and config.config_kobo_prefer_kepub:
         book_data, dl_format = epub_data, 'kepub'
     elif epub_data:
         book_data, dl_format = epub_data, 'epub'

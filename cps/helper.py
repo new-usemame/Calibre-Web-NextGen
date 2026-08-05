@@ -335,7 +335,7 @@ def get_convert_options(book):
 
 # Convert existing book entry to new format
 def convert_book_format(book_id, calibre_path, old_book_format, new_book_format, user_id,
-                        ereader_mail=None, subject=None, blocking=False):
+                        ereader_mail=None, subject=None, blocking=False, timeout=120):
     book = calibre_db.get_book(book_id)
     data = calibre_db.get_book_format(book.id, old_book_format)
     if not data:
@@ -372,7 +372,7 @@ def convert_book_format(book_id, calibre_path, old_book_format, new_book_format,
     task = TaskConvert(file_path, book.id, txt, settings, ereader_mail, user_id)
     WorkerThread.add(user_id, task)
     if blocking:
-        finished = task.done_event.wait(timeout=120)
+        finished = task.done_event.wait(timeout=timeout)
         if not finished:
             return _("Conversion timed out for book id: %(book)d", book=book_id)
         if task.stat != STAT_FINISH_SUCCESS:
@@ -2189,11 +2189,15 @@ def get_download_link(book_id, book_format, client):
         abort(404)
 
     data1 = calibre_db.get_book_format(book.id, book_format.upper())
-    if not data1 and book_format == "kepub" and config.config_kepubifypath:
+    if (not data1 and book_format == "kepub" and config.config_kepubifypath
+            and config.config_kobo_prefer_kepub):
         data1 = calibre_db.get_book_format(book.id, "EPUB")
         if data1:
             log.info("KEPUB not found for book %d; converting on demand", book.id)
-            err = convert_book_format(book.id, config.get_book_path(), 'EPUB', 'KEPUB', None, blocking=True)
+            from .services.parallel import run_blocking
+            err = run_blocking(lambda: convert_book_format(
+                book.id, config.get_book_path(), 'EPUB', 'KEPUB', None,
+                blocking=True, timeout=25))
             if not err:
                 data1 = calibre_db.get_book_format(book.id, "KEPUB")
             else:

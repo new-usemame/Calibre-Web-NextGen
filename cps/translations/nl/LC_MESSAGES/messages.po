@@ -5403,6 +5403,10 @@ msgstr "Verkennen-sectie tonen"
 msgid "Show hidden books"
 msgstr "Verborgen boeken tonen"
 
+#: cps/spa_strings.py:805
+msgid "Show Read now and edit buttons"
+msgstr "Knoppen Nu lezen en bewerken tonen"
+
 #: cps/spa_strings.py:813
 msgid "Show Table view"
 msgstr "Tabelweergave tonen"

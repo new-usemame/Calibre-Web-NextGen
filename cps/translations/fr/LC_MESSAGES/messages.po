@@ -5524,6 +5524,10 @@ msgstr "Afficher la section Découvrir"
 msgid "Show hidden books"
 msgstr "Afficher les livres masqués"
 
+#: cps/spa_strings.py:805
+msgid "Show Read now and edit buttons"
+msgstr "Afficher les boutons Lire et Modifier"
+
 #: cps/spa_strings.py:813
 msgid "Show Table view"
 msgstr "Afficher la vue en tableau"

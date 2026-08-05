@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "`get_metadata()` runs for every book in a sync page (up to SYNC_ITEM_LIMIT = 100, cps/kobo.py\n~536) and calls `get_epub_layout(book, book_data)` (cps/kobo.py ~1143) -> `get_content_opf()`\n(cps/epub_helper.py:62). That opens the book's zip, reads META-INF/container.xml, lxml-parses\nit, reads the OPF, and lxml-parses that — per book, per sync page, uncached.\n\nThis app serves with gevent and WITHOUT monkey.patch_all(), so that I/O and parsing sits on the\nrequest greenlet and blocks every other request for its duration.\n\nMeasured on a live 215-book instance (2026-08-05):\n\n    warm page cache:  0.86s total, 4.0 ms/book  -> ~0.4s per 100-book sync page\n    cold page cache:  ~60 ms/book               -> ~6s per 100-book sync page\n\nCold is the first sync after a restart, and the steady state for a library on NFS or a network\nshare (NETWORK_SHARE_MODE). Extrapolated to 5,000 books: ~20s warm, minutes cold, all of it\nfreezing the whole app. Plausible mechanism behind upstream CWA #1112 \"Kobo sync times out on\nlarge libraries\".\n\nThe layout is an immutable property of the file, so it is trivially cacheable — key on\n(book_id, format, mtime, size) so a replaced file invalidates naturally. Persisting it means a\ndevice's daily sync does not re-pay after every restart.\n\nOnly the fixed-layout (pre-paginated) branch consumes the result, and 0 of 215 books on this\ninstance are fixed-layout — the common case pays the whole parse to learn nothing.",
+  "created": "2026-08-05",
+  "id": "F-c577f9",
+  "refs": [],
+  "severity": "perf",
+  "source": "audit",
+  "status": "open",
+  "title": "Kobo sync re-parses every book's EPUB container+OPF from disk on every sync page"
+}

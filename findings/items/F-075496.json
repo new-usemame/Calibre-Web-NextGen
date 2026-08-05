@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "With `config_embed_metadata` on, `get_download_link` calls `do_kepubify_metadata_replace()`\n(cps/helper.py ~1958 and ~2053) for every KEPUB download. That rewrites the entire epub zip\nsynchronously on the request greenlet — and under gevent without monkey.patch_all() that\nfreezes every other request for the duration.\n\nMeasured on a live instance with embed_metadata on (2026-08-05), downloading an 18.5 MB kepub\nwhile sampling an unrelated `/login`:\n\n    baseline            0.009 - 0.014 s\n    during the download 1.026 s   (first sample; later samples back to ~0.010 s)\n    download itself     1.292 s\n\nSo roughly a one-second whole-app stall per large KEPUB download. A Kobo taking twenty books\nin a sync pays it twenty times.\n\nThis is pre-existing, but PR #1401 (prefer-KEPUB, default on) increases the share of downloads\nthat take this path, so the exposure grows. The fix shape is the same one used for the\nconversion wait in #1401: keep the Flask-context work on the greenlet and hand only the zip\nrewrite to `run_blocking` (cps/services/parallel.py:152). Note that Flask contextvars do not\ncross that hop, so the offloaded callable must not touch url_for/gettext/session.",
+  "created": "2026-08-05",
+  "id": "F-075496",
+  "refs": [],
+  "severity": "perf",
+  "source": "audit",
+  "status": "open",
+  "title": "Every KEPUB download rewrites the whole zip on the request greenlet when embed_metadata is on"
+}

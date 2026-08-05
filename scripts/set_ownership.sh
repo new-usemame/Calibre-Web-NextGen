@@ -30,9 +30,6 @@
 # both empty), so Python imports and template reads work regardless of owner.
 # Only the dirs the runtime user *writes* under the app tree need ownership:
 #
-#   * metadata_change_logs/ -- cps/editbooks.py (metadata edits, bare open with
-#     no mkdir) and cps/helper.py both write here as abc, so the dir must exist
-#     and be abc-writable or the write raises EACCES.
 #   * metadata_temp/        -- written by scripts/cover_enforcer.py (calibredb
 #     export --to-dir), which today runs as root: the metadata-change-detector
 #     unit setuidgids only the inotifywait side of its pipe, not the python
@@ -64,7 +61,7 @@ CWA_PYTHON="${CWA_PYTHON:-python3}"
 # The app-tree directories the runtime user writes to. These, not the whole
 # tree, are the floor's app-tree contribution (#941). cps/cache is handled
 # earlier in cwa-init, so it is intentionally absent here.
-CWA_APP_WRITABLE_DIRS="${CWA_APP_WRITABLE_DIRS:-${CWA_APP_ROOT}/metadata_change_logs ${CWA_APP_ROOT}/metadata_temp}"
+CWA_APP_WRITABLE_DIRS="${CWA_APP_WRITABLE_DIRS:-${CWA_CONFIG_ROOT}/metadata_change_logs ${CWA_APP_ROOT}/metadata_temp}"
 
 log() { echo "[cwa-init] $*"; }
 

@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 import unicodedata
 
+from cps import constants
 from cwa_db import CWA_DB
 try:
     from cps.utils.filename_sanitizer import get_valid_filename_shared
@@ -68,7 +69,7 @@ except Exception:
 
 # Global Variables
 dirs_json = "/app/calibre-web-automated/dirs.json"
-change_logs_dir = "/app/calibre-web-automated/metadata_change_logs"
+change_logs_dir = constants.CWA_METADATA_CHANGE_LOGS_DIR
 metadata_temp_dir = "/app/calibre-web-automated/metadata_temp"
 
 

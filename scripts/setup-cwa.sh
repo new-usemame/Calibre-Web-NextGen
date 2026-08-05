@@ -2,7 +2,7 @@
 
 # Make required directories and files for metadata enforcement
 make_dirs () {
-    install -d -o abc -g abc /app/calibre-web-automated/metadata_change_logs
+    install -d -o abc -g abc /config/metadata_change_logs
     install -d -o abc -g abc /app/calibre-web-automated/metadata_temp
     install -d -o abc -g abc /cwa-book-ingest
     install -d -o abc -g abc /calibre-library

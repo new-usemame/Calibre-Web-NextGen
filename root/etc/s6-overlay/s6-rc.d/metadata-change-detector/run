@@ -3,7 +3,7 @@
 echo "========== STARTING METADATA CHANGE DETECTOR ==========="
 
 # Folder to monitor
-WATCH_FOLDER="/app/calibre-web-automated/metadata_change_logs"
+WATCH_FOLDER="/config/metadata_change_logs"
 echo "[metadata-change-detector] Watching folder: $WATCH_FOLDER"
 
 # Create the folder if it doesn't exist

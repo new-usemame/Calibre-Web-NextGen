@@ -256,3 +256,10 @@ LANGUAGE_NAMES = {
     "zh_Hans_CN": _("Chinese (Simplified, China)"),
     "zh_Hant_TW": _("Chinese (Traditional, Taiwan)"),
 }
+
+# Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
+# metadata-change-detector s6 service) watches for change logs. Env-overridable
+# for tests.
+CWA_METADATA_CHANGE_LOGS_DIR = os.environ.get(
+    "CWA_METADATA_CHANGE_LOGS_DIR",
+    CONFIG_DIR / "metadata_change_logs")

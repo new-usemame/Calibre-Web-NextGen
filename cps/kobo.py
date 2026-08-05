@@ -47,7 +47,7 @@ from .constants import COVER_THUMBNAIL_SMALL, COVER_THUMBNAIL_MEDIUM, COVER_THUM
 from .kobo_cover_cache import build_cover_image_id, normalize_cover_uuid
 from .helper import get_download_link
 from .services import SyncToken as SyncToken, hardcover
-from .services import cover_preview
+from .services import cover_preview, parallel
 from .fs import FileSystem
 from .web import download_required
 from .kobo_auth import requires_kobo_auth, get_auth_token
@@ -92,14 +92,20 @@ def make_request_to_kobo_store(sync_token=None):
     if sync_token:
         sync_token.set_kobo_store_header(outgoing_headers)
 
-    store_response = requests.request(
-        method=request.method,
-        url=get_store_url_for_current_request(),
+    # Flask's request/app context does not propagate to the real OS thread
+    # used by run_blocking. Materialize every request-bound value here, then
+    # offload only requests/urllib3's blocking socket work.
+    method = request.method
+    store_url = get_store_url_for_current_request()
+    body = request.get_data()
+    store_response = parallel.run_blocking(lambda: requests.request(
+        method=method,
+        url=store_url,
         headers=outgoing_headers,
-        data=request.get_data(),
+        data=body,
         allow_redirects=False,
         timeout=(2, 10)
-    )
+    ))
     log.debug("Content: " + str(store_response.content))
     log.debug("StatusCode: " + str(store_response.status_code))
     return store_response

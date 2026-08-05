@@ -31,6 +31,19 @@ is for things you can see or feel when running the app.
   Measured on a test instance, an unrelated page load during that wait went
   from 6.5 seconds to 36 milliseconds.
 
+- **The new tag tools read in English on an otherwise Russian interface.**
+  Merging a tag, deleting one, and the confirmation prompts that tell you how
+  many books are affected all arrived in v4.1.30 without Russian text, so the
+  Tags page switched to English at exactly the point it was asking you to
+  confirm something destructive. Two upload and reading-position messages had
+  the same gap. The new interface falls back to its English text when a phrase
+  is missing rather than reporting anything, so the page still worked and
+  simply stopped being translated. All thirteen phrases are now translated and
+  Russian is complete again at 2,622 of 2,622. Contributed by
+  [@standhaftsohnsergius](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1392)
+  ([#1392](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1392)),
+  translation by ZIZA.
+
 ## [v4.1.30] - 2026-08-04
 
 ### Added

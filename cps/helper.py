@@ -43,7 +43,7 @@ except ImportError as e:
     advocate = requests
     UnacceptableAddressException = MissingSchema = BaseException
 
-from . import calibre_db, cli_param
+from . import calibre_db, cli_param, constants
 from .string_helper import strip_whitespaces
 from .tasks.convert import TaskConvert
 from . import logger, config, db, ub, fs
@@ -96,14 +96,6 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
         kobo_sync_status.remove_synced_book(book.id, all=True)
 
 
-# Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
-# metadata-change-detector s6 service) watches for change logs. Env-overridable
-# for tests.
-CWA_METADATA_CHANGE_LOGS_DIR = os.environ.get(
-    "CWA_METADATA_CHANGE_LOGS_DIR",
-    "/app/calibre-web-automated/metadata_change_logs")
-
-
 def log_metadata_change(book, changed=None):
     """Queue a CWA metadata/cover *file-level* enforcement for ``book`` (#707).
 
@@ -137,10 +129,10 @@ def log_metadata_change(book, changed=None):
         'timestamp': datetime.now().isoformat(),
     }
     try:
-        os.makedirs(CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
+        os.makedirs(constants.CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
         now = datetime.now()
         log_path = os.path.join(
-            CWA_METADATA_CHANGE_LOGS_DIR,
+            constants.CWA_METADATA_CHANGE_LOGS_DIR,
             f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json')
         with open(log_path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)

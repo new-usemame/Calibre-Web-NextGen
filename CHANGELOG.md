@@ -61,7 +61,40 @@ is for things you can see or feel when running the app.
   ask it to. Thanks to @Glennza1962 for the request and @chloeroform for the
   detail about how the classic view handled this.
 
+### Changed
+
+- **Metadata working files moved onto your `/config` volume.** The change logs
+  and scratch space the cover/metadata enforcer uses used to live inside the
+  application folder, which is replaced wholesale every time you pull a new
+  image. They now sit alongside the rest of your per-install state, so an edit
+  saved moments before an upgrade still gets applied to the book file after it.
+  Anything left in the old location is moved across automatically on first
+  start; there is nothing to do. Thanks to @chloeroform for the patch.
+
 ### Fixed
+
+- **Kobo syncs wrote to the database once per book instead of once per batch.**
+  Each book a Kobo received was recorded in its own separate save, so a sync
+  carrying a hundred books did a hundred separate writes — and everyone else's
+  pages waited behind them. It's now one write per batch. You'll notice it most
+  on a device's first sync and on libraries kept on a NAS, where each write is
+  slow.
+
+- **Kobo book covers froze the site while they were being prepared.** Covers are
+  padded to your Kobo's screen shape the first time each one is needed, which is
+  a fraction of a second of image work — but it was holding up every other page
+  while it ran, and it happens once per cover, so a device catching up on a
+  shelf-full stacked those pauses back to back. The padding now happens out of
+  the way. This affects anyone with Kobo sync on, since cover padding is on by
+  default; nothing about the covers themselves changes.
+
+- **With "proxy unknown requests to Kobo Store" turned on, your Kobo could stall
+  the site for seconds at a time.** Some of what a Kobo asks for is passed
+  through to Kobo's own servers, and the site sat still waiting for their reply —
+  up to 12 seconds if they were slow to answer, with everyone else's pages
+  waiting too. Measured against the real store, individual calls took anywhere
+  from 0.1 to 1.1 seconds. The waiting now happens out of the way. Only affects
+  you if you turned that setting on; it's off by default.
 
 - **Sending a large book to a Kobo briefly froze the site for everyone else.**
   If you have "embed metadata" turned on, every book sent to a Kobo is rebuilt

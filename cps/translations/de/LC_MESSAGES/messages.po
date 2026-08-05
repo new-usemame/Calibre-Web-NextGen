@@ -214,7 +214,7 @@ msgstr "Keine gültige Sprache gewählt"
 msgid "No Valid Book Language Given"
 msgstr "Keine gültige Buchsprache gewählt"
 
-#: cps/admin.py:963 cps/editbooks.py:686
+#: cps/admin.py:963 cps/editbooks.py:689
 msgid "Parameter not found"
 msgstr "Parameter wurde nicht gefunden"
 
@@ -456,8 +456,8 @@ msgid "Success! Gmail Account Verified."
 msgstr "Erfolg! G-Mail-Konto verifiziert."
 
 #: cps/admin.py:1963 cps/admin.py:1966 cps/admin.py:2575 cps/admin.py:2819
-#: cps/admin.py:2949 cps/admin.py:3210 cps/editbooks.py:1172
-#: cps/editbooks.py:2063 cps/shelf.py:148 cps/shelf.py:226 cps/shelf.py:297
+#: cps/admin.py:2949 cps/admin.py:3210 cps/editbooks.py:1181
+#: cps/editbooks.py:2072 cps/shelf.py:148 cps/shelf.py:226 cps/shelf.py:297
 #: cps/shelf.py:332 cps/shelf.py:389 cps/shelf.py:464 cps/shelf.py:547
 #: cps/shelf.py:672 cps/tasks/convert.py:164 cps/web.py:3134
 #, python-format
@@ -940,111 +940,111 @@ msgstr "Hochgeladene Datei ist keine SQLite-Datenbank."
 msgid "Annotations: %(title)s"
 msgstr "Anmerkungen: %(title)s"
 
-#: cps/constants.py:231
+#: cps/constants.py:241
 msgid "Czech"
 msgstr "Tschechisch"
 
-#: cps/constants.py:232
+#: cps/constants.py:242
 msgid "German"
 msgstr "Deutsch"
 
-#: cps/constants.py:233
+#: cps/constants.py:243
 msgid "Greek"
 msgstr "Griechisch"
 
-#: cps/constants.py:234
+#: cps/constants.py:244
 msgid "Spanish"
 msgstr "Spanisch"
 
-#: cps/constants.py:235
+#: cps/constants.py:245
 msgid "Finnish"
 msgstr "Finnisch"
 
-#: cps/constants.py:236
+#: cps/constants.py:246
 msgid "French"
 msgstr "Französisch"
 
-#: cps/constants.py:237
+#: cps/constants.py:247
 msgid "Galician"
 msgstr "Galizisch"
 
-#: cps/constants.py:238
+#: cps/constants.py:248
 msgid "Hungarian"
 msgstr "Ungarisch"
 
-#: cps/constants.py:239
+#: cps/constants.py:249
 msgid "Indonesian"
 msgstr "Indonesisch"
 
-#: cps/constants.py:240
+#: cps/constants.py:250
 msgid "Italian"
 msgstr "Italienisch"
 
-#: cps/constants.py:241
+#: cps/constants.py:251
 msgid "Japanese"
 msgstr "Japanisch"
 
-#: cps/constants.py:242
+#: cps/constants.py:252
 msgid "Khmer"
 msgstr "Khmer"
 
-#: cps/constants.py:243
+#: cps/constants.py:253
 msgid "Korean"
 msgstr "Koreanisch"
 
-#: cps/constants.py:244
+#: cps/constants.py:254
 msgid "Dutch"
 msgstr "Niederländisch"
 
-#: cps/constants.py:245
+#: cps/constants.py:255
 msgid "Norwegian"
 msgstr "Norwegisch"
 
-#: cps/constants.py:246
+#: cps/constants.py:256
 msgid "Polish"
 msgstr "Polnisch"
 
-#: cps/constants.py:247
+#: cps/constants.py:257
 msgid "Portuguese"
 msgstr "Portugisisch"
 
-#: cps/constants.py:248
+#: cps/constants.py:258
 msgid "Portuguese (Brazil)"
 msgstr "Portugisisch (Brasilien)"
 
-#: cps/constants.py:249
+#: cps/constants.py:259
 msgid "Russian"
 msgstr "Russisch"
 
-#: cps/constants.py:250
+#: cps/constants.py:260
 msgid "Slovak"
 msgstr "Slowakisch"
 
-#: cps/constants.py:251
+#: cps/constants.py:261
 msgid "Slovenian"
 msgstr "Slowenisch"
 
-#: cps/constants.py:252
+#: cps/constants.py:262
 msgid "Swedish"
 msgstr "Schwedisch"
 
-#: cps/constants.py:253
+#: cps/constants.py:263
 msgid "Turkish"
 msgstr "Türkisch"
 
-#: cps/constants.py:254
+#: cps/constants.py:264
 msgid "Ukrainian"
 msgstr "Ukrainisch"
 
-#: cps/constants.py:255
+#: cps/constants.py:265
 msgid "Vietnamese"
 msgstr "Vietnamesisch"
 
-#: cps/constants.py:256
+#: cps/constants.py:266
 msgid "Chinese (Simplified, China)"
 msgstr "Chinesisch (vereinfacht, China)"
 
-#: cps/constants.py:257
+#: cps/constants.py:267
 msgid "Chinese (Traditional, Taiwan)"
 msgstr "Chinesisch (traditionell, Taiwan)"
 
@@ -1409,20 +1409,20 @@ msgstr ""
 msgid "There was an error converting this book: %(res)s"
 msgstr "Es trat ein Fehler beim Konvertieren des Buches auf: %(res)s"
 
-#: cps/editbooks.py:381 cps/editbooks.py:1423 cps/editbooks.py:2010
+#: cps/editbooks.py:384 cps/editbooks.py:1432 cps/editbooks.py:2019
 msgid "File type isn't allowed to be uploaded to this server"
 msgstr "Dateityp kann nicht auf diesen Server hochgeladen werden"
 
-#: cps/editbooks.py:386 cps/editbooks.py:1429 cps/editbooks.py:2021
+#: cps/editbooks.py:389 cps/editbooks.py:1438 cps/editbooks.py:2030
 #, python-format
 msgid "File extension '%(ext)s' is not allowed to be uploaded to this server"
 msgstr "Dateiendung '%(ext)s' kann nicht auf diesen Server hochgeladen werden"
 
-#: cps/editbooks.py:390 cps/editbooks.py:1433 cps/editbooks.py:2026
+#: cps/editbooks.py:393 cps/editbooks.py:1442 cps/editbooks.py:2035
 msgid "File to be uploaded must have an extension"
 msgstr "Dateien müssen eine Erweiterung haben, um hochgeladen zu werden"
 
-#: cps/editbooks.py:944 cps/editbooks.py:1694 cps/web.py:811 cps/web.py:3315
+#: cps/editbooks.py:950 cps/editbooks.py:1703 cps/web.py:811 cps/web.py:3315
 #: cps/web.py:3496 cps/web.py:3642
 msgid ""
 "Oops! Selected book is unavailable. File does not exist or is not accessible"
@@ -1430,41 +1430,41 @@ msgstr ""
 "Ups! Gewähltes Buch ist nicht verfügbar. Datei existiert nicht oder ist "
 "nicht zugänglich"
 
-#: cps/editbooks.py:984 cps/editbooks.py:2093
+#: cps/editbooks.py:990 cps/editbooks.py:2102
 msgid "User has no rights to upload cover"
 msgstr "Benutzer hat keine Berechtigung Cover hochzuladen"
 
-#: cps/editbooks.py:992
+#: cps/editbooks.py:998
 msgid "Cover is locked. Unlock it on the cover-picker page first."
 msgstr ""
 "Cover ist gesperrt. Bitte erst auf der Buchumschlag ändern Seite entsperren."
 
-#: cps/editbooks.py:1026 cps/editbooks.py:1411
+#: cps/editbooks.py:1032 cps/editbooks.py:1420
 msgid "Identifiers are not Case Sensitive, Overwriting Old Identifier"
 msgstr ""
 "IDs unterscheiden nicht zwischen Groß- und Kleinschreibung, alte ID wird "
 "überschrieben"
 
-#: cps/editbooks.py:1038 cps/editbooks.py:1385 cps/editbooks.py:1813
+#: cps/editbooks.py:1044 cps/editbooks.py:1394 cps/editbooks.py:1822
 #, python-format
 msgid "'%(langname)s' is not a valid language"
 msgstr "'%(langname)s' ist keine gültige Sprache"
 
-#: cps/editbooks.py:1157
+#: cps/editbooks.py:1166
 msgid "Metadata successfully updated"
 msgstr "Metadaten wurden erfolgreich aktualisiert"
 
-#: cps/editbooks.py:1177
+#: cps/editbooks.py:1186
 #, python-brace-format
 msgid "Error editing book: {}"
 msgstr "Fehler beim Editieren des Buches: {}"
 
-#: cps/editbooks.py:1270 cps/editbooks.py:1320 cps/editbooks.py:2111
+#: cps/editbooks.py:1279 cps/editbooks.py:1329 cps/editbooks.py:2120
 #: cps/updater.py:685 cps/uploader.py:142 cps/uploader.py:151
 msgid "Unknown"
 msgstr "Unbekannt"
 
-#: cps/editbooks.py:1324
+#: cps/editbooks.py:1333
 msgid ""
 "Uploaded book probably exists in the library, consider to change before "
 "upload new: "
@@ -1472,80 +1472,80 @@ msgstr ""
 "Das hochgeladene Buch existiert evtl. schon in der Bibliothek, vor dem "
 "erneuten Hochladen Änderung in Betracht ziehen: "
 
-#: cps/editbooks.py:1441
+#: cps/editbooks.py:1450
 #, python-format
 msgid "File %(filename)s could not saved to temp dir"
 msgstr ""
 "Die Datei %(filename)s konnte nicht im temporären Ordner gespeichert werden"
 
-#: cps/editbooks.py:1461
+#: cps/editbooks.py:1470
 #, python-format
 msgid "Failed to Move Cover File %(file)s: %(error)s"
 msgstr "Fehler beim Verschieben der Cover Datei %(file)s: %(error)s"
 
-#: cps/editbooks.py:1549 cps/editbooks.py:1551
+#: cps/editbooks.py:1558 cps/editbooks.py:1560
 msgid "Book Format Successfully Deleted"
 msgstr "Buch Format erfolgreich gelöscht"
 
-#: cps/editbooks.py:1558 cps/editbooks.py:1560
+#: cps/editbooks.py:1567 cps/editbooks.py:1569
 msgid "Book Successfully Deleted"
 msgstr "Buch erfolgreich gelöscht"
 
-#: cps/editbooks.py:1675
+#: cps/editbooks.py:1684
 msgid "You are missing permissions to delete books"
 msgstr "Keine Erlaubnis zum Löschen von Büchern"
 
-#: cps/editbooks.py:1718
+#: cps/editbooks.py:1727
 msgid "edit metadata"
 msgstr "Metadaten editieren"
 
-#: cps/editbooks.py:1772
+#: cps/editbooks.py:1781
 #, python-format
 msgid "Seriesindex: %(seriesindex)s is not a valid number, skipping"
 msgstr "Serienindex: %(seriesindex)s ist keine gültige Zahl, wird übersprungen"
 
-#: cps/editbooks.py:2015
+#: cps/editbooks.py:2024
 msgid "User has no rights to upload additional file formats"
 msgstr "Benutzer hat kein Recht zusätzliche Dateiformate hochzuladen"
 
-#: cps/editbooks.py:2039
+#: cps/editbooks.py:2048
 #, python-format
 msgid "Failed to create path %(path)s (Permission denied)."
 msgstr "Fehler beim Erzeugen des Pfads %(path)s (Zugriff verweigert)"
 
-#: cps/editbooks.py:2046
+#: cps/editbooks.py:2055
 #, python-format
 msgid "Failed to store file %(file)s."
 msgstr "Fehler beim Speichern der Datei %(file)s."
 
-#: cps/editbooks.py:2070
+#: cps/editbooks.py:2079
 #, python-format
 msgid "File format %(ext)s added to %(book)s"
 msgstr "Dateiformat %(ext)s zu %(book)s hinzugefügt"
 
-#: cps/editbooks.py:2372
+#: cps/editbooks.py:2381
 #, fuzzy
 msgid "Book not found"
 msgstr "Buch wurde nicht gefunden."
 
-#: cps/editbooks.py:2376
+#: cps/editbooks.py:2385
 msgid "Book has no file formats on disk to reload from"
 msgstr ""
 "Das Buch hat keine Dateiformate auf dem Datenträger, aus denen neu geladen "
 "werden kann."
 
-#: cps/editbooks.py:2397
+#: cps/editbooks.py:2406
 #, fuzzy, python-format
 msgid "Book file not found on disk: %(path)s"
 msgstr "EPUB-Datei wurde nicht auf dem Datenträger gefunden."
 
-#: cps/editbooks.py:2417
+#: cps/editbooks.py:2426
 #, python-format
 msgid "Could not parse metadata from %(format)s file: %(err)s"
 msgstr ""
 "Metadaten aus der %(format)s-Datei konnten nicht eingelesen werden: %(err)s"
 
-#: cps/editbooks.py:2538
+#: cps/editbooks.py:2547
 #, python-format
 msgid ""
 "Could not rename the book folder to match the reloaded metadata: %(err)s"
@@ -1553,17 +1553,17 @@ msgstr ""
 "Der Buchordner konnte nicht umbenannt werden, um ihn an die neu geladenen "
 "Metadaten anzupassen: %(err)s "
 
-#: cps/editbooks.py:2560
+#: cps/editbooks.py:2569
 #, python-format
 msgid "Could not save reloaded metadata: %(err)s"
 msgstr "Neu geladene Metadaten konnten nicht gespeichert werden: %(err)s"
 
-#: cps/editbooks.py:2566
+#: cps/editbooks.py:2575
 #, python-format
 msgid "Reloaded %(n)d field(s) from on-disk %(fmt)s"
 msgstr "%(n)d Feld(er) aus der %(fmt)s-Datei auf dem Datenträger neu geladen"
 
-#: cps/editbooks.py:2569
+#: cps/editbooks.py:2578
 msgid "On-disk metadata matches current — no fields updated"
 msgstr "Metadaten auf dem Datenträger sind gleich - keine Felder aktualisiert"
 
@@ -1583,89 +1583,89 @@ msgstr ""
 "Callback Domain ist nicht verifiziert, bitte Domain in der Google Developer "
 "Console verifizieren"
 
-#: cps/helper.py:193 cps/spa_strings.py:101 cps/templates/email_edit.html:61
+#: cps/helper.py:185 cps/spa_strings.py:101 cps/templates/email_edit.html:61
 msgid "This Email has been sent via Calibre-Web NextGen."
 msgstr "Diese eMail wurde via Calibre-Web NextGen gesendet."
 
-#: cps/helper.py:297
+#: cps/helper.py:289
 #, python-format
 msgid "Announcement Email to %(email)s"
 msgstr "Ankündigungs-Mail für %(email)s"
 
-#: cps/helper.py:344
+#: cps/helper.py:336
 #, python-format
 msgid "%(format)s format not found for book id: %(book)d"
 msgstr "%(format)s Format für Buch-ID %(book)d nicht gefunden"
 
-#: cps/helper.py:350 cps/tasks/convert.py:88
+#: cps/helper.py:342 cps/tasks/convert.py:88
 #, python-format
 msgid "%(format)s not found on Google Drive: %(fn)s"
 msgstr "%(format)s von Buch %(fn)s nicht auf Google Drive gefunden"
 
-#: cps/helper.py:355
+#: cps/helper.py:347
 #, python-format
 msgid "%(format)s not found: %(fn)s"
 msgstr "%(format)s nicht gefunden: %(fn)s"
 
-#: cps/helper.py:362 cps/helper.py:498 cps/templates/detail.html:669
+#: cps/helper.py:354 cps/helper.py:490 cps/templates/detail.html:669
 #: cps/templates/detail.html:673
 msgid "Send to eReader"
 msgstr "An E-Reader senden"
 
-#: cps/helper.py:384
+#: cps/helper.py:376
 #, fuzzy, python-format
 msgid "Conversion timed out for book id: %(book)d"
 msgstr "%(format)s Format für Buch-ID %(book)d nicht gefunden"
 
-#: cps/helper.py:386
+#: cps/helper.py:378
 #, fuzzy, python-format
 msgid "Conversion failed for book id: %(book)d"
 msgstr "%(format)s Format für Buch-ID %(book)d nicht gefunden"
 
-#: cps/helper.py:394
+#: cps/helper.py:386
 msgid "Calibre-Web NextGen Test Email"
 msgstr "Calibre-Web NextGen Test eMail"
 
-#: cps/helper.py:395
+#: cps/helper.py:387
 msgid "Test Email"
 msgstr "E-Mail testen"
 
-#: cps/helper.py:412
+#: cps/helper.py:404
 msgid "Get Started with Calibre-Web NextGen"
 msgstr "Erste Schritte mit Calibre-Web NextGen"
 
-#: cps/helper.py:417
+#: cps/helper.py:409
 #, python-format
 msgid "Registration Email for user: %(name)s"
 msgstr "Registrierungs-E-Mail für Benutzer: %(name)s"
 
-#: cps/helper.py:428 cps/helper.py:434
+#: cps/helper.py:420 cps/helper.py:426
 #, python-format
 msgid "Convert %(orig)s to %(format)s and send to eReader"
 msgstr "Konvertiere %(orig)s nach %(format)s und sende an E-Reader"
 
-#: cps/helper.py:453 cps/helper.py:457 cps/helper.py:461
+#: cps/helper.py:445 cps/helper.py:449 cps/helper.py:453
 #, python-format
 msgid "Send %(format)s to eReader"
 msgstr "Sende %(format)s an E-Reader"
 
-#: cps/helper.py:504
+#: cps/helper.py:496
 #, python-format
 msgid "%(book)s send to eReader"
 msgstr "%(book)s an E-Reader gesendet"
 
-#: cps/helper.py:511
+#: cps/helper.py:503
 msgid "The requested file could not be read. Maybe wrong permissions?"
 msgstr ""
 "Die angeforderte Datei konnte nicht gelesen werden. Evtl. falsche "
 "Zugriffsrechte?"
 
-#: cps/helper.py:907
+#: cps/helper.py:899
 #, python-brace-format
 msgid "Read status could not set: {}"
 msgstr "Gelesen-Status konnte nicht aktualisiert werden: {}"
 
-#: cps/helper.py:942
+#: cps/helper.py:934
 #, python-format
 msgid ""
 "Deleting bookfolder for book %(id)s failed, path has subfolders: %(path)s"
@@ -1673,12 +1673,12 @@ msgstr ""
 "Löschen des Ordners für Buch %(id)s ist fehlgeschlagen, der Pfad hat "
 "Unterordner: %(path)s"
 
-#: cps/helper.py:954
+#: cps/helper.py:946
 #, python-format
 msgid "Deleting book %(id)s failed: %(message)s"
 msgstr "Löschen von Buch %(id)s fehlgeschlagen: %(message)s"
 
-#: cps/helper.py:965
+#: cps/helper.py:957
 #, python-format
 msgid ""
 "Deleting book %(id)s from database only, book path in database not valid: "
@@ -1687,7 +1687,7 @@ msgstr ""
 "Lösche Buch %(id)s nur aus Datenbank, Pfad zum Buch in Datenbank ist nicht "
 "gültig: %(path)s"
 
-#: cps/helper.py:1055
+#: cps/helper.py:1047
 #, python-format
 msgid ""
 "Rename author from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
@@ -1695,132 +1695,132 @@ msgstr ""
 "Umbenennen des Autors '%(src)s' zu '%(dest)s' fehlgeschlagen mit dem Fehler: "
 "%(error)s"
 
-#: cps/helper.py:1124 cps/helper.py:1133
+#: cps/helper.py:1116 cps/helper.py:1125
 #, python-format
 msgid "File %(file)s not found on Google Drive"
 msgstr "Datei %(file)s wurde nicht auf Google Drive gefunden"
 
-#: cps/helper.py:1223
+#: cps/helper.py:1215
 #, python-format
 msgid "Rename title from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr ""
 "Umbenennen des Titels '%(src)s' zu '%(dest)s' fehlgeschlagen mit dem Fehler: "
 "%(error)s"
 
-#: cps/helper.py:1262
+#: cps/helper.py:1254
 #, python-format
 msgid "Book path %(path)s not found on Google Drive"
 msgstr "Buchpfad %(path)s wurde nicht auf Google Drive gefunden"
 
-#: cps/helper.py:1323
+#: cps/helper.py:1315
 msgid "Found an existing account for this Email address"
 msgstr "Es existiert bereits ein Benutzerkonto für diese E-Mail Adresse"
 
-#: cps/helper.py:1331
+#: cps/helper.py:1323
 msgid "This username is already taken"
 msgstr "Benutzername ist schon vergeben"
 
-#: cps/helper.py:1345
+#: cps/helper.py:1337
 msgid "Invalid Email address format"
 msgstr "Ungültiges E-Mail Adressformat"
 
-#: cps/helper.py:1367
+#: cps/helper.py:1359
 msgid "Password doesn't comply with password validation rules"
 msgstr "Passwort entspricht nicht den Passwortvorgaben"
 
-#: cps/helper.py:1711
+#: cps/helper.py:1703
 msgid ""
 "Python module 'advocate' is not installed but is needed for cover uploads"
 msgstr ""
 "Python-Modul 'advocate' ist nicht installiert, wird aber für das Hochladen "
 "von Covern benötigt"
 
-#: cps/helper.py:1719 cps/helper.py:1754
+#: cps/helper.py:1711 cps/helper.py:1746
 msgid "Error Downloading Cover"
 msgstr "Fehler beim Herunterladen des Covers"
 
-#: cps/helper.py:1723 cps/helper.py:1731
+#: cps/helper.py:1715 cps/helper.py:1723
 #, python-format
 msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr "Cover Bild ist zu groß %(size)s MB"
 
-#: cps/helper.py:1740 cps/helper.py:1787 cps/helper.py:1800 cps/helper.py:1803
+#: cps/helper.py:1732 cps/helper.py:1779 cps/helper.py:1792 cps/helper.py:1795
 msgid "Cover-file is not a valid image file, or could not be stored"
 msgstr "Coverdatei ist keine gültige Bilddatei, kann nicht gespeichert werden"
 
-#: cps/helper.py:1757
+#: cps/helper.py:1749
 msgid "Cover Format Error"
 msgstr "Coverdatei fehlerhaft"
 
-#: cps/helper.py:1760
+#: cps/helper.py:1752
 msgid ""
 "You are not allowed to access localhost or the local network for cover "
 "uploads"
 msgstr ""
 "Keine Berechtigung Cover von localhost oder dem lokalen Netzwerk hochzuladen"
 
-#: cps/helper.py:1776
+#: cps/helper.py:1768
 msgid "Failed to create path for cover"
 msgstr "Fehler beim Erzeugen des Ordners für die Coverdatei"
 
-#: cps/helper.py:1820
+#: cps/helper.py:1812
 msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 msgstr "Nur jpg/jpeg/png/webp/bmp-Dateien werden als Cover unterstützt"
 
-#: cps/helper.py:1836 cps/helper.py:1841
+#: cps/helper.py:1828 cps/helper.py:1833
 msgid "Invalid cover file content"
 msgstr "Ungültiger Coverdatei-Inhalt"
 
-#: cps/helper.py:1845
+#: cps/helper.py:1837
 msgid "Only jpg/jpeg files are supported as coverfile"
 msgstr "Nur jpg/jpeg-Dateien werden als Cover unterstützt"
 
-#: cps/helper.py:2067 cps/helper.py:2337 cps/spa_strings.py:184
+#: cps/helper.py:2059 cps/helper.py:2329 cps/spa_strings.py:184
 msgid "Cover"
 msgstr "Titelbild"
 
-#: cps/helper.py:2090
+#: cps/helper.py:2082
 msgid "UnRar binary file not found"
 msgstr "UnRar-Programm nicht gefunden"
 
-#: cps/helper.py:2101
+#: cps/helper.py:2093
 msgid "Error executing UnRar"
 msgstr "Fehler beim Ausführen von UnRar"
 
-#: cps/helper.py:2107
+#: cps/helper.py:2099
 #, python-format
 msgid ""
 "Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is "
 "optimized for x86_64 and aarch64."
 msgstr ""
 
-#: cps/helper.py:2116
+#: cps/helper.py:2108
 msgid "Could not find the specified directory"
 msgstr "Angegebener Ordner konnte nicht gefunden werden"
 
-#: cps/helper.py:2119
+#: cps/helper.py:2111
 msgid "Please specify a directory, not a file"
 msgstr "Bitte keine Datei sondern einen Ordner angeben"
 
-#: cps/helper.py:2133
+#: cps/helper.py:2125
 msgid "Calibre binaries not viable"
 msgstr "Die Calibre Programmdaten sind nicht verwendbar"
 
-#: cps/helper.py:2142
+#: cps/helper.py:2134
 #, python-format
 msgid "Missing calibre binaries: %(missing)s"
 msgstr "Fehlendes Calibre-Programm: %(missing)s"
 
-#: cps/helper.py:2144
+#: cps/helper.py:2136
 #, python-format
 msgid "Missing executable permissions: %(missing)s"
 msgstr "Ausführberechtigung fehlt: %(missing)s"
 
-#: cps/helper.py:2149
+#: cps/helper.py:2141
 msgid "Error executing Calibre"
 msgstr "Fehler beim Ausführen von Calibre"
 
-#: cps/helper.py:2339 cps/templates/admin.html:242
+#: cps/helper.py:2331 cps/templates/admin.html:242
 msgid "Queue all books for metadata backup"
 msgstr "Alle Bücher für Metadaten-Backup einreihen"
 

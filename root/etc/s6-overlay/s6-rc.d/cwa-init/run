@@ -95,6 +95,52 @@ install -d -o abc -g abc /config/processed_books/duplicate_resolutions
 install -d -o abc -g abc /config/log_archive
 install -d -o abc -g abc /config/.cwa_conversion_tmp
 
+# The metadata dirs moved out of the app tree into /config (#995). They have to be created
+# HERE, at runtime, not in setup-cwa.sh: that script runs at image build time, so on the
+# common bind-mounted /config the user's mount shadows whatever the build put there and
+# the dirs are simply absent. Resolve them the same way cps/constants.py does, honouring
+# the same knobs in the same order, so the writer and the watcher cannot drift apart.
+# Not derived from CALIBRE_DBPATH: it is force-exported to /config above (and again in
+# svc-calibre-web-automated), so the app's CONFIG_DIR is /config regardless of what the
+# operator set. Reading it here would only introduce a way for these to disagree.
+CWA_CHANGE_LOGS_DIR="${CWA_METADATA_CHANGE_LOGS_DIR:-/config/metadata_change_logs}"
+CWA_TEMP_DIR="${CWA_METADATA_TEMP_DIR:-/config/metadata_temp}"
+install -d -o abc -g abc "${CWA_CHANGE_LOGS_DIR}"
+install -d -o abc -g abc "${CWA_TEMP_DIR}"
+
+# Pre-#995 installs kept these inside the app tree, which an upgrade replaces wholesale.
+# Move anything still sitting there so a change log written just before the upgrade is
+# still enforced after it. One-time, idempotent, and -n so an existing file always wins.
+migrate_legacy_metadata_dir () {
+  local old="$1" new="$2"
+  [ -d "$old" ] || return 0
+  [ "$old" = "$new" ] && return 0
+  if find "$old" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
+    echo "[cwa-init] Migrating leftover files from ${old} to ${new} (#995)"
+    # Symlinks are skipped rather than moved, and the chown is -h. `chown -R` without -h
+    # follows a symlink and re-owns its *target*, so a link planted in the old dir would
+    # hand root's chown an arbitrary path -- and this runs before anything validates it.
+    find "$old" -mindepth 1 -maxdepth 1 ! -type l -exec mv -n {} "${new}/" \; 2>/dev/null || true
+    chown -Rh abc:abc "${new}" 2>/dev/null || true
+  fi
+  rmdir "$old" 2>/dev/null || true
+}
+
+migrate_legacy_metadata_dir /app/calibre-web-automated/metadata_change_logs "${CWA_CHANGE_LOGS_DIR}"
+
+# metadata_temp is deliberately NOT migrated. It is scratch for `calibredb export`,
+# and get_new_metadata_path() takes opf_files[0] from a walk of the whole directory --
+# so a leftover OPF from a container killed mid-enforcement could be embedded into the
+# *next* book instead of its own. Nothing in there is worth keeping; drop it.
+# Guarded on the paths differing, compared canonically: CWA_METADATA_TEMP_DIR is
+# operator-settable, and a trailing slash or a /./ spelling of the same directory would
+# slip past a string comparison and delete the live dir created just above.
+CWA_LEGACY_TEMP_DIR=/app/calibre-web-automated/metadata_temp
+if [ "$(realpath -m -- "${CWA_LEGACY_TEMP_DIR}" 2>/dev/null || echo "${CWA_LEGACY_TEMP_DIR}")" \
+     != "$(realpath -m -- "${CWA_TEMP_DIR}" 2>/dev/null || echo "${CWA_TEMP_DIR}")" ]; then
+  rm -rf "${CWA_LEGACY_TEMP_DIR}" 2>/dev/null || true
+fi
+
 # Ensure ingest directory exists and is writable (matches dirs.json)
 INGEST_DIR=$(python3 - <<'PY'
 import json

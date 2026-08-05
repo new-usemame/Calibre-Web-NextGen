@@ -706,7 +706,10 @@ def pad_path_to_cache(
         log.warning("cover_preview: cannot read %s: %s", src_path, ex)
         return None
 
-    padded = pad_blob(blob, settings)
+    # This is the cache-miss boundary: pad_blob is pure bytes/settings work,
+    # but Wand's decode/composite/JPEG encode blocks the gevent hub while its
+    # C calls run. File/path/cache decisions stay on the caller greenlet.
+    padded = _run_in_pool(pad_blob, blob, settings)
     if padded is blob:
         # No-op padding: just symlink-equivalent (copy) so the caller can
         # serve from the cache path without branching. Cheap + simple.

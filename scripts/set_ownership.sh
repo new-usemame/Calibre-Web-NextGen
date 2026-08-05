@@ -28,19 +28,9 @@
 # of it needs re-owning: the static tree is world-readable and every directory
 # world-traversable (`find ... ! -perm -o+r` and `... -type d ! -perm -o+x` are
 # both empty), so Python imports and template reads work regardless of owner.
-# Only the dirs the runtime user *writes* under the app tree need ownership:
+# Only the dirs the runtime user *writes* under the app tree need ownership.
 #
-#   * metadata_change_logs/ -- cps/editbooks.py (metadata edits, bare open with
-#     no mkdir) and cps/helper.py both write here as abc, so the dir must exist
-#     and be abc-writable or the write raises EACCES.
-#   * metadata_temp/        -- written by scripts/cover_enforcer.py (calibredb
-#     export --to-dir), which today runs as root: the metadata-change-detector
-#     unit setuidgids only the inotifywait side of its pipe, not the python
-#     dispatcher that spawns it. abc ownership here is defense-in-depth, not a
-#     repair -- kept because the writer's uid is one s6 wrapping change away
-#     from abc. (kindle_epub_fixer.py's metadata_temp_dir global is dead code.)
-#
-# cps/cache is the third such dir; it is created and chowned earlier in the
+# cps/cache is such a dir; it is created and chowned earlier in the
 # cwa-init unit (before first-run app.db creation needs it), so it is not
 # repeated here. The rest of the tree (dirs.json, the code) is written only by
 # root or never, so orphaned build-time ownership is harmless.
@@ -60,11 +50,6 @@ CWA_DIRS_JSON="${CWA_DIRS_JSON:-${CWA_APP_ROOT}/dirs.json}"
 CWA_OWNER_USER="${CWA_OWNER_USER:-abc}"
 CWA_CHOWN="${CWA_CHOWN:-chown}"
 CWA_PYTHON="${CWA_PYTHON:-python3}"
-
-# The app-tree directories the runtime user writes to. These, not the whole
-# tree, are the floor's app-tree contribution (#941). cps/cache is handled
-# earlier in cwa-init, so it is intentionally absent here.
-CWA_APP_WRITABLE_DIRS="${CWA_APP_WRITABLE_DIRS:-${CWA_APP_ROOT}/metadata_change_logs ${CWA_APP_ROOT}/metadata_temp}"
 
 log() { echo "[cwa-init] $*"; }
 
@@ -148,15 +133,6 @@ dedupe_paths() {
 main() {
   local -a candidates=("${CWA_CONFIG_ROOT}")
   local dir
-
-  # The app tree is world-readable and never re-walked (#941); only the dirs the
-  # runtime user writes under it are chowned. They ship in the image but a
-  # missing one must not turn into a soft chown failure, so ensure they exist.
-  for dir in ${CWA_APP_WRITABLE_DIRS}; do
-    [ -n "$dir" ] || continue
-    mkdir -p "$dir" 2>/dev/null || true
-    candidates+=("$dir")
-  done
 
   while IFS= read -r dir; do
     [ -n "$dir" ] && candidates+=("$dir")

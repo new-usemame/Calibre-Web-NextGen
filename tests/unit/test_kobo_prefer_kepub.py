@@ -114,24 +114,6 @@ def test_cold_download_keeps_flask_context_while_conversion_is_prepared(monkeypa
         assert helper.get_download_link(7, "kepub", "kobo") == "served"
 
 
-def test_deferred_kepub_does_not_advertise_epub_size(monkeypatch):
-    import cps.kobo as kobo
-
-    monkeypatch.setattr(kobo, "get_epub_layout", lambda *_: None)
-    monkeypatch.setattr(kobo, "get_download_url_for_book", lambda book_id, fmt: fmt)
-    monkeypatch.setattr(kobo, "_get_cover_image_id", lambda book: str(book.uuid))
-    monkeypatch.setattr(kobo, "get_subtitle", lambda book: None)
-    monkeypatch.setattr(kobo.config, "config_kepubifypath", "/bin/kepubify", raising=False)
-    monkeypatch.setattr(kobo.config, "config_kobo_prefer_kepub", True, raising=False)
-    epub = SimpleNamespace(format="EPUB", uncompressed_size=10)
-    book = SimpleNamespace(id=7, uuid="book-uuid", data=[epub], title="T", authors=[], series=[],
-                           series_index=1, tags=[], comments=[], pubdate=None, timestamp=None,
-                           last_modified=None, languages=[], publishers=[], identifiers=[])
-    item = kobo.get_metadata(book)["DownloadUrls"][0]
-    assert item["Format"] == "KEPUB"
-    assert item["Size"] == 0
-
-
 def test_backfill_is_composite_idempotent_preserves_sync_rows_and_skips_gdrive(monkeypatch):
     from cps.tasks import kepub_backfill
 

@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1069, filed 2026-07-21._\n\nSurfaced while root-causing #1067, unrelated to that fix. Filing so it isn't rediscovered.\n\n## What's wrong\n\nThe SPA's `/api/v1/*` endpoints answer JSON with a real status code, so the app can tell \"you're signed out\" from \"that failed\". Covers don't go through that contract:\n\n- `cps/web.py` `get_cover` / `get_series_cover` are plain `web`-blueprint routes carrying `@login_required_if_no_ano`, not `/api/v1` routes.\n- On auth failure `cw_login`'s `login_required` calls `login_manager.unauthorized()`, and because `lm.login_view = 'web.login'` is set in `cps/__init__.py`, that's a **302 to `/login`** — not a 401.\n- The browser is loading these as `<img src=\"/cover/…\">`, so a 302 to an HTML login page is just a broken image. Nothing surfaces, nothing retries, and the SPA has no idea it happened.\n\nResult: a session that has genuinely ended shows a page of blank covers rather than anything actionable. That's a plausible part of what #1067's reporter described as \"covers did not load\", though the forced sign-out there explains it too.\n\n## Why it's worth fixing\n\nThe SPA is built on the idea that a server response tells you which of the two things happened. Covers are the one user-visible surface that opts out of it, and they fail in the most silent way available.\n\n## Rough shape\n\nHave the cover routes answer content-negotiated — a 401 (or the placeholder SVG `get_cover_on_failure` already returns) rather than a redirect to an HTML page when the request is an image load. `cps/helper.py`'s `get_cover_on_failure` is already the graceful-degradation path for a missing book, so there's an existing answer to reuse.\n\nWorth checking the same question for `/download`, `/read`, and the OPDS image routes before settling on a shape.",
+  "created": "2026-08-05",
+  "id": "F-dde17d",
+  "origin_issue": 1069,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Book covers fail silently when the session is gone: /cover/<id> redirects to the login page instead of answering an image"
+}

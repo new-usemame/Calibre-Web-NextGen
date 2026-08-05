@@ -1,0 +1,12 @@
+{
+  "area": "admin",
+  "body": "_Migrated from issue #1025, filed 2026-07-20._\n\nFollow-up from #1024 (surfaced by the cross-family review there).\n\n`GET /duplicates/status` has three response shapes. Two of them report `stale`, but the **cache-missing** branch (`cps/duplicates.py`, the final `return jsonify(...)`) omits `stale` entirely:\n\n```python\nreturn jsonify({\n    'success': True,\n    'enabled': bool(notifications_enabled),\n    'count': 0,\n    'preview': [],\n    'cached': False,\n    'needs_scan': duplicate_index_needs_full_scan,\n    'needs_full_scan': duplicate_index_needs_full_scan\n})\n```\n\nSince #1024, the client follows a scan only while `stale && !needs_scan`. In the cache-missing state it therefore can't tell \"a first baseline scan is running right now\" from \"an admin needs to trigger a full scan\", and treats both as nothing-to-wait-for. Practical effect: on a fresh instance with no duplicate cache yet, the badge and notification don't appear on their own when the first scan finishes — you get them on the next page load or tab refocus.\n\nThis is a deliberate trade in #1024 (polling that state indefinitely *was* the reported bug in crocodilestick/Calibre-Web-Automated#1288), but the server already knows the difference: the cached branch calls `_duplicate_scan_transiently_pending()`. Emitting that in the cache-missing response too would let the client follow a first-ever scan without reopening the idle-polling hole.\n\n**Suggested:** include `'stale': bool(_duplicate_scan_transiently_pending())` in the cache-missing branch, and add a test pinning that a transiently-pending scan is distinguishable from `needs_scan` in every response shape.\n\nLow urgency — affects the first scan on a new instance only, and the /duplicates page shows its own scan progress.",
+  "created": "2026-08-05",
+  "id": "F-d2a62a",
+  "origin_issue": 1025,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Duplicates status: cache-missing response can't distinguish a running scan from 'needs a manual scan'"
+}

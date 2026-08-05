@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #1319, filed 2026-08-03._\n\nNoted during #1316 and filed rather than widened into it.\n\n## What\n\n`cps/web.py` resolves a bookmark with an epub/kepub sibling fallback (`cps/web.py:3328-3333`), so the classic reader still finds a position saved under the other of the two formats. The SPA's bookmark GET in `cps/api/reader.py` has no such fallback — it looks up the exact format only.\n\n## Effect\n\nWhen the served format switches between `epub` and `kepub` (on-demand conversion, a format being added or removed, or Kobo-oriented settings changing what is offered), the two readers can resolve to different `ub.Bookmark` rows for the same book. The user sees their place in one reader and an older place — or none — in the other, with no indication why.\n\nOrthogonal to cross-device progress, which is keyed by book rather than format and so is unaffected.\n\n## Shape of the fix\n\nGive the API route the same sibling resolution the classic route has, from one shared helper rather than a second copy — the two drifting is what produced this. A test should pin that a bookmark saved as `epub` is found when the served format is `kepub` and the reverse.",
+  "created": "2026-08-05",
+  "id": "F-3aef89",
+  "origin_issue": 1319,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "SPA and classic readers can land on different bookmark rows when the served format switches to kepub"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "core",
+  "body": "_Migrated from issue #1182, filed 2026-07-27._\n\nSplit out of #1180.\n\n`e2e/sp1-ux.spec.ts:3` (\"Library navigation hierarchy and search are coherent\") fails and then passes on retry. Playwright reports it as `flaky`, not `failed`.\n\nThe failing assertion is the nav ordering:\n\n```\ncustomizeBox.y > aboutBox.y   →   Received: false\n```\n\nSeen on `release/v4.1.22-recut` (passed on retry #1) and on #1178 (reported flaky in the run totals).\n\nIt is **not** what made the e2e gate red repo-wide — that was the magic-link fixture gap fixed in #1180. Filing separately so it does not get lost behind that.\n\nDo not quarantine it. The assertion covers real nav structure; a flaky true assertion is worth more than a deleted one. Most likely a race between measuring `boundingBox()` and the nav finishing layout/animation, so the fix is probably an explicit wait on a stable state rather than a change to the expectation.",
+  "created": "2026-08-05",
+  "id": "F-209826",
+  "origin_issue": 1182,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "sp1-ux.spec.ts:3 is flaky (nav ordering assertion)"
+}

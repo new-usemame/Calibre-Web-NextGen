@@ -1,0 +1,12 @@
+{
+  "area": "ingest",
+  "body": "_Migrated from issue #1159, filed 2026-07-26._\n\nSurfaced by the cross-family review of #1157. Pre-existing, not introduced there — filed rather than folded into a data-loss fix, so the fix for that one didn't widen the blast radius of the thing meant to reduce it.\n\n## The hazard\n\n`add_book_to_library()` passes the configured `auto_ingest_automerge` value straight through to `calibredb add` (`scripts/ingest_processor.py`, around the `--automerge` argument). With `overwrite`, Calibre replaces duplicate formats in the matching existing record.\n\nSo: the library already holds *Title — Author* as a good EPUB. A newly ingested file resolves to the same title and author, and is a worse copy — DRM-protected, malformed, truncated, or simply unconvertible. If Calibre can read enough metadata to import it at all, it replaces the good EPUB with the bad one. Nothing warns, and nothing keeps the previous file.\n\n## Reachability\n\n`auto_ingest_automerge` defaults to `new_record` (`scripts/cwa_schema.sql:46`), so this needs a non-default setting. Anyone who chose `overwrite` presumably wanted \"prefer the newer file\", which is reasonable until the newer file is broken.\n\nThree ingest paths reach it with the original file, all of them today:\n\n- auto-convert switched off\n- the format is on the do-not-convert list\n- conversion failed and the original is imported as a fallback (added in #1157)\n\nThe third is new, so #1157 widens exposure without creating the hazard.\n\n## Worth deciding\n\n- Should a *rescued* import — one whose conversion just failed — be allowed to overwrite at all? Arguably it should never be more destructive than the setting's happy path, since the file is known to be defective in at least one way.\n- Is a preflight check wanted (does an existing record already hold this format?) with a visible conflict rather than a silent replace?\n- If overwrite stays, is keeping the previous file in `processed_books/` the right safety net?\n\nNot urgent given the default, but it is silent data loss when it fires, which puts it above cosmetic.",
+  "created": "2026-08-05",
+  "id": "F-1b2fdd",
+  "origin_issue": 1159,
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Ingest can overwrite a good existing format when automerge is set to overwrite"
+}

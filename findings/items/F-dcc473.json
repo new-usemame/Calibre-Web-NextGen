@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #1001, filed 2026-07-19._\n\nSplit out of #1000 (cross-family review finding).\n\n## What\n\nThree places download build artifacts over HTTPS with no integrity check:\n\n- `Dockerfile`, `pbs_upstream` stage — the python-build-standalone tarball\n- `Dockerfile`, `kepubify_upstream` stage — the kepubify binary\n- `scripts/ensure-python-mirror.sh` — the same two artifacts, when it *builds* the GHCR mirror\n\nHTTPS authenticates the transport, not the artifact. A truncated, swapped, or tampered download becomes the Python interpreter baked into the image.\n\n## Why it is not urgent\n\n- The shipped image is unaffected today: every CI image build pins `PBS_SOURCE=ghcr`, and the mirror is a content-addressed registry pull.\n- The `*_upstream` stages are the contributor path, so the exposure is a contributor's local build.\n- It matches what the Dockerfile already does for lsof and calibre, which are also unverified downloads. This is a pre-existing gap that the fallback inherits rather than a new one.\n\n## What to do\n\nPin per-architecture SHA-256 hashes next to the version pins in the Dockerfile's global ARG block, verify them in both `*_upstream` stages (`sha256sum -c`), and have `ensure-python-mirror.sh` check the same hashes before publishing a mirror tag — one source of truth, so the mirror cannot be built from an artifact the Dockerfile would reject.\n\nForgetting to bump a hash alongside a version pin then fails the build loudly, which is the safe direction. Worth extending to the lsof and calibre downloads in the same pass.",
+  "created": "2026-08-05",
+  "id": "F-dcc473",
+  "origin_issue": 1001,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Verify checksums on the Python and kepubify downloads"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "i18n",
+  "body": "_Migrated from issue #1252, filed 2026-07-30._\n\n`CLAUDE.md` defines safe-tier-1 as \"every changed file is a `.po` under `cps/translations/`, or `*.md`, or `README*`. No code.\" The validator behind `auto-merge.yml` does not check that.\n\n`scripts/lib/tier_policy.py validate-fork-pr --tier safe-tier-1` runs the forbidden-path filename check and the diff-content sensitive-token scan, but no file-type restriction and no LOC cap — those exist only for tier-2. Measured on #1251, which changes three `.md` files plus one `.py`:\n\n```\n--tier safe-tier-1 -> {\"ok\": true, \"reason\": \"\", \"category\": \"ok\"}\n--tier safe-tier-2 -> {\"ok\": false, \"reason\": \"PR is too large for safe-tier-2 (additions=25, files=4; caps are 80 LOC / 3 files).\"}\n```\n\nSo tier-1 is the *more* permissive label for a PR containing code, which inverts the intent of the tier table. A PR with arbitrary production `.py` changes labeled `safe-tier-1` gets auto-merge enabled on green CI with no size cap and no `CHANGES-vs-upstream.md` requirement (tier-1 is explicitly exempt from that check).\n\nThis is not an open door: `tier-label-guard.yml` strips tier labels applied by anyone outside the trusted set, so only we can reach it. The risk is a tick mislabeling in good faith — believing the validator enforces the prose definition, which is a reasonable assumption given tier-2's caps are enforced there. #1251 was merged manually under rule 3 rather than labeled tier-1 for exactly this reason.\n\nSuggested fix: give tier-1 an explicit allowlist check in `tier_policy.py` (`*.po`, `*.pot`, `*.md`, `README*`) that fails validation otherwise, so the label means what the table says it means and the single source of truth actually holds. A test pinning \"a `.py` file in the diff fails tier-1 validation\" would keep it honest.",
+  "created": "2026-08-05",
+  "id": "F-ed2450",
+  "origin_issue": 1252,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "tier-1 auto-merge validation does not enforce the \"no code\" clause of its own tier definition"
+}

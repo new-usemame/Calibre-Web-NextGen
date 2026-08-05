@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #956, filed 2026-07-16._\n\nFound while fixing #954 (PR #955). Filing so it isn't lost — deliberately **not** bundled, because wiring the timeout changes which candidates appear and deserves its own decision.\n\n## What\n\n`cps/services/cover_picker.py` defines:\n\n```python\n_DEFAULT_TIMEOUT = float(os.environ.get(\"CWA_COVER_PICKER_TIMEOUT\", \"12\"))\n```\n\n…and never uses it. `grep` finds exactly one read, the definition itself. The provider fan-out passes no timeout, so **the cover picker has no overall deadline** — it runs until the slowest provider's own internal timeout expires.\n\nMeasured live on cwn-local: a single \"Change cover\" search took **13.6s**, with `kobo` alone accounting for 11.7s.\n\n## Why it matters\n\nTwo separate problems:\n\n1. **The knob is a lie.** Anyone setting `CWA_COVER_PICKER_TIMEOUT=5` gets no effect and no warning. That's the class of thing #944 was: a documented value that silently does nothing.\n2. **Same env var, two meanings.** `cps/services/cover_url_validator.py:53` reads the *same* `CWA_COVER_PICKER_TIMEOUT` with a **different default** (`4` vs `12`). So the one variable a user might set already controls the URL validator only — and would change two unrelated things if the picker started honouring it.\n\n## Note\n\nBefore #954/#955 this was partly masked: an unbounded fan-out froze the whole app, so the timeout's absence looked like the app hanging. With #955 the app stays responsive, so this is now purely \"the cover picker can take 13s and you can't bound it\".\n\n## Suggested shape\n\nDecide what `CWA_COVER_PICKER_TIMEOUT` should mean, then either honour it in the fan-out (`parallel.fan_out` would need a deadline that abandons stragglers and reports them as `timeout` in the per-provider status) or remove it and give the URL validator its own name. Not obvious which — a user who waits 12s for a good Kobo cover may prefer that to a fast empty grid, so this needs a product call, not just code.",
+  "created": "2026-08-05",
+  "id": "F-22bb78",
+  "origin_issue": 956,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "CWA_COVER_PICKER_TIMEOUT is a dead knob — the cover-picker fan-out has no overall deadline"
+}

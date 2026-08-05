@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #995, filed 2026-07-19._\n\nSplit out of #941. Credit: @chloeroform, who raised it there.\n\nv4.1.17 narrowed the startup ownership pass to the directories the runtime user actually writes — `metadata_change_logs/` and `metadata_temp/` — instead of re-owning the whole `/app` tree. That removed the cost, but the underlying oddity stands: those directories, and `cps/cache`, live *inside* the application tree, which is read-only code that gets replaced wholesale on every image upgrade.\n\nConsequences today:\n- Per-install state sits on a layer that is discarded on upgrade rather than on the `/config` volume where the rest of it lives. #992 was one concrete symptom of the same shape (a per-user marker written to `/app`, which is root-owned and wiped on upgrade).\n- The image has to chown parts of its own code tree at boot at all.\n\nWanted: these directories resolve under `CONFIG_DIR` like other per-install state, with a migration that moves or falls back to the old location so existing volumes are not orphaned, and the startup ownership pass narrows further as a result.\n\nNot scheduled — filing so the idea is tracked rather than buried in a closed thread.",
+  "created": "2026-08-05",
+  "id": "F-ab1edf",
+  "origin_issue": 995,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Move writable runtime directories (cps/cache, metadata_change_logs, metadata_temp) out of the application tree"
+}

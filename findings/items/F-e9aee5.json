@@ -1,0 +1,12 @@
+{
+  "area": "koreader",
+  "body": "_Migrated from issue #925, filed 2026-07-15._\n\nSplit out of #924, where it blocked nothing but is worth tracking.\n\n`koreader/plugins/cwasync.koplugin/tests/*.lua` exist and pass, but nothing runs them — not `tests.yml`, not any script. The plugin's logic has **zero automated coverage in CI**, and after #924 it carries the code that decides which highlights get deleted. A regression there destroys user data silently.\n\nRunning them is a few lines in the Fast Tests job:\n\n```yaml\n- name: Run KOReader plugin tests\n  run: |\n    sudo apt-get install -y lua5.4\n    cd koreader/plugins/cwasync.koplugin/tests\n    lua sync_logic_test.lua && lua device_annotations_test.lua\n```\n\nI did not add this in #924 because `lua5.4` is a new build-environment dependency, and rule 6 plus the autonomous-merge gate put that call with the operator rather than with an autopilot tick that would benefit from waiving it.\n\nWorth deciding alongside: whether the whole-file Lua sources deserve a syntax gate too (`luac -p` on every `.lua`), which needs the same package and would have caught nothing so far — the value is the behavioural tests.\n\nRelated: #924's `tests/unit/test_cwasync_plugin_wire_contract.py` is deliberately Python precisely so CI enforces *something* about the plugin today.",
+  "created": "2026-08-05",
+  "id": "F-e9aee5",
+  "origin_issue": 925,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "The KOReader plugin's Lua tests never run in CI"
+}

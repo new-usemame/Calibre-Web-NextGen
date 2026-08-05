@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1354, filed 2026-08-04._\n\nFound by the v4.1.29 pre-tag refuter gate.\n\n#1325 fixed right-to-left page turning in the **epub** reader, and that fix verified clean on\nevery cell driven (desktop + mobile, real and synthetic books, keyboard, screen-reader names,\nLTR control). But `frontend/src/pages/NativeReader.tsx` `ComicViewer` (~lines 110-120) is\nuntouched and still hard-wires:\n\n- left zone → `Previous page` / `go(-1)`, right zone → `Next page` / `go(1)`\n- `ArrowRight` → +1, `ArrowLeft` → −1\n\nJapanese manga is *the* archetypal right-to-left reading experience, and it's delivered as\nCBZ/CBR through this component, not through the epub reader. So for manga readers the page\nturn is still backwards.\n\n## Why this isn't a one-line copy of the epub fix\n\nCBZ/CBR has no `page-progression-direction` equivalent. The nearest signal is ComicInfo.xml's\n`<Manga>` element (`YesAndRightToLeft` is the meaningful value), which not every archive\ncarries. So this needs a detection decision — ComicInfo.xml when present, and some fallback\n(per-book setting? language? user preference?) when it isn't — rather than reusing the epub\npath's `packaging.metadata.direction`.\n\nAlso worth picking up in the same change: that component's chevrons lack `aria-hidden`, unlike\nthe epub reader's, so a screen reader announces the decorative glyph alongside the button name.\n\nThe v4.1.29 note has been narrowed to say the fix is in the ebook reader, so it no longer\nimplies comics are covered.",
+  "created": "2026-08-05",
+  "id": "F-cb615d",
+  "origin_issue": 1354,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Comics/manga reader still pages left-to-right for right-to-left titles"
+}

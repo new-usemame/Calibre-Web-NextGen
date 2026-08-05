@@ -1,0 +1,12 @@
+{
+  "area": "koreader",
+  "body": "_Migrated from issue #1204, filed 2026-07-28._\n\nSurfaced by #1201. With the integration suite running again, it reports `68 passed, 50 skipped, 0 errors` — but 36 of those 50 skips are the kosync tests, and they skip for a reason worth fixing rather than accepting:\n\n| file | skipped |\n|---|---|\n| `tests/integration/test_kosync_edge_cases.py` | 17 |\n| `tests/integration/test_progress_syncing_kosync.py` | 14 |\n| `tests/integration/test_kosync_update_read_status.py` | 5 |\n| `tests/docker/test_container_startup.py` | 5 |\n| `tests/integration/test_ingest_checksums.py` | 2 |\n\nAll the kosync ones depend on `cwa_api_client`, which gives up here:\n\n```python\nlogin_response = session.post(\n    f\"{base_url}/login\",\n    data={\"username\": \"admin\", \"password\": \"admin123\"},\n    allow_redirects=False, timeout=5)\n\nif login_response.status_code not in (200, 302):\n    pytest.skip(\"Could not authenticate with CWA container\")\n```\n\nThe container is up and reachable — the 19 ingest tests in the same run drive it successfully — so this is the login specifically, not availability. Reproduced locally too: `test_percentage_at_zero` spends 13.6s in fixture setup and then skips with that message.\n\nThe effect is that KOReader progress sync, kosync validation, and read-status thresholds currently have **no** integration coverage, and the suite still reports green. A skip is invisible in a way a failure is not, which is the same shape of problem as #1202 — CI saying \"fine\" about something it never exercised.\n\nWorth checking whether `admin/admin123` is still right for the seeded test container, whether the login route needs a CSRF token the fixture isn't sending, or whether the fixture should hard-fail rather than skip once the container is confirmed up. A skip that is really \"the harness cannot log in\" should not look the same as \"this test does not apply here\".\n\nRelated: #1201, #1202, #1105, #953.",
+  "created": "2026-08-05",
+  "id": "F-e23f3c",
+  "origin_issue": 1204,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Integration: 36 kosync tests skip because cwa_api_client cannot log in"
+}

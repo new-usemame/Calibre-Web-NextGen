@@ -1,0 +1,12 @@
+{
+  "area": "koreader",
+  "body": "_Migrated from issue #842, filed 2026-07-11._\n\nCredit: @filiporlo (#400).\n\nCreate a standalone `cwasync.koplugin` repository with independent release tags and plugin ZIP assets, so KOReader Updates Manager/appstore.koplugin only reports updates when the plugin itself changes rather than on every CWNG app release. Preserve the existing plugin version lockstep tests and document the manager URL.",
+  "created": "2026-08-05",
+  "id": "F-78cd70",
+  "origin_issue": 842,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "KOReader sync plugin: move releases to a dedicated repository"
+}

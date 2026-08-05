@@ -1,0 +1,12 @@
+{
+  "area": "ingest",
+  "body": "_Migrated from issue #1384, filed 2026-08-05._\n\n## Symptom\n\nSave a metadata edit, rename or merge a tag, or upload a book *while an import is running*, and the server stops answering **everyone**. Not just the person who saved — every page, every user, until the import finishes. Nothing is logged, and it recovers on its own, so it reads as \"the server is randomly slow\".\n\n## Root cause\n\n`cps/services/calibre_db_lock.py` guards `metadata.db` writes with a POSIX flock that the ingest processor also takes, and holds across a whole `calibredb add` (plus kindle-epub-fixer). The web side waits for it in a poll loop:\n\n```python\nfcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)   # non-blocking, fine\n...\ntime.sleep(poll_interval)                         # line 109 — not fine\n```\n\nWe serve requests with `gevent.pywsgi` and deliberately do **not** call `monkey.patch_all()`, so every request is a greenlet sharing one OS thread. `time.sleep` parks that thread, and this loop has no other yield point — so the hub does not run again until the lock is won. The stall is not one poll interval, it is the **entire wait**, bounded only by the 120s timeout.\n\nThis is the same class as #954 (fan-outs) and #1111 (`run_blocking`), reached through a different door: those were blocking *work*, this is blocking *waiting*.\n\n## Measured, on the live container\n\nExternal writer holds the lock for 8s; a real `POST /api/v1/tags/<id>` waits for it on a request greenlet; meanwhile plain `GET /api/v1/books?per_page=1` is polled:\n\n| | reads completed | worst read latency |\n|---|---|---|\n| before | 2 | **6.50 s** |\n| after | 17 | **0.036 s** |\n\nThe write itself correctly waits either way (~6.85 s both runs) — the defect is purely what it does to everyone else.\n\n## How it surfaced\n\nCI, not a user report. `e2e/tag-merge-delete.spec.ts` fails intermittently with `socket hang up` on `GET /api/v1/books?per_page=12` — including on the **v4.1.30 tag run itself** — because the desktop and mobile e2e projects write tags concurrently and one lane's wait freezes the other's read until the connection drops.",
+  "created": "2026-08-05",
+  "id": "F-07fd40",
+  "origin_issue": 1384,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "[bug] The whole app stops answering while a book is being ingested"
+}

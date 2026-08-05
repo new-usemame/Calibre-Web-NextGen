@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #870, filed 2026-07-13._\n\nSmart (magic) shelves can't be marked for Kobo sync in the new UI, while ordinary shelves can (the \"Enable Kobo sync\" button in the shelf view). Part of the shelf-parity umbrella #867.\n\nThe backend is already wired for this end to end — only the new UI is missing the control:\n\n- `MagicShelf.kobo_sync` column exists (`cps/ub.py:486`, with its migration at `ub.py:1807`).\n- The create and edit endpoints already accept and persist it (`cps/web.py:1516`/`1540` and `web.py:1646`/`1669`).\n- The Kobo sync protocol already materialises kobo_sync magic shelves into a device's sync set (`cps/kobo.py:138-190`, `get_magic_shelf_book_ids_for_kobo`), gated by the global admin setting `config_kobo_sync_magic_shelves`.\n\nThe gap is SPA-only: `frontend/src/pages/MagicShelfView.tsx` renders no Kobo toggle and `frontend/src/pages/MagicShelf.tsx` never sends `kobo_sync` in its create/edit payload. Fix: add a toggle mirroring `Shelf.tsx`'s `toggleKoboSync` (`frontend/src/pages/Shelf.tsx:138`), gated on the per-user Kobo feature (`me.features.kobo_sync`) plus the global magic-shelf setting (surface `config_kobo_sync_magic_shelves` in the SPA feature payload so the toggle only shows when it can do something).\n\nCredit: @auspex (#867).",
+  "created": "2026-08-05",
+  "id": "F-c78e8c",
+  "origin_issue": 870,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "New UI: Kobo-sync toggle for smart shelves (backend already wired)"
+}

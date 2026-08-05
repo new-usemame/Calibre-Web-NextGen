@@ -1,0 +1,12 @@
+{
+  "area": "koreader",
+  "body": "_Migrated from issue #1114, filed 2026-07-25._\n\nRaised by [@Glalith121](https://github.com/Glalith121) in #633 — they asked whether to file it separately and did not get an answer, so filing it here.\n\nAfter the furthest-progress fix, manual sync and opening a book both pull correctly. The remaining gap: unlocking the device while already inside the book gives no prompt to jump forward. Pulling from the plugin menu on that same screen does work, so the sync itself is fine — it is the wake-with-book-open path that never asks.\n\nSplit out of #633, which covers the furthest-position logic and is otherwise reported as working well.",
+  "created": "2026-08-05",
+  "id": "F-bcb5de",
+  "origin_issue": 1114,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "KOReader: no pull prompt when the device wakes with the book already open"
+}

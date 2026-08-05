@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #1215, filed 2026-07-29._",
+  "created": "2026-08-05",
+  "id": "F-f38008",
+  "origin_issue": 1215,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "KOReader sync: a mismatched content_id makes a zero-row Kobo read look like an emptied device"
+}

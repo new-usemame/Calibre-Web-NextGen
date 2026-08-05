@@ -1,0 +1,12 @@
+{
+  "area": "koreader",
+  "body": "_Migrated from issue #1211, filed 2026-07-28._\n\nSplit out of #1209 rather than bundled into it.\n\n## What\n\n`koreader/plugins/cwasync.koplugin/tests/` holds four suites covering ~2,400 lines of plugin logic:\n\n- `sync_logic_test.lua` — annotation diff/merge, deletion computation, digest resolution\n- `device_annotations_test.lua` — Kobo colour codes, selector escaping, bookmark row mapping\n- `document_digest_test.lua`\n- `sync_client_outcome_test.lua` — added in #1209\n\nNothing in `.github/workflows/` references any of them. They run only when someone runs `lua` by hand in that directory.\n\n## Why it matters\n\nThe gap is not theoretical. While writing #1209 the new Lua suite caught a real bug in that PR's own diff — `succeeded and nil or (\"HTTP \" .. status)` cannot yield `nil` in Lua, so every successful sync would have carried the reason `\"HTTP 200\"` and callers branching on it would have read every sync as failed. Nothing in CI would have caught that.\n\nBecause the suites don't gate, the load-bearing assertions for plugin behaviour have had to be written twice: as Lua tests that don't run, and again as Python source-pins in `tests/unit/test_kosync_plugin_*` that regex the Lua source. The Python pins are the half that actually protects, and they can only check that text is present — not that it behaves.\n\n## Why it isn't just done\n\nRunning them needs a Lua interpreter in the workflow, which is a new toolchain dependency and a rule-6 call. Options worth weighing:\n\n- `apt-get install -y lua5.1` in an existing job (no new Action, one package)\n- a dedicated job using a setup-lua Action (new external Action)\n- vendoring nothing and keeping the status quo, accepting that the Lua suites are developer-run only — in which case they should say so at the top of each file, so nobody assumes they gate\n\nThe first is probably the smallest change that makes them real. The plugin ships as a release asset via `plugin-release-publish.yml`, so a broken plugin reaches devices through the Updates Manager without any CI having executed a line of it.\n\nRelated: #1209, #920.",
+  "created": "2026-08-05",
+  "id": "F-5f8b9c",
+  "origin_issue": 1211,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "The KOReader plugin's Lua test suite has no CI runner"
+}

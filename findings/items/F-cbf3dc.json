@@ -1,0 +1,12 @@
+{
+  "area": "i18n",
+  "body": "_Migrated from issue #1086, filed 2026-07-24._\n\n## What\n\nBrazilian Portuguese carries **415 fuzzy entries out of 2606 msgids** (~16%). `msgfmt` excludes fuzzy entries from the compiled `.mo`, so every one of them reaches users as untranslated English — the catalog looks fuller than it ships.\n\nFor comparison, Russian has 35 fuzzy entries against the same 2606 msgids.\n\nFound while verifying the pt_BR claims for v4.1.20 (see #1085).\n\n## Why these are worth a look specifically\n\nA batch of them are not merely untranslated — `msgmerge` fuzzy-matched them onto an unrelated string, so the stored msgstr is actively wrong. They are harmless while fuzzy, but anyone who clears the flag without reading the pairing ships the wrong text:\n\n| msgid | stored (fuzzy) msgstr | means |\n|---|---|---|\n| `Book not found` | `Token não encontrado` | Token not found |\n| `No books found.` | `Token não encontrado` | Token not found |\n| `Recently added Books` | `Livros Baixados` | Downloaded books |\n| `Books currently being read` | `Versão atual` | Current version |\n\nThe last two were fixed properly in #1072. The first two were not, and still fall back to English.\n\n## Suggested approach\n\n1. Sweep the 415 fuzzy pt_BR entries and split them: fuzzy-but-correct (clear the flag) vs fuzzy-and-wrong (retranslate or blank the msgstr so nobody promotes bad text later).\n2. Prioritise the ones on user-visible surfaces — `Book not found` and `No books found.` are both reachable in normal use.\n3. Do the same census for the other shipped locales; pt_BR is unlikely to be the only one with a large fuzzy tail.\n\n## Verification note for whoever picks this up\n\nCheck claims against the **compiled** catalog, not the `.po`:\n\n```python\nimport gettext\nt = gettext.translation('messages', 'cps/translations', languages=['pt_BR'])\nt.gettext('Book not found')   # returns the English msgid while fuzzy\n```\n\nA `.po` diff will happily show a translation that never reaches a user.",
+  "created": "2026-08-05",
+  "id": "F-cbf3dc",
+  "origin_issue": 1086,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "pt_BR: 415 fuzzy entries fall back to English, including \"Book not found\" and \"No books found.\""
+}

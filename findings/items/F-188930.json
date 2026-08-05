@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #330, filed 2026-05-26._\n\nWant to pick an image in the web UI and have it become my Kobo's sleep screen / background — on the stock Kobo UI (Nickel), not KOReader.\n\nLooked into whether the API can actually do this. Short version: not through the Kobo sync protocol. It has no wallpaper surface.\n\n- The init handshake (`NATIVE_KOBO_RESOURCES` in `cps/kobo.py`) hands the device 156 resource URLs; the only image ones are `image_host` / `image_url_template` / `image_url_quality_template`, all for book covers. No screensaver/lockscreen/sleep/theme key.\n- The endpoint inventory in `notes/KOBO-PROTOCOL-REFERENCE.md` §4 is books, reading state, shelves, metadata, and cover images — nothing for device backgrounds. Grepping `screensaver|wallpaper|lockscreen|sleep` across `cps/` comes back empty.\n\nThe sleep screen is a device-local Nickel setting (book cover, built-in art, or an image dropped on the device over USB). A sync server can't set it.\n\nOne indirect lever does exist: if you set the Kobo's sleep screen to \"current book's cover\" on the device, then whatever cover we serve is what shows when it sleeps. So changing a book's cover in CW already changes the sleep image — it's just tied to the cover, and you flip the device setting once.\n\nKOReader has its own screensaver (cover / custom image / random-from-folder), but it's configured on-device and only shows inside KOReader; our cwasync plugin syncs reading progress, not images. Could in theory push an image into KOReader's screensaver folder, but that's KOReader-only, not the stock UI that's wanted here.\n\nRealistic scope: document the \"sleep screen → current book cover\" trick so CW covers show on sleep. Anything beyond that needs a device-side hook Kobo doesn't expose over the API.",
+  "created": "2026-08-05",
+  "id": "F-188930",
+  "origin_issue": 330,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Set a custom Kobo sleep-screen / background from the web UI"
+}

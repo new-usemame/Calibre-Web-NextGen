@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1066, filed 2026-07-21._\n\nFound while baselining the suite for #1064. This is Layer-2 harness debt, not a product bug — but it makes the e2e gate untrustworthy, which is worse than it sounds given #953 (the job is skipped on PRs today, so nobody notices).\n\n## Two distinct problems\n\n### 1. Specs pin absolute library counts\n\nSeveral specs assert exact numbers that only hold on a pristine seed:\n\n- `hidden-books.spec.ts` — `expect(revealed.total).toBe(41)`, observed `42`\n- `admin-classic-affordance.spec.ts` — `await expect(cards).toHaveCount(8)`\n- `infinite-scroll.spec.ts` and `discover-upload.spec.ts` similarly depend on how many books exist\n\n`discover-upload.spec.ts` **adds a book** every time it runs. So each full-suite run permanently shifts the counts the other specs assert, and after a few runs against the same `cwn-local` they fail forever until the container is reseeded. Verified: these four fail identically on a pre-fix and a post-fix bundle in the same container, and pass in a freshly seeded one.\n\n### 2. Mutating specs aren't isolated from reading specs\n\nUnder `fullyParallel` the same failures appear even on a clean seed, because a spec that uploads, hides or edits a book races a spec counting books. Related: the a11y specs open \"the first book in the library\", and any spec that saves a book reorders that listing — so which nodes the a11y gate scans changes run to run (see #1006).\n\n## Why it matters\n\nA gate that fails for reasons unrelated to the diff trains everyone to ignore it. Right now a genuinely new regression would be indistinguishable from seed drift, which is the same failure mode #1006 describes for a11y.\n\n## Suggested approach\n\n1. Make the mutating specs clean up after themselves (delete the uploaded book, unhide what they hid), or give each one its own fixture book.\n2. Replace absolute counts with relative assertions — capture the count before the action and assert the delta.\n3. Pin specs that need a specific book to a fixture id rather than \"whatever is first\".\n4. Consider a per-run reseed of `cwn-local` so a local run starts from the same state CI does.\n\nRelated: #1006 (a11y gate red + reshuffles), #953 (the E2E job is skipped on PRs).",
+  "created": "2026-08-05",
+  "id": "F-de9cfb",
+  "origin_issue": 1066,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "SPA e2e: count-pinned specs break on a drifted seed, and mutating specs aren't isolated"
+}

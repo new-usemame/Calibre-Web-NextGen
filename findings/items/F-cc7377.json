@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #1374, filed 2026-08-04._\n\nSurfaced while investigating #1372.\n\n## What happens\n\nWhen **Enable NextGen Automatic Cover & Metadata Enforcement Service** is off, editing a book's metadata saves to the library and the web UI reports **\"Metadata successfully updated\"** — but the book files on disk are never touched. Download the book back and the change is not in it. Sync it to a reader and the reader shows the old data.\n\nThe only signal that this happened is a line in the *container log*:\n\n```\n[cover-metadata-enforcer] The CWA Automatic Metadata enforcement service is currently\ndisabled in the settings. Therefore the metadata changes for <title> won't be enforced.\nThis means that the changes made will appear in the Web UI, but not be stored in the\nebook files themselves.\n```\n\nA normal user never sees that. From the UI, the edit looks like it worked, so the natural conclusion is that metadata editing is broken — which is how #1372 was first read.\n\n## Two gaps\n\n1. **No feedback at the point of the edit.** The success flash says the update succeeded without qualification. It could say the library was updated but the book files were not, and link to the setting.\n2. **The setting is classic-UI only.** `auto_metadata_enforcement` appears in `cps/templates/cwa_settings.html` and has no equivalent in the SPA (`grep` over `frontend/src` finds nothing). A user who lives in the new UI cannot see the toggle that explains the behaviour, let alone change it. Related to #584.\n\n## Not a default-state problem\n\nVerified that a fresh install has this **on**: building `cwa.db` from `scripts/cwa_schema.sql` alone and inserting a default row gives `auto_metadata_enforcement=1`. So this only bites instances where it has been turned off — but when it does, it is invisible.\n\n## Suggested fix\n\nQualify the save confirmation when enforcement is off, and expose the toggle in the SPA. Neither changes the enforcement behaviour itself, which is a legitimate choice for users who do not want their files rewritten.",
+  "created": "2026-08-05",
+  "id": "F-cc7377",
+  "origin_issue": 1374,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Metadata edits are a silent no-op when enforcement is off — no indication anywhere in the UI"
+}

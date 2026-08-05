@@ -1,0 +1,12 @@
+{
+  "area": "ingest",
+  "body": "_Migrated from issue #1228, filed 2026-07-29._\n\nSplit out of #984, so the guidance fix there could ship without half-shipping this.\n\n#984 was about a wrong message: a user with DeACSM installed and running was still told to install an ACSM plugin. That is fixed — the ingest log now repeats the plugin's own reason. But @auspex's underlying wish was that dropping an `.acsm` into the ingest folder should produce the book, and it still does not.\n\n**Why it cannot work through the current path.** DeACSM is a Calibre **File Type** plugin. `ebook-convert` resolves input by format, and no File Type plugin registers `acsm` as an input format — that is why `ebook-convert x.acsm out.epub` fails with `No plugin to handle input format: acsm` no matter what is installed. Confirmed in a container: the traceback comes from `plumber.py` at option-parser construction, before any conversion begins.\n\n**What would work.** Route `.acsm` through `calibredb add` instead, which runs the on-import hook where a File Type plugin does its work — the plugin fulfills the ticket against Adobe and hands back the real EPUB/PDF. That means `.acsm` needs its own branch in the ingest pipeline rather than being treated as a convertible format.\n\n**Why it is not done yet.** Verifying it needs a genuine Adobe-fulfilled ticket and an authorized ADE account. Without that, the success path cannot be exercised end to end, and shipping an untested fulfillment path would be worse than the honest failure message that ships today.\n\nReported originally by @auspex (#984).",
+  "created": "2026-08-05",
+  "id": "F-e64448",
+  "origin_issue": 1228,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Ingest: actually fulfill .acsm tickets instead of only explaining why conversion failed"
+}

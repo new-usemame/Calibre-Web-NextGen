@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1188, filed 2026-07-28._\n\nFollow-up from the cross-family review of #1185. The fix there is verified, but three parts of `frontend/e2e/card-action-row.spec.ts` claim more coverage than they have. None is a user-visible bug; all three would let a future regression through.\n\n**1. The \"no readable format\" case is simulated, not rendered.** The test loads a normal EPUB book and deletes `.readNow` from the DOM, because the `cwn-local` seed is all EPUB. That pins the property it was written for — the pencil's position must not depend on whether a sibling exists — but it keeps the already-rendered row, so it would stay green if `hasActionRow` regressed to require a read target, or if the row were conditionally rendered around the read link. It also never exercises format classification for MOBI/AZW3.\n\nFix: intercept the book API and return formats that make `readTarget` null (the pattern `help-banner-kofi.spec.ts` already uses for `route.fulfill`), then assert the real rendered DOM.\n\n**2. The wrapped-label assertion cannot see a clipped label.** It counts Range client rects and fails on more than one, so it catches a label broken onto two lines. A label that is ellipsised or clipped to nothing by `.readNow`'s `overflow: hidden` still produces one rect and passes. It also never selects a long-label locale, so the German/Dutch case in the original reports is not actually exercised — just above the container-query threshold a long translation can be truncated beside a 44px pencil while the suite stays green.\n\nFix: set the locale explicitly and assert either that the label's rendered width fits its full text, or that the icon-only presentation is deliberately active.\n\n**3. The iPad project does not run this spec.** `playwright.config.ts` restricts `ipad-touch` to `book-card-actions.spec.ts`, and on desktop the spec skips because the hover-hidden pencil has opacity 0. So it effectively covers only the 375px mobile project, and a touch-only regression at an iPad card width would not be caught.\n\nFound by a `gpt-5.6-terra` review pass on the #1185 diff.",
+  "created": "2026-08-05",
+  "id": "F-9c44aa",
+  "origin_issue": 1188,
+  "refs": [],
+  "severity": "test",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Book-card action row: three gaps in the #1166 e2e coverage"
+}

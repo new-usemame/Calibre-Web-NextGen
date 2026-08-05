@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #1276, filed 2026-07-31._\n\n### What a user would see\n\nThe server stops responding — not one page, all of them — after opening **Admin → Version Information** or the **Statistics** page. No error, no timeout, just a hang until the container is restarted.\n\n### Why\n\n`cps/subproc_wrapper.py::process_wait` runs a binary and then waits for it to exit *before* reading anything it printed:\n\n```python\np = process_open(command, serr=serr, newlines=newlines)   # stdout=PIPE, stderr=PIPE\np.wait()                                                  # <-- blocks here\nfor line in p.stdout.readlines():\n```\n\nA pipe holds about 64 KB. If the child writes more than that to stdout *or* stderr before exiting, it blocks on its own write, and because nobody is draining the pipe, `p.wait()` never returns. The standard fix is `communicate()`, which drains both pipes while waiting.\n\nTwo things make this worse than a stuck page:\n\n- cps runs gevent **without** `monkey.patch_all()`, so `p.wait()` blocks the whole hub, not just the request that triggered it. Every other user's page load hangs too (same class as #1270).\n- All four version probes go through this path: `get_calibre_version`, `get_unrar_version`, `get_kepubify_version`, and the magick probe.\n\n### How likely\n\nLow in a stock image — `ebook-convert --version` prints one line. It becomes reachable when the configured converter path points at a wrapper script, a shim, or a build that emits warnings on startup, which is exactly the situation an admin is in when they are looking at the version table to debug something.\n\n### Not a regression\n\nThis is pre-existing and predates #1274. Worth noting that #1274 *reduced* the exposure: the calibre probe is now memoised per converter path, so it runs at most once per path instead of once per Statistics page load.\n\n### Fix sketch\n\nReplace the `wait()`-then-`readlines()` pair with `communicate(timeout=...)` and scan the captured stdout, keeping the current return contract (`re.Match` or `\"\"`). A timeout also gives the probes a bounded failure instead of an unbounded one. Needs a test that feeds it a child which writes >64 KB to stderr and asserts the call returns.\n\nFound while adopting #1274.",
+  "created": "2026-08-05",
+  "id": "F-d1f997",
+  "origin_issue": 1276,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Version probes can hang the server if a binary is chatty (process_wait reads pipes after wait)"
+}

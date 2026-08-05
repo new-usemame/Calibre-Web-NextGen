@@ -1,0 +1,12 @@
+{
+  "area": "ci",
+  "body": "_Migrated from issue #1155, filed 2026-07-26._\n\n### What happened\n\n`main` went red on `cc00a47b` (fixed forward in #1153 / #1154). `auto-revert` fired as designed, built the revert, pushed the branch — then died:\n\n```\n* [new branch]  auto-revert/cc00a47 -> auto-revert/cc00a47\npull request create failed: GraphQL: GitHub Actions is not permitted to\ncreate or approve pull requests (createPullRequest)\n##[error]Process completed with exit code 1\n```\n\nRun: https://github.com/new-usemame/Calibre-Web-NextGen/actions/runs/30198870033\n\nSo the safety net currently detects red main correctly and then produces nothing anyone sees — just a branch. Two side effects:\n\n- A stray `auto-revert/cc00a47` branch is on origin with no PR attached.\n- Every future red main leaves another orphan branch.\n\n### Cause\n\nRepo setting:\n\n```\n$ gh api repos/new-usemame/Calibre-Web-NextGen/actions/permissions/workflow\n{\"default_workflow_permissions\":\"read\",\"can_approve_pull_request_reviews\":false}\n```\n\n### Why this wasn't just flipped\n\nThe GitHub setting that unblocks `createPullRequest` is *\"Allow GitHub Actions to create **and approve** pull requests\"* — it's one toggle for both. `main` is protected by a ruleset that requires a PR plus one review for non-admins, and letting Actions approve PRs weakens exactly that. Worth an explicit decision rather than an autopilot flip.\n\nOptions:\n\n1. Give the workflow a PAT (`GH_PAT` is already an org/repo secret used by the translations push) instead of `GITHUB_TOKEN`. Keeps the approve-PRs setting off. Probably the right answer.\n2. Enable the toggle and accept that Actions can approve PRs.\n3. Drop the PR step and have the workflow only push the branch + notify, treating the branch as the artifact.\n\n### Cleanup\n\n`auto-revert/cc00a47` should be deleted whichever way this goes — it proposes reverting a commit we fixed forward from. Left in place for now rather than deleting a branch this autopilot didn't create.",
+  "created": "2026-08-05",
+  "id": "F-31a248",
+  "origin_issue": 1155,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "auto-revert workflow can't open PRs, so the red-main safety net produces nothing actionable"
+}

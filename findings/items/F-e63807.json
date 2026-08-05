@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #897, filed 2026-07-14._\n\nA user who sets `HARDCOVER_TOKEN` and wants to confirm it works sees nothing on the admin page, because the field, the env-token note, and the token-status block all sit inside the section that the `Enable Hardcover Sync` checkbox collapses — and that checkbox is off by default (`cps/config_sql.py:106`).\n\n`cps/templates/config_edit.html:275` gates `data-related=\"hardcover-settings\"` (`:278`), which contains:\n- the Hardcover API Key field (`:280-281`)\n- the env-token note (`:283-285`)\n- the token status block (`:286-303`)\n\nSo the status only appears to someone who has already enabled sync — not to someone trying to work out whether their token is set. Token configuration is not sync configuration; it should not be gated behind a sync toggle.\n\nThis also means #838 is only half-delivered: the status block shipped, but it is unreachable in the default state.\n\nIt also makes two of our own claims over-stated — the v4.1.9 close-out on #743 and `README.md:439` both say the admin page shows a note when an environment token is active, which holds only once sync is enabled.\n\nSuggested fix: move the token field, note, and status out of the `data-related` div.\n\nCredit: @KucharczykL (#873).",
+  "created": "2026-08-05",
+  "id": "F-e63807",
+  "origin_issue": 897,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Hardcover token status + env-token note are hidden until \"Enable Hardcover Sync\" is on"
+}

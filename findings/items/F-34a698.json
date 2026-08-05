@@ -1,0 +1,12 @@
+{
+  "area": "ingest",
+  "body": "_Migrated from issue #1369, filed 2026-08-04._\n\nFound while running the full unit suite for #1368. It is not that PR — the failure reproduces on a clean tree with the branch stashed.\n\n```\nFAILED tests/unit/test_ingest_batch_dirty.py::test_successful_import_marks_batch_dirty_without_hot_loop_http_calls\n1 failed, 2 passed\n```\n\nThe other 5078 tests pass. Worth tracing before it gets normalised as background noise: a red test on `main` that nobody attributes stops being a signal, and this one guards the ingest batch-dirty path against a hot loop of HTTP calls — a regression there is expensive and quiet.\n\nNote the Fast Tests CI job runs with `--maxfail`, so a failure early in the ordering can hide others behind it; check the full list, not the first entry.",
+  "created": "2026-08-05",
+  "id": "F-34a698",
+  "origin_issue": 1369,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "test_ingest_batch_dirty fails on a clean main"
+}

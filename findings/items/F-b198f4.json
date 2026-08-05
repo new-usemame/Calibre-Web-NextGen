@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #900, filed 2026-07-14._\n\nRaised in #873, where the reporter asked to enable Hardcover from an environment variable. Worth doing, but there is a structural problem to settle first.\n\nThere are two unrelated Hardcover enable flags, in two different databases, on two different settings pages:\n\n| flag | store | default | UI | gates |\n|---|---|---|---|---|\n| `config_hardcover_sync` | `app.db` (`cps/config_sql.py:106`) | `False` | Admin → Basic Configuration (`config_edit.html:275`) | Kobo→Hardcover progress sync (`kobo.py:1596`, `shelf.py:36`, `editbooks.py:1026`) — and, through template nesting, whether the token field and its status are visible at all |\n| `hardcover_auto_fetch_enabled` | `cwa.db` (`scripts/cwa_schema.sql:82`) | `0` | CWA Settings (`cwa_settings.html:564-569`) | the auto-fetch scheduler job (`schedule.py:251`) |\n\nThe names are nearly identical, neither page mentions the other, and the reporter conflated them — reasonably. This split is a large part of why the setup reads as \"too convoluted\", and #897 is a direct symptom of it: an unrelated sync toggle decides whether you can see your token status.\n\nAdding an env var over either flag as-is would harden the confusion rather than fix it. Sequence: ship #896 / #897 / #898 first, then reconcile the two flags, then expose the unified switch as an env var so a fully declarative compose deployment needs no UI clicks.\n\nRelated: the reporter also asked for the field to be disabled when the token is env-managed (Shelfmark-style). That is blocked by a deliberate precedence choice — `config_sql.py:433-439` resolves DB/UI → `HARDCOVER_TOKEN` → `HARDCOVER_TOKEN_FILE`, so the UI field overrides the env var (documented at `README.md:447`). Disabling the field would remove the only override path and silently change precedence. If we want the Shelfmark behaviour, precedence should flip deliberately with a migration note rather than as a side effect.\n\nCredit: @KucharczykL (#873).",
+  "created": "2026-08-05",
+  "id": "F-b198f4",
+  "origin_issue": 900,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Hardcover has two enable flags in two databases; reconcile them, then allow enabling by env var"
+}

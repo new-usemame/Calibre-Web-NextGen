@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #871, filed 2026-07-13._\n\nSmart (magic) shelves can be duplicated in the new UI (the \"Duplicate\" action in the smart-shelf view), but ordinary shelves can't. Part of the shelf-parity umbrella #867.\n\nUnlike the Kobo-sync gap, this one needs a small backend route — smart shelves have `/magicshelf/<id>/duplicate` (`cps/web.py:1738`), ordinary shelves have no equivalent. Fix:\n\n- Add a `/shelf/<int:shelf_id>/duplicate` POST route that copies the `Shelf` row and its `BookShelf` membership under the current user, named \"<name> (copy)\" and private by default, honouring the same ownership/permission checks the magic-shelf duplicate uses.\n- Add a `useDuplicateShelf` mutation in `frontend/src/lib/queries.ts` (mirror `useDuplicateMagicShelf`, `queries.ts:868`).\n- Add a \"Duplicate\" button to the manage row in `frontend/src/pages/Shelf.tsx` (alongside Rename / Kobo sync / Reorder / Delete), mirroring `MagicShelfView.tsx:76`.\n\nCredit: @auspex (#867).",
+  "created": "2026-08-05",
+  "id": "F-d60c09",
+  "origin_issue": 871,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "New UI: Duplicate action for ordinary shelves (parity with smart shelves)"
+}

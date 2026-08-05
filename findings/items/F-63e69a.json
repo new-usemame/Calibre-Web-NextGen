@@ -1,0 +1,12 @@
+{
+  "area": "ci",
+  "body": "_Migrated from issue #1017, filed 2026-07-20._\n\nFound while shipping #875 / #1016.\n\n`Integration Tests (Docker)` in `.github/workflows/tests.yml` runs on pushes to `main`/`dev`, on manual dispatch, or on a PR labeled `safe-tier-2` — and nowhere else. So a PR that changes **only the Dockerfile**, the one file whose whole job is producing a working image, gets `skipping` on the only job that builds and boots one.\n\n#1016 is the concrete case: a `RUN` stanza that creates Calibre's `/usr/bin` symlinks at build time. Every check on it was green with the image never having been built. I built and cold-booted it by hand and it was fine, but \"a maintainer remembered to\" is not a gate.\n\nThe tier-2 label is the wrong proxy here. A Dockerfile / `root/etc/s6-overlay/**` / `scripts/setup-cwa.sh` change is exactly the class that needs the container built, whatever its size.\n\nSuggested: extend the `if:` to also fire when the PR touches image-build inputs — `Dockerfile`, `.dockerignore`, `root/**`, `requirements*.txt` — via a paths-filter step whose output feeds the condition. Keep `continue-on-error` semantics as they are today so this doesn't become a new flake source; make it gating only where tier-2 already is.\n\nWorth checking at the same time whether `E2E Tests (SPA)` has the mirror-image gap for `frontend/**`.",
+  "created": "2026-08-05",
+  "id": "F-63e69a",
+  "origin_issue": 1017,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "CI: a Dockerfile-only PR doesn't run the Docker integration tests"
+}

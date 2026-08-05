@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #1386, filed 2026-08-05._\n\nFollow-up from #1384 / #1385, which removed the severe instance of this class (the metadata.db lock poll loop, up to 120s of hub freeze).\n\nTwo smaller ones remain, both retrying a locked-SQLite read on a request path:\n\n- `cps/web.py:567`\n- `cps/web.py:1252`\n\nEach retries 3× at `time.sleep(0.1)`, so the worst case is ~0.3s of frozen hub rather than 120s — real, but a different order of magnitude, which is why it was left out of #1385 rather than folded in.\n\nThe fix is the same one-liner: `cps.services.parallel.cooperative_sleep`. What this needs before it ships is its own red/green — the harness in `tests/unit/test_metadata_lock_gevent_responsiveness.py` measures worst heartbeat gap while a greenlet waits and transfers directly, but 0.3s sits close enough to the existing 0.3s tolerance that the threshold needs re-picking to stay decisive rather than flaky.\n\nWorth also sweeping for the general case at the same time: the guard added in #1385 is scoped to `calibre_db_lock.py`, so nothing stops a new `time.sleep` appearing on another request path. A broader AST guard over request-path modules would close the class instead of the instances, but it needs an allowlist for the legitimate ones (`services/worker.py:124` is a real OS thread; `db.py:1285` is startup, before the hub serves anything).",
+  "created": "2026-08-05",
+  "id": "F-3443ba",
+  "origin_issue": 1386,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Two more request-path time.sleep retries can freeze the gevent hub (web.py)"
+}

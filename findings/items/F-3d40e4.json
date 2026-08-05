@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #872, filed 2026-07-13._\n\nIn the new UI, an ordinary shelf's back-link reads \"< All shelves\" and returns to `/shelves`, while a smart shelf's back-link reads \"< Library\" and returns to `/`. Part of the shelf-parity umbrella #867.\n\nRoot cause: `/shelves` (`frontend/src/pages/Shelves.tsx`, `useShelves`) lists ordinary shelves only. Smart shelves have no list page at all — they surface only in the sidebar — so `frontend/src/pages/MagicShelfView.tsx:54,64` falls back to the library. Fix both at the source:\n\n- List the user's smart shelves on `/shelves` in their own section (use `useMagicShelves`, `queries.ts:842`), linking each to `/magic/<id>`.\n- Point `MagicShelfView.tsx`'s back-link at `/shelves` with the same \"All shelves\" label ordinary shelves use (`Shelf.tsx:82,160`).\n\nThis makes the two back-links consistent and gives smart shelves a discoverable home beyond the sidebar.\n\nCredit: @auspex (#867).",
+  "created": "2026-08-05",
+  "id": "F-3d40e4",
+  "origin_issue": 872,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "New UI: List smart shelves on /shelves + consistent back-links"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1181, filed 2026-07-27._\n\nSplit out of #1180.\n\n`POST /api/v1/auth/magic-link/start` returns `403 magic_link_disabled` when the admin toggle `config_remote_login` is off (`default=False`, `cps/config_sql.py:101`). Nothing asserts that automatically.\n\nBoth directions matter and neither is covered today:\n- **enabled** → 200 with `verify_url` (now covered by `login-redirect.spec.ts:68`, once #1180 seeds the toggle)\n- **disabled** → 403, and the SPA login screen should not offer the magic-link affordance\n\n#1180 verified the disabled path by hand against a live container, but hand-verification does not survive a refactor.\n\nThe e2e suite now runs with the toggle **on** for the whole job, so this cannot simply be another Playwright spec in the same run — flipping the toggle mid-suite would make spec order load-bearing, which is its own trap. Better shapes: an API-level test that drives the endpoint with the flag forced off, or a separate short job with its own container.\n\nFound while root-causing why the SPA e2e gate was red on every branch.",
+  "created": "2026-08-05",
+  "id": "F-2b5186",
+  "origin_issue": 1181,
+  "refs": [],
+  "severity": "test",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Magic-link disabled path (403) has no automated coverage"
+}

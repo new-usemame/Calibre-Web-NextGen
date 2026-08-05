@@ -1,0 +1,12 @@
+{
+  "area": "ingest",
+  "body": "_Migrated from issue #1301, filed 2026-08-02._\n\nSurfaced while establishing a clean-main baseline for #1300, not by looking for it.\n\n## Symptom\n\n`tests/unit/test_script_import_side_effects.py::TestImportIsSideEffectFree::test_import_creates_no_lockfile` fails intermittently under `pytest -n auto`, and **the failing parameter moves between runs**:\n\n| Run | Failing parameter |\n|---|---|\n| 1 | `[ingest_processor]` |\n| 2 | `[kindle_epub_fixer]` |\n\nIt passes reliably when the same tests are run in isolation, and it does **not** appear in every parallel run — the clean-`origin/main` baseline run for #1300 did not include it, while two other full runs did.\n\n## Why it matters\n\nThis is the false-red half of FAILURE-MODES class 9. A test that fails on a rotating parameter trains readers to dismiss the file, which is exactly how a genuine red in it would get waved through. It also makes \"is this failure pre-existing?\" cost two extra full-suite runs every time a PR touches anything — that is what it cost on #1300.\n\n## Likely cause\n\nThe test asserts that *importing* a script creates no lockfile. Under `-n auto` several workers import the same modules against the **same on-disk lock path** at overlapping times, so worker A observes the lockfile worker B legitimately created. The parameter that loses the race is whichever import happens to overlap, which explains why it moves.\n\nThat is a shared-fixture problem, not a product bug — the lock path needs to be per-worker (`tmp_path` / `PYTEST_XDIST_WORKER`), or these cases need to be serialised.\n\n## Not the fix\n\nQuarantining it would silence a real signal about import-time side effects. The lock path should be isolated per worker so the assertion means what it says.\n\n## Repro\n\n```\ncd repo && PYTHONPATH=scripts:. .venv/bin/python -m pytest tests/unit tests/smoke -q -p no:randomly -n auto --timeout=120\n```\n\nRun it two or three times; the parameter rotates.",
+  "created": "2026-08-05",
+  "id": "F-448e80",
+  "origin_issue": 1301,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "test_script_import_side_effects is racy under xdist: the lockfile assertion fails on a different parameter each run"
+}

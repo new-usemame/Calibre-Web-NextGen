@@ -1,0 +1,12 @@
+{
+  "area": "ci",
+  "body": "_Migrated from issue #1052, filed 2026-07-21._\n\nSplit out of the review on #1047 (findings 6 and 7 from the cross-family pass).\n\n## The gap\n\nMost `/api/v1` endpoint tests call the view function directly via\n`inspect.unwrap(mod.some_view)(...)` with CSRF disabled. That exercises the\nfunction body but not the boundary the user actually hits, so a change that\nbreaks the shipped endpoint can leave every test green:\n\n- route accidentally changed from POST to GET\n- blueprint registration removed\n- `@csrf.exempt` added\n- `@user_login_required` dropped\n\nThe same shape shows up on the frontend side: several SPA \"tests\" assert that a\nsubstring appears in a `.tsx` source file. Deleting the button JSX while leaving\nthe hook import and a comment behind keeps them passing.\n\nThis is the unit-boundary trap the verification standard already warns about —\nworth closing generically rather than per-PR.\n\n## What would close this\n\n1. A small authenticated app-client fixture (real `test_client`, real CSRF) that\n   a route test can opt into with one line.\n2. For each write endpoint, at least one test through that fixture asserting:\n   the happy path over real HTTP, rejection without a CSRF token, and rejection\n   when unauthenticated.\n3. Replace source-substring SPA tests with RTL renders that assert the control\n   appears for the right user/feature combination, click it, and check the\n   submitted payload and the post-success label.\n\nNot urgent, no user-visible symptom — this is coverage quality. Doing it once in\n`conftest.py` makes it cheap for every route afterwards.\n\nContext: #1047 verified this boundary by hand against `cwn-local` (CSRF-omitted\nPOST → 400, unauthenticated POST → 400) because the suite couldn't.",
+  "created": "2026-08-05",
+  "id": "F-d4107c",
+  "origin_issue": 1052,
+  "refs": [],
+  "severity": "test",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "API tests bypass the HTTP boundary: routing, method and auth decorators aren't pinned"
+}

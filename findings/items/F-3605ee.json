@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #885, filed 2026-07-13._\n\n**Summary (internal tech-debt):** metadata/cover providers use inconsistent per-request HTTP timeouts. Most providers use `timeout=15`; Amazon uses `timeout=10` per page-fetch with a ~15s pool cap; the cover-picker pool default is ~12s (`cps/metadata_provider/cover_picker.py`). There is no single shared timeout constant, so a slow provider can stretch the synchronous metadata-search / cover-picker window.\n\n**No user-visible hang observed** — this is a maintainability/consistency issue, not a live bug.\n\n**Candidate (low priority):** centralize a provider HTTP-timeout constant and document the pool-vs-per-request budget so the synchronous window is predictable across providers.\n\n_Filed from the internal metadata-provider audit (org run 2026-07-13). Low priority._",
+  "created": "2026-08-05",
+  "id": "F-3605ee",
+  "origin_issue": 885,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Centralize metadata-provider HTTP timeout budget (consistency)"
+}

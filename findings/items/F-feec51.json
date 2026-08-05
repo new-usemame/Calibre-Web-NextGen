@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #884, filed 2026-07-13._\n\n**Symptom (reporter-facing):** Hardcover covers often come back low-resolution when the book record has no ISBN.\n\n**Root cause (from provider audit):** `cover_booster.boost_covers()` upgrades thumbnails to ~2000px via the Amazon-CDN-by-ISBN path (Path A) only when the record carries an ISBN. Hardcover's title-search (`SEARCH_QUERY`) returns ~290px `image.url` thumbnails with **no ISBN** — only the `hardcover-id:<n>` edition query returns ISBNs (`cps/metadata_provider/hardcover.py:327`). iTunes Path C can catch some of these on a conservative title+author match, but many ISBN-less title hits slip through and stay low-res.\n\n**Candidate fix (not yet implemented):** add an Amazon-search-by-title→ASIN→CDN cover path for ISBN-less records, **or** enrich Hardcover title hits with the edition ISBN before boosting.\n\n**Reach:** anyone using Hardcover as a primary metadata source; overlaps the #304 and #303 reporters.\n\n**Relationship to #304:** distinct. #304 (shipped in v4.1.12) decoupled the high-res Amazon cover from the Amazon *metadata* toggle for records that *have* an ISBN. This issue is the *ISBN-less* gap that #304 does not cover.\n\n_Filed from the internal metadata-provider audit (org run 2026-07-13)._",
+  "created": "2026-08-05",
+  "id": "F-feec51",
+  "origin_issue": 884,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Hardcover title-search covers stay low-res when the record has no ISBN"
+}

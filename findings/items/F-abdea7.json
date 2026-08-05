@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1183, filed 2026-07-27._\n\nSplit out of #1180.\n\n`E2E Tests (SPA)` is Layer 2 of the verification standard, but it currently cannot block anything:\n\n1. `continue-on-error` on pull requests, so the job goes red while the run concludes `success`\n2. the `Test Suite Summary` only warns (`echo \"⛔ E2E tests failed - do not release!\"`, no `exit 1`)\n3. it is skipped on `main`\n\nNet effect: rule-3 merge-gate condition (a), \"every required CI check is green\", kept passing with the e2e job failing inside the run. #1176 and #1177 merged through a red gate that had been red on every branch for a while.\n\n#1180 fixes the fixture gap that made it red, and #1178 fixes the real mobile overflow it was correctly catching.\n\n**Sequencing matters, so this is deliberately not part of #1180.** Promote only after several consecutive green runs:\n\n- [ ] several consecutive green e2e runs on PRs\n- [ ] drop `continue-on-error` for pull requests\n- [ ] make `Test Suite Summary` `exit 1` on e2e failure\n- [ ] run it on `main` (or on the `:dev` image build) so the release branch is covered\n- [ ] mark it required in the branch ruleset\n\nMaking a gate mandatory before it is reliably green is how it got ignored in the first place. #1182 (sp1-ux flake) should land first — a known-flaky spec in a required gate would block merges at random.",
+  "created": "2026-08-05",
+  "id": "F-abdea7",
+  "origin_issue": 1183,
+  "refs": [],
+  "severity": "test",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Promote the SPA e2e gate to required once it has earned it"
+}

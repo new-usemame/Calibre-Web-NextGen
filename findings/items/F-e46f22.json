@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #882, filed 2026-07-13._\n\n**Requested by** @iroQuai in #699 (part of the highlights follow-ups).\n\n## What\nOn a book's page in the new UI, the **Highlights** button opens the per-book annotations view but gives no signal about whether the book actually has any saved highlights. Add a small count badge next to the button so a book with highlights stands out at a glance.\n\n## Where\n- Button: `frontend/src/pages/BookDetail.tsx:418` (`<Link href={/book/${book.id}/annotations}>` with the `Highlighter` icon).\n- Data source already exists: `GET /annotations/<book_id>/data.json` returns `{\"annotations\": [...], \"annotation_count\": N}` (`cps/annotations.py:512`). Preferred: surface `annotation_count` on the book-detail serializer (`cps/api/serializers.py`) so BookDetail renders the badge from its existing book fetch without a second request; the data.json count stays the source of truth.\n\n## Modality / a11y\n- The badge is a count, not an action — render it inside the existing button so touch/mouse/keyboard hit targets are unchanged.\n- Zero count → no badge (don't add visual noise to books with no highlights).\n- Accessible name should read e.g. \"Highlights, 12 saved\" so it isn't a bare number to a screen reader.\n\nDesign + verify matrix: `notes/699-koreader-highlights-DESIGN.md`.\n\nPart of #699.",
+  "created": "2026-08-05",
+  "id": "F-e46f22",
+  "origin_issue": 882,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "New UI: show highlight count badge on the Highlights button"
+}

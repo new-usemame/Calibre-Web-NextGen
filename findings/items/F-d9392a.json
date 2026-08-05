@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #1187, filed 2026-07-28._\n\nOn a phone, opening a book whose metadata contains one long unbroken string — a generated filename, an identifier, a URL — makes the whole book page scrollable sideways. The text runs off the right edge instead of wrapping, and every other row on the page stretches with it.\n\nCaught while verifying #1166 against `cwn-local`. A book that had been left behind by an ingest test (`new_1_20260630_140053_206808_abcdefghijk`) reproduced it every time it was the first card in the grid; the page went from 375px to 1133px wide.\n\nMeasured on the offending element:\n\n```\n<dd class=\"_metaValue_...\"> w=1038 white-space=normal max-width=none overflow-wrap=normal min-width=auto\n```\n\n`.metaValue` (`frontend/src/pages/BookDetail.module.css:500`) sets only font-size, color and margin. With `overflow-wrap: normal` a token with no break opportunity establishes a min-content width the definition list cannot shrink below, so it pushes the page out.\n\nThis is the same defect #1178 fixed for the book card's title / authors / series — the book detail page did not get the same treatment.\n\nNot urgent for the shipped seed (no such title in a normal library), but any user with a long identifier or a filename-derived field hits it.",
+  "created": "2026-08-05",
+  "id": "F-d9392a",
+  "origin_issue": 1187,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Book detail page scrolls sideways on mobile when a metadata value has no spaces"
+}

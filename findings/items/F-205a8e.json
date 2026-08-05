@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #981, filed 2026-07-18._\n\n## Symptom\n\nA book synced to a Kobo cannot be highlighted/annotated, while other books from the same library work fine. No error is visible anywhere in the UI.\n\n## Root cause (observed on a production instance, v4.1.16)\n\nWhen a Kobo requests a book that only has an EPUB format, `get_download_link` converts it to KEPUB on demand (`cps/helper.py` ~line 2019). If that conversion fails, the code logs an error and **silently serves the plain EPUB instead** (`book_format = \"epub\"` fallback). The Kobo then renders the book with its legacy ePub reader, which does not support highlighting or annotations — a permanent, invisible degradation for that book on that device.\n\nThe conversion failure in this case was `[Errno 13] Permission denied` writing the `.kepub` into the book folder: the ingest pipeline had created the book directory owned `root:root` while the app runs as `abc` (PUID 1000). 94 paths in the library were root-owned; every one of those books would hit the same failure on first Kobo download.\n\n## Two defects to fix\n\n1. **Ownership**: the ingest/import path can create book directories as root. Book dirs must be created as (or chowned to) the PUID:PGID user. Consider a startup or ingest-time ownership check on the library tree.\n2. **Silent degradation**: when on-demand KEPUB conversion fails because the library dir is unwritable, convert into the temp/cache dir and serve that instead of falling back to plain EPUB. If conversion genuinely fails (bad epub), surface the failure (task queue error entry) rather than only a log line — the user-visible effect (no annotations on Kobo) is otherwise undiagnosable.\n\n## Repro\n\n1. `chown root:root` a book folder that has only an EPUB.\n2. Sync a Kobo and download the book → device receives plain EPUB, highlighting unavailable.\n3. Log shows `On-demand KEPUB conversion failed for book N: [Errno 13] Permission denied`.\n\n## Evidence\n- `/config/calibre-web.log` 2026-07-15 01:05: conversion failure for book 535; identical failures for books 533/534 on 2026-07-08.\n- After `chown -R abc:abc /calibre-library`, the same endpoint request converted successfully and served a KEPUB with koboSpans.",
+  "created": "2026-08-05",
+  "id": "F-205a8e",
+  "origin_issue": 981,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Kobo: failed on-demand KEPUB conversion silently falls back to plain EPUB (book loses highlighting/annotations)"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "koreader",
+  "body": "_Migrated from issue #883, filed 2026-07-13._\n\n**Requested by** @iroQuai in #699 (part of the highlights follow-ups).\n\n## What\nAdd a second highlight-import path that accepts a plain-text **`My Clippings.txt`** file (the Kindle format). Each clipping carries the book title/author, a highlight/note/bookmark type, a page or location, an added date, and the text. This is the practical bridge for KOReader and xteink micro-readers too: recent xteink firmwares (Crosspoint, CrossInk) save on-device highlights in the same Kindle-style `My Clippings.txt`.\n\n## Where\n- Current import is Kobo `.sqlite`-only: `POST /annotations/import` (`cps/annotations.py:75`) gates on `looks_like_sqlite` and parses via `parse_kobo_bookmarks` (`cps/services/kobo_import.py`).\n- Add a sibling parser `cps/services/clippings_import.py` (pure, unit-testable) that turns a `My Clippings.txt` byte stream into normalized annotation rows, and branch the import route on file type (sqlite → Kobo path, text → clippings path).\n- Persist into the same `ub.Annotation` store the Kobo path writes to (loader: `_load_user_annotations`, `cps/annotations.py:269`), so the existing per-book view + MD/CSV/JSON export + count badge all work unchanged.\n\n## Hard parts to get right\n- **Book matching** by title/author against the Calibre library — clippings have no book id. Match conservatively; surface unmatched clippings rather than silently dropping them.\n- **Format variance / i18n** — `My Clippings.txt` separators and the \"Your Highlight on ...\" header are localized across Kindle firmwares. Parse defensively; reject nothing that's clearly a clipping.\n- **Dedup on re-import** — key on (book, location/page, text) so re-uploading the same file doesn't duplicate rows.\n- **Notes + bookmarks**, not just highlights — the format mixes all three; map them to the annotation types we already store.\n\n## OSS / rules\nNo new dependency (stdlib text parsing). No external service. Validate/allowlist the parsed fields before they reach the DB.\n\nDesign + parser spec + verify matrix: `notes/699-koreader-highlights-DESIGN.md`.\n\nPart of #699.",
+  "created": "2026-08-05",
+  "id": "F-794ff3",
+  "origin_issue": 883,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Import highlights from a Kindle/KOReader `My Clippings.txt` file"
+}

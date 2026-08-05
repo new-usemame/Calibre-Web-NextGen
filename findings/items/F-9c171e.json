@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #838, filed 2026-07-11._\n\nExpired or rejected Hardcover tokens are visible only in logs. Admin should show token status so expiry does not require log archaeology.\n\nCredit: @WasabiBurns and #479.\n\nPromise (2026-06-17): “surfacing token status in the UI is worth doing. No need to open a separate issue, I’ll track it from here.”\n\nSource: https://github.com/new-usemame/Calibre-Web-NextGen/issues/479",
+  "created": "2026-08-05",
+  "id": "F-9c171e",
+  "origin_issue": 838,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Surface Hardcover token status in admin"
+}

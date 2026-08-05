@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1050, filed 2026-07-21._\n\nSplit out of #521 so it is tracked on its own.\n\n**Symptom.** In Swedish, Finnish, Danish and Norwegian, Å, Ä and Ö (and Æ, Ø) are their own letters that sort *after* Z — not variants of A and O. Today they fold into A and O, so a Swedish library shows `Aalto, Åland, Ängel, Örebro, Zulu` where it should show `Aalto, Zulu, Åland, Ängel, Örebro`, and Örebro lands in the O bucket of the A–Z filter instead of its own.\n\n**Why it isn't a one-line fix.** The same letters go the other way elsewhere: German and French readers expect ä to sort with a. So there is no single global rule that is correct for both groups — the sort has to know the reader's language. Our sort key is registered once as a SQLite function shared by every connection, so it cannot simply read the current request's locale (connections are reused across users).\n\n**Shape of the real fix.** A locale-aware collation — pass the locale explicitly into the sort function rather than capturing it, and use proper Unicode collation with per-locale tailoring. An evaluation of PyICU for this is in the maintainer notes: it builds on our image against the ICU already present, but it is a native dependency and needs a full locale matrix plus a performance budget on large libraries before it could ship.\n\n**Not a new regression:** before #521 these letters happened to sort after Z by accident, which was right for Nordic readers and wrong for everyone else. #521 flipped which group is served. The non-Latin half of that regression (Cyrillic, Greek, Japanese) is fixed and shipping; this is the remaining half.",
+  "created": "2026-08-05",
+  "id": "F-5024cc",
+  "origin_issue": 1050,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Sorting: Å, Ä and Ö belong after Z for Swedish, Danish, Norwegian and Finnish readers"
+}

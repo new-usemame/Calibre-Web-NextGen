@@ -1,0 +1,12 @@
+{
+  "area": "ci",
+  "body": "_Migrated from issue #1202, filed 2026-07-28._\n\n## What happened\n\n#1201 took the Docker integration suite down to `37 passed, 80 errors` — every error at fixture setup, so the suite exercised almost nothing. The workflow still reported **success**, and it stayed that way long enough that the breakage was found by reading a log rather than by a red check.\n\n## Why\n\n`Integration Tests (Docker)` is `continue-on-error` outside `safe-tier-2` PRs, and `test-summary` treats any integration result other than a tier-2 failure as advisory:\n\n```yaml\nif [[ \"${{ needs.integration-tests.result }}\" == \"failure\" ]]; then\n  if [[ \"$IS_TIER2_PR\" == \"true\" ]]; then\n    echo \"❌ Integration tests failed on safe-tier-2 PR — auto-merge gate\"\n    exit 1\n  fi\n  echo \"⚠️ Integration tests failed (advisory; not a tier-2 PR)\"\nfi\n```\n\nAdvisory-on-main is a deliberate, documented choice (the job is slow and its failures shouldn't block auto-revert decisions), and this issue is not asking to reverse it.\n\nThe gap is that the summary cannot tell **\"a few tests failed\"** from **\"the suite could not run at all.\"** Those are different classes. The first is noise you reasonably ride out; the second means the gate is dark and every subsequent green is meaningless — including the hard gate on tier-2 PRs, which in this case couldn't pass at all.\n\n## Suggested shape\n\nHave the integration job surface a machine-readable outcome (it already writes `integration-results.xml`) and have `test-summary` treat *mass setup/collection errors* — say, errors greatly outnumbering passes, or zero tests actually executing — as a hard failure regardless of tier, while leaving ordinary test failures advisory as they are today.\n\n#1201 moves detection of its specific cause into Fast Tests, which is a hard gate, so that particular breakage cannot silently recur. This issue is about the general case: any future reason the suite goes dark.\n\nRelated: #1105, #953, #1017.",
+  "created": "2026-08-05",
+  "id": "F-dccd6c",
+  "origin_issue": 1202,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "CI: an integration suite that cannot run at all still reports the workflow green"
+}

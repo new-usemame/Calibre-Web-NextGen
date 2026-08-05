@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #1353, filed 2026-08-04._\n\nFound by the v4.1.29 pre-tag refuter gate. Narrow, but it is the same bug class #1343 fixed\nfrom the other direction, re-entering through the savepoint added in this release.\n\n## The hole\n\n`cps/services/reading_position.py` `record_web_reader_progress` wraps\n`update_book_read_status` in `ub.session.begin_nested()` — a SAVEPOINT on **app.db**.\n\nAt ≥99% with `config_read_column` set, that call reaches `_mark_custom_read_column`\n(`kosync.py:522`), which runs its own unconditional `calibre_db.session.commit()` — an\nindependent commit to a **different database**, metadata.db.\n\nIf the savepoint then rolls back — precisely the racing-writer `IntegrityError` the savepoint\nexists to absorb — metadata.db is committed \"read\" while app.db's `ReadBook` write is undone.\nThe two read-status carriers diverge, which is exactly what #1343 was about.\n\nNeeds custom read column + ≥99% + a real race, so it is narrow. But note the savepoint is what\n*creates* the window: on the kosync path a failure propagates instead of silently discarding\nhalf the work.\n\n## Fix direction\n\nMove `_mark_custom_read_column` outside the savepoint, or defer it until after the outer commit\nsucceeds, so the cross-database write only happens once the app.db side is durable.\n\n## Second, pre-existing item found alongside\n\n`kobo_statistics` has no uniqueness constraint, and the live DB already carries a duplicate\n(`kobo_reading_state_id=17` → 2 rows), producing\n`SAWarning: Multiple rows returned with uselist=False for 'KoboReadingState.statistics'`.\nPre-existing, but `_ensure_visible_reading_state` is now on the web-reader path and therefore\nruns far more often than it used to, so the duplicate is easier to hit.",
+  "created": "2026-08-05",
+  "id": "F-194ce4",
+  "origin_issue": 1353,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Web-reader savepoint can roll back app.db while metadata.db stays committed"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "ingest",
+  "body": "_Migrated from issue #1158, filed 2026-07-26._\n\nSplit out of #1094 so it can be tracked on its own. Reported by [@auspex](https://github.com/auspex).\n\n## The ask\n\nThe conversion budget is a flat value — `Ingest Timeout` in CWA Settings (default 15 minutes), with the ingest service allowing 3x that as a safety limit. A 2600-page, image-heavy PDF is not going to convert in the same time as a 300-page novel, and killing it at a fixed wall-clock limit means large books can never be converted at all, no matter how healthy the machine is.\n\nTheir suggestion: scale it with page count, which is already known by the time conversion starts — something like `900 * N/500`, or `2700 * N/500`.\n\nFor calibration, from the same thread: `ebook-convert` on that file took roughly an hour locally just to extract the text, and OCR was running at ~5s/page.\n\n## What already changed\n\nThe book is no longer lost when this fires — a failed conversion imports the original instead (#1094, PR #1157). So today the symptom is \"large books stay in their original format\" rather than \"large books vanish\". That takes the urgency off, but not the ask.\n\n## Open design questions\n\n- **Where does the page count come from?** It needs to be cheap and available *before* conversion starts. Worth checking whether the ingest path already has it or whether reading it costs a separate pass over the file.\n- **Non-paged inputs.** A `.txt` or `.mobi` has no page count; the scaling needs a sensible fallback rather than a zero.\n- **Is a ceiling wanted at all?** An unbounded budget on a genuinely stuck conversion is how the safety timeout earned its place. A per-page rate with a generous cap is probably the shape, but the cap needs a number.\n- **Two limits, one setting.** `ingest_timeout_minutes` currently drives both the file-stability wait (`is_file_in_use()`) and, x3, the service safety limit. Only the second should scale with size, so this likely wants them separated rather than one value doing both jobs.",
+  "created": "2026-08-05",
+  "id": "F-7a1bf7",
+  "origin_issue": 1158,
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Ingest conversion timeout is flat, not proportional to book size"
+}

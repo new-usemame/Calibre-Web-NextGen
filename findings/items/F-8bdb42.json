@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1116, filed 2026-07-25._\n\nRaised by [@alva-seal](https://github.com/alva-seal) in #585, alongside a separate request for smart shelves in the sidebar.\n\nReordering a shelf upward also moves the separator line, so the grouping the separator is meant to indicate no longer matches what is above and below it.\n\nSplit out of #585 so the bug is tracked apart from the feature request in the same thread.",
+  "created": "2026-08-05",
+  "id": "F-8bdb42",
+  "origin_issue": 1116,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "New UI: moving a shelf in the sidebar drags the separator line with it"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #1126, filed 2026-07-25._\n\nSplit out of #989, which fixed the edit-page preview by consuming the cache-busted URL the upload API already returns.\n\nThe same staleness applies everywhere else a cover is rendered — book cards in the library grid, the detail page, shelves. `cps/api/serializers.py` emits a stable `/cover/<id>/{sm,og}` with no version, so after any cover change (upload, cover picker, metadata fetch, ingest re-cover) those surfaces keep showing the old image until the browser cache expires on its own.\n\n## The obvious fix, and why it was not taken inline\n\nVersion `cover_url` in the serializers. The cheap token would be `book.last_modified` — already loaded, no filesystem `stat()` per book, which matters because list endpoints serialize a page of books at a time and `stat()` on a network share (`NETWORK_SHARE_MODE`) is not free.\n\nTwo things to settle first:\n\n1. **`save_cover()` does not bump `last_modified`.** It writes the file and returns. So the token would not change on the exact event it needs to track until that is fixed.\n2. **`last_modified` drives Kobo sync.** It is the \"changed since\" window, so bumping it on a cover swap queues a re-sync of those books. Arguably correct — a new cover *should* reach the device — but it is a sync-behaviour change and deserves to be decided on its own merits rather than inherited from a UI fix.\n\nAn alternative that avoids both: derive the token from the cover file mtime, cached per book, accepting the `stat()` cost. Worth measuring against a large library before choosing.\n\nReported originally by [@chloeroform](https://github.com/chloeroform) in #989.",
+  "created": "2026-08-05",
+  "id": "F-0eed67",
+  "origin_issue": 1126,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Cover changes do not bust the browser cache outside the edit page"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "db",
+  "body": "_Migrated from issue #1291, filed 2026-08-01._\n\nFollow-up from the cross-family review on #1289 (fix for #1167). Not a regression — a cost characteristic worth bounding before someone hits it.\n\n## What happens\n\nBoth consumers of `cwa_duplicate_cache` re-validate it against the user's live view via `filter_visible_duplicate_groups()`:\n\n- `/duplicates/status`, polled every few seconds by every open admin/edit tab\n- the `duplicate_notification` payload, built on every classic page render (#1289)\n\nEach call runs `get_common_filters(user_id=...)`, which loads the user row plus **all** archived-book rows (`cps/duplicates.py:1085-1091`) and **all** hidden-book rows (`:1098-1103`). The 900-id chunking in `_visible_duplicate_book_ids` bounds SQLite parameters for the cached duplicate ids; it does not bound those two exclusion lists.\n\nSo the per-call cost scales with how much a user has archived or hidden, and it is paid on a timer regardless of whether anything changed.\n\n## Why it wasn't fixed in #1289\n\nThe obvious mitigation — skip revalidation when duplicate notifications are disabled — is wrong. `layout.html:635` reads `duplicate_notification.count` unconditionally and shows the sidebar badge whenever `dup_count > 0`; `enabled` gates only the popup. Returning a zero payload early would blank the badge for anyone who turned popups off. That trades a live user-facing bug for a perf win, which is the wrong direction while #1167 is about the badge lying in the first place.\n\nMitigating factors that make this non-urgent: both filters short-circuit on an empty group list (`duplicates.py:381-384`, `:492-493`), so instances with no duplicates pay nothing; and the status poller already paid this cost continuously before #1289, so the page-render path did not introduce a new order of magnitude.\n\n## Suggested shape\n\nA short-lived per-user memoization keyed on cache version (`scan_timestamp`) + user id, shared by both consumers — so a page render and the concurrent status poll resolve visibility once, not twice, and repeated polls within the TTL reuse it. Invalidate on cache write and on archive/hide changes.\n\nWorth measuring first on a library with a large archived set to confirm it's real before adding a cache layer.",
+  "created": "2026-08-05",
+  "id": "F-1f6174",
+  "origin_issue": 1291,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Duplicate visibility revalidation is recomputed per page render and per status poll"
+}

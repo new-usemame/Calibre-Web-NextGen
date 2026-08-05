@@ -1,0 +1,12 @@
+{
+  "area": "ingest",
+  "body": "_Migrated from issue #1163, filed 2026-07-26._\n\nFound while reviewing #1157, which guarantees that a failed *conversion* still imports the original. That contract has a neighbour it does not cover.\n\n## What happens\n\n`convert_book()` handles the converter's own failure modes — non-zero exit, deadline overrun, a missing executable — and each returns `(False, \"\")`, which routes into the import-the-original fallback. But bookkeeping that runs *after* a conversion succeeds is not inside that net. An exception from, for example, `conversion_add_entry()` propagates out of `convert_book()` rather than becoming a conversion failure, so `main()` unwinds into its cleanup path without importing either the converted file or the original — while the `finally` block still removes the source from the ingest folder.\n\nThe user-visible result is the same one #1094 reported: the file is gone from ingest and there is no library entry. The cause is different, which is why #1157 does not fix it.\n\n## Scope question this raises\n\n#1157's contract is \"a failed conversion must not lose the book.\" The broader contract users actually expect is \"no ingest-stage failure may lose the source.\" Closing the gap means a catch-all around the ingest stage that guarantees the source is either imported or left in place, rather than adding handlers one exception type at a time.\n\n## Note\n\nUntriggered in normal operation — it needs a DB or filesystem error at a specific point. Filed so the narrower contract is not mistaken for the broader one.\n\nFound during cross-family review of #1157. Relates to #1094, #1161.",
+  "created": "2026-08-05",
+  "id": "F-4bd825",
+  "origin_issue": 1163,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Ingest: a failure after a successful conversion can still drop the book"
+}

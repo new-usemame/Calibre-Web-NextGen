@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #982, filed 2026-07-18._\n\nFollow-up to the in-flight convert-target-dropdown fix (branch feat/convert-target-dropdown).\n\nOperator direction for the next iteration of the Formats > Convert control:\n\n- The target dropdown should lead with the **common conversions** for the selected source format (e.g. EPUB→KEPUB/MOBI/AZW3/PDF) so converting between everyday types is one click.\n- Below the common set, list the **remaining valid targets** (the full converter-supported list).\n- Add an **\"Other…\" entry** that reveals a free-text field for unusual targets — custom entry stays possible, but as an explicit escape hatch rather than the default input. Custom values are still validated server-side against the converter's allowlist (same 400 rejection path as the dropdown).\n- Layout stays \"Convert from [X] to [Y]\".\n\nSingle source of truth: common/alternate/allowed groupings come from the backend options payload, never duplicated in the frontend. Kepubify-only installs keep their restricted target set.\n\nBuilds on #<convert-dropdown-PR> once merged.",
+  "created": "2026-08-05",
+  "id": "F-64f2bd",
+  "origin_issue": 982,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Convert on book page v2: common conversions first, 'Other…' for custom targets"
+}

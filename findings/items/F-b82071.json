@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #899, filed 2026-07-14._\n\nTwo related diagnostics gaps, both raised in #873.\n\n## Nothing is logged about the token or whether Hardcover is on\n\n`cps/schedule.py` has no logger at all — no import, no `log.` call anywhere in the file:\n\n```python\n# schedule.py:251-255\nenabled = bool(cwa_settings.get(\"hardcover_auto_fetch_enabled\", False))\ntoken_available = bool(config.resolved_hardcover_token())\nif not enabled or not token_available:\n    return                      # silent; the two causes are indistinguishable\n...\n# schedule.py:311-313\nexcept Exception:\n    pass                        # every scheduling error swallowed\n```\n\nThree different causes — disabled, no token, exception — all produce the same observable: nothing. `resolved_hardcover_token()` and `token_status()` (`cps/services/hardcover.py:34`) never log either.\n\nWorth noting for anyone debugging this: the job is only added (`schedule.py:310`) after the `:254` gate passes, so `Added job \"hardcover auto-fetch\" to job store \"default\"` does prove the token resolved and auto-fetch is enabled. That is currently the only signal, and it is accidental rather than designed.\n\nSuggested fix: add a logger to `schedule.py`; one `log.info` per branch at `:254` saying which condition failed; log token presence and source at resolve time; replace `except Exception: pass` with `log.exception`.\n\n## The source is a boolean, so file users are told the wrong variable\n\n`hardcover_token_from_env()` (`cps/config_sql.py:441-452`) returns `bool(env or file)`. The note at `config_edit.html:284` then hardcodes \"A token from the **HARDCOVER_TOKEN environment variable** is currently active\" — so someone who set `HARDCOVER_TOKEN_FILE` is pointed at a variable they never set.\n\nSuggested fix: return a source enum (`db` / `env` / `file` / none) from one resolver and let the template and the log lines name the variable actually in use.\n\nPrivacy invariant for both halves: presence and source only, never the value. `config_hardcover_token` is on the debug-bundle redaction list (`cps/debug_info.py:51`) and filtered by the `token not in k.lower()` rule (`cps/config_sql.py:409`).\n\nCredit: @KucharczykL (#873).",
+  "created": "2026-08-05",
+  "id": "F-b82071",
+  "origin_issue": 899,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Hardcover: log token presence + source, and distinguish HARDCOVER_TOKEN from HARDCOVER_TOKEN_FILE"
+}

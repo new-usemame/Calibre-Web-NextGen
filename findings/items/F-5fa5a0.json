@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1006, filed 2026-07-19._\n\nFound while baselining the e2e suite for #855 (this reproduces on unmodified `main`, not on that branch).\n\n`frontend/e2e/a11y.spec.ts` fails on most routes with the same violation:\n\n```\nAccessibility violations on grid/light:\n  color-contrast [serious] — Elements must meet minimum color contrast\n  ratio thresholds (31 node/s)\n```\n\nAffected in a single run: grid, book detail, edit book, smart shelf builder, admin, account, shelves, advanced-search, duplicates, reader, and the announcement banner — desktop and mobile.\n\n## Notes\n\n- It is **light-theme specific** (`grid/light`), which is why it isn't obvious day to day: the default palette is dark.\n- Which route names appear varies run to run, because `theme.spec.ts` mutates the seeded user's persisted theme and the suite runs `fullyParallel`. The underlying contrast failure is stable; only its distribution shuffles.\n- 31 nodes on a single page points at a **token-level** problem (a `--text-muted` / `--text-faint` / accent value in the `[data-theme=\"light\"]` block of `styles/tokens.css`) rather than 31 separate component bugs.\n\n## Why this matters\n\nPer the project's a11y standard the gate is supposed to run with an **empty** known-violations list, so any critical/serious finding fails the build. Right now it is red nearly everywhere, which means it gates nothing — a genuinely new a11y regression would be indistinguishable from the existing noise.\n\n## Suggested approach\n\n1. Compute the actual contrast ratios for the light-theme text tokens against `--surface-1` / `--surface-2` / `--bg` and fix the failing token values (fixing the token likely clears most of the 31 nodes at once).\n2. Re-run `npx playwright test a11y` on both themes until clean.\n3. While here, consider making the theme-mutating specs restore the previous value (or run serially) so parallel runs stop reshuffling which routes report.\n\nRelated: #953 (the SPA e2e job is skipped on PRs, so none of this gates today).",
+  "created": "2026-08-05",
+  "id": "F-5fa5a0",
+  "origin_issue": 1006,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "[a11y] Light theme fails colour contrast on 31 nodes — the a11y gate is red across most pages"
+}

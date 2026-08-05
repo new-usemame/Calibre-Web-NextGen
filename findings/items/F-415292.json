@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1326, filed 2026-08-03._\n\nFound while fixing #1303 (right-to-left page-turn direction), filed separately rather than folded in.\n\n**What's missing:** in the new UI's reader you can only turn the page by tapping the narrow strips at the edges of the screen — 44px wide on mobile — or by pressing arrow keys. There's no swipe.\n\nThe classic reader has had swipe since it shipped: `cps/static/js/reading/epub.js` binds `touchstart`/`touchend` on the rendition and turns the page on a horizontal swipe past a threshold, with a tap-by-half fallback and a guard so it never turns the page while text is selected (which would fight the highlight gesture). It's also direction-aware — swipe advances the right way in a right-to-left book.\n\nThe SPA reader has none of that. `Reader.tsx` has no touch handlers at all; grep for `touchstart|touchend|swipe` returns nothing.\n\n**Why it matters:** this is the primary reading surface on a phone, and edge-tapping a 44px strip is the least forgiving way to turn a page. It's a parity gap against classic on the interaction people actually use most on touch.\n\n**Worth carrying over from the classic implementation when this is built:**\n- swipe threshold + tap-by-half fallback, so both gestures work\n- the \"don't turn the page while text is selected\" guard — without it, highlighting is painful\n- direction awareness, matching what #1303 just established for the tap zones and arrow keys (forward runs leftward in a right-to-left book)\n\nNot urgent, but it's a real gap and the classic reader is a working reference for all of it.",
+  "created": "2026-08-05",
+  "id": "F-415292",
+  "origin_issue": 1326,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "New UI reader: no swipe-to-turn-page on touch devices (classic has it)"
+}

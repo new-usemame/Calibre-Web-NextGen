@@ -1,0 +1,12 @@
+{
+  "area": "admin",
+  "body": "_Migrated from issue #834, filed 2026-07-11._\n\nThe new Account page exposes email and subject settings but omits the email body template field.\n\nCredit: @iroQuai in #628.\n\nPromise (2026-07-02): the missing email field was accepted as real work “on the list.”\n\nSource: https://github.com/new-usemame/Calibre-Web-NextGen/issues/628",
+  "created": "2026-08-05",
+  "id": "F-67982f",
+  "origin_issue": 834,
+  "refs": [],
+  "severity": "chore",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Account page: email body template field missing"
+}

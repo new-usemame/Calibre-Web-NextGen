@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1233, filed 2026-07-29._\n\nAffects both the classic editor and the new UI, and predates the new UI's custom-column editing (#1232) — that PR only made it easier to reach.\n\n**Symptom.** Type exactly `None` into a custom column (a notes/comments column is the realistic case) and save. The value is not stored — the column is cleared instead.\n\n**Cause.** `cps/editbooks.py::edit_cc_data_value` maps the literal string to Python `None` before it considers the column's datatype:\n\n```python\nif to_save[cc_string] == 'None':\n    to_save[cc_string] = None\n```\n\nThat is deliberate for `bool`: the classic editor's yes/no `<select>` in `cps/templates/book_edit.html` uses `<option value=\"None\">` as its \"unset\" sentinel. For every other datatype the sentinel is meaningless — an int column cannot hold \"None\" anyway — but the check runs before the datatype branch, so a text or comments column loses a legitimate value.\n\n**Likely fix.** Narrow the check to `c.datatype == 'bool'`. Worth confirming first that no other caller relies on the broad form: the classic editor's date fields clear via `''`, and `/api/v1`'s custom-column path (added in #1232) sends `''` for null and never emits the sentinel.\n\nNeeds a red/green test on the shared core, since both editors and the inline books-table editor route through it.\n\nFound during the cross-family review of #1232 and deliberately not fixed there — changing a sentinel the classic bool select depends on should not ride along in a feature PR.",
+  "created": "2026-08-05",
+  "id": "F-48fca9",
+  "origin_issue": 1233,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Typing the literal word \"None\" into a custom column clears it instead of saving it"
+}

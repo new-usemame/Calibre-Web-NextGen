@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1007, filed 2026-07-19._\n\nFollow-up from [#855](https://github.com/new-usemame/Calibre-Web-NextGen/issues/855) (@monimkxl-web) and already flagged as a v2 item during the review of #975.\n\nv4.1.17 added the series name and position under the title/author on book cards, which covered the \"I can't see which series a book belongs to\" half of the report. The other half — \"so I can't **display** a series\" — is still open: the series line renders as plain text (`frontend/src/components/BookCard.tsx`, the `<p className={styles.series}>`), so there is no way to get from a card to that series' page.\n\n## Ask\n\nMake the series line navigate to the series (`/app/series/:id`).\n\n## Care needed\n\nThe whole card is already an interactive control, so a naive nested `<a>` creates a nested-interactive a11y violation and an ambiguous click target. Worth deciding deliberately between:\n\n- a real link that stops event propagation, positioned above the card's own click layer, or\n- keeping the card as the only control and surfacing the series link on the book detail page instead.\n\nWhichever way it goes it needs a keyboard pass (tab order, focus ring) and an `a11y.spec.ts` assertion, plus a check at 375px where the card is tightest.\n\nCredit: reported by [@monimkxl-web](https://github.com/monimkxl-web).",
+  "created": "2026-08-05",
+  "id": "F-5384f4",
+  "origin_issue": 1007,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "[New UI] Make the series line on book cards a link to the series"
+}

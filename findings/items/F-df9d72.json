@@ -1,0 +1,12 @@
+{
+  "area": "docs",
+  "body": "_Migrated from issue #843, filed 2026-07-11._\n\nCredit: @uschi1 (#527) for the Synology workflow feedback that exposed the need for visual, hardware-verified instructions.\n\nAdd current screenshots to the NAS/Docker-GUI install and update guides after verifying each flow on representative real hardware. Prioritize Synology, QNAP Container Station, Dockge, Unraid, Portainer, and TrueNAS; clearly mark any platform that remains docs-only.",
+  "created": "2026-08-05",
+  "id": "F-df9d72",
+  "origin_issue": 843,
+  "refs": [],
+  "severity": "docs",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Install guides: add real-hardware-verified screenshots"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "ci",
+  "body": "_Migrated from issue #1265, filed 2026-07-31._\n\nFollow-up from #1262, which made `integration-tests` gate on what a PR touches rather than on its tier label.\n\nBoth consumers of the new signal read `needs.changed_paths.outputs.build`. If `changed_paths` **fails** rather than skips, that output is the empty string:\n\n- `integration-tests` evaluates `needs.changed_paths.outputs.build == 'true'` to false, so a Dockerfile-only PR skips the job.\n- `test-summary` computes `IS_BUILD_PR=false`, sees a `skipped` integration result, and reports success.\n\nThat is the same shape as the bug #1262 fixes — a gate whose absence reads as a pass — one level up, triggered by infrastructure instead of a missing label. `changed_paths` is a checkout plus a `git diff` with a 5-minute timeout, so this needs a genuine runner or checkout failure. Unlikely, not impossible, and the failure is silent when it happens.\n\n**Fix: fail closed.** Treat any non-success `changed_paths` as `build=true` rather than as `build=''`, so an infrastructure failure over-runs the expensive job instead of skipping the gate. `always()` already keeps the job reachable in that state; only the predicate needs to distinguish \"not a build PR\" from \"we could not tell\".\n\nThe `e2e-tests` job reads `needs.changed_paths.outputs.frontend` with the same shape and has the same gap, so whatever lands here should cover both.\n\nA regression test belongs in `tests/unit/test_workflow_safety_invariants.py` next to the 19 behavioural cases #1262 added.",
+  "created": "2026-08-05",
+  "id": "F-b095e3",
+  "origin_issue": 1265,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "CI: a failed (not skipped) changed_paths silently disables the build gate"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "api",
+  "body": "_Migrated from issue #1051, filed 2026-07-21._\n\nCame out of declining #228 (MCP server), where it turned out to be the actual blocker rather than a detail.\n\n**Today.** `/api/v1` authenticates with the browser session cookie plus a CSRF token. The per-user app passwords that OPDS and KOReader use are not accepted there, and where they are accepted they carry the user's full role — no scopes, no read-only mode, no per-client separation. So there is currently no way to give an external tool narrow access to your library.\n\n**What this would add.** Per-user tokens that are named, individually revocable, scoped (at minimum read-only vs read-write, ideally per-area), usable against `/api/v1`, and visible in the account page with a last-used stamp so you can tell what is still talking to your server.\n\n**Why it matters beyond one feature.** It is the prerequisite for any third-party integration — an MCP adapter, a mobile client, a script — without handing over full account credentials. Right now every such integration has to be all-or-nothing, which is why #228 was declined rather than built.\n\nDesign note first; this touches auth, so it takes the security review gate.",
+  "created": "2026-08-05",
+  "id": "F-5c7d88",
+  "origin_issue": 1051,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Scoped, revocable API tokens for third-party clients"
+}

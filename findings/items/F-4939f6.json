@@ -1,0 +1,12 @@
+{
+  "area": "ci",
+  "body": "_Migrated from issue #1184, filed 2026-07-28._\n\nObserved on the e2e run for #1180 (run 30274438071): `hidden-books.spec.ts:237`\n(\"Guest never receives a Hide action even when the instance feature is enabled\")\nfailed on the first attempt and passed on retry.\n\n```\nError: apiResponse.json: Response has been disposed\n\n  241 |   await page.route('**/api/v1/auth/me', async (route) => {\n  242 |     const response = await route.fetch();\n> 243 |     const me = await response.json();\n      |                               ^\n  244 |     me.role = { ...(me.role ?? {}), anonymous: true, delete_books: false };\n  246 |     await route.fulfill({ response, json: me });\n```\n\nThe handler fetches the upstream response, awaits `.json()`, then fulfils. If the\npage navigates (or the context tears down) while `.json()` is in flight, Playwright\ndisposes the response and the await rejects.\n\nThis is not one spec's problem. The same fetch-then-json-then-fulfil shape is used\nat nine call sites:\n\n- `book-detail.spec.ts:166, 213, 229, 277` — including the new long-metadata test added in #1178\n- `entity-page-title.spec.ts:13`\n- `help-banner-kofi.spec.ts:288`\n- `hidden-books.spec.ts:194, 246`\n- `sp2-display-options.spec.ts:47`\n\nAny of them can flake the same way under the right timing.\n\nWorth doing together with #1182 (the other known flake), because #1183 — promoting\nthe gate to required — should only happen once the gate is reliably green, and two\nknown-flaky patterns are exactly what would make a required gate untrustworthy again.\n\nLikely fix is to guard the handler (fall back to `route.continue()` when the\nresponse is already disposed) rather than to retry harder. Whatever shape it takes,\nit should be applied to the pattern, not to the one spec that happened to flake.",
+  "created": "2026-08-05",
+  "id": "F-4939f6",
+  "origin_issue": 1184,
+  "refs": [],
+  "severity": "test",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "hidden-books.spec.ts:237 flakes on 'Response has been disposed' (shared route.fulfill pattern)"
+}

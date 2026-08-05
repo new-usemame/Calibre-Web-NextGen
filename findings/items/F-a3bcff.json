@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1070, filed 2026-07-21._\n\nAn idea worth building: let people set a subtle animated backdrop for their library — something beautiful to open, rather than a flat panel.\n\n**Shape.** A per-user setting, off by default, that puts a gentle looping ambient scene behind the library view (and likely the reader's side margins). Users can point it at their own image or short loop; we'd also ship a few curated scenes.\n\n**Non-negotiables**, because this is the kind of feature that goes wrong quietly:\n- Honours `prefers-reduced-motion`, plus an explicit reduce-motion toggle.\n- Opacity/blur control, with WCAG 2.2 AA text contrast holding over *every frame* — not just the first one.\n- A strict performance budget with a still-image fallback and pause-when-hidden, so a looping backdrop behind a scrolling grid stays smooth on a Raspberry Pi or an old tablet.\n- Short muted looping video/WebP rather than GIF — much better quality per byte.\n- Uploaded assets are user data: size caps, MIME validation, and the security-review gate on the upload path.\n\nDesign note first (modality matrix across mobile/desktop and light/dark, performance budget, a11y contract), then a vertical slice with one scene.\n\nFiled from a maintainer idea; comments and opinions welcome, especially from anyone running on low-powered hardware.",
+  "created": "2026-08-05",
+  "id": "F-a3bcff",
+  "origin_issue": 1070,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Ambient animated backgrounds for the library and reader"
+}

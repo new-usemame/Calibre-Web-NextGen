@@ -1,0 +1,12 @@
+{
+  "area": "i18n",
+  "body": "_Migrated from issue #879, filed 2026-07-13._\n\n**Type:** internal audit finding (surfaced while root-causing #615). Affects every non-English locale, not just French.\n\n## What\n\nThe SPA i18n catalog (`GET /api/v1/i18n/<locale>.json`) is derived from the compiled `.mo`, and `msgfmt` excludes `#, fuzzy` entries by default. Many SPA msgids were auto-translated by fuzzy-matching against a longer, similar existing msgid — which both marks them `#, fuzzy` (so they're dropped from the `.mo`) and often produces the *wrong* meaning. Result: the SPA `t()` falls back to the English source string, so the affected strings render in English for every locale.\n\n`grep -c '^#, fuzzy' cps/translations/fr/LC_MESSAGES/messages.po` = **485** (main). Comparable counts in other locales.\n\nExamples (French), all `#, fuzzy` → excluded → English on screen:\n- `Your Library` → \"Convertir la bibliothèque\" (= \"Convert the library\")\n- `Library` → \"Dans la librairie\" (= \"In the bookstore\")\n- `Advanced` → \"Recherche avancée\" (= \"Advanced search\")\n- `Search title, author…` → \"Rechercher par titre/auteur\" (**correct French** — proving the fuzzy flag alone, not bad French, is enough to drop a good translation)\n\n## Impact\n\nEvery non-English user sees a pool of new-UI strings in English (or would see wrong translations if the fuzzy value were compiled). High reach — hits all localized installs.\n\n## Fix direction\n\nTwo options (not mutually exclusive): (a) review + de-fuzzy the SPA-anchored msgids per locale behind a quality gate, and/or (b) change the auto-translation job so it does not fuzzy-match SPA bare labels against unrelated longer msgids in the first place. A `.po`-lint test could pin that SPA-anchored msgids are never left `#, fuzzy`.\n\nThe user-facing French subset is being fixed directly under #615 (with the reporter's exact list). This issue tracks the systemic pass so it isn't lost. See `notes/615-french-spa-i18n-DESIGN.md` for the full mechanism breakdown.\n\nRelated: #615",
+  "created": "2026-08-05",
+  "id": "F-b363fe",
+  "origin_issue": 879,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "SPA i18n: fuzzy-flagged translations silently fall back to English across all locales"
+}

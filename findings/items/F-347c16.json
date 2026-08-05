@@ -1,0 +1,12 @@
+{
+  "area": "api",
+  "body": "_Migrated from issue #1323, filed 2026-08-03._\n\nSplit out of the #1321 cross-family review rather than widened into it — this is a pre-existing hazard the #1318 work did not introduce and does not close.\n\n## What\n\nBoth bookmark write routes begin with a bulk delete, before anything that guards a database failure:\n\n- `cps/web.py` `set_bookmark` — `ub.session.query(ub.Bookmark).filter(...).delete()`\n- `cps/api/reader.py` `save_bookmark` — same\n\n`Query.delete()` issues SQL immediately. Under contention it can raise `OperationalError` right there, outside both `ub.session_flush()` and `ub.session_commit()`, so neither helper's rollback runs.\n\n`ub.session` is a single concrete session created once by `ub.init_db()` and shared across requests. There is no app teardown that rolls it back. So a failure raised by that delete leaves the shared session in a failed state, and the next request to touch it gets `InvalidRequestError` until some other code path happens to roll back.\n\n## Why it matters\n\n#1318 made these routes honest about a write that did not land, but only for failures raised *inside* the two helpers. A lock hit by the opening delete produces a 500 from the unhandled exception — which is at least not a false success — and then a session that can poison unrelated requests.\n\n## Shape of the fix\n\nProbably not per-route try/except; the general answer is a teardown that rolls back the shared session when a request ends with an exception (`app.teardown_request` / `teardown_appcontext`), so no single failure can strand it. Worth checking whether any other route has the same open-with-immediate-SQL shape.\n\nFound by the Terra review pass on #1321 (finding E); confirmed by reading `ub.init_db` and the two routes.",
+  "created": "2026-08-05",
+  "id": "F-347c16",
+  "origin_issue": 1323,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Bookmark routes can raise before any commit guard, leaving the shared session failed"
+}

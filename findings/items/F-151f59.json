@@ -1,0 +1,12 @@
+{
+  "area": "api",
+  "body": "_Migrated from issue #1357, filed 2026-08-04._\n\nFound by the v4.1.29 pre-tag refuter gate. A gap, not a broken claim — v4.1.29 only claims the\nfour routes that were fixed, and `test_1318_honest_commit_status.py`'s pinned list matches.\n\n#1318 made rolled-back writes stop reporting success. `ub.session_commit()` now returns a\nboolean for callers to check. `helper.edit_book_read_status` discards that boolean on **both**\nbranches, so these three still answer `200` unconditionally even when the write was rolled back:\n\n- `POST /ajax/toggleread/<id>`\n- `POST /api/v1/books/<id>/read`\n- `POST /ajax/readselectedbooks`\n\nSame class as the four already fixed (`set_bookmark`, `save_bookmark`, `delete_auth_token`,\n`edit_domain`): the user is told their read status changed when it may not have.\n\nWorth folding into the same contract rather than one-off patching — the pattern is now\nestablished, and read status is a two-carrier write (#1343), so a half-failed toggle is exactly\nwhere a silent success is most misleading.\n\nNote on evidence: the refuter could not produce a clean live DB-busy repro, because an external\n`BEGIN EXCLUSIVE` on `/config/app.db` blocked a third sqlite connection but did not block the\napp (WAL over a Docker Desktop bind mount). So the un-checked return value is OBSERVED in\nsource; the runtime consequence is reasoned, not demonstrated.",
+  "created": "2026-08-05",
+  "id": "F-151f59",
+  "origin_issue": 1357,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Read-status toggle routes still report success on a rolled-back write (#1318 contract gap)"
+}

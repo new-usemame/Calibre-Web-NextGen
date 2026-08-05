@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1234, filed 2026-07-29._\n\n**Symptom.** In the new UI's book editor, if a save comes back with a field error, the form shows the error but the field has reverted to the value stored on the server — the value you typed, and are being asked to fix, is gone.\n\n**Cause.** `useUpdateMetadata` writes the response into the `['metadata', id]` query cache, and `EditBook.tsx`'s `useEffect([meta])` rebuilds the whole form state from `meta` whenever it changes. A `200` carrying an `errors` map is still a response, so the reseed runs and overwrites the user's input.\n\nAffects every field equally — title, tags, identifiers, custom columns — so it is not specific to any one of them.\n\n**Fix sketch.** Only reseed the form from a response that carried no `errors`, or reseed only the fields that saved cleanly and leave the rejected ones holding the rejected input. The second is the better behaviour but needs care so a later clean refetch still wins.\n\nFound during the cross-family review of #1232; pre-existing, so not fixed there.",
+  "created": "2026-08-05",
+  "id": "F-151255",
+  "origin_issue": 1234,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "New UI: a save error throws away what you typed and restores the old value"
+}

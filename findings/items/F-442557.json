@@ -1,0 +1,12 @@
+{
+  "area": "ingest",
+  "body": "_Migrated from issue #1161, filed 2026-07-26._\n\nFollow-up from the review of #1157, which gave ingest conversion its own deadline inside the service's hard `timeout`.\n\n## What happens\n\nWhen the conversion deadline fires, `subprocess.run(timeout=...)` kills and reaps the converter it launched — but only that direct child. `Popen.kill()` signals one process, not a process group, and the converters are not started in their own session:\n\n```python\nsubprocess.run(['ebook-convert', ...], timeout=conversion_budget_remaining())\n```\n\n`ebook-convert` can spawn helper processes of its own. Those are not signalled when the deadline fires, so they can keep running — holding files open and consuming CPU — during the window where the processor is backing up and importing the original. They are usually cleaned up later, when the outer `timeout` expires and signals the whole group.\n\n## Why it wasn't fixed in #1157\n\nThe obvious fix (`start_new_session=True`, then signal the group) has a real trade-off: a new session takes the converter *out* of the outer `timeout`'s process group, so the service's last-resort watchdog would no longer reach it. Doing this properly means owning the full lifecycle — a session per converter, a group signal on timeout, and a SIGTERM/SIGINT handler in the processor that tears down the active converter group before exiting. That is its own change with its own failure modes, and it is not on the path of the data-loss bug #1157 fixed.\n\n## Impact\n\nResource cleanup, not correctness: the book is imported either way. Most visible on large or image-heavy books where the deadline actually fires.\n\n## Suggested shape\n\nWrap converter invocation in one helper that starts the child in its own process group, enforces the remaining budget, signals the group on timeout and waits for it, then returns the ordinary conversion failure. Install a signal handler so an outer SIGTERM still tears the group down.\n\nFound during cross-family review of #1157. Relates to #1094.",
+  "created": "2026-08-05",
+  "id": "F-442557",
+  "origin_issue": 1161,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Ingest: a converter's child processes can outlive the conversion deadline"
+}

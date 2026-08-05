@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #881, filed 2026-07-13._\n\nSplit out from #771 (reported by @darkmatterpelican).\n\n**Ask:** The classic book cards expose quick favorite (star) and read/unread controls directly on the card; the new-UI (SPA) book cards don't. Add read/unread + favorite quick-actions to the SPA cards for parity, so a book can be marked without opening the detail page. Screenshot comparison (classic card with the controls vs the SPA card without) is in #771 item 3.\n\n**Scope:** SPA book-card component — add a read-toggle and a favorite toggle wired to the existing toggle endpoints, reusing the same tri-state read semantics (unread / reading / read) the cover badge already renders. The star should reflect per-user favorite state.\n\n**Modality:** verify on mobile + desktop and on both hover and touch — the controls must be reachable without hover on touch devices (a hover-only reveal fails on phones/tablets), and must not fight the card's tap-to-open target.\n\nDesign note: `notes/771-read-status-and-star-toggle-DESIGN.md`.",
+  "created": "2026-08-05",
+  "id": "F-0a2f72",
+  "origin_issue": 881,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "New UI: read/unread + favorite quick-actions on book cards (parity with classic cards)"
+}

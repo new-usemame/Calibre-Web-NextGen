@@ -1,0 +1,12 @@
+{
+  "area": "spa",
+  "body": "_Migrated from issue #1063, filed 2026-07-21._\n\nFound while verifying #1061 on `cwn-local`. Not caused by that change — the diff there contains no CSS.\n\n**Symptom.** On the **light** theme, muted text renders `#9aa7b2` on `#ffffff` — a contrast ratio of **2.45:1**, against the 4.5:1 WCAG 2.2 AA minimum. axe reports **28 serious nodes**, mostly the sidebar: every nav link label (Books, Authors, Series, Tags, Publishers, Languages, Ratings, Formats, Favorites, Hot, Discover, Rated, Archived, Table, Magic, Duplicates, Tasks, About), the section titles, every shelf name, the Customize button, and the edit page's Cancel link. One more at 1.22:1 (`#ece8e1` on `#ffffff`) on a dropdown trigger label.\n\nThe dark theme is unaffected. Mobile passes because the sidebar is collapsed.\n\n**Reproduce.**\n\n```\ncd frontend && npx playwright test a11y --project=desktop\n```\n\nFails on `grid`, `book detail`, `edit book`, `account`, `advanced-search`, `admin`, `shelves`, `smart shelf builder` — anywhere the sidebar renders.\n\n**Why it wasn't caught.** The `E2E Tests (SPA)` job is `skipped` on pushes to `main`, so the a11y suite that would have flagged this isn't gating. That's the more important half of this issue: the gate exists and is green when run by hand, but nothing runs it on the branch that ships.\n\n**Scope.** Two pieces of work: bring the light-theme muted-text token up to 4.5:1 (and re-check the surfaces that use it), and make the SPA e2e job actually run on main.",
+  "created": "2026-08-05",
+  "id": "F-5ac530",
+  "origin_issue": 1063,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "[bug] Light theme fails WCAG contrast across the sidebar, and the SPA a11y gate is skipped on main"
+}

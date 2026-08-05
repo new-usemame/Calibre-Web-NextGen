@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #1356, filed 2026-08-04._\n\nFound by the v4.1.29 pre-tag refuter gate. New user-visible state introduced by #1340's guard;\nthe underlying trade is defensible, the frozen display is the cost.\n\n## Symptom\n\nMark a book Read while you are part-way through it — say 35%. `progress_percent` stays `35`.\nThe book page then shows a **checked Read box and `KOReader Progress: 35%` at the same time**,\nand the Kobo is served `StatusInfo: Finished` with `ProgressPercent: 35`.\n\nSince #1340 the web reader can no longer correct that number: every save below the 99% finished\nthreshold is refused for a book whose row says FINISHED. So the stale percentage is frozen\nuntil the user marks the book Unread.\n\n## Why it happens\n\n`edit_book_read_status` never touches the percentage on the mark-read path — it sets status\nonly. Before this release the reader would have corrected the number upward on the next save,\nbut at the cost of clobbering the Read status back to in-progress, which is the bug #1340\nexists to stop. So the guard is right; what is missing is that marking a book Read does not\nalso settle its progress.\n\n## Fix direction\n\nHave the mark-read path bring the position with it — set the stored percentage to the finished\nthreshold (or 100) when a book is marked Read, the same way marking Unread already calls\n`reset_reading_position` to clear the ghost percentage (#683). That closes the loop in both\ndirections and removes the frozen state without weakening the guard.",
+  "created": "2026-08-05",
+  "id": "F-447ab1",
+  "origin_issue": 1356,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Marking a book Read part-way through freezes a stale progress percentage beside the Read checkmark"
+}

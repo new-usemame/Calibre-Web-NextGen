@@ -1,0 +1,12 @@
+{
+  "area": "koreader",
+  "body": "_Migrated from issue #1190, filed 2026-07-28._\n\nSplit out of #991 rather than folded into the fix there (#1189).\n\nWhen a KOReader sync fails to resolve, the only signal is:\n\n```\nKOReader sync: No book found for checksum: <X>\n```\n\n`cps/progress_syncing/protocols/kosync.py:333`\n\nThat single line cannot distinguish between causes that need completely\ndifferent answers from the user:\n\n1. **Registration was never running.** `is_koreader_sync_enabled()`\n   (`cps/progress_syncing/settings.py:30-48`) fails closed on any exception\n   reading `cwa.db`, and the warning is rate-limited to one line per 300s. A\n   download landing in a restart or backfill window registers nothing, silently.\n2. **The device holds a copy we never served** — the #991 shape, now fixed\n   plugin-side in #1189, but still reachable for a device that cannot update.\n3. **The checksum row exists but its book id no longer resolves.**\n   `get_book_by_checksum` INNER JOINs to `Books` (kosync.py:304-308), so a stale\n   book id produces the identical message to \"never registered\". A Calibre\n   database rebuild is exactly the event that reassigns book ids.\n\nDiagnosing #991 took a round trip asking the reporter to run `sqlite3` against\ntheir library by hand. That should not be necessary.\n\n**Suggested shape:** include, on the miss path, whether sync is currently\nenabled and how many checksum rows exist library-wide. `sync_enabled=false`\nimmediately names cause 1; `0 registered` names a backfill that never ran; a\nhealthy count points at cause 2 or 3. Worth rate-limiting, since a device stuck\nin this state polls repeatedly.\n\nAlso worth considering: the boot backfill\n(`scripts/generate_book_checksums.py:167-179`) is missing-only, so a book whose\nbytes changed after its first registration is never re-hashed and `--force` is\nnot reachable from the container. That is a separate gap and may deserve its\nown issue.",
+  "created": "2026-08-05",
+  "id": "F-3eec38",
+  "origin_issue": 1190,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "KOReader sync: \"No book found for checksum\" is undiagnosable from the log alone"
+}

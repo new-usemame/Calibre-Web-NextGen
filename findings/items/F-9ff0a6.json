@@ -1,0 +1,12 @@
+{
+  "area": "admin",
+  "body": "_Migrated from issue #1141, filed 2026-07-26._\n\nFound while repairing `mobile.spec.ts` for #1130 (#1140).\n\n`cps` SPA, `frontend/src/pages/Catalog.tsx` ~line 689:\n\n```tsx\n<button aria-haspopup=\"true\" aria-expanded={settingsOpen} aria-label={t('View settings')}>\n...\n{settingsOpen && <div className={styles.settingsMenu}>   {/* no role */}\n```\n\n`aria-haspopup=\"true\"` is defined as equivalent to `aria-haspopup=\"menu\"`. So a screen-reader user is told this button opens a **menu** — and the thing that opens has no role at all. `getByRole('menu')` finds nothing, which is exactly how this surfaced.\n\nThe panel contains toggle controls (currently the Discover section toggle, plus a second one added since), so the honest options are:\n\n1. **`role=\"menu\"` with `role=\"menuitemcheckbox\"` children** — matches the promise, but brings the full menu keyboard contract (arrow-key roving focus, Escape, focus management) which is not implemented today. Claiming the role without the behaviour is worse than the current state.\n2. **`aria-haspopup=\"dialog\"` + `role=\"dialog\"`** with a label and focus handling.\n3. **Drop `aria-haspopup` and use `role=\"group\"`** with `aria-label`, treating it as a disclosure rather than a menu — the smallest honest change, since a disclosure is what it actually is.\n\nMy read is (3): it is a small panel of independent toggles, not a command menu, and a disclosure pattern is what the markup already behaves like. But that is a design call with real consequences for assistive-tech users, so it should be a deliberate decision rather than something folded into a test repair.\n\nNot blocking anything — noting it so the promise and the markup stop disagreeing.\n\nRelated: the a11y capability notes (SPA held at WCAG 2.2 AA); #1135 was a different instance of \"the gate did not see it\".",
+  "created": "2026-08-05",
+  "id": "F-9ff0a6",
+  "origin_issue": 1141,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "[a11y] View-settings popup promises a menu it does not provide"
+}

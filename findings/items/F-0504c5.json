@@ -1,0 +1,12 @@
+{
+  "area": "shelves",
+  "body": "_Migrated from issue #839, filed 2026-07-11._\n\nMagic-shelf Kobo delivery needs its per-book sub-cursor tracked independently so large shelves terminate and drain without repeats or drops.\n\nCredit: @recruiterguy and #359.\n\nPromise (2026-06-05): “The follow-up improvement to fully paginate within the magic-shelf arm is tracked separately.”\n\nSource: https://github.com/new-usemame/Calibre-Web-NextGen/issues/359",
+  "created": "2026-08-05",
+  "id": "F-0504c5",
+  "origin_issue": 839,
+  "refs": [],
+  "severity": "chore",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Magic-shelf pagination: full cursor (magic_shelf_last_id residual)"
+}

@@ -1,0 +1,12 @@
+{
+  "area": "metadata",
+  "body": "_Migrated from issue #406, filed 2026-06-09._\n\nRequest: a first-class Anna's Archive metadata provider alongside the existing ones (Google Books, Open Library, IBDb, DNB, Hardcover, Kobo, Apple Books, etc.).\n\n## Why\n\nAnna's Archive aggregates records from many catalogs and exposes cross-identifiers (ISBN-13/10, OCLC, Open Library, Goodreads) on a single record. For modern, retail and obscure titles it is the most reliable single place to resolve a clean edition and its identifiers.\n\nIn practice, seeding from an Anna's Archive record by ISBN and then filling description and subjects from Open Library and Google Books produces noticeably better results than any current provider alone. It is strongest exactly in the corner where the current first-result matching is weakest: a bare book with no embedded description, where a title-only search tends to land on a foreign edition (see #402).\n\n## Shape\n\n- A provider under `cps/metadata_provider/` implementing the standard `search(query, generic_cover, locale)` and returning `MetaRecord`s, like the others.\n- Support ISBN queries (md5 / isbndb lookups) as well as title+author, so it can back the ISBN-first matching proposed in #402.\n- Map Anna's Archive cross-IDs into `identifiers` (isbn, oclc, openlibrary, goodreads) so downstream books inherit rich identifiers for free.\n\nThis pairs directly with the ISBN-first matching change: Anna's Archive is the natural provider to turn an ISBN into a canonical record. Related: #315.",
+  "created": "2026-08-05",
+  "id": "F-e12078",
+  "origin_issue": 406,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Add Anna's Archive as a metadata provider"
+}

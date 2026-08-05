@@ -1,0 +1,12 @@
+{
+  "area": "kobo",
+  "body": "_Migrated from issue #1057, filed 2026-07-21._\n\nSplit out of #866, suggested by @auspex.\n\nToday a new account defaults to syncing the whole library to a Kobo. Marking a shelf for Kobo sync then appears to do nothing until you also switch the account to \"sync only my selected shelves\" — which is the confusion #866 was actually about. v4.1.19 added the warning and a one-click switch on both shelf types, but the default itself is unchanged.\n\nThe argument for flipping it, in the reporter's words: if the default were \"selected shelves only\", the worst case is that nothing syncs and you go looking for why. The current worst case is a device that grinds through the entire library and goes to sleep before finishing.\n\nWorth weighing before changing anything:\n\n- It changes behaviour for existing installs unless it applies to new users only, which is the safer shape.\n- Stock Calibre-Web's behaviour here should be checked rather than assumed — the reporter recalls not hitting this there.\n- A first-sync-is-empty experience needs to be self-explanatory, or it trades one confusion for another.\n\nNo commitment to a particular outcome yet; filing so the suggestion is tracked rather than buried in a closed-out thread.",
+  "created": "2026-08-05",
+  "id": "F-b22824",
+  "origin_issue": 1057,
+  "refs": [],
+  "severity": "ux",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "Consider defaulting new users to \"sync only selected shelves\" for Kobo"
+}

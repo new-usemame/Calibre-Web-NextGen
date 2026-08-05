@@ -1,0 +1,12 @@
+{
+  "area": "api",
+  "body": "_Migrated from issue #1151, filed 2026-07-26._\n\nFound while reviewing #1149 (cross-family review, proofed). Low severity, but the code no longer does what its docstring says.\n\n## What\n\n`CalibreDB.refresh_for_new_data()` iterates `CalibreDB.instances` and calls `expire_all()` / `rollback()` on `inst.session`. Since #1149, `session` is a property that resolves through the `scoped_session` registry, so `inst.session` returns **the session of whichever greenlet is executing the loop** — the same object on every iteration, regardless of how many instances there are. Sessions belonging to other in-flight requests are not reached.\n\nThe docstring's \"on every CalibreDB instance\" is therefore inaccurate: it refreshes one session N times.\n\n## Why it is low severity\n\n- The only caller is the manual reconnect endpoint (`cps/cwa_functions.py:684`).\n- Sessions live exactly one request — `shutdown_session` removes the greenlet's session on every teardown — so every request that *starts* after the refresh gets a new session and sees the new data.\n- The staleness window is only the tail of requests already in flight when the endpoint runs.\n\nSo the user-visible effect is close to nil today, and it self-heals. It is filed rather than fixed because the loop's intent genuinely is not achieved, and a future caller (a background refresh, say) would be misled by it.\n\n## Direction\n\nIterating `CalibreDB.instances` cannot fix this — instances are not what owns a session. It needs either an operation that enumerates live registry entries and expires each, or a generation/invalidation counter that a session checks lazily on next use. The second is likely simpler and avoids touching other greenlets' sessions from outside, which is what #1150 was about.\n\nRelated: #1121, #1150.",
+  "created": "2026-08-05",
+  "id": "F-84e991",
+  "origin_issue": 1151,
+  "refs": [],
+  "severity": "correctness",
+  "source": "migrated-issue",
+  "status": "open",
+  "title": "refresh_for_new_data() only refreshes the calling request's session, not other in-flight ones"
+}

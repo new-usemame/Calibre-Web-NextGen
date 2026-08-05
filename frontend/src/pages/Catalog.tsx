@@ -17,6 +17,7 @@ import { formatAuthors } from '../lib/authors';
 import { saveCatalog, loadCatalog } from '../lib/scrollCache';
 import { usePersistentBool } from '../lib/usePersistentBool';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
+import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Catalog.module.css';
@@ -312,6 +313,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // Discover section visibility (persisted; toggled by the gear menu or its ×).
   const [discoverHidden, setDiscoverHidden] = usePersistentBool('cwng_discover_hidden_v1', false);
   const [showHidden, setShowHidden] = usePersistentBool('cwng_show_hidden_books_v1', false);
+  // #1054: let a user drop the per-card Read/edit row to calm the grid down.
+  const [cardActionsHidden, setCardActionsHidden] = useCardActionsHidden();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [density, setDensity] = usePersistentChoice(
     'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
@@ -864,6 +867,16 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                     <span>{t('Show hidden books')}</span>
                   </label>
                 )}
+                <label className={styles.settingsItem}>
+                  <input
+                    type="checkbox"
+                    data-testid="show-card-actions"
+                    className={styles.settingsCheck}
+                    checked={!cardActionsHidden}
+                    onChange={(e) => setCardActionsHidden(!e.target.checked)}
+                  />
+                  <span>{t('Show Read now and edit buttons')}</span>
+                </label>
                 <fieldset className={styles.densityField}>
                   <legend>{t('Book density')}</legend>
                   {DENSITY_OPTIONS.map((option) => (
@@ -904,7 +917,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
       {/* Discover: random picks, library landing only (not while searching). */}
       {!hideLibraryControls && !search && !discoverHidden && (
-        <DiscoverSection onClose={() => setDiscoverHidden(true)} />
+        <DiscoverSection onClose={() => setDiscoverHidden(true)} hideActions={cardActionsHidden} />
       )}
 
       {isFirstLoad ? (
@@ -963,6 +976,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                 showSeriesIndex={isSeries}
                 style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }}
                 quickEdit={canEdit && !selecting}
+                hideActions={cardActionsHidden}
                 selectable={selecting}
                 selected={selected.has(book.id)}
                 onToggleSelect={(b) =>

@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "Low severity. In the deferred branch no KEPUB Data row exists yet, so Kobo metadata advertises the source EPUB's byte size for a declared KEPUB download. Measurements across 24 books with both formats show kepub/epub = 1.023, making this approximately a 2% overstatement and a proven-working estimate. Changing Size to 0 is untested against closed Kobo firmware and could affect free-space checks, progress reporting, or validation. The safe fix is to pre-produce the KEPUB so its real Data row size is available; the Kobo KEPUB preference feature already does this proactively for synced books.",
+  "created": "2026-08-05",
+  "id": "F-5f6795",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Kobo deferred KEPUB download advertises the EPUB's byte size"
+}

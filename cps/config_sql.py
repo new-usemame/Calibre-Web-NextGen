@@ -6,6 +6,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import os
+import shutil
 import stat
 import sys
 import json
@@ -153,6 +154,8 @@ class _Settings(_Base):
     config_kobo_cover_padding_aspect = Column(String, default="kobo_libra_color")
     config_kobo_cover_padding_fill_mode = Column(String, default="edge_mirror")
     config_kobo_cover_padding_color = Column(String, default="")
+    config_kobo_prefer_kepub = Column(Boolean, default=True)
+    config_kobo_kepub_backfill_completed = Column(Boolean, default=False)
 
     # Fork #225 (@froggybottomboys): admin-set server-wide announcement
     # banner. Empty string = no banner. Layout.html renders the banner
@@ -850,11 +853,12 @@ def autodetect_kepubify_binary():
     elif sys.platform.startswith("freebsd"):
         calibre_path = ["/usr/local/bin/kepubify"]
     else:
-        calibre_path = ["/opt/kepubify/kepubify-linux-64bit", "/opt/kepubify/kepubify-linux-32bit"]
+        calibre_path = ["/opt/kepubify/kepubify-linux-64bit", "/opt/kepubify/kepubify-linux-32bit",
+                        "/usr/bin/kepubify", "/usr/local/bin/kepubify"]
     for element in calibre_path:
         if os.path.isfile(element) and os.access(element, os.X_OK):
             return element
-    return ""
+    return shutil.which("kepubify") or ""
 
 
 def _migrate_database(session, secret_key):

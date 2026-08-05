@@ -16,6 +16,7 @@ import type { Book } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './Shelf.module.css';
+import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const seen = new Set(prev.map((b) => b.id));
@@ -24,6 +25,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
 }
 
 export function Shelf({ id }: { id: string }) {
+  const [cardActionsHidden] = useCardActionsHidden();
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -319,6 +321,7 @@ export function Shelf({ id }: { id: string }) {
                 style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }}
                 onRemove={canEdit ? onRemoveBook : undefined}
                 removeLabel={t('Remove from shelf')}
+                hideActions={cardActionsHidden}
               />
             ))}
           </div>

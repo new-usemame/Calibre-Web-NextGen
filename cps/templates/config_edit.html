@@ -213,6 +213,16 @@
         <label for="config_kobo_proxy">{{_('Proxy unknown requests to Kobo Store')}}</label>
       </div>
       <div class="form-group" style="margin-left:10px;">
+        <input type="checkbox" id="config_kobo_prefer_kepub" name="config_kobo_prefer_kepub" {% if config.config_kobo_prefer_kepub %}checked{% endif %} {% if not config.config_kepubifypath %}aria-describedby="kepubify-missing-help"{% endif %}>
+        <label for="config_kobo_prefer_kepub">{{_('Produce and prefer KEPUB for Kobo delivery')}}</label>
+        {% if not config.config_kepubifypath %}
+        <p id="kepubify-missing-help" class="help-block">{{_('Kepubify was not found. Set its path under External binaries before this preference can convert books.')}}</p>
+        {% else %}
+        <p class="help-block">{{_('Missing KEPUB files are created for books already delivered to a Kobo. EPUB remains the source format.')}}</p>
+        <button class="btn btn-default" type="submit" name="kobo_kepub_backfill" value="on">{{_('Convert missing KEPUBs now')}}</button>
+        {% endif %}
+      </div>
+      <div class="form-group" style="margin-left:10px;">
         <label for="config_external_port">{{_('Server External Port (for port forwarded API calls)')}}</label>
         <input type="number" min="1" max="65535" class="form-control" name="config_external_port" id="config_external_port" value="{% if config.config_external_port != None %}{{ config.config_external_port }}{% endif %}" autocomplete="off" required>
       </div>

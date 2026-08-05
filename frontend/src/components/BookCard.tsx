@@ -24,6 +24,16 @@ interface BookCardProps {
    *  so it only appears where it's wanted (catalog + search) and only for users
    *  who can edit. Suppressed in selection mode. */
   quickEdit?: boolean;
+  /** Drop the whole bottom action row — "Read now" and the edit pencil — for
+   *  users who asked to declutter the grid (fork #1054: "many users are reading
+   *  on their ereaders, so Read Now is redundant"). Persisted per browser and
+   *  toggled from the catalog's View settings.
+   *
+   *  This removes the row rather than hiding it: an `opacity: 0` control (what
+   *  the hover-reveal uses) is still focusable, so a user who has switched these
+   *  off would keep tabbing through two invisible controls per card. Both
+   *  actions remain on the book's own page, which the cover already links to. */
+  hideActions?: boolean;
 }
 
 /** Format a Calibre series_index (a float, e.g. 1.0, 2.5) for display: whole
@@ -39,6 +49,7 @@ export function BookCard({
   selectable = false, selected = false, onToggleSelect,
   showSeriesIndex = false,
   quickEdit = false,
+  hideActions = false,
 }: BookCardProps) {
   const t = useT();
   const authorStr = formatAuthors(book.authors);
@@ -156,7 +167,7 @@ export function BookCard({
   // width, density or locale — the same "impossible by construction" move the
   // badge row above makes. `.removeBtn` stays absolute: it belongs to the cover,
   // not to this row.
-  const hasActionRow = Boolean(readTarget) || quickEdit;
+  const hasActionRow = !hideActions && (Boolean(readTarget) || quickEdit);
 
   return (
     <div className={styles.wrap} style={style}>

@@ -10,7 +10,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
-"PO-Revision-Date: 2026-07-31 11:25+0300\n"
+"PO-Revision-Date: 2026-08-05 09:17+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -721,8 +721,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py:2794
 msgid "Password length has to be between 1 and 40"
@@ -6040,60 +6040,62 @@ msgstr "{field} (через запятую)"
 
 #: cps/spa_strings.py:958
 msgid "Uploading is not available for your account on this server."
-msgstr ""
+msgstr "Загрузка недоступна для вашего аккаунта на этом сервере."
 
 #: cps/spa_strings.py:963
 msgid "Could not save your reading position."
-msgstr ""
+msgstr "Не удалось сохранить вашу позицию чтения."
 
 #: cps/spa_strings.py:969
 #, python-brace-format
 msgid "Merge into {name}"
-msgstr ""
+msgstr "Объединить с {name}"
 
 #: cps/spa_strings.py:970
 #, python-brace-format
 msgid "Merged into {name}"
-msgstr ""
+msgstr "Объединено с {name}"
 
 #: cps/spa_strings.py:972
 #, python-brace-format
 msgid "Delete tag {name}"
-msgstr ""
+msgstr "Удалить тег {name}"
 
 #: cps/spa_strings.py:973
 #, python-brace-format
 msgid "Confirm delete tag {name}"
-msgstr ""
+msgstr "Подтвердите удаление тега {name}"
 
 #: cps/spa_strings.py:974
 #, python-brace-format
 msgid "Deleted tag {name}"
-msgstr ""
+msgstr "Тег {name} удалён"
 
 #: cps/spa_strings.py:975
 msgid "Could not delete tag"
-msgstr ""
+msgstr "Не удалось удалить тег"
 
 #: cps/spa_strings.py:976
 #, python-brace-format
 msgid "“{name}” already exists on {count} book. Merge this tag into it?"
-msgstr ""
+msgstr "«{name}» уже существует для {count} книги. Объединить этот тег с ним?"
 
 #: cps/spa_strings.py:977
 #, python-brace-format
 msgid "“{name}” already exists on {count} books. Merge this tag into it?"
-msgstr ""
+msgstr "«{name}» уже существует для {count} книг. Объединить этот тег с ним?"
 
 #: cps/spa_strings.py:978
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} book, which is kept."
 msgstr ""
+"Удалить «{name}»? Он будет удалён из {count} книги, сама книга останется."
 
 #: cps/spa_strings.py:979
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} books, which are kept."
 msgstr ""
+"Удалить «{name}»? Он будет удалён из {count} книг, сами книги останутся."
 
 #: cps/tasks_status.py:54
 msgid "Waiting"
@@ -6530,7 +6532,7 @@ msgstr "Неверный ID книги."
 
 #: cps/api/browse.py:183
 msgid "Tag could not be deleted"
-msgstr ""
+msgstr "Тег не удалось удалить"
 
 #: cps/progress_syncing/protocols/kosync.py:649
 msgid "KOReader Sync Plugin"
@@ -8187,9 +8189,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html:313
 msgid "Allow Reverse Proxy Authentication"
@@ -9109,9 +9111,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html:181
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -9134,9 +9136,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html:192
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -12688,9 +12690,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

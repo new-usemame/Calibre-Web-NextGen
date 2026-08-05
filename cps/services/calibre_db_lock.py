@@ -34,7 +34,23 @@ import os
 import time
 from contextlib import contextmanager
 
-from .parallel import cooperative_sleep
+try:
+    from .parallel import cooperative_sleep
+except ImportError:  # pragma: no cover — exercised by the standalone loader below
+    # This file is also loaded as a STANDALONE module, with no package context:
+    # tests/unit/test_metadata_db_write_coordination.py does it on purpose, via
+    # spec_from_file_location, to get at the lock without paying for cps/'s
+    # Flask init. Production never takes this branch — both real importers
+    # (cps.editbooks / cps.api.browse, and ingest_processor's lazy
+    # `from cps.services.calibre_db_lock import …`) have the package.
+    #
+    # Fall back to the exact primitive parallel.cooperative_sleep wraps, so the
+    # standalone module behaves the same rather than silently reverting to the
+    # blocking sleep this module exists to avoid.
+    try:
+        from gevent import sleep as cooperative_sleep
+    except ImportError:
+        cooperative_sleep = time.sleep
 
 try:
     import fcntl

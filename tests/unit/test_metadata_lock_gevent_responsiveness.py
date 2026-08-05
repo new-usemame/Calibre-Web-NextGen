@@ -210,6 +210,29 @@ def test_timeout_still_raises_when_the_lock_never_frees(tmp_path):
         assert time.monotonic() - started < _HOLD_SECONDS
 
 
+def test_standalone_load_still_gets_a_yielding_sleep():
+    """The module is also loaded with NO package context — the coordination
+    tests do it via spec_from_file_location to skip cps/'s Flask init — so the
+    package-relative import of ``cooperative_sleep`` cannot resolve there.
+
+    That fallback has to stay honest. If it quietly became ``time.sleep``, the
+    standalone module would carry exactly the bug this file exists to prevent
+    and every behavioural test above would still pass, because they load the
+    module the packaged way.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "standalone_calibre_db_lock", REPO_ROOT / "cps/services/calibre_db_lock.py"
+    )
+    standalone = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(standalone)
+
+    assert standalone.cooperative_sleep is not time.sleep, (
+        "the standalone import fell back to the blocking stdlib sleep; it must "
+        "reach gevent.sleep so a no-package load is not a silent regression"
+    )
+    assert standalone.cooperative_sleep is gevent.sleep
+
+
 def test_lock_poll_loop_does_not_use_a_blocking_sleep():
     """AST guard. The behavioural test above can only catch this on a machine
     with gevent installed; this pins the invariant unconditionally, and names

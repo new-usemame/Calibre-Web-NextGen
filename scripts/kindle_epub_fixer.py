@@ -48,7 +48,7 @@ LANGUAGE_TAG_PATTERN = re.compile(r'^[a-z]{2,3}(-[a-z]{2,4})?$', re.IGNORECASE)
 ### Global Variables
 dirs_json = "/app/calibre-web-automated/dirs.json"
 change_logs_dir = constants.CWA_METADATA_CHANGE_LOGS_DIR
-metadata_temp_dir = "/app/calibre-web-automated/metadata_temp"
+metadata_temp_dir = constants.CWA_METADATA_TEMP_DIR
 # Log file path
 epub_fixer_log_file = "/config/epub-fixer.log"
 

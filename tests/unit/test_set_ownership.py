@@ -64,11 +64,8 @@ class Harness:
         self.library = tmp_path / "calibre-library"
         self.ingest = tmp_path / "cwa-book-ingest"
         self.conv_tmp = self.config_root / ".cwa_conversion_tmp"
-        # The app-tree dirs the runtime user writes; the default value of
-        # CWA_APP_WRITABLE_DIRS derives them from CWA_APP_ROOT, so overriding the
-        # app/config root (below, in run()) points them into this fake tree for free.
         self.metadata_change_logs = self.config_root / "metadata_change_logs"
-        self.metadata_temp = self.app_root / "metadata_temp"
+        self.metadata_temp = self.config_root / "metadata_temp"
         for d in (self.app_root, self.config_root, self.library, self.ingest, self.conv_tmp):
             d.mkdir(parents=True, exist_ok=True)
 

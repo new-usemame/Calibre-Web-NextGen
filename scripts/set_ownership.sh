@@ -28,16 +28,9 @@
 # of it needs re-owning: the static tree is world-readable and every directory
 # world-traversable (`find ... ! -perm -o+r` and `... -type d ! -perm -o+x` are
 # both empty), so Python imports and template reads work regardless of owner.
-# Only the dirs the runtime user *writes* under the app tree need ownership:
+# Only the dirs the runtime user *writes* under the app tree need ownership.
 #
-#   * metadata_temp/        -- written by scripts/cover_enforcer.py (calibredb
-#     export --to-dir), which today runs as root: the metadata-change-detector
-#     unit setuidgids only the inotifywait side of its pipe, not the python
-#     dispatcher that spawns it. abc ownership here is defense-in-depth, not a
-#     repair -- kept because the writer's uid is one s6 wrapping change away
-#     from abc. (kindle_epub_fixer.py's metadata_temp_dir global is dead code.)
-#
-# cps/cache is the third such dir; it is created and chowned earlier in the
+# cps/cache is such a dir; it is created and chowned earlier in the
 # cwa-init unit (before first-run app.db creation needs it), so it is not
 # repeated here. The rest of the tree (dirs.json, the code) is written only by
 # root or never, so orphaned build-time ownership is harmless.
@@ -61,7 +54,7 @@ CWA_PYTHON="${CWA_PYTHON:-python3}"
 # The app-tree directories the runtime user writes to. These, not the whole
 # tree, are the floor's app-tree contribution (#941). cps/cache is handled
 # earlier in cwa-init, so it is intentionally absent here.
-CWA_APP_WRITABLE_DIRS="${CWA_APP_WRITABLE_DIRS:-${CWA_CONFIG_ROOT}/metadata_change_logs ${CWA_APP_ROOT}/metadata_temp}"
+CWA_APP_WRITABLE_DIRS="${CWA_APP_WRITABLE_DIRS:-${CWA_CONFIG_ROOT}/metadata_change_logs ${CWA_CONFIG_ROOT}/metadata_temp}"
 
 log() { echo "[cwa-init] $*"; }
 

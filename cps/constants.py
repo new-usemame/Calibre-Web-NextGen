@@ -44,6 +44,14 @@ else:
     if getattr(sys, 'frozen', False):
         CONFIG_DIR = os.path.abspath(os.path.join(CONFIG_DIR, os.pardir))
 
+# Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
+# metadata-change-detector s6 service) watches for change logs. Env-overridable
+# for tests.
+CWA_METADATA_CHANGE_LOGS_DIR = os.environ.get(
+    "CWA_METADATA_CHANGE_LOGS_DIR",
+    os.path.join(CONFIG_DIR, "metadata_change_logs"))
+
+CWA_METADATA_TEMP_DIR = os.path.join(CONFIG_DIR, "metadata_temp")
 
 DEFAULT_SETTINGS_FILE = "app.db"
 DEFAULT_GDRIVE_FILE = "gdrive.db"
@@ -256,10 +264,3 @@ LANGUAGE_NAMES = {
     "zh_Hans_CN": _("Chinese (Simplified, China)"),
     "zh_Hant_TW": _("Chinese (Traditional, Taiwan)"),
 }
-
-# Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
-# metadata-change-detector s6 service) watches for change logs. Env-overridable
-# for tests.
-CWA_METADATA_CHANGE_LOGS_DIR = os.environ.get(
-    "CWA_METADATA_CHANGE_LOGS_DIR",
-    CONFIG_DIR / "metadata_change_logs")

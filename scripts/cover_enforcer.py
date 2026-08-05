@@ -70,7 +70,7 @@ except Exception:
 # Global Variables
 dirs_json = "/app/calibre-web-automated/dirs.json"
 change_logs_dir = constants.CWA_METADATA_CHANGE_LOGS_DIR
-metadata_temp_dir = "/app/calibre-web-automated/metadata_temp"
+metadata_temp_dir = constants.CWA_METADATA_TEMP_DIR
 
 
 # Creates a lock file unless one already exists meaning an instance of the script is

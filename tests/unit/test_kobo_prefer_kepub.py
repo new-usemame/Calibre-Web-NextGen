@@ -153,6 +153,12 @@ def test_backfill_is_composite_idempotent_preserves_sync_rows_and_skips_gdrive(m
 
     kepub_backfill.TaskKepubBackfill().run(None)
     kepub_backfill.TaskKepubBackfill().run(None)
+    assert conversions == [1]
+    assert sync_rows == [(1,), (2,)]
+
+    monkeypatch.setattr(kepub_backfill.config, "config_use_google_drive", True)
+    monkeypatch.setattr(kepub_backfill.db, "CalibreDB", lambda **_: pytest.fail("gdrive must not open calibre DB"))
+    kepub_backfill.TaskKepubBackfill().run(None)
 
 
 def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
@@ -201,12 +207,6 @@ def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
     assert task.converted == 1
     assert kepub_backfill.config.config_kobo_kepub_backfill_completed is True
     assert saved == [True]
-    assert conversions == [1]
-    assert sync_rows == [(1,), (2,)]
-
-    monkeypatch.setattr(kepub_backfill.config, "config_use_google_drive", True)
-    monkeypatch.setattr(kepub_backfill.db, "CalibreDB", lambda **_: pytest.fail("gdrive must not open calibre DB"))
-    kepub_backfill.TaskKepubBackfill().run(None)
 
 
 def test_conversion_advances_modified_without_touching_synced_rows(monkeypatch):

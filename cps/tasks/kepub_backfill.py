@@ -62,20 +62,30 @@ class TaskKepubBackfill(CalibreTask):
                     file_path = os.path.join(config.get_book_path(), book.path, epub.name)
                     settings = {"old_book_format": "EPUB", "new_book_format": "KEPUB"}
                     conversion = TaskConvert(file_path, book_id, "EPUB -> KEPUB", settings, None)
-                    if conversion._convert_ebook_format():
-                        self.converted += 1
-                    else:
+                    try:
+                        converted = conversion._convert_ebook_format()
+                    except Exception as error:
                         self.failed += 1
-                        log.error("KEPUB backfill failed for book %d: %s", book_id, conversion.error)
+                        log.error_or_exception(
+                            "KEPUB backfill failed for book {}: {}".format(book_id, error))
+                    else:
+                        if converted:
+                            self.converted += 1
+                        else:
+                            self.failed += 1
+                            log.error("KEPUB backfill failed for book %d: %s", book_id, conversion.error)
                     self.progress = (index + 1) / total if total else 1
             finally:
                 local_db.session.close()
 
+            # The startup backfill is a bounded migration attempt. Individual
+            # failures remain visible on the task, but must not make every boot
+            # repeat the same bulk conversion against an unwritable library.
+            config.config_kobo_kepub_backfill_completed = True
+            config.save()
             if self.failed:
                 self._handleError(N_(u"%(count)d KEPUB conversion(s) failed", count=self.failed))
                 return
-            config.config_kobo_kepub_backfill_completed = True
-            config.save()
             self._handleSuccess()
         finally:
             with _enqueue_lock:

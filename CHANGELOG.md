@@ -16,6 +16,21 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The whole library stops responding while a book is being imported.** Saving
+  a metadata edit, renaming or merging a tag, or uploading while an import was
+  running could stop the server answering *anyone* — not just the person who
+  saved, but every page for every user, until the import finished. Nothing was
+  logged and it recovered on its own, so it read as "the server is randomly
+  slow" rather than as one action blocking the rest. Both jobs need the same
+  library lock, and the web side waited for it in a way that also parked the
+  thread every other request is served from. It now waits without holding
+  everyone else up: the edit still queues behind the import, which is correct
+  and unchanged, but the rest of the library stays usable while it does.
+  Measured on a test instance, an unrelated page load during that wait went
+  from 6.5 seconds to 36 milliseconds.
+
 ## [v4.1.30] - 2026-08-04
 
 ### Added

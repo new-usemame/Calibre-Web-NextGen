@@ -58,6 +58,41 @@ except ImportError:  # pragma: no cover - tornado fallback / bare test runners
     _GeventThreadPool = None  # type: ignore[assignment]
     _HAVE_GEVENT_POOL = False
 
+try:  # pragma: no cover - exercised implicitly by whichever branch runs
+    from gevent import sleep as _gevent_sleep
+    _HAVE_GEVENT_SLEEP = True
+except ImportError:  # pragma: no cover - tornado fallback / bare test runners
+    _gevent_sleep = None  # type: ignore[assignment]
+    _HAVE_GEVENT_SLEEP = False
+
+
+def cooperative_sleep(seconds: float) -> None:
+    """Sleep without freezing the hub — the wait-and-retry counterpart to
+    ``fan_out``/``run_blocking``.
+
+    Those two cover blocking *work*. This covers blocking *waiting*, which
+    reaches the app through a different door: a poll loop that retries some
+    contended resource. ``time.sleep`` parks the one OS thread every greenlet
+    shares, and a retry loop has no other yield point, so the hub does not run
+    again until the whole wait is over — the stall is the full wait, not one
+    poll interval.
+
+    That is not theoretical. ``services/calibre_db_lock.py`` polls for the
+    metadata.db write lock for up to 120s while the ingest processor holds it
+    across a ``calibredb add``, so on the pre-fix code any metadata write that
+    landed during an ingest froze every other request for the whole wait.
+
+    Under gevent the same pause is a scheduling point, so other requests keep
+    being served while this greenlet waits. Outside gevent (pytest, the tornado
+    fallback in ``server.py``, the ingest subprocess, which imports this module
+    lazily and is not a greenlet at all) there is no hub to protect and the
+    stdlib sleep behaves identically.
+    """
+    if _HAVE_GEVENT_SLEEP:
+        _gevent_sleep(seconds)
+    else:  # pragma: no cover - only on installs without gevent
+        time.sleep(seconds)
+
 
 @dataclasses.dataclass
 class FanOutResult:

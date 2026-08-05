@@ -34,6 +34,8 @@ import os
 import time
 from contextlib import contextmanager
 
+from .parallel import cooperative_sleep
+
 try:
     import fcntl
 
@@ -106,7 +108,12 @@ def metadata_db_write_lock(
                         f"holding it. If this repeats, check that the "
                         f"ingest_processor isn't stuck."
                     ) from e
-                time.sleep(poll_interval)
+                # Cooperative: this poll loop runs on a request greenlet, and
+                # it has no other yield point. A stdlib sleep here parks the
+                # one OS thread every greenlet shares, so the whole app stops
+                # answering for as long as the other writer holds the lock —
+                # up to `timeout` (120s) while ingest runs a calibredb add.
+                cooperative_sleep(poll_interval)
 
         try:
             # Record holder PID for diagnostics. Best-effort.

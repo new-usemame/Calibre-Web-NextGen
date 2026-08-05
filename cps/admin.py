@@ -2626,6 +2626,8 @@ def _configuration_update_helper():
     reboot_required = False
     to_save = request.form.to_dict()
     prev_hardcover_sync = config.hardcover_sync_enabled()
+    prev_kobo_prefer_kepub = bool(config.config_kobo_prefer_kepub)
+    queue_kepub_backfill = False
     prev_hardcover_token_available = bool(config.resolved_hardcover_token())
     try:
         reboot_required |= _config_string(to_save, "config_trustedhosts")
@@ -2652,6 +2654,7 @@ def _configuration_update_helper():
         reboot_required |= _config_checkbox_int(to_save, "config_kobo_sync")
         _config_int(to_save, "config_external_port")
         _config_checkbox_int(to_save, "config_kobo_proxy")
+        _config_checkbox(to_save, "config_kobo_prefer_kepub")
 
         # Kobo cover aspect-ratio padding (server-side letterbox elimination)
         _config_checkbox_int(to_save, "config_kobo_cover_padding_enabled")
@@ -2666,6 +2669,11 @@ def _configuration_update_helper():
         # auto-enable only fires on the off→on transition.
         if not prev_kobo_sync and bool(config.config_kobo_sync):
             config.config_kobo_cover_padding_enabled = 1
+
+        if not prev_kobo_prefer_kepub and bool(config.config_kobo_prefer_kepub):
+            queue_kepub_backfill = True
+        elif "kobo_kepub_backfill" in to_save:
+            queue_kepub_backfill = True
 
         if "config_upload_formats" in to_save:
             to_save["config_upload_formats"] = ','.join(
@@ -2811,6 +2819,11 @@ def _configuration_update_helper():
         _configuration_result(_("Oops! Database Error: %(error)s.", error=e.orig))
 
     config.save()
+    if queue_kepub_backfill:
+        from .tasks.kepub_backfill import enqueue_kepub_backfill
+        if not enqueue_kepub_backfill(current_user.name):
+            flash(_("KEPUB conversion was not queued. Check that the preference and Kepubify path are enabled."),
+                  category="warning")
     # Keep the retired cwa.db auto-fetch flag synchronized solely for safe
     # rollback. Runtime consumers use ConfigSQL.hardcover_sync_enabled().
     effective_hardcover_sync, _ = schedule.reconcile_hardcover_configuration()

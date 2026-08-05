@@ -108,5 +108,10 @@ def main():
     from .services import annotation_sync
     annotation_sync.enable_background_dispatch()
 
+    # Upgrades receive the default-on preference through the settings-table
+    # migration without an admin save, so give that path its one-time trigger.
+    from .tasks.kepub_backfill import enqueue_startup_kepub_backfill
+    enqueue_startup_kepub_backfill()
+
     success = web_server.start()
     sys.exit(0 if success else 1)

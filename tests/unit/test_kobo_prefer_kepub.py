@@ -153,6 +153,54 @@ def test_backfill_is_composite_idempotent_preserves_sync_rows_and_skips_gdrive(m
 
     kepub_backfill.TaskKepubBackfill().run(None)
     kepub_backfill.TaskKepubBackfill().run(None)
+
+
+def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
+    from cps.tasks import kepub_backfill
+
+    class Query:
+        def distinct(self): return self
+        def all(self): return [(1,), (2,)]
+
+    class AppSession:
+        def query(self, *_): return Query()
+        def close(self): pass
+
+    class CalibreDB:
+        def __init__(self, **_): self.session = SimpleNamespace(close=lambda: None)
+        def get_book(self, book_id): return SimpleNamespace(id=book_id, path=str(book_id), title=str(book_id))
+        def get_book_format(self, book_id, fmt):
+            return SimpleNamespace(format=fmt, name="book") if fmt == "EPUB" else None
+
+    attempted = []
+
+    class Conversion:
+        def __init__(self, _path, book_id, *_args): self.book_id, self.error = book_id, None
+        def _convert_ebook_format(self):
+            attempted.append(self.book_id)
+            if self.book_id == 1:
+                raise OSError("read-only library")
+            return "book.kepub"
+
+    saved = []
+    monkeypatch.setattr(kepub_backfill.ub, "get_new_session_instance", AppSession)
+    monkeypatch.setattr(kepub_backfill.db, "CalibreDB", CalibreDB)
+    monkeypatch.setattr(kepub_backfill, "TaskConvert", Conversion)
+    monkeypatch.setattr(kepub_backfill, "get_epub_layout", lambda *_: None)
+    monkeypatch.setattr(kepub_backfill.config, "config_use_google_drive", False, raising=False)
+    monkeypatch.setattr(kepub_backfill.config, "config_kepubifypath", "/bin/kepubify", raising=False)
+    monkeypatch.setattr(kepub_backfill.config, "config_kobo_kepub_backfill_completed", False, raising=False)
+    monkeypatch.setattr(kepub_backfill.config, "get_book_path", lambda: "/books", raising=False)
+    monkeypatch.setattr(kepub_backfill.config, "save", lambda: saved.append(True), raising=False)
+
+    task = kepub_backfill.TaskKepubBackfill()
+    task.run(None)
+
+    assert attempted == [1, 2]
+    assert task.failed == 1
+    assert task.converted == 1
+    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is True
+    assert saved == [True]
     assert conversions == [1]
     assert sync_rows == [(1,), (2,)]
 
@@ -206,6 +254,71 @@ def test_conversion_advances_modified_without_touching_synced_rows(monkeypatch):
     assert book.last_modified > old_modified
     assert synced_rows == [(1, 1), (2, 1)]
     assert len(merged) == 1
+
+
+def test_truncated_kepub_is_not_adopted_as_database_format(monkeypatch, tmp_path):
+    from cps.tasks import convert
+
+    book = SimpleNamespace(id=1, title="Book", path="Author/Book",
+                           data=[SimpleNamespace(name="book")])
+    merged = []
+
+    class Query:
+        def filter(self, *_): return self
+        def one_or_none(self): return None
+
+    class Session:
+        def query(self, *_): return Query()
+        def merge(self, row): merged.append(row)
+        def commit(self): pass
+        def rollback(self): pass
+        def close(self): pass
+
+    class LocalDB:
+        def __init__(self, **_): self.session = Session()
+        def get_book(self, _book_id): return book
+        def get_book_format(self, *_): return None
+
+    file_path = tmp_path / "book"
+    (tmp_path / "book.epub").write_bytes(b"source")
+    (tmp_path / "book.kepub").write_bytes(b"PK truncated")
+
+    monkeypatch.setattr(convert.db, "CalibreDB", LocalDB)
+    monkeypatch.setattr(convert.config, "config_kepubifypath", "/bin/kepubify", raising=False)
+    task = convert.TaskConvert(str(file_path), 1, "convert",
+                               {"old_book_format": "EPUB", "new_book_format": "KEPUB"}, None)
+    conversion_attempted = []
+    monkeypatch.setattr(task, "_convert_kepubify",
+                        lambda *_: (conversion_attempted.append(True) or 1, "failed"))
+
+    assert task._convert_ebook_format() is None
+    assert conversion_attempted == [True]
+    assert merged == []
+
+
+def test_download_serves_epub_immediately_while_backfill_is_in_flight(monkeypatch):
+    import cps.helper as helper
+    from cps.tasks import kepub_backfill
+
+    epub = SimpleNamespace(format="EPUB", name="book", uncompressed_size=10)
+    book = SimpleNamespace(id=7, title="Book", path="Author/Book", authors=[])
+
+    monkeypatch.setattr(helper.calibre_db, "get_filtered_book", lambda *_args, **_kwargs: book)
+    monkeypatch.setattr(helper.calibre_db, "get_book_format",
+                        lambda _book_id, fmt: epub if fmt == "EPUB" else None)
+    monkeypatch.setattr(helper, "convert_book_format",
+                        lambda *_args, **_kwargs: pytest.fail("download blocked on conversion"))
+    monkeypatch.setattr(helper, "do_download_file", lambda *_args: "served")
+    monkeypatch.setattr(helper, "get_valid_filename", lambda value, **_: value)
+    monkeypatch.setattr(helper, "current_user", SimpleNamespace(is_authenticated=False, role_admin=lambda: False))
+    monkeypatch.setattr(helper.config, "config_kepubifypath", "/bin/kepubify", raising=False)
+    monkeypatch.setattr(helper.config, "config_kobo_prefer_kepub", True, raising=False)
+    monkeypatch.setattr(helper.config, "get_book_path", lambda: "/books", raising=False)
+    monkeypatch.setattr(kepub_backfill, "_pending", True)
+
+    app = Flask(__name__)
+    with app.test_request_context("/kobo/token/download/7/kepub"):
+        assert helper.get_download_link(7, "kepub", "kobo") == "served"
 
 
 def test_startup_backfill_task_formats_without_flask_context():

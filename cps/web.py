@@ -30,7 +30,7 @@ from sqlalchemy.sql.functions import coalesce
 from werkzeug.datastructures import Headers
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from . import constants, logger, isoLanguages, services, helper, spa
+from . import constants, logger, isoLanguages, services, helper, spa, oauth_auto_redirect
 from . import db, ub, config, app
 from . import calibre_db, kobo_sync_status
 from .services.ereader_send import send_includes_own_address
@@ -2649,7 +2649,25 @@ def render_login(username="", password=""):
 @web.route('/login', methods=['GET'])
 def login():
     if current_user is not None and current_user.is_authenticated:
+        oauth_auto_redirect.clear_auto_redirect_guard(flask_session)
         return redirect(url_for('web.index'))
+
+    # Start the sole configured provider before the SPA preference redirect so
+    # Classic- and SPA-preferring browsers behave consistently. ``?local=1``
+    # remains an explicit break-glass path to the local login page.
+    if config.config_login_type == constants.LOGIN_OAUTH and feature_support['oauth']:
+        oauth_endpoint, render_local_login = oauth_auto_redirect.auto_redirect_decision(
+            request.args,
+            oauth_bb.oauthblueprints,
+            flask_session,
+        )
+        if oauth_endpoint:
+            return redirect(url_for(oauth_endpoint))
+        if render_local_login:
+            return render_login()
+
+    if config.config_login_type != constants.LOGIN_OAUTH:
+        oauth_auto_redirect.clear_auto_redirect_guard(flask_session)
 
     # #908: the UI preference is intentionally per-browser, not per-user, so it
     # remains readable after logout. Route an anonymous HTML browser into the
@@ -2662,9 +2680,8 @@ def login():
 
     # Handle OAuth-only authentication mode
     if config.config_login_type == constants.LOGIN_OAUTH:
-        # In OAuth-only mode, show OAuth options but still render login template
-        # This prevents infinite redirects to OAuth providers
         if not feature_support['oauth']:
+            oauth_auto_redirect.clear_auto_redirect_guard(flask_session)
             log.error("OAuth authentication is enabled but OAuth support is not available")
             flash(_("OAuth authentication is not properly configured. Please contact administrator."), category="error")
         return render_login()
@@ -2835,6 +2852,7 @@ def login_post():
 @web.route('/logout')
 @user_login_required
 def logout():
+    oauth_auto_redirect.clear_auto_redirect_guard(flask_session)
     cleanup_local_logout()
 
     log.debug("User logged out")

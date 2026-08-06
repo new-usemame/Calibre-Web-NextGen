@@ -79,7 +79,7 @@ msgstr "匹配 Hardcover 評論"
 #: cps/admin.py:333
 #, python-format
 msgid "Error loading review queue: %(error)s"
-msgstr "載入評論隊列出錯：(error)s"
+msgstr "載入評論隊列出錯：%(error)s"
 
 #: cps/admin.py:414
 #, fuzzy

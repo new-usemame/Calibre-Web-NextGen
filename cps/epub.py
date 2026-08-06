@@ -82,7 +82,15 @@ def get_epub_layout(book, book_data):
         p = tree.xpath('/pkg:package/pkg:metadata', namespaces=default_ns)[0]
 
         layout = p.xpath('pkg:meta[@property="rendition:layout"]/text()', namespaces=default_ns)
-    except (etree.XMLSyntaxError, KeyError, IndexError, OSError) as e:
+    except (etree.XMLSyntaxError, KeyError, IndexError, OSError,
+            zipfile.BadZipFile, RuntimeError) as e:
+        # BadZipFile subclasses Exception, not OSError, so a truncated or
+        # otherwise corrupt archive used to escape this handler even though
+        # "unparseable epub" is exactly what it means -- the one caller that
+        # noticed wrapped this call in its own try (cps/kobo.py). RuntimeError
+        # is the same shape for a password-protected archive. Every caller
+        # already treats None as "layout unknown", so report it here once
+        # instead of leaking two more exception types to each call site.
         log.error("Could not parse epub metadata of book {} during kobo sync: {}".format(book.id, e))
         return None
 

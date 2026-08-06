@@ -73,6 +73,16 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **"Source Code" in the package details opened a list of downloads instead of
+  the code.** If you inspect the installed package — `pip show`, a package
+  index, the dependency view — its Source Code link pointed at the releases
+  page, which is already what the Release Management link is for. It now opens
+  the repository. The same details block used to send you to the upstream
+  tracker for bugs in this build; that was repointed here by @chloeroform in
+  [#1298](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1298), and
+  this finishes the last link that was still wrong.
+  ([#1361](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1361))
+
 - **Kobo syncs wrote to the database once per book instead of once per batch.**
   Each book a Kobo received was recorded in its own separate save, so a sync
   carrying a hundred books did a hundred separate writes — and everyone else's

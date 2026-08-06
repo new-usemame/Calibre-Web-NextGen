@@ -739,3 +739,64 @@ def test_publication_survives_a_failing_log_close():
     assert any("close()" in ast.unparse(t.body) for t in inner_tries), (
         "the guarded block in the finally is not the close()"
     )
+
+
+def test_none_sentinel_is_terminal_for_the_watcher():
+    """Round three: the sentinel unblocked cancel but never ended the run.
+
+    Both exit conditions were "a marker in the log" and "a live process exited". A failure
+    to open the log produces neither, so publishing None left the loop spinning at 20Hz
+    and the claim held forever — the exact wedge this watcher exists to prevent, reached
+    through its own error path.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "_watch_cover_enforcer")
+    src = ast.unparse(fn)
+    assert re.search(r"if published and watched is None:", src), (
+        "a published None sentinel is not treated as terminal"
+    )
+    sentinel = src.index("if published and watched is None:")
+    poll = src.index(".poll()")
+    assert sentinel < poll, (
+        "the None check must precede the poll(), or poll() is called on None"
+    )
+    # And it must actually end the loop.
+    after = src[sentinel:poll]
+    assert "break" in after, "the sentinel branch does not break"
+
+
+def test_terminal_process_state_does_not_fall_through_to_cancel():
+    """A cancel landing just after a clean finish showed the run as cancelled, in red.
+
+    poll() reported the exited child, the marker was present so the abnormal branch did
+    nothing — and execution fell into the trigger branch, which appends the cancellation
+    marker. The page checks that marker first, so a successful run was reported as
+    cancelled.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "_watch_cover_enforcer")
+    src = ast.unparse(fn)
+    poll_idx = src.index(".poll()")
+    trigger_idx = src.index("trigger_file.exists()")
+    between = src[poll_idx:trigger_idx]
+    assert between.count("break") >= 2, (
+        "the terminal-process branch must break on BOTH the finished and the abnormal "
+        "path; falling through reaches cancellation handling"
+    )
+    assert "is_cover_enforcer_finished()" in between, (
+        "the terminal branch does not distinguish a clean finish from a crash"
+    )
+
+
+def test_cancel_does_not_clear_the_script_lock_it_never_owned():
+    """A publication timeout is not evidence that no process exists.
+
+    The child may be running and holding that lock, or it may belong to a CLI run.
+    Removing it there strips the script's only cross-process overlap protection.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "_watch_cover_enforcer")
+    src = ast.unparse(fn)
+    lock_idx = src.index("cover_enforcer.lock")
+    # Walk back to the nearest enclosing condition and require it to be the ownership test.
+    preceding = src[:lock_idx]
+    assert "if ce_process is not None:" in preceding.split("os.remove(trigger_file)")[-1], (
+        "the script lock is removed without confirming this watcher owned a process"
+    )

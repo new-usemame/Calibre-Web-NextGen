@@ -2466,22 +2466,36 @@ def _watch_cover_enforcer(queue):
                 published = True
             except Empty:
                 ...
-        if published and watched is not None and watched.poll() is not None:
-            # Child is gone. If it exited cleanly it has already printed the marker and
-            # the branch below would have caught it; reaching here means it did not, so
-            # record a terminal state rather than waiting for a marker that is not coming.
-            if not is_cover_enforcer_finished():
-                log.error(f"Cover enforcer exited with code {watched.returncode} "
-                          "without reporting completion")
-                try:
-                    with open(log_path, 'a') as f:
-                        f.write(f"\nThe enforcement run stopped unexpectedly (exit code "
-                                f"{watched.returncode}).")
-                        f.write(f"\nNextGen Cover & Metadata Enforcement Service - Run Ended: {datetime.now()}")
-                except Exception as e:
-                    log.error(f"Could not record the cover enforcer failure: {e}")
+        if published and watched is None:
+            # The spawn failed and said so with a sentinel. This has to be terminal HERE:
+            # the exit conditions below are a marker in the log and a live process, and a
+            # failure to open the log at all produces neither - so the loop would spin
+            # forever and the claim would never be released. That is the exact wedge this
+            # watcher exists to prevent, reachable through its own error path.
+            log.error("Cover enforcer never started; ending the run")
+            break
+        if published and watched.poll() is not None:
+            # Terminal: the child is gone. Classify and break HERE rather than falling
+            # through. Falling through let a cancel that arrived just after a SUCCESSFUL
+            # finish take the branch below, which appends the cancellation marker - and
+            # the page checks that marker first, so a run that completed cleanly was shown
+            # to the user as cancelled, in red.
+            if is_cover_enforcer_finished():
                 archive_run_log(log_path)
                 break
+            log.error(f"Cover enforcer exited with code {watched.returncode} "
+                      "without reporting completion")
+            try:
+                with open(log_path, 'a') as f:
+                    f.write(f"\nThe enforcement run stopped unexpectedly (exit code "
+                            f"{watched.returncode}).")
+                    f.write(f"\nNextGen Cover & Metadata Enforcement Service - Run Ended: {datetime.now()}")
+            except Exception as e:
+                # The page stops polling on a marker it can now never see. The claim is
+                # still released by the caller's finally, so a retry is at least possible.
+                log.error(f"Could not record the cover enforcer failure: {e}")
+            archive_run_log(log_path)
+            break
         if trigger_file.exists():
             # Kill the cover_enforcer process, then WAIT for it. Two reasons the wait
             # is load-bearing rather than tidiness: terminate() only sends the signal,
@@ -2525,10 +2539,20 @@ def _watch_cover_enforcer(queue):
             # its own atexit removeLock(), so deleting it while the script is still alive
             # makes that handler raise FileNotFoundError into this very log. This is the
             # SIGKILL safety net (atexit does not run then), not the normal path.
-            try:
-                os.remove(tempfile.gettempdir() + '/cover_enforcer.lock')
-            except FileNotFoundError:
-                ...
+            #
+            # And only when we actually OWNED a child. Reaching here with ce_process None
+            # means the publication timed out, not that no process exists - it may be
+            # running and holding this very lock, or it may belong to a CLI run. Deleting
+            # it then removes the script's only cross-process overlap protection and lets
+            # a second enforcement start on top of a live one.
+            if ce_process is not None:
+                try:
+                    os.remove(tempfile.gettempdir() + '/cover_enforcer.lock')
+                except FileNotFoundError:
+                    ...
+            else:
+                log.error("Cover enforcer cancel: leaving the script lock alone; this "
+                          "watcher never owned a process")
             # Add string to log to notify user of successful cancellation and to stop the JS update script
             with open(log_path, 'a') as f:
                 f.write(f"\nNextGen COVER & METADATA ENFORCEMENT PROCESS TERMINATED BY USER AT {datetime.now()}")

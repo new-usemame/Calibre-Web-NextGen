@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.31] - 2026-08-06
+
 ### Added
 
 - **You can now re-apply covers and metadata to your whole library from the

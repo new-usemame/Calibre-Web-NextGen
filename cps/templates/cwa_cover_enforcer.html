@@ -60,6 +60,12 @@
 <script>
   var timeout;
   var pollFailures = 0;
+  // Every polling chain carries the generation it was started under. Restarting the
+  // poller bumps this, so a chain whose fetch was already in flight when Start was
+  // pressed retires itself instead of scheduling another tick alongside the new one -
+  // otherwise two chains poll forever and only the last one to write `timeout` can ever
+  // be cleared.
+  var pollGeneration = 0;
 
   const CANCELLED_MARKER = "NextGen COVER & METADATA ENFORCEMENT PROCESS TERMINATED BY USER AT";
   const FINISHED_MARKER = "NextGen Cover & Metadata Enforcement Service - Run Ended:";
@@ -68,7 +74,16 @@
     document.getElementById("enforcerMessage").textContent = text || "";
   }
 
-  async function getStatus() {
+  function restartPolling() {
+    pollGeneration += 1;
+    pollFailures = 0;
+    clearTimeout(timeout);
+    getStatus(pollGeneration);
+  }
+
+  async function getStatus(generation) {
+
+    if (generation === undefined) generation = pollGeneration;
 
     let get;
 
@@ -81,11 +96,16 @@
       // threw before the setTimeout at the bottom - so ONE blip stopped the page
       // updating for the rest of the run, silently. Back off and keep trying instead.
       console.error("Error: ", e);
+      if (generation !== pollGeneration) return;
       pollFailures += 1;
       setMessage("{{ _('Lost contact with the server, retrying...') }}");
-      timeout = setTimeout(getStatus, Math.min(30000, 1000 * Math.pow(2, pollFailures)));
+      timeout = setTimeout(function () { getStatus(generation); },
+                           Math.min(30000, 1000 * Math.pow(2, pollFailures)));
       return;
     }
+
+    // Superseded while this request was in flight.
+    if (generation !== pollGeneration) return;
 
     if (pollFailures > 0) {
       pollFailures = 0;
@@ -129,7 +149,7 @@
       return false;
     }
 
-    timeout = setTimeout(getStatus, 1000);
+    timeout = setTimeout(function () { getStatus(generation); }, 1000);
   }
 
   async function postAction(url, busyText) {
@@ -161,9 +181,7 @@
       progressBar.style.backgroundColor = "green";
       progressBar.style.width = "0%";
       progressBar.textContent = "";
-      clearTimeout(timeout);
-      pollFailures = 0;
-      getStatus();
+      restartPolling();
     }
   });
 

@@ -589,3 +589,24 @@ def test_poll_survives_a_failed_request():
     )
     assert "res.ok" in tpl, "a non-2xx response is treated as a successful poll"
     assert "enforcerMessage" in tpl, "poll failures are not surfaced to the user"
+
+
+def test_polling_chains_cannot_stack():
+    """Pressing Start with a poll in flight must not leave two chains running.
+
+    Introduced by the retry fix, not present in the original: the in-flight request
+    resolves after the restart and schedules its own next tick, so two chains poll at
+    once and only the last to assign `timeout` can ever be cleared. Every chain now
+    carries the generation it started under and retires when superseded.
+    """
+    tpl = PAGE_TEMPLATE.read_text()
+    assert "pollGeneration" in tpl, "no generation guard on the polling chain"
+    assert tpl.count("generation !== pollGeneration") >= 2, (
+        "both the success path and the retry path must retire a superseded chain"
+    )
+    # Every scheduled continuation must carry its generation forward, or the guard is
+    # defeated by a bare re-entry that adopts the current generation.
+    assert "setTimeout(getStatus," not in tpl, (
+        "a continuation is scheduled without passing its generation"
+    )
+    assert "restartPolling" in tpl, "Start does not go through the generation bump"

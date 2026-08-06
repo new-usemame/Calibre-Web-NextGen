@@ -1,0 +1,13 @@
+{
+  "area": "container",
+  "body": "Observed while verifying #947 on a live root-path container (the fixed build and\nstock v4.1.29 behave identically, so this is pre-existing, not a regression):\n\n    USER   COMMAND\n    abc    python3 /app/calibre-web-automated/cps.py\n    root   python3 .../scripts/watch_fallback.py --path .../metadata_change_logs\n    root   python3 .../scripts/metadata_change_dispatch.py --watch-folder ...\n\nmetadata-change-detector/run:32 invokes watch_fallback.py with no privilege\ndrop, while the same unit's line 81 (cwa-as-abc inotifywait ..., after #947)\ndoes drop. So the inotify path runs as abc and the polling fallback path runs as\nroot, in the same service, watching the same directory.\n\nTwo consequences: files the fallback path creates under the watch folder land\nowned by root, which the abc-owned services then cannot rewrite; and it is more\nprivilege than the job needs.\n\nDeliberately not folded into #947 -- that issue is the container failing to\nstart at all as non-root, and widening a startup fix into privilege-hygiene\nchanges on a path that works today would have made it riskier than it needed to\nbe. Wants its own change with its own before/after on ingest.",
+  "created": "2026-08-06",
+  "id": "F-5d9298",
+  "refs": [
+    "#947"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "metadata-change-detector starts two watchers as root while its sibling drops to abc"
+}

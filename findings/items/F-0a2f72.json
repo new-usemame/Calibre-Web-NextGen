@@ -4,9 +4,17 @@
   "created": "2026-08-05",
   "id": "F-0a2f72",
   "origin_issue": 881,
-  "refs": [],
+  "refs": [
+    "#1412"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-06",
+    "note": "promoted to #1412 (reported independently by a user)",
+    "release": ""
+  },
   "severity": "ux",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "New UI: read/unread + favorite quick-actions on book cards (parity with classic cards)"
 }

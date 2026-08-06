@@ -1,0 +1,11 @@
+{
+  "area": "i18n",
+  "body": "Running `python scripts/extract_spa_strings.py --write` on 81933ac61 rewrites the AUTOGEN\nblock at -92/+35 msgids (net -57), so the checked-in anchor file no longer matches what the\nextractor derives from the current SPA source.\n\nWhy it is not caught: tests/unit/test_spa_strings_anchored.py only asserts the one direction\nthat matters for correctness -- every SPA key IS anchored. Stale extras that no longer exist\nin the SPA are harmless to users (they just add dead msgids for translators) so the suite\nstays green while the file drifts.\n\nImpact is translator-facing, not user-facing: dead msgids are offered for translation and\nreal ones churn. Worth a standalone regeneration PR with the diff actually reviewed --\nnotably whether any of the 92 removals are strings the extractor's scanner misses\n(dynamically constructed keys) rather than genuinely dead ones.\n\nFound while adding the v4.1.31 What's New entries (PR #1418), where a new label tripped the\nanchoring test. Deliberately not bundled into that content PR at a release boundary.",
+  "created": "2026-08-06",
+  "id": "F-1a7b43",
+  "refs": [],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "cps/spa_strings.py AUTOGEN block has drifted ~57 msgids from the SPA source"
+}

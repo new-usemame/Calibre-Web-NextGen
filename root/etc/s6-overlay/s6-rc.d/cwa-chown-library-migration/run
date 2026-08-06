@@ -31,6 +31,16 @@ if [ -f "$MARKER" ]; then
     exit 0
 fi
 
+# Started as an arbitrary non-root user: every chown below would fail with
+# EPERM, and there is nothing to align anyway -- files already belong to the uid
+# we are running as. Leave WITHOUT writing the sentinel, so that a later rootful
+# start still performs the real migration. Writing it here would mark the
+# migration done on the one run that could not do any of it. See #947.
+if [ "$(id -u)" != "0" ]; then
+    echo "[cwa-chown-library-migration] running as uid $(id -u) (not root); nothing to align, leaving sentinel unset"
+    exit 0
+fi
+
 if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] \
    || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
     echo "[cwa-chown-library-migration] NETWORK_SHARE_MODE=true — skipping migration"

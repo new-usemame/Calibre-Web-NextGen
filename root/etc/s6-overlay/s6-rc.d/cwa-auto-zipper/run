@@ -47,7 +47,7 @@ do
     # are owned by PUID:PGID. The mismatch breaks host-side cleanup,
     # backup, and rsync workflows for any deployment where PUID isn't 0.
     # See issue #162.
-    s6-setuidgid abc python3 /app/calibre-web-automated/scripts/auto_zip.py
+    cwa-as-abc python3 /app/calibre-web-automated/scripts/auto_zip.py
     if [[ $? == 1 ]]
     then
         echo "[cwa-auto-zipper] Error occurred during script initialisation (see errors above)."

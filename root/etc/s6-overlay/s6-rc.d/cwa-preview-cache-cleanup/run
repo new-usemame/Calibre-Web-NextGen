@@ -53,7 +53,7 @@ while true; do
     # Run as the abc service user so unlink permissions match what the
     # Flask endpoint wrote (write_to_cache runs in the gunicorn worker
     # which is also abc).
-    s6-setuidgid abc python3 -m cps.services.cover_preview_cache_sweeper \
+    cwa-as-abc python3 -m cps.services.cover_preview_cache_sweeper \
         || echo "[cwa-preview-cache-cleanup] WARNING: sweeper exited non-zero; continuing schedule"
 
     sleep "$SWEEP_INTERVAL_SECONDS"

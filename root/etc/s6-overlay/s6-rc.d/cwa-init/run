@@ -46,7 +46,16 @@ fi
 mkdir -p /app/calibre-web-automated/cps/cache
 
 # permissions (skip chown on network shares for bind mounts, but still fix /app)
-if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
+#
+# When the container is started as an arbitrary non-root user (`--user`,
+# `--userns=keep-id`), LSIO's init-adduser is skipped, `abc` keeps its
+# build-time 911:1001, and every chown to it fails with EPERM -- one error per
+# file. Nothing here is fatal, but a screenful of "Operation not permitted"
+# reads like a broken container when it is just a uid we were never going to be
+# able to set. Say it once instead. See #947.
+if [ "$(id -u)" != "0" ]; then
+  echo "[cwa-init] running as uid $(id -u) (not root); skipping chown — files keep their current owner"
+elif [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
   echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping initial chown of /config"
   chown -R abc:abc /app/calibre-web-automated/cps/cache
 else
@@ -59,7 +68,7 @@ export CALIBRE_DBPATH=/config
 
 if [[ ! -f /config/app.db ]]; then
   echo "First time run, creating app.db..."
-  cd /app/calibre-web-automated && s6-setuidgid abc python3 /app/calibre-web-automated/cps.py -d > /dev/null 2>&1
+  cd /app/calibre-web-automated && cwa-as-abc python3 /app/calibre-web-automated/cps.py -d > /dev/null 2>&1
   # handle app.db updates for kepubify and ext binary path
   # borrowed from crocodilestick because it's a better solution than what i was doing
   sqlite3 /config/app.db <<EOS

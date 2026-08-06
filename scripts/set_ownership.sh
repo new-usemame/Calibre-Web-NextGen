@@ -50,6 +50,7 @@ CWA_DIRS_JSON="${CWA_DIRS_JSON:-${CWA_APP_ROOT}/dirs.json}"
 CWA_OWNER_USER="${CWA_OWNER_USER:-abc}"
 CWA_CHOWN="${CWA_CHOWN:-chown}"
 CWA_PYTHON="${CWA_PYTHON:-python3}"
+CWA_UID="${CWA_UID:-$(id -u)}"
 
 log() { echo "[cwa-init] $*"; }
 
@@ -133,6 +134,20 @@ dedupe_paths() {
 main() {
   local -a candidates=("${CWA_CONFIG_ROOT}")
   local dir
+
+  # Started as an arbitrary non-root user (`--user`, `--userns=keep-id`):
+  # nothing below can succeed. LSIO's init-adduser is skipped on that path, so
+  # `abc` keeps its build-time 911:1001, and changing a file's owner to a
+  # different uid needs CAP_CHOWN. Every directory would report EPERM in turn.
+  #
+  # There is also nothing to repair: files under a bind mount already belong to
+  # the uid we are running as. So say it once and skip the walk, rather than
+  # emitting one failure line per directory that reads like a broken container.
+  # See #947.
+  if [ "${CWA_UID}" != "0" ]; then
+    log "running as uid ${CWA_UID} (not root); skipping ownership pass — files keep their current owner"
+    return 0
+  fi
 
   while IFS= read -r dir; do
     [ -n "$dir" ] && candidates+=("$dir")

@@ -33,7 +33,7 @@ fi
 echo "[cwa-checksum-backfill] Checking for missing KOReader sync checksums..."
 
 # Run the checksum generation script (fills in missing checksums)
-if s6-setuidgid abc python3 /app/calibre-web-automated/scripts/generate_book_checksums.py --library-path /calibre-library --batch-size 50; then
+if cwa-as-abc python3 /app/calibre-web-automated/scripts/generate_book_checksums.py --library-path /calibre-library --batch-size 50; then
   echo "[cwa-checksum-backfill] Checksum generation/backfill completed successfully"
 else
   echo "[cwa-checksum-backfill] WARNING: Checksum generation encountered errors but continuing..."

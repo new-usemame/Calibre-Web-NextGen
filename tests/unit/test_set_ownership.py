@@ -103,6 +103,14 @@ class Harness:
                 "CWA_OWNER_USER": str(os.getuid()),
                 "CWA_CHOWN": str(self.chown),
                 "CWA_TEST_CHOWN_LOG": str(self.chown_log),
+                # In the container this pass runs as root, and since #947 it
+                # skips itself entirely when it is not (nothing it does can
+                # succeed unprivileged). The suite runs as an ordinary user, so
+                # state the uid rather than inheriting the runner's -- otherwise
+                # every test below silently asserts the skip path instead of the
+                # walk it was written for. Non-root behaviour is covered in
+                # tests/unit/test_947_non_root_container_starts.py.
+                "CWA_UID": "0",
             }
         )
         env.pop("NETWORK_SHARE_MODE", None)

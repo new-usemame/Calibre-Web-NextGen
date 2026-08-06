@@ -125,7 +125,7 @@ wait_for_stable_file() {
 
 run_fallback() {
         echo "[cwa-ingest-service] Falling back to polling watcher" >&2
-        s6-setuidgid abc python3 /app/calibre-web-automated/scripts/watch_fallback.py --path "$WATCH_FOLDER" --interval 5 |
+        cwa-as-abc python3 /app/calibre-web-automated/scripts/watch_fallback.py --path "$WATCH_FOLDER" --interval 5 |
         {
                 # Drain anything a previous run left queued (#1360). No startup
                 # sweep here: watch_fallback.py walks the whole tree on its
@@ -282,7 +282,7 @@ run_processor_with_timeout() {
         if [ -n "${CWA_INGEST_PROCESSOR_CMD:-}" ]; then
                 timeout "$safety_timeout" "$CWA_INGEST_PROCESSOR_CMD" "$filepath"
         else
-                timeout "$safety_timeout" s6-setuidgid abc python3 /app/calibre-web-automated/scripts/ingest_processor.py "$filepath"
+                timeout "$safety_timeout" cwa-as-abc python3 /app/calibre-web-automated/scripts/ingest_processor.py "$filepath"
         fi
 }
 
@@ -663,7 +663,7 @@ if [ -n "$(get_stale_temp_interval_from_db)" ]; then
 fi
 
 ( set -o pipefail
-        s6-setuidgid abc inotifywait -m -r --format="%e %w%f" -e close_write -e moved_to -e create "$WATCH_FOLDER" | \
+        cwa-as-abc inotifywait -m -r --format="%e %w%f" -e close_write -e moved_to -e create "$WATCH_FOLDER" | \
         {
                 # Both ends of a pipeline start together, so by the time this
                 # block runs inotifywait is already establishing its watches

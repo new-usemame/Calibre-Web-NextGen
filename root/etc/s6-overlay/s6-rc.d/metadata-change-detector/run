@@ -78,6 +78,6 @@ fi
 
 (
         set -o pipefail
-        s6-setuidgid abc inotifywait -m -e close_write -e moved_to --format '%f' --exclude '^.*\.(swp)$' "$WATCH_FOLDER" |
+        cwa-as-abc inotifywait -m -e close_write -e moved_to --format '%f' --exclude '^.*\.(swp)$' "$WATCH_FOLDER" |
         python3 "$DISPATCHER" --watch-folder "$WATCH_FOLDER"
 ) || run_fallback

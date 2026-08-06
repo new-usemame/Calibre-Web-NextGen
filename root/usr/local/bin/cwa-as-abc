@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Run a command as the app user `abc`, but only when we are actually able to.
+#
+# Every long-running service used to end in an unconditional
+# `s6-setuidgid abc <cmd>`. That is correct for the normal case, where PID 1 is
+# root and LSIO's init-adduser has already remapped `abc` to PUID/PGID.
+#
+# It is fatal when the container is started as an arbitrary non-root user
+# (`docker run --user 1000:1000`, `podman --userns=keep-id --user ...`). On that
+# path init-adduser is skipped, so `abc` keeps its build-time 911:1001, and
+# dropping from an unprivileged uid to a *different* uid needs setgroups(),
+# which an unprivileged process may not call:
+#
+#     s6-applyuidgid: fatal: unable to set supplementary group list:
+#     Operation not permitted
+#
+# Every service then crash-loops under the supervisor while the container still
+# reports `Up` -- a healthy-looking container with no web server. Reported with
+# a full diagnosis by @KucharczykL in #947.
+#
+# So: drop privileges when we are root and it means something, and otherwise run
+# the command as whoever we already are. This is a single place on purpose --
+# there were nine call sites, and a guard copied nine times is a guard that
+# eventually differs in one of them.
+set -eu
+
+if [ "$(id -u)" = "0" ]; then
+  exec s6-setuidgid abc "$@"
+fi
+
+exec "$@"

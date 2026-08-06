@@ -481,7 +481,9 @@ def test_spawn_failure_is_terminal_and_visible():
     assert "Run Ended" in src, (
         "a failed spawn must still write the end marker or the page polls forever"
     )
-    assert "queue.put(None)" in src, (
+    # ce_process stays None when the spawn fails, and publication happens in the finally,
+    # so the sentinel and the success value are the same statement on every path.
+    assert "queue.put(ce_process)" in src, (
         "the watcher must be unblocked with a sentinel when there is no process"
     )
 
@@ -610,3 +612,108 @@ def test_polling_chains_cannot_stack():
         "a continuation is scheduled without passing its generation"
     )
     assert "restartPolling" in tpl, "Start does not go through the generation bump"
+
+
+# ------------------------------------------- second review round (fixes reviewed as code)
+#
+# The re-review looked at the fixes above as new code and found three ways to wedge the
+# feature permanently. All three end the same way: the run claim is never released, so
+# every later start returns 409 and the UI offers no route back. A gate that disables its
+# own repair is worse than the bug it guards.
+
+
+def test_read_log_tail_is_bounded_against_a_growing_file():
+    """`f.read()` after a seek is bounded by the WRITER, not by `limit`.
+
+    The child appends to this log continuously, so a bare read() keeps consuming whatever
+    arrives after the seek — reintroducing the unbounded blocking read the helper exists
+    to remove, precisely when the run is at its most productive.
+    """
+    source = CWA_FUNCTIONS.read_text()
+    fn_src = source[source.index("def _read_log_tail"):source.index("def is_cover_enforcer_finished")]
+    assert re.search(r"\.read\(limit\)", fn_src), (
+        "_read_log_tail() must read(limit); a bare read() is bounded by the child's "
+        "output rate, not by the cap"
+    )
+    assert not re.search(r"\.read\(\s*\)", fn_src), "unbounded read() still present"
+
+
+def test_read_log_tail_never_exceeds_limit_while_the_file_grows(tmp_path):
+    """Behavioural version of the above: grow the file, still get at most `limit`."""
+    source = CWA_FUNCTIONS.read_text()
+    fn_src = source[source.index("def _read_log_tail"):source.index("def is_cover_enforcer_finished")]
+    ns = {"os": __import__("os"), "COVER_ENFORCER_STATUS_TAIL_BYTES": 64 * 1024}
+    exec(compile(fn_src, "<tail>", "exec"), ns)
+    read_tail = ns["_read_log_tail"]
+
+    log = tmp_path / "run.log"
+    log.write_bytes(b"X" * 10_000)
+    assert len(read_tail(str(log), limit=1000)) <= 1000
+
+    # Simulate the writer racing the reader: the file is much larger than the cap.
+    log.write_bytes(b"Y" * 500_000)
+    out = read_tail(str(log), limit=1000)
+    assert len(out) <= 1000, f"returned {len(out)} bytes for a 1000-byte cap"
+
+
+def test_spawn_thread_publishes_a_result_even_if_the_log_cannot_be_opened():
+    """The log open() must be inside the try, or a disk/permission failure wedges all runs.
+
+    Outside it, the spawn thread dies before anything reaches the queue. The watcher is
+    not raising — it is looping waiting for a marker nobody will write — so its
+    release-the-claim `finally` never runs and every later start returns 409 until the
+    container restarts.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "cover_enforcer_start")
+
+    tries = [n for n in ast.walk(fn) if isinstance(n, ast.Try)]
+    assert tries, "cover_enforcer_start() has no try block"
+    outer = tries[0]
+    body_src = ast.unparse(outer.body)
+    assert "cover-enforcer.log" in body_src and "open(" in body_src, (
+        "the log open() is outside the try; a failure there publishes nothing and the "
+        "watcher waits forever"
+    )
+    assert outer.finalbody, "no finally to guarantee publication"
+    assert "queue.put" in ast.unparse(outer.finalbody), (
+        "the queue result must be published from the finally, so EVERY path — including "
+        "a failure to write the failure — still ends the run"
+    )
+
+
+def test_watcher_terminates_on_process_exit_not_only_on_the_marker():
+    """A child that dies without printing the marker used to spin the watcher forever.
+
+    An import error, a fatal signal or a disk-full write all exit without the end marker.
+    Keying the loop's exit solely on a string in the log means the run claim is held for
+    the life of the process.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "_watch_cover_enforcer")
+    src = ast.unparse(fn)
+    assert ".poll()" in src, (
+        "the watcher never checks process liveness; a child that exits without the "
+        "marker leaves it looping and the run claim held forever"
+    )
+    assert "returncode" in src, "the abnormal exit is not reported to the user"
+    # And the abnormal path must still end the run for the PAGE, which stops polling
+    # only on a marker.
+    poll_idx = src.index(".poll()")
+    tail = src[poll_idx:]
+    assert "Run Ended" in tail, (
+        "an abnormal exit must still write the end marker or the page polls forever"
+    )
+
+
+def test_watcher_does_not_double_consume_the_queue():
+    """The liveness check drains the queue, so the cancel branch must not re-get it.
+
+    A second blocking get() on an already-drained queue would block for its full timeout
+    on every cancel, which is the hang the bounded get was added to prevent.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "_watch_cover_enforcer")
+    src = ast.unparse(fn)
+    assert "published" in src, "no guard tracking whether the queue was already drained"
+    # The cancel branch must consult the already-held process before reaching for the queue.
+    assert re.search(r"if published:\s*\n\s*ce_process = watched", src), (
+        "cancel re-reads the queue instead of using the process the loop already holds"
+    )

@@ -2365,22 +2365,45 @@ def cover_enforcer_start(queue):
     # O_APPEND makes every write go to the current end of file for both writers.
     # Popen dups the fd into the child, so closing the parent copy here is safe and
     # avoids leaking one descriptor per run.
-    log_file = open('/config/cover-enforcer.log', 'a')
+    # The open() is INSIDE the try. Outside it, a failure to open the log (permissions, a
+    # full disk, descriptor exhaustion) killed this thread before anything reached the
+    # queue - and the watcher's release-the-claim finally never runs, because the watcher
+    # is not raising, it is looping forever waiting for a marker no one will write. Every
+    # later start then returns 409 until the container restarts. A path that can wedge
+    # the feature has to publish a terminal state even when the failure is the logging.
+    log_file = None
+    ce_process = None
     try:
+        # Append mode, not 'w', and the parent handle is closed straight after the spawn.
+        # start_cover_enforcer() has already truncated the file, so 'a' still gives a clean
+        # log per run. The reason it matters is that the kill thread appends the
+        # cancellation marker to this same file: with a 'w' handle each writer keeps its own
+        # offset, so the child's dying traceback lands on top of the marker and the page -
+        # which stops polling only when it sees that marker - spins forever after a cancel.
+        # O_APPEND makes every write go to the current end of file for both writers.
+        # Popen dups the fd into the child, so closing the parent copy here is safe and
+        # avoids leaking one descriptor per run.
+        log_file = open('/config/cover-enforcer.log', 'a')
         ce_process = subprocess.Popen(['python3', '/app/calibre-web-automated/scripts/cover_enforcer.py', '-all'], stdout=log_file, stderr=subprocess.STDOUT)
     except Exception as e:
-        # A spawn failure used to be silent and terminal: nothing was ever put on the
-        # queue, so the watcher blocked forever at queue.get() on cancel and the page
-        # polled a run that had never started. Write the end marker so the poller stops
-        # and the admin sees the reason, and hand the watcher a sentinel to unblock it.
+        # Nothing was ever put on the queue, so the watcher blocked forever at queue.get()
+        # on cancel and the page polled a run that had never started. Write the end marker
+        # so the poller stops and the admin sees why, and hand the watcher a sentinel.
         log.error(f"Failed to start cover enforcer: {e}")
-        log_file.write(f"\nFailed to start the enforcement run: {e}")
-        log_file.write(f"\nNextGen Cover & Metadata Enforcement Service - Run Ended: {datetime.now()}")
-        queue.put(None)
-        return
+        try:
+            with open('/config/cover-enforcer.log', 'a') as f:
+                f.write(f"\nFailed to start the enforcement run: {e}")
+                f.write(f"\nNextGen Cover & Metadata Enforcement Service - Run Ended: {datetime.now()}")
+        except Exception as log_exc:
+            # The log itself is what failed. The sentinel below is then the ONLY thing
+            # that ends the run, so it must still be published.
+            log.error(f"Could not record the cover enforcer start failure: {log_exc}")
     finally:
-        log_file.close()
-    queue.put(ce_process)
+        if log_file is not None:
+            log_file.close()
+        # Exactly one result reaches the watcher on every path, including a raise from
+        # the queue's own put in the body above.
+        queue.put(ce_process)
 
 def _read_log_tail(log_path: str, limit: int = COVER_ENFORCER_STATUS_TAIL_BYTES) -> str:
     """Return at most the last `limit` bytes of `log_path` ("" when absent).
@@ -2393,7 +2416,11 @@ def _read_log_tail(log_path: str, limit: int = COVER_ENFORCER_STATUS_TAIL_BYTES)
             f.seek(0, os.SEEK_END)
             size = f.tell()
             f.seek(max(0, size - limit))
-            chunk = f.read()
+            # read(limit), not read(). The child appends to this file continuously, so a
+            # bare read() keeps consuming whatever arrives after the seek and is bounded
+            # by the child's output rate rather than by `limit` - which is the unbounded
+            # blocking read this helper exists to remove.
+            chunk = f.read(limit)
     except FileNotFoundError:
         return ""
     # A backwards seek can land mid-character; drop the partial one rather than raise.
@@ -2418,8 +2445,37 @@ def kill_cover_enforcer(queue):
 def _watch_cover_enforcer(queue):
     trigger_file = Path(tempfile.gettempdir() + "/.kill_cover_enforcer_trigger")
     log_path = "/config/cover-enforcer.log"
+    # The run this watcher owns, once cover_enforcer_start() publishes it. Held so the
+    # loop can key termination on the PROCESS rather than only on a string in the log:
+    # a child that dies without printing the marker - an import error, a fatal signal, a
+    # disk-full write - otherwise leaves this loop spinning at 20Hz forever and the run
+    # claim held, so every later start returns 409 with no way back but a restart.
+    watched = None
+    published = False
     while True:
         sleep(0.05) # Required to prevent high cpu usage
+        if not published:
+            try:
+                watched = queue.get_nowait()
+                published = True
+            except Empty:
+                ...
+        if published and watched is not None and watched.poll() is not None:
+            # Child is gone. If it exited cleanly it has already printed the marker and
+            # the branch below would have caught it; reaching here means it did not, so
+            # record a terminal state rather than waiting for a marker that is not coming.
+            if not is_cover_enforcer_finished():
+                log.error(f"Cover enforcer exited with code {watched.returncode} "
+                          "without reporting completion")
+                try:
+                    with open(log_path, 'a') as f:
+                        f.write(f"\nThe enforcement run stopped unexpectedly (exit code "
+                                f"{watched.returncode}).")
+                        f.write(f"\nNextGen Cover & Metadata Enforcement Service - Run Ended: {datetime.now()}")
+                except Exception as e:
+                    log.error(f"Could not record the cover enforcer failure: {e}")
+                archive_run_log(log_path)
+                break
         if trigger_file.exists():
             # Kill the cover_enforcer process, then WAIT for it. Two reasons the wait
             # is load-bearing rather than tidiness: terminate() only sends the signal,
@@ -2427,13 +2483,21 @@ def _watch_cover_enforcer(queue):
             # one zombie accumulates per cancelled run; and until the child is reaped it
             # can still write to the log, which would land after the cancellation marker
             # and leave the page polling a run it thinks is live.
-            # Bounded: a spawn that failed puts None on the queue rather than nothing, but
-            # a timeout still has to be survivable or a cancel wedges the watcher forever.
-            try:
-                ce_process = queue.get(timeout=30)
-            except Empty:
-                log.error("Cover enforcer cancel: no process was ever published")
-                ce_process = None
+            # The loop above already drains the queue into `watched`, so take that when it
+            # has it. Falling back to a BOUNDED get covers a cancel landing in the window
+            # before the spawn thread has published; a failed spawn publishes None rather
+            # than nothing, but the timeout still has to be survivable or a cancel wedges
+            # this watcher forever.
+            if published:
+                ce_process = watched
+            else:
+                try:
+                    ce_process = queue.get(timeout=30)
+                    published = True
+                    watched = ce_process
+                except Empty:
+                    log.error("Cover enforcer cancel: no process was ever published")
+                    ce_process = None
             if ce_process is not None:
                 ce_process.terminate()
                 try:
@@ -2469,7 +2533,7 @@ def _watch_cover_enforcer(queue):
             # Reap the finished child so a completed run leaves no defunct process
             # either. It has already exited, so this does not block.
             try:
-                finished = queue.get_nowait()
+                finished = watched if published else queue.get_nowait()
                 if finished is not None:
                     finished.wait(timeout=5)
             except (Empty, subprocess.TimeoutExpired):

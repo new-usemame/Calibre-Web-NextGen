@@ -75,7 +75,7 @@ export const WHATS_NEW: WhatsNewRelease[] = [
         title: 'Turn off the Read now and edit buttons on covers',
         body: 'If you read on an ereader, the "Read now" link on every cover is just noise, and on a touchscreen it and the edit pencil stayed visible all the time instead of appearing on hover. A new Show Read now and edit buttons switch in the library View settings takes them off every cover everywhere — library, shelves, search, Discover and More by this author. Both actions are still on the book\'s own page, which is what the cover has always linked to.',
         category: 'Library',
-        link: { to: '/', label: 'Go to the library' },
+        link: { to: '/', label: 'Open your library' },
       },
       {
         title: 'The library stays usable while a book is being imported',

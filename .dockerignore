@@ -20,6 +20,7 @@ wiki_images
 .devcontainer
 .editorconfig
 AI_README.md
+babel.cfg
 CHANGELOG.md
 CHANGES-vs-upstream.md
 CONTRIBUTING.md
@@ -28,10 +29,12 @@ docs
 drafts
 examples
 feedback-server
+findings
 GOVERNANCE.md
 greptile.json
 homepage
 kubernetes
+messages.pot
 notes
 run_tests.sh
 SECURITY.md

@@ -365,8 +365,11 @@ RUN \
 # Copy the rest of the application code (changes most frequently)
 COPY --chown=abc:abc . /app/calibre-web-automated/
 
-# Install our Python package. The dependencies were installed in STEP 3.1.
 RUN \
+  # The `frontend/` directory should be in `.dockerignore` but is used during
+  # STAGE 0 to build the SPA. We therefore manually remove it.
+  rm -Rf /app/calibre-web-automated/frontend && \
+  # Install our Python package. The dependencies were installed in STEP 3.1.
   /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ \
     -e /app/calibre-web-automated
 

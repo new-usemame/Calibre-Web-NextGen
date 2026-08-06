@@ -16,6 +16,18 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- **A sign-in page whose only button is your one provider now just takes you
+  there.** If your server runs in OAuth-only mode with exactly one provider
+  switched on, opening the login page showed you a page whose sole purpose was
+  to click through to that provider. NextGen now starts it for you. If the
+  provider is unreachable, or you want the plain page back for any reason, add
+  `?local=1` to the login URL. A cancelled or failed sign-in returns you to the
+  login page instead of bouncing you straight back out to the provider.
+  Contributed by @lduesing.
+  ([#1411](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1411))
+
 ## [v4.1.31] - 2026-08-06
 
 ### Added

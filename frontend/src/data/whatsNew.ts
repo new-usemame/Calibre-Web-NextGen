@@ -56,6 +56,66 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.31',
+    date: '2026-08-06',
+    items: [
+      {
+        title: 'Your Kobo gets books in its own format, automatically',
+        body: 'Kobo devices read two kinds of EPUB, and the "kepub" one is what the device is actually built for — faster page turns, working chapter progress, and highlights that stay put. That file used to be made only the first time a device asked for a particular book, so most of a library sat in the plain format. A new switch in Settings → Kobo, on by default, prepares it ahead of time for everything you have already sent to a Kobo; your EPUB stays as the source and nothing is replaced, so those books take roughly twice the disk they did before.',
+        category: 'Sync',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Re-apply covers and metadata across the whole library',
+        body: 'Edits are written into the book files themselves, but only for the book you just edited — so anything changed before a fix, or imported with bad metadata, kept the old values inside the file even though the web page looked right. Sweeping the whole library used to mean a docker exec command that is not in the docs. There is now a Cover & Metadata Enforcement page in Admin with a Start button, live progress and log, Cancel, and an archive of past runs.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Turn off the Read now and edit buttons on covers',
+        body: 'If you read on an ereader, the "Read now" link on every cover is just noise, and on a touchscreen it and the edit pencil stayed visible all the time instead of appearing on hover. A new Show Read now and edit buttons switch in the library View settings takes them off every cover everywhere — library, shelves, search, Discover and More by this author. Both actions are still on the book\'s own page, which is what the cover has always linked to.',
+        category: 'Library',
+        link: { to: '/', label: 'Go to the library' },
+      },
+      {
+        title: 'The library stays usable while a book is being imported',
+        body: 'Saving a metadata edit, renaming or merging a tag, or uploading during an import could stop the server answering anyone at all — not just you — until the import finished, with nothing in the log to explain it. The edit still queues behind the import, which is correct, but everyone else\'s pages now keep loading while it waits. On a test instance an unrelated page load during that wait went from 6.5 seconds to 36 milliseconds.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Kobo activity no longer freezes the site for everyone else',
+        body: 'Several parts of a Kobo sync did their work in a way that held up every other page for every user: padding covers to the device screen shape, converting a book on first download, rebuilding a large book to embed metadata, and waiting on the Kobo store when store proxying is on. All of that now happens out of the way. On a 24 MB book an unrelated page load went from 754 ms back to 21 ms.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Kobo syncs are much faster on big libraries',
+        body: 'Every sync re-opened and re-parsed each book from disk to check one rarely-used property, and recorded each delivered book in its own separate database write. The answer to that check never changes unless the file does, so it is now remembered, and the writes are batched into one. On a 215-book library the per-100-book cost dropped from 400 ms to 11 ms; the memory holds 4,096 books, so a full sync of a larger library sees less of the benefit.',
+        category: 'Sync',
+      },
+      {
+        title: 'Preparing books for Kobo can no longer damage your library',
+        body: 'A converted book was written straight into place, so stopping the container mid-write left a half-written file that the next run accepted as finished — after which the device was handed a book it could not open, permanently. Converted books are now written aside and swapped in only once complete and verified as a readable archive. A single unreadable book also no longer halts the whole run, and downloads during that background work go through immediately instead of timing out.',
+        category: 'Sync',
+      },
+      {
+        title: 'The container starts when you run it as a non-root user',
+        body: 'Starting NextGen with --user, or under rootless Podman with --userns=keep-id, left every service dying the moment it tried to switch to its own app user. The supervisor restarted them forever, so the container showed as Up while nothing was listening on the port. It now checks whether it can switch users before trying and stays as whoever you started it as when it cannot; running normally is unchanged.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Metadata working files survive an upgrade',
+        body: 'The change logs and scratch space the cover and metadata enforcer uses lived inside the application folder, which is replaced wholesale every time you pull a new image. They now sit on your /config volume with the rest of your per-install state, so an edit saved moments before an upgrade still gets applied to the book file after it. Anything left in the old location moves across on first start.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The Tags page speaks Russian again',
+        body: 'The tag merge and delete tools added in v4.1.30 arrived without Russian text, so the page switched to English at exactly the point it asked you to confirm something destructive. Two upload and reading-position messages had the same gap. All thirteen phrases are translated and Russian is complete again at 2,622 of 2,622.',
+        category: 'Account',
+        link: { to: '/tags', label: 'Browse tags' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.30',
     date: '2026-08-04',
     items: [

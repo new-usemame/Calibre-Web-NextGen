@@ -89,13 +89,13 @@ def test_decision_output_is_always_a_resolvable_endpoint():
     app = _app_with_real_oauth_blueprints()
 
     for provider_name in sorted(oauth_auto_redirect._PROVIDER_ENDPOINTS):
-        endpoint, render_local = oauth_auto_redirect.auto_redirect_decision(
+        endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
             {},
             [{"provider_name": provider_name, "active": True}],
             {},
         )
 
-        assert render_local is False
+        assert next_url is None
         assert endpoint is not None
         with app.test_request_context():
             assert flask.url_for(endpoint).startswith(_URL_PREFIX)

@@ -35,6 +35,7 @@ import json
 import requests
 import os
 from functools import wraps
+from urllib.parse import urlsplit
 
 # Relax OAuthlib scope validation to prevent errors when providers return different scopes
 # This fixes Issue #715 where missing 'groups' scope causes 500 Internal Server Error
@@ -43,7 +44,12 @@ os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 from flask import session, request, make_response, abort
 from flask import Blueprint, flash, redirect, url_for
 from flask_babel import gettext as _
-from flask_dance.consumer import oauth_authorized, oauth_error, OAuth2ConsumerBlueprint
+from flask_dance.consumer import (
+    oauth_authorized,
+    oauth_before_login,
+    oauth_error,
+    OAuth2ConsumerBlueprint,
+)
 from flask_dance.contrib.github import make_github_blueprint, github
 from flask_dance.contrib.google import make_google_blueprint, google
 from oauthlib.oauth2 import TokenExpiredError, InvalidGrantError
@@ -51,7 +57,7 @@ from .cw_login import login_user, current_user
 from sqlalchemy.orm.exc import NoResultFound
 from .usermanagement import user_login_required
 
-from . import constants, logger, config, app, ub
+from . import app, config, constants, logger, oauth_auto_redirect, ub
 from .ui_themes import config_theme_code
 
 try:
@@ -436,7 +442,7 @@ def register_user_from_generic_oauth(token=None):
             provider_username, allowed_groups, group_claim, user_groups,
         )
         flash(_("Login failed: your account is not allowed to access this application."), category="error")
-        return redirect(url_for("web.login"))
+        return _oauth_failure_redirect("generic")
 
     admin_group = generic.get('oauth_admin_group', 'admin')
     should_be_admin = bool(admin_group and _oauth_claim_contains_any(user_groups, [admin_group]))
@@ -627,7 +633,7 @@ def bind_oauth_or_register(provider_id, provider_user_id, redirect_url, provider
     if not provider_user_id:
         log.error("OAuth provider %s returned empty user ID", provider_name)
         flash(_("OAuth error: Provider returned invalid user information. Please try again."), category="error")
-        return redirect(url_for('web.login'))
+        return _oauth_failure_redirect(provider_name)
     
     query = ub.session.query(ub.OAuth).filter_by(
         provider=provider_id,
@@ -649,7 +655,7 @@ def bind_oauth_or_register(provider_id, provider_user_id, redirect_url, provider
             log.debug("You are now logged in as: '%s'", oauth_entry.user.name)
             flash(_("Success! You are now logged in as: %(nickname)s", nickname=oauth_entry.user.name),
                   category="success")
-            return redirect(url_for('web.index'))
+            return redirect(_oauth_success_redirect(provider_name))
         elif oauth_entry:
             # bind to current user
             if current_user and current_user.is_authenticated:
@@ -669,16 +675,16 @@ def bind_oauth_or_register(provider_id, provider_user_id, redirect_url, provider
                        "Please contact your administrator to create an account or link your existing account.", 
                        provider=provider_name), category="error")
             log.info('Login failed, No User Linked With OAuth Account for provider %s', provider_name)
-            return redirect(url_for('web.login'))
+            return _oauth_failure_redirect(provider_name)
         else:
             # No OAuth entry found - this shouldn't happen if OAuth creation worked
             log.error("OAuth entry not found for provider %s, user %s", provider_name, provider_user_id)
             flash(_("OAuth authentication failed. Please try again or contact administrator."), category="error")
-            return redirect(url_for('web.login'))
+            return _oauth_failure_redirect(provider_name)
     except (NoResultFound, AttributeError) as e:
         log.error("OAuth binding error for provider %s: %s", provider_name, e)
         flash(_("OAuth system error. Please contact administrator."), category="error")
-        return redirect(url_for('web.login'))
+        return _oauth_failure_redirect(provider_name)
 
 
 def get_oauth_status():
@@ -919,6 +925,103 @@ def generate_oauth_blueprints():
     return oauthblueprints
 
 
+_AUTHORIZED_ENDPOINT_PROVIDERS = {
+    "github.authorized": "github",
+    "google.authorized": "google",
+    "generic.authorized": "generic",
+}
+
+
+def _request_oauth_state():
+    return request.args.get("state")
+
+
+def _oauth_failure_redirect(provider_name):
+    """Return to login without immediately restarting the sole provider."""
+    next_url = oauth_auto_redirect.consume_oauth_next(
+        session,
+        provider_name,
+        _request_oauth_state(),
+    )
+    values = {
+        oauth_auto_redirect.LOCAL_LOGIN_PARAMETER:
+            oauth_auto_redirect.LOCAL_LOGIN_VALUE,
+    }
+    if next_url:
+        values["next"] = next_url
+    return redirect(url_for("web.login", **values))
+
+
+def _remember_auto_redirect_state(blueprint, url):
+    """Remember the OAuth state generated for an automatic login start."""
+    del url
+    if (
+        request.args.get(oauth_auto_redirect.AUTO_REDIRECT_PARAMETER)
+        != oauth_auto_redirect.AUTO_REDIRECT_VALUE
+    ):
+        return
+
+    oauth_auto_redirect.remember_oauth_state(
+        session,
+        blueprint.name,
+        session.get(f"{blueprint.name}_oauth_state"),
+        oauth_auto_redirect.validated_relative_next(request.args),
+    )
+
+
+def _prepare_oauth_callback():
+    """Restore attempt-scoped state before Flask-Dance validates a callback."""
+    provider_name = _AUTHORIZED_ENDPOINT_PROVIDERS.get(request.endpoint)
+    if provider_name is None:
+        return None
+
+    oauth_state = _request_oauth_state()
+    if oauth_auto_redirect.restore_provider_oauth_state(
+        session,
+        provider_name,
+        oauth_state,
+    ):
+        return None
+
+    # Flask-Dance emits oauth_error before consulting its stored state. Let the
+    # provider-specific handler preserve the detailed flash message and return
+    # the loop-breaking login response.
+    if request.args.get("error"):
+        return None
+
+    expected_state = session.get(f"{provider_name}_oauth_state")
+    if oauth_state and expected_state == oauth_state:
+        return None
+    return _oauth_failure_redirect(provider_name)
+
+
+def _oauth_success_redirect(provider_name):
+    """Clear flow state and resolve the post-login destination."""
+    next_url = oauth_auto_redirect.consume_oauth_next(
+        session,
+        provider_name,
+        _request_oauth_state(),
+    )
+    session.pop(oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY, None)
+    oauth_auto_redirect.clear_auto_redirect_state(session)
+    if not next_url or urlsplit(next_url).path == url_for("web.logout"):
+        return url_for("web.index")
+    return next_url
+
+
+def _register_auto_redirect_hooks(blueprints):
+    """Attach state tracking and callback recovery to OAuth blueprints."""
+    for element in blueprints:
+        oauth_before_login.connect_via(element['blueprint'])(
+            _remember_auto_redirect_state
+        )
+
+    guard_key = "cwa_oauth_auto_redirect_callback_guard"
+    if not app.extensions.get(guard_key):
+        app.before_request(_prepare_oauth_callback)
+        app.extensions[guard_key] = True
+
+
 def init_oauth_blueprints():
     """
     Initialize OAuth blueprints and register signal handlers.
@@ -936,18 +1039,20 @@ def init_oauth_blueprints():
     global oauthblueprints
     oauthblueprints = generate_oauth_blueprints()
 
+    _register_auto_redirect_hooks(oauthblueprints)
+
     @oauth_authorized.connect_via(oauthblueprints[0]['blueprint'])
     def github_logged_in(blueprint, token):
         if not token:
             flash(_("Failed to log in with GitHub."), category="error")
             log.error("Failed to log in with GitHub")
-            return False
+            return _oauth_failure_redirect(blueprint.name)
 
         resp = blueprint.session.get("/user")
         if not resp.ok:
             flash(_("Failed to fetch user info from GitHub."), category="error")
             log.error("Failed to fetch user info from GitHub")
-            return False
+            return _oauth_failure_redirect(blueprint.name)
 
         github_info = resp.json()
         github_user_id = str(github_info["id"])
@@ -968,7 +1073,7 @@ def init_oauth_blueprints():
         if not token:
             flash(_("Failed to log in with Google."), category="error")
             log.error("Failed to log in with Google")
-            return False
+            return _oauth_failure_redirect(blueprint.name)
 
         # We do NOT store token in session["google_oauth_token"] here to avoid duplication/bloat.
         # It will be stored in session[provider_id + "_oauth_token"] by oauth_update_token.
@@ -977,7 +1082,7 @@ def init_oauth_blueprints():
         if not resp.ok:
             flash(_("Failed to fetch user info from Google."), category="error")
             log.error("Failed to fetch user info from Google")
-            return False
+            return _oauth_failure_redirect(blueprint.name)
 
         google_info = resp.json()
         google_user_id = str(google_info["id"])
@@ -1002,7 +1107,7 @@ def init_oauth_blueprints():
         if not token:
             flash(_("Failed to log in with Generic OAuth."), category="error")
             log.error("Failed to log in with Generic OAuth - no token received")
-            return False
+            return _oauth_failure_redirect(blueprint.name)
 
         try:
             # Pass token explicitly to avoid DB race condition
@@ -1011,17 +1116,17 @@ def init_oauth_blueprints():
             if response:
                 return response
             
-            # If no response, something failed silently (already logged)
-            return False
+            # If no response, something failed silently (already logged).
+            return _oauth_failure_redirect(blueprint.name)
 
         except (InvalidGrantError, TokenExpiredError) as e:
             log.error("OAuth token error in generic_logged_in: %s", e)
             flash(_("OAuth authentication failed: Token validation error. Please try again."), category="error")
-            return False
+            return _oauth_failure_redirect(blueprint.name)
         except Exception as e:
             log.error("Unexpected error in generic OAuth login: %s", e)
             flash(_("OAuth authentication failed due to an unexpected error. Please contact administrator."), category="error")
-            return False
+            return _oauth_failure_redirect(blueprint.name)
 
 
     # notify on OAuth provider error
@@ -1042,6 +1147,7 @@ def init_oauth_blueprints():
             )  # ToDo: Translate
         flash(msg, category="error")
         log.error("GitHub OAuth error: %s", msg)
+        return _oauth_failure_redirect(blueprint.name)
 
     @oauth_error.connect_via(oauthblueprints[1]['blueprint'])
     def google_error(blueprint, error, error_description=None, error_uri=None):
@@ -1060,6 +1166,7 @@ def init_oauth_blueprints():
             )  # ToDo: Translate
         flash(msg, category="error")
         log.error("Google OAuth error: %s", msg)
+        return _oauth_failure_redirect(blueprint.name)
 
     @oauth_error.connect_via(oauthblueprints[2]['blueprint'])
     def generic_error(blueprint, error, error_description=None, error_uri=None):
@@ -1078,6 +1185,7 @@ def init_oauth_blueprints():
             )  # ToDo: Translate
         flash(msg, category="error")
         log.error("Generic OAuth error: %s", msg)
+        return _oauth_failure_redirect(blueprint.name)
 
     return oauthblueprints
 

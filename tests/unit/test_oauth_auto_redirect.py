@@ -21,10 +21,7 @@ pytestmark = pytest.mark.unit
 
 
 def _provider(name, active=True):
-    return {
-        "provider_name": name,
-        "active": active,
-    }
+    return {"provider_name": name, "active": active}
 
 
 @pytest.mark.parametrize(
@@ -35,48 +32,52 @@ def _provider(name, active=True):
         ("generic", "generic.login"),
     ),
 )
-def test_single_active_provider_is_selected(provider_name, expected_endpoint):
+def test_single_active_provider_starts_and_counts_redirect(
+    provider_name,
+    expected_endpoint,
+):
     session_store = {}
 
-    endpoint, render_local = oauth_auto_redirect.auto_redirect_decision(
+    endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
         {},
         [_provider(provider_name)],
         session_store,
     )
 
     assert endpoint == expected_endpoint
-    assert render_local is False
-    assert session_store[
-        oauth_auto_redirect.AUTO_REDIRECT_GUARD_KEY
-    ] is True
+    assert next_url is None
+    assert session_store[oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY] == 1
 
 
-def test_local_login_parameter_bypasses_oauth_and_clears_guard():
+def test_local_parameter_suppresses_start_without_consuming_other_tab():
     session_store = {
-        oauth_auto_redirect.AUTO_REDIRECT_GUARD_KEY: True,
+        oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY: 2,
+        oauth_auto_redirect.AUTO_REDIRECT_STATES_KEY: {
+            "state-a": {"provider": "generic", "next": "/book/7"},
+        },
     }
 
-    endpoint, render_local = oauth_auto_redirect.auto_redirect_decision(
+    endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
         {"local": "1"},
         [_provider("generic")],
         session_store,
     )
 
     assert endpoint is None
-    assert render_local is True
-    assert oauth_auto_redirect.AUTO_REDIRECT_GUARD_KEY not in session_store
+    assert next_url is None
+    assert session_store[oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY] == 2
+    assert "state-a" in session_store[oauth_auto_redirect.AUTO_REDIRECT_STATES_KEY]
 
 
 @pytest.mark.parametrize("local_value", ("", "0", "true", "yes"))
-def test_only_exact_local_value_bypasses_oauth(local_value):
-    endpoint, render_local = oauth_auto_redirect.auto_redirect_decision(
+def test_only_exact_local_value_suppresses_start(local_value):
+    endpoint, _ = oauth_auto_redirect.auto_redirect_decision(
         {"local": local_value},
         [_provider("generic")],
         {},
     )
 
     assert endpoint == "generic.login"
-    assert render_local is False
 
 
 @pytest.mark.parametrize(
@@ -89,44 +90,104 @@ def test_only_exact_local_value_bypasses_oauth(local_value):
     ),
 )
 def test_redirect_requires_exactly_one_known_active_provider(providers):
-    session_store = {
-        oauth_auto_redirect.AUTO_REDIRECT_GUARD_KEY: True,
-    }
+    session_store = {}
 
-    endpoint, render_local = oauth_auto_redirect.auto_redirect_decision(
+    endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
         {},
         providers,
         session_store,
     )
 
     assert endpoint is None
-    assert render_local is False
-    assert oauth_auto_redirect.AUTO_REDIRECT_GUARD_KEY not in session_store
+    assert next_url is None
+    assert session_store == {}
 
 
-def test_pending_guard_renders_login_once_then_allows_new_redirect():
-    session_store = {
-        oauth_auto_redirect.AUTO_REDIRECT_GUARD_KEY: True,
-    }
+def test_existing_redirect_counter_stops_auto_start_after_limit():
+    session_store = {oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY: 4}
 
-    endpoint, render_local = oauth_auto_redirect.auto_redirect_decision(
+    endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
         {},
         [_provider("generic")],
         session_store,
     )
 
     assert endpoint is None
-    assert render_local is True
-    assert oauth_auto_redirect.AUTO_REDIRECT_GUARD_KEY not in session_store
+    assert next_url is None
+    assert session_store[oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY] == 4
 
-    endpoint, render_local = oauth_auto_redirect.auto_redirect_decision(
-        {},
+
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    (
+        ("/book/7", "/book/7"),
+        ("/book/7?format=epub#download", "/book/7?format=epub#download"),
+        ("", None),
+        ("book/7", None),
+        ("//evil.example/path", None),
+        ("https://evil.example/path", None),
+        ("/\\evil.example/path", None),
+        ("/book/7\r\nX-Test: injected", None),
+        ("/%5cevil.example/path", None),
+        ("/%2f%2fevil.example/path", None),
+        ("/" + "x" * 512, None),
+    ),
+)
+def test_next_target_is_kept_only_when_relative(target, expected):
+    endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
+        {"next": target},
         [_provider("generic")],
-        session_store,
+        {},
     )
 
     assert endpoint == "generic.login"
-    assert render_local is False
-    assert session_store[
-        oauth_auto_redirect.AUTO_REDIRECT_GUARD_KEY
-    ] is True
+    assert next_url == expected
+
+
+def test_oauth_state_is_provider_scoped_and_attempt_scoped():
+    session_store = {}
+    assert oauth_auto_redirect.remember_oauth_state(
+        session_store,
+        "generic",
+        "state-a",
+        "/book/1",
+    )
+    assert oauth_auto_redirect.remember_oauth_state(
+        session_store,
+        "generic",
+        "state-b",
+        "/book/2",
+    )
+
+    assert not oauth_auto_redirect.restore_provider_oauth_state(
+        session_store,
+        "google",
+        "state-a",
+    )
+    assert oauth_auto_redirect.restore_provider_oauth_state(
+        session_store,
+        "generic",
+        "state-a",
+    )
+    assert session_store["generic_oauth_state"] == "state-a"
+
+    assert oauth_auto_redirect.consume_oauth_next(
+        session_store,
+        "generic",
+        "state-a",
+    ) == "/book/1"
+    assert "state-b" in session_store[oauth_auto_redirect.AUTO_REDIRECT_STATES_KEY]
+
+
+def test_clear_removes_states_and_legacy_boolean_guard():
+    session_store = {
+        oauth_auto_redirect.AUTO_REDIRECT_STATES_KEY: {
+            "state-a": {"provider": "generic", "next": None},
+        },
+        "_oauth_auto_redirect_pending": True,
+        "unrelated": "keep",
+    }
+
+    oauth_auto_redirect.clear_auto_redirect_state(session_store)
+
+    assert session_store == {"unrelated": "keep"}

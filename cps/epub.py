@@ -88,8 +88,11 @@ def get_epub_layout(book, book_data):
         # otherwise corrupt archive used to escape this handler even though
         # "unparseable epub" is exactly what it means -- the one caller that
         # noticed wrapped this call in its own try (cps/kobo.py). RuntimeError
-        # is the same shape for a password-protected archive. Every caller
-        # already treats None as "layout unknown", so report it here once
+        # is the same shape for a password-protected archive -- note it is the
+        # broadest clause here, so it also absorbs NotImplementedError
+        # (unsupported compression or zip version, which is still "unparseable
+        # epub") and RecursionError from lxml on a pathological tree. Every
+        # caller already treats None as "layout unknown", so report it here once
         # instead of leaking two more exception types to each call site.
         log.error("Could not parse epub metadata of book {} during kobo sync: {}".format(book.id, e))
         return None

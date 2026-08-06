@@ -224,6 +224,92 @@ def test_failed_enqueue_does_not_leave_the_latch_set(monkeypatch):
     assert kepub_backfill.is_kepub_backfill_pending() is False
 
 
+def test_a_finished_task_does_not_free_a_later_tasks_latch(monkeypatch):
+    """The latch has an owner. Round 2 of the refuter loop proved it needed one.
+
+    Three ways an unowned latch is freed by the wrong instance: a finishing run
+    releasing it before its own `finally` runs again; a cancel of an
+    already-finished task still retained in ``dequeued`` (``end_task`` has no
+    terminal-state guard); and the window between a mid-run cancel and the loop
+    noticing. A falsely-free latch puts a blocking 25s conversion on the Kobo
+    download request path -- the exact thing the latch exists to prevent.
+    """
+    from cps.tasks import kepub_backfill
+    from cps.services.worker import STAT_ENDED, STAT_FINISH_SUCCESS
+
+    finished_earlier = kepub_backfill.TaskKepubBackfill()
+    live = kepub_backfill.TaskKepubBackfill()
+
+    monkeypatch.setattr(kepub_backfill, "_pending", True, raising=False)
+    monkeypatch.setattr(kepub_backfill, "_pending_owner", live, raising=False)
+
+    # A stale task reaching a terminal state must not touch the live task's latch.
+    finished_earlier.stat = STAT_FINISH_SUCCESS
+    assert kepub_backfill.is_kepub_backfill_pending() is True
+    finished_earlier.stat = STAT_ENDED
+    assert kepub_backfill.is_kepub_backfill_pending() is True
+
+    # The owner releasing it does.
+    live.stat = STAT_FINISH_SUCCESS
+    assert kepub_backfill.is_kepub_backfill_pending() is False
+
+
+def test_enqueue_lock_is_reentrant(monkeypatch):
+    """The stat setter can take the lock from an arbitrary attribute assignment."""
+    from cps.tasks import kepub_backfill
+    from cps.services.worker import STAT_FINISH_SUCCESS
+
+    task = kepub_backfill.TaskKepubBackfill()
+    # A plain threading.Lock deadlocks forever here instead of returning.
+    with kepub_backfill._enqueue_lock:
+        task.stat = STAT_FINISH_SUCCESS
+
+    assert kepub_backfill.is_kepub_backfill_pending() is False
+
+
+def test_a_failing_config_save_does_not_leave_the_flag_set_in_memory(monkeypatch):
+    """Otherwise this process thinks it is done while the next boot re-reads False."""
+    from cps.tasks import kepub_backfill
+
+    attempted = []
+
+    def boom():
+        raise RuntimeError("database is locked")
+
+    _wire(monkeypatch, kepub_backfill, [(1,)], _conversion(attempted), lambda *_: None)
+    monkeypatch.setattr(kepub_backfill.config, "save", boom, raising=False)
+
+    task = kepub_backfill.TaskKepubBackfill()
+    with pytest.raises(RuntimeError):
+        task.run(None)
+
+    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is False
+
+
+def test_an_unclosable_session_does_not_destroy_the_diagnosis(monkeypatch):
+    """CalibreDB.session is documented as possibly None; close() must not mask the cause."""
+    from cps.tasks import kepub_backfill
+
+    class BadSessionDB:
+        def __init__(self, **_):
+            self.session = None
+
+        def get_book(self, book_id):
+            raise RuntimeError("the real cause")
+
+        def get_book_format(self, *_):
+            return None
+
+    saved = _wire(monkeypatch, kepub_backfill, [(1,)], _conversion([]), lambda *_: None)
+    monkeypatch.setattr(kepub_backfill.db, "CalibreDB", BadSessionDB)
+
+    task = kepub_backfill.TaskKepubBackfill()
+    task.run(None)  # must not raise AttributeError about 'close'
+
+    assert task.failed == 1
+    assert saved == []
+
+
 def test_get_epub_layout_returns_none_for_a_corrupt_archive(monkeypatch, tmp_path):
     """The contract is 'None when unparseable' -- BadZipFile is exactly that."""
     from cps import epub as epub_module

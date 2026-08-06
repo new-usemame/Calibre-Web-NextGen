@@ -717,3 +717,25 @@ def test_watcher_does_not_double_consume_the_queue():
     assert re.search(r"if published:\s*\n\s*ce_process = watched", src), (
         "cancel re-reads the queue instead of using the process the loop already holds"
     )
+
+
+def test_publication_survives_a_failing_log_close():
+    """`close()` flushes, so it is a write that can fail — on a full disk especially.
+
+    Round three: the publication in the `finally` sat AFTER an unguarded `close()`, so a
+    raise there skipped it and re-opened the wedge the finally was added to close. The
+    guarantee the comment claims only holds if the close cannot pre-empt the put.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "cover_enforcer_start")
+    tries = [n for n in ast.walk(fn) if isinstance(n, ast.Try)]
+    outer = tries[0]
+    final_src = ast.unparse(outer.finalbody)
+
+    assert "queue.put" in final_src, "publication is not in the finally"
+    # The close must be individually guarded, not merely present.
+    inner_tries = [n for n in ast.walk(ast.Module(body=outer.finalbody, type_ignores=[]))
+                   if isinstance(n, ast.Try)]
+    assert inner_tries, "close() in the finally is unguarded; a raise there skips the put"
+    assert any("close()" in ast.unparse(t.body) for t in inner_tries), (
+        "the guarded block in the finally is not the close()"
+    )

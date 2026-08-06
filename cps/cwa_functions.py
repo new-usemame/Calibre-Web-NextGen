@@ -2400,9 +2400,15 @@ def cover_enforcer_start(queue):
             log.error(f"Could not record the cover enforcer start failure: {log_exc}")
     finally:
         if log_file is not None:
-            log_file.close()
-        # Exactly one result reaches the watcher on every path, including a raise from
-        # the queue's own put in the body above.
+            # close() FLUSHES, so it is itself a write that can fail - and a full disk is
+            # exactly the case this whole path exists for. Unguarded, a raise here skips
+            # the publication below and re-opens the wedge: the watcher waits forever for
+            # a process nobody hands it, and the claim is never released.
+            try:
+                log_file.close()
+            except Exception as e:
+                log.error(f"Failed to close the cover enforcer log: {e}")
+        # Exactly one result reaches the watcher on every path.
         queue.put(ce_process)
 
 def _read_log_tail(log_path: str, limit: int = COVER_ENFORCER_STATUS_TAIL_BYTES) -> str:

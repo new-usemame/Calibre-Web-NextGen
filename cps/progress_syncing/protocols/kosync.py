@@ -81,6 +81,48 @@ MAX_PROGRESS_LENGTH = 255  # Maximum progress string length
 MAX_DEVICE_LENGTH = 100    # Maximum device name length
 MAX_DEVICE_ID_LENGTH = 100 # Maximum device ID length
 
+# Sentinel stored in ``KOSyncProgress.progress`` by producers that know a
+# reading percentage but cannot express a position KOReader can seek to — the
+# web reader (#1366) and, later, a Kobo (#1425 gap 1).
+#
+# It has to be a sentinel rather than an empty/absent value because the column
+# is NOT NULL and, more importantly, because of what the client does with it.
+# ``CWASync:syncToProgress`` feeds this column straight to ``GotoXPointer`` for
+# any non-numeric value, and ``applyProgressToBook`` writes it to
+# ``last_xpointer``. The plugin's only guard is ``body.progress == nil``, and in
+# Lua ``"" ~= nil`` — so an empty string would sail past it and store a
+# meaningless xpointer on the device. The colon keeps it outside the space of
+# things KOReader itself pushes and mirrors ``is_valid_key_field``'s reservation
+# of ':' for internal use.
+PERCENTAGE_ONLY_LOCATOR = "cwng:percentage"
+
+# Query parameter a client sends on GET to say which position encodings it can
+# act on. Absent means "locator only", which is every plugin released before
+# percentage-only rows existed, so those rows stay invisible to them.
+POSITION_KINDS_PARAM = "position_kinds"
+POSITION_KIND_PERCENTAGE = "percentage"
+POSITION_KIND_LOCATOR = "locator"
+
+
+def is_percentage_only(progress_record) -> bool:
+    """True when ``progress_record`` carries a percentage but no seekable locator."""
+    return getattr(progress_record, "progress", None) == PERCENTAGE_ONLY_LOCATOR
+
+
+def client_accepts_percentage_only() -> bool:
+    """True when the requesting client advertised percentage-only support.
+
+    Read from the request's ``position_kinds`` parameter (comma-separated).
+    Defaults to False so an older plugin's behaviour is byte-identical to what
+    it saw before percentage-only rows existed: it never receives one, so it
+    can neither mis-seek on it nor show a sync error for it.
+    """
+    try:
+        raw = request.args.get(POSITION_KINDS_PARAM, "") or ""
+    except RuntimeError:  # outside a request context
+        return False
+    return POSITION_KIND_PERCENTAGE in {k.strip().lower() for k in raw.split(",")}
+
 
 def _require_kosync_enabled():
     if not is_koreader_sync_enabled():
@@ -587,7 +629,8 @@ def get_book_checksums(book_id):
         return []
 
 
-def get_progress_record(user_id, document_checksum, book_id) -> KOSyncProgress:
+def get_progress_record(user_id, document_checksum, book_id,
+                        include_percentage_only: bool = True) -> KOSyncProgress:
     """
     Look up and return the KOSyncProgress record associated with a user and document identifier(s).
 
@@ -602,6 +645,11 @@ def get_progress_record(user_id, document_checksum, book_id) -> KOSyncProgress:
         user_id: The ID of the user
         book_id: The ID of the book in the Calibre library
         document_checksum: The checksum of the document sought
+        include_percentage_only: When False, rows carrying only a percentage
+            (``PERCENTAGE_ONLY_LOCATOR``) are excluded, so a caller serving a
+            client that can only act on a seekable locator never sees one.
+            Writers leave this True: a KOReader push must find and upgrade the
+            shared row rather than fork a second one beside it.
     """
     # Keys that identify the same conceptual book: the incoming checksum, the
     # book_id itself, and — when the book resolved — every checksum registered
@@ -612,10 +660,14 @@ def get_progress_record(user_id, document_checksum, book_id) -> KOSyncProgress:
         lookup_keys.update(get_book_checksums(book_id))
     lookup_keys.discard(None)
 
-    progress_record = ub.session.query(KOSyncProgress).filter(
+    query = ub.session.query(KOSyncProgress).filter(
         KOSyncProgress.user_id == user_id,
         KOSyncProgress.document.in_(tuple(lookup_keys))
-    ).order_by(
+    )
+    if not include_percentage_only:
+        query = query.filter(KOSyncProgress.progress != PERCENTAGE_ONLY_LOCATOR)
+
+    progress_record = query.order_by(
         desc(KOSyncProgress.percentage),
         desc(KOSyncProgress.timestamp)
     ).first()
@@ -624,6 +676,61 @@ def get_progress_record(user_id, document_checksum, book_id) -> KOSyncProgress:
         log.debug(f"No progress record found for user: {user_id}, document_checksum: {document_checksum}, book_id: {book_id}")
     log.debug(f"Progress found: {progress_record}")
     return progress_record
+
+
+def record_percentage_only_progress(user_id, book_id, percentage: float,
+                                    device: str, device_id=None) -> bool:
+    """Publish a percentage-only reading position onto the carrier KOReader reads.
+
+    KOReader pulls from ``KOSyncProgress``; until now the only writer was
+    KOReader's own PUT, so a book read anywhere else left nothing for it to
+    fetch (#1366, and #1425 gap 1 for the Kobo). This writes that row for a
+    producer that knows the percentage but not a KOReader-seekable locator.
+
+    The row is keyed on ``str(book_id)`` — the same key ``update_progress``
+    converges on (#633) — so the browser and the devices share one record
+    instead of fragmenting per checksum.
+
+    Furthest-wins, matching ``update_progress``: a lower percentage is dropped
+    rather than dragging a device backwards. When it does win it replaces any
+    stored locator with the sentinel, which is the honest outcome — that
+    locator described an earlier position, so handing it back would send the
+    device behind where the user actually is.
+
+    Returns True when the row was written. The caller commits.
+    """
+    if percentage is None or not book_id:
+        return False
+
+    record = get_progress_record(user_id, None, book_id, include_percentage_only=True)
+    now = datetime.now(timezone.utc)
+
+    if record is not None:
+        if percentage < record.percentage:
+            log.debug("Percentage-only progress not shared for user %s book %s: "
+                      "incoming %.2f%% < stored %.2f%%",
+                      user_id, book_id, percentage, record.percentage)
+            return False
+        record.progress = PERCENTAGE_ONLY_LOCATOR
+        record.percentage = percentage
+        record.device = device
+        record.device_id = device_id
+        record.timestamp = now
+        record.document = str(book_id)
+    else:
+        ub.session.add(KOSyncProgress(
+            user_id=user_id,
+            document=str(book_id),
+            progress=PERCENTAGE_ONLY_LOCATOR,
+            percentage=percentage,
+            device=device,
+            device_id=device_id,
+            timestamp=now,
+        ))
+
+    log.debug("Shared percentage-only progress for user %s book %s at %.2f%% from %s",
+              user_id, book_id, percentage, device)
+    return True
 
 
 ################################################################################
@@ -736,7 +843,15 @@ def get_progress(document: str):
             {}, document
         )
 
-        progress_record = get_progress_record(user.id, document, book_id)
+        # A client that did not advertise percentage-only support gets exactly
+        # what it got before those rows existed: they are excluded from the
+        # candidate set entirely, rather than returned with a null progress it
+        # would report as a sync error.
+        accepts_percentage = client_accepts_percentage_only()
+        progress_record = get_progress_record(
+            user.id, document, book_id,
+            include_percentage_only=accepts_percentage,
+        )
 
         if not progress_record:
             return create_sync_response({})
@@ -745,9 +860,15 @@ def get_progress(document: str):
         # We store it as percentage (0-100), so convert back to decimal (0-1)
         percentage_decimal = progress_record.percentage / 100.0
 
+        percentage_only = is_percentage_only(progress_record)
+
         response_updates = {
             "document": document,
-            "progress": progress_record.progress,
+            # The sentinel is an internal marker, never a position — send null
+            # so no client can mistake it for an xpointer.
+            "progress": None if percentage_only else progress_record.progress,
+            "position_kind": (POSITION_KIND_PERCENTAGE if percentage_only
+                              else POSITION_KIND_LOCATOR),
             "percentage": percentage_decimal,
             "device": progress_record.device,
             "device_id": progress_record.device_id,

@@ -334,6 +334,54 @@ local function testPlanLocalContribution()
     assertEqual(#plan.deletions, 0, "an empty watermark yields no deletions")
 end
 
+-- #1366: the server can now send a position that is a percentage with no
+-- locator, written by the web reader (and later a Kobo). The reader has to tell
+-- that apart from a locator, and above all must never treat one as an xpointer.
+local function testResolveRemotePosition()
+    -- The existing encoding is untouched.
+    local locator = SyncLogic.resolveRemotePosition({
+        progress = "/body/DocFragment[12]/body/div/p[3].0",
+        percentage = 0.45,
+    })
+    assertEqual(locator.kind, "locator", "a progress string is a locator")
+    assertEqual(locator.progress, "/body/DocFragment[12]/body/div/p[3].0",
+        "and is passed through untouched")
+
+    -- A page number is still a locator, not a percentage.
+    assertEqual(SyncLogic.resolveRemotePosition({ progress = "42", percentage = 0.5 }).kind,
+        "locator", "a page number is a locator")
+
+    -- Percentage-only: labelled by the server, no progress at all.
+    local pct = SyncLogic.resolveRemotePosition({
+        progress = nil,
+        position_kind = "percentage",
+        percentage = 0.4567,
+    })
+    assertEqual(pct.kind, "percentage", "a labelled percentage body is percentage-only")
+    assertEqual(pct.percent_whole, 45.67, "and is converted to whole percent for GotoPercent")
+
+    -- The label wins over a progress value, so a server that sends both cannot
+    -- get the reader to seek to something it said was not a position.
+    assertEqual(SyncLogic.resolveRemotePosition({
+        progress = "cwng:percentage", position_kind = "percentage", percentage = 0.5,
+    }).kind, "percentage", "the sentinel is never treated as a locator")
+
+    -- Unusable bodies. An unlabelled body with no progress is NOT guessed to be
+    -- a percentage -- a truncated response must not move the reader.
+    assertEqual(SyncLogic.resolveRemotePosition({ percentage = 0.5 }).kind, "none",
+        "an unlabelled body with no progress is unusable")
+    assertEqual(SyncLogic.resolveRemotePosition({ position_kind = "percentage" }).kind, "none",
+        "a percentage label with no percentage is unusable")
+    assertEqual(SyncLogic.resolveRemotePosition({}).kind, "none", "an empty body is unusable")
+    assertEqual(SyncLogic.resolveRemotePosition(nil).kind, "none", "a non-table body is unusable")
+
+    -- The dangerous case: in Lua `"" ~= nil`, so an empty progress passes every
+    -- nil-check upstream. It must not reach GotoXPointer or last_xpointer.
+    assertEqual(SyncLogic.resolveRemotePosition({ progress = "", percentage = 0.5 }).kind,
+        "none", "an empty progress is not a position")
+end
+
+testResolveRemotePosition()
 testIsRemoteProgressFromThisDevice()
 testDidBookProgressChange()
 testMergeAnnotation()

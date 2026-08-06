@@ -26,13 +26,20 @@ We deliberately reuse KOSync's ``update_book_read_status`` rather than writing
 the row here, so the web reader, KOReader and Kobo all converge on one
 status-threshold implementation instead of three that can drift.
 
-Not done here, on purpose: we do **not** write ``KOSyncProgress``.  KOReader
-consumes that table's ``progress`` column as an engine-private crengine
-xpointer (numeric values become a page number, anything else is applied as an
-xpointer — ``koreader/plugins/cwasync.koplugin/main.lua``).  A CFI is neither,
-so pushing one there would hand KOReader an unresolvable position.  Bridging
-that direction needs a real CFI <-> xpointer canonicalization, which is tracked
-separately on #324.
+Reaching KOReader as well (#1366) needs a second carrier, because KOReader
+pulls from ``KOSyncProgress`` and never looks at the Kobo bookmark.  What we
+must **not** do is write a CFI into that table's ``progress`` column: KOReader
+consumes it as an engine-private crengine xpointer (numeric values become a
+page number, anything else is applied as an xpointer —
+``koreader/plugins/cwasync.koplugin/main.lua``), so a CFI there is an
+unresolvable position.  Instead the row is written with an explicit
+percentage-only sentinel and served as ``position_kind: "percentage"``, which
+the plugin acts on with ``GotoPercent`` — an event both of KOReader's engines
+implement (``ReaderRolling:onGotoPercent``, ``ReaderPaging:onGotoPercent``).
+That lands the reader near where the browser stopped rather than exactly there;
+an exact hand-off still needs CFI <-> xpointer canonicalization, tracked on
+#324.  Clients that have not advertised percentage support never receive these
+rows, so this cannot mis-seek an older plugin.
 
 Conflict policy: **furthest wins**, matching the rule KOSync already applies
 across devices (``kosync.py:1106``).  Opening a book in the browser therefore
@@ -146,6 +153,7 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     # Imported lazily: the KOSync protocol module pulls in cps.kobo, and this
     # service is imported from cps.web / cps.api.reader at request time.
     from ..progress_syncing.protocols.kosync import (read_status_for_percentage,
+                                                     record_percentage_only_progress,
                                                      update_book_read_status)
 
     # A sample from the browser must not un-finish a book the user marked Read.
@@ -200,9 +208,17 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     # write raising inside this best-effort helper, where the routes' broad
     # handler logs it as an optional progress-sharing failure and answers success
     # anyway. Both bookmark routes settle before calling in.
+    # Both carriers go in the one savepoint: the Kobo bookmark that
+    # ``update_book_read_status`` maintains, and the KOSync row KOReader pulls
+    # from (#1366). They describe the same position, so a partial write would
+    # leave the two devices disagreeing about where the user is — worse than
+    # neither being updated, which is a state the next save corrects.
     try:
         with ub.session.begin_nested():
             update_book_read_status(user, book_id, percentage)
+            record_percentage_only_progress(
+                user_id, book_id, percentage, device="Web reader",
+            )
     except Exception as e:
         log.warning("Could not share web reader progress for user %s book %s: %s",
                     user_id, book_id, e)

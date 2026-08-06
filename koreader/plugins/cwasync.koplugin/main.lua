@@ -867,6 +867,19 @@ function CWASync:applyProgressToBook(file_path, progress, percentage)
     local previous_page = doc_settings:readSetting("last_page")
     local previous_xpointer = doc_settings:readSetting("last_xpointer")
     local previous_status = summary.status
+    -- Only a non-empty string is a locator. Guarding here rather than trusting
+    -- callers because the failure is silent and permanent: `saveSetting` writes
+    -- whatever it is given, and in Lua `"" ~= nil`, so an empty progress from
+    -- any future caller would pass a nil-check upstream and then be stored as
+    -- the document's last_xpointer -- an unresolvable position the reader
+    -- cannot recover from on its own.
+    if type(progress) ~= "string" or progress == "" then
+        if tonumber(progress) == nil then
+            logger.dbg("CWASync: [Apply] refusing unusable progress for", file_path, progress)
+            return false
+        end
+    end
+
     local new_page = tonumber(progress)
     local new_xpointer = new_page == nil and progress or nil
 
@@ -1013,7 +1026,23 @@ function CWASync:pullLibraryProgress(ensure_networking)
                     return
                 end
 
-                if not body.percentage or body.progress == nil then
+                local remote = SyncLogic.resolveRemotePosition(body)
+
+                if remote.kind ~= "locator" then
+                    -- Includes percentage-only positions (#1366). Bulk pull
+                    -- writes the sidecar for a book that is NOT open, and a
+                    -- percentage cannot be turned into a locator without the
+                    -- document being rendered -- that conversion is the engine's
+                    -- and only exists once the book is loaded. Storing the
+                    -- percentage alone would be worse than skipping: KOReader
+                    -- resumes from the locator, so the sidecar would claim a
+                    -- position the reader does not open at, and the next page
+                    -- turn would overwrite the claim anyway.
+                    --
+                    -- These positions are applied on the single-document path
+                    -- instead, where the book IS open and GotoPercent works --
+                    -- which is the flow the report describes: open the book on
+                    -- KOReader and land where the browser got to.
                     missing = missing + 1
                     pullNextBook()
                     return
@@ -1050,12 +1079,32 @@ function CWASync:pullLibraryProgress(ensure_networking)
     pullNextBook()
 end
 
-function CWASync:syncToProgress(progress)
-    logger.dbg("CWASync: [Sync] progress to", progress)
+-- `position` is a descriptor from SyncLogic.resolveRemotePosition, not a raw
+-- progress string.
+--
+-- A percentage-only position (#1366) is seeked with GotoPercent, which both
+-- engines implement (ReaderRolling:onGotoPercent, ReaderPaging:onGotoPercent)
+-- and which takes whole percent. It lands near where the other device stopped
+-- rather than exactly there -- the sending side had no locator this engine
+-- could resolve, so approximate is the best available answer and is still much
+-- closer than not moving at all.
+function CWASync:syncToProgress(position)
+    if type(position) ~= "table" or position.kind == "none" then
+        logger.dbg("CWASync: [Sync] no usable remote position")
+        return
+    end
+
+    if position.kind == "percentage" then
+        logger.dbg("CWASync: [Sync] progress to", position.percent_whole, "%")
+        self.ui:handleEvent(Event:new("GotoPercent", position.percent_whole))
+        return
+    end
+
+    logger.dbg("CWASync: [Sync] progress to", position.progress)
     if self.ui.document.info.has_pages then
-        self.ui:handleEvent(Event:new("GotoPage", tonumber(progress)))
+        self.ui:handleEvent(Event:new("GotoPage", tonumber(position.progress)))
     else
-        self.ui:handleEvent(Event:new("GotoXPointer", progress))
+        self.ui:handleEvent(Event:new("GotoXPointer", position.progress))
     end
 end
 
@@ -1264,6 +1313,8 @@ function CWASync:getProgress(ensure_networking, interactive)
                 return
             end
 
+            local remote = SyncLogic.resolveRemotePosition(body)
+
             if not body.percentage then
                 logger.dbg("CWASync: [Pull] end for", current_file, "with no remote progress")
                 if interactive then
@@ -1275,8 +1326,8 @@ function CWASync:getProgress(ensure_networking, interactive)
                 return
             end
 
-            if body.progress == nil then
-                logger.dbg("CWASync: [Pull] end for", current_file, "with missing progress field")
+            if remote.kind == "none" then
+                logger.dbg("CWASync: [Pull] end for", current_file, "with unusable progress field")
                 if interactive then
                     showSyncError()
                 end
@@ -1315,7 +1366,7 @@ function CWASync:getProgress(ensure_networking, interactive)
             if interactive then
                 -- If user actively pulls progress from other devices,
                 -- we always update the progress without further confirmation.
-                self:syncToProgress(body.progress)
+                self:syncToProgress(remote)
                 showSyncedMessage()
                 logger.dbg("CWASync: [Pull] end for", current_file, "interactive sync applied", {
                     remote_progress = body.progress,
@@ -1340,7 +1391,7 @@ function CWASync:getProgress(ensure_networking, interactive)
             end
             if self_older then
                 if self.settings.sync_forward == SYNC_STRATEGY.SILENT then
-                    self:syncToProgress(body.progress)
+                    self:syncToProgress(remote)
                     showSyncedMessage()
                     logger.dbg("CWASync: [Pull] end for", current_file, "auto-applied newer remote progress")
                 elseif self.settings.sync_forward == SYNC_STRATEGY.PROMPT then
@@ -1350,13 +1401,13 @@ function CWASync:getProgress(ensure_networking, interactive)
                                  Math.round(body.percentage * 100),
                                  body.device),
                         ok_callback = function()
-                            self:syncToProgress(body.progress)
+                            self:syncToProgress(remote)
                         end,
                     })
                 end
             else -- if not self_older then
                 if self.settings.sync_backward == SYNC_STRATEGY.SILENT then
-                    self:syncToProgress(body.progress)
+                    self:syncToProgress(remote)
                     showSyncedMessage()
                     logger.dbg("CWASync: [Pull] end for", current_file, "auto-applied older remote progress")
                 elseif self.settings.sync_backward == SYNC_STRATEGY.PROMPT then
@@ -1366,7 +1417,7 @@ function CWASync:getProgress(ensure_networking, interactive)
                                  Math.round(body.percentage * 100),
                                  body.device),
                         ok_callback = function()
-                            self:syncToProgress(body.progress)
+                            self:syncToProgress(remote)
                         end,
                     })
                 end

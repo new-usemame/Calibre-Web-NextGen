@@ -1,0 +1,11 @@
+{
+  "area": "cwa-functions",
+  "body": "Found while fixing the same defect in the cover-enforcer copy on #1410.\n\n`cps/cwa_functions.py` defines three `download_current_log()` handlers, one per\nlog-owning blueprint (epub-fixer, convert-library, cover-enforcer). Each does:\n\n    try:\n        ...\n        if not file_path.startswith(os.path.abspath(LOG_DIR)):\n            abort(403)\n        if not os.path.exists(file_path):\n            abort(404)\n        return send_from_directory(...)\n    except Exception as e:\n        abort(400)\n\n`abort()` raises `werkzeug.exceptions.HTTPException`, which the blanket\n`except Exception` catches — so both the 403 and the 404 come back as 400,\ncollapsing exactly the distinction the two checks above exist to make. A\nmissing log is reported as a malformed request.\n\nThe cover-enforcer copy was fixed on the #1408 branch by re-raising\n`HTTPException` ahead of the broad handler. The other two still have it. The fix\nis the same three lines in each.\n\nLow impact — a wrong status code on a log download, not a data or access defect.",
+  "created": "2026-08-06",
+  "id": "F-391ce8",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "download_current_log siblings rewrite their own abort(403)/abort(404) as 400"
+}

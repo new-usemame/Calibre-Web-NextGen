@@ -26,9 +26,11 @@
             </div>
             <h3>{{_('Bulk Processing')}}</h3>
             <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 2rem; margin-bottom: 1rem;">
-              <a class="btn btn-default" href="{{ url_for('cover_enforcer_ui.start_cover_enforcer') }}" style="width: 100px;">{{_('Start')}}</a>
-              <a class="btn btn-default" href="{{ url_for('cover_enforcer_ui.cancel_cover_enforcer') }}" style="width: 100px;">{{_('Cancel')}}</a>
+              {# Buttons, not links: both endpoints are POST so CSRFProtect covers them. #}
+              <button type="button" id="startEnforcerBtn" class="btn btn-default" style="width: 100px;">{{_('Start')}}</button>
+              <button type="button" id="cancelEnforcerBtn" class="btn btn-default" style="width: 100px;">{{_('Cancel')}}</button>
             </div>
+            <p id="enforcerMessage" role="status" aria-live="polite" style="font-size: 11px; margin-top: 0.5rem; min-height: 1em;"></p>
           </div>
         </div>
       <div class="progress-container" style="margin: 20px 0;">
@@ -42,7 +44,12 @@
                                           padding-bottom: 1px;
                                           max-height: calc(100vh - 40rem);
                                           overflow-y: scroll;">
-          <p id="innerStatus" style="color: whitesmoke; font-size: small;">{{_('No current or previous run to display. Press the Start button above to initiate a run.')}}</p>
+          {# white-space: pre-wrap renders the log's own newlines, so the status can be
+             set with textContent instead of innerHTML. The log contains book titles,
+             authors and filenames straight out of the library, and anyone who can upload
+             a book can put HTML in a title - as innerHTML that executed in the admin's
+             session on this page. #}
+          <p id="innerStatus" style="color: whitesmoke; font-size: small; white-space: pre-wrap;">{{_('No current or previous run to display. Press the Start button above to initiate a run.')}}</p>
         </div>
       </div>
     </div>
@@ -52,6 +59,14 @@
 {% block js %}
 <script>
   var timeout;
+  var pollFailures = 0;
+
+  const CANCELLED_MARKER = "NextGen COVER & METADATA ENFORCEMENT PROCESS TERMINATED BY USER AT";
+  const FINISHED_MARKER = "NextGen Cover & Metadata Enforcement Service - Run Ended:";
+
+  function setMessage(text) {
+    document.getElementById("enforcerMessage").textContent = text || "";
+  }
 
   async function getStatus() {
 
@@ -59,14 +74,29 @@
 
     try {
       const res = await cwaFetch("{{ url_for('cover_enforcer_ui.get_status')}}");
+      if (!res.ok) throw new Error("HTTP " + res.status);
       get = await res.json();
     } catch (e) {
+      // A failed poll used to fall through to get.status on an undefined `get`, which
+      // threw before the setTimeout at the bottom - so ONE blip stopped the page
+      // updating for the rest of the run, silently. Back off and keep trying instead.
       console.error("Error: ", e);
+      pollFailures += 1;
+      setMessage("{{ _('Lost contact with the server, retrying...') }}");
+      timeout = setTimeout(getStatus, Math.min(30000, 1000 * Math.pow(2, pollFailures)));
+      return;
     }
 
-    // Check if get.status is a non-empty string
-    if (get.status && get.status.trim() !== "") {
-      document.getElementById("innerStatus").innerHTML = get.status.replace(/\n/g, "<br>");
+    if (pollFailures > 0) {
+      pollFailures = 0;
+      setMessage("");
+    }
+
+    const status = get.status || "";
+
+    // textContent, not innerHTML: this is subprocess output containing library metadata.
+    if (status.trim() !== "") {
+      document.getElementById("innerStatus").textContent = status;
     }
 
     if (get.progress) {
@@ -79,9 +109,7 @@
       }
     }
 
-    if (get.status.includes("NextGen COVER & METADATA ENFORCEMENT PROCESS TERMINATED BY USER AT")){
-      // Add finished log
-      document.getElementById("innerStatus").innerHTML;
+    if (status.includes(CANCELLED_MARKER)) {
       // Check if run was cancelled, make progress bar red if so
       const progressBar = document.getElementById("progress-bar");
       progressBar.style.backgroundColor = "#D22B2B"; // Cadmium Red
@@ -90,9 +118,7 @@
       return false;
     }
 
-    if (get.status.includes("NextGen Cover & Metadata Enforcement Service - Run Ended:")){
-      // Add finished log
-      document.getElementById("innerStatus").innerHTML;
+    if (status.includes(FINISHED_MARKER)) {
       // Set the progress bar to 100%
       const percentage = 100;
       const progressBar = document.getElementById("progress-bar");
@@ -105,6 +131,46 @@
 
     timeout = setTimeout(getStatus, 1000);
   }
+
+  async function postAction(url, busyText) {
+    setMessage(busyText);
+    try {
+      const res = await cwaFetch(url, { method: "POST" });
+      let payload = {};
+      try { payload = await res.json(); } catch (e) { /* non-JSON error page */ }
+      if (!res.ok) {
+        // 409 carries the "already running" message from the server.
+        setMessage(payload.message || "{{ _('The request failed.') }}");
+        return false;
+      }
+      setMessage("");
+      return true;
+    } catch (e) {
+      console.error("Error: ", e);
+      setMessage("{{ _('The request failed.') }}");
+      return false;
+    }
+  }
+
+  document.getElementById("startEnforcerBtn").addEventListener("click", async function () {
+    const started = await postAction("{{ url_for('cover_enforcer_ui.start_cover_enforcer') }}",
+                                     "{{ _('Starting...') }}");
+    if (started) {
+      document.getElementById("innerStatus").textContent = "";
+      const progressBar = document.getElementById("progress-bar");
+      progressBar.style.backgroundColor = "green";
+      progressBar.style.width = "0%";
+      progressBar.textContent = "";
+      clearTimeout(timeout);
+      pollFailures = 0;
+      getStatus();
+    }
+  });
+
+  document.getElementById("cancelEnforcerBtn").addEventListener("click", function () {
+    postAction("{{ url_for('cover_enforcer_ui.cancel_cover_enforcer') }}",
+               "{{ _('Cancelling...') }}");
+  });
 
   getStatus();
   </script>

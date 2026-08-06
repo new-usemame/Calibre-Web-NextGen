@@ -212,13 +212,20 @@ def test_status_route_tolerates_missing_log():
     source = CWA_FUNCTIONS.read_text()
     start = source.index("@cover_enforcer_ui.route('/cover-enforcer-status'")
     body = source[start:start + 900]
-    assert "os.path.exists" in body, (
-        "/cover-enforcer-status must tolerate a missing log file"
+    assert "_read_log_tail" in body, (
+        "/cover-enforcer-status must read via _read_log_tail(), which returns '' for a "
+        "missing log instead of raising"
+    )
+    assert ".read()" not in body, (
+        "the status route must not read the whole log — it is polled once a second and "
+        "this app runs gevent without monkey.patch_all()"
     )
 
 
 def _kill_watcher() -> ast.FunctionDef:
-    return _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "kill_cover_enforcer")
+    # The watch loop lives in _watch_cover_enforcer(); kill_cover_enforcer() is now the
+    # thin wrapper that guarantees the run claim is released on every exit path.
+    return _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "_watch_cover_enforcer")
 
 
 def test_run_log_is_opened_in_append_mode():
@@ -353,3 +360,232 @@ def test_page_reacts_to_both_terminal_markers():
     assert cancel_marker in CWA_FUNCTIONS.read_text(), (
         "kill thread no longer writes the cancellation marker the page waits for"
     )
+
+
+# ------------------------------------------------------ security fixes (review #1410)
+#
+# The cross-family review on #1410 found five HIGH issues in the first cut of this
+# feature. These pin the fixes. Every one of them fails against that first cut, which is
+# the bar the rest of this file's route tests do not meet — they search source text and
+# stay green if the feature stops working.
+
+
+def test_status_is_rendered_as_text_not_html():
+    """Stored XSS: the run log is library content, and it was going through innerHTML.
+
+    OBSERVED in review: `innerHTML = get.status.replace(/\\n/g, "<br>")`. The log is the
+    enforcer's stdout, which prints book titles, authors and filenames. Anyone who can
+    upload a book can put HTML in a title, so this executed in an ADMIN's session on this
+    page — a privilege escalation from any upload-capable user.
+
+    The newlines the `<br>` substitution existed for are handled by `white-space` now.
+    """
+    tpl = PAGE_TEMPLATE.read_text()
+
+    # Strip comments/prose so the words "innerHTML" in the rationale don't fail this.
+    code = re.sub(r"\{#.*?#\}", "", tpl, flags=re.S)
+    code = re.sub(r"//.*", "", code)
+
+    assert "innerHTML" not in code, (
+        "the run log is assigned with innerHTML; it contains user-controllable library "
+        "metadata and will execute as HTML in the admin's session"
+    )
+    assert re.search(r'innerStatus"\)\.textContent\s*=', code), (
+        "the status must be written with textContent"
+    )
+    assert "white-space: pre-wrap" in tpl, (
+        "textContent without pre-wrap collapses the log onto one line"
+    )
+
+
+@pytest.mark.parametrize("endpoint,rule", [
+    ("start_cover_enforcer", "/cwa-cover-enforcer-start"),
+    ("cancel_cover_enforcer", "/cover-enforcer-cancel"),
+])
+def test_state_changing_routes_are_post_only(endpoint, rule):
+    """Start rewrites every book in the library; cancel kills a running job.
+
+    @admin_required is authorization, not CSRF protection. As GETs these were reachable
+    by making an admin follow a link. CSRFProtect only covers non-safe methods, so the
+    method IS the fix — hence pinning it rather than pinning a decorator.
+    """
+    source = CWA_FUNCTIONS.read_text()
+    decorator = re.search(
+        rf"@cover_enforcer_ui\.route\(\s*'{re.escape(rule)}'\s*,\s*methods=(\[[^\]]*\])",
+        source,
+    )
+    assert decorator, f"no methods= on the {rule} route"
+    methods = decorator.group(1)
+    assert '"GET"' not in methods and "'GET'" not in methods, (
+        f"{rule} still accepts GET; it is state-changing and must be POST-only so CSRF "
+        "protection applies"
+    )
+    assert '"POST"' in methods or "'POST'" in methods, f"{rule} must accept POST"
+
+
+def test_page_invokes_the_actions_with_post():
+    """A POST-only route is only reachable if the page stopped using <a href>."""
+    tpl = PAGE_TEMPLATE.read_text()
+    assert 'method: "POST"' in tpl, "the page never POSTs; the buttons cannot work"
+    for endpoint in ("start_cover_enforcer", "cancel_cover_enforcer"):
+        assert not re.search(rf"<a[^>]*url_for\('cover_enforcer_ui\.{endpoint}'\)", tpl), (
+            f"{endpoint} is still a plain link, which issues a GET"
+        )
+
+
+def test_start_claims_the_run_before_touching_shared_state():
+    """Two clicks used to wipe the live run's log and start a second watcher.
+
+    cover_enforcer.py holds a cross-process lockfile, but it refuses AFTER this route has
+    already truncated the shared log and spawned threads — so the second click destroyed
+    the first run's output rather than being rejected. The claim has to happen here, and
+    it has to happen before the truncate.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "start_cover_enforcer")
+    src = ast.unparse(fn)
+
+    assert "_cover_enforcer_lock" in src, "run admission is not guarded by a lock"
+    assert "409" in src, "a concurrent start must be refused with 409, not run anyway"
+
+    claim = src.index("_cover_enforcer_run['active'] = True")
+    truncate = src.index("'w'")
+    assert claim < truncate, (
+        "the run is claimed after the log is truncated; a second start still erases the "
+        "live run's log before being refused"
+    )
+
+
+def test_watcher_always_releases_the_run_claim():
+    """A claim that outlives its run is a gate that disables its own repair.
+
+    If the watcher can exit without clearing 'active', every later start returns 409
+    until the container restarts — and the UI offers no way out of that state.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "kill_cover_enforcer")
+    tries = [n for n in ast.walk(fn) if isinstance(n, ast.Try)]
+    assert tries, "kill_cover_enforcer() does not use try/finally"
+    assert any(
+        "_release_cover_enforcer_run" in ast.unparse(t.finalbody) for t in tries
+    ), "the run claim is not released in a finally; a crashed watcher wedges all starts"
+
+
+def test_spawn_failure_is_terminal_and_visible():
+    """A failed Popen published nothing, so the watcher blocked forever on queue.get().
+
+    The page also polls until it sees the end marker, so a spawn failure showed as a run
+    that never progressed and never ended.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "cover_enforcer_start")
+    src = ast.unparse(fn)
+    assert "except Exception" in src, "a spawn failure is not caught"
+    assert "Run Ended" in src, (
+        "a failed spawn must still write the end marker or the page polls forever"
+    )
+    assert "queue.put(None)" in src, (
+        "the watcher must be unblocked with a sentinel when there is no process"
+    )
+
+
+def test_status_read_is_bounded():
+    """Unbounded f.read() once a second, growing for the length of the run.
+
+    This app runs gevent WITHOUT monkey.patch_all(), so a blocking read in a request
+    handler stalls every request, not just this one — worst on the large libraries this
+    feature exists for.
+    """
+    source = CWA_FUNCTIONS.read_text()
+    fn = _find_function(ast.parse(source), "_read_log_tail")
+    src = ast.unparse(fn)
+    assert "SEEK_END" in src, "_read_log_tail() does not seek; it is not bounded"
+    assert "FileNotFoundError" in src, "a missing log must return '' rather than raise"
+    assert "COVER_ENFORCER_STATUS_TAIL_BYTES" in source, "no cap is defined"
+
+
+def test_read_log_tail_returns_only_the_tail(tmp_path):
+    """Behaviour, not shape: the whole point is that a big log costs a small read."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_ce_tail", CWA_FUNCTIONS)
+    # cwa_functions imports the Flask app; exercise the helper's logic directly instead
+    # of importing the module, which is what the rest of this file avoids too.
+    src = CWA_FUNCTIONS.read_text()
+    fn_src = src[src.index("def _read_log_tail"):src.index("def is_cover_enforcer_finished")]
+    ns = {"os": __import__("os"), "COVER_ENFORCER_STATUS_TAIL_BYTES": 64 * 1024}
+    exec(compile(fn_src, "<tail>", "exec"), ns)
+    read_tail = ns["_read_log_tail"]
+
+    log = tmp_path / "run.log"
+    log.write_text("A" * 5000 + "TAIL-MARKER")
+
+    out = read_tail(str(log), limit=100)
+    assert out.endswith("TAIL-MARKER")
+    assert len(out) <= 100, "returned more than the requested limit"
+
+    assert read_tail(str(tmp_path / "does-not-exist.log")) == "", (
+        "a missing log must be '' so a first-ever page load does not 500"
+    )
+
+    # A cut landing mid-character must not raise.
+    log.write_bytes("é".encode("utf-8") * 50)
+    assert isinstance(read_tail(str(log), limit=5), str)
+
+
+def test_cancel_does_not_pkill_by_script_path():
+    """`pkill -f <script path>` killed CLI-started runs this UI never owned.
+
+    The watcher already terminates the exact Popen it holds, with bounded waits, so the
+    request only needs to signal.
+    """
+    fn = _find_function(ast.parse(CWA_FUNCTIONS.read_text()), "cancel_cover_enforcer")
+    src = ast.unparse(fn)
+    assert "pkill" not in src, (
+        "cancel still uses pkill -f, which matches on the script path and kills runs "
+        "started outside this UI"
+    )
+    assert "kill_cover_enforcer_trigger" in src, "cancel no longer signals the watcher"
+
+
+def test_download_handler_lets_http_errors_through():
+    """abort() raises HTTPException, which `except Exception` swallowed.
+
+    403 and 404 both came back as 400 — collapsing exactly the distinction the checks
+    above them exist to make.
+    """
+    # NB: cwa_functions.py defines THREE functions called download_current_log, one per
+    # log-owning blueprint. _find_function returns the first, which is a different
+    # blueprint's. Slice to this feature's route explicitly.
+    source = CWA_FUNCTIONS.read_text()
+    start = source.index(
+        "@cover_enforcer_ui.route('/cwa-cover-enforcer/download-current-log")
+    end = source.index("@cover_enforcer_ui.route('/cwa-cover-enforcer-start")
+    fn = _find_function(ast.parse(source[start:end].lstrip()), "download_current_log")
+    handlers = [n for n in ast.walk(fn) if isinstance(n, ast.ExceptHandler)]
+    names = [ast.unparse(h.type) if h.type else "" for h in handlers]
+    assert "HTTPException" in " ".join(names), (
+        "HTTPException is not re-raised; abort(403)/abort(404) are rewritten to 400"
+    )
+    http_idx = next(i for i, n in enumerate(names) if "HTTPException" in n)
+    broad_idx = next((i for i, n in enumerate(names) if n == "Exception"), None)
+    if broad_idx is not None:
+        assert http_idx < broad_idx, "HTTPException must be caught before Exception"
+
+
+def test_poll_survives_a_failed_request():
+    """One failed poll used to stop the page updating for the rest of the run.
+
+    The catch logged to console and fell through to `get.status` on an undefined `get`,
+    which threw before the setTimeout at the bottom — so polling silently never resumed
+    and the user saw a frozen page with no error.
+    """
+    tpl = PAGE_TEMPLATE.read_text()
+    # Body of the FIRST catch (the status poller's), from after its opening brace to the
+    # matching close.
+    opener = "} catch (e) {"
+    body_start = tpl.index(opener) + len(opener)
+    catch_block = tpl[body_start:tpl.index("}", body_start)]
+    assert "setTimeout" in catch_block or "return" in catch_block, (
+        "the catch neither reschedules nor returns; execution falls through to a "
+        "dereference of the undefined response"
+    )
+    assert "res.ok" in tpl, "a non-2xx response is treated as a successful poll"
+    assert "enforcerMessage" in tpl, "poll failures are not surfaced to the user"

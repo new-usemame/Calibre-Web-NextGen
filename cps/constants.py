@@ -58,6 +58,9 @@ CWA_METADATA_TEMP_DIR = os.environ.get(
     "CWA_METADATA_TEMP_DIR",
     os.path.join(CONFIG_DIR, "metadata_temp"))
 
+# Folder where the log files are stored
+LOG_ARCHIVE = os.path.join(CONFIG_DIR, "log_archive")
+
 DEFAULT_SETTINGS_FILE = "app.db"
 DEFAULT_GDRIVE_FILE = "gdrive.db"
 

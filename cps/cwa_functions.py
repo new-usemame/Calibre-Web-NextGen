@@ -8,7 +8,7 @@ from flask import Blueprint, redirect, flash, url_for, request, send_from_direct
 from flask_babel import gettext as _, lazy_gettext as _l
 
 from . import logger, config, constants, csrf, helper, ub, calibre_db
-from constants import DIRS_JSON
+from .constants import DIRS_JSON, LOG_ARCHIVE
 from .metadata_constants import DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON
 from .usermanagement import login_required_if_no_ano, user_login_required
 from .admin import admin_required
@@ -71,9 +71,6 @@ def _mirror_hardcover_sync_for_rollback(cwa_db):
     )
 
 ##——————————————————————————————GLOBAL VARIABLES——————————————————————————————##
-
-# Folder where the log files are stored
-LOG_ARCHIVE = "/config/log_archive"
 
 # Debounced duplicate scan timer (web process)
 _duplicate_scan_timer = None

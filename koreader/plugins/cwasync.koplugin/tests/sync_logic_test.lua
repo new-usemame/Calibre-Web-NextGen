@@ -364,7 +364,49 @@ local function testResolveRemotePosition()
     -- get the reader to seek to something it said was not a position.
     assertEqual(SyncLogic.resolveRemotePosition({
         progress = "cwng:percentage", position_kind = "percentage", percentage = 0.5,
-    }).kind, "percentage", "the sentinel is never treated as a locator")
+    }).kind, "percentage", "a labelled sentinel resolves as a percentage")
+
+    -- The same body with the label MISSING. This is the case that matters: the
+    -- sentinel is a non-empty string, so recognising it only via `position_kind`
+    -- would classify it as a locator and send it to GotoXPointer, which is the
+    -- unrecoverable position the encoding exists to avoid. The value alone has
+    -- to be enough.
+    assertEqual(SyncLogic.resolveRemotePosition({
+        progress = "cwng:percentage", percentage = 0.5,
+    }).kind, "percentage", "an unlabelled sentinel is still not a locator")
+    assertEqual(SyncLogic.resolveRemotePosition({
+        progress = "cwng:percentage", percentage = 0.5,
+    }).percent_whole, 50, "an unlabelled sentinel keeps its percentage")
+
+    -- ...and with no usable percentage to fall back on it is nothing at all,
+    -- rather than a locator.
+    assertEqual(SyncLogic.resolveRemotePosition({ progress = "cwng:percentage" }).kind,
+        "none", "a bare sentinel with no percentage is unusable")
+    assertEqual(SyncLogic.resolveRemotePosition({
+        progress = "cwng:percentage", position_kind = "locator", percentage = 0.5,
+    }).kind, "percentage", "a mislabelled sentinel is still not a locator")
+
+    -- The constant is the contract with the server; the literals above are
+    -- spelled out on purpose so this pins the value and not just itself.
+    assertEqual(SyncLogic.PERCENTAGE_ONLY_LOCATOR, "cwng:percentage",
+        "the sentinel matches the server's PERCENTAGE_ONLY_LOCATOR")
+
+    -- A percentage is on its way to GotoPercent, so an out-of-range value is a
+    -- seek outside the document rather than a harmless bad number. The wire
+    -- format is a 0..1 fraction; anything else is not a position.
+    for _, bad in ipairs({ -0.25, 4, 1.5, -1 }) do
+        assertEqual(SyncLogic.resolveRemotePosition({
+            position_kind = "percentage", percentage = bad,
+        }).kind, "none", "an out-of-range percentage is unusable")
+    end
+    assertEqual(SyncLogic.validWirePercentage(0 / 0), nil, "NaN is not a percentage")
+    assertEqual(SyncLogic.validWirePercentage("not a number"), nil,
+        "a non-numeric percentage is unusable")
+    assertEqual(SyncLogic.validWirePercentage(0), 0, "0 is in range")
+    assertEqual(SyncLogic.validWirePercentage(1), 1, "1 is in range")
+    assertEqual(SyncLogic.resolveRemotePosition({
+        position_kind = "percentage", percentage = "0.5",
+    }).percent_whole, 50, "a numeric string percentage is still accepted")
 
     -- Unusable bodies. An unlabelled body with no progress is NOT guessed to be
     -- a percentage -- a truncated response must not move the reader.

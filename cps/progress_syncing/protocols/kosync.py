@@ -1209,6 +1209,16 @@ def update_progress():
         # Validate field lengths
         if not is_valid_field(progress) or len(progress) > MAX_PROGRESS_LENGTH:
             raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid progress field")
+        # `progress` is client-controlled, and PERCENTAGE_ONLY_LOCATOR is the
+        # only value whose meaning is decided by the server rather than the
+        # engine: is_percentage_only() classifies a row purely by equality with
+        # it. A client that pushed it — by accident or otherwise — would have
+        # its row served to capable clients as `progress: null`, withheld from
+        # every older plugin, and skipped by bulk pull, all while looking like
+        # an ordinary locator push. Reserving the value at the one boundary
+        # that accepts locators keeps the classification unambiguous.
+        if progress == PERCENTAGE_ONLY_LOCATOR:
+            raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid progress field")
         if not is_valid_field(device) or len(device) > MAX_DEVICE_LENGTH:
             raise KOSyncError(ERROR_INVALID_FIELDS, "Invalid device field")
         if device_id and len(device_id) > MAX_DEVICE_ID_LENGTH:

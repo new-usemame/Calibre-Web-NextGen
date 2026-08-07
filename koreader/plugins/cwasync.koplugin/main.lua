@@ -879,6 +879,15 @@ function CWASync:applyProgressToBook(file_path, progress, percentage)
             return false
         end
     end
+    -- The percentage-only sentinel is a non-empty string, so it clears the
+    -- check above and would be saved verbatim as last_xpointer. It names a
+    -- percentage held in another field, never a position this engine can
+    -- resolve, and this function writes the sidecar for a book that is not
+    -- open -- so there is nothing to convert it against even in principle.
+    if progress == SyncLogic.PERCENTAGE_ONLY_LOCATOR then
+        logger.dbg("CWASync: [Apply] refusing percentage-only sentinel for", file_path)
+        return false
+    end
 
     local new_page = tonumber(progress)
     local new_xpointer = new_page == nil and progress or nil

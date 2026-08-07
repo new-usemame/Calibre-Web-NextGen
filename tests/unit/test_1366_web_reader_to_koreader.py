@@ -276,3 +276,47 @@ def test_equal_percentage_does_not_destroy_a_real_locator(protocol):
     # The consequence the user actually feels: an installed plugin still syncs.
     assert _pull(client, advertises_percentage=False).get_json()["progress"] == \
         "/body/DocFragment[12]/body/div/p[3].0"
+
+
+@pytest.mark.unit
+def test_a_client_cannot_push_the_sentinel_as_its_own_locator(protocol):
+    """``progress`` is client-controlled, and the sentinel's meaning is ours.
+
+    ``is_percentage_only`` classifies a row by equality with
+    ``PERCENTAGE_ONLY_LOCATOR`` alone, so a client that pushed that exact string
+    through the ordinary locator path would have its row silently reclassified:
+    served to capable clients as ``progress: null``, withheld from every plugin
+    that does not advertise, and skipped by bulk pull -- while the client
+    believed it had stored a position. Reserving the value at the one boundary
+    that accepts locators is what keeps the classification unambiguous.
+    """
+    module, client, session = protocol
+
+    response = client.put("/kosync/syncs/progress", json={
+        "document": "digest-a",
+        "progress": module.PERCENTAGE_ONLY_LOCATOR,
+        "percentage": 0.5,
+        "device": "Impostor",
+        "device_id": "impostor-1",
+    })
+
+    assert response.status_code != 200, "the reserved sentinel must be refused"
+    assert session.query(module.KOSyncProgress).count() == 0, (
+        "no row may be created from a reserved-value push"
+    )
+
+
+@pytest.mark.unit
+def test_a_real_locator_push_is_unaffected_by_the_reservation(protocol):
+    """The guard rejects one exact value, not locators that merely resemble it."""
+    module, client, session = protocol
+
+    for locator in ("cwng:percentage-ish", "/body/DocFragment[2]/body/p[1].0", "42"):
+        response = client.put("/kosync/syncs/progress", json={
+            "document": "digest-a",
+            "progress": locator,
+            "percentage": 0.5,
+            "device": "Crosspoint",
+            "device_id": "crosspoint-1",
+        })
+        assert response.status_code == 200, f"{locator!r} is a legitimate locator"

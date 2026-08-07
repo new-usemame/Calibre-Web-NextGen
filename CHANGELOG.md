@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.32] - 2026-08-07
+
 ### Added
 
 - **Reading in the browser now carries over to KOReader.** Read a few chapters

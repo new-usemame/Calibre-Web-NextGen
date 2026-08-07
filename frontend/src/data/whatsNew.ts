@@ -56,6 +56,22 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.32',
+    date: '2026-08-07',
+    items: [
+      {
+        title: 'Where you stopped in the browser carries over to KOReader',
+        body: 'Read a few chapters in the web reader, then open the same book on a KOReader device and it moves to roughly where you stopped, instead of resuming wherever the device itself last was. It lands near the spot rather than exactly on it — the browser records a position KOReader\'s engine cannot resolve, so the two share a percentage — and it applies when you open the book, not during a bulk library sync. This needs the updated NextGen Progress Sync plugin on the device; until you update it, nothing about its behaviour changes.',
+        category: 'Sync',
+      },
+      {
+        title: 'A stray metadata.db no longer stops the container from starting',
+        body: 'Every release since v4.1.20 could refuse to come up if an empty or leftover metadata.db was sitting at the top of your library folder: the log filled with "no such table: custom_columns" over and over, and rolling back was the only way out. NextGen finds your library by looking for that filename, and it had started trusting the first file with that name — hiding the real library in the folder below. It now checks that a file is genuinely a Calibre database before mounting it, says in the log which one it skipped and why, and keeps looking.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.31',
     date: '2026-08-06',
     items: [

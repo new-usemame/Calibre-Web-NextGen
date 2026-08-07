@@ -2659,7 +2659,16 @@ def login():
     # Classic- and SPA-preferring browsers behave consistently. ``?local=1``
     # only suppresses automatic startup; normal SPA-or-Classic routing below
     # still decides which login surface is shown.
-    if config.config_login_type == constants.LOGIN_OAUTH and feature_support['oauth']:
+    #
+    # ``config_disable_standard_login`` is required as well as the login type:
+    # the two are independent settings, and with the local form still enabled
+    # ``login_post`` below goes on accepting local credentials. Auto-starting
+    # in that state would hide a form whose handler still works, and would
+    # leave an admin with no way back in at the canonical URL if the provider
+    # is unreachable.
+    if (config.config_login_type == constants.LOGIN_OAUTH
+            and config.config_disable_standard_login
+            and feature_support['oauth']):
         oauth_endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
             request.args,
             oauth_bb.oauthblueprints,

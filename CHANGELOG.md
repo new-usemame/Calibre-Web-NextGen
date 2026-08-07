@@ -31,11 +31,13 @@ is for things you can see or feel when running the app.
 ### Changed
 
 - **A sign-in page whose only button is your one provider now just takes you
-  there.** If your server runs in OAuth-only mode with exactly one provider
-  switched on, opening the login page showed you a page whose sole purpose was
-  to click through to that provider. NextGen now starts it for you. If the
-  provider is unreachable, or you want the plain page back for any reason, add
-  `?local=1` to the login URL. Contributed by @lduesing.
+  there.** If your server runs in OAuth-only mode with standard login switched
+  off and exactly one provider switched on, opening the login page showed you a
+  page whose sole purpose was to click through to that provider. NextGen now
+  starts it for you. Servers that still allow username-and-password sign-in keep
+  the normal login page. If the provider is unreachable, or you want the plain
+  page back for any reason, add `?local=1` to the login URL. Contributed by
+  @lduesing.
   ([#1411](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1411))
 - **Cancelling a sign-in at your provider now returns you to the login page
   instead of bouncing you back to the provider forever.** Backing out of the

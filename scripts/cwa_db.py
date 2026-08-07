@@ -12,6 +12,7 @@ import re
 from datetime import datetime
 
 from tabulate import tabulate
+from library_paths import connect_calibre_metadata_db
 
 
 # Settings whose stored int value is a real number, not a boolean flag.
@@ -1279,8 +1280,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Build date filter
@@ -1316,8 +1316,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Build date filter for current period
@@ -1399,8 +1398,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Build date filter
@@ -1519,8 +1517,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Query series with book counts and highest index, ordered by count
@@ -1556,8 +1553,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Extract year from pubdate and count books
@@ -2034,8 +2030,7 @@ class CWA_DB:
         try:
             import sqlite3
             
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Build date filter for books added in time period
@@ -2179,8 +2174,7 @@ class CWA_DB:
                 return []
             
             # Pass 2: Enrich with book titles from metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             results = []

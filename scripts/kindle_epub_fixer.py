@@ -27,6 +27,7 @@ import pwd
 import grp
 
 from cwa_db import CWA_DB
+from library_paths import get_calibre_metadata_db_path
 
 try:
     from charset_normalizer import from_bytes as _charset_from_bytes
@@ -369,7 +370,10 @@ class EPUBFixer:
     def _get_metadata_db_path(self) -> str:
         """Get the path to metadata.db considering split library configuration."""
         try:
-            con = sqlite3.connect("/config/app.db", timeout=30)
+            app_db = "/config/app.db"
+            if not os.path.isfile(app_db):
+                return get_calibre_metadata_db_path(dirs_json)
+            con = sqlite3.connect(Path(app_db).as_uri() + "?mode=ro", uri=True, timeout=30)
             cur = con.cursor()
             split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 
@@ -382,8 +386,8 @@ class EPUBFixer:
                 library_location = get_library_location()
                 return os.path.join(library_location, "metadata.db")
         except Exception:
-            # Fallback to default location
-            return "/calibre-library/metadata.db"
+            # dirs.json is maintained by auto_library and supports nested libraries.
+            return get_calibre_metadata_db_path(dirs_json)
 
     def _recalculate_checksum_after_modification(self, book_id: int, file_format: str, file_path: str) -> None:
         """Calculate and store new checksum after modifying an EPUB file."""
@@ -413,6 +417,8 @@ class EPUBFixer:
 
             # Store in database using centralized manager function
             metadb_path = self._get_metadata_db_path()
+            if not os.path.isfile(metadb_path):
+                return
             con = sqlite3.connect(metadb_path, timeout=30)
 
             try:
@@ -756,7 +762,9 @@ class EPUBFixer:
             
             # Query metadata.db for language
             metadb_path = self._get_metadata_db_path()
-            con = sqlite3.connect(metadb_path, timeout=30)
+            if not os.path.isfile(metadb_path):
+                return None
+            con = sqlite3.connect(Path(metadb_path).as_uri() + "?mode=ro", uri=True, timeout=30)
             cur = con.cursor()
             
             # Get language from books table via languages link table

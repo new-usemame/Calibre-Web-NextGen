@@ -10,13 +10,35 @@
 
 echo "[cwa-checksum-backfill] Waiting for CWA service to be ready..."
 
+dirs_json="${CWA_DIRS_JSON:-/app/calibre-web-automated/dirs.json}"
+library_path="$(python3 - "$dirs_json" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as config_file:
+        configured = json.load(config_file).get("calibre_library_dir")
+    print(configured if isinstance(configured, str) and configured.strip() else "/calibre-library")
+except (OSError, ValueError, TypeError):
+    print("/calibre-library")
+PY
+)"
+metadata_db="${library_path%/}/metadata.db"
+metadata_uri="$(python3 - "$metadata_db" <<'PY'
+import sys
+from pathlib import Path
+
+print(Path(sys.argv[1]).as_uri() + "?mode=ro")
+PY
+)"
+
 # Poll for database schema to be initialized (up to 30 seconds)
 max_attempts=30
 attempt=0
 db_ready=false
 
 while [ $attempt -lt $max_attempts ]; do
-  if sqlite3 /calibre-library/metadata.db "SELECT name FROM sqlite_master WHERE type='table' AND name='book_format_checksums';" 2>/dev/null | grep -q "book_format_checksums"; then
+  if [ -f "$metadata_db" ] && sqlite3 "$metadata_uri" "SELECT name FROM sqlite_master WHERE type='table' AND name='book_format_checksums';" 2>/dev/null | grep -q "book_format_checksums"; then
     echo "[cwa-checksum-backfill] Database schema ready (attempt $((attempt + 1)))"
     db_ready=true
     break
@@ -33,7 +55,7 @@ fi
 echo "[cwa-checksum-backfill] Checking for missing KOReader sync checksums..."
 
 # Run the checksum generation script (fills in missing checksums)
-if cwa-as-abc python3 /app/calibre-web-automated/scripts/generate_book_checksums.py --library-path /calibre-library --batch-size 50; then
+if cwa-as-abc python3 /app/calibre-web-automated/scripts/generate_book_checksums.py --library-path "$library_path" --batch-size 50; then
   echo "[cwa-checksum-backfill] Checksum generation/backfill completed successfully"
 else
   echo "[cwa-checksum-backfill] WARNING: Checksum generation encountered errors but continuing..."

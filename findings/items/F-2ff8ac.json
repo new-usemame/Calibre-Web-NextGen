@@ -4,8 +4,14 @@
   "created": "2026-08-07",
   "id": "F-2ff8ac",
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-07",
+    "note": "Duplicate of F-9073e5 (migrated from #1317), which already covers this defect and names the conditional-UPDATE fix. The one new fact from the #1427 review is folded into F-9073e5: that PR adds a third writer of the same unlocked pattern, record_percentage_only_progress(), whose loss is qualitatively worse than a transient low percentage because it replaces a real KOReader locator with the percentage-only sentinel.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "duplicate",
   "title": "KOSync furthest-wins is an unlocked read-compare-write, so a concurrent push can regress progress"
 }

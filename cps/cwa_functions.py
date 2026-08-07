@@ -38,7 +38,7 @@ from werkzeug.exceptions import HTTPException
 from .web import cwa_get_num_books_in_library
 
 import sys
-sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+sys.path.insert(1, constants.SCRIPTS_DIR)
 from cwa_db import CWA_DB, INTEGER_SETTINGS, FLOAT_SETTINGS, JSON_SETTINGS
 from .services.background_scheduler import BackgroundScheduler, DateTrigger
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
@@ -260,7 +260,7 @@ def get_ingest_queue_size():
 def refresh_library(app):
     with app.app_context():  # Create app context for session
         ingest_dir = get_ingest_dir()
-        result = subprocess.run(['python3', '/app/calibre-web-automated/scripts/ingest_processor.py', ingest_dir])
+        result = subprocess.run(['python3', os.path.join(constants.SCRIPTS_DIR, 'ingest_processor.py'), ingest_dir])
         return_code = result.returncode
 
         # Add empty list for messages in app context if a list doesn't already exist
@@ -1820,7 +1820,7 @@ def show_full_epub_fixer_with_paths_fixes():
 @login_required_if_no_ano
 @admin_required
 def cwa_flash_status():
-    result = subprocess.run(['/app/calibre-web-automated/scripts/check-cwa-services.sh'])
+    result = subprocess.run([os.path.join(constants.SCRIPTS_DIR, 'check-cwa-services.sh')])
     services_status = result.returncode
 
     match services_status:
@@ -1946,7 +1946,7 @@ def get_log_dates(logs) -> dict[str,str]:
 ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
 
 def convert_library_start(queue):
-    cl_process = subprocess.Popen(['python3', '/app/calibre-web-automated/scripts/convert_library.py'])
+    cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
     queue.put(cl_process)
 
 def get_tmp_conversion_dir() -> str:
@@ -2118,9 +2118,9 @@ def get_status():
 
 def epub_fixer_start(queue, input_file: str | None = None):
     if input_file:
-        ef_process = subprocess.Popen(['python3', '/app/calibre-web-automated/scripts/kindle_epub_fixer.py', '--input_file', input_file])
+        ef_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'kindle_epub_fixer.py'), '--input_file', input_file])
     else:
-        ef_process = subprocess.Popen(['python3', '/app/calibre-web-automated/scripts/kindle_epub_fixer.py', '--all'])
+        ef_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'kindle_epub_fixer.py'), '--all'])
     queue.put(ef_process)
 
 def is_epub_fixer_finished() -> bool:
@@ -2301,7 +2301,7 @@ def cancel_epub_fixer():
         subprocess.run([
             "pkill",
             "-f",
-            "/app/calibre-web-automated/scripts/kindle_epub_fixer.py"
+            os.path.join(constants.SCRIPTS_DIR, 'kindle_epub_fixer.py')
         ], check=False)
     except Exception as e:
         log.error(f"Failed to terminate epub fixer process: {e}")
@@ -2381,7 +2381,7 @@ def cover_enforcer_start(queue):
         # Popen dups the fd into the child, so closing the parent copy here is safe and
         # avoids leaking one descriptor per run.
         log_file = open('/config/cover-enforcer.log', 'a')
-        ce_process = subprocess.Popen(['python3', '/app/calibre-web-automated/scripts/cover_enforcer.py', '-all'], stdout=log_file, stderr=subprocess.STDOUT)
+        ce_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'cover_enforcer.py'), '-all'], stdout=log_file, stderr=subprocess.STDOUT)
     except Exception as e:
         # Nothing was ever put on the queue, so the watcher blocked forever at queue.get()
         # on cancel and the page polled a run that had never started. Write the end marker

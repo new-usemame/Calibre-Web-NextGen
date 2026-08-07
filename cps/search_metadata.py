@@ -88,7 +88,7 @@ if os.environ.get("CWA_METADATA_DEBUG", "").lower() in ("1", "true", "yes"):
 def _get_global_provider_enabled_map() -> dict:
     try:
         # Import here to avoid circular import issues and keep startup fast
-        sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+        sys.path.insert(1, constants.SCRIPTS_DIR)
         from cwa_db import CWA_DB  # type: ignore
         cwa_db = CWA_DB()
         settings = cwa_db.get_cwa_settings()
@@ -119,7 +119,7 @@ def _get_provider_hierarchy() -> list:
         DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON,
     )
     try:
-        sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+        sys.path.insert(1, constants.SCRIPTS_DIR)
         from cwa_db import CWA_DB  # type: ignore
         settings = CWA_DB().get_cwa_settings() or {}
         hierarchy = json.loads(

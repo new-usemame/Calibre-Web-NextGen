@@ -29,6 +29,8 @@ STATIC_DIR          = os.path.join(BASE_DIR, 'cps', 'static')
 TEMPLATES_DIR       = os.path.join(BASE_DIR, 'cps', 'templates')
 TRANSLATIONS_DIR    = os.path.join(BASE_DIR, 'cps', 'translations')
 
+SCRIPTS_DIR         = os.path.join(BASE_DIR, 'scripts')
+
 DIRS_JSON           = os.path.join(BASE_DIR, 'dirs.json')
 
 # Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache

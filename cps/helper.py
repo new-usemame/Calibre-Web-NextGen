@@ -58,7 +58,7 @@ from .services import parallel
 _pending_thumbnail_books = set()
 
 import sys
-sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+sys.path.insert(1, constants.SCRIPTS_DIR)
 from cwa_db import CWA_DB
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS
 from .tasks.mail import TaskEmail

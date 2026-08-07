@@ -21,8 +21,10 @@ from flask import session
 from flask import url_for
 from werkzeug.local import LocalProxy
 
+from .. import constants
+
 import sys
-sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+sys.path.insert(1, constants.SCRIPTS_DIR)
 from cwa_db import CWA_DB
 
 from .config import COOKIE_NAME

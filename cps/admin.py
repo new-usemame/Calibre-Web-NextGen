@@ -256,8 +256,8 @@ def trigger_hardcover_auto_fetch():
         
         # Get settings
         import sys as _sys
-        if '/app/calibre-web-automated/scripts/' not in _sys.path:
-            _sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+        if constants.SCRIPTS_DIR not in _sys.path:
+            _sys.path.insert(1, constants.SCRIPTS_DIR)
         from cwa_db import CWA_DB
         from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
         from cps.services.worker import WorkerThread

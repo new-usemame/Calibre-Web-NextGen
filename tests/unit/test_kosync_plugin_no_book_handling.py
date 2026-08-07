@@ -119,11 +119,19 @@ def test_pull_log_lines_include_current_file_context():
     # `[Pull] end for <current_file> with ...` form from CWA #1271 rather than
     # the older `body.<field> missing` shape. Pin the new form so a future
     # edit that quietly reverts to the less-useful text trips this test.
+    #
+    # The third tail used to read "with missing progress field", pinning a
+    # `body.progress == nil` guard. Fork #1366 replaced that guard with
+    # `SyncLogic.resolveRemotePosition(body).kind == "none"`, which rejects a
+    # strict superset: nil progress, the empty-string locator that reads as
+    # present to every nil-check, and a percentage-kind row with no usable
+    # percentage. "Unusable" is what the branch actually rejects, so the log
+    # says that. The structured form this test exists to protect is unchanged.
     body = _read(MAIN_LUA)
     for tail in (
         "with invalid body",
         "with no remote progress",
-        "with missing progress field",
+        "with unusable progress field",
     ):
         assert (
             f'"CWASync: [Pull] end for", current_file, "{tail}"' in body

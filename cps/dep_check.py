@@ -25,6 +25,6 @@ def load_dependencies(optional=False):
             dep_version = version(req.name)
         except (PackageNotFoundError):
             dep_version = "not installed"
-        deps.append([dep_version, req.name])
+        deps.append([dep_version, req])
 
     return deps

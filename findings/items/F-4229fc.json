@@ -1,0 +1,13 @@
+{
+  "area": "autopilot",
+  "body": "`scripts/verification-sweep.sh:124-126`:\n\n```\ngh issue list --repo \"$REPO\" --state open --limit 300 \\\n  --json number,title,author,labels,comments > \"$WORK/issues.json\" 2>/dev/null \\\n  || fail_soft \"could not list issues\"\n```\n\n`2>/dev/null` discards gh's stderr, so the only record of a radar failure is the\nliteral string \"could not list issues\". Rate limit, network blip, auth expiry,\nGraphQL timeout on a 300-issue comment fetch and a malformed `--json` field all\nproduce the identical line.\n\nOBSERVED 2026-08-06: the 18:06Z tick logged `status=failed reason=could not list\nissues`, streak 1 after ~20 consecutive OK ticks. Determining it was transient\nrequired re-running the exact call by hand (rc=0, 107 issues, 3.6s). The log\ncould not distinguish \"blip, ignore\" from \"wedged, act.\"\n\nWhy it matters more than a normal swallowed error: this step is the regression\nradar. It is deliberately fail-soft and exit-0 so a broken sweep cannot abort the\ntick, and the tick pages the operator only at streak >= 3. Those two together\nmean the failure reason is the *only* signal available for two whole ticks, and\nit currently carries no information. The `wedge-audit-signal-not-just-heal`\nlesson applies directly: a path that stops work needs to say why, not just that.\n\nFix shape: capture stderr into the fail_soft message, e.g.\n`ERR=\"$(... 2>&1 >\"$WORK/issues.json\")\" || fail_soft \"could not list issues: ${ERR##*$'\\n'}\"`,\nkeeping the reason on one line so the tick's `summary: status=` grep still parses.\n\nNote the sibling risk while touching this: the query pulls `comments` for up to\n300 issues in one GraphQL call, which is the kind of request that starts timing\nout as the tracker grows. If that is what failed here, the reason string is also\nwhat would have revealed it.",
+  "created": "2026-08-06",
+  "id": "F-4229fc",
+  "refs": [
+    "scripts/verification-sweep.sh:124"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "verification-sweep discards gh's stderr, so the regression radar's failure reason is unrecoverable"
+}

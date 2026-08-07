@@ -1,0 +1,14 @@
+{
+  "area": "ci",
+  "body": "OBSERVED on the v4.1.32 release cut (PR #1434, run 31160888185, 2026-08-07).\n\nA **data-and-docs-only** PR (CHANGELOG.md, CHANGES-vs-upstream.md, and a new\nconst block in `frontend/src/data/whatsNew.ts`) failed `E2E Tests (SPA)`:\n\n```\n[mobile] › e2e/tag-merge-delete.spec.ts:168:1 › deleting a tag takes a confirm, then removes only the tag\n  Error: apiRequestContext.get: socket hang up\n    - → GET http://localhost:8083/api/v1/tags\n```\n\nFailed through `Retry #2`. Four more specs were flaky in the same run and\npassed on retry:\n\n- `[desktop] tag-merge-delete.spec.ts:168` (same spec, other viewport)\n- `[mobile] reader-rtl.spec.ts:90`\n- `[mobile] sp1-ux.spec.ts:3` (already filed as F-209826)\n- `[mobile] tag-merge-delete.spec.ts:109`\n\nRe-running the failed job alone was clean: **319 passed, 0 failed, 0 flaky.**\nSame commit, same image, no code change between the two runs.\n\n## Why this matters more than an ordinary flake\n\n`continue-on-error` on the e2e job is now scoped to fork PRs only\n(`.github/workflows/tests.yml:489`), and `Test Suite Summary` genuinely goes\nred when e2e fails — both OBSERVED on this run, Summary tracking e2e\n`failure` → `success` across the re-run. So the gate really does block now,\nwhich is what F-abdea7 was asking for.\n\nF-abdea7 predicted exactly this consequence: *\"a known-flaky spec in a\nrequired gate would block merges at random.\"* That is no longer hypothetical.\nIt cost the v4.1.32 train a full re-run cycle, on a diff that could not\npossibly have caused it.\n\n## What the signature suggests\n\n`socket hang up` is the backend dropping the connection, not an assertion\nfailure — the app under test died or stopped accepting. The clustering (five\nspecs, two viewports, one run) points at the shared `cwn-e2e` container rather\nthan at any one spec. `tag-merge-delete` is a mutating spec that mints and\ndeletes tags via the API, so it is a plausible trigger rather than merely a\nvictim; F-de9cfb already covers mutating specs and drifted seed state.\n\n## Not yet established\n\n- Whether the container actually crashed, or the harness lost the socket.\n  `docker logs cwn-e2e` is dumped only on the seed-step failure path, not on\n  a spec failure — so the one artifact that would settle it was not captured.\n- Whether tag mutation is causal or coincidental.\n\n## Suggested direction\n\n1. Capture `docker logs cwn-e2e` as an artifact on **any** e2e job failure,\n   not just seed failure. Without it every instance of this is unfalsifiable.\n2. Then decide between quarantine and a real fix — quarantining first would\n   discard the only evidence.",
+  "created": "2026-08-07",
+  "id": "F-7a530b",
+  "refs": [
+    "#1434",
+    "F-abdea7"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "tag-merge-delete.spec.ts flakes on 'socket hang up' and can block a release cut"
+}

@@ -28,6 +28,13 @@ What's pinned here:
   authoritative (a nested library below it is not scanned); "largest wins" still
   holds across sibling library roots when there's no root DB. Directories named
   ``metadata.db`` are ignored (files only).
+* **Only a real library counts (#1428)** — a candidate is validated as an
+  actual Calibre database before it can claim the mount point. Matching on the
+  name alone let a stale 0-byte ``metadata.db`` at the library root prune away
+  the real library nested below it; the container then crash-looped forever on
+  ``no such table: custom_columns``. Invalid candidates are named, skipped, and
+  walked past; when *nothing* usable is found the boot stops with an actionable
+  error instead of seeding an empty library over the user's files.
 
 The library ships ``empty_library/app.db`` (a real SQLite file with the
 ``settings`` table) and ``empty_library/metadata.db``; the tests use those as the
@@ -96,6 +103,26 @@ def _walk_must_not_run(*_a, **_k):
     raise AssertionError("os.walk was called — the app.db default-location fast path did not short-circuit")
 
 
+def _make_calibre_db(path, pad_rows=0):
+    """Write a small but *genuine* Calibre database at ``path``.
+
+    Carries the tables the locator validates against, so it is a real library as
+    far as selection is concerned. ``pad_rows`` inflates the file when a test
+    needs to control which of two valid candidates is larger — size has to be
+    steered with real content now that junk files no longer count as libraries.
+    """
+    con = sqlite3.connect(str(path))
+    try:
+        con.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT)")
+        con.execute("CREATE TABLE custom_columns (id INTEGER PRIMARY KEY, datatype TEXT)")
+        for i in range(pad_rows):
+            con.execute("INSERT INTO books (title) VALUES (?)", ("x" * 512,))
+        con.commit()
+    finally:
+        con.close()
+    return path
+
+
 # --------------------------------------------------------------------------- #
 # The crash the naive fast path introduced (fresh install).
 # --------------------------------------------------------------------------- #
@@ -160,7 +187,7 @@ def test_root_metadb_is_authoritative_over_larger_subfolder(lib):
     """Deliberate contract: a metadata.db at the library ROOT wins, even when a
     larger one exists in a sub-folder below it (the root is the mount point)."""
     _mod, al, _cfg, library = lib
-    (library / "metadata.db").write_bytes(b"tiny")  # small root DB
+    _make_calibre_db(library / "metadata.db")  # small root DB, but a real one
     sub = library / "NestedLibrary"
     sub.mkdir()
     shutil.copyfile(EMPTY_METADB, sub / "metadata.db")  # larger, but nested below root
@@ -225,7 +252,7 @@ def test_metadb_multiple_subfolders_largest_wins(lib):
     big = library / "LibB"
     small.mkdir()
     big.mkdir()
-    (small / "metadata.db").write_bytes(b"x" * 16)
+    _make_calibre_db(small / "metadata.db")
     shutil.copyfile(EMPTY_METADB, big / "metadata.db")
     assert os.path.getsize(big / "metadata.db") > os.path.getsize(small / "metadata.db")
 
@@ -236,3 +263,187 @@ def test_metadb_multiple_subfolders_largest_wins(lib):
 def test_no_library_anywhere_returns_false(lib):
     _mod, al, _cfg, _library = lib
     assert al.check_for_existing_library() is False
+
+
+# --------------------------------------------------------------------------- #
+# #1428 — a metadata.db-shaped file that isn't a Calibre database must never
+# claim the mount point and prune away the real library below it.
+#
+# Reported symptom: every release from v4.1.20 refused to start, looping on
+#     ERROR {cps.db} (sqlite3.OperationalError) no such table: custom_columns
+#     [SQL: SELECT id, datatype FROM custom_columns]
+# while v4.1.19 was fine. The name-only match accepted a stale/0-byte
+# metadata.db at the library root, pruned the walk there, and wrote that
+# directory into config_calibre_dir — so Calibre-Web opened a database with no
+# Calibre tables in it, on every boot, forever.
+# --------------------------------------------------------------------------- #
+
+def test_is_calibre_database_accepts_a_real_library(tmp_path):
+    mod = _load_module()
+    assert mod.is_calibre_database(str(EMPTY_METADB)) is True
+    assert mod.is_calibre_database(str(_make_calibre_db(tmp_path / "metadata.db"))) is True
+
+
+@pytest.mark.parametrize(
+    "name, payload",
+    [
+        ("empty", b""),                                  # 0-byte placeholder
+        ("garbage", b"not a database at all, just text"),  # unrelated file
+        ("truncated", b"SQLite format 3\x00truncated"),   # looks like sqlite, isn't
+    ],
+)
+def test_is_calibre_database_rejects_non_libraries(tmp_path, name, payload):
+    mod = _load_module()
+    path = tmp_path / f"{name}-metadata.db"
+    path.write_bytes(payload)
+    assert mod.is_calibre_database(str(path)) is False
+
+
+def test_is_calibre_database_rejects_sqlite_without_calibre_tables(tmp_path):
+    """A perfectly valid SQLite file is still not a Calibre library."""
+    mod = _load_module()
+    path = tmp_path / "metadata.db"
+    con = sqlite3.connect(str(path))
+    con.execute("CREATE TABLE settings (id INTEGER PRIMARY KEY)")
+    con.commit()
+    con.close()
+    assert mod.is_calibre_database(str(path)) is False
+
+
+def test_is_calibre_database_does_not_modify_the_candidate(tmp_path):
+    """Validation opens read-only — checking a file must never write to it."""
+    mod = _load_module()
+    path = tmp_path / "metadata.db"
+    path.write_bytes(b"")
+    before = (path.stat().st_size, path.stat().st_mtime_ns)
+
+    assert mod.is_calibre_database(str(path)) is False
+
+    assert (path.stat().st_size, path.stat().st_mtime_ns) == before
+    assert not (tmp_path / "metadata.db-wal").exists()
+    assert not (tmp_path / "metadata.db-journal").exists()
+
+
+def test_empty_root_metadb_does_not_shadow_real_nested_library(lib):
+    """#1428, exactly as reported: a 0-byte metadata.db sits at the mount root
+    and the real library is one folder down. v4.1.19 picked the real one."""
+    _mod, al, _cfg, library = lib
+    (library / "metadata.db").write_bytes(b"")  # stale placeholder at the root
+    sub = library / "MyLibrary"
+    sub.mkdir()
+    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")  # the actual library
+
+    assert al.check_for_existing_library() is True
+    assert al.metadb_path == str(sub / "metadata.db")
+    assert al.lib_path == str(sub)
+
+
+def test_non_database_root_metadb_does_not_shadow_real_nested_library(lib):
+    """Same shape, but the root file is unrelated content rather than 0 bytes."""
+    _mod, al, _cfg, library = lib
+    (library / "metadata.db").write_bytes(b"leftover junk from a failed restore")
+    sub = library / "Books"
+    sub.mkdir()
+    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+
+    assert al.check_for_existing_library() is True
+    assert al.metadb_path == str(sub / "metadata.db")
+
+
+def test_selected_library_can_answer_the_startup_query(lib):
+    """Symptom-level pin: whatever gets mounted must satisfy the query whose
+    failure crash-looped the container — SELECT id, datatype FROM custom_columns."""
+    _mod, al, _cfg, library = lib
+    (library / "metadata.db").write_bytes(b"")
+    sub = library / "MyLibrary"
+    sub.mkdir()
+    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+
+    assert al.check_for_existing_library() is True
+
+    con = sqlite3.connect(al.metadb_path)
+    try:
+        con.execute("SELECT id, datatype FROM custom_columns").fetchall()
+    finally:
+        con.close()
+
+
+def test_invalid_candidate_is_recorded_and_walk_continues_below_it(lib):
+    """The rejected file is named for the user rather than silently ignored."""
+    _mod, al, _cfg, library = lib
+    (library / "metadata.db").write_bytes(b"")
+    sub = library / "MyLibrary"
+    sub.mkdir()
+    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+
+    al.check_for_existing_library()
+
+    assert al.rejected_dbs == [str(library / "metadata.db")]
+
+
+def test_only_invalid_candidates_exits_without_touching_them(lib):
+    """No usable library, but metadata.db-shaped files are present: stop with a
+    clear error. Seeding an empty library here would copy over the top of files
+    the user may still be able to recover."""
+    _mod, al, _cfg, library = lib
+    (library / "metadata.db").write_bytes(b"")
+    before = (library / "metadata.db").stat().st_size
+
+    with pytest.raises(SystemExit) as exc:
+        al.check_for_existing_library()
+
+    assert exc.value.code == 1
+    assert (library / "metadata.db").stat().st_size == before, "the user's file was modified"
+    assert al.metadb_path is None
+
+
+def test_only_invalid_candidates_names_them_in_the_error(lib, capsys):
+    _mod, al, _cfg, library = lib
+    (library / "metadata.db").write_bytes(b"")
+
+    with pytest.raises(SystemExit):
+        al.check_for_existing_library()
+
+    out = capsys.readouterr().out
+    assert str(library / "metadata.db") in out
+    assert "not a Calibre database" in out or "readable Calibre database" in out
+
+
+def test_backup_sibling_does_not_outrank_the_real_metadata_db(lib):
+    """A larger metadata.db.bak next to the real metadata.db is a copy, not the
+    library — the exactly-named file wins regardless of size."""
+    _mod, al, _cfg, library = lib
+    _make_calibre_db(library / "metadata.db")
+    _make_calibre_db(library / "metadata.db.bak", pad_rows=200)
+    assert os.path.getsize(library / "metadata.db.bak") > os.path.getsize(library / "metadata.db")
+
+    assert al.check_for_existing_library() is True
+    assert al.metadb_path == str(library / "metadata.db")
+
+
+def test_invalid_root_candidate_still_prunes_the_real_librarys_book_folders(lib, monkeypatch):
+    """Skipping past a bad root file must not cost the #1022 perf win below it:
+    once the real library is found, its per-book folders are still pruned."""
+    _mod, al, _cfg, library = lib
+    (library / "metadata.db").write_bytes(b"")
+    sub = library / "MyLibrary"
+    sub.mkdir()
+    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    book = sub / "Some Author" / "Some Book (1)"
+    book.mkdir(parents=True)
+    (book / "book.epub").write_text("x")
+
+    visited = []
+    real_walk = os.walk
+
+    def spy_walk(top, *a, **k):
+        for dp, dn, fn in real_walk(top, *a, **k):
+            visited.append(dp)
+            yield dp, dn, fn
+
+    monkeypatch.setattr(os, "walk", spy_walk)
+
+    assert al.check_for_existing_library() is True
+    assert al.metadb_path == str(sub / "metadata.db")
+    assert str(sub / "Some Author") not in visited, "book folders must still be pruned"
+    assert str(book) not in visited

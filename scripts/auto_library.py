@@ -12,6 +12,35 @@ import sys
 import subprocess
 
 
+# The tables Calibre-Web reads while starting up. Calibre creates both with the
+# library itself, so every real library has them however empty it is — which is
+# what makes them a safe test for "is this file actually a Calibre library?".
+# ``custom_columns`` is the one whose absence took the whole container down in
+# #1428: SELECT id, datatype FROM custom_columns runs on every boot.
+REQUIRED_CALIBRE_TABLES = ("books", "custom_columns")
+
+
+def is_calibre_database(path) -> bool:
+    """True when *path* is a readable SQLite file carrying Calibre's schema.
+
+    Opened read-only so a candidate is never created, migrated or otherwise
+    touched by the act of checking it. Anything that isn't a database, is
+    truncated, or is missing the tables above returns False rather than raising.
+    """
+    try:
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)
+    except sqlite3.Error:
+        return False
+    try:
+        names = {row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    except sqlite3.Error:
+        # Not a database at all, or unreadable — sqlite defers that to first use.
+        return False
+    finally:
+        con.close()
+    return all(table in names for table in REQUIRED_CALIBRE_TABLES)
+
+
 def main():
     auto_lib = AutoLibrary()
     auto_lib.check_for_app_db()
@@ -47,6 +76,10 @@ class AutoLibrary:
         self.app_db = self.DEFAULT_APPDB_PATH
         self.metadb_path = None
         self.lib_path = None
+        # metadata.db-shaped files that turned out not to be Calibre databases.
+        # Kept so the "found something, but nothing usable" case can name them
+        # instead of silently seeding an empty library over the top (#1428).
+        self.rejected_dbs = []
 
     @property #getter
     def metadb_path(self):
@@ -108,6 +141,14 @@ class AutoLibrary:
         # and a library nested *below* it is not scanned. That is the location
         # Calibre-Web actually mounts from; if your real library lives in a
         # sub-folder, don't also leave a metadata.db at /calibre-library root.
+        #
+        # Only a file that really carries Calibre's schema counts as a library
+        # root. Matching on the *name* alone let a 0-byte placeholder, a
+        # half-finished copy or an unrelated SQLite file claim the mount point
+        # and prune away the real library nested below it — the container then
+        # crash-looped on "no such table: custom_columns" (#1428). An invalid
+        # candidate is reported and skipped, and the walk keeps descending past
+        # it so a real library underneath is still found.
         db_files = []
         for dirpath, dirnames, filenames in os.walk(self.library_dir):
             # Regular files only (os.walk already excludes directories here), and
@@ -117,11 +158,37 @@ class AutoLibrary:
                 if "metadata.db" in f
                 and not (f.endswith("-wal") or f.endswith("-shm") or f.endswith("-journal"))
             ]
-            if matches:
-                for f in matches:
-                    db_files.append(os.path.join(dirpath, f))
+            # An exactly-named metadata.db is the library's own database; a
+            # suffixed sibling (metadata.db.bak, metadata.db.old) is a copy and
+            # must never outrank it just for being larger.
+            if "metadata.db" in matches:
+                matches = ["metadata.db"]
+            valid = []
+            for f in sorted(matches):
+                candidate = os.path.join(dirpath, f)
+                if is_calibre_database(candidate):
+                    valid.append(candidate)
+                else:
+                    self.rejected_dbs.append(candidate)
+                    required = " / ".join(REQUIRED_CALIBRE_TABLES)
+                    print(f"[cwa-auto-library]: Ignoring {candidate} - it is not a Calibre database "
+                          f"(missing the {required} tables). Continuing to search below it...")
+            if valid:
+                db_files.extend(valid)
                 # Don't walk this library's book sub-folders -- that's the slow part.
                 dirnames[:] = []
+        if not db_files and self.rejected_dbs:
+            # Files that look like a library are present but none can be opened
+            # as one. Creating a fresh library here would copy an empty
+            # metadata.db over the top of them, so stop and say what to fix.
+            print("\n[cwa-auto-library]: ERROR: found metadata.db file(s) in "
+                  f"'{self.library_dir}' but none of them is a readable Calibre database:\n")
+            for db in self.rejected_dbs:
+                print(f"    - {db} | Size: {os.path.getsize(db)}")
+            print("\n[cwa-auto-library]: Nothing has been modified. Remove or restore the file(s) "
+                  "above — or point the library mount at the folder holding your real metadata.db — "
+                  "then restart the container.")
+            sys.exit(1)
         if len(db_files) == 1:
             self.metadb_path = db_files[0]
             print(f"[cwa-auto-library]: Existing library found at {self.lib_path}, mounting now...")

@@ -1,0 +1,13 @@
+{
+  "area": "ci",
+  "body": "`.github/policy/tier-policy.config` opens \"Auto-merge tier policy — single source\nof truth\" and lists three consumers. For TIER1_PATHS_REGEX that is not true.\n\nEvery reference to it, repo-wide:\n\n    .github/policy/tier-policy.config:31   the declaration\n    scripts/lib/tier_policy.py:45          a frozen historical fallback\n    scripts/lib/tier_policy.py:76,167      parsed onto Policy\n    scripts/lib/tier_policy.py:370         echoed by the `show` subcommand\n    tests/unit/test_tier_policy_module.py  asserts the pattern compiles/matches\n\nNo workflow and no shell script reads it, and `validate_fork_pr` never consults\n`policy.tier1_paths_regex` — a safe-tier-1 PR touching arbitrary paths validates\n`ok`. Confirmed by editing the regex to exclude a path and watching\n`validate_fork_pr` still pass it.\n\nSo the file's own comment tells a reader this value gates tier-1 eligibility\nwhen it gates nothing. That is worse than an unused constant: a 2026-08-07 tick\ninherited a note diagnosing a stuck findings PR as \"the tier-1 regex cannot\nmatch findings/items/*.json\", wrote the widening fix and a test, and only caught\nit because the test that should have gone red stayed green. The real blocker was\nan ordinary merge conflict.\n\nDecide one way or the other: either wire the regex into `validate_fork_pr` as\nthe comment claims, with tests, or delete it and drop the claim from the header.\nDo not leave it looking load-bearing.",
+  "created": "2026-08-07",
+  "id": "F-79d746",
+  "refs": [
+    "#1423"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "TIER1_PATHS_REGEX is declared as tier policy but enforces nothing"
+}

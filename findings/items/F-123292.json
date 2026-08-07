@@ -1,0 +1,13 @@
+{
+  "area": "oauth",
+  "body": "Present on main, independent of #1411.\n\nOn an OAuth error or user cancellation the browser never reaches `GET /login`,\nso nothing renders the flashed error and the user is sent straight back to the\nIdP:\n\n1. blueprints are built with `redirect_to=\"oauth.<provider>_login\"`\n   (cps/oauth_bb.py:852, :868, :888)\n2. the `oauth_error` handlers only flash() and log.error() — none return a\n   response (cps/oauth_bb.py:1029-1080), so flask_dance falls through to\n   next_url\n3. next_url is `/oauth/link/<provider>`, which does\n   `if not <provider>.authorized: return redirect(url_for('<provider>.login'))`\n   (cps/oauth_bb.py:1095 github, :1191 generic)\n4. `/login/<provider>` starts another IdP trip\n\nObservable symptom: clicking Cancel/Deny at the provider appears to do nothing —\nthe user bounces back to the provider, and the flashed explanation is never\nshown because no login template renders.\n\n`_login_redirect_count` does not detect it: that counter only increments inside\n`render_login()` (cps/web.py:2615), which this chain never calls.\n\nConfirmed by source trace during the #1411 review. Not exercised against a live\nIdP. #1411 would make this much easier to hit, since it turns every visit to\n/login into an automatic provider start.\n\nLikely fix: have the three oauth_error handlers return a redirect to web.login\nso the failure lands somewhere that can render the error.",
+  "created": "2026-08-06",
+  "id": "F-123292",
+  "refs": [
+    "#1411"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Cancelled or failed OAuth loops back to the provider instead of the login page"
+}

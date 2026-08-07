@@ -66,6 +66,7 @@ dependencies = [
     "urllib3>=2.5.0",
     "qrcode>=8.1",
     "polib>=1.2.0",
+    "packaging>=21",
 
     # GDrive Integration
     "google-api-python-client>=1.7.11,<2.200.0",

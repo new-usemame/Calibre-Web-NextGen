@@ -170,6 +170,35 @@ def test_callsite_uses_the_single_source_of_truth():
     assert "record_notified" in called
 
 
+def test_po_lookup_is_contained_under_translations_dir():
+    """The locale is a path segment, and it is not a trusted value.
+
+    ``get_locale()`` returns ``current_user.locale`` verbatim (cw_babel.py) and
+    the self-service profile route stores it without checking it against the
+    shipped locales, so a crafted value reaches this join. ``basename()`` alone
+    is not enough: ``basename("../../..")`` is ``".."``, which still escapes one
+    level. The callsite must require a direct child of TRANSLATIONS_DIR.
+    """
+    translations_dir = "/app/calibre-web-automated/cps/translations"
+
+    def resolve(lang):
+        return os.path.normpath(os.path.join(translations_dir, lang))
+
+    # Values that must be rejected — each resolves outside TRANSLATIONS_DIR.
+    for lang in ("../../../../etc", "../../..", "..", "de/../..", "/etc"):
+        assert os.path.dirname(resolve(lang)) != translations_dir, (
+            "{!r} would need rejecting".format(lang)
+        )
+
+    # ...and a real locale must still be accepted.
+    assert os.path.dirname(resolve("de")) == translations_dir
+    assert os.path.dirname(resolve("pt_BR")) == translations_dir
+
+    # The callsite performs exactly this check rather than trusting the value.
+    src = _module_source("cps/render_template.py")
+    assert "os.path.dirname(locale_dir) != translations_dir" in src
+
+
 def test_po_lookup_is_not_cwd_relative():
     """The .po path must not depend on the process working directory.
 

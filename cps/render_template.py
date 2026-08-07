@@ -401,7 +401,16 @@ def translations_missing_notification() -> None:
         return
     # Resolved from the package rather than the working directory: this only
     # ever found the file because the s6 service cds into the app dir first.
-    po_path = os.path.join(constants.TRANSLATIONS_DIR, lang, 'LC_MESSAGES', 'messages.po')
+    #
+    # lang arrives straight from user.locale, which the self-service profile
+    # route stores without validating against the locales we ship, so it is not
+    # safe as a path segment. Require the resolved directory to be a direct
+    # child of TRANSLATIONS_DIR; anything else has no .po for us to count.
+    translations_dir = os.path.normpath(constants.TRANSLATIONS_DIR)
+    locale_dir = os.path.normpath(os.path.join(translations_dir, lang))
+    if os.path.dirname(locale_dir) != translations_dir:
+        return
+    po_path = os.path.join(locale_dir, 'LC_MESSAGES', 'messages.po')
     current_date = datetime.now().strftime("%Y-%m-%d")
     missing_count = 0
     if os.path.isfile(po_path):

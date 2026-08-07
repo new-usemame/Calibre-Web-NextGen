@@ -15,7 +15,11 @@ AUTO_REDIRECT_STATES_KEY = "_oauth_auto_redirect_states"
 LOGIN_REDIRECT_COUNT_KEY = "_login_redirect_count"
 MAX_LOGIN_REDIRECTS = 3
 _MAX_STATES = 4
-_MAX_NEXT_LENGTH = 512
+# Budgeted in UTF-8 bytes, not characters: the attempt registry lives in the
+# signed cookie session, and a multi-byte path costs several bytes per
+# character once serialised. Four 512-character CJK targets serialise to ~7.5 KB
+# and blow past the ~4 KB per-cookie limit, which silently drops the session.
+_MAX_NEXT_BYTES = 512
 
 # Clear sessions created by the first revision of this feature too.
 _LEGACY_GUARD_KEY = "_oauth_auto_redirect_pending"
@@ -32,17 +36,39 @@ def local_login_requested(query_args):
     return query_args.get(LOCAL_LOGIN_PARAMETER) == LOCAL_LOGIN_VALUE
 
 
+def _has_url_control_character(value):
+    """Return whether ``value`` holds a C0 control character or DEL.
+
+    Tab, CR and LF are stripped by both ``urlsplit`` and the WHATWG URL parser
+    a browser applies to a ``Location`` header, so a target may pass a
+    same-origin check here and still resolve to a different origin in the
+    browser. ``/<TAB>//evil.example`` is the concrete case: ``urlsplit`` removes
+    the tab and reports an empty netloc with path ``/evil.example``, while the
+    browser removes the tab and resolves ``///evil.example`` to
+    ``https://evil.example/``. Rejecting the whole control range is simpler than
+    tracking which characters each parser happens to strip.
+    """
+    return any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+
+
 def validated_relative_next(query_args):
     """Return a safe app-relative ``next`` target, or ``None``."""
     target = query_args.get("next")
-    if not isinstance(target, str) or not target or len(target) > _MAX_NEXT_LENGTH:
+    if not isinstance(target, str) or not target:
+        return None
+    if len(target.encode("utf-8")) > _MAX_NEXT_BYTES:
+        return None
+
+    decoded_target = unquote(target)
+    if _has_url_control_character(target) or _has_url_control_character(decoded_target):
         return None
     if (
         not target.startswith("/")
         or target.startswith("//")
         or "\\" in target
-        or "\r" in target
-        or "\n" in target
+        or not decoded_target.startswith("/")
+        or decoded_target.startswith("//")
+        or "\\" in decoded_target
     ):
         return None
 
@@ -53,8 +79,6 @@ def validated_relative_next(query_args):
         or parsed.netloc
         or decoded_path.startswith("//")
         or "\\" in decoded_path
-        or "\r" in decoded_path
-        or "\n" in decoded_path
     ):
         return None
     return target
@@ -64,6 +88,18 @@ def clear_auto_redirect_state(session_store):
     """Clear all automatic OAuth state from the browser session."""
     session_store.pop(AUTO_REDIRECT_STATES_KEY, None)
     session_store.pop(_LEGACY_GUARD_KEY, None)
+
+
+def clear_provider_oauth_states(session_store):
+    """Invalidate every outstanding Flask-Dance authorization transaction.
+
+    Clearing only the attempt registry leaves ``<provider>_oauth_state`` behind,
+    so a flow started before logout can still validate its state afterwards and
+    log the browser straight back in. Logout has to invalidate the transaction
+    itself, not just our bookkeeping for it.
+    """
+    for provider_name in _PROVIDER_ENDPOINTS:
+        session_store.pop(f"{provider_name}_oauth_state", None)
 
 
 def single_active_oauth_endpoint(oauth_blueprints):

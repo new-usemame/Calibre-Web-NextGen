@@ -23,3 +23,4 @@ def cleanup_local_logout():
 
     flask_session.pop(oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY, None)
     oauth_auto_redirect.clear_auto_redirect_state(flask_session)
+    oauth_auto_redirect.clear_provider_oauth_states(flask_session)

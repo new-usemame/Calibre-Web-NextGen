@@ -1,0 +1,13 @@
+{
+  "area": "container",
+  "body": "`root/etc/s6-overlay/s6-rc.d/cwa-auto-library/run` ends:\n\n    python3 .../auto_library.py\n    exit_code=$?\n    if [[ ${exit_code} -eq 0 ]]; then echo \"...completed successfully!\"\n    else echo \"...did not complete successfully (exit code: ${exit_code})...\"; fi\n\nThe `if` is the last statement, so the script's own status is the echo's -- always\n0. Every `sys.exit(1)` in `auto_library.py` (there are four: two in\n`set_library_location`/`update_calibre_web_db`, one in `update_dirs_json`, and the\n\"no usable library\" stop added in #1429) is therefore invisible to s6. The\noneshot reports success and boot continues with an unconfigured or wrongly\nconfigured library, which then fails later and further from the cause.\n\nNoted while tracing #1429's blast radius, deliberately not changed there: it\ntouches every boot path and deserves its own change. Decide first whether a\nfailed auto-library SHOULD block boot -- swallowing may have been intentional so\na library problem does not make the container unstartable. If so, the fix is to\nsay so in a comment and keep the log line; if not, propagate the code.",
+  "created": "2026-08-07",
+  "id": "F-b6a4af",
+  "refs": [
+    "#1429"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "cwa-auto-library swallows its own exit code, so a failed boot step reads as success"
+}

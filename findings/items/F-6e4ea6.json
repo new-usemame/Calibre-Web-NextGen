@@ -1,0 +1,13 @@
+{
+  "area": "ci",
+  "body": "`scripts/findings.py` writes one JSON per finding (merge-safe, as designed) but\nALSO regenerates `findings/INDEX.md`, a single file listing every finding, and\nthat file is committed. Two findings branches cut from the same main therefore\nrewrite the same lines of INDEX.md and the second one to be reviewed goes\nCONFLICTING.\n\nOBSERVED 2026-08-07: PR #1423 (`findings/INDEX.md` + `findings/items/F-123292.json`)\nsits `mergeable=CONFLICTING, mergeStateStatus=DIRTY` with auto-merge armed. It is\ngreen on every required check. The conflict is the blocker — not, as a previous\ntick's note concluded, the tier-1 path regex (which enforces nothing; see the\nsibling finding).\n\nThis defeats the module docstring's own promise: \"Storage is one JSON file per\nfinding under findings/items/, which makes concurrent branches merge without\nconflicts.\" The per-item storage does. The index re-introduces exactly the\ncontention it avoids, and the autopilot files findings from several branches, so\nit hits this routinely.\n\nOptions, cheapest first:\n  * stop committing INDEX.md — regenerate on demand (`findings.py index`) and\n    gitignore it; nothing reads it programmatically;\n  * keep it committed but add a `.gitattributes` merge driver that regenerates\n    it on conflict;\n  * generate it in CI on merge to main rather than in the contributing branch.\n\nPrefer the first: an index derived from files already in the tree is not source.",
+  "created": "2026-08-07",
+  "id": "F-6e4ea6",
+  "refs": [
+    "#1423"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "findings/INDEX.md is generated and committed, so concurrent findings PRs always conflict"
+}

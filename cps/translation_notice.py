@@ -71,12 +71,17 @@ def last_notified(lang):
     Unreadable markers read as "never shown": the caller's only use for this
     value is deciding whether to flash once more today, and a spurious extra
     notice is a better failure than an exception on every page render.
+
+    ``ValueError`` is caught alongside ``OSError`` because ``lang`` is not a
+    trusted value — it is ``current_user.locale``, which the self-service
+    profile route stores unvalidated — and an embedded null byte makes ``open``
+    raise ``ValueError`` rather than ``OSError``.
     """
     for path in (translation_notice_file(lang), legacy_translation_notice_file(lang)):
         try:
             with open(path, "r") as handle:
                 recorded = handle.read().strip()
-        except OSError:
+        except (OSError, ValueError):
             continue
         if recorded:
             return recorded
@@ -88,10 +93,12 @@ def record_notified(lang, date_str):
 
     Best-effort: a state directory that isn't writable must not turn a page
     render into an error. Returns True when the marker was persisted.
+
+    See :func:`last_notified` for why ``ValueError`` is caught too.
     """
     try:
         with open(translation_notice_file(lang), "w") as handle:
             handle.write(date_str)
         return True
-    except OSError:
+    except (OSError, ValueError):
         return False

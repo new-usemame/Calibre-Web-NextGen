@@ -120,6 +120,30 @@ def test_unwritable_state_dir_does_not_raise(tmp_path, monkeypatch):
     assert translation_notice.last_notified("de") is None
 
 
+def test_hostile_locales_never_raise_and_never_escape(config_dir, legacy_dir):
+    """``lang`` is untrusted, so neither helper may raise or write outside.
+
+    ``current_user.locale`` is returned verbatim by ``get_locale()`` and stored
+    without validation by the self-service profile route. The null-byte case is
+    the one that bites: ``open()`` raises ``ValueError``, not ``OSError``, so an
+    ``except OSError`` alone left the module's "best-effort" contract untrue.
+    """
+    hostile = [
+        "..", "../../..", "../" * 8, "/etc/passwd", "de/../../../../etc",
+        "", ".", "de\x00", "\x00", "a" * 5000, "de/../..", "~/../..",
+        "..\\..\\..", "\n/etc", "  ..  ", "....//....//",
+    ]
+    for lang in hostile:
+        # Neither helper may raise for any of these.
+        translation_notice.record_notified(lang, "2026-08-07")
+        translation_notice.last_notified(lang)
+
+    # Nothing was written outside the state dir, under any name.
+    for name in os.listdir(str(config_dir)):
+        assert name.startswith("cwa_translation_notice_"), name
+    assert os.listdir(str(legacy_dir)) == []
+
+
 def test_odd_locales_stay_inside_the_state_dir(config_dir):
     for lang in ("de", "pt_BR", "../../etc/passwd"):
         path = translation_notice.translation_notice_file(lang)

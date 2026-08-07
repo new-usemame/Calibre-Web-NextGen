@@ -1,5 +1,34 @@
 local SyncLogic = {}
 
+-- Mirror of PERCENTAGE_ONLY_LOCATOR in
+-- cps/progress_syncing/protocols/kosync.py. The two must stay byte-identical;
+-- tests/unit/test_cwasync_plugin_wire_contract.py pins the correspondence so
+-- neither side can be edited alone.
+SyncLogic.PERCENTAGE_ONLY_LOCATOR = "cwng:percentage"
+
+-- A wire percentage is KOReader's decimal fraction, so the only meaningful
+-- values are 0..1 inclusive. Returns nil for anything else.
+--
+-- This is the trust boundary for a server response, and the value is on its way
+-- to GotoPercent: `tonumber` alone would let -0.25 through as GotoPercent(-25)
+-- and 4 through as GotoPercent(400), seeking outside the document. The rows are
+-- not all written by this release -- KOSyncProgress predates it and accepts
+-- writes from other producers -- so the client cannot assume every stored
+-- percentage is one the current server would have accepted.
+--
+-- NaN is excluded by `p ~= p`, which is the only way to test for it in Lua, and
+-- would otherwise pass every comparison below without ever being in range.
+function SyncLogic.validWirePercentage(value)
+    local p = tonumber(value)
+    if p == nil or p ~= p then
+        return nil
+    end
+    if p < 0 or p > 1 then
+        return nil
+    end
+    return p
+end
+
 function SyncLogic.isRemoteProgressFromThisDevice(body, device_model, device_id)
     return type(body) == "table"
         and body.device == device_model
@@ -55,6 +84,86 @@ function SyncLogic.didBookProgressChange(previous, new_values)
         or previous.last_page ~= new_values.last_page
         or previous.last_xpointer ~= new_values.last_xpointer
         or previous.status ~= new_values.status
+end
+
+-- Decide what a pulled progress body actually tells us about where to go.
+--
+-- Two encodings arrive on this endpoint. The original one is a locator: an
+-- engine-private crengine xpointer, or a page number for a paged document,
+-- which the reader seeks to exactly. The second (#1366) is a percentage with no
+-- locator at all, written by producers that know how far through the book the
+-- user is but cannot express it as a position this engine would understand --
+-- the web reader, whose positions are EPUB CFIs, and a Kobo. The server marks
+-- those `position_kind = "percentage"` and sends `progress` as null.
+--
+-- Returning the decision as data keeps it testable, and keeps the two pull
+-- paths (single document, bulk library) from drifting: both ask this.
+--
+-- `kind` is one of:
+--   "locator"    -- seek to `progress` exactly (existing behaviour)
+--   "percentage" -- seek to `percentage` of the book; approximate by nature
+--   "none"       -- nothing usable; the caller reports "no progress"
+--
+-- A body with neither a locator nor a percentage is "none" rather than an
+-- error. So is a percentage-only body from a server that did not label it,
+-- which cannot happen against a server that understands `position_kinds` but
+-- costs nothing to be strict about: guessing "percentage" from a missing
+-- `progress` would mean any truncated response silently moved the reader.
+--
+-- `percentage` is normalised to 0-100 here. The wire format is KOReader's
+-- decimal fraction (0.4567 = 45.67%), while GotoPercent takes whole percent,
+-- and getting that conversion wrong lands the reader at the front of the book
+-- rather than half way -- a mistake with no visible symptom other than being
+-- in the wrong place.
+function SyncLogic.resolveRemotePosition(body)
+    if type(body) ~= "table" then
+        return { kind = "none" }
+    end
+
+    local percentage = SyncLogic.validWirePercentage(body.percentage)
+
+    -- The sentinel is never a locator, whatever else the body says.
+    --
+    -- Checking the value and not just the `position_kind` label matters because
+    -- the two arrive independently. `position_kind` is a field the server adds;
+    -- `progress` is the column's stored contents. If the label is absent --
+    -- stripped by a proxy, dropped by a truncated response, omitted by a future
+    -- caller of get_progress_record(), which defaults to including these rows --
+    -- then a sentinel that is only recognised via the label is a non-empty
+    -- string, which is to say a locator. It would reach GotoXPointer and be
+    -- written to last_xpointer, which is exactly the unrecoverable position
+    -- this encoding exists to avoid. Recognising the value itself makes that
+    -- shape unreachable rather than merely unlikely.
+    local is_sentinel = body.progress == SyncLogic.PERCENTAGE_ONLY_LOCATOR
+
+    -- A locator must be a non-empty string (an xpointer) or a number (a page).
+    -- The empty string is rejected explicitly because it is the one value that
+    -- looks present to every nil-check and is meaningless to the engine: it
+    -- would reach GotoXPointer and be stored as the document's last_xpointer.
+    local has_locator = not is_sentinel
+        and ((type(body.progress) == "string" and body.progress ~= "")
+            or type(body.progress) == "number")
+
+    if has_locator and body.position_kind ~= "percentage" then
+        return {
+            kind = "locator",
+            progress = body.progress,
+            percentage = percentage,
+        }
+    end
+
+    -- An unlabelled sentinel still carries a usable percentage; honour it
+    -- rather than discarding a real position, but only ever as a percentage.
+    if (body.position_kind == "percentage" or is_sentinel) and percentage then
+        return {
+            kind = "percentage",
+            percentage = percentage,
+            -- 0-100, the unit GotoPercent expects.
+            percent_whole = percentage * 100,
+        }
+    end
+
+    return { kind = "none" }
 end
 
 -- Phase 2: annotation sync. Annotations are portable tables (see the server's

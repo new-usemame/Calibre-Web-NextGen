@@ -215,3 +215,33 @@ def test_every_payload_field_is_also_an_expected_param(method):
         f"in Lua means the key is absent from the body rather than null — so the "
         f"field can never actually be populated. Add them to optional_params."
     )
+
+
+SYNC_LOGIC_LUA = PLUGIN / "sync_logic.lua"
+KOSYNC_PY = Path(__file__).resolve().parents[2] / "cps" / "progress_syncing" / "protocols" / "kosync.py"
+
+
+def test_the_percentage_only_sentinel_matches_on_both_sides_of_the_wire():
+    """One value, written by Python and compared by Lua, in two files.
+
+    ``PERCENTAGE_ONLY_LOCATOR`` is what the server stores in the ``progress``
+    column for a position it cannot express as a locator, and the plugin refuses
+    to treat that exact string as an xpointer. Those are the two halves of one
+    contract, and they are not derived from each other -- so if either side is
+    edited alone the plugin stops recognising the sentinel and starts handing it
+    to ``GotoXPointer``, which is the unrecoverable position the encoding exists
+    to prevent. Nothing at runtime would report the mismatch, so it is pinned
+    here.
+    """
+    py = re.search(r'^PERCENTAGE_ONLY_LOCATOR\s*=\s*"([^"]+)"',
+                   KOSYNC_PY.read_text(encoding="utf-8"), re.MULTILINE)
+    lua = re.search(r'^SyncLogic\.PERCENTAGE_ONLY_LOCATOR\s*=\s*"([^"]+)"',
+                    SYNC_LOGIC_LUA.read_text(encoding="utf-8"), re.MULTILINE)
+
+    assert py, "kosync.py no longer defines PERCENTAGE_ONLY_LOCATOR at module level"
+    assert lua, "sync_logic.lua no longer defines SyncLogic.PERCENTAGE_ONLY_LOCATOR"
+    assert py.group(1) == lua.group(1), (
+        f"the server stores {py.group(1)!r} but the plugin compares against "
+        f"{lua.group(1)!r}; the plugin would treat the server's sentinel as an "
+        f"xpointer and store it as the document's last_xpointer"
+    )

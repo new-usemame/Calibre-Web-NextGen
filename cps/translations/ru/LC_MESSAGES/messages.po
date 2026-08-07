@@ -6557,7 +6557,7 @@ msgstr "Неверный ID книги."
 msgid "Tag could not be deleted"
 msgstr "Тег не удалось удалить"
 
-#: cps/progress_syncing/protocols/kosync.py:649
+#: cps/progress_syncing/protocols/kosync.py:768
 msgid "KOReader Sync Plugin"
 msgstr "Плагин синхронизации KOReader"
 

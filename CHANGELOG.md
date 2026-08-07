@@ -16,6 +16,18 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Reading in the browser now carries over to KOReader.** Read a few chapters
+  in the web reader, then open the same book on your KOReader device and it
+  moves to roughly where you stopped, instead of resuming where the device
+  itself last was. It lands near the spot rather than exactly on it — the
+  browser records a position KOReader's engine cannot resolve, so the two share
+  a percentage — and it applies when you open the book, not during a bulk
+  library sync. This needs the updated NextGen Progress Sync plugin on the
+  device; until you update it, nothing about its behaviour changes. Reported by
+  @jrodrigoferreira and kept current by @iroQuai (#1366, #324).
+
 ### Changed
 
 - **A sign-in page whose only button is your one provider now just takes you

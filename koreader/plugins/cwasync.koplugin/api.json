@@ -31,6 +31,9 @@
             "required_params" : [
                 "document"
             ],
+            "optional_params" : [
+                "position_kinds"
+            ],
             "expected_status" : [200, 401]
         },
         "pull_annotations" : {

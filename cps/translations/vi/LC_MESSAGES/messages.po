@@ -6370,7 +6370,7 @@ msgstr "Vai trò không hợp lệ"
 msgid "Tag could not be deleted"
 msgstr ""
 
-#: cps/progress_syncing/protocols/kosync.py:649
+#: cps/progress_syncing/protocols/kosync.py:768
 msgid "KOReader Sync Plugin"
 msgstr ""
 

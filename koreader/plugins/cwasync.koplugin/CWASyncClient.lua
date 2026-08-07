@@ -237,6 +237,12 @@ function CWASyncClient:get_progress(
         local ok, res = pcall(function()
             return self.client:get_progress({
                 document = document,
+                -- Tell the server this build can act on a percentage with no
+                -- locator (#1366). Servers that predate it ignore the
+                -- parameter; servers that understand it withhold those rows
+                -- from clients that stay silent, so sending it is what opts
+                -- this device into web-reader and Kobo positions.
+                position_kinds = "locator,percentage",
             })
         end)
         finish(callback, ok, res, "CWASyncClient:get_progress")

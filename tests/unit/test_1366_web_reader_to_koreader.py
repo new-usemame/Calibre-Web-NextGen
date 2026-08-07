@@ -252,3 +252,27 @@ def test_record_web_reader_progress_writes_the_kosync_row(monkeypatch):
     assert stored.device == "Web reader"
 
     session.close()
+
+
+@pytest.mark.unit
+def test_equal_percentage_does_not_destroy_a_real_locator(protocol):
+    """The browser opens the book AT the last synced position.
+
+    Saving there without moving produces a percentage exactly equal to the
+    stored one. Treating equality as a win replaces the device's real
+    xpointer with the sentinel, and an already-installed plugin — which is
+    served only locator rows — then gets no row at all. Strictly-further
+    wins; equal does not.
+    """
+    module, client, session = protocol
+
+    assert _koreader_pushes(client, 0.50).status_code == 200
+    _web_reader_saves(module, 50.0)
+
+    stored = session.query(KOSyncProgress).one()
+    assert stored.progress == "/body/DocFragment[12]/body/div/p[3].0", \
+        "an equal browser sample must not overwrite the device's locator"
+
+    # The consequence the user actually feels: an installed plugin still syncs.
+    assert _pull(client, advertises_percentage=False).get_json()["progress"] == \
+        "/body/DocFragment[12]/body/div/p[3].0"

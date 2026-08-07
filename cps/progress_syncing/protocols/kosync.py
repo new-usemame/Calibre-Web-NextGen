@@ -711,6 +711,18 @@ def record_percentage_only_progress(user_id, book_id, percentage: float,
                       "incoming %.2f%% < stored %.2f%%",
                       user_id, book_id, percentage, record.percentage)
             return False
+        # Equal is not evidence that the browser has the better position. The
+        # web reader opens the book AT the last synced percentage, so a save
+        # without moving lands here exactly. Overwriting a real locator with
+        # the sentinel would cost an already-installed plugin its row
+        # entirely, since those clients are served locator rows only.
+        if (percentage == record.percentage
+                and record.progress
+                and record.progress != PERCENTAGE_ONLY_LOCATOR):
+            log.debug("Percentage-only progress not shared for user %s book %s: "
+                      "incoming %.2f%% ties stored %.2f%% which holds a locator",
+                      user_id, book_id, percentage, record.percentage)
+            return False
         record.progress = PERCENTAGE_ONLY_LOCATOR
         record.percentage = percentage
         record.device = device

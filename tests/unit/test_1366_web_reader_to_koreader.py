@@ -152,12 +152,26 @@ def test_older_plugin_never_receives_a_percentage_only_row(protocol):
     If it received the row, its ``body.progress == nil`` guard would either miss
     a non-null sentinel and store it as ``last_xpointer``, or catch a null one
     and report a sync error where it used to say "no progress found".
+
+    Asserted as "no position field is present" rather than "the body is empty".
+    #1445 adds ``position_kinds_available`` to this miss, naming what is being
+    withheld so a third-party client can discover the parameter from the wire.
+    That key is not a position: ``resolveRemotePosition`` ignores it and still
+    returns ``kind = "none"``, and an older plugin's ``progress`` guard does not
+    see it either — so the property above is untouched while the body is not
+    byte-identical. Pinning equality here coupled this safety test to every
+    unrelated key, which the endpoint already carries several of
+    (``calibre_book_id`` and friends).
     """
     module, client, session = protocol
 
     _web_reader_saves(module, 45.67)
 
-    assert _pull(client, advertises_percentage=False).get_json() == {}
+    body = _pull(client, advertises_percentage=False).get_json()
+    for position_field in ("progress", "percentage", "position_kind", "timestamp"):
+        assert position_field not in body, (
+            f"{position_field!r} reached a client that never advertised it could act on it"
+        )
 
 
 @pytest.mark.unit
@@ -200,8 +214,10 @@ def test_browser_ahead_replaces_a_stale_locator(protocol):
     stored = session.query(KOSyncProgress).one()
     assert stored.percentage == pytest.approx(75.0)
     assert stored.progress == module.PERCENTAGE_ONLY_LOCATOR
-    assert _pull(client, advertises_percentage=False).get_json() == {}, \
-        "and it is now percentage-only, so it is withheld again"
+    withheld = _pull(client, advertises_percentage=False).get_json()
+    for position_field in ("progress", "percentage", "position_kind", "timestamp"):
+        assert position_field not in withheld, \
+            "and it is now percentage-only, so it is withheld again"
 
 
 @pytest.mark.unit

@@ -18,6 +18,19 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A third-party KOReader sync client is no longer left guessing why a book
+  looks unsynced.** Positions that exist only as a percentage — the ones the
+  web reader and a Kobo produce — are deliberately held back from clients that
+  haven't said they can use them, because older plugins would try to jump to a
+  position they can't understand and lose your place. The problem was that
+  "held back" and "never synced" looked identical from the client's side: an
+  empty answer, with nothing naming the setting that would reveal the position.
+  The server now says what it is holding and how to ask for it, logs the same
+  thing for anyone reading the server log, and the sync protocol documentation
+  now covers the parameter and both position formats. Nothing changes for the
+  bundled plugin or for anyone syncing today. Reported by @sroebert (#1445),
+  who hit this building Crossink and had to read our source to find it.
+
 - **The "help translate this" notice no longer reappears after every update, and
   now works outside Docker.** The app remembered that it had already shown you
   the notice by writing a small file into its own program folder, which gets

@@ -3408,7 +3408,7 @@ def restore_calibre_db():
             log.warning("Failed to dispose sessions before restore: %s", e)
 
         # 2. Run calibredb check_library (pre)
-        calibredb_binary = get_calibre_binarypath("calibredb") or "/app/calibre/calibredb"
+        calibredb_binary = get_calibre_binarypath("calibredb")
         check_cmd = [
             calibredb_binary, "check_library",
             "--with-library", config.config_calibre_dir

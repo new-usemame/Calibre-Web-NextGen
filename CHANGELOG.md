@@ -18,6 +18,18 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **If your library lives in a sub-folder, NextGen stopped leaving a stray
+  `metadata.db` at the top of it.** Something in the startup checked for a
+  database at the top level of your library folder, and the act of checking
+  created an empty one there. That stray file is what made versions 4.1.20 to
+  4.1.31 refuse to start for some people — 4.1.32 already stopped it breaking
+  startup, and now it isn't created in the first place. Two other things were
+  looking in the same wrong place and now find your real library: the KOReader
+  sync checksum job, which had been failing with "no such table: books" on every
+  restart, and the reading statistics, which had been reading an empty database
+  and reporting nothing. If you already have a stray file, it's safe to delete
+  once you're on this version.
+
 - **Installing from source no longer reports the previous version.** A checkout
   or pip install made from the v4.1.31 or v4.1.32 tag identified itself as one
   release older than it was, so the update check kept offering an update that

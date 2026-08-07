@@ -18,6 +18,15 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The "help translate this" notice no longer reappears after every update, and
+  now works outside Docker.** The app remembered that it had already shown you
+  the notice by writing a small file into its own program folder, which gets
+  replaced whenever you update — so the reminder came back each time. Outside
+  Docker that folder doesn't exist at all, so the note was never saved and the
+  reminder never appeared for anyone running from source. It's now kept
+  alongside your settings, where it survives updates. Reported by @chloeroform
+  (#1447).
+
 - **If your library lives in a sub-folder, NextGen stopped leaving a stray
   `metadata.db` at the top of it.** Something in the startup checked for a
   database at the top level of your library folder, and the act of checking

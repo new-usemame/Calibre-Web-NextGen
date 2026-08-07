@@ -411,7 +411,7 @@ def test_only_invalid_candidates_names_them_in_the_error(lib, capsys):
 
 def test_backup_sibling_does_not_outrank_the_real_metadata_db(lib):
     """A larger metadata.db.bak next to the real metadata.db is a copy, not the
-    library — the exactly-named file wins regardless of size."""
+    library — only the exactly-named file is ever a candidate."""
     _mod, al, _cfg, library = lib
     _make_calibre_db(library / "metadata.db")
     _make_calibre_db(library / "metadata.db.bak", pad_rows=200)
@@ -419,6 +419,45 @@ def test_backup_sibling_does_not_outrank_the_real_metadata_db(lib):
 
     assert al.check_for_existing_library() is True
     assert al.metadb_path == str(library / "metadata.db")
+
+
+def test_a_backup_alone_is_not_a_library(lib):
+    """Only ``metadata.db`` counts, because Calibre-Web opens exactly
+    ``<config_calibre_dir>/metadata.db`` (cps/db.py). Mounting a directory on the
+    strength of a metadata.db.bak configures a library whose real database does
+    not exist — the same "validated one file, opened another" mistake as #1428."""
+    _mod, al, _cfg, library = lib
+    sub = library / "MyLibrary"
+    sub.mkdir()
+    _make_calibre_db(sub / "metadata.db.bak")
+
+    assert al.check_for_existing_library() is False
+    assert al.rejected_dbs == []
+
+
+def test_a_backup_does_not_shadow_a_real_library_below_it(lib):
+    _mod, al, _cfg, library = lib
+    _make_calibre_db(library / "metadata.db.old", pad_rows=200)
+    sub = library / "MyLibrary"
+    sub.mkdir()
+    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+
+    assert al.check_for_existing_library() is True
+    assert al.metadb_path == str(sub / "metadata.db")
+
+
+def test_sqlite_sidecars_are_never_candidates(lib):
+    """metadata.db-wal / -shm / -journal sit next to a real library."""
+    _mod, al, _cfg, library = lib
+    sub = library / "MyLibrary"
+    sub.mkdir()
+    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    for suffix in ("-wal", "-shm", "-journal"):
+        (library / f"metadata.db{suffix}").write_bytes(b"x" * 32)
+
+    assert al.check_for_existing_library() is True
+    assert al.metadb_path == str(sub / "metadata.db")
+    assert al.rejected_dbs == []
 
 
 def test_invalid_root_candidate_still_prunes_the_real_librarys_book_folders(lib, monkeypatch):
@@ -447,3 +486,123 @@ def test_invalid_root_candidate_still_prunes_the_real_librarys_book_folders(lib,
     assert al.metadb_path == str(sub / "metadata.db")
     assert str(sub / "Some Author") not in visited, "book folders must still be pruned"
     assert str(book) not in visited
+
+
+# --------------------------------------------------------------------------- #
+# Validator edge cases found by the cross-family review of #1429. Each of these
+# is a way the check could REJECT a real library — a worse outcome than the
+# mis-selection it exists to prevent, so each gets a pin.
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("name", ["plain.db", "has space.db", "weird?query.db", "hash#frag.db", "pct%20.db"])
+def test_is_calibre_database_handles_awkward_path_characters(tmp_path, name):
+    """'?' and '#' are legal in a filename and start a URI's query and fragment.
+    Interpolating the path into the URI truncated it, so a real library whose
+    folder contained either character was rejected on its name alone."""
+    mod = _load_module()
+    assert mod.is_calibre_database(str(_make_calibre_db(tmp_path / name))) is True
+
+
+def test_awkward_path_library_is_still_selected(lib):
+    """End to end through the locator, not just the validator."""
+    _mod, al, _cfg, library = lib
+    sub = library / "Books #2 (why?)"
+    sub.mkdir()
+    _make_calibre_db(sub / "metadata.db")
+
+    assert al.check_for_existing_library() is True
+    assert al.metadb_path == str(sub / "metadata.db")
+
+
+def test_is_calibre_database_accepts_an_unreadable_file(tmp_path):
+    """Permission denied means "could not tell", not "not a library". The boot
+    runs under a different uid than the app on some mounts (NFS root_squash),
+    and refusing on that basis would strand a library the app could read."""
+    mod = _load_module()
+    path = _make_calibre_db(tmp_path / "metadata.db")
+    os.chmod(path, 0o000)
+    try:
+        if os.access(str(path), os.R_OK):
+            pytest.skip("running as root; the file stays readable")
+        assert mod.is_calibre_database(str(path)) is True
+    finally:
+        os.chmod(path, 0o644)
+
+
+def test_is_calibre_database_accepts_a_locked_database(tmp_path):
+    """A busy database is self-evidently a real one. Rejecting it would skip the
+    user's actual library whenever something else held a lock at boot."""
+    mod = _load_module()
+    path = _make_calibre_db(tmp_path / "metadata.db")
+    holder = sqlite3.connect(str(path), isolation_level=None)
+    holder.execute("BEGIN EXCLUSIVE")
+    try:
+        assert mod.is_calibre_database(str(path)) is True
+    finally:
+        holder.execute("ROLLBACK")
+        holder.close()
+
+
+def test_locked_but_empty_file_is_still_rejected(tmp_path):
+    """The busy allowance must not readmit #1428: a placeholder is never locked,
+    and an unlocked non-database still fails."""
+    mod = _load_module()
+    path = tmp_path / "metadata.db"
+    path.write_bytes(b"")
+    assert mod.is_calibre_database(str(path)) is False
+
+
+@pytest.mark.parametrize("journal_mode", ["delete", "wal"])
+def test_is_calibre_database_accepts_wal_and_rollback_journals(tmp_path, journal_mode):
+    """WAL needs a -shm to read; opening read-only must not fail because of it."""
+    mod = _load_module()
+    path = tmp_path / "metadata.db"
+    con = sqlite3.connect(str(path))
+    con.execute(f"PRAGMA journal_mode={journal_mode}")
+    con.execute("CREATE TABLE books (id INTEGER PRIMARY KEY)")
+    con.execute("CREATE TABLE custom_columns (id INTEGER PRIMARY KEY, datatype TEXT)")
+    con.commit()
+    con.close()
+
+    assert mod.is_calibre_database(str(path)) is True
+
+
+def test_is_calibre_database_accepts_a_hot_wal_database(tmp_path):
+    """Sidecars present and a writer still attached — the uncleanly-stopped case."""
+    mod = _load_module()
+    path = tmp_path / "metadata.db"
+    con = sqlite3.connect(str(path))
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("CREATE TABLE books (id INTEGER PRIMARY KEY)")
+    con.execute("CREATE TABLE custom_columns (id INTEGER PRIMARY KEY, datatype TEXT)")
+    con.commit()
+    con.execute("INSERT INTO books DEFAULT VALUES")
+    con.commit()
+    try:
+        assert (tmp_path / "metadata.db-wal").exists()
+        assert mod.is_calibre_database(str(path)) is True
+    finally:
+        con.close()
+
+
+def test_is_calibre_database_follows_a_symlinked_library(tmp_path):
+    mod = _load_module()
+    target = _make_calibre_db(tmp_path / "real.db")
+    link = tmp_path / "metadata.db"
+    os.symlink(target, link)
+    assert mod.is_calibre_database(str(link)) is True
+
+
+def test_is_calibre_database_does_not_block_on_a_fifo(tmp_path):
+    """A FIFO named metadata.db would hang the open forever and wedge the boot.
+    Regular-files-only settles it before anything is opened."""
+    mod = _load_module()
+    fifo = tmp_path / "metadata.db"
+    os.mkfifo(fifo)
+    assert mod.is_calibre_database(str(fifo)) is False
+
+
+def test_is_calibre_database_rejects_a_directory(tmp_path):
+    mod = _load_module()
+    (tmp_path / "metadata.db").mkdir()
+    assert mod.is_calibre_database(str(tmp_path / "metadata.db")) is False

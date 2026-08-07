@@ -10,6 +10,7 @@ import shutil
 import sqlite3
 import sys
 import subprocess
+from pathlib import Path
 
 
 # The tables Calibre-Web reads while starting up. Calibre creates both with the
@@ -20,24 +21,52 @@ import subprocess
 REQUIRED_CALIBRE_TABLES = ("books", "custom_columns")
 
 
+# SQLite saying one of these is a positive answer: the bytes are not a database.
+# Every other failure (locked, busy, permission denied, I/O error, a dropped
+# network mount) means we could not tell, which is a different thing entirely.
+_NOT_A_DATABASE_SIGNALS = ("file is not a database", "malformed", "encrypted")
+
+
+def _is_definitely_not_a_database(error) -> bool:
+    message = str(error).lower()
+    return any(signal in message for signal in _NOT_A_DATABASE_SIGNALS)
+
+
 def is_calibre_database(path) -> bool:
     """True when *path* is a readable SQLite file carrying Calibre's schema.
 
     Opened read-only so a candidate is never created, migrated or otherwise
-    touched by the act of checking it. Anything that isn't a database, is
-    truncated, or is missing the tables above returns False rather than raising.
+    touched by the act of checking it.
+
+    Rejects only on a *positive* answer — the query succeeded and the tables are
+    absent, or SQLite reported the bytes are not a database. When the file merely
+    could not be inspected (locked by another process, unreadable because the
+    boot runs under a different uid than the app, a network mount that blinked)
+    the candidate is accepted, because wrongly refusing a real library strands a
+    user far worse than the mis-selection this check exists to prevent. A stale
+    placeholder is never locked, so this cannot let the #1428 case back in.
     """
-    try:
-        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)
-    except sqlite3.Error:
+    # Regular files only. Rejects a directory, and stops a FIFO named
+    # metadata.db from blocking the open forever and wedging the boot -- SQLite's
+    # timeout is a busy-handler for locks, not a deadline on opening the file.
+    if not os.path.isfile(path):
         return False
+    con = None
     try:
+        # Path.as_uri() percent-encodes the path. Interpolating it raw breaks on
+        # any library whose name contains '?' or '#' — SQLite reads those as the
+        # URI's query and fragment, truncates the filename, and the real library
+        # is rejected for a reason that has nothing to do with its contents.
+        con = sqlite3.connect(Path(path).as_uri() + "?mode=ro", uri=True, timeout=5)
         names = {row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    except sqlite3.Error:
-        # Not a database at all, or unreadable — sqlite defers that to first use.
-        return False
+    except (sqlite3.Error, OSError, ValueError) as error:
+        return not _is_definitely_not_a_database(error)
     finally:
-        con.close()
+        if con is not None:
+            try:
+                con.close()
+            except sqlite3.Error:
+                pass
     return all(table in names for table in REQUIRED_CALIBRE_TABLES)
 
 
@@ -142,41 +171,36 @@ class AutoLibrary:
         # Calibre-Web actually mounts from; if your real library lives in a
         # sub-folder, don't also leave a metadata.db at /calibre-library root.
         #
-        # Only a file that really carries Calibre's schema counts as a library
-        # root. Matching on the *name* alone let a 0-byte placeholder, a
-        # half-finished copy or an unrelated SQLite file claim the mount point
-        # and prune away the real library nested below it — the container then
-        # crash-looped on "no such table: custom_columns" (#1428). An invalid
-        # candidate is reported and skipped, and the walk keeps descending past
-        # it so a real library underneath is still found.
+        # Only an exactly-named metadata.db that really carries Calibre's schema
+        # counts as a library root, because those are the two things the rest of
+        # the system assumes about the directory this picks:
+        #
+        #   * Calibre-Web opens ``os.path.join(config_calibre_dir, "metadata.db")``
+        #     (cps/db.py), so validating any other filename proves nothing about
+        #     the file that actually gets opened. Selecting a directory on the
+        #     strength of a metadata.db.bak configures a library whose real
+        #     metadata.db may not exist at all.
+        #   * Matching on the name alone let a 0-byte placeholder, a half-finished
+        #     copy or an unrelated SQLite file claim the mount point and prune
+        #     away the real library nested below it — the container then
+        #     crash-looped on "no such table: custom_columns" (#1428).
+        #
+        # An unusable candidate is reported and skipped, and the walk keeps
+        # descending past it so a real library underneath is still found.
         db_files = []
         for dirpath, dirnames, filenames in os.walk(self.library_dir):
-            # Regular files only (os.walk already excludes directories here), and
-            # ignore the SQLite sidecars created by WAL/journal modes.
-            matches = [
-                f for f in filenames
-                if "metadata.db" in f
-                and not (f.endswith("-wal") or f.endswith("-shm") or f.endswith("-journal"))
-            ]
-            # An exactly-named metadata.db is the library's own database; a
-            # suffixed sibling (metadata.db.bak, metadata.db.old) is a copy and
-            # must never outrank it just for being larger.
-            if "metadata.db" in matches:
-                matches = ["metadata.db"]
-            valid = []
-            for f in sorted(matches):
-                candidate = os.path.join(dirpath, f)
-                if is_calibre_database(candidate):
-                    valid.append(candidate)
-                else:
-                    self.rejected_dbs.append(candidate)
-                    required = " / ".join(REQUIRED_CALIBRE_TABLES)
-                    print(f"[cwa-auto-library]: Ignoring {candidate} - it is not a Calibre database "
-                          f"(missing the {required} tables). Continuing to search below it...")
-            if valid:
-                db_files.extend(valid)
+            if "metadata.db" not in filenames:
+                continue
+            candidate = os.path.join(dirpath, "metadata.db")
+            if is_calibre_database(candidate):
+                db_files.append(candidate)
                 # Don't walk this library's book sub-folders -- that's the slow part.
                 dirnames[:] = []
+            else:
+                self.rejected_dbs.append(candidate)
+                required = " / ".join(REQUIRED_CALIBRE_TABLES)
+                print(f"[cwa-auto-library]: Ignoring {candidate} - it is not a Calibre database "
+                      f"(missing the {required} tables). Continuing to search below it...")
         if not db_files and self.rejected_dbs:
             # Files that look like a library are present but none can be opened
             # as one. Creating a fresh library here would copy an empty
@@ -184,7 +208,13 @@ class AutoLibrary:
             print("\n[cwa-auto-library]: ERROR: found metadata.db file(s) in "
                   f"'{self.library_dir}' but none of them is a readable Calibre database:\n")
             for db in self.rejected_dbs:
-                print(f"    - {db} | Size: {os.path.getsize(db)}")
+                try:
+                    size = os.path.getsize(db)
+                except OSError as e:
+                    # The file can move or the mount can drop between inspecting
+                    # it and reporting it; a diagnostic must not die mid-print.
+                    size = f"unavailable ({e.strerror or e})"
+                print(f"    - {db} | Size: {size}")
             print("\n[cwa-auto-library]: Nothing has been modified. Remove or restore the file(s) "
                   "above — or point the library mount at the folder holding your real metadata.db — "
                   "then restart the container.")

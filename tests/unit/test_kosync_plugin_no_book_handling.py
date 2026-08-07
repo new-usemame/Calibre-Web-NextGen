@@ -14,21 +14,16 @@ tests pattern-pin the load-bearing call sites against the main.lua source. A
 regression that drops a no-book guard, removes the bulk-pull entry point, or
 breaks the sync_logic require would trip the test.
 
-Also pins the plugin version string at the CWNG-tag value — per the standing
-versioning rule, plugin-touching releases must update this in lockstep with
-the release tag.
+The plugin version gate that used to live here is now derived, in
+tests/unit/test_cwasync_plugin_version_bump_gate.py.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
 
-# CI selects with -m "smoke or unit"; without this the whole file is deselected
-# and EXPECTED_PLUGIN_VERSION below — the anchor tying the plugin version to the
-# release tag — never gates anything.
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -37,32 +32,22 @@ MAIN_LUA = PLUGIN_DIR / "main.lua"
 SYNC_LOGIC_LUA = PLUGIN_DIR / "sync_logic.lua"
 SYNC_LOGIC_TEST_LUA = PLUGIN_DIR / "tests" / "sync_logic_test.lua"
 
-# Standing rule: plugin version mirrors the CWNG release tag (drop the `v`).
-# Update this in lockstep with main.lua on every plugin-touching release — it is
-# a deliberate forcing function, not a value to read dynamically. Currently
-# 4.1.25 (the release that lets a KOReader highlight deletion reach the server at
-# all: `api.json` declared `deleted`/`delete_source` for the body but not as
-# expected params, so lua-Spore's validate() raised and the push was never built,
-# #920). The bump is load-bearing here: the Updates Manager compares this string
-# to decide whether a device needs the new plugin, so a device-side fix shipped
-# without it would never reach anyone.
-EXPECTED_PLUGIN_VERSION = "4.1.25"
+# The plugin version gate used to live here as EXPECTED_PLUGIN_VERSION, a
+# hand-maintained constant that main.lua had to equal. It is now derived in
+# tests/unit/test_cwasync_plugin_version_bump_gate.py. The constant did not
+# survive contact with the failure it was written for: it pins the version
+# against *itself*, so it only ever caught a unilateral edit to one of the two
+# places, and was silent on the case that actually happened — #1427 changed 280
+# lines of plugin source while version and constant both sat at 4.1.25, six
+# releases behind, with CI green throughout. It also inverted: bumping the
+# version correctly turned CI red until someone edited the test to match, which
+# teaches the opposite of the intended lesson. The replacement reads the release
+# tags and the plugin's own history, so there is nothing left to remember.
 
 
 def _read(path: Path) -> str:
     assert path.exists(), f"missing file: {path}"
     return path.read_text(encoding="utf-8")
-
-
-def test_plugin_version_mirrors_cwng_release_tag():
-    body = _read(MAIN_LUA)
-    match = re.search(r'version\s*=\s*"([^"]+)"\s*,', body)
-    assert match, "main.lua must declare a `version = \"...\"` field"
-    assert match.group(1) == EXPECTED_PLUGIN_VERSION, (
-        f"plugin version must mirror CWNG release tag — expected "
-        f"{EXPECTED_PLUGIN_VERSION!r}, found {match.group(1)!r}. "
-        "If you're updating for a new release, update EXPECTED_PLUGIN_VERSION here too."
-    )
 
 
 def test_main_lua_requires_sync_logic_module():

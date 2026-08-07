@@ -10,7 +10,6 @@ import base64
 import logging
 from datetime import datetime, timezone
 from cps import cw_babel
-from kobo_sync_utils import get_kobo_created_ts
 import os
 import uuid
 import zipfile
@@ -80,6 +79,29 @@ CONNECTION_SPECIFIC_HEADERS = [
     "content-length",
     "transfer-encoding",
 ]
+
+
+def get_kobo_created_ts(book):
+    ts_created = None
+    if book.Books.timestamp is not None:
+        ts_created = book.Books.timestamp.replace(tzinfo=None)
+    else:
+        log.debug("Kobo Sync: book %s has no timestamp", book.Books.id)
+
+    try:
+        if book.date_added is not None:
+            ts_created = max(ts_created, book.date_added) if ts_created else book.date_added
+        else:
+            log.debug("Kobo Sync: book %s has no date_added", book.Books.id)
+    except AttributeError:
+        pass
+
+    if ts_created is None and book.Books.last_modified is not None:
+        ts_created = book.Books.last_modified.replace(tzinfo=None)
+    if ts_created is None:
+        ts_created = datetime.min
+
+    return ts_created
 
 
 def get_kobo_activated():

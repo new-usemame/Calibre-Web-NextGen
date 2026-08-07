@@ -1,0 +1,13 @@
+{
+  "area": "progress-sync",
+  "body": "`cps/progress_syncing/protocols/kosync.py`, `record_percentage_only_progress`.\n\nThe read/compare/write implementing \"furthest wins\" is not atomic. Concurrent\nbrowser and device commits can interleave so the later, lower write lands last:\nstored 40%; browser A reads 40 and accepts 50; device B reads 40 and writes 60\nplus a real xpointer; A commits 50 plus the sentinel. The row regresses to 50%\nand the valid locator is gone.\n\nNarrow window, self-heals on the next device push, so not a ship-stopper alone.\nWants a conditional `UPDATE ... WHERE percentage <= :incoming` with upsert\nhandling for the absent-row case, plus a two-writer concurrency test asserting\nthe furthest survives. Raised by the cross-family review on PR #1427 and\ndispositioned there as tracked.",
+  "created": "2026-08-07",
+  "id": "F-fe2b1c",
+  "refs": [
+    "#1427"
+  ],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "Lost update on the shared kosync row"
+}

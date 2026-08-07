@@ -16,6 +16,22 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Fixed: the container refused to start on every release since v4.1.20 if a
+  leftover `metadata.db` was sitting at the top of your library folder.** The
+  log filled up with `no such table: custom_columns` over and over and the app
+  never came up; rolling back to v4.1.19 was the only way out. NextGen picks
+  your library by looking for `metadata.db`, and it had started trusting the
+  first file with that name — so an empty or leftover one at the root of
+  `/calibre-library` was mounted as your library and hid the real one in the
+  folder below it. It now checks that a file is genuinely a Calibre database
+  before mounting it, says in the log which file it skipped and why, and keeps
+  looking. If nothing usable turns up at all it stops with an explanation
+  instead of looping, and never writes over the files it found. Reported by
+  @sammiq.
+  ([#1428](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1428))
+
 ## [v4.1.31] - 2026-08-06
 
 ### Added

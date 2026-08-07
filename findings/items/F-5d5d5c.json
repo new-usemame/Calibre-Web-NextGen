@@ -1,0 +1,13 @@
+{
+  "area": "ci",
+  "body": "`scripts/preflight-release-tag.sh` (autopilot workspace, outside this repo)\ncarries four release-bookkeeping checks, including check #3, which compares the\n`VERSION` file at the target commit against the version being tagged.\n\nRun against the real tag it refuses correctly:\n\n    $ bash scripts/preflight-release-tag.sh v4.1.32 v4.1.32\n    REFUSING to tag v4.1.32 at 313982f58 (v4.1.32) -- release bookkeeping incomplete:\n      - VERSION reads '4.1.31' at v4.1.32, expected '4.1.32'\n    exit=1\n\nThe script was committed 2026-08-06T14:37Z, about 18 hours BEFORE the v4.1.32\ntag (2026-08-07T08:31:45Z). So the gate existed, was correct, was available, and\nthe defective release shipped anyway — because nothing invokes it. Its only\ncaller in the tree is a sentence of prose, LOOP.md:176 (\"Gate before tagging:\n... must pass\"). The release tick cuts the tag directly with\n`gh release create --target <sha>` and never runs it.\n\nThis is the wedge-audit shape: the question is not only \"does the gate heal or\nsignal\" but \"can the gate be skipped by omission\". A gate whose invocation\ndepends on a model remembering a prose instruction is documentation.\n\n#1437 is fixed at a different layer on purpose: `tests/unit/\ntest_1437_version_matches_changelog.py` pins VERSION against the newest dated\nCHANGELOG release section, so the drift goes red in CI on the pre-tag\nbookkeeping PR — upstream of the tag, which is the last point where a fix is\nstill free. That closes the VERSION hole specifically.\n\nThe other three preflight checks (changelog section present, [Unreleased]\ndrained, whatsNew entry) remain enforced only by prose. Remaining work: either\ngive the release path a single scripted entry point that runs preflight before\n`gh release create`, or mirror each surviving check into repo-side CI the way\nthe VERSION one now is. Prefer the latter where the artifact is in-tree — CI\ncannot be skipped by omission.",
+  "created": "2026-08-07",
+  "id": "F-5d5d5c",
+  "refs": [
+    "#1437"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "preflight-release-tag.sh is a correct gate with no caller — invocation depends on prose in LOOP.md"
+}

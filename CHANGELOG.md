@@ -16,6 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Installing from source no longer reports the previous version.** A checkout
+  or pip install made from the v4.1.31 or v4.1.32 tag identified itself as one
+  release older than it was, so the update check kept offering an update that
+  was already installed. Docker users were never affected — those images take
+  their version from the build, not from this file. Reported by @chloeroform
+  (#1437).
+
 ## [v4.1.32] - 2026-08-07
 
 ### Added

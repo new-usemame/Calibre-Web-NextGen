@@ -18,6 +18,26 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Installing outside Docker put your database somewhere the app never
+  looks.** On a source install, the setup script wrote `app.db` into a
+  `/config` folder it created at the top of your filesystem, while the app
+  itself reads its database from the folder you installed into. Nothing said
+  anything was wrong; you just got a first-run setup screen and an empty
+  library, with the seeded database sitting in a directory nothing opens. The
+  two halves now resolve the config folder the same way, so a source install
+  keeps its database where the app reads it. `CWA_DIRS_JSON` had the matching
+  problem — it moved `dirs.json` for the scripts but not for the app, which
+  would have pointed your ingest and your library at two different places —
+  and is now honoured by both. Docker installs set these explicitly and are
+  byte-for-byte unaffected. Reported by @Thovi98, packaging for YunoHost.
+
+- **First run printed a chown error that was not an error.** Outside the
+  container there is no `abc` service account to hand files to, so setup
+  reported `chown: invalid user: 'abc:abc'` and a failed-command traceback on
+  every run. The files were already owned by the right user. Setup now says it
+  is skipping the step and why, and only reports a genuine permission problem.
+  Reported by @Thovi98.
+
 - **Installing outside Docker failed on the first setup script.** If you install
   from source rather than pulling the image — a distro package, a systemd unit,
   anything not living at `/app/calibre-web-automated` — `auto_library.py` quit

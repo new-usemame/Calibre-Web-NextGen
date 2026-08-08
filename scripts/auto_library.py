@@ -14,6 +14,7 @@ from pathlib import Path
 
 import app_paths
 import library_paths
+import service_user
 
 
 # The tables Calibre-Web reads while starting up. Calibre creates both with the
@@ -157,6 +158,31 @@ class AutoLibrary:
             sys.exit(1)
         print(f"[cwa-auto-library] Created {what} {path}")
 
+    #: Directories that are part of the application, never part of its config.
+    #: Only reachable off Docker, where the config dir and the app root are the
+    #: same directory (``cps`` resolves CONFIG_DIR to BASE_DIR when
+    #: CALIBRE_DBPATH is unset, and app_paths follows it).
+    NON_CONFIG_DIRS = frozenset({
+        "empty_library", "cps", "scripts", "tests", "frontend",
+        "node_modules", ".git", ".venv", "__pycache__",
+    })
+
+    def _walk_config_dir(self):
+        """Walk the config dir without descending into the application itself.
+
+        In the container the config dir is a bind mount holding nothing but
+        state, so this walks the same tree it always did. Off Docker the config
+        dir IS the app root, and an unpruned walk gets two things wrong: it
+        finds the shipped seed database at ``empty_library/app.db`` and
+        concludes the install already has an app.db — leaving the real one
+        never copied, so sqlite creates an empty file and the first query dies
+        on ``no such table: settings`` — and on the way there it walks the whole
+        checkout, ``frontend/node_modules`` included.
+        """
+        for dirpath, dirnames, filenames in os.walk(self.config_dir):
+            dirnames[:] = [d for d in dirnames if d not in self.NON_CONFIG_DIRS]
+            yield dirpath, dirnames, filenames
+
     # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from <app root>/empty_library/app.db and sets the permissions
     def check_for_app_db(self):
         # app.db always resolves to the canonical <config dir>/app.db; keep the
@@ -170,8 +196,12 @@ class AutoLibrary:
         if os.path.isfile(self.DEFAULT_APPDB_PATH):
             print(f"[cwa-auto-library] app.db found in default location ({self.app_db}).")
             return
-        files_in_config = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.config_dir) for f in filenames]
-        db_files = [f for f in files_in_config if "app.db" in f]
+        db_files = [
+            os.path.join(dirpath, f)
+            for (dirpath, dirnames, filenames) in self._walk_config_dir()
+            for f in filenames
+            if "app.db" in f
+        ]
         if len(db_files) == 0:
             print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from {self.empty_appdb}")
             self.ensure_dir_exists(
@@ -180,14 +210,7 @@ class AutoLibrary:
                 "Set CALIBRE_DBPATH to a directory this user can write to.",
             )
             shutil.copyfile(self.empty_appdb, self.DEFAULT_APPDB_PATH)
-            try:
-                nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-                if not nsm:
-                    subprocess.run(["chown", "-R", "abc:abc", self.config_dir], check=True)
-                else:
-                    print(f"[cwa-auto-library] NETWORK_SHARE_MODE=true detected; skipping chown of {self.config_dir}", flush=True)
-            except subprocess.CalledProcessError as e:
-                print(f"[cwa-auto-library] An error occurred while attempting to recursively set ownership of {self.config_dir} to abc:abc. See the following error:\n{e}", flush=True)
+            service_user.chown_to_service_user(self.config_dir, "[cwa-auto-library]")
             print(f"[cwa-auto-library] app.db successfully copied to {self.config_dir}")
         else:
             return
@@ -328,14 +351,7 @@ class AutoLibrary:
             f"Set 'calibre_library_dir' in {self.dirs_path} to a directory this user can write to.",
         )
         shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
-        try:
-            nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-            if not nsm:
-                subprocess.run(["chown", "-R", "abc:abc", self.library_dir], check=True)
-            else:
-                print(f"[cwa-auto-library] NETWORK_SHARE_MODE=true detected; skipping chown of {self.library_dir}", flush=True)
-        except subprocess.CalledProcessError as e:
-            print(f"[cwa-auto-library] An error occurred while attempting to recursively set ownership of {self.library_dir} to abc:abc. See the following error:\n{e}", flush=True)
+        service_user.chown_to_service_user(self.library_dir, "[cwa-auto-library]")
         self.metadb_path = f"{self.library_dir}/metadata.db"
         return
 
@@ -368,19 +384,18 @@ class AutoLibrary:
                 flush=True,
             )
             return
-        # Always chown the calibre config dir to abc:abc — /config is a
-        # local Docker volume regardless of NETWORK_SHARE_MODE (NSM gates
-        # the library/ingest paths that may be on NFS, not the local
-        # config volume). Without this, plugins extracted by calibre-
-        # customize -a end up root-owned and the abc service user can't
-        # read them at conversion time.
-        try:
-            subprocess.run(
-                ["chown", "-R", "abc:abc", "/config/.config/calibre"],
-                check=False,
-            )
-        except Exception as e:
-            print(f"[cwa-auto-library] chown of {target} failed: {e}", flush=True)
+        # Always chown the calibre config dir to the service account — the
+        # config dir is a local Docker volume regardless of
+        # NETWORK_SHARE_MODE (NSM gates the library/ingest paths that may be
+        # on NFS, not the local config volume). Without this, plugins
+        # extracted by calibre-customize -a end up root-owned and the abc
+        # service user can't read them at conversion time.
+        calibre_config_dir = app_paths.config_dir() / ".config" / "calibre"
+        service_user.chown_to_service_user(
+            calibre_config_dir,
+            "[cwa-auto-library]",
+            respect_network_share_mode=False,
+        )
 
         # Auto-register any .zip files the operator dropped in. First-
         # boot only — once calibre's customize.py.json has entries, we
@@ -395,16 +410,14 @@ class AutoLibrary:
             # of those files land owned by whichever uid invoked
             # calibre-customize (root, if cont-init ran as root). Re-
             # chown so abc can read them at conversion time. Skipped
-            # ONLY for /calibre-library (library_dir, NAS) earlier — for
-            # /config/.config/calibre we chown unconditionally because
-            # /config is always a local volume.
-            try:
-                subprocess.run(
-                    ["chown", "-R", "abc:abc", "/config/.config/calibre"],
-                    check=False,
-                )
-            except Exception:
-                pass
+            # ONLY for the library dir (NAS) earlier — the calibre config
+            # dir is chowned unconditionally because it is always a local
+            # volume.
+            service_user.chown_to_service_user(
+                calibre_config_dir,
+                "[cwa-auto-library]",
+                respect_network_share_mode=False,
+            )
         else:
             zip_count = len(list(target.glob("*.zip")))
             if zip_count == 0:

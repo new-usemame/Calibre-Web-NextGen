@@ -18,15 +18,13 @@ import atexit
 from datetime import datetime
 import sqlite3
 
-import pwd
-import grp
-
 import app_paths
+import service_user
 from cwa_db import CWA_DB
 from kindle_epub_fixer import EPUBFixer
 
 ### Global Variables
-convert_library_log_file = "/config/convert-library.log"
+convert_library_log_file = str(app_paths.config_dir() / "convert-library.log")
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -46,29 +44,10 @@ except FileNotFoundError:
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
-# Define user and group
-USER_NAME = "abc"
-GROUP_NAME = "abc"
-
-# Get UID and GID (skip if user doesn't exist, e.g., in CI environments)
-uid = None
-gid = None
-try:
-    uid = pwd.getpwnam(USER_NAME).pw_uid
-    gid = grp.getgrnam(GROUP_NAME).gr_gid
-except KeyError:
-    pass
-
-# Set permissions for log file (skip on network shares or if uid/gid not available)
-if uid is not None and gid is not None:
-    try:
-        nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-        if not nsm:
-            subprocess.run(["chown", f"{uid}:{gid}", convert_library_log_file], check=True)
-        else:
-            print(f"[convert-library] NETWORK_SHARE_MODE=true detected; skipping chown of {convert_library_log_file}", flush=True)
-    except subprocess.CalledProcessError as e:
-        print(f"[convert-library] An error occurred while attempting to set ownership of {convert_library_log_file} to abc:abc. See the following error:\n{e}", flush=True)
+# Hand the log file to the service account. service_user skips this when there
+# is no such account, which is the normal case outside the container.
+service_user.chown_to_service_user(
+    convert_library_log_file, "[convert-library]", recursive=False)
 
 def print_and_log(string) -> None:
     """ Ensures the provided string is passed to STDOUT and stored in the runs log file """
@@ -573,15 +552,9 @@ class LibraryConverter:
 
 
     def set_library_permissions(self):
-        try:
-            nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-            if not nsm:
-                subprocess.run(["chown", "-R", "abc:abc", self.library_dir], check=True)
-                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Successfully set ownership of new files in {self.library_dir} to abc:abc.")
-            else:
-                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) NETWORK_SHARE_MODE=true detected; skipping chown of {self.library_dir}")
-        except subprocess.CalledProcessError as e:
-            print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) An error occurred while attempting to recursively set ownership of {self.library_dir} to abc:abc. See the following error:\n{e}")
+        label = f"[convert-library]: ({self.current_book}/{len(self.to_convert)})"
+        if service_user.chown_to_service_user(self.library_dir, label, log=print_and_log):
+            print_and_log(f"{label} Successfully set ownership of new files in {self.library_dir}.")
 
 
 def main():

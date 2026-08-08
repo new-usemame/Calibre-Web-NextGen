@@ -23,10 +23,16 @@ Resolution order, for every knob:
 What                 Environment override                  Default
 ===================  ====================================  =========================
 app root             ``CWA_APP_ROOT``                       parent of this file's dir
-config dir           ``CALIBRE_DBPATH``                     ``/config``
+config dir           ``CALIBRE_DBPATH``                     same as ``cps`` (app root)
 ``dirs.json``        ``CWA_DIRS_JSON``                      ``<app root>/dirs.json``
 ``app.db``           ``CWA_APP_DB_PATH``, ``CALIBRE_DBPATH`` ``<config dir>/app.db``
 ===================  ====================================  =========================
+
+Every default here has to match what ``cps`` resolves to, because the two
+halves of the install read and write the same files. Where they disagree, the
+disagreement is invisible in Docker — the image sets the environment variables
+explicitly — and silent everywhere else: scripts seed a database the app never
+opens. Both known cases were fixed together in the #1462 follow-up.
 
 Deliberately dependency-free and free of any ``cps`` import: ``auto_library.py``
 runs before the Flask stack is usable, and ``cover_enforcer.py`` has to survive
@@ -67,8 +73,11 @@ __all__ = [
     "DEFAULT_LIBRARY_DIR",
 ]
 
-#: Where the container keeps the writable state. Unchanged from the literal
-#: that scripts/ used before #1462.
+#: Where the *container* keeps the writable state. The Dockerfile sets
+#: ``CALIBRE_DBPATH=/config``, so this is documentation of that layout rather
+#: than a fallback — off Docker the fallback is whatever ``cps`` uses, see
+#: :func:`_default_config_dir`. Kept as a named constant because "the container
+#: puts config here" is worth being able to reference.
 DEFAULT_CONFIG_DIR = "/config"
 
 #: Legacy library root, used as a last resort by :mod:`library_paths`.
@@ -113,13 +122,37 @@ def config_dir():
     Honours ``CALIBRE_DBPATH``, the same knob ``cps/constants.py`` reads. A
     value pointing straight at a ``.db`` file resolves to its parent, matching
     what ``ingest_processor.get_app_db_path()`` has always accepted.
+
+    When it is unset, the fallback has to be whatever ``cps`` would pick, or
+    the two halves of the install disagree about where the database lives.
+    ``cps/constants.py`` resolves ``CALIBRE_DBPATH`` -> ``~/.calibre-web-automated``
+    when the pip ``.HOMEDIR`` marker is present -> ``BASE_DIR`` otherwise. This
+    mirrors that.
+
+    It used to be the literal ``/config`` instead, which is right in the image
+    and wrong everywhere else. The container is unaffected either way because
+    the Dockerfile sets ``CALIBRE_DBPATH=/config`` explicitly (the #1162 fix),
+    so the fallback never fires there. Off Docker it fired every time, and the
+    two sides landed in different places: ``auto_library.py`` seeded ``app.db``
+    into a newly-created ``/config`` at the filesystem root while the app read
+    ``<app root>/app.db`` and found nothing. @Thovi98 hit exactly this while
+    packaging for YunoHost — "``Created config directory /config``: indeed, but
+    it has been created at /config as absolute path" — and the seeding silently
+    went to a database the app never opens.
     """
     override = _env_path("CALIBRE_DBPATH")
     if override is None:
-        return Path(DEFAULT_CONFIG_DIR)
+        return _default_config_dir()
     if override.suffix == ".db":
         return override.parent
     return override
+
+
+def _default_config_dir():
+    """The directory ``cps`` would use when ``CALIBRE_DBPATH`` is unset."""
+    if (app_root() / "cps" / ".HOMEDIR").is_file():
+        return Path(os.path.expanduser("~")) / ".calibre-web-automated"
+    return app_root()
 
 
 def app_db_path():

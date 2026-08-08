@@ -177,13 +177,33 @@ def test_dirs_json_defaults_under_app_root_and_honours_its_override(
     assert app_paths.dirs_json() == override
 
 
-def test_config_dir_keeps_the_slash_config_default(app_paths):
-    """#1162 contract: the container sets CALIBRE_DBPATH=/config as a Docker ENV.
+def test_config_dir_default_follows_cps_not_the_container_literal(app_paths, monkeypatch, tmp_path):
+    """Revises the #1463 pin, which required the fallback to stay ``/config``.
 
-    The fallback must stay ``/config`` — the value scripts/ already used — so
-    de-hardcoding the app root cannot quietly move the container's databases.
+    That pin was protecting the right thing for the wrong reason: it read the
+    ``/config`` literal as "the container's databases live here" and concluded
+    that changing it would move them. It cannot. The container sets
+    ``CALIBRE_DBPATH=/config`` as a Docker ENV (#1162), so the fallback never
+    runs there — see ``test_config_dir_container_env_is_unchanged`` below,
+    which pins the property the old test was actually reaching for.
+
+    The fallback only ever fires off Docker, and there ``/config`` was wrong:
+    ``cps.constants.CONFIG_DIR`` falls back to ``BASE_DIR``, so scripts/ seeded
+    ``app.db`` into a ``/config`` directory at the filesystem root while the app
+    read ``<app root>/app.db``. @Thovi98 hit exactly that packaging for
+    YunoHost. The two sides now share one answer.
     """
+    monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path))
+
+    assert app_paths.config_dir() == tmp_path
+
+
+def test_config_dir_container_env_is_unchanged(app_paths, monkeypatch):
+    """What the old ``/config`` pin was really guarding: Docker does not move."""
+    monkeypatch.setenv("CALIBRE_DBPATH", "/config")
+
     assert app_paths.config_dir() == pathlib.Path("/config")
+    assert app_paths.app_db_path() == pathlib.Path("/config/app.db")
 
 
 def test_config_dir_honours_calibre_dbpath(app_paths, monkeypatch, tmp_path):

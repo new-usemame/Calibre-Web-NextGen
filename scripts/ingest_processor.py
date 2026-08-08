@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 import app_paths
+import service_user
 
 # cwa_db / kindle_epub_fixer / audiobook / requests are loaded lazily by
 # initialize_runtime() (CWA #1349 by @navels) so the ingest-service can
@@ -1988,14 +1989,7 @@ class NewBookProcessor:
             # Don't fail the import if checksum generation fails
 
     def set_library_permissions(self):
-        try:
-            nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-            if not nsm:
-                subprocess.run(["chown", "-R", "abc:abc", self.library_dir], check=True)
-            else:
-                print(f"[ingest-processor] NETWORK_SHARE_MODE=true detected; skipping chown of {self.library_dir}", flush=True)
-        except subprocess.CalledProcessError as e:
-            print(f"[ingest-processor] An error occurred while attempting to recursively set ownership of {self.library_dir} to abc:abc. See the following error:\n{e}", flush=True)
+        service_user.chown_to_service_user(self.library_dir, "[ingest-processor]")
 
 
 def _truncate_overlong_ingest_name(filepath, max_length=150):

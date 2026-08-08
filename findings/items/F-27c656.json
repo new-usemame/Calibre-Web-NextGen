@@ -1,0 +1,13 @@
+{
+  "area": "auth",
+  "body": "`cps/__init__.py` constructs the limiter with `key_func=True`. flask_limiter\nexpects a callable and stores it as `self._key_func`, handing it to every\nlimit that does not override it.\n\nEvery `@limiter.limit(...)` in the tree happens to pass its own `key_func`\ntoday (13 callsites across `cps/web.py` and `cps/api/auth.py`), so nothing is\nbroken right now. The trap is the next one: a limit added without that kwarg\ncalls `True()`.\n\nMeasured against the shipped image, with a limit declared the obvious way:\n\n    @lim.limit('3/minute')      # no key_func\n    ...\n    File \".../flask_limiter/extension.py\", line 1077, in __evaluate_limits\n        limit_key = lim.key_func()\n    TypeError: 'bool' object is not callable\n    status: 500\n\nRate limits here sit on login and token endpoints, so the failure surfaces as\na 500 on an auth route, and only for the person who added the limit correctly\nby the library's own documentation.\n\nFix is a real callable — `get_remote_address` is the library's own default and\nmatches what most callsites already pass. Worth pairing with a test that\ndeclares a limit without `key_func` and asserts it returns non-500, so the\nfallback path has coverage it currently lacks.\n\nFound while fixing #1443 (explicit limiter storage), which touched the same\nconstructor.",
+  "created": "2026-08-08",
+  "id": "F-27c656",
+  "refs": [
+    "#1443"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Global limiter key_func is the literal True, so any rate limit added without an explicit key_func 500s"
+}

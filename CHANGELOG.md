@@ -105,6 +105,22 @@ is for things you can see or feel when running the app.
   their version from the build, not from this file. Reported by @chloeroform
   (#1437).
 
+- **The interface now reads in Spanish throughout, instead of leaving about
+  half of its labels in English.** With the language set to Spanish, the admin
+  screens, metadata editing, upload, shelves, the reader and a long tail of task
+  and error messages still showed in English. Another 196 phrases were worse
+  than untranslated: gettext had guessed them from a similar English sentence and
+  marked the guess provisional, and a provisional entry is dropped when the
+  catalog is compiled — so those rendered in English while Spanish that said
+  something else, sometimes the text of an entirely different string, sat in the
+  file waiting for somebody to confirm it. A few outright reversed the meaning of
+  the English. Spanish was covering 1,378 of 2,645 phrases and now covers all
+  2,645, which makes it the most complete translation the project ships. Wording
+  for add, delete, edit, file, email and eReader is now consistent across the
+  interface. Contributed by
+  [@HaruIjima-kun](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1469)
+  ([#1469](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1469)).
+
 ## [v4.1.32] - 2026-08-07
 
 ### Added

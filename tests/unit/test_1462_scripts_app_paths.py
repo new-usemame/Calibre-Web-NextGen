@@ -38,6 +38,7 @@ import json
 import os
 import pathlib
 import re
+import subprocess
 import sys
 
 import pytest
@@ -102,11 +103,37 @@ def test_no_python_script_hardcodes_the_app_root():
 
 
 def test_app_paths_module_exists_and_is_importable_without_cps():
-    """It must not drag in the Flask stack — auto_library runs before cps does."""
+    """It must not drag in the Flask stack — auto_library runs before cps does.
+
+    Executed in a clean subprocess with an import hook that raises on any
+    attempt to load ``cps`` (directly or transitively), rather than grepping the
+    source: a regex cannot see ``importlib.import_module("cps")`` or an import
+    reached through another module.
+    """
     assert (SCRIPTS_DIR / "app_paths.py").is_file()
-    source = (SCRIPTS_DIR / "app_paths.py").read_text(encoding="utf-8")
-    assert not re.search(r"^\s*(?:from|import)\s+cps\b", source, re.MULTILINE), (
-        "app_paths must stay importable in a bare interpreter"
+    probe = (
+        "import sys\n"
+        "class Blocker:\n"
+        "    def find_module(self, name, path=None):\n"
+        "        if name == 'cps' or name.startswith('cps.'):\n"
+        "            raise AssertionError('app_paths imported ' + name)\n"
+        "        return None\n"
+        "sys.meta_path.insert(0, Blocker())\n"
+        "import app_paths\n"
+        "app_paths.app_root(); app_paths.config_dir(); app_paths.app_db_path()\n"
+        "app_paths.dirs_json(); app_paths.empty_library_file('app.db')\n"
+        "print('OK')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=str(SCRIPTS_DIR),
+        capture_output=True,
+        text=True,
+        env={"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(SCRIPTS_DIR)},
+    )
+    assert result.returncode == 0 and "OK" in result.stdout, (
+        f"app_paths must import and resolve without cps.\n"
+        f"stdout={result.stdout}\nstderr={result.stderr}"
     )
 
 
@@ -184,11 +211,33 @@ def test_app_db_path_matches_the_ingest_processor_resolver(app_paths, monkeypatc
 
 
 def test_ingest_processor_delegates_to_app_paths(app_paths, monkeypatch, tmp_path):
-    """The duplicated resolver is gone, not merely shadowed."""
-    ingest_source = (SCRIPTS_DIR / "ingest_processor.py").read_text(encoding="utf-8")
-    assert "app_paths" in ingest_source, (
-        "ingest_processor must resolve through app_paths, not its own copy"
-    )
+    """The duplicated resolver is gone, not merely shadowed.
+
+    Calls the real function across an environment matrix and compares it to the
+    central resolver. A restored private copy would agree on the easy cases and
+    diverge on the awkward ones, which is exactly what this walks.
+    """
+    ingest = importlib.import_module("ingest_processor")
+
+    cases = [
+        {},
+        {"CALIBRE_DBPATH": str(tmp_path)},
+        {"CALIBRE_DBPATH": str(tmp_path / "other.db")},
+        {"CALIBRE_DBPATH": str(tmp_path / "app.db")},
+        {"CWA_APP_DB_PATH": str(tmp_path / "explicit" / "custom.db")},
+        {
+            "CWA_APP_DB_PATH": str(tmp_path / "wins.db"),
+            "CALIBRE_DBPATH": str(tmp_path / "ignored"),
+        },
+    ]
+    for env in cases:
+        for var in ("CALIBRE_DBPATH", "CWA_APP_DB_PATH"):
+            monkeypatch.delenv(var, raising=False)
+        for key, value in env.items():
+            monkeypatch.setenv(key, value)
+        assert ingest.get_app_db_path() == str(app_paths.app_db_path()), (
+            f"ingest_processor diverged from app_paths under {env}"
+        )
 
 
 def test_auto_library_reads_the_library_dir_from_dirs_json(
@@ -227,12 +276,98 @@ def test_auto_library_reads_the_library_dir_from_dirs_json(
     library_paths = importlib.reload(importlib.import_module("library_paths"))
     assert library_paths.get_calibre_library_dir() == str(library)
 
-    auto_library_source = (SCRIPTS_DIR / "auto_library.py").read_text(encoding="utf-8")
-    assert "library_paths.get_calibre_library_dir()" in auto_library_source, (
-        "auto_library must take the library root from dirs.json, not assume "
+    auto_library = importlib.reload(importlib.import_module("auto_library"))
+    lib = auto_library.AutoLibrary()
+    assert lib.library_dir == str(library), (
+        "AutoLibrary must take the library root from dirs.json, not assume "
         "the container's /calibre-library mount"
     )
-    assert '"/calibre-library"' not in auto_library_source
+    # app.db must follow CALIBRE_DBPATH too, through the same resolver.
+    assert lib.DEFAULT_APPDB_PATH == str(app_paths.app_db_path())
+    assert lib.empty_appdb == str(REPO_ROOT / "empty_library" / "app.db")
+
+
+def test_auto_library_creates_a_missing_library_dir(app_paths, monkeypatch, tmp_path):
+    """The rest of #1462, found by running the reporter's DEFAULT configuration.
+
+    The first pass at this fix was verified against a hand-written dirs.json and
+    looked complete. Re-run with the dirs.json the project actually ships —
+    which still says ``/calibre-library`` — and the install died anyway, in
+    ``make_new_library()``::
+
+        FileNotFoundError: [Errno 2] No such file or directory:
+        '/calibre-library/metadata.db'
+
+    In the container that path is a bind mount and always exists. Off Docker it
+    does not, and nothing created it.
+    """
+    library = tmp_path / "not-yet-created" / "books"
+    dirs = tmp_path / "dirs.json"
+    dirs.write_text(json.dumps({"calibre_library_dir": str(library)}), encoding="utf-8")
+    monkeypatch.setenv("CWA_DIRS_JSON", str(dirs))
+    monkeypatch.setenv("CALIBRE_DBPATH", str(tmp_path / "config"))
+    monkeypatch.setenv("NETWORK_SHARE_MODE", "true")
+
+    auto_library = importlib.reload(importlib.import_module("auto_library"))
+    lib = auto_library.AutoLibrary()
+    assert not library.exists()
+
+    lib.make_new_library()
+
+    assert (library / "metadata.db").is_file(), (
+        "make_new_library must create the configured library dir before seeding it"
+    )
+
+
+def test_auto_library_seeds_app_db_into_a_missing_config_dir(app_paths, monkeypatch, tmp_path):
+    """Same root cause, the other database. CALIBRE_DBPATH may not exist yet."""
+    config = tmp_path / "fresh-config"
+    dirs = tmp_path / "dirs.json"
+    dirs.write_text(json.dumps({"calibre_library_dir": str(tmp_path / "books")}), encoding="utf-8")
+    monkeypatch.setenv("CWA_DIRS_JSON", str(dirs))
+    monkeypatch.setenv("CALIBRE_DBPATH", str(config))
+    monkeypatch.setenv("NETWORK_SHARE_MODE", "true")
+
+    auto_library = importlib.reload(importlib.import_module("auto_library"))
+    lib = auto_library.AutoLibrary()
+    assert not config.exists()
+
+    lib.check_for_app_db()
+
+    assert (config / "app.db").is_file()
+    assert lib.app_db == str(config / "app.db")
+
+
+def test_auto_library_reports_an_unwritable_library_dir_instead_of_a_traceback(
+    app_paths, monkeypatch, tmp_path, capsys
+):
+    """A path we cannot create must name the setting to edit, not raise.
+
+    This is the shipped-dirs.json case on a non-root source install: the user
+    never chose ``/calibre-library``, so a bare FileNotFoundError about it is
+    not something they can act on.
+    """
+    blocked = tmp_path / "blocked"
+    blocked.mkdir()
+    blocked.chmod(0o500)  # no write permission
+    dirs = tmp_path / "dirs.json"
+    dirs.write_text(
+        json.dumps({"calibre_library_dir": str(blocked / "library")}), encoding="utf-8"
+    )
+    monkeypatch.setenv("CWA_DIRS_JSON", str(dirs))
+    monkeypatch.setenv("CALIBRE_DBPATH", str(tmp_path / "config"))
+
+    auto_library = importlib.reload(importlib.import_module("auto_library"))
+    lib = auto_library.AutoLibrary()
+    try:
+        with pytest.raises(SystemExit) as excinfo:
+            lib.make_new_library()
+        assert excinfo.value.code == 1
+        out = capsys.readouterr().out
+        assert "could not create the library directory" in out
+        assert str(dirs) in out, "the message must name the file to edit"
+    finally:
+        blocked.chmod(0o700)
 
 
 def test_shipped_dirs_json_still_points_at_the_container_mount():
@@ -293,10 +428,23 @@ def test_container_layout_resolves_without_the_env_override(app_paths, monkeypat
 
 
 def test_sys_path_bootstrap_points_at_the_resolved_root(app_paths, monkeypatch):
-    """The ``_CPS_ROOT`` sys.path inserts were literals too (4 call sites)."""
+    """The ``_CPS_ROOT`` sys.path inserts were literals too (4 call sites).
+
+    The repo root is often already on sys.path under pytest, so a no-op
+    implementation would pass a bare membership check. Clear it first, then
+    assert position, return value and idempotency.
+    """
     before = list(sys.path)
     try:
+        root = str(REPO_ROOT)
+        sys.path[:] = [p for p in sys.path if p != root]
+        assert root not in sys.path
+
+        returned = app_paths.ensure_app_root_on_sys_path()
+        assert returned == root
+        assert sys.path[0] == root, "must go to the front, ahead of scripts/"
+
         app_paths.ensure_app_root_on_sys_path()
-        assert str(REPO_ROOT) in sys.path
+        assert sys.path.count(root) == 1, "second call must not duplicate the entry"
     finally:
         sys.path[:] = before

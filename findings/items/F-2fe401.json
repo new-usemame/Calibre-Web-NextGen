@@ -1,0 +1,13 @@
+{
+  "area": "autopilot",
+  "body": "`.github/workflows/auto-merge.yml` sizes a tier-2 PR from\n`gh pr view --json additions,changedFiles`, which is the raw diff. The\ndocumented policy says the opposite:\n\n    Test files (anything under `tests/`) don't count toward the cap —\n    tests pin behavior, they don't introduce risk, and penalizing\n    test-coverage would undermine the test-driven discipline below.\n        — ~/.claude/skills/CWNG-tick/SKILL.md, \"Autonomous test-driven\n          merge + release\"\n\nSo the gate penalises exactly the behaviour the project mandates\neverywhere else. Observed on #1457: two changed production lines in\n`cps/__init__.py`, plus a regression-test file and a changelog entry.\n\n    auto-merge skipped: PR is too large for safe-tier-2\n    (additions=149, files=3; caps are 80 LOC / 3 files)\n\nThe production diff was ~15 lines. The same fix shipped with no tests\nwould have auto-merged.\n\nNothing is unsafe here — demotion routes to `needs-review`, which is\nautonomous — but it costs a review cycle on every well-tested small fix,\nand it quietly teaches the wrong lesson: the cheapest way to keep a fix\nin the fast lane is to not write the test.\n\nFix is to subtract test-path additions and files before the comparison,\nin `auto-merge.yml`, sourcing the exclusion regex from\n`.github/policy/tier-policy.config` so it stays the single source of\ntruth. `tests/autopilot/test_tier_policy.sh` should pin it: a PR of N\nproduction lines plus a large test file must classify the same as one of\nN production lines alone.\n\nFound while shipping #1443.",
+  "created": "2026-08-08",
+  "id": "F-2fe401",
+  "refs": [
+    "#1457"
+  ],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "Tier-2 auto-merge cap counts test files, so writing regression tests demotes your own PR"
+}

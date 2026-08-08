@@ -1,0 +1,13 @@
+{
+  "area": "i18n",
+  "body": "`get_locale()` (cps/cw_babel.py:53-56) returns `current_user.locale` verbatim for\nany logged-in non-Guest user. The value is not constrained to the locales we ship.\n\nValidation on the write side is inconsistent:\n\n- `cps/admin.py:947` DOES validate: `if vals['value'] in get_available_translations()`.\n- `cps/web.py:2908` does NOT: `current_user.locale = to_save.get(\"locale\", \"en\")`.\n  This is the self-service profile route, so any authenticated user can store an\n  arbitrary string as their own locale.\n- `cps/admin.py:2888` and `cps/admin.py:3148` also assign without validation.\n\nThe `?lang=` per-request override IS validated (`_coerce_locale` against\navailable), so the stored-locale path is the gap.\n\nImpact found so far: the value flowed into a filesystem path segment in\n`render_template.translations_missing_notification`, where `'../../..'` resolved\nto `cps/LC_MESSAGES` — outside the translations tree. Fixed at that callsite in\nPR #1449 with a containment assertion, but the callsite is the symptom. Other\nconsumers of `get_locale()` inherit the same untrusted value, and each one has to\nremember to defend itself.\n\nThe root fix is to validate on write in `web.py:2908` (and the two admin\nassignments) against `get_available_translations()`, matching what\n`admin.py:947` already does, so `get_locale()` can be trusted by its callers.\n\nAuthenticated-only and low reach on its own; filed rather than shipped because\nthe write-side fix touches three routes and wants its own change.\n\nNot user-reported. Surfaced while fixing #1447.",
+  "created": "2026-08-07",
+  "id": "F-011141",
+  "refs": [
+    "PR #1449"
+  ],
+  "severity": "security",
+  "source": "audit",
+  "status": "open",
+  "title": "user.locale is stored unvalidated and reaches get_locale() verbatim"
+}

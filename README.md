@@ -656,7 +656,7 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Chinese (Simplified, China) (`zh_Hans_CN`) | `█████████░░░░░░░░░░░` 44% | 1175/2645 | 350 |
 | Italian (`it`) | `███████░░░░░░░░░░░░░` 36% | 958/2645 | 269 |
 | Korean (`ko`) | `███████░░░░░░░░░░░░░` 36% | 949/2645 | 269 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `███████░░░░░░░░░░░░░` 35% | 919/2645 | 252 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `███████░░░░░░░░░░░░░` 35% | 919/2645 | 251 |
 | Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 30% | 791/2645 | 286 |
 | Slovak (`sk`) | `██████░░░░░░░░░░░░░░` 28% | 750/2645 | 315 |
 | Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 26% | 702/2645 | 362 |

@@ -418,7 +418,7 @@ msgstr "Gmail 계정 인증에 성공했습니다."
 #: cps/admin.py:2949 cps/admin.py:3210 cps/editbooks.py:1181
 #: cps/editbooks.py:2072 cps/shelf.py:148 cps/shelf.py:226 cps/shelf.py:297
 #: cps/shelf.py:332 cps/shelf.py:389 cps/shelf.py:464 cps/shelf.py:547
-#: cps/shelf.py:672 cps/tasks/convert.py:164 cps/web.py:3134
+#: cps/shelf.py:672 cps/tasks/convert.py:164 cps/web.py:3168
 #, python-format
 msgid "Oops! Database Error: %(error)s."
 msgstr "데이터베이스 오류가 발생했습니다: %(error)s."
@@ -514,7 +514,7 @@ msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
 #: cps/admin.py:2172 cps/opds.py:316 cps/opds.py:354 cps/opds.py:357
-#: cps/web.py:3050 cps/web.py:3185
+#: cps/web.py:3084 cps/web.py:3219
 #, fuzzy
 msgid "title"
 msgstr "제목"
@@ -714,7 +714,7 @@ msgstr "게스트 사용자는 삭제할 수 없습니다."
 msgid "No admin user remaining, can't delete user"
 msgstr "남은 관리자가 없어 사용자를 삭제할 수 없습니다."
 
-#: cps/admin.py:3161 cps/web.py:2865
+#: cps/admin.py:3161 cps/web.py:2899
 msgid "Email can't be empty and has to be a valid Email"
 msgstr "이메일 주소는 비워둘 수 없고, 올바른 형식이어야 합니다."
 
@@ -1359,8 +1359,8 @@ msgstr "파일 확장자 '%(ext)s'은(는) 서버에 업로드할 수 없습니�
 msgid "File to be uploaded must have an extension"
 msgstr "확장자가 없는 파일은 업로드할 수 없습니다."
 
-#: cps/editbooks.py:950 cps/editbooks.py:1703 cps/web.py:811 cps/web.py:3315
-#: cps/web.py:3496 cps/web.py:3642
+#: cps/editbooks.py:950 cps/editbooks.py:1703 cps/web.py:811 cps/web.py:3349
+#: cps/web.py:3530 cps/web.py:3676
 msgid ""
 "Oops! Selected book is unavailable. File does not exist or is not accessible"
 msgstr "선택한 책을 사용할 수 없습니다. 파일이 없거나 접근할 수 없습니다."
@@ -1767,37 +1767,37 @@ msgstr ""
 msgid "Recent Publications"
 msgstr ""
 
-#: cps/oauth_bb.py:288
+#: cps/oauth_bb.py:294
 #, python-format
 msgid "Register with %(provider)s"
 msgstr "%(provider)s에 등록"
 
-#: cps/oauth_bb.py:343
+#: cps/oauth_bb.py:349
 msgid ""
 "Login failed: OAuth token validation error. This may be due to scope "
 "configuration mismatch. Please check your OAuth scopes configuration or "
 "contact your administrator."
 msgstr ""
 
-#: cps/oauth_bb.py:348
+#: cps/oauth_bb.py:354
 msgid "Login failed: OAuth token expired. Please try logging in again."
 msgstr ""
 
-#: cps/oauth_bb.py:352
+#: cps/oauth_bb.py:358
 #, fuzzy
 msgid ""
 "Login failed: Could not connect to the OAuth provider's user info endpoint. "
 "Please try again or contact your administrator."
 msgstr "로그인 실패: 사용자 정보 엔드포인트에 접속할 수 없습니다."
 
-#: cps/oauth_bb.py:357
+#: cps/oauth_bb.py:363
 #, fuzzy
 msgid ""
 "Login failed: The OAuth provider returned invalid user profile data. Please "
 "contact your administrator."
 msgstr "로그인 실패: OAuth 제공자가 잘못된 사용자 정보를 제공했습니다."
 
-#: cps/oauth_bb.py:379
+#: cps/oauth_bb.py:385
 #, python-format
 msgid ""
 "Login failed: OAuth provider response is missing required fields: "
@@ -1805,35 +1805,35 @@ msgid ""
 "administrator."
 msgstr ""
 
-#: cps/oauth_bb.py:405 cps/oauth_bb.py:666
+#: cps/oauth_bb.py:411 cps/oauth_bb.py:672
 msgid "Failed to link OAuth account. Please try again."
 msgstr ""
 
-#: cps/oauth_bb.py:438
+#: cps/oauth_bb.py:444
 msgid "Login failed: your account is not allowed to access this application."
 msgstr ""
 
-#: cps/oauth_bb.py:629
+#: cps/oauth_bb.py:635
 msgid ""
 "OAuth error: Provider returned invalid user information. Please try again."
 msgstr ""
 
-#: cps/oauth_bb.py:643
+#: cps/oauth_bb.py:649
 #, python-format
 msgid "This %(oauth)s account is already linked to a different user"
 msgstr ""
 
-#: cps/oauth_bb.py:650 cps/remotelogin.py:149
+#: cps/oauth_bb.py:656 cps/remotelogin.py:149
 #, python-format
 msgid "Success! You are now logged in as: %(nickname)s"
 msgstr "%(nickname)s로 로그인했습니다."
 
-#: cps/oauth_bb.py:660
+#: cps/oauth_bb.py:666
 #, python-format
 msgid "Link to %(oauth)s Succeeded"
 msgstr "%(oauth)s에 성공적으로 연결되었습니다."
 
-#: cps/oauth_bb.py:668
+#: cps/oauth_bb.py:674
 #, python-format
 msgid ""
 "Login failed: No user account is linked to your %(provider)s account. Please "
@@ -1841,86 +1841,86 @@ msgid ""
 "account."
 msgstr ""
 
-#: cps/oauth_bb.py:676
+#: cps/oauth_bb.py:682
 msgid "OAuth authentication failed. Please try again or contact administrator."
 msgstr ""
 
-#: cps/oauth_bb.py:680
+#: cps/oauth_bb.py:686
 #, fuzzy
 msgid "OAuth system error. Please contact administrator."
 msgstr "이메일 서버가 설정되지 않았습니다. 관리자에게 문의하세요."
 
-#: cps/oauth_bb.py:713
+#: cps/oauth_bb.py:719
 #, python-format
 msgid "Unlink to %(oauth)s Succeeded"
 msgstr "%(oauth)s에 연결 해제에 성공했습니다."
 
-#: cps/oauth_bb.py:718
+#: cps/oauth_bb.py:724
 #, python-format
 msgid "Unlink to %(oauth)s Failed"
 msgstr "%(oauth)s에 연결 해제에 실패했습니다."
 
-#: cps/oauth_bb.py:721
+#: cps/oauth_bb.py:727
 #, python-format
 msgid "Not Linked to %(oauth)s"
 msgstr "%(oauth)s에 연결되지 않았습니다."
 
-#: cps/oauth_bb.py:942
+#: cps/oauth_bb.py:1047
 msgid "Failed to log in with GitHub."
 msgstr "GitHub 로그인에 실패했습니다."
 
-#: cps/oauth_bb.py:948
+#: cps/oauth_bb.py:1053
 msgid "Failed to fetch user info from GitHub."
 msgstr "GitHub에서 사용자 정보를 불러오지 못했습니다."
 
-#: cps/oauth_bb.py:969
+#: cps/oauth_bb.py:1074
 msgid "Failed to log in with Google."
 msgstr "Google 로그인에 실패했습니다."
 
-#: cps/oauth_bb.py:978
+#: cps/oauth_bb.py:1083
 msgid "Failed to fetch user info from Google."
 msgstr "Google에서 사용자 정보를 불러오지 못했습니다."
 
-#: cps/oauth_bb.py:1003
+#: cps/oauth_bb.py:1108
 msgid "Failed to log in with Generic OAuth."
 msgstr "일반 OAuth 로그인에 실패했습니다."
 
-#: cps/oauth_bb.py:1019
+#: cps/oauth_bb.py:1124
 msgid "OAuth authentication failed: Token validation error. Please try again."
 msgstr ""
 
-#: cps/oauth_bb.py:1023
+#: cps/oauth_bb.py:1128
 msgid ""
 "OAuth authentication failed due to an unexpected error. Please contact "
 "administrator."
 msgstr ""
 
-#: cps/oauth_bb.py:1031 cps/oauth_bb.py:1049 cps/oauth_bb.py:1067
+#: cps/oauth_bb.py:1136 cps/oauth_bb.py:1155 cps/oauth_bb.py:1174
 msgid ""
 "OAuth error: Invalid redirect URI. If you're experiencing this error "
 "repeatedly, please configure the 'OAuth Redirect Host' setting in Admin > "
 "Basic Configuration > OAuth."
 msgstr ""
 
-#: cps/oauth_bb.py:1103
+#: cps/oauth_bb.py:1211
 msgid "GitHub Oauth error, please retry later."
 msgstr "GitHub Oauth 오류입니다. 잠시 후 다시 시도해 주세요."
 
-#: cps/oauth_bb.py:1110
+#: cps/oauth_bb.py:1218
 #, python-brace-format
 msgid "GitHub Oauth error: {}"
 msgstr "GitHub 인증 오류가 발생했습니다: {}"
 
-#: cps/oauth_bb.py:1160
+#: cps/oauth_bb.py:1268
 msgid "Google Oauth error, please retry later."
 msgstr "Google 인증 오류입니다. 잠시 후 다시 시도해 주세요."
 
-#: cps/oauth_bb.py:1167
+#: cps/oauth_bb.py:1275
 #, python-brace-format
 msgid "Google Oauth error: {}"
 msgstr "Google 인증 오류가 발생했습니다: {}"
 
-#: cps/oauth_bb.py:1203 cps/oauth_bb.py:1211
+#: cps/oauth_bb.py:1311 cps/oauth_bb.py:1319
 #, python-brace-format
 msgid "OAuth error: {}"
 msgstr "OAuth 오류: {}"
@@ -1933,7 +1933,7 @@ msgstr "책 이름 오름차순 정렬"
 msgid "Books sorted alphabetically"
 msgstr "책 이름 오름차순 정렬"
 
-#: cps/opds.py:170 cps/render_template.py:150
+#: cps/opds.py:170 cps/render_template.py:151
 msgid "Hot Books"
 msgstr "인기"
 
@@ -1941,7 +1941,7 @@ msgstr "인기"
 msgid "Popular publications from this catalog based on Downloads."
 msgstr "다운로드 기준 인기 책"
 
-#: cps/opds.py:176 cps/render_template.py:164 cps/web.py:686
+#: cps/opds.py:176 cps/render_template.py:165 cps/web.py:686
 msgid "Top Rated Books"
 msgstr "베스트"
 
@@ -1962,12 +1962,12 @@ msgstr "최신 책"
 msgid "Random Books"
 msgstr "랜덤 책"
 
-#: cps/opds.py:189 cps/render_template.py:176 cps/templates/user_table.html:161
+#: cps/opds.py:189 cps/render_template.py:177 cps/templates/user_table.html:161
 #: cps/templates/user_table.html:164
 msgid "Show Random Books"
 msgstr "무작위 추천 보기"
 
-#: cps/opds.py:194 cps/opds.py:195 cps/render_template.py:167 cps/web.py:1051
+#: cps/opds.py:194 cps/opds.py:195 cps/render_template.py:168 cps/web.py:1051
 msgid "Read Books"
 msgstr "읽음"
 
@@ -1976,11 +1976,11 @@ msgstr "읽음"
 msgid "Books currently being read"
 msgstr "현재 버전"
 
-#: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:171 cps/web.py:1054
+#: cps/opds.py:206 cps/opds.py:207 cps/render_template.py:172 cps/web.py:1054
 msgid "Unread Books"
 msgstr "읽지 않음"
 
-#: cps/opds.py:212 cps/render_template.py:183 cps/spa_strings.py:432
+#: cps/opds.py:212 cps/render_template.py:184 cps/spa_strings.py:432
 #: cps/templates/book_table.html:109 cps/templates/cwa_settings.html:334
 #: cps/templates/cwa_settings.html:336
 #: cps/templates/hardcover_review_matches.html:134
@@ -1991,7 +1991,7 @@ msgstr "저자"
 msgid "Books ordered by Author"
 msgstr "저자별 정렬"
 
-#: cps/opds.py:218 cps/render_template.py:187 cps/spa_strings.py:732
+#: cps/opds.py:218 cps/render_template.py:188 cps/spa_strings.py:732
 #: cps/templates/book_table.html:115 cps/web.py:2019
 msgid "Publishers"
 msgstr "출판사"
@@ -2000,7 +2000,7 @@ msgstr "출판사"
 msgid "Books ordered by publisher"
 msgstr "출판사별 정렬"
 
-#: cps/opds.py:224 cps/render_template.py:177 cps/spa_strings.py:456
+#: cps/opds.py:224 cps/render_template.py:178 cps/spa_strings.py:456
 #: cps/templates/book_table.html:110 cps/web.py:2171
 msgid "Categories"
 msgstr "카테고리"
@@ -2009,7 +2009,7 @@ msgstr "카테고리"
 msgid "Books ordered by category"
 msgstr "카테고리별 정렬"
 
-#: cps/opds.py:230 cps/render_template.py:180 cps/spa_strings.py:279
+#: cps/opds.py:230 cps/render_template.py:181 cps/spa_strings.py:279
 #: cps/templates/book_edit.html:143 cps/templates/book_table.html:111
 #: cps/templates/cwa_settings.html:362 cps/templates/cwa_settings.html:364
 #: cps/templates/cwa_settings.html:1134
@@ -2022,7 +2022,7 @@ msgstr "시리즈"
 msgid "Books ordered by series"
 msgstr "시리즈별 정렬"
 
-#: cps/opds.py:236 cps/render_template.py:190 cps/spa_strings.py:628
+#: cps/opds.py:236 cps/render_template.py:191 cps/spa_strings.py:628
 #: cps/templates/book_table.html:113 cps/templates/detail.html:930
 #: cps/templates/search_form.html:108 cps/web.py:2143
 msgid "Languages"
@@ -2032,7 +2032,7 @@ msgstr "언어"
 msgid "Books ordered by Languages"
 msgstr "언어별 정렬"
 
-#: cps/opds.py:242 cps/render_template.py:194 cps/spa_strings.py:736
+#: cps/opds.py:242 cps/render_template.py:195 cps/spa_strings.py:736
 #: cps/web.py:2103
 msgid "Ratings"
 msgstr "평점"
@@ -2041,7 +2041,7 @@ msgstr "평점"
 msgid "Books ordered by Rating"
 msgstr "평점별 정렬"
 
-#: cps/opds.py:248 cps/render_template.py:197
+#: cps/opds.py:248 cps/render_template.py:198
 msgid "File formats"
 msgstr "파일 형식"
 
@@ -2088,7 +2088,7 @@ msgstr "검색"
 
 #: cps/remotelogin.py:76 cps/spa_strings.py:639 cps/templates/layout.html:357
 #: cps/templates/layout.html:404 cps/templates/login.html:11
-#: cps/templates/login.html:39 cps/web.py:2639
+#: cps/templates/login.html:39 cps/web.py:2642
 msgid "Login"
 msgstr "로그인"
 
@@ -2104,115 +2104,115 @@ msgstr "토큰이 만료되었습니다."
 msgid "Success! Please return to your device"
 msgstr "인증되었습니다. 기기로 돌아가 주세요."
 
-#: cps/render_template.py:127
+#: cps/render_template.py:128
 msgid ""
 "Duplicate scanning needs a one-time full scan before fast duplicate checks "
 "can run after imports and metadata changes. "
 msgstr ""
 
-#: cps/render_template.py:147 cps/spa_strings.py:444
+#: cps/render_template.py:148 cps/spa_strings.py:444
 msgid "Books"
 msgstr "전체"
 
-#: cps/render_template.py:149
+#: cps/render_template.py:150
 msgid "Show recent books"
 msgstr "최근 책 보기"
 
-#: cps/render_template.py:152
+#: cps/render_template.py:153
 msgid "Show Hot Books"
 msgstr "인기 책 보기"
 
-#: cps/render_template.py:154 cps/render_template.py:159
+#: cps/render_template.py:155 cps/render_template.py:160
 msgid "Downloaded Books"
 msgstr "받은 적 있는"
 
-#: cps/render_template.py:156 cps/render_template.py:161
+#: cps/render_template.py:157 cps/render_template.py:162
 #: cps/templates/user_table.html:169
 msgid "Show Downloaded Books"
 msgstr "다운로드 받은 적 있는 책 보기"
 
-#: cps/render_template.py:166 cps/templates/user_table.html:163
+#: cps/render_template.py:167 cps/templates/user_table.html:163
 msgid "Show Top Rated Books"
 msgstr "평점 높은 책 보기"
 
-#: cps/render_template.py:169
+#: cps/render_template.py:170
 msgid "Show Read and Unread"
 msgstr "읽은 책과 안 읽은 책 보기"
 
-#: cps/render_template.py:173
+#: cps/render_template.py:174
 msgid "Show unread"
 msgstr "읽지 않은 책 보기"
 
-#: cps/render_template.py:174 cps/spa_strings.py:540
+#: cps/render_template.py:175 cps/spa_strings.py:540
 msgid "Discover"
 msgstr "둘러보기"
 
-#: cps/render_template.py:179 cps/templates/user_table.html:160
+#: cps/render_template.py:180 cps/templates/user_table.html:160
 msgid "Show Category Section"
 msgstr "카테고리 보기"
 
-#: cps/render_template.py:182 cps/templates/user_table.html:159
+#: cps/render_template.py:183 cps/templates/user_table.html:159
 msgid "Show Series Section"
 msgstr "시리즈 보기"
 
-#: cps/render_template.py:185 cps/templates/user_table.html:162
+#: cps/render_template.py:186 cps/templates/user_table.html:162
 msgid "Show Author Section"
 msgstr "저자 보기"
 
-#: cps/render_template.py:189 cps/templates/user_table.html:165
+#: cps/render_template.py:190 cps/templates/user_table.html:165
 msgid "Show Publisher Section"
 msgstr "출판사 보기"
 
-#: cps/render_template.py:193 cps/templates/user_table.html:157
+#: cps/render_template.py:194 cps/templates/user_table.html:157
 msgid "Show Language Section"
 msgstr "언어 보기"
 
-#: cps/render_template.py:196 cps/templates/user_table.html:166
+#: cps/render_template.py:197 cps/templates/user_table.html:166
 msgid "Show Ratings Section"
 msgstr "평점 보기"
 
-#: cps/render_template.py:199 cps/templates/user_table.html:167
+#: cps/render_template.py:200 cps/templates/user_table.html:167
 msgid "Show File Formats Section"
 msgstr "파일 형식 보기"
 
-#: cps/render_template.py:201 cps/web.py:1077
+#: cps/render_template.py:202 cps/web.py:1077
 msgid "Archived Books"
 msgstr "보관함"
 
-#: cps/render_template.py:203 cps/templates/user_table.html:168
+#: cps/render_template.py:204 cps/templates/user_table.html:168
 msgid "Show Archived Books"
 msgstr "보관된 책 보기"
 
-#: cps/render_template.py:205 cps/spa_strings.py:574
+#: cps/render_template.py:206 cps/spa_strings.py:574
 msgid "Favorites"
 msgstr ""
 
-#: cps/render_template.py:207
+#: cps/render_template.py:208
 msgid "Show Favorites"
 msgstr ""
 
-#: cps/render_template.py:210 cps/web.py:1825
+#: cps/render_template.py:211 cps/web.py:1825
 msgid "Books List"
 msgstr "책 목록"
 
-#: cps/render_template.py:212 cps/templates/user_table.html:170
+#: cps/render_template.py:213 cps/templates/user_table.html:170
 msgid "Show Books List"
 msgstr "책 목록 보기"
 
-#: cps/render_template.py:215 cps/spa_strings.py:551
+#: cps/render_template.py:216 cps/spa_strings.py:551
 msgid "Duplicates"
 msgstr "중복인 책"
 
-#: cps/render_template.py:217
+#: cps/render_template.py:218
 msgid "Show Duplicate Books"
 msgstr "중복인 책 보기"
 
-#: cps/render_template.py:333
+#: cps/render_template.py:334
 #, python-format
 msgid "Calibre-Web NextGen %(latest)s is available — you're on %(current)s."
 msgstr ""
 
-#: cps/render_template.py:343
+#: cps/render_template.py:344
 #, python-format
 msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
@@ -6224,7 +6224,7 @@ msgstr "다음 사용자를 등록은 1분 뒤 가능합니다."
 msgid "Register"
 msgstr "등록"
 
-#: cps/web.py:2522 cps/web.py:2695
+#: cps/web.py:2522 cps/web.py:2729
 msgid "Connection error to limiter backend, please contact your administrator"
 msgstr ""
 "Flask-Limiter 시스템 연결에 문제가 발생했습니다. 관리자에게 문의하세요."
@@ -6242,62 +6242,62 @@ msgstr "사용할 수 없는 이메일입니다."
 msgid "Success! Confirmation Email has been sent."
 msgstr "인증 이메일을 발송했습니다."
 
-#: cps/web.py:2620
+#: cps/web.py:2623
 #, fuzzy
 msgid ""
 "Authentication loop detected. If you're experiencing login issues, please "
 "contact your administrator."
 msgstr "Calibre-Web이 아직 구성되지 않았습니다. 관리자에게 문의하세요."
 
-#: cps/web.py:2669
+#: cps/web.py:2703
 #, fuzzy
 msgid ""
 "OAuth authentication is not properly configured. Please contact "
 "administrator."
 msgstr "이메일 서버가 설정되지 않았습니다. 관리자에게 문의하세요."
 
-#: cps/web.py:2674 cps/web.py:2701
+#: cps/web.py:2708 cps/web.py:2735
 msgid "Cannot activate LDAP authentication"
 msgstr "LDAP 인증을 활성화할 수 없습니다."
 
-#: cps/web.py:2683
+#: cps/web.py:2717
 msgid "Standard login is disabled."
 msgstr ""
 
-#: cps/web.py:2691
+#: cps/web.py:2725
 msgid "Please wait one minute before next login"
 msgstr "1분 후 시도해 주세요."
 
-#: cps/web.py:2709
+#: cps/web.py:2743
 msgid "Username cannot be empty"
 msgstr ""
 
-#: cps/web.py:2721
+#: cps/web.py:2755
 #, python-format
 msgid "you are now logged in as: '%(nickname)s'"
 msgstr "'%(nickname)s'로 로그인했습니다."
 
-#: cps/web.py:2740
+#: cps/web.py:2774
 #, fuzzy, python-format
 msgid ""
 "Welcome! Your account has been automatically created. You are now logged in "
 "as: '%(nickname)s'"
 msgstr "%(nickname)s로 로그인했습니다."
 
-#: cps/web.py:2745 cps/web.py:2748
+#: cps/web.py:2779 cps/web.py:2782
 #, fuzzy
 msgid ""
 "Authentication successful, but account creation failed. Please contact your "
 "administrator."
 msgstr "Calibre-Web이 아직 구성되지 않았습니다. 관리자에게 문의하세요."
 
-#: cps/web.py:2752
+#: cps/web.py:2786
 msgid ""
 "Authentication successful, but no local account found. Please contact your "
 "administrator to create your account."
 msgstr ""
 
-#: cps/web.py:2760
+#: cps/web.py:2794
 #, python-format
 msgid ""
 "Fallback Login as: '%(nickname)s', LDAP Server not reachable, or user not "
@@ -6306,50 +6306,50 @@ msgstr ""
 "'%(nickname)s'(으)로 대체 로그인했습니다. LDAP 서버에 연결할 수 없거나 존재하"
 "지 않는 사용자입니다."
 
-#: cps/web.py:2766
+#: cps/web.py:2800
 #, python-format
 msgid "Could not login: %(message)s"
 msgstr "로그인할 수 없습니다: %(message)s"
 
-#: cps/web.py:2788 cps/web.py:2789 cps/web.py:2831
+#: cps/web.py:2822 cps/web.py:2823 cps/web.py:2865
 msgid "Wrong Username or Password"
 msgstr "사용자 이름 또는 비밀번호가 올바르지 않습니다."
 
-#: cps/web.py:2797
+#: cps/web.py:2831
 msgid "New Password was sent to your email address"
 msgstr "새 비밀번호가 이메일로 전송되었습니다"
 
-#: cps/web.py:2801
+#: cps/web.py:2835
 msgid "An unknown error occurred. Please try again later."
 msgstr "알 수 없는 오류가 발생했습니다. 나중에 다시 시도해 주세요."
 
-#: cps/web.py:2803
+#: cps/web.py:2837
 msgid "Please enter valid username to reset password"
 msgstr "비밀번호를 재설정하려면 올바른 사용자 이름을 입력하세요."
 
-#: cps/web.py:2811
+#: cps/web.py:2845
 #, python-format
 msgid "You are now logged in as: '%(nickname)s'"
 msgstr "'%(nickname)s'로 로그인했습니다."
 
-#: cps/web.py:3123
+#: cps/web.py:3157
 msgid "Success! Profile Updated"
 msgstr "프로필이 업데이트되었습니다."
 
-#: cps/web.py:3129
+#: cps/web.py:3163
 msgid "Oops! An account already exists for this Email."
 msgstr "이미 등록된 이메일 주소입니다."
 
-#: cps/web.py:3263
+#: cps/web.py:3297
 msgid "App-password label must be 1-64 characters."
 msgstr ""
 
-#: cps/web.py:3298
+#: cps/web.py:3332
 #, python-format
 msgid "App password '%(label)s' revoked."
 msgstr ""
 
-#: cps/web.py:3509
+#: cps/web.py:3543
 msgid "Invalid book ID."
 msgstr "잘못된 "
 
@@ -6357,7 +6357,7 @@ msgstr "잘못된 "
 msgid "Tag could not be deleted"
 msgstr ""
 
-#: cps/progress_syncing/protocols/kosync.py:768
+#: cps/progress_syncing/protocols/kosync.py:821
 msgid "KOReader Sync Plugin"
 msgstr "KOReader Sync 플러그인"
 

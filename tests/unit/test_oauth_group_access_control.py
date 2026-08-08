@@ -122,7 +122,7 @@ class TestGateOrdering:
         assert gate < creation, "group access gate must run before user auto-creation"
         # And the rejection path must actually short-circuit (return), not just log.
         gate_block = src[gate:creation]
-        assert "return redirect(url_for(" in gate_block
+        assert "return _oauth_failure_redirect(" in gate_block
 
     def test_configurable_group_claim_used(self):
         """The group claim name must come from provider config, not be hardcoded

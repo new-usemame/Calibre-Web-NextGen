@@ -172,6 +172,11 @@ export function BrowseList({ plural, title }: BrowseListProps) {
     }
   }, [locale, t, title]);
 
+  // #1396 — the per-row rename/delete buttons (#973) only render for an editor,
+  // and they are what crowds the name out of the track, so the wider track is
+  // scoped to the same condition rather than applied to every browse list.
+  const gridClass = canEditTags ? `${styles.grid} ${styles.gridWithActions}` : styles.grid;
+
   const items = useMemo(() => {
     const all = data?.items ?? [];
     if (!q.trim()) return all;
@@ -219,7 +224,7 @@ export function BrowseList({ plural, title }: BrowseListProps) {
           ? t('No matching {items} for "{query}".', { items: translatedItems, query: q })
           : t('No {items} yet.', { items: translatedItems })} />
       ) : (
-        <ul className={compact ? styles.list : styles.grid} role="list">
+        <ul className={compact ? styles.list : gridClass} role="list">
           {items.map((e) => {
             const href = `/${plural}/${encodeURIComponent(String(e.id))}`;
             return canEditTags ? (

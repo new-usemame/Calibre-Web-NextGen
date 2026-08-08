@@ -18,6 +18,39 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The Tags page showed columns of "…" instead of tag names.** The grid was
+  sized before the per-row rename and delete buttons existed, so once those
+  arrived they took their space out of the tag name itself: in a 1280px-wide
+  window the name had 86px of a 244px cell, and 87% of tags were cut off. Rows
+  carrying those buttons now get a wider column — three across instead of four
+  on a typical desktop — and a long name uses a second line before it
+  ellipsizes. Measured on a 152-tag library, names cut off went from 87% to 9%
+  on desktop, 41% to 9% at the 720px width in the report, and 32% to 8% on a
+  phone. The Authors, Series and Publishers lists keep their current column
+  count and gain the same second line; the compact list view is unchanged.
+
+- **A third-party KOReader sync client is no longer left guessing why a book
+  looks unsynced.** Positions that exist only as a percentage — the ones the
+  web reader and a Kobo produce — are deliberately held back from clients that
+  haven't said they can use them, because older plugins would try to jump to a
+  position they can't understand and lose your place. The problem was that
+  "held back" and "never synced" looked identical from the client's side: an
+  empty answer, with nothing naming the setting that would reveal the position.
+  The server now says what it is holding and how to ask for it, logs the same
+  thing for anyone reading the server log, and the sync protocol documentation
+  now covers the parameter and both position formats. Nothing changes for the
+  bundled plugin or for anyone syncing today. Reported by @sroebert (#1445),
+  who hit this building Crossink and had to read our source to find it.
+
+- **The "help translate this" notice no longer reappears after every update, and
+  now works outside Docker.** The app remembered that it had already shown you
+  the notice by writing a small file into its own program folder, which gets
+  replaced whenever you update — so the reminder came back each time. Outside
+  Docker that folder doesn't exist at all, so the note was never saved and the
+  reminder never appeared for anyone running from source. It's now kept
+  alongside your settings, where it survives updates. Reported by @chloeroform
+  (#1447).
+
 - **If your library lives in a sub-folder, NextGen stopped leaving a stray
   `metadata.db` at the top of it.** Something in the startup checked for a
   database at the top level of your library folder, and the act of checking
@@ -50,6 +83,25 @@ is for things you can see or feel when running the app.
   library sync. This needs the updated NextGen Progress Sync plugin on the
   device; until you update it, nothing about its behaviour changes. Reported by
   @jrodrigoferreira and kept current by @iroQuai (#1366, #324).
+
+### Changed
+
+- **A sign-in page whose only button is your one provider now just takes you
+  there.** If your server runs in OAuth-only mode with standard login switched
+  off and exactly one provider switched on, opening the login page showed you a
+  page whose sole purpose was to click through to that provider. NextGen now
+  starts it for you. Servers that still allow username-and-password sign-in keep
+  the normal login page. If the provider is unreachable, or you want the plain
+  page back for any reason, add `?local=1` to the login URL. Contributed by
+  @lduesing.
+  ([#1411](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1411))
+- **Cancelling a sign-in at your provider now returns you to the login page
+  instead of bouncing you back to the provider forever.** Backing out of the
+  provider's consent screen used to hand you straight back to it, with no way
+  off the merry-go-round short of clearing cookies. This affected OAuth servers
+  before this release too, including ones that never turned on the automatic
+  start above.
+  ([#1411](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1411))
 
 ### Fixed
 

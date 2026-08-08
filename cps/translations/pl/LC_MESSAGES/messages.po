@@ -949,111 +949,111 @@ msgstr "Przesłany plik nie jest bazą danych SQLite."
 msgid "Annotations: %(title)s"
 msgstr "Adnotacje: %(title)s"
 
-#: cps/constants.py:242
+#: cps/constants.py:249
 msgid "Czech"
 msgstr "Czeski"
 
-#: cps/constants.py:243
+#: cps/constants.py:250
 msgid "German"
 msgstr "Niemiecki"
 
-#: cps/constants.py:244
+#: cps/constants.py:251
 msgid "Greek"
 msgstr "Grecki"
 
-#: cps/constants.py:245
+#: cps/constants.py:252
 msgid "Spanish"
 msgstr "Hiszpański"
 
-#: cps/constants.py:246
+#: cps/constants.py:253
 msgid "Finnish"
 msgstr "Fiński"
 
-#: cps/constants.py:247
+#: cps/constants.py:254
 msgid "French"
 msgstr "Francuski"
 
-#: cps/constants.py:248
+#: cps/constants.py:255
 msgid "Galician"
 msgstr "Galicyjski"
 
-#: cps/constants.py:249
+#: cps/constants.py:256
 msgid "Hungarian"
 msgstr "Węgierski"
 
-#: cps/constants.py:250
+#: cps/constants.py:257
 msgid "Indonesian"
 msgstr "Indonezyjski"
 
-#: cps/constants.py:251
+#: cps/constants.py:258
 msgid "Italian"
 msgstr "Włoski"
 
-#: cps/constants.py:252
+#: cps/constants.py:259
 msgid "Japanese"
 msgstr "Japoński"
 
-#: cps/constants.py:253
+#: cps/constants.py:260
 msgid "Khmer"
 msgstr "Khmerski"
 
-#: cps/constants.py:254
+#: cps/constants.py:261
 msgid "Korean"
 msgstr "Koreański"
 
-#: cps/constants.py:255
+#: cps/constants.py:262
 msgid "Dutch"
 msgstr "Holenderski"
 
-#: cps/constants.py:256
+#: cps/constants.py:263
 msgid "Norwegian"
 msgstr "Norweski"
 
-#: cps/constants.py:257
+#: cps/constants.py:264
 msgid "Polish"
 msgstr "Polski"
 
-#: cps/constants.py:258
+#: cps/constants.py:265
 msgid "Portuguese"
 msgstr "Portugalski"
 
-#: cps/constants.py:259
+#: cps/constants.py:266
 msgid "Portuguese (Brazil)"
 msgstr "Portugalski (Brazylia)"
 
-#: cps/constants.py:260
+#: cps/constants.py:267
 msgid "Russian"
 msgstr "Rosyjski"
 
-#: cps/constants.py:261
+#: cps/constants.py:268
 msgid "Slovak"
 msgstr "Słowacki"
 
-#: cps/constants.py:262
+#: cps/constants.py:269
 msgid "Slovenian"
 msgstr "Słoweński"
 
-#: cps/constants.py:263
+#: cps/constants.py:270
 msgid "Swedish"
 msgstr "Szwedzki"
 
-#: cps/constants.py:264
+#: cps/constants.py:271
 msgid "Turkish"
 msgstr "Turecki"
 
-#: cps/constants.py:265
+#: cps/constants.py:272
 msgid "Ukrainian"
 msgstr "Ukraiński"
 
-#: cps/constants.py:266
+#: cps/constants.py:273
 msgid "Vietnamese"
 msgstr "Wietnamski"
 
-#: cps/constants.py:267
+#: cps/constants.py:274
 msgid "Chinese (Simplified, China)"
 msgstr "Chiński (uproszczony, Chiny)"
 
-#: cps/constants.py:268
+#: cps/constants.py:275
 msgid "Chinese (Traditional, Taiwan)"
 msgstr "Chiński (tradycyjny, Tajwan)"
 
@@ -1115,230 +1115,230 @@ msgstr "Nie udało się wczytać obrazu źródłowego do podglądu."
 msgid "Cover save failed."
 msgstr "Nie udało się zapisać okładki."
 
-#: cps/cwa_functions.py:183
+#: cps/cwa_functions.py:180
 msgid "Theme switching is temporarily disabled until v5.0.0"
 msgstr "Zmiana motywu jest tymczasowo wyłączona do wersji v5.0.0"
 
-#: cps/cwa_functions.py:298
+#: cps/cwa_functions.py:295
 msgid ""
 "Library Refresh 🔄 Checking for any books that may have been missed, please "
 "wait..."
 msgstr ""
 "Odświeżanie biblioteki 🔄 Sprawdzanie pominiętych książek, proszę czekać..."
 
-#: cps/cwa_functions.py:1000
+#: cps/cwa_functions.py:997
 msgid "Invalid cron expression for duplicate scans. Changes were not saved."
 msgstr ""
 "Nieprawidłowe wyrażenie cron dla skanowania duplikatów. Zmiany nie zostały "
 "zapisane."
 
-#: cps/cwa_functions.py:1112
+#: cps/cwa_functions.py:1109
 msgid "Calibre-Web NextGen User Settings"
 msgstr "Ustawienia użytkownika Calibre-Web NextGen"
 
-#: cps/cwa_functions.py:1158 cps/cwa_functions.py:1160
-#: cps/cwa_functions.py:1164 cps/cwa_functions.py:1166
-#: cps/cwa_functions.py:1169 cps/cwa_functions.py:1171
+#: cps/cwa_functions.py:1155 cps/cwa_functions.py:1157
+#: cps/cwa_functions.py:1161 cps/cwa_functions.py:1163
+#: cps/cwa_functions.py:1166 cps/cwa_functions.py:1168
 msgid "Timestamp"
 msgstr "Znacznik czasu"
 
-#: cps/cwa_functions.py:1158 cps/cwa_functions.py:1160
+#: cps/cwa_functions.py:1155 cps/cwa_functions.py:1157
 #: cps/templates/tasks.html:43 cps/templates/user_edit.html:342
 msgid "Book ID"
 msgstr "ID książki"
 
-#: cps/cwa_functions.py:1158 cps/templates/book_edit.html:125
+#: cps/cwa_functions.py:1155 cps/templates/book_edit.html:125
 #: cps/templates/search_form.html:8
 msgid "Book Title"
 msgstr "Tytuł książki"
 
-#: cps/cwa_functions.py:1158
+#: cps/cwa_functions.py:1155
 msgid "Book Author"
 msgstr "Autor książki"
 
-#: cps/cwa_functions.py:1158
+#: cps/cwa_functions.py:1155
 msgid "Trigger Type"
 msgstr "Typ wyzwalacza"
 
-#: cps/cwa_functions.py:1160 cps/cwa_functions.py:1166
+#: cps/cwa_functions.py:1157 cps/cwa_functions.py:1163
 msgid "Filepath"
 msgstr "Ścieżka pliku"
 
-#: cps/cwa_functions.py:1164 cps/cwa_functions.py:1166
-#: cps/cwa_functions.py:1169 cps/cwa_functions.py:1171
+#: cps/cwa_functions.py:1161 cps/cwa_functions.py:1163
+#: cps/cwa_functions.py:1166 cps/cwa_functions.py:1168
 msgid "Filename"
 msgstr "Nazwa pliku"
 
-#: cps/cwa_functions.py:1164
+#: cps/cwa_functions.py:1161
 msgid "Manual?"
 msgstr "Ręcznie?"
 
-#: cps/cwa_functions.py:1164
+#: cps/cwa_functions.py:1161
 msgid "No. Fixes"
 msgstr "Liczba poprawek"
 
-#: cps/cwa_functions.py:1164 cps/cwa_functions.py:1169
-#: cps/cwa_functions.py:1171
+#: cps/cwa_functions.py:1161 cps/cwa_functions.py:1166
+#: cps/cwa_functions.py:1168
 msgid "Original Backed Up?"
 msgstr "Oryginał zarchiwizowany?"
 
-#: cps/cwa_functions.py:1166
+#: cps/cwa_functions.py:1163
 msgid "Fixes Applied"
 msgstr "Zastosowane poprawki"
 
-#: cps/cwa_functions.py:1171
+#: cps/cwa_functions.py:1168
 msgid "Original Format"
 msgstr "Oryginalny format"
 
-#: cps/cwa_functions.py:1171
+#: cps/cwa_functions.py:1168
 msgid "End Format"
 msgstr "Format końcowy"
 
 # ???
-#: cps/cwa_functions.py:1247 cps/cwa_functions.py:1276
+#: cps/cwa_functions.py:1244 cps/cwa_functions.py:1273
 msgid "Unknown User"
 msgstr "Nieznany użytkownik"
 
-#: cps/cwa_functions.py:1384
+#: cps/cwa_functions.py:1381
 msgid "Calibre-Web NextGen Stats & Activity"
 msgstr "Statystyki i aktywność Calibre-Web NextGen"
 
-#: cps/cwa_functions.py:1768
+#: cps/cwa_functions.py:1765
 msgid "Calibre-Web NextGen - Full Enforcement History"
 msgstr "Calibre-Web NextGen - Pełna historia wymuszania"
 
-#: cps/cwa_functions.py:1777
+#: cps/cwa_functions.py:1774
 msgid "Calibre-Web NextGen - Full Enforcement History (w/ Paths)"
 msgstr "Calibre-Web NextGen - Pełna historia wymuszania (ze ścieżkami)"
 
-#: cps/cwa_functions.py:1786
+#: cps/cwa_functions.py:1783
 msgid "Calibre-Web NextGen - Full Import History"
 msgstr "Calibre-Web NextGen - Pełna historia importu"
 
-#: cps/cwa_functions.py:1795
+#: cps/cwa_functions.py:1792
 msgid "Calibre-Web NextGen - Full Conversion History"
 msgstr "Calibre-Web NextGen - Pełna historia konwersji"
 
-#: cps/cwa_functions.py:1804
+#: cps/cwa_functions.py:1801
 msgid "Calibre-Web NextGen - Full EPUB Fixer History (w/out Paths & Fixes)"
 msgstr ""
 "Calibre-Web NextGen - Pełna historia naprawy EPUB (bez ścieżek i poprawek)"
 
-#: cps/cwa_functions.py:1813
+#: cps/cwa_functions.py:1810
 msgid "Calibre-Web NextGen - Full EPUB Fixer History (w/ Paths & Fixes)"
 msgstr ""
 "Calibre-Web NextGen - Pełna historia naprawy EPUB (ze ścieżkami i poprawkami)"
 
-#: cps/cwa_functions.py:1831
+#: cps/cwa_functions.py:1828
 msgid "✅ All Monitoring Services are running as intended! 👍"
 msgstr "✅ Wszystkie usługi monitorowania działają prawidłowo! 👍"
 
-#: cps/cwa_functions.py:1833
+#: cps/cwa_functions.py:1830
 msgid ""
 "🔴 The Ingest Service is running but the Metadata Change Detector is not"
 msgstr "🔴 Usługa importu działa, ale detektor zmian metadanych nie działa"
 
-#: cps/cwa_functions.py:1835
+#: cps/cwa_functions.py:1832
 msgid ""
 "🔴 The Metadata Change Detector is running but the Ingest Service is not"
 msgstr "🔴 Detektor zmian metadanych działa, ale usługa importu nie działa"
 
-#: cps/cwa_functions.py:1837
+#: cps/cwa_functions.py:1834
 msgid ""
 "⛔ Neither the Ingest Service or the Metadata Change Detector are running"
 msgstr "⛔ Ani usługa importu, ani detektor zmian metadanych nie działają"
 
-#: cps/cwa_functions.py:1839
+#: cps/cwa_functions.py:1836
 msgid "An Error has occurred"
 msgstr "Wystąpił błąd"
 
-#: cps/cwa_functions.py:2016 cps/cwa_functions.py:2044
+#: cps/cwa_functions.py:2013 cps/cwa_functions.py:2041
 msgid "Calibre-Web NextGen - Convert Library"
 msgstr "Calibre-Web NextGen - Konwertuj bibliotekę"
 
-#: cps/cwa_functions.py:2170 cps/cwa_functions.py:2196
+#: cps/cwa_functions.py:2167 cps/cwa_functions.py:2193
 msgid "Calibre-Web NextGen - EPUB Fixer Service"
 msgstr "Calibre-Web NextGen - Usługa naprawy EPUB"
 
-#: cps/cwa_functions.py:2254
+#: cps/cwa_functions.py:2251
 msgid "Single-book EPUB Fixer is not supported with Google Drive libraries."
 msgstr ""
 "Naprawa pojedynczej książki EPUB nie jest obsługiwana w bibliotekach na "
 "Google Drive."
 
-#: cps/cwa_functions.py:2261
+#: cps/cwa_functions.py:2258
 msgid "Invalid book selection."
 msgstr "Nieprawidłowy wybór książki."
 
-#: cps/cwa_functions.py:2267 cps/spa_strings.py:442
+#: cps/cwa_functions.py:2264 cps/spa_strings.py:442
 msgid "Book not found."
 msgstr "Nie znaleziono książki."
 
-#: cps/cwa_functions.py:2273
+#: cps/cwa_functions.py:2270
 msgid "Selected book has no EPUB format."
 msgstr "Wybrana książka nie ma formatu EPUB."
 
-#: cps/cwa_functions.py:2277
+#: cps/cwa_functions.py:2274
 msgid "EPUB file not found on disk."
 msgstr "Nie znaleziono na dysku pliku EPUB."
 
-#: cps/cwa_functions.py:2292
+#: cps/cwa_functions.py:2289
 msgid "EPUB Fixer started for selected book."
 msgstr "Rozpoczęto naprawę EPUB dla wybranej książki."
 
-#: cps/cwa_functions.py:2295
+#: cps/cwa_functions.py:2292
 msgid "Failed to start EPUB Fixer for selected book."
 msgstr "Nie udało się uruchomić naprawy EPUB dla wybranej książki."
 
-#: cps/cwa_functions.py:2578 cps/cwa_functions.py:2586
+#: cps/cwa_functions.py:2575 cps/cwa_functions.py:2583
 msgid "Calibre-Web NextGen - Cover & Metadata Enforcement"
 msgstr ""
 
-#: cps/cwa_functions.py:2637
+#: cps/cwa_functions.py:2634
 msgid "An enforcement run is already in progress."
 msgstr ""
 
-#: cps/cwa_functions.py:2660
+#: cps/cwa_functions.py:2657
 msgid "Could not start the enforcement run."
 msgstr ""
 
-#: cps/cwa_functions.py:2711
+#: cps/cwa_functions.py:2708
 msgid "You must be an admin to access this page."
 msgstr "Musisz być administratorem, aby uzyskać dostęp do tej strony."
 
-#: cps/cwa_functions.py:2726
+#: cps/cwa_functions.py:2723
 msgid "Both username and image data are required."
 msgstr "Wymagana jest zarówno nazwa użytkownika, jak i dane obrazu."
 
-#: cps/cwa_functions.py:2734
+#: cps/cwa_functions.py:2731
 msgid "Invalid image data format. Must be a valid image."
 msgstr "Nieprawidłowy format danych obrazu. Musi to być prawidłowy obraz."
 
-#: cps/cwa_functions.py:2742
+#: cps/cwa_functions.py:2739
 msgid "Unsupported image type. Only PNG and JPEG are allowed."
 msgstr "Nieobsługiwany typ obrazu. Dozwolone są tylko PNG i JPEG."
 
-#: cps/cwa_functions.py:2754
+#: cps/cwa_functions.py:2751
 msgid "Image is too large. Please use an image smaller than 500KB."
 msgstr "Obraz jest zbyt duży. Użyj obrazu mniejszego niż 500 KB."
 
-#: cps/cwa_functions.py:2758
+#: cps/cwa_functions.py:2755
 msgid "Invalid Base64 image data."
 msgstr "Nieprawidłowe dane obrazu Base64."
 
-#: cps/cwa_functions.py:2762
+#: cps/cwa_functions.py:2759
 msgid "Invalid image data format."
 msgstr "Nieprawidłowy format danych obrazu."
 
-#: cps/cwa_functions.py:2767
+#: cps/cwa_functions.py:2764
 msgid "Error validating image data."
 msgstr "Błąd podczas sprawdzania poprawności danych obrazu."
 
-#: cps/cwa_functions.py:2785
+#: cps/cwa_functions.py:2782
 msgid "Profile picture updated successfully."
 msgstr "Zdjęcie profilowe zostało pomyślnie zaktualizowane."
 
-#: cps/cwa_functions.py:2798
+#: cps/cwa_functions.py:2795
 msgid "Calibre-Web NextGen Profile Picture Management (WIP)"
 msgstr "Zarządzanie zdjęciem profilowym Calibre-Web NextGen (w budowie)"
 

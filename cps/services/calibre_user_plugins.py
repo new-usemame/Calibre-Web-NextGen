@@ -148,7 +148,7 @@ def _registered_plugin_names() -> set[str]:
 
 
 def auto_register_plugins(
-    calibre_customize_binary: str = "/app/calibre/calibre-customize",
+    calibre_customize_binary: str = "calibre-customize",
 ) -> list[str]:
     """If enabled, scan the plugins dir for ``*.zip`` files and call
     ``calibre-customize -a`` on each one with HOME=/config so calibre
@@ -162,10 +162,6 @@ def auto_register_plugins(
     Designed to be called from the container bootstrap (auto_library)
     after ensure_plugins_dir(). When disabled, returns ``[]`` without
     touching the filesystem.
-
-    The binary path defaults to the canonical location inside our
-    Docker image (`/app/calibre/calibre-customize`); override for
-    tests or alternate Calibre installs.
     """
     import subprocess
 
@@ -187,7 +183,16 @@ def auto_register_plugins(
     if _registered_plugin_names():
         return []
 
-    env = {"HOME": _HOME, "PATH": "/usr/bin:/bin:/app/calibre"}
+    # Inherit the ambient environment so `calibre-customize` resolves off
+    # the real PATH, but keep HOME pinned to the config tree: calibre
+    # writes its plugin registry under `$HOME/.config/calibre/`, which is
+    # exactly where `_CUSTOMIZE_JSON` above reads it back from. Letting
+    # HOME default to the service's own (`/root`) would write the registry
+    # somewhere nothing reads, so the short-circuit never fires and the
+    # running calibre never sees the plugins.
+    env = os.environ.copy()
+    env["HOME"] = _HOME
+
     registered: list[str] = []
     # `calibre-customize -a` copies the source .zip into
     # `<plugins_dir>/<PluginDisplayName>.zip`. When the source filename

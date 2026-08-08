@@ -10,10 +10,10 @@
 import sys
 import time
 
-from .. import logger
+from .. import constants, logger
 
 # Access CWA_DB from scripts path (consistent with existing patterns)
-sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+sys.path.insert(1, constants.SCRIPTS_DIR)
 
 log = logger.create()
 

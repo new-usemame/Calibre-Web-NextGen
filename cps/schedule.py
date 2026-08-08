@@ -26,8 +26,8 @@ def reconcile_hardcover_configuration():
     """Migrate the former two enable flags and maintain a rollback mirror."""
     try:
         import sys as _sys
-        if '/app/calibre-web-automated/scripts/' not in _sys.path:
-            _sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+        if constants.SCRIPTS_DIR not in _sys.path:
+            _sys.path.insert(1, constants.SCRIPTS_DIR)
         from cwa_db import CWA_DB
 
         db = CWA_DB()
@@ -132,8 +132,8 @@ def register_startup_tasks():
         # Rehydrate scheduled auto-send jobs from cwa.db (if any)
         try:
             import sys as _sys
-            if '/app/calibre-web-automated/scripts/' not in _sys.path:
-                _sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+            if constants.SCRIPTS_DIR not in _sys.path:
+                _sys.path.insert(1, constants.SCRIPTS_DIR)
             from cwa_db import CWA_DB
             from .tasks.auto_send import TaskAutoSend
             from .services.worker import WorkerThread
@@ -179,8 +179,8 @@ def register_startup_tasks():
         # Rehydrate other scheduled ops (convert_library, epub_fixer)
         try:
             import sys as _sys
-            if '/app/calibre-web-automated/scripts/' not in _sys.path:
-                _sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+            if constants.SCRIPTS_DIR not in _sys.path:
+                _sys.path.insert(1, constants.SCRIPTS_DIR)
             from cwa_db import CWA_DB
             from datetime import datetime
             # wrappers will trigger internal routes themselves
@@ -247,8 +247,8 @@ def _schedule_duplicate_scan(scheduler, timezone_info):
     """Schedule background duplicate scan based on CWA settings."""
     try:
         import sys as _sys
-        if '/app/calibre-web-automated/scripts/' not in _sys.path:
-            _sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+        if constants.SCRIPTS_DIR not in _sys.path:
+            _sys.path.insert(1, constants.SCRIPTS_DIR)
         from cwa_db import CWA_DB
         from .tasks.duplicate_scan import TaskDuplicateScan
         from apscheduler.triggers.cron import CronTrigger
@@ -382,8 +382,8 @@ def _schedule_archived_book_cleanup(scheduler, timezone_info):
     """Schedule cleanup for stale archived_book entries (default 03:00 local)."""
     try:
         import sys as _sys
-        if '/app/calibre-web-automated/scripts/' not in _sys.path:
-            _sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+        if constants.SCRIPTS_DIR not in _sys.path:
+            _sys.path.insert(1, constants.SCRIPTS_DIR)
         from cwa_db import CWA_DB
 
         db = CWA_DB()

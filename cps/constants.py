@@ -29,6 +29,10 @@ STATIC_DIR          = os.path.join(BASE_DIR, 'cps', 'static')
 TEMPLATES_DIR       = os.path.join(BASE_DIR, 'cps', 'templates')
 TRANSLATIONS_DIR    = os.path.join(BASE_DIR, 'cps', 'translations')
 
+SCRIPTS_DIR         = os.path.join(BASE_DIR, 'scripts')
+
+DIRS_JSON           = os.path.join(BASE_DIR, 'dirs.json')
+
 # Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache
 DEFAULT_CACHE_DIR   = os.path.join(BASE_DIR, 'cps', 'cache')
 CACHE_DIR           = os.environ.get('CACHE_DIR', DEFAULT_CACHE_DIR)
@@ -55,6 +59,9 @@ CWA_METADATA_CHANGE_LOGS_DIR = os.environ.get(
 CWA_METADATA_TEMP_DIR = os.environ.get(
     "CWA_METADATA_TEMP_DIR",
     os.path.join(CONFIG_DIR, "metadata_temp"))
+
+# Folder where the log files are stored
+LOG_ARCHIVE = os.path.join(CONFIG_DIR, "log_archive")
 
 DEFAULT_SETTINGS_FILE = "app.db"
 DEFAULT_GDRIVE_FILE = "gdrive.db"

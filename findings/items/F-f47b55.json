@@ -1,0 +1,13 @@
+{
+  "area": "test",
+  "body": "`tests/unit/test_ingest_startup_sweep_1360.py::test_wait_for_stable_file_reports_failure_when_never_stable`\nraces the scheduler. It appends to a file every 0.05s from a background\nsubshell (10 iterations, ~0.5s of writing) and asserts that\n`wait_for_stable_file` reports UNSTABLE:\n\n    ( for i in 1 2 3 4 5 6 7 8 9 10; do printf \"more\" >> \"$growing\"; sleep 0.05; done ) &\n\nOn a loaded runner with `-n auto`, the writer can be descheduled long\nenough for the helper to sample two identical sizes and declare the file\nsettled, so the assertion fires:\n\n    AssertionError: wait_for_stable_file reported a continuously growing\n    file as settled\n\nObserved on PR #1457, where it was the *only* failure — 1 failed, 5525\npassed — on a diff that touches `cps/__init__.py`'s rate limiter and\nnothing in ingest. Passes locally (16/16 in that file). The job passed on\nre-run.\n\nCost is real: `--maxfail=3` means an early flake can also truncate the\nfailure list, and a red Fast Tests blocks the merge gate, so every hit\nburns a CI cycle and invites the next reader to go looking for a\nregression that is not there.\n\nFix by removing the wall-clock dependency rather than widening the sleep:\ndrive `wait_for_stable_file` against a fake/injected size source, or have\nthe writer signal progress through a file the helper polls, so the test\nasserts the helper's logic instead of the runner's scheduling. Widening\nthe sleeps only makes the flake rarer and the suite slower.",
+  "created": "2026-08-08",
+  "id": "F-f47b55",
+  "refs": [
+    "#1457"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "test_wait_for_stable_file_reports_failure_when_never_stable is timing-flaky under xdist"
+}

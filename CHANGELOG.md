@@ -18,6 +18,20 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Installing outside Docker failed on the first setup script.** If you install
+  from source rather than pulling the image — a distro package, a systemd unit,
+  anything not living at `/app/calibre-web-automated` — `auto_library.py` quit
+  with `FileNotFoundError` looking for a starter database under `/app`, a
+  directory that only exists inside the container. The file was in your install
+  the whole time; the scripts just weren't looking where the code actually was.
+  They now work out their own location, so a source install sets itself up
+  without patching. The same run then reached a second copy of the problem and
+  tried to create your library at `/calibre-library` no matter what
+  `dirs.json` said; it now uses the folder you configured. Docker installs
+  resolve to exactly the same paths as before and are unaffected. Reported by
+  @Thovi98, who packages Calibre-Web NextGen for YunoHost, and follows the
+  `cps/` cleanup @chloeroform did in #1438.
+
 - **The container reported itself unhealthy, and the library count showed 0
   books.** A path cleanup landed a reference to a setting the file never
   imported, so the lookup that finds your Calibre library raised an error the

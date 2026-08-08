@@ -21,6 +21,7 @@ import sqlite3
 import pwd
 import grp
 
+import app_paths
 from cwa_db import CWA_DB
 from kindle_epub_fixer import EPUBFixer
 
@@ -143,7 +144,7 @@ class LibraryConverter:
         self.hierarchy_of_success = {'epub', 'lit', 'mobi', 'azw', 'azw3', 'fb2', 'fbz', 'azw4', 'prc', 'odt', 'lrf', 'pdb',  'cbz', 'pml', 'rb', 'cbr', 'cb7', 'cbc', 'chm', 'djvu', 'snb', 'tcr', 'pdf', 'docx', 'rtf', 'html', 'htmlz', 'txtz', 'txt', 'kfx', 'kfx-zip'}
 
         self.current_book = 1
-        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs('/app/calibre-web-automated/dirs.json')
+        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs(str(app_paths.dirs_json()))
 
         # Calibre subprocess environment. Operator-opt-in plugin loading
         # (CWA_CALIBRE_USER_PLUGINS=true) routes HOME to /config so any
@@ -152,9 +153,7 @@ class LibraryConverter:
         # CWA #243.
         self.calibre_env = os.environ.copy()
         try:
-            _CPS_ROOT = "/app/calibre-web-automated"
-            if _CPS_ROOT not in sys.path:
-                sys.path.insert(0, _CPS_ROOT)
+            app_paths.ensure_app_root_on_sys_path()
             from cps.services import calibre_user_plugins
             calibre_user_plugins.apply_to_env(self.calibre_env)
         except ImportError:
@@ -169,7 +168,7 @@ class LibraryConverter:
 
     def get_split_library(self) -> dict[str, str] | None:
         """Checks whether or not the user has split library enabled. Returns None if they don't and the path of the Split Library location if True."""
-        con = sqlite3.connect("/config/app.db", timeout=30)
+        con = sqlite3.connect(str(app_paths.app_db_path()), timeout=30)
         cur = con.cursor()
         split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 

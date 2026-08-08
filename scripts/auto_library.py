@@ -12,6 +12,9 @@ import sys
 import subprocess
 from pathlib import Path
 
+import app_paths
+import library_paths
+
 
 # The tables Calibre-Web reads while starting up. Calibre creates both with the
 # library itself, so every real library has them however empty it is — which is
@@ -87,17 +90,24 @@ def main():
 
 class AutoLibrary:
     def __init__(self):
-        self.config_dir = "/config"
-        self.library_dir = "/calibre-library"
-        self.dirs_path = "/app/calibre-web-automated/dirs.json"
+        self.config_dir = str(app_paths.config_dir())
+        # Where to look for an existing library, and where make_new_library()
+        # seeds a new one. Read from dirs.json rather than assuming the
+        # container's mount point: on a bare-metal install there is no
+        # /calibre-library and seeding one there fails outright (#1462). The
+        # shipped dirs.json still says /calibre-library, so Docker is unchanged.
+        self.library_dir = library_paths.get_calibre_library_dir()
+        self.dirs_path = str(app_paths.dirs_json())
 
-        self.empty_appdb = "/app/calibre-web-automated/empty_library/app.db"
-        self.empty_metadb = "/app/calibre-web-automated/empty_library/metadata.db"
+        self.empty_appdb = str(app_paths.empty_library_file("app.db"))
+        self.empty_metadb = str(app_paths.empty_library_file("metadata.db"))
 
-        # Canonical location. app.db always lives at /config/app.db; check_for_app_db()
-        # tries it first and only falls back to a full os.walk() of /config when
-        # it's missing.
-        self.DEFAULT_APPDB_PATH = f"{self.config_dir}/app.db"
+        # Canonical location. app.db always lives at <config dir>/app.db;
+        # check_for_app_db() tries it first and only falls back to a full
+        # os.walk() of the config dir when it's missing. Resolved by app_paths
+        # rather than re-derived here, so this and every other app.db consumer
+        # agree by construction (#1462).
+        self.DEFAULT_APPDB_PATH = str(app_paths.app_db_path())
 
         # Kept non-None at all times: update_calibre_web_db() opens this with
         # sqlite3.connect(), which raises on None. check_for_app_db() realigns
@@ -123,9 +133,33 @@ class AutoLibrary:
             self._metadb_path = path
             self.lib_path = os.path.dirname(path)
 
-    # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from /app/calibre-web-automated/empty_library/app.db and sets the permissions
+    @staticmethod
+    def ensure_dir_exists(path, what, remedy):
+        """Create a directory we are about to seed a database into.
+
+        In the container these are bind mounts and always exist, so this is a
+        no-op there. Off Docker they routinely do not: the shipped dirs.json
+        still names ``/calibre-library``, so a source install that has not
+        edited it used to die inside ``shutil.copyfile`` with a bare
+        ``FileNotFoundError`` naming a path the user never chose (#1462).
+
+        Fail with an actionable message naming the file to edit, rather than a
+        traceback — we cannot guess where somebody keeps their books, but we
+        can say exactly which setting decides it.
+        """
+        if os.path.isdir(path):
+            return
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as error:
+            print(f"[cwa-auto-library]: ERROR: could not create the {what} '{path}': {error}")
+            print(f"[cwa-auto-library]: {remedy}")
+            sys.exit(1)
+        print(f"[cwa-auto-library] Created {what} {path}")
+
+    # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from <app root>/empty_library/app.db and sets the permissions
     def check_for_app_db(self):
-        # app.db always resolves to the canonical /config/app.db; keep the
+        # app.db always resolves to the canonical <config dir>/app.db; keep the
         # handle aligned in every branch so update_calibre_web_db() never hands
         # None to sqlite3.connect().
         self.app_db = self.DEFAULT_APPDB_PATH
@@ -140,6 +174,11 @@ class AutoLibrary:
         db_files = [f for f in files_in_config if "app.db" in f]
         if len(db_files) == 0:
             print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from {self.empty_appdb}")
+            self.ensure_dir_exists(
+                self.config_dir,
+                "config directory",
+                "Set CALIBRE_DBPATH to a directory this user can write to.",
+            )
             shutil.copyfile(self.empty_appdb, self.DEFAULT_APPDB_PATH)
             try:
                 nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
@@ -280,9 +319,14 @@ class AutoLibrary:
             print(e)
             sys.exit(1)
 
-    # Uses the empty metadata.db in /app/calibre-web-automated to create a new library
+    # Uses the empty metadata.db shipped in the app root to create a new library
     def make_new_library(self):
         print("[cwa-auto-library]: No existing library found. Creating new library...")
+        self.ensure_dir_exists(
+            self.library_dir,
+            "library directory",
+            f"Set 'calibre_library_dir' in {self.dirs_path} to a directory this user can write to.",
+        )
         shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
         try:
             nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
@@ -308,9 +352,7 @@ class AutoLibrary:
         upstream #243 ('I copied the plugin folder, nothing happens').
         """
         try:
-            _CPS_ROOT = "/app/calibre-web-automated"
-            if _CPS_ROOT not in sys.path:
-                sys.path.insert(0, _CPS_ROOT)
+            app_paths.ensure_app_root_on_sys_path()
             from cps.services import calibre_user_plugins
         except ImportError:
             return

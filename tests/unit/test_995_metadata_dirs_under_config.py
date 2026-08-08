@@ -80,7 +80,17 @@ def _is_sys_path_mutation(node):
     if not isinstance(node, ast.Call):
         return False
     func = node.func
-    if not isinstance(func, ast.Attribute) or func.attr not in ("insert", "append"):
+    if not isinstance(func, ast.Attribute):
+        return False
+
+    # app_paths.ensure_app_root_on_sys_path() is the shared bootstrap (#1462).
+    # It does the same sys.path.insert these scripts each used to inline, so it
+    # satisfies this ordering contract; the assertion below still requires it to
+    # run before the module-level cps import.
+    if func.attr == "ensure_app_root_on_sys_path":
+        return True
+
+    if func.attr not in ("insert", "append"):
         return False
     value = func.value
     return (

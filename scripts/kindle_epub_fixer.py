@@ -23,6 +23,8 @@ import json
 import shutil
 from typing import Optional, Tuple
 
+import app_paths
+
 import pwd
 import grp
 
@@ -46,7 +48,7 @@ except Exception:
 LANGUAGE_TAG_PATTERN = re.compile(r'^[a-z]{2,3}(-[a-z]{2,4})?$', re.IGNORECASE)
 
 ### Global Variables
-dirs_json = "/app/calibre-web-automated/dirs.json"
+dirs_json = str(app_paths.dirs_json())
 # `change_logs_dir` / `metadata_temp_dir` used to be declared here and were never read by
 # anything in this module. Importing cps.constants just to define them pulled the whole
 # Flask web stack into a script that convert_library.py imports at module scope, so both
@@ -370,7 +372,7 @@ class EPUBFixer:
     def _get_metadata_db_path(self) -> str:
         """Get the path to metadata.db considering split library configuration."""
         try:
-            app_db = "/config/app.db"
+            app_db = str(app_paths.app_db_path())
             if not os.path.isfile(app_db):
                 return get_calibre_metadata_db_path(dirs_json)
             con = sqlite3.connect(Path(app_db).as_uri() + "?mode=ro", uri=True, timeout=30)
@@ -1249,7 +1251,7 @@ class EPUBFixer:
 
 
 def get_library_location() -> str:
-    con = sqlite3.connect("/config/app.db", timeout=30)
+    con = sqlite3.connect(str(app_paths.app_db_path()), timeout=30)
     cur = con.cursor()
     split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 
@@ -1259,7 +1261,7 @@ def get_library_location() -> str:
         return split_path
     else:
         dirs = {}
-        with open('/app/calibre-web-automated/dirs.json', 'r') as f:
+        with open(str(app_paths.dirs_json()), 'r') as f:
             dirs: dict[str, str] = json.load(f)
         library_dir = f"{dirs['calibre_library_dir']}/"
         return library_dir

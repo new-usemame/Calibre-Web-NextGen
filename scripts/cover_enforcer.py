@@ -23,10 +23,9 @@ import unicodedata
 # so sys.path[0] is scripts/ and the project root that owns the `cps` package is not on
 # the path at all. Put it there before the first cps import, not after: an import that
 # runs earlier in the module body raises ModuleNotFoundError no matter what follows it.
-_this_dir = os.path.dirname(os.path.abspath(__file__))
-_project_root = os.path.abspath(os.path.join(_this_dir, os.pardir))
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
+import app_paths
+
+app_paths.ensure_app_root_on_sys_path()
 
 try:
     from cps import constants
@@ -91,7 +90,7 @@ except Exception:
     unidecode = None
 
 # Global Variables
-dirs_json = "/app/calibre-web-automated/dirs.json"
+dirs_json = str(app_paths.dirs_json())
 change_logs_dir = _CHANGE_LOGS_DIR
 metadata_temp_dir = _METADATA_TEMP_DIR
 
@@ -133,9 +132,7 @@ class Book:
         # CWA #243.
         self.calibre_env = os.environ.copy()
         try:
-            _CPS_ROOT = "/app/calibre-web-automated"
-            if _CPS_ROOT not in sys.path:
-                sys.path.insert(0, _CPS_ROOT)
+            app_paths.ensure_app_root_on_sys_path()
             from cps.services import calibre_user_plugins
             calibre_user_plugins.apply_to_env(self.calibre_env)
         except ImportError:
@@ -155,7 +152,7 @@ class Book:
 
     def get_split_library(self) -> dict[str, str] | None:
         """Checks whether or not the user has split library enabled. Returns None if they don't and the path of the Split Library location if True."""
-        con = sqlite3.connect("/config/app.db", timeout=60)
+        con = sqlite3.connect(str(app_paths.app_db_path()), timeout=60)
         cur = con.cursor()
         split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 
@@ -279,9 +276,7 @@ class Enforcer:
         # CWA #243.
         self.calibre_env = os.environ.copy()
         try:
-            _CPS_ROOT = "/app/calibre-web-automated"
-            if _CPS_ROOT not in sys.path:
-                sys.path.insert(0, _CPS_ROOT)
+            app_paths.ensure_app_root_on_sys_path()
             from cps.services import calibre_user_plugins
             calibre_user_plugins.apply_to_env(self.calibre_env)
         except ImportError:
@@ -294,7 +289,7 @@ class Enforcer:
 
         # Read Calibre-Web setting: config_unicode_filename (True -> transliterate non-English in filenames)
         try:
-            with sqlite3.connect("/config/app.db", timeout=60) as con:
+            with sqlite3.connect(str(app_paths.app_db_path()), timeout=60) as con:
                 cur = con.cursor()
                 self.unicode_filename = bool(cur.execute('SELECT config_unicode_filename FROM settings;').fetchone()[0])
         except Exception:
@@ -328,7 +323,7 @@ class Enforcer:
 
     def get_split_library(self) -> dict[str, str] | None:
         """Checks whether or not the user has split library enabled. Returns None if they don't and the path of the Split Library location if True."""
-        con = sqlite3.connect("/config/app.db", timeout=60)
+        con = sqlite3.connect(str(app_paths.app_db_path()), timeout=60)
         cur = con.cursor()
         split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 

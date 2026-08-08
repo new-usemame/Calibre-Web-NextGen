@@ -109,6 +109,10 @@ cover/
 
 # Django stuff:
 *.log
+# Rotated logs. `*.log` does not match `calibre-web.log.1` — logrotate puts the
+# number AFTER the extension — so a bare-metal run's rotated log stayed
+# untracked-but-visible and a `git add -A` swept 5 MB of it into a commit.
+*.log.[0-9]*
 local_settings.py
 db.sqlite3
 db.sqlite3-journal

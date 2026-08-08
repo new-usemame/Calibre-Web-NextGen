@@ -52,6 +52,17 @@ is for things you can see or feel when running the app.
   @Thovi98, who packages Calibre-Web NextGen for YunoHost, and follows the
   `cps/` cleanup @chloeroform did in #1438.
 
+- **Upgrading a source install no longer looks like it lost your settings.**
+  Earlier builds put the database in a `/config` folder at the very top of the
+  filesystem, whatever directory you installed into. Now that setup uses your
+  install directory, a machine upgrading from one of those builds has a real
+  database in the old place and none in the new one — and setting up a fresh
+  empty one there would have left you looking at an empty library with your
+  users and books apparently gone. Setup now stops before that happens, tells
+  you which database it found, and gives you the one setting that keeps it.
+  Nothing is moved or deleted for you, because only you know which copy is the
+  one you want. Fresh installs and Docker are unaffected.
+
 - **The container reported itself unhealthy, and the library count showed 0
   books.** A path cleanup landed a reference to a setting the file never
   imported, so the lookup that finds your Calibre library raised an error the

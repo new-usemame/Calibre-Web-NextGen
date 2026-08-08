@@ -1,0 +1,11 @@
+{
+  "area": "testing",
+  "body": "`tests/unit/test_ingest_batch_dirty.py::test_successful_import_marks_batch_dirty_without_hot_loop_http_calls`\nfails identically on `origin/main` and on a feature branch when run locally\n(Python 3.12.7, macOS), while CI's Fast Tests job reports the same suite green\non main.\n\nObserved 2026-08-08 while running the full unit suite before pushing the #1438\nDIRS_JSON fix. A/B'd against a clean `origin/main` worktree to confirm it is\nnot branch-related: `1 failed, 2 passed` in both trees.\n\nSo either the test asserts something about ambient environment state that\nhappens to hold on the CI runner and not on the dev Mac, or CI is not actually\nrunning it. Both are worth knowing: the first makes the local suite noisy\nenough that a real failure gets waved through as \"that one always fails\", and\nthe second means the assertion protects nothing.\n\nNot chased in the DIRS_JSON PR because it is unrelated to that diff and\npre-existing. Next step is to diff the CI invocation against the local one and\ncheck whether the test depends on Python version, a network-adjacent default,\nor an env var the runner sets.",
+  "created": "2026-08-08",
+  "id": "F-f6f411",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "test_ingest_batch_dirty hot-loop test fails locally but is green in CI"
+}

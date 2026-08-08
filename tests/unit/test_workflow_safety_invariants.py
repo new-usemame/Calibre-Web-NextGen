@@ -832,14 +832,30 @@ _DETECT_MATRIX = [
     (["tests/integration/test_ingest_flow.py"], "true", "false"),
     # tests.yml houses both harnesses' setup, so it is relevant to both.
     ([".github/workflows/tests.yml"], "true", "true"),
+    # Application Python. This row used to expect "false" on the theory that
+    # only build *definitions* can break the image. #1438 disproved it: a
+    # cleanup in cps/web.py referenced a constant it never imported, which is
+    # invisible at import time, so every unit test passed, the container
+    # booted, and /health then answered 503 forever. Integration Tests caught
+    # it and was advisory, so the summary reported that failure as a pass.
+    # integration-tests is still the only job that boots the container, and
+    # app code can stop it booting as dead as a bad Dockerfile.
+    (["cps/admin.py"], "true", "false"),
+    (["cps/services/cover_picker.py"], "true", "false"),
     # Negative cases — these must NOT pay the ~15-minute Docker build.
-    (["cps/admin.py"], "false", "false"),
     (["README.md"], "false", "false"),
     # The requirements pattern was widened to catch optional-requirements.txt;
     # pin that the widening stays bounded to the repo root, where the image's
     # pip install reads from. A nested one is not a build input.
     (["docs/requirements.txt"], "false", "false"),
+    # The cps/ gate above is scoped to .py deliberately. Locale catalogues are
+    # tier-1 auto-merge PRs and a malformed one already fails Fast Tests via
+    # test_translations_compile.py, so sending them through a full image build
+    # would buy nothing and stall every translation PR behind it. Same for
+    # templates and static assets, which cannot stop the container booting.
     (["cps/translations/de/LC_MESSAGES/messages.po"], "false", "false"),
+    (["cps/templates/index.html"], "false", "false"),
+    (["cps/static/css/style.css"], "false", "false"),
     (["frontend/src/App.tsx"], "false", "true"),
     # Mixed PR: one build-relevant path anywhere in the diff is enough.
     (["README.md", "Dockerfile"], "true", "false"),
@@ -865,8 +881,10 @@ def test_changed_paths_classifies_build_definition_edits(changed, want_build, wa
     )
     assert out["build"] == want_build, (
         f"changed={changed} → build={out['build']!r}, expected {want_build!r}. "
-        "A Dockerfile/requirements/integration-suite edit must run the Docker "
-        "integration job; anything else must not pay for it."
+        "A Dockerfile/requirements/root/integration-suite edit, or any change "
+        "to application Python under cps/, must run the Docker integration "
+        "job — it is the only one that boots the container. Non-Python cps/ "
+        "assets and everything else must not pay for it."
     )
     assert out["frontend"] == want_frontend, (
         f"changed={changed} → frontend={out['frontend']!r}, expected {want_frontend!r}"

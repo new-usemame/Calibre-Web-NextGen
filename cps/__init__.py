@@ -109,17 +109,7 @@ web_server = WebServer()
 updater_thread = Updater()
 
 if limiter_present:
-    # `storage_uri` is stated rather than left to default. flask_limiter warns
-    # on every startup when no storage is given, because an implicit in-memory
-    # backend is wrong for the multi-worker deployments it usually sees. This
-    # server is single-process — gevent's WSGIServer or one tornado IOLoop,
-    # never a pre-fork pool — so every request handler shares these counters
-    # and in-memory is the right backend. Declaring it silences the warning
-    # without changing behaviour. A networked backend is deliberately not
-    # offered here: the image ships no redis/memcached client, so pointing at
-    # one would turn a log line into a failed startup.
-    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False,
-                      storage_uri="memory://")
+    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False)
 else:
     limiter = None
 
@@ -271,11 +261,24 @@ def create_app():
         app.config.update(RATELIMIT_STORAGE_URI=config.config_limiter_uri)
         if config.config_limiter_options != "":
             app.config.update(RATELIMIT_STORAGE_OPTIONS=config.config_limiter_options)
+    else:
+        # No backend configured, so we get the in-memory one. Say so rather
+        # than leaving the key unset: flask_limiter warns on every startup
+        # when nothing is specified, because an implicit in-memory backend is
+        # wrong for the multi-worker deployments it usually sees. This server
+        # is single-process, so those counters are shared by every handler
+        # that reads them and the backend is right.
+        #
+        # This belongs here and not on the Limiter(...) constructor. A
+        # constructor storage_uri outranks app.config, so it would quietly
+        # override the admin's own "Limiter Backend" setting above and drop
+        # them onto memory storage with no error.
+        app.config.update(RATELIMIT_STORAGE_URI="memory://")
     try:
         limiter.init_app(app)
     except Exception as e:
         log.error('Wrong Flask Limiter configuration, falling back to default: {}'.format(e))
-        app.config.update(RATELIMIT_STORAGE_URI=None)
+        app.config.update(RATELIMIT_STORAGE_URI="memory://")
         limiter.init_app(app)
 
     # Register scheduled tasks

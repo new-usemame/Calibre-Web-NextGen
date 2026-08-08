@@ -1,0 +1,11 @@
+{
+  "area": "autopilot",
+  "body": "`scripts/lib/phase7-envelope.sh:84` does:\n\n    text=\"$(printf '%s' \"$last\" | jq -r '.result // \"\"' | tr '\\n' ' ' | cut -c1-160)\"\n\nThe launchd plist sets PATH, HOME and USER but NOT LANG, so the tick runs in the C locale,\nwhere `cut -c` counts BYTES rather than characters. Non-ASCII model output longer than 160\nbytes is therefore sliced mid-UTF-8-sequence.\n\nSeverity is deliberately `chore`, not `correctness`: `$text` is only used for ASCII substring\nmatching (`*\"Not logged in\"*` and friends, which a tail-end split does not affect) and for\ninterpolation into an operator-facing error string. The realistic worst case is mojibake in a\npage that only fires when phase-7 has already failed.\n\nRecorded because it is the same defect class as the Discord one fixed on 2026-08-08, where it\nDID matter: `discord_start_thread` and the triage title/question caps used the identical\n`tr -d … | cut -c1-N` spelling and would have sent Discord undecodable bytes for any non-ASCII\nreport title over the cap. That was replaced with a `discord_clip` python3 helper, because\npython3 auto-enables UTF-8 mode in the C locale (PEP 540, `sys.flags.utf8_mode == 1`).\n\nMeasured 2026-08-08 on a 150-character CJK string: `cut -c1-100` returns 100 characters under\n`LANG=en_US.UTF-8` and an undecodable byte string with LANG unset.\n\nTwo fix directions, neither applied:\n- swap this one site to the same python3 clipping approach; smallest and safest\n- OR set `LANG` in the plist, which fixes the whole class at once but changes `sort`\n  collation for every script in the tick — a broader behaviour change than this warrants on\n  its own, and it should not be made casually just to tidy a log line",
+  "created": "2026-08-08",
+  "id": "F-537fa8",
+  "refs": [],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "phase7-envelope truncates model output with cut -c, which counts bytes under launchd's C locale"
+}

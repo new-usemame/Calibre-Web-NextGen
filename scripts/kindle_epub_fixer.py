@@ -1261,7 +1261,12 @@ def get_library_location() -> str:
         return split_path
     else:
         dirs = {}
-        with open(str(app_paths.dirs_json()), 'r') as f:
+        # The module-level `dirs_json`, not a fresh app_paths lookup: it is the
+        # same value, and it is the seam the rest of this module (and its tests)
+        # already resolve through. Before #1462 this line hardcoded a path that
+        # does not exist outside the container, so it raised and the caller's
+        # `except` branch quietly did the right thing via that global.
+        with open(dirs_json, 'r') as f:
             dirs: dict[str, str] = json.load(f)
         library_dir = f"{dirs['calibre_library_dir']}/"
         return library_dir

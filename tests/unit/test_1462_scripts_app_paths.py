@@ -38,6 +38,7 @@ import json
 import os
 import pathlib
 import re
+import sqlite3
 import subprocess
 import sys
 
@@ -448,3 +449,46 @@ def test_sys_path_bootstrap_points_at_the_resolved_root(app_paths, monkeypatch):
         assert sys.path.count(root) == 1, "second call must not duplicate the entry"
     finally:
         sys.path[:] = before
+
+
+def test_kindle_fixer_library_lookup_honours_the_module_dirs_json(
+    app_paths, monkeypatch, tmp_path
+):
+    """#1462 regression, caught by CI and not by the local run.
+
+    ``kindle_epub_fixer.get_library_location()`` used to open a hardcoded
+    ``dirs.json`` path. Outside the container that path does not exist, so the
+    call raised and ``_get_metadata_db_path()``'s ``except`` branch resolved the
+    library through the module-level ``dirs_json`` global instead — which is the
+    seam its tests monkeypatch.
+
+    Routing that ``open()`` through a fresh ``app_paths.dirs_json()`` made it
+    *succeed*, reading the shipped ``dirs.json`` and silently ignoring the
+    global. It only shows up when ``app.db`` exists, because otherwise
+    ``_get_metadata_db_path`` returns before reaching this path — which is
+    exactly why a macOS run stayed green and CI went red.
+    """
+    library = tmp_path / "mount" / "nested-library"
+    library.mkdir(parents=True)
+    (library / "metadata.db").write_bytes(b"")
+    dirs = tmp_path / "dirs.json"
+    dirs.write_text(json.dumps({"calibre_library_dir": str(library)}), encoding="utf-8")
+
+    # An app.db that EXISTS, with split-library off: the branch CI exercises.
+    config = tmp_path / "config"
+    config.mkdir()
+    app_db = config / "app.db"
+    con = sqlite3.connect(str(app_db))
+    con.execute("CREATE TABLE settings (config_calibre_split INTEGER, config_calibre_dir TEXT)")
+    con.execute("INSERT INTO settings VALUES (0, '')")
+    con.commit()
+    con.close()
+    monkeypatch.setenv("CALIBRE_DBPATH", str(config))
+
+    fixer_module = importlib.reload(importlib.import_module("kindle_epub_fixer"))
+    monkeypatch.setattr(fixer_module, "dirs_json", str(dirs))
+
+    assert fixer_module.get_library_location() == f"{library}/"
+
+    fixer = fixer_module.EPUBFixer.__new__(fixer_module.EPUBFixer)
+    assert fixer._get_metadata_db_path() == str(library / "metadata.db")

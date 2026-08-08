@@ -643,6 +643,7 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
+| Spanish (`es`) | `████████████████████` 100% | 2645/2645 | 0 |
 | Russian (`ru`) | `████████████████████` 99% | 2622/2645 | 0 |
 | Polish (`pl`) | `████████████████████` 99% | 2609/2645 | 0 |
 | French (`fr`) | `█████████████████░░░` 83% | 2200/2645 | 129 |
@@ -650,7 +651,6 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1736/2645 | 292 |
 | Hungarian (`hu`) | `████████████░░░░░░░░` 62% | 1646/2645 | 123 |
 | Portuguese (Brazil) (`pt_BR`) | `███████████░░░░░░░░░` 53% | 1409/2645 | 312 |
-| Spanish (`es`) | `██████████░░░░░░░░░░` 52% | 1378/2645 | 196 |
 | Japanese (`ja`) | `██████████░░░░░░░░░░` 50% | 1320/2645 | 249 |
 | Slovenian (`sl`) | `█████████░░░░░░░░░░░` 46% | 1214/2645 | 320 |
 | Chinese (Simplified, China) (`zh_Hans_CN`) | `█████████░░░░░░░░░░░` 44% | 1175/2645 | 350 |

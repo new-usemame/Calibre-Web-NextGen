@@ -1,0 +1,11 @@
+{
+  "area": "i18n",
+  "body": "OBSERVED 2026-08-08 while validating the Spanish completion in #1469.\n\nThe checked-in `messages.pot` lists **2397** unique msgids. The source tree actually\nyields ~**2595**. The 198-string gap is not noise: each one was checked and found\nverbatim in `cps/` (e.g. \"A duplicate scan is already running…\" in a template,\n\"Callback domain is not verified…\" in `cps/gdrive.py`, \"LDAP Server not reachable\"\nand \"Kobo sync for Magic Shelves is disabled globally…\" in `cps/web.py`,\n\"Cleared sync state for book…\" and the title-sort rule message in `cps/admin.py`).\n\nWhy it matters: translators sync their catalogue from the pot. Every locale except\n`es` sits at exactly **2373** unique msgids — ru, de and fr all measure identically,\nwhich is the signature of a shared stale source rather than a coincidence. Those\ntranslators cannot translate the 198 strings because the strings are not in the file\nthey are handed. No amount of translation effort can close the gap; de/fr/it can\nnever reach 100% until the pot is regenerated.\n\n`es` is at 2645/2645 only because @HaruIjima-kun extracted fresh rather than working\nfrom the checked-in pot. That is the workaround, not the fix, and it is invisible to\nanyone who follows the documented process.\n\nFix: regenerate `messages.pot` from source (SPA msgids must stay anchored in\n`cps/spa_strings.py` or auto-translation strips them) and run `pybabel update` across\nlocales so the new msgids appear as untranslated rather than absent. Verify after with\n`msgfmt --statistics` per locale — the untranslated counts should RISE, which is the\ncorrect outcome: the work becomes visible instead of hidden.\n\nMeasured on merged main (72e718f30):\n    es 2645 translated\n    pl 2609 translated, 36 untranslated\n    ru 2622 translated, 23 untranslated\n    de 1891 translated, 124 fuzzy, 630 untranslated",
+  "created": "2026-08-08",
+  "id": "F-af3ee7",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "messages.pot is stale, so ~198 real user-facing strings are invisible to every translator"
+}

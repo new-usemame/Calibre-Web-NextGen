@@ -18,6 +18,17 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The Tags page showed columns of "…" instead of tag names.** The grid was
+  sized before the per-row rename and delete buttons existed, so once those
+  arrived they took their space out of the tag name itself: in a 1280px-wide
+  window the name had 86px of a 244px cell, and 87% of tags were cut off. Rows
+  carrying those buttons now get a wider column — three across instead of four
+  on a typical desktop — and a long name uses a second line before it
+  ellipsizes. Measured on a 152-tag library, names cut off went from 87% to 9%
+  on desktop, 41% to 9% at the 720px width in the report, and 32% to 8% on a
+  phone. The Authors, Series and Publishers lists keep their current column
+  count and gain the same second line; the compact list view is unchanged.
+
 - **A third-party KOReader sync client is no longer left guessing why a book
   looks unsynced.** Positions that exist only as a percentage — the ones the
   web reader and a Kobo produce — are deliberately held back from clients that

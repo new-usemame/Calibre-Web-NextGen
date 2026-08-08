@@ -109,7 +109,17 @@ web_server = WebServer()
 updater_thread = Updater()
 
 if limiter_present:
-    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False)
+    # `storage_uri` is stated rather than left to default. flask_limiter warns
+    # on every startup when no storage is given, because an implicit in-memory
+    # backend is wrong for the multi-worker deployments it usually sees. This
+    # server is single-process — gevent's WSGIServer or one tornado IOLoop,
+    # never a pre-fork pool — so every request handler shares these counters
+    # and in-memory is the right backend. Declaring it silences the warning
+    # without changing behaviour. A networked backend is deliberately not
+    # offered here: the image ships no redis/memcached client, so pointing at
+    # one would turn a log line into a failed startup.
+    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False,
+                      storage_uri="memory://")
 else:
     limiter = None
 

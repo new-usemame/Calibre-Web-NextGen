@@ -32,6 +32,17 @@ Deliberately dependency-free and free of any ``cps`` import: ``auto_library.py``
 runs before the Flask stack is usable, and ``cover_enforcer.py`` has to survive
 an environment where importing ``cps`` fails outright.
 
+**These four variables are trusted configuration, not user input.** They are read
+from the launch environment — the Dockerfile, the s6 service definitions, or a
+packager's systemd unit — and they were already trusted that way before this
+module existed. Centralising them does widen what one of them reaches:
+``CWA_APP_ROOT`` now selects the ``sys.path`` entry used for ``cps`` imports
+across every script rather than a couple of them, so whoever can set it can
+choose which ``cps`` package is imported. That is the same privilege the
+launch environment already had (it picks the interpreter and the code), but do
+not plumb any of these through from a request, a config page, or anything a
+library user can influence.
+
 The ``/config`` default is kept exactly as scripts/ already had it. The
 container sets ``CALIBRE_DBPATH=/config`` as a Docker ``ENV`` (the #1162 fix),
 so that default never fires there — and de-hardcoding the *app* root must not

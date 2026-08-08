@@ -183,6 +183,16 @@ def auto_register_plugins(
     if _registered_plugin_names():
         return []
 
+    # Inherit the ambient environment so `calibre-customize` resolves off
+    # the real PATH, but keep HOME pinned to the config tree: calibre
+    # writes its plugin registry under `$HOME/.config/calibre/`, which is
+    # exactly where `_CUSTOMIZE_JSON` above reads it back from. Letting
+    # HOME default to the service's own (`/root`) would write the registry
+    # somewhere nothing reads, so the short-circuit never fires and the
+    # running calibre never sees the plugins.
+    env = os.environ.copy()
+    env["HOME"] = _HOME
+
     registered: list[str] = []
     # `calibre-customize -a` copies the source .zip into
     # `<plugins_dir>/<PluginDisplayName>.zip`. When the source filename
@@ -204,6 +214,7 @@ def auto_register_plugins(
             shutil.copy(str(zip_path), staged_path)
             result = subprocess.run(
                 [calibre_customize_binary, "-a", staged_path],
+                env=env,
                 capture_output=True,
                 text=True,
                 timeout=60,

@@ -57,27 +57,52 @@ def _iter_code(code):
             yield from _iter_code(const)
 
 
-def _module_bound_names(source, path):
-    """Names the module binds at any scope, discovered statically.
+SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
-    Deliberately over-inclusive: every import, def, class, assignment target
-    and ``global`` declaration counts. A false *negative* here just means the
-    sweep stays quiet, so over-inclusion keeps this test from going flaky on
-    dynamic-but-legitimate binding patterns.
+
+def _module_bound_names(source, path):
+    """Names bound in the module's own scope, discovered statically.
+
+    Scope-aware on purpose. An earlier draft counted every ``Store`` anywhere
+    in the file, which meant a local variable inside one function marked that
+    name "bound" for the whole module and hid a genuinely missing global of the
+    same name elsewhere — the exact class this test exists to catch.
+
+    So: recurse through module-level compound statements (``if``/``try``/
+    ``for``/``with`` are still module scope), bind the *name* of a nested def
+    or class but do not descend into its body, and separately honour ``global``
+    declarations anywhere, since a function may legally bind a module global.
     """
     names = set()
+
+    def visit_block(body):
+        for node in body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                for alias in node.names:
+                    if alias.name == "*":
+                        names.add("*STAR*")
+                    names.add(alias.asname or alias.name.split(".")[0])
+            elif isinstance(node, SCOPE_NODES):
+                # Its name lands in this scope; its body is a different one.
+                names.add(node.name)
+            else:
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Store):
+                        names.add(sub.id)
+                    elif isinstance(sub, (ast.Import, ast.ImportFrom)):
+                        for alias in sub.names:
+                            if alias.name == "*":
+                                names.add("*STAR*")
+                            names.add(alias.asname or alias.name.split(".")[0])
+                    elif isinstance(sub, SCOPE_NODES):
+                        names.add(sub.name)
+
     tree = ast.parse(source, str(path))
+    visit_block(tree.body)
+
+    # `global X; X = ...` inside any function still binds a module global.
     for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            for alias in node.names:
-                if alias.name == "*":
-                    names.add("*STAR*")
-                names.add(alias.asname or alias.name.split(".")[0])
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            names.add(node.name)
-        elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
-            names.add(node.id)
-        elif isinstance(node, ast.Global):
+        if isinstance(node, ast.Global):
             names.update(node.names)
     return names
 

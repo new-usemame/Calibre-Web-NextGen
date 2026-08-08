@@ -133,7 +133,7 @@ class TestChownToServiceUser:
         result = service_user.chown_to_service_user(tmp_path, "[test]")
 
         assert result is True
-        assert captured["command"] == ["chown", "-R", "1000:1000", str(tmp_path)]
+        assert captured["command"] == ["chown", "-R", "1000:1000", "--", str(tmp_path)]
         assert captured["check"] is True
 
     def test_non_recursive_for_a_single_log_file(self, service_user, monkeypatch, tmp_path):
@@ -149,6 +149,30 @@ class TestChownToServiceUser:
         service_user.chown_to_service_user(tmp_path / "x.log", "[test]", recursive=False)
 
         assert "-R" not in captured["command"]
+
+    def test_the_path_is_separated_from_the_options(self, service_user, monkeypatch, tmp_path):
+        """RED before the review fix: a leading-dash path was parsed as a flag.
+
+        dirs.json is the operator's file, not anything reachable from the web,
+        so this is not an exploit path — but a library directory whose name
+        starts with ``-`` should fail as a missing file rather than silently
+        become an option to chown.
+        """
+        monkeypatch.setattr(service_user, "service_ids", lambda: (1000, 1000))
+        captured = {}
+        monkeypatch.setattr(
+            subprocess,
+            "run",
+            lambda command, **k: captured.setdefault("command", command)
+            or subprocess.CompletedProcess(command, 0),
+        )
+        awkward = tmp_path / "--reference=elsewhere"
+
+        service_user.chown_to_service_user(awkward, "[test]")
+
+        command = captured["command"]
+        assert command[-2:] == ["--", str(awkward)]
+        assert command.index("--") == len(command) - 2
 
     def test_a_real_chown_failure_is_still_reported(self, service_user, monkeypatch, tmp_path):
         """Skipping an absent account must not swallow a genuine permission error."""

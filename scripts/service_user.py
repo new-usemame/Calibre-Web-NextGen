@@ -114,7 +114,11 @@ def chown_to_service_user(path, label, recursive=True, respect_network_share_mod
     command = ["chown"]
     if recursive:
         command.append("-R")
-    command += [f"{uid}:{gid}", str(path)]
+    # `--` so a path is never parsed as an option. dirs.json is the operator's
+    # file rather than anything reachable from the web, so this is not an
+    # exploit path, but a library directory whose name begins with `-` should
+    # fail as a missing file rather than turn into a flag.
+    command += [f"{uid}:{gid}", "--", str(path)]
     try:
         subprocess.run(command, check=True)
         return True

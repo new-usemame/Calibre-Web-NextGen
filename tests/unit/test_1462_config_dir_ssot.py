@@ -111,40 +111,47 @@ class TestConfigDirMatchesCps:
 
         assert str(app_paths.config_dir()) == cps_config_dir
 
-    def test_an_existing_legacy_config_app_db_is_not_abandoned(
+    def test_an_existing_legacy_config_app_db_does_not_redirect_the_default(
         self, app_paths, monkeypatch, tmp_path
     ):
-        """cps.py takes ``-p /config/app.db``, which scripts/ cannot see.
+        """RED before the review fix: returned the legacy dir.
 
-        A bare-metal service started that way agreed with the old ``/config``
-        fallback. Moving the default to the app root would leave the app on
-        ``/config/app.db`` while scripts seeded a second database beside the
-        code — settings and users appearing to roll back. An install that
-        already has a database at the legacy location keeps it.
+        An earlier revision deferred to an existing ``/config/app.db`` so a
+        service started with ``cps.py -p /config/app.db`` — an argument
+        scripts/ cannot see — would keep agreeing. The heuristic is unsound:
+        ``cps`` reads ``/config`` only when ``CALIBRE_DBPATH`` is set, and when
+        it is set this branch is unreachable, so it could never produce
+        agreement, only a new disagreement. It also fired on precisely the
+        machines this fix is for, since the broken build left an app.db at
+        ``/config`` on every source install.
         """
         legacy = tmp_path / "legacy-config"
         legacy.mkdir()
         (legacy / "app.db").write_text("existing install")
-        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(legacy))
-        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path / "code"))
-        (tmp_path / "code").mkdir()
-
-        assert app_paths.config_dir() == legacy
-
-    def test_the_legacy_fallback_yields_once_the_app_root_has_its_own_db(
-        self, app_paths, monkeypatch, tmp_path
-    ):
-        """Compatibility, not a permanent redirect."""
-        legacy = tmp_path / "legacy-config"
-        legacy.mkdir()
-        (legacy / "app.db").write_text("stale")
         root = tmp_path / "code"
         root.mkdir()
-        (root / "app.db").write_text("the real one")
         monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(legacy))
         monkeypatch.setenv("CWA_APP_ROOT", str(root))
 
         assert app_paths.config_dir() == root
+
+    def test_still_agrees_with_cps_when_a_legacy_database_exists(
+        self, app_paths, monkeypatch, tmp_path
+    ):
+        """The whole point: the two halves cannot be allowed to diverge.
+
+        RED before the review fix — scripts said the legacy dir, cps said the
+        app root, which is the same split #1462 is about.
+        """
+        checkout = tmp_path / "app"
+        (checkout / "cps").mkdir(parents=True)
+        legacy = tmp_path / "legacy-config"
+        legacy.mkdir()
+        (legacy / "app.db").write_text("left by the broken build")
+        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(legacy))
+        monkeypatch.setenv("CWA_APP_ROOT", str(checkout))
+
+        assert str(app_paths.config_dir()) == _exec_cps_config_dir(checkout)
 
     def test_a_fresh_source_install_ignores_a_nonexistent_legacy_dir(
         self, app_paths, monkeypatch, tmp_path
@@ -155,6 +162,66 @@ class TestConfigDirMatchesCps:
         monkeypatch.setenv("CWA_APP_ROOT", str(root))
 
         assert app_paths.config_dir() == root
+
+
+class TestLegacyConfigDirIsReportedNotGuessedAt:
+    """An ambiguous layout is the operator's call, so we report and stop.
+
+    Dropping the redirect above leaves a real hazard: an install upgrading
+    from a build that seeded ``/config`` has a database there that this run
+    would ignore, seeding an empty one beside the code. Nothing is destroyed,
+    but the operator's users and settings vanish behind an empty library,
+    silently. ``stray_legacy_config_dir()`` is what makes that loud.
+    """
+
+    def test_reports_the_legacy_dir_when_this_install_has_no_database(
+        self, app_paths, monkeypatch, tmp_path
+    ):
+        legacy = tmp_path / "legacy-config"
+        legacy.mkdir()
+        (legacy / "app.db").write_text("the operator's real database")
+        root = tmp_path / "code"
+        root.mkdir()
+        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(legacy))
+        monkeypatch.setenv("CWA_APP_ROOT", str(root))
+
+        assert app_paths.stray_legacy_config_dir() == legacy
+
+    def test_silent_once_this_install_has_its_own_database(
+        self, app_paths, monkeypatch, tmp_path
+    ):
+        """Not ambiguous — the local database is plainly the live one."""
+        legacy = tmp_path / "legacy-config"
+        legacy.mkdir()
+        (legacy / "app.db").write_text("stale leftover")
+        root = tmp_path / "code"
+        root.mkdir()
+        (root / "app.db").write_text("the real one")
+        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(legacy))
+        monkeypatch.setenv("CWA_APP_ROOT", str(root))
+
+        assert app_paths.stray_legacy_config_dir() is None
+
+    def test_silent_when_there_is_no_legacy_database(
+        self, app_paths, monkeypatch, tmp_path
+    ):
+        root = tmp_path / "code"
+        root.mkdir()
+        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(tmp_path / "nope"))
+        monkeypatch.setenv("CWA_APP_ROOT", str(root))
+
+        assert app_paths.stray_legacy_config_dir() is None
+
+    def test_silent_in_the_container(self, app_paths, monkeypatch, tmp_path):
+        """CALIBRE_DBPATH is set in the image, so there is nothing to resolve."""
+        legacy = tmp_path / "legacy-config"
+        legacy.mkdir()
+        (legacy / "app.db").write_text("existing install")
+        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(legacy))
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path / "code"))
+        monkeypatch.setenv("CALIBRE_DBPATH", str(legacy))
+
+        assert app_paths.stray_legacy_config_dir() is None
 
 
 class TestRelativeDirsJsonIsAnchored:
@@ -331,6 +398,9 @@ class TestSeedDatabaseIsNotMistakenForTheLiveOne:
         (tmp_path / "frontend" / "node_modules" / "pkg").mkdir(parents=True)
         (tmp_path / "frontend" / "node_modules" / "pkg" / "app.db").write_text("noise")
 
+        # The prune only applies when the config dir IS the app root, which is
+        # the off-Docker layout these tests are about.
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path))
         walker = auto_library.AutoLibrary.__new__(auto_library.AutoLibrary)
         walker.config_dir = str(tmp_path)
 
@@ -360,6 +430,9 @@ class TestSeedDatabaseIsNotMistakenForTheLiveOne:
         fixture.mkdir(parents=True)
         (fixture / "app.db").write_text("a dependency's test fixture")
 
+        # The prune only applies when the config dir IS the app root, which is
+        # the off-Docker layout these tests are about.
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path))
         walker = auto_library.AutoLibrary.__new__(auto_library.AutoLibrary)
         walker.config_dir = str(tmp_path)
 
@@ -380,6 +453,9 @@ class TestSeedDatabaseIsNotMistakenForTheLiveOne:
         (tmp_path / "legacy").mkdir()
         (tmp_path / "legacy" / "app.db").write_text("real")
 
+        # The prune only applies when the config dir IS the app root, which is
+        # the off-Docker layout these tests are about.
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path))
         walker = auto_library.AutoLibrary.__new__(auto_library.AutoLibrary)
         walker.config_dir = str(tmp_path)
 
@@ -391,3 +467,160 @@ class TestSeedDatabaseIsNotMistakenForTheLiveOne:
         ]
 
         assert found == [str(tmp_path / "legacy" / "app.db")]
+
+    def test_a_config_dir_of_its_own_is_never_pruned(self, monkeypatch, tmp_path):
+        """RED before the review fix: the container's walk lost directories.
+
+        Pruning by name at every depth is only safe when the config dir IS the
+        app root. A config dir the operator mounts is theirs to lay out — a
+        folder called ``cps`` or ``venv`` in it is a name, not our code — and
+        skipping those would hide a live database and re-seed over it. That is
+        the failure this pruning exists to prevent, pointed the other way.
+        """
+        monkeypatch.syspath_prepend(str(SCRIPTS_DIR))
+        import auto_library
+
+        config = tmp_path / "config"
+        (config / "cps").mkdir(parents=True)
+        (config / "cps" / "app.db").write_text("the operator's database")
+
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path / "app"))
+        walker = auto_library.AutoLibrary.__new__(auto_library.AutoLibrary)
+        walker.config_dir = str(config)
+
+        found = [
+            os.path.join(dirpath, name)
+            for dirpath, _dirs, files in walker._walk_config_dir()
+            for name in files
+            if name == "app.db"
+        ]
+
+        assert found == [str(config / "cps" / "app.db")]
+
+    def test_sqlite_sidecars_do_not_suppress_the_seed_copy(self, monkeypatch, tmp_path):
+        """RED before the review fix: matched on ``"app.db" in f``.
+
+        ``app.db-journal`` and ``app.db-wal`` are what sqlite leaves *beside* a
+        database. A config dir whose app.db had been deleted still counted as
+        having one, so the seed copy was skipped, sqlite created a 0-byte file,
+        and the first query died on ``no such table: settings`` — the very
+        symptom this fix is for. ``app.db.bak`` suppressed it the same way.
+
+        Drives the real ``check_for_app_db()`` rather than re-testing the match
+        expression: an earlier version of this test filtered the walk itself
+        with ``name == "app.db"``, which passes whatever the production code
+        does and so proved nothing.
+        """
+        monkeypatch.syspath_prepend(str(SCRIPTS_DIR))
+        import auto_library
+
+        config = tmp_path / "config"
+        config.mkdir()
+        for sidecar in ("app.db-journal", "app.db-wal", "app.db-shm", "app.db.bak"):
+            (config / sidecar).write_text("not a database")
+        seed = tmp_path / "empty_library" / "app.db"
+        seed.parent.mkdir()
+        seed.write_text("the seed database")
+
+        monkeypatch.setenv("CWA_APP_ROOT", str(config))
+        walker = auto_library.AutoLibrary.__new__(auto_library.AutoLibrary)
+        walker.config_dir = str(config)
+        walker.DEFAULT_APPDB_PATH = str(config / "app.db")
+        walker.empty_appdb = str(seed)
+        monkeypatch.setattr(
+            auto_library.service_user, "chown_to_service_user", lambda *a, **k: False
+        )
+        # raising=False so this test isolates the filename match: without it,
+        # the pre-fix tree fails on the missing attribute instead of on the
+        # defect, which is a red test for the wrong reason.
+        monkeypatch.setattr(
+            auto_library.app_paths, "stray_legacy_config_dir", lambda: None, raising=False
+        )
+
+        walker.check_for_app_db()
+
+        assert (config / "app.db").read_text() == "the seed database"
+
+    def test_check_for_app_db_matches_the_exact_filename(self):
+        """Source-pin, so the substring test cannot come back by edit."""
+        source = (SCRIPTS_DIR / "auto_library.py").read_text()
+        tree = ast.parse(source)
+        func = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "check_for_app_db"
+        )
+        comparisons = [
+            node
+            for node in ast.walk(func)
+            if isinstance(node, ast.Compare) and isinstance(node.ops[0], ast.In)
+            and isinstance(node.left, ast.Constant) and node.left.value == "app.db"
+        ]
+
+        assert comparisons == [], "app.db must be matched exactly, not as a substring"
+
+
+class TestRefusesToSeedBesideAnExistingDatabase:
+    """auto_library stops rather than silently hiding the operator's data.
+
+    The counterpart to :class:`TestLegacyConfigDirIsReportedNotGuessedAt`: the
+    report is only worth having if the run acts on it. Seeding a fresh app.db
+    while a real one sits at the legacy location leaves the app serving an
+    empty library — no data destroyed, but the operator's users and settings
+    are gone from where they can see them, with nothing in the output saying so.
+    """
+
+    def _walker(self, monkeypatch, config_dir):
+        monkeypatch.syspath_prepend(str(SCRIPTS_DIR))
+        import auto_library
+
+        walker = auto_library.AutoLibrary.__new__(auto_library.AutoLibrary)
+        walker.config_dir = str(config_dir)
+        return auto_library, walker
+
+    def test_exits_instead_of_seeding_over_a_legacy_database(self, monkeypatch, tmp_path):
+        import app_paths as _app_paths  # noqa: F401  (ensures scripts/ is importable)
+
+        legacy = tmp_path / "legacy-config"
+        legacy.mkdir()
+        (legacy / "app.db").write_text("the operator's real database")
+        root = tmp_path / "code"
+        root.mkdir()
+
+        auto_library, walker = self._walker(monkeypatch, root)
+        monkeypatch.setattr(
+            auto_library.app_paths, "stray_legacy_config_dir", lambda: legacy
+        )
+
+        with pytest.raises(SystemExit) as exit_info:
+            walker._refuse_if_legacy_config_dir_is_ambiguous()
+
+        assert exit_info.value.code == 1
+
+    def test_says_which_database_and_how_to_keep_it(self, monkeypatch, tmp_path, capsys):
+        """A stop the operator cannot act on is just a different silence."""
+        legacy = tmp_path / "legacy-config"
+        legacy.mkdir()
+        root = tmp_path / "code"
+        root.mkdir()
+
+        auto_library, walker = self._walker(monkeypatch, root)
+        monkeypatch.setattr(
+            auto_library.app_paths, "stray_legacy_config_dir", lambda: legacy
+        )
+
+        with pytest.raises(SystemExit):
+            walker._refuse_if_legacy_config_dir_is_ambiguous()
+
+        message = capsys.readouterr().out
+        assert str(legacy / "app.db") in message
+        assert f"CALIBRE_DBPATH={legacy}" in message
+
+    def test_does_nothing_when_the_layout_is_unambiguous(self, monkeypatch, tmp_path):
+        """The container and every ordinary source install pass straight through."""
+        auto_library, walker = self._walker(monkeypatch, tmp_path)
+        monkeypatch.setattr(
+            auto_library.app_paths, "stray_legacy_config_dir", lambda: None
+        )
+
+        assert walker._refuse_if_legacy_config_dir_is_ambiguous() is None

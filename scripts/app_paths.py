@@ -62,6 +62,7 @@ from pathlib import Path
 __all__ = [
     "app_root",
     "config_dir",
+    "stray_legacy_config_dir",
     "dirs_json",
     "app_db_path",
     "empty_library_dir",
@@ -151,25 +152,59 @@ def config_dir():
 def _default_config_dir():
     """The directory ``cps`` would use when ``CALIBRE_DBPATH`` is unset.
 
-    One exception to "mirror cps": an install that already keeps its database
-    at the historical ``/config`` keeps using it. ``cps.py`` takes a ``-p
-    /config/app.db`` argument (``cps/cli.py``) that scripts/ cannot see, so a
-    bare-metal service started that way agreed with the old ``/config``
-    fallback and would silently stop agreeing here — the app would carry on
-    reading ``/config/app.db`` while auto_library.py seeded and updated a
-    second database beside the code. Nothing is deleted, but the operator's
-    users and settings appear to roll back, which is the shape of data loss.
+    Mirrors ``cps/constants.py`` exactly and infers nothing beyond it: the pip
+    ``.HOMEDIR`` marker selects ``~/.calibre-web-automated``, everything else
+    gets the app root.
 
-    Deferring to an existing ``/config/app.db`` keeps those installs whole and
-    still gives new ones the correct location. Never reached in Docker, where
-    ``CALIBRE_DBPATH`` is set.
+    An earlier revision of this fix also deferred to an existing
+    ``/config/app.db``, to protect a bare-metal service started with ``cps.py
+    -p /config/app.db`` — an argument scripts/ cannot see. That heuristic is
+    unsound, and cannot be repaired: ``cps`` reads ``/config`` only when
+    ``CALIBRE_DBPATH`` is set, and when it is set this function is never
+    reached. So the branch could never make the two sides agree; it could only
+    make them disagree in a *new* way. Worse, it fired on exactly the machines
+    this fix is for — the old code seeded ``/config/app.db`` at the filesystem
+    root, so every install upgrading from a broken build has that file, and
+    would have gone on reading a different database from the app.
+
+    An ambiguous layout is reported instead of guessed at, by
+    :func:`stray_legacy_config_dir`. See #1462.
     """
     if (app_root() / "cps" / ".HOMEDIR").is_file():
         return Path(os.path.expanduser("~")) / ".calibre-web-automated"
-    root = app_root()
-    if not (root / "app.db").is_file() and Path(DEFAULT_CONFIG_DIR, "app.db").is_file():
-        return Path(DEFAULT_CONFIG_DIR)
-    return root
+    return app_root()
+
+
+def stray_legacy_config_dir():
+    """``/config`` holding a database nothing is going to read, or ``None``.
+
+    Returns the legacy directory when all of the following hold: no
+    ``CALIBRE_DBPATH``, a database at the pre-#1462 ``/config/app.db``, and a
+    resolved config dir that is somewhere else and has no database of its own.
+    That is an install upgrading from a build whose ``auto_library.py`` seeded
+    ``/config`` at the filesystem root, or a service started with an explicit
+    ``cps.py -p /config/app.db``.
+
+    Both cases need the operator to say which database is the real one, so
+    nothing is moved and nothing is guessed — the caller reports it and stops.
+    Setting ``CALIBRE_DBPATH=/config`` adopts the existing one and makes both
+    halves of the install agree again.
+
+    ``None`` in the container, where ``CALIBRE_DBPATH`` is always set.
+    """
+    if _env_path("CALIBRE_DBPATH") is not None:
+        return None
+    legacy = Path(DEFAULT_CONFIG_DIR)
+    resolved = config_dir()
+    if resolved == legacy:
+        return None
+    if not (legacy / "app.db").is_file():
+        return None
+    if (resolved / "app.db").is_file():
+        # This install already has its own database; the /config one is a
+        # leftover, not a competing answer. Nothing ambiguous to report.
+        return None
+    return legacy
 
 
 def app_db_path():

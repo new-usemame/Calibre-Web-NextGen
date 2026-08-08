@@ -67,8 +67,14 @@ try:
     file_handler.setFormatter(formatter)
     # Add the handler to the logger
     logger.addHandler(file_handler)
-except FileNotFoundError:
-    # Fallback for test environments where /config might not exist
+except OSError:
+    # Fallback when the log file cannot be opened. This caught only
+    # FileNotFoundError, which was enough while the path was /config: a
+    # missing directory was the only way it failed. The config dir now
+    # resolves to the app root off Docker, which usually exists and may be
+    # read-only (a distro package installs the tree root-owned), so the
+    # failure mode is PermissionError. Importing this module must not depend
+    # on the log file being writable either way.
     stream_handler = logging.StreamHandler()
     LOG_FORMAT = '%(message)s'
     formatter = logging.Formatter(LOG_FORMAT)

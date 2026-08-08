@@ -36,8 +36,11 @@ try:
     formatter = logging.Formatter(LOG_FORMAT)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-except FileNotFoundError:
-    # Fallback for test environments where /config might not exist
+except OSError:
+    # Fallback when the log file cannot be opened -- a missing directory, or
+    # (now that the config dir resolves to the app root off Docker) a
+    # read-only install tree. Importing this module must not require a
+    # writable log file. See kindle_epub_fixer.py for the same change.
     stream_handler = logging.StreamHandler()
     LOG_FORMAT = '%(message)s'
     formatter = logging.Formatter(LOG_FORMAT)

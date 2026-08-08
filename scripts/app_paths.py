@@ -149,10 +149,27 @@ def config_dir():
 
 
 def _default_config_dir():
-    """The directory ``cps`` would use when ``CALIBRE_DBPATH`` is unset."""
+    """The directory ``cps`` would use when ``CALIBRE_DBPATH`` is unset.
+
+    One exception to "mirror cps": an install that already keeps its database
+    at the historical ``/config`` keeps using it. ``cps.py`` takes a ``-p
+    /config/app.db`` argument (``cps/cli.py``) that scripts/ cannot see, so a
+    bare-metal service started that way agreed with the old ``/config``
+    fallback and would silently stop agreeing here — the app would carry on
+    reading ``/config/app.db`` while auto_library.py seeded and updated a
+    second database beside the code. Nothing is deleted, but the operator's
+    users and settings appear to roll back, which is the shape of data loss.
+
+    Deferring to an existing ``/config/app.db`` keeps those installs whole and
+    still gives new ones the correct location. Never reached in Docker, where
+    ``CALIBRE_DBPATH`` is set.
+    """
     if (app_root() / "cps" / ".HOMEDIR").is_file():
         return Path(os.path.expanduser("~")) / ".calibre-web-automated"
-    return app_root()
+    root = app_root()
+    if not (root / "app.db").is_file() and Path(DEFAULT_CONFIG_DIR, "app.db").is_file():
+        return Path(DEFAULT_CONFIG_DIR)
+    return root
 
 
 def app_db_path():
@@ -177,10 +194,19 @@ def app_db_path():
 
 
 def dirs_json():
-    """Path to ``dirs.json`` (ingest folder, library dir, conversion tmp dir)."""
+    """Path to ``dirs.json`` (ingest folder, library dir, conversion tmp dir).
+
+    A relative ``CWA_DIRS_JSON`` is anchored to the app root, not to the
+    current directory. The scripts are launched from ``scripts/`` (the
+    reporter's build does ``pushd <app root>/scripts``) while the systemd unit
+    runs ``cps.py`` with ``WorkingDirectory=<app root>``, so an unanchored
+    relative value resolves to two different files and puts the ingest and the
+    app on two different libraries. ``cps/constants.py`` anchors it the same
+    way, against ``BASE_DIR``.
+    """
     override = _env_path("CWA_DIRS_JSON")
     if override is not None:
-        return override
+        return override if override.is_absolute() else app_root() / override
     return app_root() / "dirs.json"
 
 

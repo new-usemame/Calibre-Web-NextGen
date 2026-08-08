@@ -23,6 +23,7 @@ Both are invisible in Docker, which sets ``CALIBRE_DBPATH=/config`` and leaves
 pin that this fix did not move anything in the image.
 """
 
+import ast
 import importlib
 import os
 import sys
@@ -94,17 +95,103 @@ class TestConfigDirMatchesCps:
         assert app_paths.app_db_path() == Path("/data/app.db")
 
     def test_agrees_with_cps_constants_on_a_source_install(self, app_paths, monkeypatch, tmp_path):
-        """The invariant itself, asserted against the real cps resolution.
+        """The invariant itself, against cps's own BASE_DIR/CONFIG_DIR lines.
 
-        Rather than restating cps's rule, run cps/constants.py's own expression
-        for a source layout and require the two to agree. If either side's
-        default is edited later, this fails.
+        An earlier version of this assigned ``cps_base_dir = tmp_path`` and
+        compared against that, which asserted the test's own assumption and
+        would pass even if the two modules disagreed. Both expressions are now
+        executed from the shipped source, with ``__file__`` pointed at a real
+        checkout layout, so a change to either side's default breaks this.
         """
-        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path))
-        cps_base_dir = tmp_path  # what BASE_DIR resolves to for a checkout at tmp_path
-        cps_config_dir = os.environ.get("CALIBRE_DBPATH", str(cps_base_dir))
+        checkout = tmp_path / "srv" / "cwng"
+        (checkout / "cps").mkdir(parents=True)
+        monkeypatch.setenv("CWA_APP_ROOT", str(checkout))
+
+        cps_config_dir = _exec_cps_config_dir(checkout)
 
         assert str(app_paths.config_dir()) == cps_config_dir
+
+    def test_an_existing_legacy_config_app_db_is_not_abandoned(
+        self, app_paths, monkeypatch, tmp_path
+    ):
+        """cps.py takes ``-p /config/app.db``, which scripts/ cannot see.
+
+        A bare-metal service started that way agreed with the old ``/config``
+        fallback. Moving the default to the app root would leave the app on
+        ``/config/app.db`` while scripts seeded a second database beside the
+        code — settings and users appearing to roll back. An install that
+        already has a database at the legacy location keeps it.
+        """
+        legacy = tmp_path / "legacy-config"
+        legacy.mkdir()
+        (legacy / "app.db").write_text("existing install")
+        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(legacy))
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path / "code"))
+        (tmp_path / "code").mkdir()
+
+        assert app_paths.config_dir() == legacy
+
+    def test_the_legacy_fallback_yields_once_the_app_root_has_its_own_db(
+        self, app_paths, monkeypatch, tmp_path
+    ):
+        """Compatibility, not a permanent redirect."""
+        legacy = tmp_path / "legacy-config"
+        legacy.mkdir()
+        (legacy / "app.db").write_text("stale")
+        root = tmp_path / "code"
+        root.mkdir()
+        (root / "app.db").write_text("the real one")
+        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(legacy))
+        monkeypatch.setenv("CWA_APP_ROOT", str(root))
+
+        assert app_paths.config_dir() == root
+
+    def test_a_fresh_source_install_ignores_a_nonexistent_legacy_dir(
+        self, app_paths, monkeypatch, tmp_path
+    ):
+        root = tmp_path / "code"
+        root.mkdir()
+        monkeypatch.setattr(app_paths, "DEFAULT_CONFIG_DIR", str(tmp_path / "nope"))
+        monkeypatch.setenv("CWA_APP_ROOT", str(root))
+
+        assert app_paths.config_dir() == root
+
+
+class TestRelativeDirsJsonIsAnchored:
+    """A relative CWA_DIRS_JSON must not resolve against the working directory.
+
+    scripts/ run from ``<app root>/scripts`` (the reporter's build does
+    ``pushd``); the systemd unit runs cps.py from ``<app root>``. An unanchored
+    relative value therefore names two different files.
+    """
+
+    def test_scripts_anchor_a_relative_value_to_the_app_root(
+        self, app_paths, monkeypatch, tmp_path
+    ):
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path))
+        monkeypatch.setenv("CWA_DIRS_JSON", "config/dirs.json")
+
+        assert app_paths.dirs_json() == tmp_path / "config" / "dirs.json"
+
+    def test_cps_anchors_the_same_relative_value_the_same_way(self, monkeypatch):
+        monkeypatch.setenv("CWA_DIRS_JSON", "config/dirs.json")
+
+        namespace = _exec_cps_dirs_json(base_dir="/srv/cwng")
+
+        assert namespace == "/srv/cwng/config/dirs.json"
+
+    def test_both_halves_agree_on_a_relative_value(self, app_paths, monkeypatch, tmp_path):
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path))
+        monkeypatch.setenv("CWA_DIRS_JSON", "etc/dirs.json")
+
+        assert str(app_paths.dirs_json()) == _exec_cps_dirs_json(base_dir=str(tmp_path))
+
+    def test_an_absolute_value_is_left_alone(self, app_paths, monkeypatch, tmp_path):
+        monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path / "code"))
+        monkeypatch.setenv("CWA_DIRS_JSON", "/etc/cwng/dirs.json")
+
+        assert app_paths.dirs_json() == Path("/etc/cwng/dirs.json")
+        assert _exec_cps_dirs_json(base_dir="/srv/cwng") == "/etc/cwng/dirs.json"
 
 
 class TestDirsJsonSSOT:
@@ -117,31 +204,23 @@ class TestDirsJsonSSOT:
         external.write_text("{}")
         monkeypatch.setenv("CWA_DIRS_JSON", str(external))
 
-        source = (REPO_ROOT / "cps" / "constants.py").read_text()
-        namespace = {"__file__": str(REPO_ROOT / "cps" / "constants.py")}
-        exec(_dirs_json_assignment(source), {"os": os, "sys": sys, **namespace}, namespace)
-
-        assert namespace["DIRS_JSON"] == str(external)
+        assert _exec_cps_dirs_json(base_dir=str(REPO_ROOT)) == str(external)
 
     def test_cps_falls_back_to_base_dir_when_unset(self, monkeypatch):
         """Docker and every existing install keep BASE_DIR/dirs.json."""
         monkeypatch.delenv("CWA_DIRS_JSON", raising=False)
 
-        source = (REPO_ROOT / "cps" / "constants.py").read_text()
-        namespace = {"BASE_DIR": "/app/calibre-web-automated"}
-        exec(_dirs_json_assignment(source), {"os": os}, namespace)
-
-        assert namespace["DIRS_JSON"] == "/app/calibre-web-automated/dirs.json"
+        assert _exec_cps_dirs_json(base_dir="/app/calibre-web-automated") == (
+            "/app/calibre-web-automated/dirs.json"
+        )
 
     def test_blank_cwa_dirs_json_is_treated_as_unset(self, monkeypatch):
         """An empty env var must not resolve dirs.json to the empty string."""
         monkeypatch.setenv("CWA_DIRS_JSON", "   ")
 
-        source = (REPO_ROOT / "cps" / "constants.py").read_text()
-        namespace = {"BASE_DIR": "/app/calibre-web-automated"}
-        exec(_dirs_json_assignment(source), {"os": os}, namespace)
-
-        assert namespace["DIRS_JSON"] == "/app/calibre-web-automated/dirs.json"
+        assert _exec_cps_dirs_json(base_dir="/app/calibre-web-automated") == (
+            "/app/calibre-web-automated/dirs.json"
+        )
 
     def test_scripts_and_cps_pick_the_same_dirs_json(self, app_paths, monkeypatch, tmp_path):
         """The invariant: one dirs.json, both halves."""
@@ -149,11 +228,7 @@ class TestDirsJsonSSOT:
         external.write_text("{}")
         monkeypatch.setenv("CWA_DIRS_JSON", str(external))
 
-        source = (REPO_ROOT / "cps" / "constants.py").read_text()
-        namespace = {"BASE_DIR": "/app/calibre-web-automated"}
-        exec(_dirs_json_assignment(source), {"os": os}, namespace)
-
-        assert str(app_paths.dirs_json()) == namespace["DIRS_JSON"]
+        assert str(app_paths.dirs_json()) == _exec_cps_dirs_json(base_dir="/app/calibre-web-automated")
 
 
 class TestDockerParity:
@@ -185,17 +260,56 @@ class TestDockerParity:
         assert app_paths.dirs_json() == Path("/app/calibre-web-automated/dirs.json")
 
 
-def _dirs_json_assignment(source):
-    """Pull the DIRS_JSON assignment out of cps/constants.py.
+def _cps_constants_source():
+    return (REPO_ROOT / "cps" / "constants.py").read_text()
+
+
+def _exec_cps_dirs_json(base_dir):
+    """Run cps/constants.py's real DIRS_JSON resolution for a given BASE_DIR.
 
     constants.py imports flask_babel at module scope, so it cannot be imported
-    in a bare unit test. Executing just this statement keeps the assertion
-    against the real shipped line rather than a copy of it.
+    in a bare unit test. Lifting the statements out with ast keeps the
+    assertion against the shipped code rather than a copy of it — and unlike
+    matching on a line prefix, it survives the assignment being reformatted
+    across lines.
     """
-    for line in source.splitlines():
-        if line.startswith("DIRS_JSON"):
-            return line
-    raise AssertionError("DIRS_JSON assignment not found in cps/constants.py")
+    source = _cps_constants_source()
+    segments = [
+        ast.get_source_segment(source, node)
+        for node in ast.parse(source).body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id in {"_dirs_json_override", "DIRS_JSON"}
+            for target in node.targets
+        )
+    ]
+    if not segments:
+        raise AssertionError("DIRS_JSON assignment not found in cps/constants.py")
+    namespace = {"BASE_DIR": base_dir}
+    exec("\n".join(segments), {"os": os}, namespace)
+    return namespace["DIRS_JSON"]
+
+
+def _exec_cps_config_dir(checkout):
+    """Run cps/constants.py's real BASE_DIR + CONFIG_DIR resolution.
+
+    ``__file__`` is pointed at ``<checkout>/cps/constants.py`` so BASE_DIR
+    derives from a real layout, exactly as it does at runtime.
+    """
+    source = _cps_constants_source()
+    segments = []
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id in {"HOME_CONFIG", "BASE_DIR"}
+            for target in node.targets
+        ):
+            segments.append(ast.get_source_segment(source, node))
+        elif isinstance(node, ast.If) and "CONFIG_DIR" in (ast.get_source_segment(source, node) or ""):
+            segments.append(ast.get_source_segment(source, node))
+            break
+    namespace = {"__file__": str(Path(checkout) / "cps" / "constants.py")}
+    exec("\n".join(segments), {"os": os, "sys": sys}, namespace)
+    return namespace["CONFIG_DIR"]
 
 
 class TestSeedDatabaseIsNotMistakenForTheLiveOne:
@@ -228,6 +342,35 @@ class TestSeedDatabaseIsNotMistakenForTheLiveOne:
         ]
 
         assert found == [], f"seed/vendor databases must not count as the live app.db: {found}"
+
+    def test_an_un_dotted_venv_is_pruned_too(self, monkeypatch, tmp_path):
+        """The reporter's layout is <app root>/venv, not .venv.
+
+        Any dependency shipping a fixture called app.db inside site-packages
+        would otherwise count as this install's live database and suppress the
+        seed copy, leaving a 0-byte app.db and "no such table: settings".
+        """
+        monkeypatch.syspath_prepend(str(SCRIPTS_DIR))
+        import auto_library
+
+        # Deliberately NOT under site-packages: that name is pruned in its own
+        # right, and a fixture below it would pass this test with "venv" removed
+        # from the blocklist entirely.
+        fixture = tmp_path / "venv" / "lib" / "dep-data"
+        fixture.mkdir(parents=True)
+        (fixture / "app.db").write_text("a dependency's test fixture")
+
+        walker = auto_library.AutoLibrary.__new__(auto_library.AutoLibrary)
+        walker.config_dir = str(tmp_path)
+
+        found = [
+            os.path.join(dirpath, name)
+            for dirpath, _dirs, files in walker._walk_config_dir()
+            for name in files
+            if "app.db" in name
+        ]
+
+        assert found == []
 
     def test_a_real_stray_app_db_is_still_found(self, monkeypatch, tmp_path):
         """The pruning must not blind the legacy-layout discovery it guards."""

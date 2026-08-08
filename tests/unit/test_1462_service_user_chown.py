@@ -188,3 +188,34 @@ class TestCallSitesUseTheHelper:
         source = (SCRIPTS_DIR / script).read_text()
 
         assert "import service_user" in source
+
+    @pytest.mark.parametrize(
+        "script",
+        ["auto_library.py", "ingest_processor.py", "convert_library.py", "kindle_epub_fixer.py"],
+    )
+    def test_script_actually_calls_the_helper(self, script):
+        """Absence of `abc:abc` plus an import is not evidence of a call.
+
+        Deleting every `chown_to_service_user(...)` call would leave both of
+        the checks above green while, in Docker, root-owned config and library
+        files stayed root-owned and the `abc` web process could not write them.
+        """
+        source = (SCRIPTS_DIR / script).read_text()
+
+        assert "service_user.chown_to_service_user(" in source
+
+    def test_auto_library_still_chowns_all_four_of_its_targets(self):
+        """config dir, library dir, and the calibre plugin dir twice."""
+        source = (SCRIPTS_DIR / "auto_library.py").read_text()
+
+        assert source.count("service_user.chown_to_service_user(") == 4
+
+    def test_the_plugin_dir_chown_ignores_network_share_mode(self):
+        """The calibre config dir is a local volume even when the library is on NFS.
+
+        Losing this makes plugins root-owned and unreadable at conversion time
+        for anyone running NETWORK_SHARE_MODE=true.
+        """
+        source = (SCRIPTS_DIR / "auto_library.py").read_text()
+
+        assert source.count("respect_network_share_mode=False") == 2

@@ -162,9 +162,14 @@ class AutoLibrary:
     #: Only reachable off Docker, where the config dir and the app root are the
     #: same directory (``cps`` resolves CONFIG_DIR to BASE_DIR when
     #: CALIBRE_DBPATH is unset, and app_paths follows it).
+    #: ``venv`` matters as much as ``.venv``: the reporter's build puts its
+    #: virtualenv at ``<app root>/venv``, and any dependency shipping a test
+    #: fixture called ``app.db`` inside site-packages would be counted as this
+    #: install's live database and suppress the seed copy. It is ~20k files to
+    #: walk on first run besides.
     NON_CONFIG_DIRS = frozenset({
         "empty_library", "cps", "scripts", "tests", "frontend",
-        "node_modules", ".git", ".venv", "__pycache__",
+        "node_modules", ".git", ".venv", "venv", "site-packages", "__pycache__",
     })
 
     def _walk_config_dir(self):

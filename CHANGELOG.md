@@ -18,6 +18,17 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The container reported itself unhealthy, and the library count showed 0
+  books.** A path cleanup landed a reference to a setting the file never
+  imported, so the lookup that finds your Calibre library raised an error the
+  moment anything called it. Two places call it, and both quietly treat any
+  error as "no library": the `/health` endpoint every Docker, Compose and
+  Kubernetes setup polls started answering "degraded" forever even though the
+  app was serving pages normally, and the book count on the instance rendered
+  0. If your orchestration restarts or refuses to roll out on a failing
+  healthcheck, that is why. Affects the `:dev` channel only — no published
+  release shipped it.
+
 - **The Tags page showed columns of "…" instead of tag names.** The grid was
   sized before the per-row rename and delete buttons existed, so once those
   arrived they took their space out of the tag name itself: in a 1280px-wide

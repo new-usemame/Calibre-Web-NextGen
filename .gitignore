@@ -250,3 +250,18 @@ cps/static/app/
 # Local output from the no-argument wiki generator. The published wiki is
 # rendered into a temporary clone by scripts/sync-wiki.sh.
 wiki-generated/
+
+# Runtime artifacts of a BARE-METAL run from the source checkout. In Docker the
+# app writes these under /config, but running `cps` directly from a clone puts
+# them in the repo root. `.key` is a real secret, so an accidental `git add -A`
+# by a contributor would publish it.
+#
+# This is not hypothetical: on 2026-08-08 an autopilot tick ran the app from the
+# checkout while working on bare-metal path handling, left both files behind, and
+# every subsequent tick aborted at the preflight clean-tree gate — four ticks in a
+# row drained nothing before anyone noticed.
+.key
+app.db
+app.db-journal
+app.db-wal
+app.db-shm

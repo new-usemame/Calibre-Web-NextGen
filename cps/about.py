@@ -26,8 +26,6 @@ modules = dict()
 req = dep_check.load_dependencies(False)
 opt = []
 for i in (req + opt):
-    if i[0] == 'not installed':
-        continue
     modules[i[1].name] = i[0]
 modules['Jinja2'] = importlib.metadata.version("jinja2")
 if sys.version_info < (3, 12):

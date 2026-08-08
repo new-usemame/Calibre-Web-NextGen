@@ -21,6 +21,16 @@ def load_dependencies(optional=False):
         if (not optional and is_extra) or (optional and not is_extra):
             continue
 
+        # Environment markers (sys_platform, python_version) say whether a
+        # requirement applies to this interpreter at all. Without this, the three
+        # marked entries in pyproject.toml come back reading "not installed" on an
+        # interpreter they were never meant to be installed on, which is what
+        # forced the About page to hide every "not installed" row -- including the
+        # ones that were genuinely missing. Extras are skipped because "extra" is
+        # undefined in a bare marker environment and would evaluate False.
+        if req.marker and not is_extra and not req.marker.evaluate():
+            continue
+
         try:
             dep_version = version(req.name)
         except (PackageNotFoundError):

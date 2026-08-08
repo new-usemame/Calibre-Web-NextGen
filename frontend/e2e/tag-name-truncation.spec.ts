@@ -29,6 +29,7 @@ const CLIPPING = `(() => {
   const names = [...document.querySelectorAll('span[class*="name"]')].filter((e) => e.closest('li'));
   if (!names.length) return { total: 0, clipped: 0, pctClipped: 0, nameShareOfTrack: 0 };
   const li = names[0].closest('li');
+  const tracks = getComputedStyle(li.closest('ul')).gridTemplateColumns;
   const track = li.getBoundingClientRect().width;
   // Widest name box in the list — the share of the cell the content gets.
   const widest = Math.max(...names.map((n) => n.clientWidth));
@@ -39,13 +40,14 @@ const CLIPPING = `(() => {
     clipped,
     pctClipped: Math.round((100 * clipped) / names.length),
     nameShareOfTrack: Math.round((100 * widest) / track),
+    columns: tracks === 'none' ? 1 : tracks.split(' ').length,
     hasRowActions: li.querySelectorAll('button').length > 0,
   };
 })()`;
 
 type Clipping = {
   total: number; clipped: number; pctClipped: number;
-  nameShareOfTrack: number; hasRowActions?: boolean;
+  nameShareOfTrack: number; columns: number; hasRowActions?: boolean;
 };
 
 for (const [name, width, height] of [
@@ -68,6 +70,30 @@ for (const [name, width, height] of [
     ).toBeLessThanOrEqual(20);
   });
 }
+
+test('the wider track is scoped to the list that carries row actions (#1396)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  const trackOf = async (route: string) => {
+    await page.goto(`/app/${route}`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector('li span[class*="name"]', { timeout: 20_000 }).catch(() => {});
+    return (await page.evaluate(CLIPPING)) as Clipping;
+  };
+
+  const tags = await trackOf('tags');
+  const authors = await trackOf('authors');
+  test.skip(tags.total < 20 || authors.total < 3, 'seed too small to compare grid density');
+  test.skip(!tags.hasRowActions, 'this user has no tag-edit rights, so no list carries row actions');
+
+  // Only the Tags grid pays for the #973 buttons, so only it gets the wider
+  // track. Widening `.grid` globally would silently thin out Authors, Series
+  // and Publishers, which nobody asked for.
+  expect(
+    authors.columns,
+    `Authors dropped to ${authors.columns} columns; the #1396 wider track leaked outside the list that carries row actions`,
+  ).toBeGreaterThan(tags.columns);
+});
 
 test('the tag name keeps a fair share of its grid cell (#1396)', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });

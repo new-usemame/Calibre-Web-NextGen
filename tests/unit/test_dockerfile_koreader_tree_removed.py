@@ -24,6 +24,7 @@ it resolves its ROOT from its own location in a repo checkout and runs
 on CI, never inside the image, so the delete does not affect it.
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -33,7 +34,26 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPO_ROOT / "Dockerfile"
 
 STATIC_COPY = "/app/calibre-web-automated/cps/static/"
-KOREADER_TREE = "/app/calibre-web-automated/koreader/"
+KOREADER_TREE = "/app/calibre-web-automated/koreader"
+
+#: The `rm` line, however it is spelled. Deliberately loose about the trailing
+#: slash and the quoting: an equivalent rewrite must not make the ordering pin
+#: below silently skip, because a skip reads as a pass.
+REMOVE_RE = re.compile(
+    r"^\s*rm\s+(?P<flags>(?:-{1,2}[A-Za-z-]+\s+)*)['\"]?"
+    + re.escape(KOREADER_TREE)
+    + r"/?['\"]?\s*$"
+)
+
+#: A filesystem reference to a directory named `koreader`, in the two shapes
+#: this repo actually uses to build paths, plus the absolute in-image path.
+#: Matching the bare word would hit `cps/progress_syncing/checksums/koreader.py`
+#: and every import of it, which are modules, not paths.
+RUNTIME_READ_RE = re.compile(
+    r"calibre-web-automated/koreader"
+    r"|/\s*['\"]koreader['\"]"
+    r"|join\([^)]*['\"]koreader['\"]"
+)
 
 
 @pytest.fixture(scope="module")
@@ -58,10 +78,14 @@ def _copy_line_index(text: str) -> int:
 
 
 def _remove_line_index(text: str) -> int:
-    return _line_index(
-        text,
-        lambda ln: ln.strip().startswith("rm ") and KOREADER_TREE in ln,
-    )
+    return _line_index(text, lambda ln: REMOVE_RE.match(ln) is not None)
+
+
+def _remove_flags(line: str) -> str:
+    """Every flag token on the `rm`, joined. `-rf`, `-r -f` and
+    `--recursive --force` all have to read the same way."""
+    match = REMOVE_RE.match(line)
+    return "" if match is None else match.group("flags")
 
 
 def test_the_plugin_zip_is_copied_into_static(dockerfile: str) -> None:
@@ -100,8 +124,9 @@ def test_the_removal_does_not_hard_fail_a_build(dockerfile: str) -> None:
     if remove_at == -1:
         pytest.skip("Dockerfile no longer removes the koreader/ tree")
     line = dockerfile.splitlines()[remove_at]
-    flags = line.strip().split()[1]
-    assert flags.startswith("-") and "f" in flags.lower(), (
+    flags = _remove_flags(line)
+    forcing = "f" in flags.replace("--", " ").replace("-", " ") or "force" in flags
+    assert forcing, (
         f"`{line.strip()}` removes the koreader tree without -f. If the tree is "
         "ever absent the whole RUN fails and the image does not build."
     )
@@ -111,9 +136,15 @@ def test_nothing_under_cps_reads_the_koreader_tree_at_runtime(dockerfile: str) -
     """Guard the premise of the delete: if application code ever starts
     reading the in-image koreader/ tree, removing it becomes a live bug.
 
-    Matches the absolute in-image path only. `cps/templates/kosync_plugin.html`
-    and `cps/services/reading_position.py` both mention `/koreader/plugins/`,
-    but those are paths on the user's e-reader, not in the container.
+    Matches the absolute in-image path and the two relative shapes this repo
+    builds paths with (`... / "koreader"` and `join(..., "koreader")`), because
+    code reaching the tree relatively would pass an absolute-path-only grep and
+    then raise FileNotFoundError in the published image only.
+
+    `cps/templates/kosync_plugin.html` and `cps/services/reading_position.py`
+    both mention `/koreader/plugins/`, but those are paths on the user's
+    e-reader, not in the container, and `cps/progress_syncing/checksums/
+    koreader.py` is a module name. None of those are path joins, so none match.
     """
     offenders = []
     for path in (REPO_ROOT / "cps").rglob("*"):
@@ -123,7 +154,7 @@ def test_nothing_under_cps_reads_the_koreader_tree_at_runtime(dockerfile: str) -
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:  # pragma: no cover - unreadable file in a build tree
             continue
-        if KOREADER_TREE.rstrip("/") in text:
+        if RUNTIME_READ_RE.search(text):
             offenders.append(path.relative_to(REPO_ROOT))
     assert not offenders, (
         "These files reference the in-image koreader/ tree, which the "

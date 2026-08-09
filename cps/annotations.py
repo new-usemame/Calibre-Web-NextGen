@@ -62,6 +62,12 @@ annotations_bp = Blueprint("annotations", __name__)
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 
+def _commit_required(commit):
+    """Raise when CWNG's commit wrapper reports a rolled-back write."""
+    if commit() is False:
+        raise RuntimeError("database commit did not land")
+
+
 def _owned_device(public_id, user_id, session):
     return session.query(ub.Device).filter(
         ub.Device.public_id == public_id, ub.Device.user_id == user_id,
@@ -107,7 +113,7 @@ def rename_annotation_device(public_id, *, user_id, label, session, commit):
     if device is None:
         return None
     device.display_name = label
-    commit()
+    _commit_required(commit)
     return device
 
 
@@ -144,7 +150,7 @@ def soft_delete_annotation_device(public_id, *, user_id, session, commit):
         {ub.AnnotationDeviceState.desired: False}, synchronize_session=False,
     )
     device.active = False
-    commit()
+    _commit_required(commit)
     return device, counts
 
 
@@ -172,7 +178,7 @@ def restore_annotation_device(public_id, *, user_id, session, commit):
             conflicts += 1
         session.delete(snapshot)
     device.active = True
-    commit()
+    _commit_required(commit)
     return device, restored, conflicts
 
 
@@ -920,7 +926,7 @@ def edit_annotation(annotation_id, *, user_id, book_id, session, commit,
         row.note_text = note
     row.last_synced = datetime.now(timezone.utc)
     if commit is not None:
-        commit()
+        _commit_required(commit)
     return row
 
 
@@ -959,7 +965,8 @@ def reassign_annotation(annotation_id, *, user_id, book_id, assigned_device_publ
             else:
                 state.desired = True
         if commit is not None:
-            commit()
+            if commit() is False:
+                raise AssignmentError("database_error")
         else:
             session.flush()
         return row
@@ -990,7 +997,8 @@ def reassign_annotation(annotation_id, *, user_id, book_id, assigned_device_publ
     row.assigned_device_id = target_id
     row.routing_revision = (row.routing_revision or 1) + 1
     if commit is not None:
-        commit()
+        if commit() is False:
+            raise AssignmentError("database_error")
     else:
         session.flush()
     return row
@@ -1088,7 +1096,9 @@ def annotations_edit(book_id, annotation_id):
     except AssignmentError as error:
         ub.session.rollback()
         status = 404 if error.code in ("not_found", "device_not_found") else (
-            409 if error.code in ("revision_conflict", "device_inactive") else 400
+            409 if error.code in ("revision_conflict", "device_inactive") else (
+                500 if error.code == "database_error" else 400
+            )
         )
         return jsonify({"error": error.code}), status
     except ValueError as e:

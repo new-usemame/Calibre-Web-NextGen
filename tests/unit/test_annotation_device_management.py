@@ -173,6 +173,27 @@ def test_bulk_rejects_more_than_500_items(session, monkeypatch):
     assert response.get_json()["max_items"] == 500
 
 
+def test_bulk_reports_commit_wrapper_failure_instead_of_false_success(session):
+    from cps.annotations import bulk_reassign_annotations
+    target = _device(session, label="Target")
+    annotation = _annotation(session, "commit-fails")
+    session.commit()
+
+    def failed_commit():
+        session.rollback()
+        return False
+
+    results = bulk_reassign_annotations(
+        [{"book_id": 5, "annotation_id": "commit-fails", "expected_routing_revision": 1}],
+        user_id=7, assigned_device_public_id=target.public_id,
+        session=session, commit=failed_commit,
+    )
+    assert results == [{"annotation_id": "commit-fails", "ok": False,
+                        "error_code": "database_error"}]
+    session.refresh(annotation)
+    assert annotation.assigned_device_id is None
+
+
 def test_device_management_migration_twice_and_downgrade_are_reversible():
     from cps import ub
     from sqlalchemy import text

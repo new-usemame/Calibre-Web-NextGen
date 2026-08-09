@@ -385,6 +385,46 @@ _("Could not save sidebar. Please try again.")
 _("Refresh library")
 
 
+# ---- Restored anchors (regression guard) --------------------------------
+# `extract_spa_strings.py --write` regenerates the AUTOGEN block below from
+# what its parser can see in the frontend. Strings it cannot see statically
+# — dynamic keys, values built at runtime — were previously anchored inside
+# that block and were dropped when it was regenerated on 2026-08-09, which
+# obsoleted their msgids and lost the existing fr/ru/de translations (the
+# #615 symptom: an untranslated SPA msgid renders English rather than
+# failing). They live ABOVE the marker so regeneration cannot drop them again.
+_("<")
+_("=")
+_(">")
+_("A one-time full duplicate scan is needed. Run it from CWA settings, then return here.")
+_("Border fill style")
+_("Date Added")
+_("Delete \u201c{name}\u201d? It is removed from {count} book, which is kept.")
+_("Delete \u201c{name}\u201d? It is removed from {count} books, which are kept.")
+_("Delete")
+_("Dismiss Ko-fi support message")
+_("Dismiss help announcement")
+_("Merge")
+_("Open Ko-fi →")
+_("Publication Date")
+_("Saving…")
+_("Support us on Ko-fi!")
+_("These open the full configuration pages. Changes there apply to the whole server.")
+_("\u201c{name}\u201d already exists on {count} book. Merge this tag into it?")
+_("\u201c{name}\u201d already exists on {count} books. Merge this tag into it?")
+_("begins with")
+_("contains")
+_("does not contain")
+_("ends with")
+_("in the past N days")
+_("is not")
+_("is")
+_("not in the past N days")
+_("on or after")
+_("on or before")
+_("≤")
+_("≥")
+
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====
 # Auto-anchored SPA-only msgids — every t('literal') and static label
 # property in frontend/src that

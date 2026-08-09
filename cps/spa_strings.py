@@ -393,11 +393,19 @@ _("Refresh library")
 # obsoleted their msgids and lost the existing fr/ru/de translations (the
 # #615 symptom: an untranslated SPA msgid renders English rather than
 # failing). They live ABOVE the marker so regeneration cannot drop them again.
+#
+# 30 of the 31 are restored. "Border fill style" is deliberately NOT among them:
+# nothing renders it. The classic cover picker's dropdown is labelled
+# _('Fill style') (cover_picker.html:114) and the SPA's is t('Fill style')
+# (CoverPicker.tsx:205) -- both of which are anchored and translated. The
+# phrase survives only in changelog prose and a test comment, and no locale has
+# ever carried a translation for it. Re-anchoring it puts a msgid nobody can
+# see back into the SPA-chrome catalog, which is what the #615 completeness
+# gate then requires fr and nl to translate. Do not add it back.
 _("<")
 _("=")
 _(">")
 _("A one-time full duplicate scan is needed. Run it from CWA settings, then return here.")
-_("Border fill style")
 _("Date Added")
 _("Delete \u201c{name}\u201d? It is removed from {count} book, which is kept.")
 _("Delete \u201c{name}\u201d? It is removed from {count} books, which are kept.")

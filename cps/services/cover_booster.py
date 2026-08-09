@@ -78,6 +78,58 @@ _AMAZON_CDN_URL = "https://m.media-amazon.com/images/P/{isbn10}.01._SCRM_SL2000_
 # threshold is almost certainly the placeholder, not a cover.
 _AMAZON_CDN_MIN_BYTES = 5_000
 
+# Which service actually serves the image bytes, keyed by host fragment. The
+# boost pass swaps a record's cover for a higher-res URL from one of these
+# without touching record["source"], so after a boost the source names the
+# provider that supplied the *metadata* while the image comes from somewhere
+# else entirely (fork #304: "how do I know if the cover is coming from
+# hardcover or Amazon?" - you couldn't). Values are metadata-provider __id__
+# strings so callers can compare against a record's own source id and drop
+# the label when it would say nothing.
+_IMAGE_ORIGIN_HOSTS = (
+    ("m.media-amazon.com", "amazon"),
+    ("ssl-images-amazon.com", "amazon"),
+    ("images-amazon.com", "amazon"),
+    ("mzstatic.com", "applebooks"),
+)
+
+# Display label per origin id, for the badge the picker renders.
+IMAGE_ORIGIN_LABELS = {
+    "amazon": "Amazon",
+    "applebooks": "Apple Books",
+}
+
+
+def image_origin(cover_url: str) -> Optional[str]:
+    """Return the provider id of the service serving ``cover_url``'s bytes.
+
+    Derived from the URL rather than from which code path produced it, so a
+    provider that natively returns an Amazon image is labelled the same as one
+    the boost pass rewrote. Returns None for hosts we can't attribute.
+    """
+    if not cover_url or not isinstance(cover_url, str):
+        return None
+    for fragment, origin in _IMAGE_ORIGIN_HOSTS:
+        if fragment in cover_url:
+            return origin
+    return None
+
+
+def stamp_cover_origins(records: List[Dict]) -> List[Dict]:
+    """Set ``record["cover_origin"]`` on every record with an attributable cover.
+
+    Runs over all records, not just boosted ones: the boost pass skips covers
+    that are already high-res, and those are exactly the Amazon URLs a provider
+    returned natively - equally in need of attribution.
+    """
+    for rec in records:
+        if not isinstance(rec, dict):
+            continue
+        origin = image_origin(rec.get("cover") or "")
+        if origin:
+            rec["cover_origin"] = origin
+    return records
+
 
 def boost_covers(records: List[Dict]) -> List[Dict]:
     """Mutate each MetaRecord-as-dict in place, upgrading record["cover"] when a
@@ -86,9 +138,13 @@ def boost_covers(records: List[Dict]) -> List[Dict]:
     Inputs are dicts (post-asdict()) keyed like MetaRecord: title, authors,
     identifiers (with optional 'isbn'), cover, source, etc. Records with no
     title or no cover are skipped.
+
+    Every return path stamps ``cover_origin`` (see ``stamp_cover_origins``) so
+    attribution does not depend on whether a record was boosted, or on the boost
+    pass being enabled at all.
     """
     if os.environ.get("CWA_COVER_BOOST", "1").lower() in ("0", "false", "no", "off"):
-        return records
+        return stamp_cover_origins(records)
     if not records:
         return records
 
@@ -106,7 +162,7 @@ def boost_covers(records: List[Dict]) -> List[Dict]:
             break
 
     if not candidates:
-        return records
+        return stamp_cover_origins(records)
 
     # parallel.fan_out, not concurrent.futures: this runs on the request
     # greenlet (the cover picker and metadata search both call it inline) and
@@ -126,7 +182,7 @@ def boost_covers(records: List[Dict]) -> List[Dict]:
                 rec.get("title"), upgraded, rec.get("cover"),
             )
             rec["cover"] = upgraded
-    return records
+    return stamp_cover_origins(records)
 
 
 def _boosted_cover_for(record: Dict) -> Optional[str]:

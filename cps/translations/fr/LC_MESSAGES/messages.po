@@ -12577,6 +12577,11 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py:674
+#, python-brace-format
+msgid "Image from {source}"
+msgstr "Image provenant de {source}"
+
 #~ msgid "Sync Kobo read progress to Hardcover (Requires API key per user)"
 #~ msgstr ""
 #~ "Synchroniser la progression de lecture Kobo avec Hardcover (nécessite une "

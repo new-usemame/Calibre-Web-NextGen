@@ -58,6 +58,11 @@ class CoverCandidate:
     height: Optional[int] = None
     candidate_id: Optional[str] = None      # Stable id for the apply step
     flags: Optional[List[str]] = None       # 'low_res', 'squished', etc.
+    # Who actually serves the image, when that differs from the provider that
+    # supplied the metadata. Set only when it adds information: a Hardcover
+    # record whose cover the boost pass swapped for an Amazon image gets
+    # 'Amazon' here, an Amazon record keeps None. Fork #304.
+    image_origin: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -199,10 +204,12 @@ def gather_cover_candidates(
         if not cover_url or _is_generic_cover(cover_url, static_cover):
             continue
         source = record.get("source") or {}
+        source_id = source.get("id") or "unknown"
         candidates.append(CoverCandidate(
-            source_id=source.get("id") or "unknown",
+            source_id=source_id,
             source_name=source.get("description") or "Unknown",
             cover_url=cover_url,
+            image_origin=_image_origin_label(record.get("cover_origin"), source_id),
             title=record.get("title"),
             authors=record.get("authors") or [],
             publisher=record.get("publisher") or None,
@@ -225,6 +232,17 @@ def gather_cover_candidates(
 
     statuses.sort(key=lambda s: s.name.lower())
     return candidates, statuses
+
+
+def _image_origin_label(origin_id: Optional[str], source_id: str) -> Optional[str]:
+    """Display label for who serves the image, or None when it says nothing.
+
+    Suppressed when the image host matches the provider that supplied the
+    record - an Amazon result on an Amazon image needs no second badge.
+    """
+    if not origin_id or origin_id == source_id:
+        return None
+    return cover_booster.IMAGE_ORIGIN_LABELS.get(origin_id)
 
 
 def _amazon_candidate_isbn10s(book_isbns: Iterable[str]) -> List[str]:

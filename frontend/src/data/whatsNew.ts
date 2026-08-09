@@ -56,6 +56,49 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.33',
+    date: '2026-08-08',
+    items: [
+      {
+        title: 'Tag names are readable again',
+        body: 'The Tags page was showing columns of "…" where the names should be: the grid had been sized before the rename and delete buttons existed, so once those arrived they took their space out of the name itself. Rows with those buttons now get a wider column and a long name wraps to a second line before it gets cut. On a 152-tag library, names cut off went from 87% to 9% on desktop and 32% to 8% on a phone. Authors, Series and Publishers keep their layout and gain the same second line.',
+        category: 'Library',
+        link: { to: '/tags', label: 'Browse tags' },
+      },
+      {
+        title: 'Signing in with your provider skips the extra click',
+        body: 'If your server has standard login switched off and exactly one sign-in provider configured, the login page existed only to be clicked through — it now starts that provider straight away. Adding ?local=1 to the login URL brings the plain page back, which is how an admin gets in if the provider itself is down. Cancelling at the provider used to bounce you straight back to it in a loop; that is fixed too.',
+        category: 'Account',
+      },
+      {
+        title: 'Spanish is complete, and Traditional Chinese is much further along',
+        body: 'Spanish now covers all 2,645 phrases in the interface, up from 1,378 — the most complete translation the project ships. Traditional Chinese went from 619 to 919. Both catalogues also had entries that gettext had guessed from a similar English sentence and marked provisional; a provisional entry is dropped when the catalogue is compiled, so those had been rendering in English while a translation sat in the file unused. In Spanish, 196 of them were confirmed or corrected, and a few had reversed the meaning of the original.',
+        category: 'Under the hood',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'A sync client is told when a position is being held back',
+        body: 'Reading positions that exist only as a percentage — the ones the web reader and a Kobo produce — are deliberately withheld from KOReader clients that have not said they can use them, because older plugins would try to jump to a position they cannot resolve and lose your place. From the client\'s side that looked identical to never having synced at all. The server now says what it is holding and how to ask for it, and the sync protocol documentation covers both position formats. Nothing changes for the bundled plugin.',
+        category: 'Sync',
+      },
+      {
+        title: 'Your library folder stops collecting a stray metadata.db',
+        body: 'Something during startup checked for a database at the top of your library folder, and the act of checking created an empty one there. That stray file is what made versions 4.1.20 to 4.1.31 refuse to start for some people. It is no longer created at all, and two things that had been reading it instead of your real library now find the right one: the KOReader checksum job, which had been failing with "no such table: books" on every restart, and your reading statistics, which had been reporting nothing.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The "help translate this" notice stops coming back',
+        body: 'The app remembered it had shown you that notice by writing a small file into its own program folder — which gets replaced every time you update, so the reminder returned with each new version. It is now kept alongside your settings, where it survives updates.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Installing from source keeps your database where the app reads it',
+        body: 'If you run NextGen from a checkout or a distro package rather than the Docker image, setup used to write app.db, dirs.json and your CWA settings into a /config folder it created at the top of the filesystem, while the app read from the folder you installed into — so you got a first-run screen and an empty library. All of them now resolve the same way. An install upgrading from one of those builds is told which database it found instead of being handed an empty one, first run no longer prints a chown error that was not an error, and the version no longer reports one release behind. Docker installs are unaffected.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.32',
     date: '2026-08-07',
     items: [

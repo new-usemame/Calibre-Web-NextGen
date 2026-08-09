@@ -113,6 +113,76 @@ HTTP Basic Auth endpoints for KOReader devices:
 
 Progress stored in `kosync_progress` table (app.db). Updates `ReadBook` and `KoboReadingState` tables for web UI and Kobo device sync.
 
+### Position encodings and `position_kinds`
+
+Two encodings travel on `GET /kosync/syncs/progress/<document>`, and a client
+has to say which it can act on. This section is the reference for third-party
+clients; the stock KOReader plugin and our `cwasync.koplugin` already comply.
+
+**`locator`** — the original encoding. `progress` is an engine-private crengine
+xpointer, or a page number for a paged document. The reader seeks to it exactly.
+
+**`percentage`** — a position written by a producer that knows how far through
+the book the reader is but cannot express it as a locator this engine would
+understand: the web reader, whose positions are EPUB CFIs, and a Kobo, whose
+positions are its own location tuples. `progress` is `null` and `percentage`
+carries the position. Approximate by nature.
+
+Advertise support with a comma-separated `position_kinds` query parameter:
+
+```
+GET /kosync/syncs/progress/<document>?position_kinds=locator,percentage
+```
+
+| Value | Meaning |
+|---|---|
+| `locator` | Client can seek to an xpointer or page number. Implied always. |
+| `percentage` | Client can seek to a percentage of the book. |
+
+**The default — an absent parameter — is `locator` only, and percentage-only
+rows are withheld entirely.** That is deliberate, not an oversight. A plugin
+released before this encoding existed guards only on `progress == nil`, and in
+Lua `"" ~= nil`, so any non-null placeholder reaches `GotoXPointer` and is
+stored as the document's `last_xpointer` — an unresolvable position the device
+cannot recover from. Serving `null` instead clears that hazard but makes the
+same plugin report a sync error where it used to say "no progress found". So
+those clients are served nothing at all and behave exactly as they did before.
+
+Responses carry a `position_kind` field naming the encoding of what was sent:
+
+```jsonc
+// locator
+{ "document": "abc…", "progress": "/body/DocFragment[12]/body/div/p[3].0",
+  "position_kind": "locator", "percentage": 0.4567, "device": "KOReader", … }
+
+// percentage-only, to a client that advertised `percentage`
+{ "document": "abc…", "progress": null,
+  "position_kind": "percentage", "percentage": 0.4567, "device": "Web reader", … }
+```
+
+Check the `progress` value as well as the `position_kind` label. The label is
+added by the server and the value is the stored column; if a proxy strips the
+label, a client that trusts it alone would treat the percentage-only marker as
+a locator. Our plugin's `SyncLogic.resolveRemotePosition` recognises the value
+itself for that reason.
+
+When a position exists but is being withheld because the client did not
+advertise its encoding, the otherwise-empty response names what it is holding:
+
+```jsonc
+{ "position_kinds_available": ["percentage"] }
+```
+
+This appears only on that miss, never beside a served position, so its presence
+means "ask for these and you get something". A book with no progress at all
+returns `{}`. The server also logs the withholding at WARNING with the
+parameter to send, so it is diagnosable from the server side too.
+
+`percentage` is a decimal fraction on the wire (`0.4567` = 45.67%), which is
+KOReader's format; it is stored as 0–100 internally. Progress is furthest-wins
+across producers, so a lower percentage is dropped rather than dragging a
+device backwards — a deliberate flip back to re-read a chapter does not travel.
+
 ## Testing
 
 ```bash

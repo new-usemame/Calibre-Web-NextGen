@@ -27,20 +27,35 @@ class TestBasicFunctionality:
         assert sys.version_info >= (3, 11), "Python 3.11 or higher required"
     
     def test_required_directories_exist(self):
-        """Verify critical directories exist."""
-        # /config always should exist (we're running from workspace)
-        assert os.path.exists('/config'), "Missing critical directory: /config"
-        
-        # These are container-specific paths - skip if not in container
-        container_dirs = [
-            '/app/calibre-web-automated',
-            '/calibre-library',
-            '/cwa-book-ingest'
-        ]
-        
-        # Check if we're in a container environment
-        if not all(os.path.exists(d) for d in container_dirs):
-            pytest.skip("Container mount points not available (running outside Docker)")
+        """Verify the resolved config directory exists, plus container mounts when present.
+
+        This used to assert the literal ``/config`` unconditionally, which is a
+        statement about the *runner*, not about the code: it passes in the image
+        because the volume is mounted and fails on every source checkout, so the
+        only way to keep it green was to run tests in Docker. Since #1462 the
+        config directory is resolved by ``app_paths.config_dir()``, and that
+        resolved directory is the thing worth asserting — it is what a source
+        install actually needs to exist. See #1474.
+        """
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))), 'scripts'))
+        import app_paths
+
+        resolved = str(app_paths.config_dir())
+        assert os.path.isdir(resolved), f"Missing resolved config directory: {resolved}"
+
+        # Container mode is decided by ONE marker, not by "do all the mounts
+        # happen to be here". The old form asked whether every container path
+        # existed and skipped if any was missing — so a container missing two of
+        # its mounts reported "not a container, skipped" instead of failing,
+        # which is the exact layout the assertion is for.
+        in_container = os.path.isdir('/app/calibre-web-automated')
+        if not in_container:
+            pytest.skip("Not running inside the container image (source checkout)")
+
+        required_mounts = ['/config', '/calibre-library', '/cwa-book-ingest']
+        missing = [d for d in required_mounts if not os.path.isdir(d)]
+        assert not missing, f"Container is missing required mounts: {missing}"
     
     def test_flask_app_can_be_imported(self):
         """Verify Flask app module can be imported without errors."""

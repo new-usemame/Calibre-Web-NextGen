@@ -452,6 +452,106 @@ class TestAutoRegisterPlugins:
             f"Cleanup must happen after each calibre-customize call."
         )
 
+    def test_registration_runs_with_HOME_pointed_at_the_config_tree(
+            self, clean_env, tmp_path, monkeypatch):
+        """`calibre-customize -a` must run with HOME set to the same tree
+        that `_CUSTOMIZE_JSON` is read from.
+
+        calibre writes its plugin registry under `$HOME/.config/calibre/`,
+        and `_registered_plugin_names()` reads `_CUSTOMIZE_JSON`, which is
+        derived from `_HOME`. If registration inherits an ambient HOME
+        (the service runs as root, so `/root`) the registry is written
+        somewhere the reader never looks: the idempotency short-circuit
+        never fires, every boot re-registers, and the running calibre —
+        which is pointed at `/config` — never sees the plugins at all.
+        """
+        from unittest.mock import patch, MagicMock
+
+        clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
+        monkeypatch.setenv("HOME", "/root")
+        monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
+        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
+        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
+        plugins_dir.mkdir(parents=True)
+        (plugins_dir / "DeDRM_plugin.zip").write_bytes(b"PK\x03\x04")
+
+        seen_env = {}
+
+        def fake_run(args, **kwargs):
+            seen_env["env"] = kwargs.get("env")
+            mock = MagicMock()
+            mock.returncode = 0
+            mock.stdout = "Plugin added: DeDRM (1, 0, 0)\n"
+            return mock
+
+        with patch("subprocess.run", side_effect=fake_run):
+            calibre_user_plugins.auto_register_plugins(
+                calibre_customize_binary="/fake/calibre-customize"
+            )
+
+        env = seen_env["env"]
+        assert env is not None, (
+            "calibre-customize was invoked with no explicit env, so it "
+            "inherits the service's HOME (/root). calibre would write its "
+            "registry to /root/.config/calibre/customize.py.json while "
+            "_registered_plugin_names() reads it from _HOME."
+        )
+        assert env.get("HOME") == str(tmp_path), (
+            f"HOME must point at the config tree that _CUSTOMIZE_JSON is "
+            f"derived from ({tmp_path}); got {env.get('HOME')!r}. Writing "
+            f"the registry outside that tree breaks both the idempotency "
+            f"guard and plugin visibility at conversion time."
+        )
+
+    def test_registration_inherits_ambient_PATH_rather_than_pinning_it(
+            self, clean_env, tmp_path, monkeypatch):
+        """The env handed to `calibre-customize` must be built from the
+        ambient environment, not a fixed dict.
+
+        A hardcoded `PATH` pins binary resolution to one layout and breaks
+        bare-metal installs where calibre lives elsewhere. This pins the
+        fix so a future change cannot restore the literal PATH while
+        restoring HOME.
+        """
+        from unittest.mock import patch, MagicMock
+
+        clean_env.setenv("CWA_CALIBRE_USER_PLUGINS", "true")
+        monkeypatch.setenv("PATH", "/sentinel/bin")
+        monkeypatch.setenv("CWA_SENTINEL_VAR", "inherited")
+        monkeypatch.setattr(calibre_user_plugins, "_HOME", str(tmp_path))
+        registry_path = tmp_path / ".config" / "calibre" / "customize.py.json"
+        monkeypatch.setattr(calibre_user_plugins, "_CUSTOMIZE_JSON", registry_path)
+        plugins_dir = tmp_path / ".config" / "calibre" / "plugins"
+        plugins_dir.mkdir(parents=True)
+        (plugins_dir / "DeDRM_plugin.zip").write_bytes(b"PK\x03\x04")
+
+        seen_env = {}
+
+        def fake_run(args, **kwargs):
+            seen_env["env"] = kwargs.get("env")
+            mock = MagicMock()
+            mock.returncode = 0
+            mock.stdout = "Plugin added: DeDRM (1, 0, 0)\n"
+            return mock
+
+        with patch("subprocess.run", side_effect=fake_run):
+            calibre_user_plugins.auto_register_plugins(
+                calibre_customize_binary="/fake/calibre-customize"
+            )
+
+        env = seen_env["env"]
+        assert env is not None, "calibre-customize was invoked with no env"
+        assert env.get("PATH") == "/sentinel/bin", (
+            f"PATH must be inherited so calibre-customize resolves from the "
+            f"ambient environment; got {env.get('PATH')!r}. A pinned PATH is "
+            f"the /app hardcoding this PR set out to remove."
+        )
+        assert env.get("CWA_SENTINEL_VAR") == "inherited", (
+            "the subprocess env must be a copy of os.environ with HOME "
+            "overridden, not a fresh dict — unrelated variables must survive."
+        )
+
 
 @pytest.mark.unit
 class TestCallSiteWiringSourcePin:

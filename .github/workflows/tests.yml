@@ -418,7 +418,25 @@ jobs:
           # tests/docker/ and tests/integration/ are included for the same
           # reason tests.yml counts as frontend-relevant above: a PR that
           # changes a harness must be validated by the harness it changes.
-          if echo "$files" | grep -qE '^(Dockerfile$|[^/]*requirements[^/]*\.txt$|root/|tests/(docker|integration)/|\.github/workflows/tests\.yml$)'; then
+          #   cps/**.py          the application the image exists to run. A
+          #                      pure-Python change can stop the container
+          #                      booting just as dead as a bad Dockerfile,
+          #                      and integration-tests is still the ONLY job
+          #                      that boots it. #1438 removed a hardcoded
+          #                      path in cps/web.py without importing the
+          #                      constant that replaced it: import-time was
+          #                      fine, every unit test was green, and the
+          #                      container went permanently unhealthy. It
+          #                      touched no Dockerfile, carried no tier-2
+          #                      label, so Integration Tests was advisory,
+          #                      went red, and the summary reported success.
+          #                      Scoped to .py on purpose: cps/translations/
+          #                      *.po are tier-1 auto-merge PRs and a broken
+          #                      catalogue is already a hard failure in Fast
+          #                      Tests (test_translations_compile.py), so
+          #                      routing them through a full image build
+          #                      would buy nothing and stall every locale PR.
+          if echo "$files" | grep -qE '^(Dockerfile$|[^/]*requirements[^/]*\.txt$|root/|cps/.*\.py$|tests/(docker|integration)/|\.github/workflows/tests\.yml$)'; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
             echo "build=false" >> "$GITHUB_OUTPUT"

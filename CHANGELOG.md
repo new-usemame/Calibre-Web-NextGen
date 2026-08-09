@@ -16,7 +16,169 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Two new cover fill styles that fill the e-reader frame instead of adding a
+  border.** Every existing style pads the cover out to your device's shape,
+  which leaves a mirrored, blurred or coloured band down the sides. If you would
+  rather see the artwork itself edge to edge, there are now two more options in
+  the fill-style dropdown: **Stretch to fill**, which scales the cover to the
+  frame and accepts a little distortion, and **Crop to fill**, which keeps the
+  proportions honest and trims a strip off the two long edges instead. The six
+  original styles are untouched and Edge mirror is still the default, so nothing
+  changes unless you pick one. Requested by @mgrimace (#1280).
+
+## [v4.1.33] - 2026-08-08
+
+### Changed
+
+- **On a sign-in-with-your-provider-only server, the login page stops asking
+  you to click one button.** If standard login is switched off and exactly one
+  OAuth provider is configured, the login page existed only to be clicked
+  through — it now starts that provider straight away. Add `?local=1` to the
+  login URL if you ever need the plain page back, which is how an admin gets in
+  when the provider itself is down. Cancelling at the provider's consent screen
+  used to hand your browser straight back to it, over and over; that loop is
+  gone too, and it predates this feature. Servers with standard login enabled,
+  or with more than one provider, are unchanged. Contributed by
+  [@lduesing](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1411)
+  ([#1411](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1411)).
+
 ### Fixed
+
+- **More of the interface reads in Traditional Chinese.** Coverage went from
+  619 to 919 translated phrases, and 130 entries that gettext had guessed and
+  marked provisional — provisional entries are dropped when the catalogue is
+  compiled, so they were showing in English — are now confirmed translations.
+  Contributed by
+  [@siuwai1999](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1424)
+  ([#1424](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1424)).
+
+- **Installing outside Docker still lost your settings database, and imports
+  died without saying why.** The previous fix moved `app.db` and `dirs.json`
+  to the folder you installed into, but `cwa.db` — the one holding your CWA
+  settings, import history and enforcement records — kept looking for a
+  `/config` folder at the top of your filesystem. If it could write there you
+  got a second config directory nothing else reads; if it could not, importing
+  a book stopped partway through and the process exited reporting success, so
+  nothing in the logs said anything had gone wrong. All three files now resolve
+  the same way, a failure to open the database says which path it tried and
+  exits non-zero, and adding a missing settings column no longer depends on
+  `/config` being writable — that step used to be skipped silently on exactly
+  these installs. Docker sets `CALIBRE_DBPATH=/config` explicitly and is
+  byte-for-byte unaffected. Follows on from the packaging work reported by
+  @Thovi98.
+
+- **Installing outside Docker put your database somewhere the app never
+  looks.** On a source install, the setup script wrote `app.db` into a
+  `/config` folder it created at the top of your filesystem, while the app
+  itself reads its database from the folder you installed into. Nothing said
+  anything was wrong; you just got a first-run setup screen and an empty
+  library, with the seeded database sitting in a directory nothing opens. The
+  two halves now resolve the config folder the same way, so a source install
+  keeps its database where the app reads it. `CWA_DIRS_JSON` had the matching
+  problem — it moved `dirs.json` for the scripts but not for the app, which
+  would have pointed your ingest and your library at two different places —
+  and is now honoured by both. Docker installs set these explicitly and are
+  byte-for-byte unaffected. Reported by @Thovi98, packaging for YunoHost.
+
+- **First run printed a chown error that was not an error.** Outside the
+  container there is no `abc` service account to hand files to, so setup
+  reported `chown: invalid user: 'abc:abc'` and a failed-command traceback on
+  every run. The files were already owned by the right user. Setup now says it
+  is skipping the step and why, and only reports a genuine permission problem.
+  Reported by @Thovi98.
+
+- **Installing outside Docker failed on the first setup script.** If you install
+  from source rather than pulling the image — a distro package, a systemd unit,
+  anything not living at `/app/calibre-web-automated` — `auto_library.py` quit
+  with `FileNotFoundError` looking for a starter database under `/app`, a
+  directory that only exists inside the container. The file was in your install
+  the whole time; the scripts just weren't looking where the code actually was.
+  They now work out their own location, so a source install sets itself up
+  without patching. The same run then reached a second copy of the problem and
+  tried to create your library at `/calibre-library` no matter what
+  `dirs.json` said; it now uses the folder you configured. Docker installs
+  resolve to exactly the same paths as before and are unaffected. Reported by
+  @Thovi98, who packages Calibre-Web NextGen for YunoHost, and follows the
+  `cps/` cleanup @chloeroform did in #1438.
+
+- **Upgrading a source install no longer looks like it lost your settings.**
+  Earlier builds put the database in a `/config` folder at the very top of the
+  filesystem, whatever directory you installed into. Now that setup uses your
+  install directory, a machine upgrading from one of those builds has a real
+  database in the old place and none in the new one — and setting up a fresh
+  empty one there would have left you looking at an empty library with your
+  users and books apparently gone. Setup now stops before that happens, tells
+  you which database it found, and gives you the one setting that keeps it.
+  Nothing is moved or deleted for you, because only you know which copy is the
+  one you want. Fresh installs and Docker are unaffected.
+
+- **The container reported itself unhealthy, and the library count showed 0
+  books.** A path cleanup landed a reference to a setting the file never
+  imported, so the lookup that finds your Calibre library raised an error the
+  moment anything called it. Two places call it, and both quietly treat any
+  error as "no library": the `/health` endpoint every Docker, Compose and
+  Kubernetes setup polls started answering "degraded" forever even though the
+  app was serving pages normally, and the book count on the instance rendered
+  0. If your orchestration restarts or refuses to roll out on a failing
+  healthcheck, that is why. Affects the `:dev` channel only — no published
+  release shipped it.
+
+- **The log no longer opens with a warning about rate-limit storage on every
+  startup.** Calibre-Web-NextGen serves from a single process, so the
+  rate limiter's in-memory counters are shared by everything that reads them
+  and are the correct choice here. The limiter library could not tell that
+  the choice was deliberate, because the setting was simply left at its
+  default, so it warned that the setup was unsuitable for production on each
+  boot. The setting is now stated explicitly. Nothing about rate limiting
+  changes — login attempts are still capped the same way — the log just stops
+  raising a concern that did not apply. Reported by @chloeroform (#1443).
+
+- **The Tags page showed columns of "…" instead of tag names.** The grid was
+  sized before the per-row rename and delete buttons existed, so once those
+  arrived they took their space out of the tag name itself: in a 1280px-wide
+  window the name had 86px of a 244px cell, and 87% of tags were cut off. Rows
+  carrying those buttons now get a wider column — three across instead of four
+  on a typical desktop — and a long name uses a second line before it
+  ellipsizes. Measured on a 152-tag library, names cut off went from 87% to 9%
+  on desktop, 41% to 9% at the 720px width in the report, and 32% to 8% on a
+  phone. The Authors, Series and Publishers lists keep their current column
+  count and gain the same second line; the compact list view is unchanged.
+
+- **A third-party KOReader sync client is no longer left guessing why a book
+  looks unsynced.** Positions that exist only as a percentage — the ones the
+  web reader and a Kobo produce — are deliberately held back from clients that
+  haven't said they can use them, because older plugins would try to jump to a
+  position they can't understand and lose your place. The problem was that
+  "held back" and "never synced" looked identical from the client's side: an
+  empty answer, with nothing naming the setting that would reveal the position.
+  The server now says what it is holding and how to ask for it, logs the same
+  thing for anyone reading the server log, and the sync protocol documentation
+  now covers the parameter and both position formats. Nothing changes for the
+  bundled plugin or for anyone syncing today. Reported by @sroebert (#1445),
+  who hit this building Crossink and had to read our source to find it.
+
+- **The "help translate this" notice no longer reappears after every update, and
+  now works outside Docker.** The app remembered that it had already shown you
+  the notice by writing a small file into its own program folder, which gets
+  replaced whenever you update — so the reminder came back each time. Outside
+  Docker that folder doesn't exist at all, so the note was never saved and the
+  reminder never appeared for anyone running from source. It's now kept
+  alongside your settings, where it survives updates. Reported by @chloeroform
+  (#1447).
+
+- **If your library lives in a sub-folder, NextGen stopped leaving a stray
+  `metadata.db` at the top of it.** Something in the startup checked for a
+  database at the top level of your library folder, and the act of checking
+  created an empty one there. That stray file is what made versions 4.1.20 to
+  4.1.31 refuse to start for some people — 4.1.32 already stopped it breaking
+  startup, and now it isn't created in the first place. Two other things were
+  looking in the same wrong place and now find your real library: the KOReader
+  sync checksum job, which had been failing with "no such table: books" on every
+  restart, and the reading statistics, which had been reading an empty database
+  and reporting nothing. If you already have a stray file, it's safe to delete
+  once you're on this version.
 
 - **Installing from source no longer reports the previous version.** A checkout
   or pip install made from the v4.1.31 or v4.1.32 tag identified itself as one
@@ -24,6 +186,22 @@ is for things you can see or feel when running the app.
   was already installed. Docker users were never affected — those images take
   their version from the build, not from this file. Reported by @chloeroform
   (#1437).
+
+- **The interface now reads in Spanish throughout, instead of leaving about
+  half of its labels in English.** With the language set to Spanish, the admin
+  screens, metadata editing, upload, shelves, the reader and a long tail of task
+  and error messages still showed in English. Another 196 phrases were worse
+  than untranslated: gettext had guessed them from a similar English sentence and
+  marked the guess provisional, and a provisional entry is dropped when the
+  catalog is compiled — so those rendered in English while Spanish that said
+  something else, sometimes the text of an entirely different string, sat in the
+  file waiting for somebody to confirm it. A few outright reversed the meaning of
+  the English. Spanish was covering 1,378 of 2,645 phrases and now covers all
+  2,645, which makes it the most complete translation the project ships. Wording
+  for add, delete, edit, file, email and eReader is now consistent across the
+  interface. Contributed by
+  [@HaruIjima-kun](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1469)
+  ([#1469](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1469)).
 
 ## [v4.1.32] - 2026-08-07
 
@@ -38,6 +216,25 @@ is for things you can see or feel when running the app.
   library sync. This needs the updated NextGen Progress Sync plugin on the
   device; until you update it, nothing about its behaviour changes. Reported by
   @jrodrigoferreira and kept current by @iroQuai (#1366, #324).
+
+### Changed
+
+- **A sign-in page whose only button is your one provider now just takes you
+  there.** If your server runs in OAuth-only mode with standard login switched
+  off and exactly one provider switched on, opening the login page showed you a
+  page whose sole purpose was to click through to that provider. NextGen now
+  starts it for you. Servers that still allow username-and-password sign-in keep
+  the normal login page. If the provider is unreachable, or you want the plain
+  page back for any reason, add `?local=1` to the login URL. Contributed by
+  @lduesing.
+  ([#1411](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1411))
+- **Cancelling a sign-in at your provider now returns you to the login page
+  instead of bouncing you back to the provider forever.** Backing out of the
+  provider's consent screen used to hand you straight back to it, with no way
+  off the merry-go-round short of clearing cookies. This affected OAuth servers
+  before this release too, including ones that never turned on the automatic
+  start above.
+  ([#1411](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1411))
 
 ### Fixed
 

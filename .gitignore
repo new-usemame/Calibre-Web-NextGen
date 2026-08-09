@@ -109,6 +109,10 @@ cover/
 
 # Django stuff:
 *.log
+# Rotated logs. `*.log` does not match `calibre-web.log.1` — logrotate puts the
+# number AFTER the extension — so a bare-metal run's rotated log stayed
+# untracked-but-visible and a `git add -A` swept 5 MB of it into a commit.
+*.log.[0-9]*
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -250,3 +254,23 @@ cps/static/app/
 # Local output from the no-argument wiki generator. The published wiki is
 # rendered into a temporary clone by scripts/sync-wiki.sh.
 wiki-generated/
+
+# Runtime artifacts of a BARE-METAL run from the source checkout. In Docker the
+# app writes these under /config, but running `cps` directly from a clone puts
+# them in the repo root. `.key` is a real secret, so an accidental `git add -A`
+# by a contributor would publish it.
+#
+# This is not hypothetical: on 2026-08-08 an autopilot tick ran the app from the
+# checkout while working on bare-metal path handling, left both files behind, and
+# every subsequent tick aborted at the preflight clean-tree gate — four ticks in a
+# row drained nothing before anyone noticed.
+#
+# Root-anchored on purpose. `empty_library/app.db` is a TRACKED file — the starter
+# database auto_library.py seeds a new install from — so a bare `app.db` pattern
+# would match it too. Tracked files ignore .gitignore, so nothing breaks today,
+# but it would silently swallow that file the moment anyone re-added it.
+/.key
+/app.db
+/app.db-journal
+/app.db-wal
+/app.db-shm

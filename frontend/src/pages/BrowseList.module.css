@@ -73,8 +73,29 @@
   gap: var(--sp-3);
 }
 
+/* #1396 — rows that carry the #973 rename/delete buttons spend a constant
+   ~84px of the track on controls, and that came straight out of the name: at
+   1280px the name box was 86px of a 244px track and 87% of tags ellipsized.
+   Widen the track only where those buttons actually render, so the author,
+   series and publisher lists keep their existing density. */
+.gridWithActions {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
 .grid > * {
   animation: fadeRise var(--dur-base) var(--ease-out) both;
+}
+
+/* #1396 — the name is the content of this page, so let it take a second line
+   before ellipsizing. The compact list view is a single 760px column that
+   already fits its names on one line and keeps the single-line treatment. */
+.grid .name {
+  white-space: normal;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .list { display: flex; flex-direction: column; gap: var(--sp-1); max-width: 760px; }

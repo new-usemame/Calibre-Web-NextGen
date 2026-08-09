@@ -14,7 +14,7 @@ from typing import Iterable
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
-from . import calibre_db, db, logger
+from . import calibre_db, constants, db, logger
 from .duplicates import (
     _AWARE_MIN,
     _timestamp_or_default,
@@ -25,7 +25,7 @@ from .duplicates import (
     normalize_text_for_duplicates,
 )
 
-sys.path.insert(1, "/app/calibre-web-automated/scripts/")
+sys.path.insert(1, constants.SCRIPTS_DIR)
 from cwa_db import CWA_DB
 
 

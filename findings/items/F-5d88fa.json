@@ -1,0 +1,12 @@
+{
+  "area": "scripts",
+  "body": "The #1462 follow-up moved the *config dir* onto a single source of truth\n(`app_paths.config_dir()`, which now matches `cps.constants.CONFIG_DIR`), and\nconverted the two log-file paths in `convert_library.py` and\n`kindle_epub_fixer.py` onto it. Sibling paths were deliberately left on the\nliteral, because they belong to container-lifecycle services a source install\ndoes not currently run, and widening the diff would have made the\nreporter-facing fix harder to review:\n\n- `scripts/auto_zip.py:18` — `/config/processed_books/`\n- `scripts/convert_library.py:83,459` — `/config/processed_books`, failed/\n- `scripts/ingest_processor.py:418,478,486` — processed_books roots\n- `scripts/ingest_processor.py:602,606` — batch dirty/active markers (these at\n  least have `CWA_INGEST_BATCH_*` env overrides)\n- `scripts/cwa_db.py:66,436` — `CWA_DB_PATH` defaults to `/config/`\n- `scripts/generate_book_checksums.py:63` — same\n- `scripts/kindle_epub_fixer.py:429` — processed_books/fixed_originals\n\nImpact: a source install that wires up the ingest service (which @Thovi98's\nYunoHost package is heading towards) writes these to the filesystem root, or\nfails to. The mechanical fix is the same one-line substitution already applied\nto the log files: `str(app_paths.config_dir() / \"...\")`.\n\nSeparately, `check_for_app_db()` matches `\"app.db\" in f` against the whole path\nrather than the basename, so `/config/backup/app.db.bak` counts as a live\ndatabase and suppresses seeding. Pre-existing; not touched here because\nchanging the match semantics is a behaviour change for existing installs and\nwants its own red test.",
+  "created": "2026-08-08",
+  "id": "F-5d88fa",
+  "origin_issue": 1462,
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "scripts/ still hardcodes /config for processed_books, cwa.db and ingest batch markers"
+}

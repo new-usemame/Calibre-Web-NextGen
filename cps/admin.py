@@ -256,8 +256,8 @@ def trigger_hardcover_auto_fetch():
         
         # Get settings
         import sys as _sys
-        if '/app/calibre-web-automated/scripts/' not in _sys.path:
-            _sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+        if constants.SCRIPTS_DIR not in _sys.path:
+            _sys.path.insert(1, constants.SCRIPTS_DIR)
         from cwa_db import CWA_DB
         from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
         from cps.services.worker import WorkerThread
@@ -3408,7 +3408,7 @@ def restore_calibre_db():
             log.warning("Failed to dispose sessions before restore: %s", e)
 
         # 2. Run calibredb check_library (pre)
-        calibredb_binary = get_calibre_binarypath("calibredb") or "/app/calibre/calibredb"
+        calibredb_binary = get_calibre_binarypath("calibredb")
         check_cmd = [
             calibredb_binary, "check_library",
             "--with-library", config.config_calibre_dir

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func
 from flask_babel import lazy_gettext as N_
 
-from cps import calibre_db, db, logger
+from cps import calibre_db, constants, db, logger
 from cps.duplicate_index import (
     MAX_INCREMENTAL_BOOK_IDS,
     get_duplicate_groups_from_index,
@@ -24,8 +24,8 @@ from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
 from cps.ub import init_db_thread
 
 # Access CWA DB (scripts path)
-if '/app/calibre-web-automated/scripts/' not in sys.path:
-    sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+if constants.SCRIPTS_DIR not in sys.path:
+    sys.path.insert(1, constants.SCRIPTS_DIR)
 from cwa_db import CWA_DB
 
 

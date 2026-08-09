@@ -19,6 +19,9 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
+import app_paths
+import service_user
+
 # cwa_db / kindle_epub_fixer / audiobook / requests are loaded lazily by
 # initialize_runtime() (CWA #1349 by @navels) so the ingest-service can
 # fast-exit when there's nothing to process. Globals declared just below
@@ -31,7 +34,7 @@ from pathlib import Path
 # no-op fallback so callsites that reference these names work even if
 # the lazy load hasn't happened yet (or fails in a test environment).
 _calibre_plugins = None
-_CPS_ROOT = "/app/calibre-web-automated"
+_CPS_ROOT = str(app_paths.app_root())
 
 # Anchor for the shared conversion budget (#1094). Bound at import so it
 # tracks the same span the service's `timeout` wrapper is measuring, rather
@@ -299,16 +302,13 @@ def cleanup_lock():
 
 
 def get_app_db_path() -> str:
-    """Resolve app.db path consistently with the main app config."""
-    app_db_path = os.environ.get("CWA_APP_DB_PATH")
-    if app_db_path:
-        return app_db_path
-    base_path = os.environ.get("CALIBRE_DBPATH", "/config")
-    if base_path.endswith(".db"):
-        if os.path.basename(base_path) != "app.db":
-            return os.path.join(os.path.dirname(base_path), "app.db")
-        return base_path
-    return os.path.join(base_path, "app.db")
+    """Resolve app.db path consistently with the main app config.
+
+    Thin wrapper over ``app_paths.app_db_path()`` — this module used to carry
+    its own copy of the resolver (#1462). Kept as a function because eight
+    call sites in this file use it.
+    """
+    return str(app_paths.app_db_path())
 
 
 def _load_cps_configuration_from_app_db() -> None:
@@ -1035,7 +1035,7 @@ class NewBookProcessor:
         self.supported_audiobook_formats = {'m4b', 'm4a', 'mp4'}
 
         # Directories
-        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs("/app/calibre-web-automated/dirs.json")
+        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs(str(app_paths.dirs_json()))
         self.ingest_folder = os.path.normpath(self.ingest_folder)
         # Ensure library_dir is consistent with the main app's config
         app_db_path = get_app_db_path()
@@ -1989,14 +1989,7 @@ class NewBookProcessor:
             # Don't fail the import if checksum generation fails
 
     def set_library_permissions(self):
-        try:
-            nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-            if not nsm:
-                subprocess.run(["chown", "-R", "abc:abc", self.library_dir], check=True)
-            else:
-                print(f"[ingest-processor] NETWORK_SHARE_MODE=true detected; skipping chown of {self.library_dir}", flush=True)
-        except subprocess.CalledProcessError as e:
-            print(f"[ingest-processor] An error occurred while attempting to recursively set ownership of {self.library_dir} to abc:abc. See the following error:\n{e}", flush=True)
+        service_user.chown_to_service_user(self.library_dir, "[ingest-processor]")
 
 
 def _truncate_overlong_ingest_name(filepath, max_length=150):

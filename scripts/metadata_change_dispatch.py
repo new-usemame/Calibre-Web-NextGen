@@ -57,6 +57,8 @@ import select
 import subprocess
 import sys
 import time
+
+import app_paths
 from typing import Callable, Dict, Optional, Sequence
 
 # Defaults chosen so a single save's event burst (sub-second) collapses to one
@@ -206,7 +208,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--watch-folder", required=True, help="Directory the change logs live in (informational).")
     parser.add_argument(
         "--enforcer",
-        default="/app/calibre-web-automated/scripts/cover_enforcer.py",
+        default=str(app_paths.script_path("cover_enforcer.py")),
         help="Path to cover_enforcer.py.",
     )
     parser.add_argument("--debounce", type=float, default=DEFAULT_DEBOUNCE, help="Quiet-window seconds before dispatch.")

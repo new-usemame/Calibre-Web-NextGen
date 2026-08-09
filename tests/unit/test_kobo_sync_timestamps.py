@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from kobo_sync_utils import get_kobo_created_ts
+from cps.kobo import get_kobo_created_ts
 
 
 def _make_book(*, timestamp=None, date_added=None, last_modified=None, book_id=1):

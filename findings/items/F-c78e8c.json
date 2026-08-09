@@ -5,8 +5,14 @@
   "id": "F-c78e8c",
   "origin_issue": 870,
   "refs": [],
+  "resolution": {
+    "commit": "f74c280fe",
+    "date": "2026-08-09",
+    "note": "Shipped 2026-07-20 in f74c280fe (#870); the SPA smart-shelf view now renders an 'Enable Kobo sync' toggle (MagicShelfView.tsx:127). The finding was migrated from #870 on 2026-08-05 as open, but the fix had already landed 16 days earlier — stale on arrival, not a regression. Confirmed reachable from origin/main.",
+    "release": "v4.1.19"
+  },
   "severity": "ux",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "New UI: Kobo-sync toggle for smart shelves (backend already wired)"
 }

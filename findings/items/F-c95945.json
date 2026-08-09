@@ -1,0 +1,11 @@
+{
+  "area": "ci",
+  "body": "Every `safe-tier-1` docs PR this cycle has needed a manual `gh pr merge --admin`\ndespite green CI and a `success` run of `auto-merge.yml`. Observed twice on\n2026-08-07: #1450 (opened by the 20:00Z tick, still open and green at 22:22Z)\nand #1452 (opened and stalled in the same tick that filed this).\n\n## Mechanism — all four links OBSERVED\n\n1. `auto-merge.yml` evaluates the tier and calls `gh pr merge --auto --squash`,\n   which enables GitHub's *native* auto-merge. The run reports `success` — it\n   enabled the setting, which is all it claims to do.\n2. The `main protection` ruleset (id `15871246`) sets\n   `strict_required_status_checks_policy = true`, i.e. a branch must be\n   up to date with `main` to merge.\n3. `main` receives commits on its own — the `Update Translations` bot is the\n   routine one — so an open PR goes `BEHIND` shortly after it is opened.\n4. Native auto-merge does **not** update the head branch. Nothing else does\n   either. So the PR sits green + `BEHIND` indefinitely.\n\n`gh pr view` reports `mergeable=MERGEABLE` throughout, which is what makes this\neasy to miss: the blocking condition shows up only in `mergeStateStatus=BEHIND`.\n\n## Why it matters\n\nThe CHANGES-SHA backfill is the last step of every release cycle, and it is\nalways tier-1, so it always lands in this hole. Each one then needs a human or\na tick to notice and admin-merge it. A tick that does not look will leave the\nledger un-backfilled, which is the record the *next* release reads.\n\n## Options\n\n- Have `auto-merge.yml` call `gh pr update-branch` before enabling auto-merge,\n  and re-run on `push` to `main` so it re-updates. Closest to the intent.\n- Enable the repo's \"Automatically update branch\" / auto-update setting so\n  GitHub keeps auto-merge candidates current.\n- Drop `strict_required_status_checks_policy` for docs-only paths — narrowest\n  in effect but weakens the gate for everything sharing the ruleset.\n\nNoticed while shipping #1451 and #1452.",
+  "created": "2026-08-07",
+  "id": "F-c95945",
+  "refs": [],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "tier-1 auto-merge stalls forever once a PR goes BEHIND"
+}

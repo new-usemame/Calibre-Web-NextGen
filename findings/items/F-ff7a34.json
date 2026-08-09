@@ -1,0 +1,11 @@
+{
+  "area": "frontend-e2e",
+  "body": "Running the full SPA e2e suite against cwn-local on 2026-08-08 gave 318 passed /\n14 failed. A/B on the same container with main's SPA rebuilt (no local diff)\ngave 13 failed — so the failures are pre-existing, not introduced by the change\nunder test (#1454 / #1396).\n\nThe two failure sets overlap but are NOT identical, which is the flake tell:\n\n  both runs:      a11y duplicates, a11y reader, a11y admin, edit-rating\n                  (desktop + mobile), hidden-books, theme desktop,\n                  tag-quick-add-typeahead mobile\n  diff-run only:  a11y account, browse \"open a book detail\", browse \"open the\n                  reader\" (mobile), tag-quick-add-typeahead desktop\n  main-run only:  a11y edit-book, a11y announcement, a11y book-detail mobile,\n                  theme mobile\n\nTwo distinct causes are likely mixed in here and should be separated before\neither is chased:\n\n1. Genuine pre-existing a11y breakage. The admin/light contrast violations are\n   deterministic and reproduce on both runs (e.g. #9aa7b2 on #ffffff = 2.45:1,\n   and #23292f on #1b2530 = 1.05:1 on the settings labels). Those look like a\n   real light-theme token defect, not flake.\n2. Order-dependent state pollution. The specs mutate library data and the local\n   library carries residue from prior runs — a tag literally named\n   \"... e2e-1785947780250\" is sitting in the fixture. Specs that hide books,\n   set ratings, and add tags are the ones that move between runs.\n\nWhy this matters beyond tidiness: a suite that is red by default cannot gate\nanything. Every future change has to run this same A/B to learn whether its own\nfailures are real, which is a per-change cost and an obvious place for a real\nregression to hide in the noise.\n\nNot filed as a tracker issue: no user reported it, per the findings-ledger rule.",
+  "created": "2026-08-08",
+  "id": "F-ff7a34",
+  "refs": [],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "Local SPA e2e suite is red and flaky on main (13-14 failures, shifting set)"
+}

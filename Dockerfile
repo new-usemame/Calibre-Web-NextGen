@@ -412,7 +412,24 @@ RUN \
   echo "Moved koplugin.zip to static directory"; \
   else \
   echo "Warning: koplugin.zip not found, skipping move to static directory"; \
-  fi
+  fi && \
+  # Once the koplugin zip is built and copied into cps/static, the `koreader/`
+  # tree is a second copy of the same plugin that nothing in the running
+  # container reads — the download button serves static/koplugin.zip. Hide it
+  # so nobody edits that copy inside a container and wonders why the download
+  # is unchanged.
+  #
+  # This does NOT reclaim the ~188 KB. `COPY . /app/calibre-web-automated/`
+  # above is its own layer (61.8 MB in the published image), so removing a path
+  # in this later layer only writes a whiteout: the bytes still ship and are
+  # still pulled. Actually dropping them needs a .dockerignore entry or a build
+  # stage that COPY --from's just koplugin.zip. Same caveat as the frontend/
+  # removal in STEP 6, whose comment already points at .dockerignore.
+  #
+  # -f because every other step in this RUN degrades to a warning rather than
+  # failing the build; this one should not be the exception if the tree is
+  # ever absent.
+  rm -rf "/app/calibre-web-automated/koreader/"
 
 # Add unrar from unrar stage
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar

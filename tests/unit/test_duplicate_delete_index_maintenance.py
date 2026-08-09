@@ -266,6 +266,10 @@ def _load_duplicates_module(delete_key_calls):
             "session": session,
         },
     )
+    constants = _install_stub(
+        "cps.constants",
+        {"SCRIPTS_DIR": str(pathlib.Path(__file__).resolve().parents[2] / "scripts")},
+    )
     helper = _install_stub("cps.helper", {"delete_book": lambda *args, **kwargs: (True, None)})
     config = _install_stub(
         "cps.config",
@@ -276,6 +280,7 @@ def _load_duplicates_module(delete_key_calls):
 
     cps.logger = logger
     cps.calibre_db = calibre_db
+    cps.constants = constants
     cps.helper = helper
     cps.config = config
     cps.db = db

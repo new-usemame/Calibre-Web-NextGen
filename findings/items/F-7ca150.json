@@ -1,0 +1,11 @@
+{
+  "area": "web",
+  "body": "`_probe_metadata_db()` in `cps/web.py` opens `metadata.db` and runs\n`SELECT 1`.\n\n`SELECT 1` is a constant expression. SQLite answers it without reading a page\nof the database file, and `sqlite3.connect()` is lazy about opening the file\nat all, so the probe can succeed against a database that is missing, corrupt,\ntruncated, or unreadable by the app user. It proves a connection object can be\nconstructed, not that the library is usable.\n\nThat is thin for the thing every Docker, Compose and Kubernetes deployment\npolls to decide whether to route traffic or roll back.\n\n`SELECT 1 FROM books LIMIT 1` would touch a real table and cost essentially\nthe same. Noted while fixing #1438 (#1459), which restored this probe to\nworking but deliberately did not redesign it.",
+  "created": "2026-08-08",
+  "id": "F-7ca150",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Health check SELECT 1 never reads metadata.db, so a corrupt library probes healthy"
+}

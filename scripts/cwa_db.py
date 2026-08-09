@@ -13,6 +13,77 @@ from datetime import datetime
 
 from tabulate import tabulate
 
+import app_paths
+from library_paths import connect_calibre_metadata_db
+
+
+DB_FILE = "cwa.db"
+
+
+_LEGACY_NOTICE_SHOWN = False
+
+
+def _as_dir(path: str) -> str:
+    """Normalise to a directory string with exactly one trailing separator."""
+    path = path.strip().rstrip(os.sep)
+    return path + os.sep if path else os.sep
+
+
+def default_db_dir() -> str:
+    """Directory holding ``cwa.db``, with a trailing separator.
+
+    ``CWA_DB_PATH`` is an explicit override and wins outright — parallel pytest
+    workers depend on it for isolation, and it is the escape hatch from the
+    legacy handling below. Everything else defers to
+    :func:`app_paths.config_dir`, the same resolver ``app.db`` and ``dirs.json``
+    use since #1462, so a source install keeps all three together.
+
+    This used to be the literal ``"/config/"``. In the image that is still the
+    answer — the Dockerfile sets ``CALIBRE_DBPATH=/config`` — but off Docker it
+    reproduced #1462 one file over: ``cwa.db`` was seeded into a ``/config``
+    created at the filesystem root while the app read its config from the
+    install directory, or the open failed outright.
+
+    **The legacy branch is the whole reason this is not a one-line change.**
+    Anyone who overrides ``CALIBRE_DBPATH`` has, today, ``app.db`` at their
+    chosen path and ``cwa.db`` at ``/config`` — because the old literal ignored
+    the override. Resolving both to the new path would leave the real settings
+    database stranded and silently open a fresh, empty one: settings, import
+    history and enforcement records all apparently gone. So when the resolved
+    directory has no ``cwa.db`` and the legacy location does, we keep reading
+    the legacy one and say so. Nothing is moved or deleted, because only the
+    operator knows which copy they want — the same stance #1462 took for
+    ``app.db`` in :func:`app_paths.stray_legacy_config_dir`. See #1474.
+    """
+    global _LEGACY_NOTICE_SHOWN
+
+    raw = os.environ.get("CWA_DB_PATH")
+    if raw is not None and raw.strip():
+        return _as_dir(raw)
+
+    resolved = str(app_paths.config_dir())
+    legacy = app_paths.DEFAULT_CONFIG_DIR
+    try:
+        same = os.path.realpath(resolved) == os.path.realpath(legacy)
+        if not same and not os.path.isfile(os.path.join(resolved, DB_FILE)) \
+                and os.path.isfile(os.path.join(legacy, DB_FILE)):
+            # Once per process, not once per call. CWA_DB is constructed inside
+            # web requests, so an unqualified print here puts the same line in
+            # the log on every request that touches settings.
+            if not _LEGACY_NOTICE_SHOWN:
+                _LEGACY_NOTICE_SHOWN = True
+                print(
+                    f"[cwa-db]: using the existing settings database at "
+                    f"{os.path.join(legacy, DB_FILE)} rather than starting an empty one at "
+                    f"{os.path.join(resolved, DB_FILE)}. Move it to keep everything in one "
+                    f"place, or set CWA_DB_PATH to choose explicitly.",
+                    flush=True,
+                )
+            return _as_dir(legacy)
+    except OSError:
+        pass
+    return _as_dir(resolved)
+
 
 # Settings whose stored int value is a real number, not a boolean flag.
 #
@@ -57,16 +128,13 @@ class CWA_DB:
     def __init__(self, verbose=False):
         self.verbose = verbose
 
-        self.db_file = "cwa.db"
-        # Honor CWA_DB_PATH for test isolation. In production this env var is
-        # not set, so we fall back to the canonical /config/ location that
-        # matches the Docker volume mount. The trailing slash is significant
+        self.db_file = DB_FILE
+        # Resolved by default_db_dir(): CWA_DB_PATH for test isolation, else the
+        # shared app_paths.config_dir() SSOT. The trailing slash is significant
         # because connect_to_db() does string concatenation against db_file.
-        self.db_path = os.environ.get("CWA_DB_PATH", "/config/")
-        if self.db_path and not self.db_path.endswith("/"):
-            self.db_path = self.db_path + "/"
+        self.db_path = default_db_dir()
         # Ensure the parent dir exists so sqlite3 can create the file.
-        # In production /config/ always exists (Docker volume mount); the
+        # In production the config dir always exists (Docker volume mount); the
         # makedirs is defense-in-depth and the path that test isolation
         # relies on (CWA_DB_PATH may point at a fresh tmp_path subdir).
         try:
@@ -107,7 +175,15 @@ class CWA_DB:
             con = sqlite3.connect(self.db_path + self.db_file, timeout=30)
         except sqlError as e:
             print(f"[cwa-db]: The following error occurred while trying to connect to the CWA Enforcement DB: {e}")
-            sys.exit(0)
+            # Name the knob that is actually in force. CWA_DB_PATH takes
+            # precedence, so telling someone to set CALIBRE_DBPATH while
+            # CWA_DB_PATH is what put them here sends them in a circle.
+            knob = "CWA_DB_PATH" if os.environ.get("CWA_DB_PATH", "").strip() else "CALIBRE_DBPATH"
+            print(f"[cwa-db]: tried {self.db_path}{self.db_file} — set {knob} to the directory holding app.db if that is wrong", flush=True)
+            # Exit NONZERO. This was exit 0, which made an unopenable database
+            # indistinguishable from a clean run: the ingest processor died
+            # mid-import and its supervisor saw success. See #1474.
+            sys.exit(1)
         if con:
             cur = con.cursor()
             if self.verbose:
@@ -432,10 +508,26 @@ class CWA_DB:
                     if command.startswith('--') or not command:
                         continue
                     command = command.replace(',', ';')
-                    with open('/config/.cwa_db_debug', 'a') as f:
-                        f.write(command)
-                    self.cur.execute(f"ALTER TABLE cwa_settings ADD {command}")  
+                    # This used to append the command to a hardcoded
+                    # `/config/.cwa_db_debug` FIRST, sharing one try/except with
+                    # the ALTER. On any install without a writable /config the
+                    # open raised and the schema change never ran — a settings
+                    # migration silently skipped on exactly the source installs
+                    # #1462 was for.
+                    #
+                    # The breadcrumb is gone rather than relocated. It appended
+                    # without a delimiter, so repeated migrations ran together
+                    # into an unparseable byte stream ("foo INTEGERbar BOOLEAN");
+                    # it recorded the intent before the outcome, so it could
+                    # claim a migration that then failed; and as a predictable
+                    # append target inside a user-controlled config volume it
+                    # was a liability (a FIFO left at that path blocks the
+                    # writer indefinitely, before any OSError can be caught).
+                    # Nothing reads it. The log line below carries the same
+                    # information, after the fact, where it can be read.
+                    self.cur.execute(f"ALTER TABLE cwa_settings ADD {command}")
                     self.con.commit()
+                    print(f"[cwa-db]: added missing setting to cwa_settings: {command}", flush=True)
                     return True
                 except Exception as e:
                     print(f"[cwa-db] The following error occurred when trying to add {setting} to cwa.db:\n{e}")
@@ -1279,8 +1371,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Build date filter
@@ -1316,8 +1407,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Build date filter for current period
@@ -1399,8 +1489,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Build date filter
@@ -1519,8 +1608,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Query series with book counts and highest index, ordered by count
@@ -1556,8 +1644,7 @@ class CWA_DB:
             import sqlite3
             
             # Connect to Calibre's metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Extract year from pubdate and count books
@@ -2034,8 +2121,7 @@ class CWA_DB:
         try:
             import sqlite3
             
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             # Build date filter for books added in time period
@@ -2179,8 +2265,7 @@ class CWA_DB:
                 return []
             
             # Pass 2: Enrich with book titles from metadata.db
-            metadata_db_path = "/calibre-library/metadata.db"
-            metadata_con = sqlite3.connect(metadata_db_path, timeout=10)
+            metadata_con = connect_calibre_metadata_db()
             metadata_cur = metadata_con.cursor()
             
             results = []

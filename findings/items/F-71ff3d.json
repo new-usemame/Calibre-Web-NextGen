@@ -1,0 +1,11 @@
+{
+  "area": "web",
+  "body": "`_probe_metadata_db()` and `cwa_get_num_books_in_library()` in `cps/web.py`\nboth wrap their whole body in `except Exception:` and return `False` / `0`.\n\nThose are not error values, they are *valid-looking answers*: \"the database is\ndown\" and \"the library is empty\". So a programming error three lines away is\nreported to the operator as a service problem.\n\nThat is what made #1438 expensive. A missing import raised `NameError` on\nevery call, and instead of a traceback the operator got `/health` answering\n503 `degraded` while listing every service as \"up\" — a self-contradicting\nresponse that reads as an infrastructure fault. The library count rendered 0\nat the same time. Diagnosis took roughly two hours for a one-word omission.\n\nThe imports are fixed (#1459). The swallowing is not, and it will do this to\nthe next caller.\n\nSuggested shape: catch the errors that genuinely mean \"database unavailable\"\n(`sqlite3.Error`, `OSError`) and let everything else propagate, or log the\nexception at ERROR with the traceback before returning the degraded value so\nthe cause is at least visible in the container log. A health endpoint in\nparticular should distinguish \"I checked and it is down\" from \"I could not\nrun the check\".",
+  "created": "2026-08-08",
+  "id": "F-71ff3d",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Health probe and book count turn any exception into a plausible wrong answer"
+}

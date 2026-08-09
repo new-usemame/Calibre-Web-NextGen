@@ -108,6 +108,9 @@ def test_shared_logout_cleanup_deletes_session_and_oauth_state():
     with app.test_request_context("/logout"):
         flask.session["_id"] = "session-key"
         flask.session["_login_redirect_count"] = 2
+        flask.session[
+            cps.logout.oauth_auto_redirect.AUTO_REDIRECT_STATES_KEY
+        ] = {"state-1": {"provider": "generic", "next": "/book/7"}}
         with patch("cps.logout.current_user", user), \
              patch("cps.logout.config.config_login_type", 2, create=True), \
              patch("cps.oauth_bb.logout_oauth_user") as oauth_logout, \
@@ -119,6 +122,10 @@ def test_shared_logout_cleanup_deletes_session_and_oauth_state():
         delete_session.assert_called_once_with(73, "session-key")
         logout_user.assert_called_once_with()
         assert "_login_redirect_count" not in flask.session
+        assert (
+            cps.logout.oauth_auto_redirect.AUTO_REDIRECT_STATES_KEY
+            not in flask.session
+        )
 
 
 @pytest.mark.unit

@@ -10,14 +10,14 @@ import re
 import unicodedata
 from difflib import SequenceMatcher
 
-from cps import logger, db
+from cps import constants, logger, db
 from cps.metadata_constants import (
     DEFAULT_METADATA_PROVIDER_HIERARCHY,
     DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON,
 )
 from cps.search_metadata import cl as metadata_providers
 import sys
-sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+sys.path.insert(1, constants.SCRIPTS_DIR)
 from cwa_db import CWA_DB
 
 log = logger.create()

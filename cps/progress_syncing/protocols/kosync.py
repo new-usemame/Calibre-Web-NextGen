@@ -103,10 +103,63 @@ POSITION_KINDS_PARAM = "position_kinds"
 POSITION_KIND_PERCENTAGE = "percentage"
 POSITION_KIND_LOCATOR = "locator"
 
+# Response field naming the kinds a position exists in but is being withheld
+# under, because the client did not advertise it could act on them (#1445).
+#
+# Withholding is correct, but "withheld" and "never synced" were spelled the
+# same way — an empty body — so a client author had no reason to suspect a
+# position was there, and nothing named the parameter that would reveal it.
+# This appears ONLY on that miss, never alongside a served position, so its
+# presence means "ask for these and you get something".
+#
+# It is safe to add to a body an already-installed plugin will parse:
+# ``SyncLogic.resolveRemotePosition`` reads ``progress``, ``position_kind`` and
+# ``percentage``, none of which this adds, and no client counts the body's
+# keys — so such a client still resolves this to "no progress", exactly as it
+# resolves the bare ``{}`` it gets today.
+POSITION_KINDS_AVAILABLE_FIELD = "position_kinds_available"
+
 
 def is_percentage_only(progress_record) -> bool:
     """True when ``progress_record`` carries a percentage but no seekable locator."""
     return getattr(progress_record, "progress", None) == PERCENTAGE_ONLY_LOCATOR
+
+
+def _withheld_position_hint(user_id, document, book_id,
+                            accepts_percentage: bool, endpoint: str) -> dict:
+    """Body for a progress miss, saying so when a position was actually withheld.
+
+    Called only when the ordinary lookup found nothing. For a client that
+    advertised percentage support that genuinely means "no progress"; for one
+    that stayed silent it may instead mean a percentage-only row was filtered
+    out, and #1445 is that those two were indistinguishable on the wire.
+
+    The re-query runs on the miss path of a silent client only, and cannot
+    return a locator row: the first lookup differs solely by excluding the
+    sentinel, so anything it missed and this finds is percentage-only. The
+    ``is_percentage_only`` check states that rather than relying on it.
+
+    Returns the extra keys to merge into the empty response — ``{}`` when
+    nothing was withheld, so the no-progress body stays byte-identical.
+    """
+    if accepts_percentage:
+        return {}
+
+    withheld = get_progress_record(user_id, document, book_id,
+                                   include_percentage_only=True)
+    if withheld is None or not is_percentage_only(withheld):
+        return {}
+
+    # Same reasoning as the sync_disabled warning above (#312): the failure is
+    # invisible from both ends, so name the fix in one greppable line rather
+    # than leaving an admin to infer it from an empty body.
+    log.warning(
+        "%s: withholding a %s-only position from a client that did not advertise "
+        "support. Send ?%s=%s,%s on the GET to receive it.",
+        endpoint, POSITION_KIND_PERCENTAGE, POSITION_KINDS_PARAM,
+        POSITION_KIND_LOCATOR, POSITION_KIND_PERCENTAGE,
+    )
+    return {POSITION_KINDS_AVAILABLE_FIELD: [POSITION_KIND_PERCENTAGE]}
 
 
 def client_accepts_percentage_only() -> bool:
@@ -866,7 +919,11 @@ def get_progress(document: str):
         )
 
         if not progress_record:
-            return create_sync_response({})
+            # A miss and a withheld position looked identical on the wire, which
+            # is what sent @sroebert to our source to find the parameter (#1445).
+            return create_sync_response(_withheld_position_hint(
+                user.id, document, book_id, accepts_percentage, endpoint
+            ))
 
         # KOReader expects percentage as a decimal fraction (0.9411 = 94.11%)
         # We store it as percentage (0-100), so convert back to decimal (0-1)

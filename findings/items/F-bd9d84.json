@@ -1,0 +1,11 @@
+{
+  "area": "progress-sync",
+  "body": "`cps/progress_syncing/README.md` is the only reference a third-party kosync\nclient author has, and #1451 expanded it to cover both position encodings, the\n`position_kinds` parameter and the response shapes.\n\n`scripts/generate-wiki.py` builds the public wiki from `repo/README.md` and\n`repo/docs/` only, so none of that reaches the wiki. A client author who starts\nat the wiki — the surface we point users to — finds no protocol reference at\nall and has to know to look inside `cps/`.\n\nThe file is public on GitHub, so #1445's ask is met. This is about reach, not\ncorrectness: `repo/docs/` currently holds only `install/`, so surfacing the\nprotocol reference means deciding whether `docs/` grows a `protocols/` section\nand whether the canonical copy moves there (with the module README pointing at\nit) or is templated in from where it is.\n\nNoticed while shipping #1451.",
+  "created": "2026-08-07",
+  "id": "F-bd9d84",
+  "refs": [],
+  "severity": "docs",
+  "source": "audit",
+  "status": "open",
+  "title": "kosync protocol reference lives outside the wiki-generated docs set"
+}

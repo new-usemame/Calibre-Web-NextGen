@@ -1,0 +1,13 @@
+{
+  "area": "packaging",
+  "body": "Found while finishing #1442, not reported by a user.\n\n`fb3c7e4c8` removed the startup `dependency_check()` loop from `cps/__init__.py`.\nBefore it, a required package that was absent produced:\n\n    *** Cannot import tabulate module, it is needed to run calibre-web,\n        please install it using \"pip install tabulate\" ***\n\nand `sys.exit(8)`. The rationale for removing it is sound and I agreed with it:\nit duplicated pip's resolver, and `dep_version_int` got the comparison wrong\nanyway (`int(x) if x.isnumeric() else 0` collapsed `2.0.0rc1` to `(2,0,0)`).\n\nThe gap it leaves is narrow but real. OBSERVED on `:v4.1.32` with `tabulate`\nuninstalled: the container restart-loops and the only diagnostic is\n\n    File \"/app/calibre-web-automated/scripts/cwa_db.py\", line 14\n    from tabulate import tabulate\n    ModuleNotFoundError: No module named 'tabulate'\n\nDocker users cannot hit this — the image installs from pyproject at build time.\nIt reaches source installs that pull new code into an existing venv without\nre-running `pip install`, where a newly declared dependency is simply absent.\nThe traceback does name the module, so it is diagnosable rather than silent;\nit is just a worse first-run experience than the old message.\n\nNot fixed in #1442 because that PR's scope was the About-page half, and the\nlazily-imported case (the one where the app boots and the failure IS invisible)\nis now covered by the marker fix + un-suppressed `not installed` rows.\n\nIf this is worth closing, the cheap version is a guarded import at the entry\npoint that catches ImportError and re-raises with the install hint, rather than\nreinstating a version-comparing check.",
+  "created": "2026-08-08",
+  "id": "F-2f6258",
+  "refs": [
+    "#1442"
+  ],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "A missing startup-critical dependency now fails with a raw traceback instead of a named install instruction"
+}

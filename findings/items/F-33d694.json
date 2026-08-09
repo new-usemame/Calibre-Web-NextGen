@@ -1,0 +1,13 @@
+{
+  "area": "autopilot",
+  "body": "scripts/auto-close-awaiting-verification.sh clears the `awaiting-verification`\nlabel when ANY non-`new-usemame` comment appears after the label was applied,\non the reasoning that the reporter has engaged and their reply is the\nverification signal.\n\nThe commenter is never checked against the reporter.\n\nOBSERVED 2026-08-09 on #1372, filed by @bjekel: the sweep logged\n\"LABEL CLEARED — 1 reporter comment(s) since label applied\" and removed it. The\ncomment was @stripeymonkey's, a third party, and it was not about @bjekel's bug\nat all — they were asking where the cover-and-metadata enforcement button had\ngone. @bjekel has still never said whether the v4.1.30 kepub series fix worked.\n\nThe consequence is not cosmetic. Clearing the label takes the issue off the\n14-day auto-close path, so it now sits open forever with no verification from\nanyone: too engaged to time out, not actually verified. The follow-up board also\nreported it only as \"needs triage\", so the real state — nobody has confirmed the\nfix — was invisible.\n\nFix shape: compare the commenter against the issue author. A reply from the\nreporter clears the label as it does today. A comment from anyone else should\nleave the label alone (at most note it), because a stranger's unrelated question\nis not the reporter confirming their bug is gone.",
+  "created": "2026-08-09",
+  "id": "F-33d694",
+  "refs": [
+    "#1372"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "awaiting-verification sweep counts a third party's comment as the reporter verifying"
+}

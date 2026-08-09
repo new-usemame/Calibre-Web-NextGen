@@ -12,6 +12,10 @@ import sys
 import subprocess
 from pathlib import Path
 
+import app_paths
+import library_paths
+import service_user
+
 
 # The tables Calibre-Web reads while starting up. Calibre creates both with the
 # library itself, so every real library has them however empty it is — which is
@@ -87,17 +91,24 @@ def main():
 
 class AutoLibrary:
     def __init__(self):
-        self.config_dir = "/config"
-        self.library_dir = "/calibre-library"
-        self.dirs_path = "/app/calibre-web-automated/dirs.json"
+        self.config_dir = str(app_paths.config_dir())
+        # Where to look for an existing library, and where make_new_library()
+        # seeds a new one. Read from dirs.json rather than assuming the
+        # container's mount point: on a bare-metal install there is no
+        # /calibre-library and seeding one there fails outright (#1462). The
+        # shipped dirs.json still says /calibre-library, so Docker is unchanged.
+        self.library_dir = library_paths.get_calibre_library_dir()
+        self.dirs_path = str(app_paths.dirs_json())
 
-        self.empty_appdb = "/app/calibre-web-automated/empty_library/app.db"
-        self.empty_metadb = "/app/calibre-web-automated/empty_library/metadata.db"
+        self.empty_appdb = str(app_paths.empty_library_file("app.db"))
+        self.empty_metadb = str(app_paths.empty_library_file("metadata.db"))
 
-        # Canonical location. app.db always lives at /config/app.db; check_for_app_db()
-        # tries it first and only falls back to a full os.walk() of /config when
-        # it's missing.
-        self.DEFAULT_APPDB_PATH = f"{self.config_dir}/app.db"
+        # Canonical location. app.db always lives at <config dir>/app.db;
+        # check_for_app_db() tries it first and only falls back to a full
+        # os.walk() of the config dir when it's missing. Resolved by app_paths
+        # rather than re-derived here, so this and every other app.db consumer
+        # agree by construction (#1462).
+        self.DEFAULT_APPDB_PATH = str(app_paths.app_db_path())
 
         # Kept non-None at all times: update_calibre_web_db() opens this with
         # sqlite3.connect(), which raises on None. check_for_app_db() realigns
@@ -123,9 +134,105 @@ class AutoLibrary:
             self._metadb_path = path
             self.lib_path = os.path.dirname(path)
 
-    # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from /app/calibre-web-automated/empty_library/app.db and sets the permissions
+    @staticmethod
+    def ensure_dir_exists(path, what, remedy):
+        """Create a directory we are about to seed a database into.
+
+        In the container these are bind mounts and always exist, so this is a
+        no-op there. Off Docker they routinely do not: the shipped dirs.json
+        still names ``/calibre-library``, so a source install that has not
+        edited it used to die inside ``shutil.copyfile`` with a bare
+        ``FileNotFoundError`` naming a path the user never chose (#1462).
+
+        Fail with an actionable message naming the file to edit, rather than a
+        traceback — we cannot guess where somebody keeps their books, but we
+        can say exactly which setting decides it.
+        """
+        if os.path.isdir(path):
+            return
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as error:
+            print(f"[cwa-auto-library]: ERROR: could not create the {what} '{path}': {error}")
+            print(f"[cwa-auto-library]: {remedy}")
+            sys.exit(1)
+        print(f"[cwa-auto-library] Created {what} {path}")
+
+    #: Directories that are part of the application, never part of its config.
+    #: Only reachable off Docker, where the config dir and the app root are the
+    #: same directory (``cps`` resolves CONFIG_DIR to BASE_DIR when
+    #: CALIBRE_DBPATH is unset, and app_paths follows it).
+    #: ``venv`` matters as much as ``.venv``: the reporter's build puts its
+    #: virtualenv at ``<app root>/venv``, and any dependency shipping a test
+    #: fixture called ``app.db`` inside site-packages would be counted as this
+    #: install's live database and suppress the seed copy. It is ~20k files to
+    #: walk on first run besides.
+    NON_CONFIG_DIRS = frozenset({
+        "empty_library", "cps", "scripts", "tests", "frontend",
+        "node_modules", ".git", ".venv", "venv", "site-packages", "__pycache__",
+    })
+
+    def _walk_config_dir(self):
+        """Walk the config dir without descending into the application itself.
+
+        Off Docker the config dir IS the app root, and an unpruned walk gets
+        two things wrong: it finds the shipped seed database at
+        ``empty_library/app.db`` and concludes the install already has an
+        app.db — leaving the real one never copied, so sqlite creates an empty
+        file and the first query dies on ``no such table: settings`` — and on
+        the way there it walks the whole checkout, ``frontend/node_modules``
+        included.
+
+        The pruning applies *only* when the config dir and the app root are the
+        same directory. A config dir of its own — every container, and any
+        source install with ``CALIBRE_DBPATH`` set — is a volume the operator
+        owns, where a directory called ``cps`` or ``venv`` is theirs to name
+        and may hold a real database. Pruning those unconditionally would hide
+        a live app.db the old walk found and re-seed over it, which is the
+        failure this function exists to prevent, pointed the other way.
+        """
+        prune = Path(self.config_dir).resolve() == Path(app_paths.app_root()).resolve()
+        for dirpath, dirnames, filenames in os.walk(self.config_dir):
+            if prune:
+                dirnames[:] = [d for d in dirnames if d not in self.NON_CONFIG_DIRS]
+            yield dirpath, dirnames, filenames
+
+    def _refuse_if_legacy_config_dir_is_ambiguous(self):
+        """Stop rather than seed a second database next to an existing one.
+
+        A build before #1462 seeded ``/config/app.db`` at the filesystem root
+        on every source install, so an install upgrading from one has a real
+        database there that this run is about to ignore. Seeding a fresh one
+        beside the code would leave the app reading an empty library while the
+        operator's users and settings sit in a file nothing opens — no data is
+        destroyed, but it has the shape of data loss, and it is silent.
+
+        Which database is the real one is the operator's call, so this reports
+        and exits instead of guessing. Never fires in the container, where
+        ``CALIBRE_DBPATH`` is set.
+        """
+        legacy = app_paths.stray_legacy_config_dir()
+        if legacy is None:
+            return
+        print(
+            f"[cwa-auto-library] Refusing to set up a new database.\n"
+            f"[cwa-auto-library] There is an existing one at {legacy / 'app.db'}, left by a\n"
+            f"[cwa-auto-library] build that wrote to {legacy} regardless of where this install\n"
+            f"[cwa-auto-library] lives. This install now uses {self.config_dir}, which has no\n"
+            f"[cwa-auto-library] database yet, so continuing would hide your users and settings\n"
+            f"[cwa-auto-library] behind an empty library.\n"
+            f"[cwa-auto-library]\n"
+            f"[cwa-auto-library] To keep the existing database, start the app and these scripts\n"
+            f"[cwa-auto-library] with CALIBRE_DBPATH={legacy}\n"
+            f"[cwa-auto-library] To start fresh instead, move {legacy / 'app.db'} out of the way\n"
+            f"[cwa-auto-library] and run this again.",
+            flush=True,
+        )
+        sys.exit(1)
+
+    # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from <app root>/empty_library/app.db and sets the permissions
     def check_for_app_db(self):
-        # app.db always resolves to the canonical /config/app.db; keep the
+        # app.db always resolves to the canonical <config dir>/app.db; keep the
         # handle aligned in every branch so update_calibre_web_db() never hands
         # None to sqlite3.connect().
         self.app_db = self.DEFAULT_APPDB_PATH
@@ -136,19 +243,29 @@ class AutoLibrary:
         if os.path.isfile(self.DEFAULT_APPDB_PATH):
             print(f"[cwa-auto-library] app.db found in default location ({self.app_db}).")
             return
-        files_in_config = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.config_dir) for f in filenames]
-        db_files = [f for f in files_in_config if "app.db" in f]
+        # Exact filename, not a substring. `"app.db" in f` also matched
+        # `app.db-journal`, `app.db-wal` and `app.db.bak` — the first two are
+        # what sqlite leaves *beside* a database, so a config dir whose app.db
+        # had been deleted still counted as having one, the seed copy was
+        # skipped, and sqlite created a 0-byte file whose first query died on
+        # `no such table: settings`. A backup file could suppress it the same
+        # way.
+        db_files = [
+            os.path.join(dirpath, f)
+            for (dirpath, dirnames, filenames) in self._walk_config_dir()
+            for f in filenames
+            if f == "app.db"
+        ]
         if len(db_files) == 0:
+            self._refuse_if_legacy_config_dir_is_ambiguous()
             print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from {self.empty_appdb}")
+            self.ensure_dir_exists(
+                self.config_dir,
+                "config directory",
+                "Set CALIBRE_DBPATH to a directory this user can write to.",
+            )
             shutil.copyfile(self.empty_appdb, self.DEFAULT_APPDB_PATH)
-            try:
-                nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-                if not nsm:
-                    subprocess.run(["chown", "-R", "abc:abc", self.config_dir], check=True)
-                else:
-                    print(f"[cwa-auto-library] NETWORK_SHARE_MODE=true detected; skipping chown of {self.config_dir}", flush=True)
-            except subprocess.CalledProcessError as e:
-                print(f"[cwa-auto-library] An error occurred while attempting to recursively set ownership of {self.config_dir} to abc:abc. See the following error:\n{e}", flush=True)
+            service_user.chown_to_service_user(self.config_dir, "[cwa-auto-library]")
             print(f"[cwa-auto-library] app.db successfully copied to {self.config_dir}")
         else:
             return
@@ -280,18 +397,16 @@ class AutoLibrary:
             print(e)
             sys.exit(1)
 
-    # Uses the empty metadata.db in /app/calibre-web-automated to create a new library
+    # Uses the empty metadata.db shipped in the app root to create a new library
     def make_new_library(self):
         print("[cwa-auto-library]: No existing library found. Creating new library...")
+        self.ensure_dir_exists(
+            self.library_dir,
+            "library directory",
+            f"Set 'calibre_library_dir' in {self.dirs_path} to a directory this user can write to.",
+        )
         shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
-        try:
-            nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-            if not nsm:
-                subprocess.run(["chown", "-R", "abc:abc", self.library_dir], check=True)
-            else:
-                print(f"[cwa-auto-library] NETWORK_SHARE_MODE=true detected; skipping chown of {self.library_dir}", flush=True)
-        except subprocess.CalledProcessError as e:
-            print(f"[cwa-auto-library] An error occurred while attempting to recursively set ownership of {self.library_dir} to abc:abc. See the following error:\n{e}", flush=True)
+        service_user.chown_to_service_user(self.library_dir, "[cwa-auto-library]")
         self.metadb_path = f"{self.library_dir}/metadata.db"
         return
 
@@ -308,9 +423,7 @@ class AutoLibrary:
         upstream #243 ('I copied the plugin folder, nothing happens').
         """
         try:
-            _CPS_ROOT = "/app/calibre-web-automated"
-            if _CPS_ROOT not in sys.path:
-                sys.path.insert(0, _CPS_ROOT)
+            app_paths.ensure_app_root_on_sys_path()
             from cps.services import calibre_user_plugins
         except ImportError:
             return
@@ -326,19 +439,18 @@ class AutoLibrary:
                 flush=True,
             )
             return
-        # Always chown the calibre config dir to abc:abc — /config is a
-        # local Docker volume regardless of NETWORK_SHARE_MODE (NSM gates
-        # the library/ingest paths that may be on NFS, not the local
-        # config volume). Without this, plugins extracted by calibre-
-        # customize -a end up root-owned and the abc service user can't
-        # read them at conversion time.
-        try:
-            subprocess.run(
-                ["chown", "-R", "abc:abc", "/config/.config/calibre"],
-                check=False,
-            )
-        except Exception as e:
-            print(f"[cwa-auto-library] chown of {target} failed: {e}", flush=True)
+        # Always chown the calibre config dir to the service account — the
+        # config dir is a local Docker volume regardless of
+        # NETWORK_SHARE_MODE (NSM gates the library/ingest paths that may be
+        # on NFS, not the local config volume). Without this, plugins
+        # extracted by calibre-customize -a end up root-owned and the abc
+        # service user can't read them at conversion time.
+        calibre_config_dir = app_paths.config_dir() / ".config" / "calibre"
+        service_user.chown_to_service_user(
+            calibre_config_dir,
+            "[cwa-auto-library]",
+            respect_network_share_mode=False,
+        )
 
         # Auto-register any .zip files the operator dropped in. First-
         # boot only — once calibre's customize.py.json has entries, we
@@ -353,16 +465,14 @@ class AutoLibrary:
             # of those files land owned by whichever uid invoked
             # calibre-customize (root, if cont-init ran as root). Re-
             # chown so abc can read them at conversion time. Skipped
-            # ONLY for /calibre-library (library_dir, NAS) earlier — for
-            # /config/.config/calibre we chown unconditionally because
-            # /config is always a local volume.
-            try:
-                subprocess.run(
-                    ["chown", "-R", "abc:abc", "/config/.config/calibre"],
-                    check=False,
-                )
-            except Exception:
-                pass
+            # ONLY for the library dir (NAS) earlier — the calibre config
+            # dir is chowned unconditionally because it is always a local
+            # volume.
+            service_user.chown_to_service_user(
+                calibre_config_dir,
+                "[cwa-auto-library]",
+                respect_network_share_mode=False,
+            )
         else:
             zip_count = len(list(target.glob("*.zip")))
             if zip_count == 0:

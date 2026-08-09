@@ -1,0 +1,11 @@
+{
+  "area": "cwa-db",
+  "body": "`CWA_DB.add_missing_setting()` checks for a column, then issues\n`ALTER TABLE cwa_settings ADD <col>`. Two processes can both pass the check —\nweb workers and the ingest processor each construct their own `CWA_DB` — and\nthe loser gets `duplicate column name`, which the outer handler logs and\nreports as a failed migration.\n\nThe schema is correct either way (SQLite adds the column exactly once), so this\nis a false failure report rather than corruption, but it makes first-request and\nstartup behaviour nondeterministic and produces an alarming log line for a\nmigration that in fact succeeded.\n\nFix direction: on a duplicate-column error, re-inspect `PRAGMA table_info` and\nreturn success when the column is present. Idempotent completion is the correct\nreading of \"someone else already did it\".\n\nSurfaced by adversarial review of #1474; predates that change, which only\nreordered the ALTER relative to a now-deleted breadcrumb write.",
+  "created": "2026-08-08",
+  "id": "F-438052",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "add_missing_setting treats a lost duplicate-column race as a failed migration"
+}

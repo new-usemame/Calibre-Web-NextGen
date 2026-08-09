@@ -1,0 +1,11 @@
+{
+  "area": "autopilot",
+  "body": "`tests/autopilot/test_tick_lock.sh::test_the_fingerprint_actually_distinguishes_processes`\nspawns a background `sleep`, waits `sleep 0.2`, then reads `_tick_lock_fingerprint \"$pid\"`.\nUnder load the process is not yet visible to `ps`, the fingerprint comes back empty, and both\nthat test and `test_a_recycled_pid_does_not_hold_the_lock_forever` fail.\n\nWhy this matters far more than a flaky test normally would: step 6 of\n`scripts/autopilot-tick.sh` `exit 4`s on a red suite, deliberately, BEFORE phase-7. So a\ntransient flake stops the entire tick — no issue picked, nothing merged, no release train.\n\nMeasured 2026-08-08: the suite went red at load average 47-161 (an unrelated Xcode/simulator\nbuild plus swap exhaustion — 28,976 MB of 29,696 MB used). The same probe succeeded 3/3 on\nan idle shell, and the full suite reported 68 files / 0 failures once load fell to ~7.\n\nThis has already fired in production three times: `tick-tests-failed` on 2026-07-31,\n2026-08-01 and 2026-08-05. Each cost a full tick of drainage.\n\nFix directions (not yet applied):\n- poll for the pid to appear (retry `_tick_lock_fingerprint` until non-empty, bounded) rather\n  than a fixed `sleep 0.2`; a fixed sleep can never be right on a machine whose load varies\n  by two orders of magnitude\n- and/or treat an empty fingerprint as \"cannot determine\" and skip the assertion rather than\n  failing it, since the test's real subject is whether two DIFFERENT commands are\n  distinguishable, not whether `ps` responded in time\n- consider whether a red autopilot suite should really kill a tick outright, or whether the\n  flake-prone subset should be quarantined so an infrastructure hiccup cannot stop drainage",
+  "created": "2026-08-08",
+  "id": "F-9d6b51",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Load-sensitive fingerprint flake in test_tick_lock.sh silently kills whole ticks"
+}

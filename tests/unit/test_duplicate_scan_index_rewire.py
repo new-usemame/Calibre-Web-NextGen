@@ -95,9 +95,14 @@ def _load_duplicate_scan_module(monkeypatch, calls):
             "session": SimpleNamespace(close=lambda: None),
         },
     )
+    constants = _install_stub(
+        "cps.constants",
+        {"SCRIPTS_DIR": str(pathlib.Path(__file__).resolve().parents[2] / "scripts")},
+    )
     db = _install_stub("cps.db", {"Books": SimpleNamespace(id=object())})
     logger = _install_stub("cps.logger", {"create": lambda: _Logger()})
     cps.calibre_db = calibre_db
+    cps.constants = constants
     cps.db = db
     cps.logger = logger
 
@@ -518,8 +523,13 @@ def _load_duplicates_route_module(
     for name in ("db", "calibre_db", "ub", "config", "helper", "user_book_data"):
         module = _install_stub(f"cps.{name}")
         setattr(cps, name, module)
+    constants = _install_stub(
+        "cps.constants",
+        {"SCRIPTS_DIR": str(pathlib.Path(__file__).resolve().parents[2] / "scripts")},
+    )
     logger = _install_stub("cps.logger", {"create": lambda: _Logger()})
     csrf = _install_stub("cps.csrf", {"exempt": lambda fn: fn})
+    cps.constants = constants
     cps.logger = logger
     cps.csrf = csrf
 

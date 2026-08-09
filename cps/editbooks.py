@@ -876,7 +876,7 @@ def merge_list_book():
 def _queue_duplicate_scan_after_change(book_ids=None):
     """Queue a debounced duplicate scan after manual changes."""
     try:
-        sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+        sys.path.insert(1, constants.SCRIPTS_DIR)
         from cwa_db import CWA_DB
         from .cwa_functions import queue_debounced_duplicate_scan
 
@@ -1643,7 +1643,7 @@ def delete_book_from_table(book_id, book_format, json_response, location="", ski
                             delete_book_keys,
                             get_duplicate_groups_from_index,
                         )
-                        sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+                        sys.path.insert(1, constants.SCRIPTS_DIR)
                         from cwa_db import CWA_DB
 
                         delete_book_keys([book_id])
@@ -1658,7 +1658,7 @@ def delete_book_from_table(book_id, book_format, json_response, location="", ski
                 # above already handled it; otherwise mark the cache as stale.
                 if not skip_cache_invalidation and not refreshed_duplicate_cache:
                     try:
-                        sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+                        sys.path.insert(1, constants.SCRIPTS_DIR)
                         from cwa_db import CWA_DB
                         cwa_db = CWA_DB()
                         cwa_db.invalidate_duplicate_cache()

@@ -417,6 +417,19 @@ local function testResolveRemotePosition()
     assertEqual(SyncLogic.resolveRemotePosition({}).kind, "none", "an empty body is unusable")
     assertEqual(SyncLogic.resolveRemotePosition(nil).kind, "none", "a non-table body is unusable")
 
+    -- #1445: the server now names a withheld encoding on the otherwise-empty
+    -- miss, so a third-party client can discover `position_kinds` from the wire
+    -- instead of from our source. That key must stay inert here: this is the
+    -- body an already-installed plugin receives, and resolving it to anything
+    -- other than "none" would move the reader on a response that carries no
+    -- position at all.
+    assertEqual(SyncLogic.resolveRemotePosition({
+        position_kinds_available = { "percentage" },
+    }).kind, "none", "a withheld-kinds hint is not a position")
+    assertEqual(SyncLogic.resolveRemotePosition({
+        position_kinds_available = { "percentage" }, percentage = 0.5,
+    }).kind, "none", "a hint plus a stray percentage is still not a labelled position")
+
     -- The dangerous case: in Lua `"" ~= nil`, so an empty progress passes every
     -- nil-check upstream. It must not reach GotoXPointer or last_xpointer.
     assertEqual(SyncLogic.resolveRemotePosition({ progress = "", percentage = 0.5 }).kind,

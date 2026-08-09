@@ -1286,6 +1286,12 @@ class Thumbnail(Base):
 
 # Add missing tables during migration of database
 def add_missing_tables(engine, _session):
+    # Local import: progress_syncing.models imports Base from this module, so a
+    # module-level import would be circular. Every other table below is defined
+    # in this file; this one is not, and referencing it as a bare global raised
+    # NameError on any app.db missing kosync_progress (a fresh install).
+    from .progress_syncing.models import KOSyncProgress
+
     if not engine.dialect.has_table(engine.connect(), "archived_book"):
         ArchivedBook.__table__.create(bind=engine, checkfirst=True)
     if not engine.dialect.has_table(engine.connect(), "thumbnail"):

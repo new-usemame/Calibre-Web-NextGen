@@ -89,6 +89,8 @@ export const EREADER_FILL_MODES: { value: string; label: string }[] = [
   { value: 'dominant', label: 'Solid: most-common colour in the cover' },
   { value: 'average', label: 'Solid: average colour of the cover' },
   { value: 'manual', label: 'Solid: custom colour' },
+  { value: 'stretch', label: 'Stretch to fill — no border, slight distortion' },
+  { value: 'scale_crop', label: 'Crop to fill — no border, trims the edges' },
 ];
 
 // ---- low-level fetch (CSRF + envelope parsing) -------------------------------

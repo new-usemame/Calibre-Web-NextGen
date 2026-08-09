@@ -29,6 +29,8 @@ import re
 import sqlite3
 import sys
 
+import app_paths
+
 
 TARGET_TITLE = "Calibre-Web NextGen"
 
@@ -90,8 +92,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "db_path",
         nargs="?",
-        default="/config/app.db",
-        help="Path to app.db (default: /config/app.db)",
+        default=str(app_paths.app_db_path()),
+        help="Path to app.db (default: the configured config dir).",
     )
     args = parser.parse_args(argv)
 

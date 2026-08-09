@@ -202,7 +202,7 @@ function EreaderPanel({ value, onChange }: {
             </select>
           </label>
           <label className={styles.field}>
-            <span>{t('Border fill style')}</span>
+            <span>{t('Fill style')}</span>
             <select value={value.fill_mode} onChange={(e) => set({ fill_mode: e.target.value })}>
               {EREADER_FILL_MODES.map((o) => <option key={o.value} value={o.value}>{t(o.label)}</option>)}
             </select>

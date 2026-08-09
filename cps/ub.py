@@ -1017,6 +1017,9 @@ class Annotation(Base):
     # Device-supplied modification clock. This is distinct from last_synced,
     # which remains the server's receipt/dispatch time.
     client_modified_at = Column(DateTime, nullable=True)
+    origin_device_id = Column(Integer, ForeignKey('device.id', ondelete='SET NULL'), nullable=True)
+    assigned_device_id = Column(Integer, ForeignKey('device.id', ondelete='SET NULL'), nullable=True)
+    routing_revision = Column(Integer, nullable=False, default=1)
     last_synced = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
@@ -1075,6 +1078,32 @@ class Annotation(Base):
 
     def __repr__(self):
         return f'<Annotation annotation_id={self.annotation_id} book_id={self.book_id}>'
+
+
+class AnnotationDeviceState(Base):
+    """Per-device delivery intent/telemetry; reassignment never deletes it."""
+    __tablename__ = 'annotation_device_state'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    annotation_id = Column(Integer, ForeignKey('annotation.id', ondelete='CASCADE'), nullable=False)
+    device_id = Column(Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False)
+    native_annotation_id = Column(String, nullable=True)
+    desired = Column(Boolean, nullable=False, default=False)
+    delivery_status = Column(String(32), nullable=False, default='pending')
+    first_seen_revision = Column(Integer, nullable=True)
+    last_delivered_revision = Column(Integer, nullable=True)
+    last_ack_revision = Column(Integer, nullable=True)
+    last_seen_present_at = Column(DateTime, nullable=True)
+    content_fingerprint = Column(String(64), nullable=True)
+    native_metadata_json = Column(Text, nullable=True)
+    last_error_code = Column(String(64), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint('annotation_id', 'device_id', name='uq_annotation_device_state'),
+        Index('ix_annotation_device_state_device_desired', 'device_id', 'desired'),
+    )
 
 
 class AnnotationSyncTarget(Base):
@@ -2747,6 +2776,45 @@ def migrate_multi_device_annotation_safe_slice(engine, _session):
             log.info("[annotation-content-id] conservatively normalized %d rows", changed)
 
 
+def migrate_device_management_slice(engine, _session):
+    """Add nullable attribution/routing columns and per-device state."""
+    Base.metadata.create_all(engine, tables=[AnnotationDeviceState.__table__], checkfirst=True)
+    with engine.begin() as conn:
+        if not conn.execute(text(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='annotation'"
+        )).first():
+            return
+        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
+        additions = (
+            ("origin_device_id", "origin_device_id INTEGER REFERENCES device(id) ON DELETE SET NULL"),
+            ("assigned_device_id", "assigned_device_id INTEGER REFERENCES device(id) ON DELETE SET NULL"),
+            ("routing_revision", "routing_revision INTEGER NOT NULL DEFAULT 1"),
+        )
+        for name, ddl in additions:
+            if name not in existing:
+                try:
+                    conn.execute(text(f"ALTER TABLE annotation ADD COLUMN {ddl}"))
+                except exc.OperationalError as error:
+                    if "duplicate column" not in str(error).lower():
+                        raise
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_annotation_origin_device ON annotation(origin_device_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_annotation_assigned_device ON annotation(assigned_device_id)"
+        ))
+
+
+def downgrade_device_management_slice(engine):
+    """Manual rollback for the additive, NULL-backfilled management schema."""
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS annotation_device_state"))
+        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
+        for name in ("routing_revision", "assigned_device_id", "origin_device_id"):
+            if name in existing:
+                conn.execute(text(f"ALTER TABLE annotation DROP COLUMN {name}"))
+
+
 def downgrade_multi_device_annotation_safe_slice(engine):
     """Manual rollback; refuses to clobber content ids edited after migration."""
     with engine.begin() as conn:
@@ -2981,6 +3049,7 @@ def migrate_Database(_session):
     migrate_annotation_device_origin(engine, _session)
     migrate_annotation_koreader_identity(engine, _session)
     migrate_multi_device_annotation_safe_slice(engine, _session)
+    migrate_device_management_slice(engine, _session)
     migrate_book_cover_preview_table(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)
 

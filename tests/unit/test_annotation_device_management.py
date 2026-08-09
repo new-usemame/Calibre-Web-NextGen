@@ -103,7 +103,7 @@ def test_soft_delete_preserves_origin_clears_assignment_and_restore_round_trips(
     state = session.query(ub.AnnotationDeviceState).filter_by(
         annotation_id=annotation.id, device_id=device.id,
     ).one()
-    assert state.desired is True and state.delivery_status == "pending"
+    assert state.desired is True and state.delivery_status == "acknowledged"
 
 
 def test_reassignment_changes_intent_but_never_origin(session):
@@ -167,7 +167,33 @@ def test_bulk_rejects_more_than_500_items(session, monkeypatch):
     monkeypatch.setattr(annotations, "current_user", SimpleNamespace(id=7))
     monkeypatch.setattr(ub, "session", session)
     with app.test_request_context("/api/annotations/assignments/bulk", method="POST",
-                                  json={"items": [{}] * 501}):
+                                  json={"assigned_device_id": None, "items": [{}] * 501}):
         response, status = annotations.annotation_assignments_bulk.__wrapped__()
     assert status == 400
     assert response.get_json()["max_items"] == 500
+
+
+def test_device_management_migration_twice_and_downgrade_are_reversible():
+    from cps import ub
+    from sqlalchemy import text
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE annotation (id INTEGER PRIMARY KEY, content_id TEXT)"))
+        connection.execute(text("INSERT INTO annotation VALUES (1, 'opaque-history')"))
+    ub.migrate_multi_device_annotation_safe_slice(engine, None)
+    ub.migrate_device_management_slice(engine, None)
+    ub.migrate_device_management_slice(engine, None)
+    with engine.connect() as connection:
+        columns = {row[1] for row in connection.execute(text("PRAGMA table_info(annotation)"))}
+        assert {"origin_device_id", "assigned_device_id", "routing_revision"} <= columns
+        assert connection.execute(text("SELECT content_id FROM annotation WHERE id=1")).scalar() == "opaque-history"
+    ub.downgrade_device_management_slice(engine)
+    with engine.connect() as connection:
+        columns = {row[1] for row in connection.execute(text("PRAGMA table_info(annotation)"))}
+        tables = {row[0] for row in connection.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ))}
+        assert not {"origin_device_id", "assigned_device_id", "routing_revision"} & columns
+        assert "annotation_device_state" not in tables
+        assert "device_retired_assignment" not in tables
+        assert connection.execute(text("SELECT content_id FROM annotation WHERE id=1")).scalar() == "opaque-history"

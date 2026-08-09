@@ -48,7 +48,10 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
     model = _bounded_header(headers.get("x-kobo-devicemodel"), 160)
     firmware = _bounded_header(headers.get("x-kobo-appversion"), 64)
     if identity is None:
-        label_base = model or "Kobo"
+        # User-editable labels are capped at 60 by the API. Keep generated
+        # labels inside the same contract without silently truncating a
+        # suspiciously long client-controlled model header.
+        label_base = model if model and len(model) <= 55 else "Kobo"
         used_labels = {row[0] for row in session.query(ub.Device.display_name).filter_by(user_id=user_id)}
         label = label_base
         suffix = 2

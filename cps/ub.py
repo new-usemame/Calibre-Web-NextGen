@@ -2827,6 +2827,8 @@ def downgrade_device_management_slice(engine):
     with engine.begin() as conn:
         conn.execute(text("DROP TABLE IF EXISTS device_retired_assignment"))
         conn.execute(text("DROP TABLE IF EXISTS annotation_device_state"))
+        conn.execute(text("DROP INDEX IF EXISTS ix_annotation_assigned_device"))
+        conn.execute(text("DROP INDEX IF EXISTS ix_annotation_origin_device"))
         existing = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
         for name in ("routing_revision", "assigned_device_id", "origin_device_id"):
             if name in existing:

@@ -167,7 +167,6 @@ def restore_annotation_device(public_id, *, user_id, session, commit):
                 state = ub.AnnotationDeviceState(annotation_id=annotation.id, device_id=device.id)
                 session.add(state)
             state.desired = True
-            state.delivery_status = "pending"
             restored += 1
         elif annotation is not None:
             conflicts += 1
@@ -948,6 +947,21 @@ def reassign_annotation(annotation_id, *, user_id, book_id, assigned_device_publ
     target_id = target.id if target else None
     old_id = row.assigned_device_id
     if old_id == target_id:
+        if target is not None:
+            state = session.query(ub.AnnotationDeviceState).filter_by(
+                annotation_id=row.id, device_id=target.id,
+            ).first()
+            if state is None:
+                session.add(ub.AnnotationDeviceState(
+                    annotation_id=row.id, device_id=target.id,
+                    desired=True, delivery_status="pending",
+                ))
+            else:
+                state.desired = True
+        if commit is not None:
+            commit()
+        else:
+            session.flush()
         return row
     if old_id is not None:
         old_state = session.query(ub.AnnotationDeviceState).filter_by(
@@ -1100,6 +1114,8 @@ def annotations_edit(book_id, annotation_id):
 def annotation_assignments_bulk():
     data = request.get_json(silent=True) or {}
     items = data.get("items")
+    if "assigned_device_id" not in data:
+        return jsonify({"error": "missing_assigned_device_id"}), 400
     if not isinstance(items, list) or not items or len(items) > 500:
         return jsonify({"error": "invalid_items", "max_items": 500}), 400
     results = bulk_reassign_annotations(

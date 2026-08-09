@@ -413,9 +413,14 @@ RUN \
   else \
   echo "Warning: koplugin.zip not found, skipping move to static directory"; \
   fi && \
-  # Once the koplugin zip is built, the `koreader/` files at the root
-  # of the repository are not useful anymore and can be safely removed.
-  rm -R "/app/calibre-web-automated/koreader/"
+  # Once the koplugin zip is built and copied into cps/static, the
+  # `koreader/` tree is a second copy of the same plugin that nothing in the
+  # running container reads — the download button serves
+  # static/koplugin.zip. Drop it so there is one copy in the image, not two.
+  # -f because every other step in this RUN degrades to a warning rather than
+  # failing the build; this one should not be the exception if the tree is
+  # ever absent.
+  rm -rf "/app/calibre-web-automated/koreader/"
 
 # Add unrar from unrar stage
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar

@@ -416,7 +416,7 @@ const SHOTS = {
   'book-detail': [1200, 900],
   reader: [1600, 900],
   settings: [1600, 900],
-  'mobile-library': [780, 1560],
+  'mobile-library': [390, 780],
 };
 
 function figureShot(name, caption, eager) {
@@ -523,9 +523,9 @@ function buildHomeBody(pages, md) {
       ${featureCards}
     </div>
     <div class="shot-row" style="margin-top:2rem">
-      ${figureShot('book-detail', 'Book detail with metadata and covers — placeholder')}
-      ${figureShot('reader', 'In-browser reading — placeholder')}
-      ${figureShot('settings', 'Settings, including the sync options — placeholder')}
+      ${figureShot('book-detail', 'Book details, formats and metadata')}
+      ${figureShot('reader', 'Reading in the browser, no app required')}
+      ${figureShot('settings', 'Setting up KOReader progress sync')}
     </div>
   </section>
 
@@ -536,7 +536,7 @@ function buildHomeBody(pages, md) {
         <p class="section-sub">The new interface is responsive end to end — browse, search and read your library from the sofa. Sync carries your progress back to your e-reader.</p>
         <a class="btn btn-ghost" href="~ROOT~/first-run/">First-run setup ${ICONS.arrowRight}</a>
       </div>
-      ${figureShot('mobile-library', 'The library on a phone — placeholder')}
+      ${figureShot('mobile-library', 'The library on a phone')}
     </div>
   </section>
 

@@ -33,7 +33,7 @@ def _chapter(value: str) -> str:
         raise ContentIdError("content_id chapter path is not relative")
     if any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise ContentIdError("content_id chapter path contains control characters")
-    if any(part in ("", ".", "..") for part in PurePosixPath(value).parts):
+    if any(part in ("", ".", "..") for part in value.split("/")):
         raise ContentIdError("content_id chapter path contains an unsafe segment")
     return value
 
@@ -54,6 +54,7 @@ def normalize_content_id(value, *, book_uuid=None, allow_legacy_file_uri=False):
     if allow_legacy_file_uri:
         match = _LEGACY_FILE.fullmatch(value)
         if match and expected:
+            _chapter(match.group(1))
             return f"{expected}!!{_chapter(match.group(2))}"
     raise ContentIdError("content_id has an unsupported shape")
 

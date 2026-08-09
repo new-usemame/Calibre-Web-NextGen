@@ -48,19 +48,31 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
     model = _bounded_header(headers.get("x-kobo-devicemodel"), 160)
     firmware = _bounded_header(headers.get("x-kobo-appversion"), 64)
     if identity is None:
-        device = ub.Device(user_id=user_id, kind="kobo", display_name=model or "Kobo", model=model,
-                           firmware_version=firmware, first_seen_at=now, last_seen_at=now)
+        label_base = model or "Kobo"
+        used_labels = {row[0] for row in session.query(ub.Device.display_name).filter_by(user_id=user_id)}
+        label = label_base
+        suffix = 2
+        while label in used_labels:
+            label = f"{label_base} ({suffix})"
+            suffix += 1
+        device = ub.Device(user_id=user_id, kind="kobo", display_name=label, model=model,
+                           platform="nickel", firmware_version=firmware,
+                           first_seen_at=now, last_seen_at=now, last_metadata_at=now,
+                           active=True, created_by="auto")
         identity = ub.DeviceIdentity(device=device, scheme=SCHEME, key_version=1,
                                      fingerprint=fingerprint, first_seen_at=now, last_seen_at=now)
         session.add(device)
     else:
         device = identity.device
-        device.last_seen_at = now
-        identity.last_seen_at = now
-        if model:
-            device.model = model
-        if firmware:
-            device.firmware_version = firmware
+        observed_is_newer = device.last_seen_at is None or now >= device.last_seen_at.replace(tzinfo=now.tzinfo)
+        if observed_is_newer:
+            device.last_seen_at = now
+            identity.last_seen_at = now
+            if model:
+                device.model = model
+            if firmware:
+                device.firmware_version = firmware
+            device.last_metadata_at = now
     session.flush()
     return device
 

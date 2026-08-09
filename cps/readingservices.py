@@ -133,8 +133,11 @@ def requires_reading_services_auth_and_config(f):
             log.debug("Kobo sync disabled, proxying to Kobo")
             return proxy_to_kobo_reading_services()
         if current_user.is_authenticated:
-            from .services.device_registry import register_kobo_device_best_effort
-            register_kobo_device_best_effort(user_id=current_user.id, headers=request.headers)
+            try:
+                from .services.device_registry import register_kobo_device_best_effort
+                register_kobo_device_best_effort(user_id=current_user.id, headers=request.headers)
+            except Exception:
+                log.warning("Best-effort Kobo device observation failed", exc_info=True)
             return f(*args, **kwargs)
         log.debug("Reading services request without auth, proxying to Kobo")
         return proxy_to_kobo_reading_services()

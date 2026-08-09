@@ -915,12 +915,19 @@ class Device(Base):
     kind = Column(String(32), nullable=False)
     display_name = Column(String(160), nullable=False)
     model = Column(String(160), nullable=True)
+    platform = Column(String(80), nullable=True)
     firmware_version = Column(String(64), nullable=True)
     first_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     last_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_metadata_at = Column(DateTime, nullable=True)
+    active = Column(Boolean, nullable=False, default=True)
+    created_by = Column(String(32), nullable=False, default="auto")
 
     identities = relationship("DeviceIdentity", back_populates="device", cascade="all, delete-orphan")
-    __table_args__ = (Index('ix_device_user_kind', 'user_id', 'kind'),)
+    __table_args__ = (
+        Index('ix_device_user_active_last_seen', 'user_id', 'active', 'last_seen_at'),
+        Index('ix_device_user_display_name', 'user_id', 'display_name'),
+    )
 
 
 class DeviceIdentity(Base):
@@ -936,7 +943,8 @@ class DeviceIdentity(Base):
     last_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     device = relationship("Device", back_populates="identities")
     __table_args__ = (
-        UniqueConstraint('scheme', 'fingerprint', name='uq_device_identity_scheme_fingerprint'),
+        UniqueConstraint('scheme', 'key_version', 'fingerprint',
+                         name='uq_device_identity_scheme_version_fingerprint'),
         Index('ix_device_identity_device', 'device_id'),
     )
 

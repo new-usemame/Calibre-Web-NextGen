@@ -1106,6 +1106,19 @@ class AnnotationDeviceState(Base):
     )
 
 
+class DeviceRetiredAssignment(Base):
+    """Undo snapshot for assignments cleared by a device soft-delete."""
+    __tablename__ = 'device_retired_assignment'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False)
+    annotation_id = Column(Integer, ForeignKey('annotation.id', ondelete='CASCADE'), nullable=False)
+    retired_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    __table_args__ = (
+        UniqueConstraint('device_id', 'annotation_id', name='uq_device_retired_assignment'),
+    )
+
+
 class AnnotationSyncTarget(Base):
     """Per-(annotation, target) row tracking sync state to a single remote
     destination (Hardcover today; Readwise / Notion / etc. later).
@@ -2778,7 +2791,11 @@ def migrate_multi_device_annotation_safe_slice(engine, _session):
 
 def migrate_device_management_slice(engine, _session):
     """Add nullable attribution/routing columns and per-device state."""
-    Base.metadata.create_all(engine, tables=[AnnotationDeviceState.__table__], checkfirst=True)
+    Base.metadata.create_all(
+        engine,
+        tables=[AnnotationDeviceState.__table__, DeviceRetiredAssignment.__table__],
+        checkfirst=True,
+    )
     with engine.begin() as conn:
         if not conn.execute(text(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='annotation'"
@@ -2808,6 +2825,7 @@ def migrate_device_management_slice(engine, _session):
 def downgrade_device_management_slice(engine):
     """Manual rollback for the additive, NULL-backfilled management schema."""
     with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS device_retired_assignment"))
         conn.execute(text("DROP TABLE IF EXISTS annotation_device_state"))
         existing = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
         for name in ("routing_revision", "assigned_device_id", "origin_device_id"):

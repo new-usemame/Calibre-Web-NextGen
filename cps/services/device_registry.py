@@ -53,7 +53,7 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
         label = label_base
         suffix = 2
         while label in used_labels:
-            label = f"{label_base} ({suffix})"
+            label = f"{label_base} {suffix}"
             suffix += 1
         device = ub.Device(user_id=user_id, kind="kobo", display_name=label, model=model,
                            platform="nickel", firmware_version=firmware,

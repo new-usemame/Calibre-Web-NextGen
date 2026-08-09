@@ -172,6 +172,22 @@ def test_no_auto_start_while_standard_login_is_still_enabled():
     render_login.assert_called_once_with()
 
 
+def test_explicit_auto_forward_starts_provider_with_standard_login_enabled():
+    app = _app()
+    client = app.test_client()
+    p1, p2, p3, p4, p5, p6 = _oauth_only_patches(
+        spa_preferred=False, standard_login_disabled=False
+    )
+    with p1, p2, p3, p4, p5, p6, \
+            patch("cps.web.config.config_enable_oauth_auto_forward", True, create=True), \
+            patch("cps.web.render_login") as render_login:
+        response = client.get("/login")
+
+    assert response.status_code == 302
+    assert urlparse(response.location).path == "/login/generic"
+    render_login.assert_not_called()
+
+
 def test_authenticated_login_route_clears_auto_attempts():
     app = _app()
     client = app.test_client()

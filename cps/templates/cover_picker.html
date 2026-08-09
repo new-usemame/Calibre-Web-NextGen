@@ -111,7 +111,7 @@
               </div>
 
               <div class="form-group">
-                <label for="cwa-cover-picker-ereader-fill-mode">{{ _('Border fill style') }}</label>
+                <label for="cwa-cover-picker-ereader-fill-mode">{{ _('Fill style') }}</label>
                 <select id="cwa-cover-picker-ereader-fill-mode" class="form-control">
                   <option value="edge_mirror" {% if config.config_kobo_cover_padding_fill_mode == 'edge_mirror' %}selected{% endif %}>{{_('Edge mirror — extend the artwork (recommended)')}}</option>
                   <option value="edge_blur" {% if config.config_kobo_cover_padding_fill_mode == 'edge_blur' %}selected{% endif %}>{{_('Edge blur — soft bokeh border')}}</option>
@@ -119,6 +119,8 @@
                   <option value="dominant" {% if config.config_kobo_cover_padding_fill_mode == 'dominant' %}selected{% endif %}>{{_('Solid: most-common color in the cover')}}</option>
                   <option value="average" {% if config.config_kobo_cover_padding_fill_mode == 'average' %}selected{% endif %}>{{_('Solid: average color of the cover')}}</option>
                   <option value="manual" {% if config.config_kobo_cover_padding_fill_mode == 'manual' %}selected{% endif %}>{{_('Solid: custom color')}}</option>
+                  <option value="stretch" {% if config.config_kobo_cover_padding_fill_mode == 'stretch' %}selected{% endif %}>{{_('Stretch to fill — no border, slight distortion')}}</option>
+                  <option value="scale_crop" {% if config.config_kobo_cover_padding_fill_mode == 'scale_crop' %}selected{% endif %}>{{_('Crop to fill — no border, trims the edges')}}</option>
                 </select>
               </div>
 

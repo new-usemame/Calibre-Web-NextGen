@@ -16,6 +16,18 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **Two new cover fill styles that fill the e-reader frame instead of adding a
+  border.** Every existing style pads the cover out to your device's shape,
+  which leaves a mirrored, blurred or coloured band down the sides. If you would
+  rather see the artwork itself edge to edge, there are now two more options in
+  the fill-style dropdown: **Stretch to fill**, which scales the cover to the
+  frame and accepts a little distortion, and **Crop to fill**, which keeps the
+  proportions honest and trims a strip off the two long edges instead. The six
+  original styles are untouched and Edge mirror is still the default, so nothing
+  changes unless you pick one. Requested by @mgrimace (#1280).
+
 ## [v4.1.33] - 2026-08-08
 
 ### Changed

@@ -1,0 +1,11 @@
+{
+  "area": "autopilot",
+  "body": "`run_preflight()` in scripts/autopilot-tick.sh pipes preflight through\n`tee \"$PREFLIGHT_LAST\"` (state/preflight-last.txt). That file is rewritten on\nEVERY run, pass or fail, so the moment a later tick's preflight succeeds the\nfailing run's output is gone.\n\nOBSERVED 2026-08-09: preflight failed rc=1 at 04:00:05Z after 5m53s. By 04:21\nthe file read \"== preflight OK ==\". The only surviving record of the failure is\ntwo lines in autopilot-tick.log saying rc=1 with no reason, plus a\n`tick-preflight-failed` ledger row that says \"see state/autopilot-tick.log\" —\nwhich does not contain the reason either.\n\nThe 5m53s duration is the tell: the autopilot test suite (step 5/5) takes ~4.5\nmin and every other step is seconds, so the failure was almost certainly a flaky\ntest. Which test is unknowable now, which is the whole problem — a flaky gate\nthat wedges the tick is exactly the thing that needs a name.\n\nCompounding it: the ntfy page built for a red-preflight streak interpolates\n`${PREFLIGHT_RED:-see state/preflight-last.txt}`, pointing the operator at the\nfile that self-erases. By the time a human reads the page the evidence can\nalready be overwritten by a passing run.\n\nFix shape: write failures to a non-clobbering path — state/preflight-fail-<TS>.txt\n— and keep preflight-last.txt as the rolling copy. Retain the last few, and have\nthe ledger row and the ntfy text name the retained file rather than the log.",
+  "created": "2026-08-09",
+  "id": "F-561a35",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Preflight failure diagnostics are overwritten by the next successful tick"
+}

@@ -8,8 +8,14 @@
     "#877",
     "#579"
   ],
+  "resolution": {
+    "commit": "1cf1db3",
+    "date": "2026-08-09",
+    "note": "Mechanism implemented: scripts/promise-delivery-scan.sh + skill Phase 0.6.\n\nThe scan sweeps open `promised` issues, finds merged PRs cross-referencing each,\ntests whether the PR carries a resolution phrase naming that exact issue, resolves\nthe earliest release tag containing its merge commit, and compares that tag against\nthe tags WE have already named in our own comments. `shipped_unannounced` is the\nresulting \"fixed, released, never told them\" set. Rulings land in\nstate/promise-delivery-ledger.json so a judged candidate never resurfaces.\n\nIt surfaces only — it never closes or comments. Measured on the live tracker, a bare\ncross-reference is not delivery: #1410 says \"Addresses #1408\" (real), #1413 is\n\"promote F-0a2f72 to #1412\" (the FILING of the issue), #1451 mentions #1425 once in\na test list. Auto-closing on cross-reference would have closed two issues nobody had\nfixed. The judgment stays with the tick.\n\nFirst live run found four beyond the three named here: #1445 (v4.1.33) and #1408\n(v4.1.31), both OPEN with zero comments; #303, where we told @briffaantoine on\n07-11 there was no date and shipped the Goodreads provider three days later in\nv4.1.13 and never came back, 26 days; and #705, correctly ruled partial rather\nthan announced. All four are now dispositioned.\n\nSCOPE LIMIT, stated because it is not covered: the scan reads only issues labeled\n`promised`. The three cases named in this finding (#876, #877, #579) were NOT so\nlabeled and were caught by the awaiting-verification path instead, so a fix promised\nin prose on an unlabeled issue is still invisible to it. Broadening to every open\nissue is ~220 timeline calls per tick against 20 today (61s), which is too slow for\na tick — it would need a different shape, e.g. a per-release sweep keyed off the\nrelease diff, which is what this finding originally suggested.",
+    "release": ""
+  },
   "severity": "ux",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Fixes ship but the originating issue never gets its close-out, so reporters sit on solved problems"
 }

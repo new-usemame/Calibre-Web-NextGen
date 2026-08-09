@@ -12250,7 +12250,6 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
-#, fuzzy
 #: cps/spa_strings.py:674
 #, python-brace-format
 msgid "Image from {source}"

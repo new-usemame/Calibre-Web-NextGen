@@ -412,7 +412,10 @@ RUN \
   echo "Moved koplugin.zip to static directory"; \
   else \
   echo "Warning: koplugin.zip not found, skipping move to static directory"; \
-  fi
+  fi && \
+  # Once the koplugin zip is built, the `koreader/` files at the root
+  # of the repository are not useful anymore and can be safely removed.
+  rm -R "/app/calibre-web-automated/koreader/"
 
 # Add unrar from unrar stage
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar

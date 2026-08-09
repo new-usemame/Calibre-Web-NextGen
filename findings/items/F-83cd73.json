@@ -1,0 +1,11 @@
+{
+  "area": "i18n",
+  "body": "`scripts/extract_spa_strings.py --write` regenerates the AUTOGEN block from\nstatically-parseable frontend literals. Anchors added by hand INSIDE that block\nfor strings the parser cannot see (dynamic keys, runtime-built values) are\nremoved without warning — measured 2026-08-09: 72 removed / 37 added, net 31\nlost, including \"contains\" and \"begins with\".\n\nThe loss is silent twice over. `--write` reports only a count (\"530 anchored\nmsgid(s)\"), never a delta, and the damage does not surface until the NEXT\n`Update Translations` run marks the now-unextracted msgids obsolete, dropping\nreal translations from the compiled `.mo`. That run is tagged `[skip ci]`, so\nno test reports it either. fr/ru/de lost human-authored translations this way\nand main went red on a commit nobody tested.\n\nFix direction: `--write` should refuse to remove an anchor whose msgid still\ncarries a translation in any locale, and should print the add/remove delta\nrather than a total. The hand-maintained section above the marker (added in\n#1485) prevents recurrence but does not make the generator safe.",
+  "created": "2026-08-09",
+  "id": "F-83cd73",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "extract_spa_strings.py --write silently discards hand-added anchors"
+}

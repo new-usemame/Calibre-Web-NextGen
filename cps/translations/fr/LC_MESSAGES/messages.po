@@ -13191,3 +13191,9 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr ""
 #~ "Cliquer sur la couverture pour importer les métadonnées dans le formulaire"
+
+msgid "Stretch to fill — no border, slight distortion"
+msgstr "Étirer pour remplir — sans bordure, légère distorsion"
+
+msgid "Crop to fill — no border, trims the edges"
+msgstr "Rogner pour remplir — sans bordure, rogne les bords"

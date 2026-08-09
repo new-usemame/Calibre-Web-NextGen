@@ -12724,3 +12724,9 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"
+
+msgid "Stretch to fill — no border, slight distortion"
+msgstr "Uitrekken om te vullen — geen rand, lichte vervorming"
+
+msgid "Crop to fill — no border, trims the edges"
+msgstr "Bijsnijden om te vullen — geen rand, snijdt de randen bij"

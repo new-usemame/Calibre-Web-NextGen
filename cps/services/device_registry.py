@@ -69,6 +69,11 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
             device.last_seen_at = now
             identity.last_seen_at = now
             if model:
+                if device.model and device.model != model:
+                    log.warning(
+                        "Kobo device model changed for known identity: %r -> %r",
+                        device.model, model,
+                    )
                 device.model = model
             if firmware:
                 device.firmware_version = firmware

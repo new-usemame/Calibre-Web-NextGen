@@ -38,6 +38,22 @@ def test_device_registry_upsert_is_idempotent_and_hides_raw_id(db_session):
     assert identity.last_seen_at == datetime(2026, 8, 9, 2, 0)
 
 
+def test_known_device_model_change_updates_and_warns(db_session, caplog):
+    from cps.services.device_registry import upsert_kobo_device
+    headers = {"x-kobo-deviceid": "c" * 64, "x-kobo-devicemodel": "Kobo Clara HD"}
+    device = upsert_kobo_device(db_session, user_id=7, headers=headers, secret_key="test-secret",
+                                seen_at=datetime(2026, 8, 9, 1, 0))
+    db_session.commit()
+    headers["x-kobo-devicemodel"] = "Kobo Libra Colour"
+    with caplog.at_level("WARNING"):
+        updated = upsert_kobo_device(db_session, user_id=7, headers=headers, secret_key="test-secret",
+                                     seen_at=datetime(2026, 8, 9, 2, 0))
+    assert updated.id == device.id
+    assert updated.model == "Kobo Libra Colour"
+    assert updated.display_name == "Kobo Clara HD"
+    assert "Kobo Clara HD" in caplog.text and "Kobo Libra Colour" in caplog.text
+
+
 def test_registry_failure_does_not_break_reading_services_request(monkeypatch):
     from cps import readingservices
     from cps.services import device_registry

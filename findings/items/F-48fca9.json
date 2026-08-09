@@ -5,8 +5,14 @@
   "id": "F-48fca9",
   "origin_issue": 1233,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-09",
+    "note": "Verified in code: cps/editbooks.py:1851-1854 carries the 'None' sentinel handling with an explicit reference to #1233. Migrated as open; fix predated migration.",
+    "release": "v4.1.25"
+  },
   "severity": "correctness",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Typing the literal word \"None\" into a custom column clears it instead of saving it"
 }

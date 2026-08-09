@@ -5,8 +5,14 @@
   "id": "F-571ee7",
   "origin_issue": 1104,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-09",
+    "note": "Verified in code: @web.route('/robots.txt') exists at cps/web.py:2211. Migrated as open; fix predated migration.",
+    "release": "v4.1.21"
+  },
   "severity": "correctness",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "GET /robots.txt returns 404 in every deployment — needs a crawl-policy decision"
 }

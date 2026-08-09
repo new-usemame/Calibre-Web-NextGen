@@ -1,0 +1,15 @@
+{
+  "area": "process",
+  "body": "Three open issues from real reporters were found today to have been fully fixed and\nreleased weeks earlier, with the reporter never told:\n\n* #876 (@KucharczykL, CWA_DB.execute_write) — fixed in v4.1.13 (0f03c2784, #901).\n  We wrote \"I'll post back here once it's in a release.\" 26 days, no post.\n* #877 (@yodatak, PDF reload) — fixed in the SAME release, v4.1.13 (986ac8f77, #904),\n  both the parse fix and the new-UI button the reporter also asked for. 26 days, no post.\n* #579 (@uschi1, light design + read mark) — both halves delivered; the reporter had\n  even CONFIRMED the light theme themselves in #351 on 2026-07-27. We wrote \"will follow\n  up here once it lands\" on 07-11 and never did.\n\nThe shape: the `promised` label captures the commitment at the moment it is made, which\nworks. Nothing ever sweeps that label back against shipped releases, so the promise is\ntracked but never discharged. Two of the three trace to one release (v4.1.13), which\nsuggests the failure is per-release-sweep, not per-issue.\n\nWhy it matters: these are the highest-trust threads we have — a user who reported a real\nbug, got a specific diagnosis, and was promised a follow-up. The fix existing and the user\nknowing about it are different things, and only the second one ends their problem. It also\ninflates the promise backlog with items that are actually done, which buries the ones that\nare not.\n\nSuggested mechanism (not implemented here): extend the awaiting-verification sweep in\nscripts/auto-close-awaiting-verification.sh, or the followup-board generator, to also list\nopen `promised` issues whose referenced fix appears in a published release — the same\ncross-reference against CHANGES-vs-upstream.md / CHANGELOG.md that post-release-outreach.sh\nalready does for upstream threads. The board currently reports owe_reply=0 for these\nbecause our comment was last, which is exactly why they were invisible.",
+  "created": "2026-08-09",
+  "id": "F-88da18",
+  "refs": [
+    "#876",
+    "#877",
+    "#579"
+  ],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "Fixes ship but the originating issue never gets its close-out, so reporters sit on solved problems"
+}

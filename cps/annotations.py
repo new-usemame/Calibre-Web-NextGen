@@ -881,6 +881,12 @@ def create_annotation(payload, *, user_id, book, session, commit):
 _UNSET = object()
 
 
+class AssignmentError(ValueError):
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
+
+
 def _find_owned_annotation(annotation_id, user_id, book_id, session):
     """Resolve a single annotation scoped to its owner — the IDOR guard. A row
     that belongs to another user (or doesn't exist) is invisible: returns
@@ -914,8 +920,91 @@ def edit_annotation(annotation_id, *, user_id, book_id, session, commit,
     if note is not _UNSET:
         row.note_text = note
     row.last_synced = datetime.now(timezone.utc)
-    commit()
+    if commit is not None:
+        commit()
     return row
+
+
+def reassign_annotation(annotation_id, *, user_id, book_id, assigned_device_public_id,
+                        expected_routing_revision, session, commit):
+    """Change routing intent while retaining provenance and old device state."""
+    row = _find_owned_annotation(annotation_id, user_id, book_id, session)
+    if row is None:
+        raise AssignmentError("not_found")
+    if expected_routing_revision is not None:
+        if isinstance(expected_routing_revision, bool) or not isinstance(expected_routing_revision, int):
+            raise AssignmentError("invalid_revision")
+        if (row.routing_revision or 1) != expected_routing_revision:
+            raise AssignmentError("revision_conflict")
+    target = None
+    if assigned_device_public_id is not None:
+        if not isinstance(assigned_device_public_id, str):
+            raise AssignmentError("device_not_found")
+        target = _owned_device(assigned_device_public_id, user_id, session)
+        if target is None:
+            raise AssignmentError("device_not_found")
+        if not target.active:
+            raise AssignmentError("device_inactive")
+    target_id = target.id if target else None
+    old_id = row.assigned_device_id
+    if old_id == target_id:
+        return row
+    if old_id is not None:
+        old_state = session.query(ub.AnnotationDeviceState).filter_by(
+            annotation_id=row.id, device_id=old_id,
+        ).first()
+        if old_state is None:
+            old_state = ub.AnnotationDeviceState(
+                annotation_id=row.id, device_id=old_id, desired=False, delivery_status="pending",
+            )
+            session.add(old_state)
+        else:
+            old_state.desired = False
+    if target is not None:
+        new_state = session.query(ub.AnnotationDeviceState).filter_by(
+            annotation_id=row.id, device_id=target.id,
+        ).first()
+        if new_state is None:
+            new_state = ub.AnnotationDeviceState(
+                annotation_id=row.id, device_id=target.id, desired=True, delivery_status="pending",
+            )
+            session.add(new_state)
+        else:
+            new_state.desired = True
+            new_state.delivery_status = "pending"
+            new_state.last_error_code = None
+    row.assigned_device_id = target_id
+    row.routing_revision = (row.routing_revision or 1) + 1
+    if commit is not None:
+        commit()
+    else:
+        session.flush()
+    return row
+
+
+def bulk_reassign_annotations(items, *, user_id, assigned_device_public_id, session, commit):
+    """Apply and commit every item independently, returning mixed results."""
+    results = []
+    for item in items:
+        annotation_id = item.get("annotation_id") if isinstance(item, dict) else None
+        try:
+            if not isinstance(item, dict) or not isinstance(item.get("book_id"), int) or not annotation_id:
+                raise AssignmentError("invalid_item")
+            reassign_annotation(
+                annotation_id, user_id=user_id, book_id=item["book_id"],
+                assigned_device_public_id=assigned_device_public_id,
+                expected_routing_revision=item.get("expected_routing_revision"),
+                session=session, commit=commit,
+            )
+            results.append({"annotation_id": annotation_id, "ok": True})
+        except AssignmentError as error:
+            session.rollback()
+            results.append({"annotation_id": annotation_id, "ok": False, "error_code": error.code})
+        except Exception:
+            session.rollback()
+            log.exception("annotations: per-item reassignment failed")
+            results.append({"annotation_id": annotation_id, "ok": False, "error_code": "database_error"})
+    return results
 
 
 def delete_annotation(annotation_id, *, user_id, book_id, session, commit):
@@ -971,16 +1060,54 @@ def annotations_edit(book_id, annotation_id):
     if "note_text" in data:
         kwargs["note"] = data.get("note_text")
     try:
+        if "assigned_device_id" in data:
+            reassign_annotation(
+                annotation_id, user_id=current_user.id, book_id=book_id,
+                assigned_device_public_id=data.get("assigned_device_id"),
+                expected_routing_revision=data.get("expected_routing_revision"),
+                session=ub.session, commit=None,
+            )
         row = edit_annotation(
             annotation_id, user_id=current_user.id, book_id=book_id,
             session=ub.session, commit=ub.session_commit, **kwargs,
         )
+    except AssignmentError as error:
+        ub.session.rollback()
+        status = 404 if error.code in ("not_found", "device_not_found") else (
+            409 if error.code in ("revision_conflict", "device_inactive") else 400
+        )
+        return jsonify({"error": error.code}), status
     except ValueError as e:
+        ub.session.rollback()
         return jsonify({"error": "bad_color", "message": str(e)}), 400
     if row is None:
         abort(404)
     _fanout_to_sync_targets(row, book)
-    return jsonify(_data_json_row(row, row.cfi_range, None)), 200
+    response = _data_json_row(row, row.cfi_range, None)
+    response.update({
+        "assigned_device_id": (
+            session_device.public_id if row.assigned_device_id and (
+                session_device := ub.session.query(ub.Device).filter_by(id=row.assigned_device_id).first()
+            ) else None
+        ),
+        "routing_revision": row.routing_revision,
+    })
+    return jsonify(response), 200
+
+
+@annotations_bp.route("/api/annotations/assignments/bulk", methods=["POST"])
+@user_login_required
+def annotation_assignments_bulk():
+    data = request.get_json(silent=True) or {}
+    items = data.get("items")
+    if not isinstance(items, list) or not items or len(items) > 500:
+        return jsonify({"error": "invalid_items", "max_items": 500}), 400
+    results = bulk_reassign_annotations(
+        items, user_id=current_user.id,
+        assigned_device_public_id=data.get("assigned_device_id"),
+        session=ub.session, commit=ub.session_commit,
+    )
+    return jsonify({"results": results}), 200
 
 
 @annotations_bp.route("/annotations/<int:book_id>/<annotation_id>", methods=["DELETE"])

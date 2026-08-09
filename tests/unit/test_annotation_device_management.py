@@ -4,6 +4,7 @@
 from types import SimpleNamespace
 
 import pytest
+from flask import Flask
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -103,3 +104,70 @@ def test_soft_delete_preserves_origin_clears_assignment_and_restore_round_trips(
         annotation_id=annotation.id, device_id=device.id,
     ).one()
     assert state.desired is True and state.delivery_status == "pending"
+
+
+def test_reassignment_changes_intent_but_never_origin(session):
+    from cps import ub
+    from cps.annotations import reassign_annotation
+    origin = _device(session, label="Origin")
+    target = _device(session, label="Target")
+    annotation = _annotation(session, "move-me", origin=origin.id, assigned=origin.id)
+    session.add(ub.AnnotationDeviceState(annotation_id=annotation.id, device_id=origin.id,
+                                         desired=True, delivery_status="acknowledged"))
+    session.commit()
+    reassign_annotation(
+        "move-me", user_id=7, book_id=5, assigned_device_public_id=target.public_id,
+        expected_routing_revision=1, session=session, commit=session.commit,
+    )
+    session.refresh(annotation)
+    assert annotation.origin_device_id == origin.id
+    assert annotation.assigned_device_id == target.id
+    assert annotation.routing_revision == 2
+    states = {state.device_id: state for state in session.query(ub.AnnotationDeviceState).all()}
+    assert states[origin.id].desired is False
+    assert states[target.id].desired is True
+    assert states[target.id].delivery_status == "pending"
+
+
+def test_bulk_mixed_results_return_200_and_commit_successes(session, monkeypatch):
+    from cps import annotations, ub
+    target = _device(session, label="Target")
+    succeeds = _annotation(session, "succeeds")
+    stale = _annotation(session, "stale")
+    session.commit()
+    app = Flask(__name__)
+    monkeypatch.setattr(annotations, "current_user", SimpleNamespace(id=7))
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(ub, "session_commit", session.commit)
+    payload = {
+        "assigned_device_id": target.public_id,
+        "items": [
+            {"book_id": 5, "annotation_id": "succeeds", "expected_routing_revision": 1},
+            {"book_id": 5, "annotation_id": "stale", "expected_routing_revision": 99},
+            {"book_id": 5, "annotation_id": "missing", "expected_routing_revision": 1},
+        ],
+    }
+    with app.test_request_context("/api/annotations/assignments/bulk", method="POST", json=payload):
+        response, status = annotations.annotation_assignments_bulk.__wrapped__()
+    assert status == 200
+    assert response.get_json()["results"] == [
+        {"annotation_id": "succeeds", "ok": True},
+        {"annotation_id": "stale", "ok": False, "error_code": "revision_conflict"},
+        {"annotation_id": "missing", "ok": False, "error_code": "not_found"},
+    ]
+    session.refresh(succeeds)
+    session.refresh(stale)
+    assert succeeds.assigned_device_id == target.id
+    assert stale.assigned_device_id is None
+
+
+def test_bulk_rejects_more_than_500_items(session, monkeypatch):
+    from cps import annotations, ub
+    app = Flask(__name__)
+    monkeypatch.setattr(annotations, "current_user", SimpleNamespace(id=7))
+    monkeypatch.setattr(ub, "session", session)
+    with app.test_request_context("/api/annotations/assignments/bulk", method="POST",
+                                  json={"items": [{}] * 501}):
+        response, status = annotations.annotation_assignments_bulk.__wrapped__()
+    assert status == 400
+    assert response.get_json()["max_items"] == 500

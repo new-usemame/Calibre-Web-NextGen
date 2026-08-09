@@ -42,6 +42,12 @@ def create_appdb(appdb_path):
     ub.init_db(appdb_path)
 
 
+def create_metadb(metadb_path):
+    with open(os.path.join(app_paths.scripts_dir(), "metadata.db.sql"), "r") as f:
+        with sqlite3.connect(metadb_path) as conn:
+            conn.executescript(f.read())
+
+
 def is_calibre_database(path) -> bool:
     """True when *path* is a readable SQLite file carrying Calibre's schema.
 
@@ -105,8 +111,6 @@ class AutoLibrary:
         # shipped dirs.json still says /calibre-library, so Docker is unchanged.
         self.library_dir = library_paths.get_calibre_library_dir()
         self.dirs_path = str(app_paths.dirs_json())
-
-        self.empty_metadb = str(app_paths.empty_library_file("metadata.db"))
 
         # Canonical location. app.db always lives at <config dir>/app.db;
         # check_for_app_db() tries it first and only falls back to a full
@@ -415,9 +419,10 @@ class AutoLibrary:
             "library directory",
             f"Set 'calibre_library_dir' in {self.dirs_path} to a directory this user can write to.",
         )
-        shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
+        self.metadb_path = os.path.join(self.library_dir, "metadata.db")
+        create_metadb(self.metadb_path)
         service_user.chown_to_service_user(self.library_dir, "[cwa-auto-library]")
-        self.metadb_path = f"{self.library_dir}/metadata.db"
+        print(f"[cwa-auto-library] app.db successfully created in {self.metadb_path}")
         return
 
     def bootstrap_calibre_user_plugins_dir(self):

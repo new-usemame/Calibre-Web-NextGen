@@ -45,6 +45,7 @@ from typing import Optional
 
 from flask import Blueprint, Response, abort, flash, jsonify, redirect, request, url_for
 from flask_babel import gettext as _
+from sqlalchemy import and_, func
 
 from . import calibre_db, logger, ub
 from .cw_login import current_user
@@ -59,6 +60,180 @@ annotations_bp = Blueprint("annotations", __name__)
 # Defense-in-depth file-size cap. Typical real-device KoboReader.sqlite
 # files are 30-50 MB; reject anything over 100 MB.
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+
+
+def _owned_device(public_id, user_id, session):
+    return session.query(ub.Device).filter(
+        ub.Device.public_id == public_id, ub.Device.user_id == user_id,
+    ).first()
+
+
+def _device_json(device, annotation_count=0):
+    return {
+        "public_id": device.public_id,
+        "label": device.display_name,
+        "type": device.kind,
+        "model": device.model,
+        "firmware": device.firmware_version,
+        "first_seen": device.first_seen_at.isoformat() if device.first_seen_at else None,
+        "last_seen": device.last_seen_at.isoformat() if device.last_seen_at else None,
+        "annotation_count": int(annotation_count),
+        "active": bool(device.active),
+    }
+
+
+def list_annotation_devices(*, user_id, session, active_only=False):
+    """List devices with one aggregate assigned-annotation count query."""
+    query = (
+        session.query(ub.Device, func.count(ub.Annotation.id))
+        .outerjoin(ub.Annotation, and_(
+            ub.Annotation.assigned_device_id == ub.Device.id,
+            ub.Annotation.user_id == user_id,
+        ))
+        .filter(ub.Device.user_id == user_id)
+    )
+    if active_only:
+        query = query.filter(ub.Device.active.is_(True))
+    rows = query.group_by(ub.Device.id).order_by(ub.Device.display_name, ub.Device.id).all()
+    return [_device_json(device, count) for device, count in rows]
+
+
+def rename_annotation_device(public_id, *, user_id, label, session, commit):
+    if not isinstance(label, str) or label != label.strip() or not 1 <= len(label) <= 60:
+        raise ValueError("device label must be 1-60 characters without surrounding whitespace")
+    if any(ord(char) < 32 or ord(char) == 127 for char in label):
+        raise ValueError("device label contains control characters")
+    device = _owned_device(public_id, user_id, session)
+    if device is None:
+        return None
+    device.display_name = label
+    commit()
+    return device
+
+
+def device_annotation_counts(public_id, *, user_id, session):
+    device = _owned_device(public_id, user_id, session)
+    if device is None:
+        return None
+    origin = session.query(func.count(ub.Annotation.id)).filter(
+        ub.Annotation.user_id == user_id, ub.Annotation.origin_device_id == device.id,
+    ).scalar()
+    assigned = session.query(func.count(ub.Annotation.id)).filter(
+        ub.Annotation.user_id == user_id, ub.Annotation.assigned_device_id == device.id,
+    ).scalar()
+    return device, {"origin_count": int(origin), "assigned_count": int(assigned)}
+
+
+def soft_delete_annotation_device(public_id, *, user_id, session, commit):
+    found = device_annotation_counts(public_id, user_id=user_id, session=session)
+    if found is None:
+        return None
+    device, counts = found
+    assigned = session.query(ub.Annotation).filter(
+        ub.Annotation.user_id == user_id, ub.Annotation.assigned_device_id == device.id,
+    ).all()
+    for annotation in assigned:
+        snapshot = session.query(ub.DeviceRetiredAssignment).filter_by(
+            device_id=device.id, annotation_id=annotation.id,
+        ).first()
+        if snapshot is None:
+            session.add(ub.DeviceRetiredAssignment(device_id=device.id, annotation_id=annotation.id))
+        annotation.assigned_device_id = None
+        annotation.routing_revision = (annotation.routing_revision or 0) + 1
+    session.query(ub.AnnotationDeviceState).filter_by(device_id=device.id).update(
+        {ub.AnnotationDeviceState.desired: False}, synchronize_session=False,
+    )
+    device.active = False
+    commit()
+    return device, counts
+
+
+def restore_annotation_device(public_id, *, user_id, session, commit):
+    device = _owned_device(public_id, user_id, session)
+    if device is None:
+        return None
+    restored = 0
+    conflicts = 0
+    snapshots = session.query(ub.DeviceRetiredAssignment).filter_by(device_id=device.id).all()
+    for snapshot in snapshots:
+        annotation = session.query(ub.Annotation).filter_by(id=snapshot.annotation_id, user_id=user_id).first()
+        if annotation is not None and annotation.assigned_device_id is None:
+            annotation.assigned_device_id = device.id
+            annotation.routing_revision = (annotation.routing_revision or 0) + 1
+            state = session.query(ub.AnnotationDeviceState).filter_by(
+                annotation_id=annotation.id, device_id=device.id,
+            ).first()
+            if state is None:
+                state = ub.AnnotationDeviceState(annotation_id=annotation.id, device_id=device.id)
+                session.add(state)
+            state.desired = True
+            state.delivery_status = "pending"
+            restored += 1
+        elif annotation is not None:
+            conflicts += 1
+        session.delete(snapshot)
+    device.active = True
+    commit()
+    return device, restored, conflicts
+
+
+@annotations_bp.route("/api/annotations/devices", methods=["GET"])
+@user_login_required
+def annotation_devices_list():
+    active_only = request.args.get("active", "").lower() == "true"
+    return jsonify({"devices": list_annotation_devices(
+        user_id=current_user.id, session=ub.session, active_only=active_only,
+    )})
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>", methods=["PATCH"])
+@user_login_required
+def annotation_device_rename(public_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        device = rename_annotation_device(
+            public_id, user_id=current_user.id, label=data.get("label"),
+            session=ub.session, commit=ub.session_commit,
+        )
+    except ValueError as error:
+        return jsonify({"error": "invalid_label", "message": str(error)}), 400
+    if device is None:
+        abort(404)
+    return jsonify(_device_json(device))
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>/delete-preflight", methods=["GET"])
+@user_login_required
+def annotation_device_delete_preflight(public_id):
+    found = device_annotation_counts(public_id, user_id=current_user.id, session=ub.session)
+    if found is None:
+        abort(404)
+    return jsonify(found[1])
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>", methods=["DELETE"])
+@user_login_required
+def annotation_device_delete(public_id):
+    result = soft_delete_annotation_device(
+        public_id, user_id=current_user.id, session=ub.session, commit=ub.session_commit,
+    )
+    if result is None:
+        abort(404)
+    device, counts = result
+    return jsonify({"device": _device_json(device), **counts})
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>/restore", methods=["POST"])
+@user_login_required
+def annotation_device_restore(public_id):
+    result = restore_annotation_device(
+        public_id, user_id=current_user.id, session=ub.session, commit=ub.session_commit,
+    )
+    if result is None:
+        abort(404)
+    device, restored, conflicts = result
+    return jsonify({"device": _device_json(device), "restored_assignment_count": restored,
+                    "assignment_conflict_count": conflicts})
 
 
 @annotations_bp.route("/annotations/import", methods=["GET"])

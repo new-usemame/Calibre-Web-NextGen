@@ -399,6 +399,15 @@ path would remain capture/import or a controllable client/plugin.
 sets only server `_now()` into `last_synced` (`cps/services/annotation_sync/__init__.py:133-193`).
 Cross-device last-write-wins cannot be reconstructed from server arrival time.
 
+**Safe-slice implementation note (2026-08-09):** the additive ingest-only slice persists the
+nullable `client_modified_at` value but intentionally does not pretend that the future actor-based
+tie-break already exists. A malformed value is rejected from local storage without changing the
+proxied Kobo response; an older, undated-over-dated, or equal-clock update is a local no-op. Equal
+clock must remain a no-op until an annotation actor/device key and revision journal are populated,
+because applying the §5.2 tie-break without its actor input would be nondeterministic. This is a
+staging constraint, not the final multi-device conflict implementation
+(`cps/services/annotation_sync/__init__.py:154-207`).
+
 Add `client_created_at`, `client_modified_at`, `client_clock_kind`, `server_modified_at`, and
 `revision` as specified in §3.1. Kobo ingest parses `clientLastModifiedUtc` as strict timezone-aware
 UTC, rejects impossible/out-of-range values from ordering (while retaining the mutation for review),

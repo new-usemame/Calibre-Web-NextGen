@@ -168,11 +168,12 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
     skipped_existing = 0
     skipped_orphan = 0
     skipped_hidden = 0
+    skipped_invalid_content_id = 0
     total_seen = 0
 
     # Cache: VolumeID -> CW book_id (or None for not-in-library).
     # Same VolumeID often appears across many bookmarks; resolve once.
-    uuid_cache: dict[str, Optional[int]] = {}
+    uuid_cache = {}
 
     for bm in parse_kobo_bookmarks(sqlite_path):
         total_seen += 1
@@ -186,11 +187,12 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
         # skipped (design doc §11 row 2).
         volume_uuid = bm.volume_id
         if volume_uuid in uuid_cache:
-            book_id = uuid_cache[volume_uuid]
+            book_id, resolved_uuid = uuid_cache[volume_uuid]
         else:
             book = book_lookup(volume_uuid)
             book_id = book.id if book else None
-            uuid_cache[volume_uuid] = book_id
+            resolved_uuid = (getattr(book, "uuid", None) or volume_uuid) if book else None
+            uuid_cache[volume_uuid] = (book_id, resolved_uuid)
 
         if book_id is None:
             skipped_orphan += 1
@@ -206,6 +208,15 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
             skipped_existing += 1
             continue
 
+        from .services.annotation_content_id import normalize_content_id, ContentIdError
+        try:
+            content_id = normalize_content_id(
+                bm.content_id, book_uuid=resolved_uuid, allow_legacy_file_uri=True
+            )
+        except ContentIdError:
+            skipped_invalid_content_id += 1
+            continue
+
         row = ub.Annotation(
             user_id=user_id,
             annotation_id=bm.bookmark_id,
@@ -213,7 +224,7 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
             highlighted_text=bm.text,
             highlight_color=bm.color,
             note_text=bm.annotation,
-            content_id=bm.content_id,
+            content_id=content_id,
             start_container_path=bm.start_container_path,
             start_container_child_index=bm.start_container_child_index,
             start_offset=bm.start_offset,
@@ -240,6 +251,7 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
         "skipped_existing": skipped_existing,
         "skipped_orphan": skipped_orphan,
         "skipped_hidden": skipped_hidden,
+        "skipped_invalid_content_id": skipped_invalid_content_id,
         "total_seen": total_seen,
     }
 
@@ -619,6 +631,9 @@ def create_annotation(payload, *, user_id, book, session, commit):
         book_uuid = getattr(book, "uuid", None)
         if chapter and book_uuid:
             content_id = f"{book_uuid}!!{chapter}"
+    if content_id is not None:
+        from .services.annotation_content_id import normalize_content_id
+        content_id = normalize_content_id(content_id, book_uuid=getattr(book, "uuid", None))
 
     start_span = (payload.get("start_kobospan") or "").strip()
     cfi_range = (payload.get("cfi_range") or "").strip()

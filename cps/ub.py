@@ -905,6 +905,53 @@ class KoboStatistics(Base):
     spent_reading_minutes = Column(Integer)
 
 
+class Device(Base):
+    """User-visible device; raw hardware identifiers are never stored."""
+    __tablename__ = 'device'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), nullable=False, unique=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    kind = Column(String(32), nullable=False)
+    display_name = Column(String(160), nullable=False)
+    model = Column(String(160), nullable=True)
+    firmware_version = Column(String(64), nullable=True)
+    first_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    identities = relationship("DeviceIdentity", back_populates="device", cascade="all, delete-orphan")
+    __table_args__ = (Index('ix_device_user_kind', 'user_id', 'kind'),)
+
+
+class DeviceIdentity(Base):
+    """Versioned, keyed derivation of an upstream device identifier."""
+    __tablename__ = 'device_identity'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False)
+    scheme = Column(String(64), nullable=False)
+    key_version = Column(Integer, nullable=False)
+    fingerprint = Column(String(64), nullable=False)
+    first_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    device = relationship("Device", back_populates="identities")
+    __table_args__ = (
+        UniqueConstraint('scheme', 'fingerprint', name='uq_device_identity_scheme_fingerprint'),
+        Index('ix_device_identity_device', 'device_id'),
+    )
+
+
+class AnnotationContentIdMigration(Base):
+    """Exact undo journal for conservative content-id backfills."""
+    __tablename__ = 'annotation_content_id_migration'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    annotation_row_id = Column(Integer, ForeignKey('annotation.id', ondelete='CASCADE'), nullable=False, unique=True)
+    original_content_id = Column(Text, nullable=False)
+    normalized_content_id = Column(Text, nullable=False)
+    migrated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
 class Annotation(Base):
     """Per-user-per-annotation row. Canonical store for ALL highlight/note
     origins (Kobo device, web reader, KOReader plugin).
@@ -959,6 +1006,9 @@ class Annotation(Base):
     # Lifecycle
     hidden = Column(Boolean, default=False, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # Device-supplied modification clock. This is distinct from last_synced,
+    # which remains the server's receipt/dispatch time.
+    client_modified_at = Column(DateTime, nullable=True)
     last_synced = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
@@ -2648,6 +2698,75 @@ def migrate_annotation_device_origin(engine, _session):
                 raise
 
 
+def migrate_multi_device_annotation_safe_slice(engine, _session):
+    """Create the additive registry, timestamp, and conservative backfill."""
+    Base.metadata.create_all(
+        engine,
+        tables=[Device.__table__, DeviceIdentity.__table__, AnnotationContentIdMigration.__table__],
+        checkfirst=True,
+    )
+    from .services.annotation_content_id import normalize_content_id_for_backfill
+    with engine.begin() as conn:
+        if not conn.execute(text(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='annotation'"
+        )).first():
+            return
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
+        if "client_modified_at" not in columns:
+            try:
+                conn.execute(text("ALTER TABLE annotation ADD COLUMN client_modified_at DATETIME"))
+            except exc.OperationalError as error:
+                if "duplicate column" not in str(error).lower():
+                    raise
+        rows = conn.execute(text("SELECT id, content_id FROM annotation WHERE content_id IS NOT NULL")).fetchall()
+        changed = 0
+        for row_id, original in rows:
+            normalized = normalize_content_id_for_backfill(original)
+            if normalized == original:
+                continue
+            conn.execute(text(
+                "INSERT OR IGNORE INTO annotation_content_id_migration "
+                "(annotation_row_id, original_content_id, normalized_content_id, migrated_at) "
+                "VALUES (:row_id, :original, :normalized, :migrated_at)"
+            ), {"row_id": row_id, "original": original, "normalized": normalized,
+                "migrated_at": datetime.now(timezone.utc)})
+            result = conn.execute(text(
+                "UPDATE annotation SET content_id=:normalized "
+                "WHERE id=:row_id AND content_id=:original"
+            ), {"normalized": normalized, "row_id": row_id, "original": original})
+            changed += result.rowcount
+        if changed:
+            log.info("[annotation-content-id] conservatively normalized %d rows", changed)
+
+
+def downgrade_multi_device_annotation_safe_slice(engine):
+    """Manual rollback; refuses to clobber content ids edited after migration."""
+    with engine.begin() as conn:
+        tables = {row[0] for row in conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ))}
+        if "annotation_content_id_migration" in tables:
+            conflicts = conn.execute(text(
+                "SELECT COUNT(*) FROM annotation_content_id_migration m JOIN annotation a "
+                "ON a.id=m.annotation_row_id WHERE a.content_id != m.normalized_content_id"
+            )).scalar()
+            if conflicts:
+                raise RuntimeError("content ids changed after migration; refusing lossy downgrade")
+            conn.execute(text(
+                "UPDATE annotation SET content_id=(SELECT original_content_id FROM "
+                "annotation_content_id_migration m WHERE m.annotation_row_id=annotation.id) "
+                "WHERE id IN (SELECT annotation_row_id FROM annotation_content_id_migration)"
+            ))
+            conn.execute(text("DROP TABLE annotation_content_id_migration"))
+        if "device_identity" in tables:
+            conn.execute(text("DROP TABLE device_identity"))
+        if "device" in tables:
+            conn.execute(text("DROP TABLE device"))
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
+        if "client_modified_at" in columns:
+            conn.execute(text("ALTER TABLE annotation DROP COLUMN client_modified_at"))
+
+
 def migrate_annotation_koreader_identity(engine, _session):
     """Add KOReader-native locator columns and enforce merge identity.
 
@@ -2853,6 +2972,7 @@ def migrate_Database(_session):
     migrate_annotation_polymorphic_position(engine, _session)
     migrate_annotation_device_origin(engine, _session)
     migrate_annotation_koreader_identity(engine, _session)
+    migrate_multi_device_annotation_safe_slice(engine, _session)
     migrate_book_cover_preview_table(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)
 

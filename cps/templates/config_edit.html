@@ -682,7 +682,7 @@
             <div class="form-group">
                 <input type="checkbox" id="config_enable_oauth_auto_forward" name="config_enable_oauth_auto_forward" {% if config.config_enable_oauth_auto_forward %}checked{% endif %}>
                 <label for="config_enable_oauth_auto_forward">{{_('Automatically forward to the only OAuth provider')}}</label>
-                <div class="help-block">{{_('When enabled and exactly one OAuth provider is active, visiting the login page starts it automatically. Add ?local=1 to the login URL to open the normal login page instead.')}}</div>
+                <div class="help-block">{{_('When enabled and exactly one OAuth provider is active, visiting the login page starts it automatically. Add ?local=1 to the login URL to open the normal login page instead. That page still accepts a username and password only while the setting above is left off.')}}</div>
             </div>
             <div class="form-group">
                 <input type="checkbox" id="config_enable_oauth_group_admin_management" name="config_enable_oauth_group_admin_management" {% if config.config_enable_oauth_group_admin_management %}checked{% endif %}>

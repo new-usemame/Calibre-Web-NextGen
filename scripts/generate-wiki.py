@@ -51,6 +51,12 @@ IGNORED_SLUGS = {
     # mirrored to its own wiki page by the update-translations CI workflow; the
     # Contributing page links to the live table instead of freezing a copy.
     "README.md#translations",
+    # Container heading with an EMPTY body: every child section under it
+    # (network shares, Calibre coexistence, plugins, reverse proxy, Hardcover)
+    # is transcluded individually into wiki-src/Configuration.md, whose H1 *is*
+    # this section. Transcluding the parent would also pull its children and
+    # duplicate all five on that page.
+    "README.md#common-configurations",
 }
 
 # Wiki pages this generator does NOT own (managed elsewhere). sync-wiki.sh

@@ -471,7 +471,10 @@ all device IDs are resolved under `Device.user_id == current_user.id`:
 GET   /api/annotations/devices
       ?active=true&include_counts=true
 PATCH /api/annotations/devices/<public_id>
-      {display_name, active?, expected_updated_at}
+      {label}
+GET   /api/annotations/devices/<public_id>/delete-preflight
+DELETE /api/annotations/devices/<public_id>
+POST  /api/annotations/devices/<public_id>/restore
 POST  /api/annotations/devices/web-session
 GET   /api/annotations/devices/<public_id>/annotations
       ?book_id=&include_hidden=false&limit=&cursor=
@@ -480,18 +483,25 @@ GET   /api/annotations/devices/<public_id>/annotations
 List shape includes public ID, display name, kind, model, firmware, first/last seen, active, current
 assigned annotation count, and optionally origin count. Do not expose identity fingerprints. Device
 rename uses optimistic concurrency; deactivation does not null provenance.
+Deletion is soft: it retains the device and label, leaves every immutable `origin_device_id`
+unchanged, and clears current assignments after snapshotting them for restore. Preflight returns
+`origin_count` and `assigned_count`. Restore reactivates the same public ID and restores snapshotted
+assignments that remain unassigned; it reports conflicts rather than overwriting a later assignment.
 
 ### 6.2 Single and bulk reassignment
 
 ```http
-PATCH /api/annotations/books/<book_id>/annotations/<annotation_id>/assignment
-{"device_public_id":"... or null","expected_routing_revision":4}
+PATCH /annotations/<book_id>/<annotation_id>
+{"assigned_device_id":"... or null","expected_routing_revision":4}
 
 POST /api/annotations/assignments/bulk
 {
   "items":[{"book_id":539,"annotation_id":"...","expected_routing_revision":4}],
-  "device_public_id":"... or null"
+  "assigned_device_id":"... or null"
 }
+
+Response: `{"results":[{"annotation_id":"...","ok":true},{"annotation_id":"...",
+"ok":false,"error_code":"revision_conflict"}]}` with HTTP 200.
 ```
 
 Rules:
@@ -500,8 +510,9 @@ Rules:
   404, following the current annotation owner-scoped lookup (`cps/annotations.py:694-706`);
 - target must be active; compatibility can yield 409 `device_incompatible` rather than accepting a
   delivery that can never render;
-- single reassignment is atomic; bulk is all-or-nothing, max 500, and reports a revision conflict
-  without partial writes;
+- single reassignment is atomic; bulk is capped at 500 and commits each item independently. Mixed
+  successes/failures return HTTP 200 with per-item error codes, so one stale revision does not roll
+  back successful siblings and clients can safely chunk the real 559-row case;
 - NULL means “unassigned,” not delete and not “all devices”;
 - origin never changes;
 - create/update target `AnnotationDeviceState(desired=true,pending)` and retain old state with

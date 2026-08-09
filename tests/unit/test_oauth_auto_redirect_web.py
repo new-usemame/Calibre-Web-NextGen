@@ -188,6 +188,27 @@ def test_explicit_auto_forward_starts_provider_with_standard_login_enabled():
     render_login.assert_not_called()
 
 
+def test_local_parameter_breaks_glass_under_explicit_auto_forward():
+    # The whole safety argument for auto-forwarding while standard login is
+    # still enabled is that ``?local=1`` remains a way back to a form whose
+    # handler still accepts local credentials. The other two ``?local=1``
+    # cases run with standard login disabled, so they cannot pin it: they
+    # would stay green even if this branch stopped honouring the parameter.
+    app = _app()
+    client = app.test_client()
+    p1, p2, p3, p4, p5, p6 = _oauth_only_patches(
+        spa_preferred=False, standard_login_disabled=False
+    )
+    with p1, p2, p3, p4, p5, p6, \
+            patch("cps.web.config.config_enable_oauth_auto_forward", True, create=True), \
+            patch("cps.web.render_login", return_value="classic") as render_login:
+        response = client.get("/login?local=1")
+
+    assert response.status_code == 200
+    assert response.get_data(as_text=True) == "classic"
+    render_login.assert_called_once_with()
+
+
 def test_authenticated_login_route_clears_auto_attempts():
     app = _app()
     client = app.test_client()

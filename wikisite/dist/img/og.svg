@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#11151b"/>
+  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="#263040" stroke-width="2"/>
+  <g transform="translate(88 210)">
+    <rect x="0" y="0" width="34" height="118" rx="9" fill="#4fc798" opacity="0.55"/>
+    <rect x="46" y="0" width="34" height="118" rx="9" fill="#4fc798"/>
+    <rect x="92" y="0" width="34" height="118" rx="9" fill="#4fc798" opacity="0.8" transform="rotate(9 109 118)"/>
+  </g>
+  <text x="240" y="282" font-family="Georgia, 'Times New Roman', serif" font-size="76" fill="#e8ebf0">Calibre-Web <tspan fill="#4fc798">NextGen</tspan></text>
+  <text x="242" y="336" font-family="Georgia, 'Times New Roman', serif" font-size="29" fill="#a7b0bd">The community-maintained Calibre-Web-Automated build —</text>
+  <text x="242" y="372" font-family="Georgia, 'Times New Roman', serif" font-size="29" fill="#a7b0bd">bugs fixed, shipped.</text>
+  <g transform="translate(240 410)">
+    <rect width="640" height="52" rx="10" fill="#182030" stroke="#334052"/>
+    <text x="24" y="34" font-family="Menlo, monospace" font-size="22" fill="#5fd0a3">ghcr.io/new-usemame/calibre-web-nextgen:latest</text>
+  </g>
+  <text x="88" y="560" font-family="Menlo, monospace" font-size="20" fill="#7d8794">wiki.calibrewebnextgen.com</text>
+</svg>

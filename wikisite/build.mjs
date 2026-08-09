@@ -25,8 +25,16 @@ import {
 import { PLACEHOLDER_JPG } from './src/placeholders.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO = path.resolve(HERE, '..');            // .../Calibre-Web-NextGen/repo
-const PROJECT_ROOT = path.resolve(REPO, '..');    // .../Calibre-Web-NextGen
+
+// Resolve the repo root from git rather than by walking up a fixed number of
+// directories. The old `resolve(HERE, '..', '..')` assumed the shared-checkout
+// layout `<workspace>/repo/wikisite/`, which is NOT how this builds in a
+// `git worktree` — there the repo root is the worktree itself and wikisite sits
+// directly beneath it. Since sessions are required to work in worktrees (four of
+// them share one checkout), that assumption broke every worktree build with a
+// misleading "generator exited non-zero".
+const REPO = execFileSync('git', ['rev-parse', '--show-toplevel'],
+  { cwd: HERE, encoding: 'utf8' }).trim();
 const DIST = path.join(HERE, 'dist');
 const SRC_IMG = path.join(HERE, 'src', 'img');
 
@@ -94,8 +102,8 @@ function runGenerator() {
   try {
     const res = execFileSync(
       'python3',
-      ['repo/scripts/generate-wiki.py', '--repo', 'repo', '--src', 'repo/wiki-src', '--out', out],
-      { cwd: PROJECT_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      ['scripts/generate-wiki.py', '--repo', '.', '--src', 'wiki-src', '--out', out],
+      { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     );
     if (res && res.trim()) console.log(res.trim());
   } catch (e) {
@@ -404,7 +412,7 @@ function extractFence(src, lang, mustContain) {
 }
 
 const SHOTS = {
-  'hero-library': [1600, 1000],
+  'hero-library': [1440, 600],   // real screenshot of the SPA library view, not a placeholder
   'book-detail': [1200, 900],
   reader: [1600, 900],
   settings: [1600, 900],
@@ -494,7 +502,7 @@ function buildHomeBody(pages, md) {
           <p class="hero-steps" style="margin-top:1rem"><span>Just the image: <code>docker pull ${IMAGE_REF}</code></span></p>
         </div>
         <div class="hero-shot">
-          ${figureShot('hero-library', 'The redesigned library view — placeholder screenshot', true)}
+          ${figureShot('hero-library', 'The new library view in Calibre-Web NextGen', true)}
         </div>
       </div>
     </div>

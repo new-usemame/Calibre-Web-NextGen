@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-prefix="../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOReader Sync — Calibre-Web NextGen docs</title>
+<meta name="description" content="CWA has built-in KOReader progress sync; no separate kosync server is needed.">
+<link rel="canonical" href="https://wiki.calibrewebnextgen.com/koreader-sync/">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ee">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#11151b">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Calibre-Web NextGen docs">
+<meta property="og:title" content="KOReader Sync — Calibre-Web NextGen docs">
+<meta property="og:description" content="CWA has built-in KOReader progress sync; no separate kosync server is needed.">
+<meta property="og:url" content="https://wiki.calibrewebnextgen.com/koreader-sync/">
+<meta property="og:image" content="https://wiki.calibrewebnextgen.com/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="KOReader Sync — Calibre-Web NextGen docs">
+<meta name="twitter:description" content="CWA has built-in KOReader progress sync; no separate kosync server is needed.">
+<meta name="twitter:image" content="https://wiki.calibrewebnextgen.com/img/og.png">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<script>try{var t=localStorage.getItem('cwng-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/search-index.js" defer></script>
+<script src="../assets/site.js" defer></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"KOReader Sync","description":"CWA has built-in KOReader progress sync; no separate kosync server is needed.","url":"https://wiki.calibrewebnextgen.com/koreader-sync/","dateModified":"2026-08-09","inLanguage":"en","isAccessibleForFree":true,"author":{"@type":"Organization","name":"Calibre-Web NextGen","url":"https://github.com/new-usemame/Calibre-Web-NextGen"},"publisher":{"@type":"Organization","name":"Calibre-Web NextGen","url":"https://github.com/new-usemame/Calibre-Web-NextGen"},"isPartOf":{"@type":"WebSite","name":"Calibre-Web NextGen docs","url":"https://wiki.calibrewebnextgen.com/"}}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="header-inner">
+    <button type="button" class="icon-btn" id="nav-toggle" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <a class="brand" href="../" aria-label="Calibre-Web NextGen docs home"><svg class="brand-logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="5" width="6.5" height="22" rx="1.8" fill="currentColor" opacity="0.55"/><rect x="12.75" y="5" width="6.5" height="22" rx="1.8" fill="currentColor"/><rect x="21.5" y="5" width="6.5" height="22" rx="1.8" fill="currentColor" opacity="0.8" transform="rotate(9 24.75 27)"/></svg><span class="brand-name">Calibre-Web <b>NextGen</b></span><span class="brand-tag">Docs</span></a>
+    <span class="header-spacer"></span>
+    <button type="button" class="search-btn" id="search-button" aria-label="Search the docs"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M13.6 13.6 17.5 17.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span class="search-btn-text">Search</span><kbd class="search-btn-kbd">⌘K</kbd></button>
+    <a class="icon-btn" href="https://github.com/new-usemame/Calibre-Web-NextGen" aria-label="GitHub repository"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38l-.01-1.49c-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg></a>
+    <button type="button" class="icon-btn" id="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme"><svg class="sun" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M10 1.8v2M10 16.2v2M1.8 10h2M16.2 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M15.8 4.2l-1.4 1.4M5.6 14.4l-1.4 1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><svg class="moon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17.2 12.2A7.5 7.5 0 0 1 7.8 2.8a7.5 7.5 0 1 0 9.4 9.4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
+  </div>
+</header>
+<div id="nav-backdrop"></div>
+<div class="layout">
+  <nav class="site-nav" id="site-nav" aria-label="Documentation">
+    <div class="nav-drawer-head">
+      <span class="nav-drawer-title">Docs</span>
+      <button type="button" class="icon-btn" id="nav-close" aria-label="Close navigation"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    </div>
+    <details class="nav-group" open>
+      <summary><svg class="chev" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Get Started</span></summary>
+      <ul class="nav-list">
+        <li><a href="../">Home</a></li>
+        <li><a href="../quick-start/">Quick Start</a></li>
+        <li><a href="../installation/">Installation</a></li>
+        <li><a href="../first-run/">First Run</a></li>
+        <li><a href="../updating/">Updating</a></li>
+      </ul>
+    </details>
+    <details class="nav-group" open>
+      <summary><svg class="chev" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Install</span></summary>
+      <ul class="nav-list">
+        <li><a href="../install-with-docker-compose/">Docker Compose</a></li>
+        <li><a href="../install-on-synology/">Synology</a></li>
+        <li><a href="../install-on-unraid/">Unraid</a></li>
+        <li><a href="../install-on-truenas-scale/">TrueNAS SCALE</a></li>
+        <li><a href="../install-on-qnap/">QNAP</a></li>
+        <li><a href="../install-with-portainer/">Portainer</a></li>
+        <li><a href="../install-with-dockge/">Dockge</a></li>
+        <li><a href="../migrating/">Migrating</a></li>
+      </ul>
+    </details>
+    <details class="nav-group" open>
+      <summary><svg class="chev" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Using it</span></summary>
+      <ul class="nav-list">
+        <li><a href="../configuration/">Configuration</a></li>
+        <li><a href="../shelfmark/">Shelfmark</a></li>
+      </ul>
+    </details>
+    <details class="nav-group" open>
+      <summary><svg class="chev" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sync</span></summary>
+      <ul class="nav-list">
+        <li><a href="../koreader-sync/" aria-current="page">KOReader Sync</a></li>
+        <li><a href="../kobo-sync/">Kobo Sync</a></li>
+      </ul>
+    </details>
+    <details class="nav-group" open>
+      <summary><svg class="chev" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Help</span></summary>
+      <ul class="nav-list">
+        <li><a href="../troubleshooting/">Troubleshooting</a></li>
+        <li><a href="../differences-from-upstream/">Differences from Upstream</a></li>
+        <li><a href="../contributing/">Contributing</a></li>
+      </ul>
+    </details>
+    <div class="nav-externals">
+      <a href="https://github.com/new-usemame/Calibre-Web-NextGen"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38l-.01-1.49c-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg> GitHub</a>
+      <a href="https://github.com/new-usemame/Calibre-Web-NextGen/releases">Releases</a>
+      <a href="https://github.com/new-usemame/Calibre-Web-NextGen/issues">Issues</a>
+      <a href="https://discord.gg/B8NXZmcp32"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.93-1.51 13.8 13.8 0 0 0-.64 1.28 18.3 18.3 0 0 0-5.5 0 13.8 13.8 0 0 0-.64-1.28c-1.71.29-3.37.8-4.93 1.51A20.3 20.3 0 0 0 .1 18.06a19.9 19.9 0 0 0 6.07 3.03c.49-.66.93-1.37 1.3-2.1a12.9 12.9 0 0 1-2.05-.98c.17-.12.34-.25.5-.38a14.2 14.2 0 0 0 12.16 0c.16.13.33.26.5.38-.65.39-1.34.72-2.05.98.37.73.81 1.44 1.3 2.1a19.9 19.9 0 0 0 6.07-3.03 20.3 20.3 0 0 0-3.58-13.69ZM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42s.95-2.42 2.16-2.42 2.18 1.09 2.16 2.42c0 1.34-.95 2.42-2.16 2.42Zm7.96 0c-1.18 0-2.16-1.08-2.16-2.42s.95-2.42 2.16-2.42 2.18 1.09 2.16 2.42c0 1.34-.95 2.42-2.16 2.42Z"/></svg> Discord</a>
+    </div>
+  </nav>
+  <main id="main">
+    <p class="page-eyebrow">Sync</p>
+    
+    <article class="prose"><h1 id="koreader-sync"><a class="h-anchor" href="#koreader-sync" aria-hidden="true" tabindex="-1">#</a>KOReader Sync</h1>
+<p>CWA has built-in KOReader progress sync; no separate kosync server is needed.</p>
+<ol>
+<li>In KOReader, install the CWA plugin: visit <code>http://your-cwa:8083/kosync</code> for download and install instructions.</li>
+<li>Point the plugin at <code>http://your-cwa:8083</code> and log in with your CWA username and password.</li>
+<li>Read on any device. Progress syncs back to CWA, and from there to Kobo if Kobo sync is enabled.</li>
+</ol>
+<p><strong>Keeping the plugin updated.</strong> KOReader's <a href="https://github.com/advokatb/updatesmanager.koplugin" rel="noopener" class="ext">Updates Manager</a> and <a href="https://github.com/kaz-utashiro/appstore.koplugin" rel="noopener" class="ext">appstore.koplugin</a> can both update the plugin in place. Point either at the plugin's own repository, <a href="https://github.com/new-usemame/cwasync.koplugin/releases" rel="noopener" class="ext"><code>new-usemame/cwasync.koplugin</code></a> — not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version; that alone doesn't mean anything is wrong. With the plugin repository configured, a check that reports no new release means the plugin stream has nothing newer.</p>
+<p>If your update manager is still pointed at this repository, switch it. That setup keeps working — a release that changes the plugin attaches the plugin download — but the plugin only appears on those releases, which is easy to misread as &quot;no update available&quot;. The download on <code>/kosync</code> always serves the plugin bundled with your running server if you would rather update by hand.</p>
+<p><strong>Matching filenames across devices (OPDS downloads).</strong> If you download books to KOReader over OPDS and sync progress by filename across several e-readers, turn on <strong>Use server filenames</strong> in KOReader's OPDS catalog settings (the checkbox when you add or edit the catalog). By default KOReader names a downloaded file <code>Author - Title.epub</code> from the catalog entry, which differs from the on-disk library name <code>Title - Author.epub</code> and forces a manual rename. CWA already sends the library name in the download's <code>Content-Disposition</code> header; with <strong>Use server filenames</strong> on, KOReader uses that name, so the file matches your library and your other devices without renaming.</p>
+<hr>
+<p>See also <strong><a href="../kobo-sync/">Kobo Sync</a></strong> for reading on a Kobo e-reader.</p>
+</article>
+    <nav class="prev-next" aria-label="Previous and next pages">
+    <a class="pn-card pn-prev" href="../shelfmark/"><span class="pn-label"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Previous</span><span class="pn-title">Shelfmark</span></a>
+    <a class="pn-card pn-next" href="../kobo-sync/"><span class="pn-label"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Next</span><span class="pn-title">Kobo Sync</span></a>
+  </nav>
+  </main>
+  
+</div>
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="../"><svg class="brand-logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="5" width="6.5" height="22" rx="1.8" fill="currentColor" opacity="0.55"/><rect x="12.75" y="5" width="6.5" height="22" rx="1.8" fill="currentColor"/><rect x="21.5" y="5" width="6.5" height="22" rx="1.8" fill="currentColor" opacity="0.8" transform="rotate(9 24.75 27)"/></svg><span class="brand-name">Calibre-Web <b>NextGen</b></span></a>
+      <p>The community-maintained build of Calibre-Web-Automated — upstream fixes shipped, new bugs fixed, one Docker image.</p>
+    </div>
+    <nav class="footer-col" aria-label="Project links">
+      <h2>Project</h2>
+      <ul>
+        <li><a href="https://github.com/new-usemame/Calibre-Web-NextGen">GitHub</a></li>
+        <li><a href="https://github.com/new-usemame/Calibre-Web-NextGen/releases">Releases</a></li>
+        <li><a href="https://github.com/new-usemame/Calibre-Web-NextGen/issues">Issue tracker</a></li>
+        <li><a href="https://github.com/new-usemame/Calibre-Web-NextGen/blob/main/CHANGES-vs-upstream.md">What&rsquo;s different</a></li>
+      </ul>
+    </nav>
+    <nav class="footer-col" aria-label="Community links">
+      <h2>Community</h2>
+      <ul>
+        <li><a href="https://discord.gg/B8NXZmcp32">Discord server</a></li>
+        <li><a href="https://ko-fi.com/calibrewebnextgen">Ko-fi</a></li>
+        <li><a href="https://github.com/sponsors/new-usemame">Sponsor on GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="footer-legal">
+    <span>Community-maintained by <a href="https://github.com/new-usemame">new-usemame</a> and contributors. Not affiliated with the original Calibre-Web or Calibre-Web-Automated authors.</span>
+    <span>License: GPL-3.0-or-later</span>
+    <span>&copy; <span id="footer-year">2026</span> the Calibre-Web-NextGen contributors</span>
+  </div>
+</footer>
+<div id="search-overlay" hidden>
+  <div class="search-backdrop" data-close-search></div>
+  <div class="search-modal" role="dialog" aria-modal="true" aria-label="Search the docs">
+    <div class="search-box">
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M13.6 13.6 17.5 17.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input id="search-input" type="search" placeholder="Search the docs…" autocomplete="off"
+        spellcheck="false" role="combobox" aria-expanded="true" aria-controls="search-results"
+        aria-label="Search the docs">
+      <kbd>Esc</kbd>
+    </div>
+    <ul id="search-results" role="listbox" aria-label="Search results"></ul>
+    <div class="search-foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+      <span><kbd>Enter</kbd> open</span>
+      <span><kbd>Esc</kbd> close</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

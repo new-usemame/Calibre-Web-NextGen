@@ -198,19 +198,6 @@ else
 fi
 
 #------------------------------------------------------------------------------------------------------------------------
-#  Check for existing app.db and create one from the included example if one doesn't already exist
-#------------------------------------------------------------------------------------------------------------------------
-
-echo "[cwa-init] Checking for an existing app.db in /config..."
-
-if [ ! -f /config/app.db ]; then
-    echo "[cwa-init] No existing app.db found! Creating new one..."
-    cp /app/calibre-web-automated/empty_library/app.db /config/app.db
-else
-    echo "[cwa-init] Existing app.db found!"
-fi
-
-#------------------------------------------------------------------------------------------------------------------------
 #  Ensure correct binary paths in app.db
 #------------------------------------------------------------------------------------------------------------------------
 

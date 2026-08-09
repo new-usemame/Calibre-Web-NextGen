@@ -4010,8 +4010,8 @@ msgstr "Libros por página"
 
 #: cps/spa_strings.py:446 cps/templates/config_edit.html:250
 #: cps/templates/cover_picker.html:114
-msgid "Border fill style"
-msgstr "Estilo de relleno del borde"
+msgid "Fill style"
+msgstr "Estilo de relleno"
 
 #: cps/spa_strings.py:447
 msgid "Built-in providers (leave blank to disable):"

@@ -3924,8 +3924,8 @@ msgstr ""
 
 #: cps/spa_strings.py:446 cps/templates/config_edit.html:250
 #: cps/templates/cover_picker.html:114
-msgid "Border fill style"
-msgstr "Szegélykitöltés stílusa"
+msgid "Fill style"
+msgstr "Kitöltés stílusa"
 
 #: cps/spa_strings.py:447
 msgid "Built-in providers (leave blank to disable):"

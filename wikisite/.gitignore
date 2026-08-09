@@ -1,0 +1,6 @@
+# Build artifacts — `node build.mjs` regenerates both from repo/wiki-src via the
+# canonical generator. Committing them would create a second copy of content that
+# is already generated, which is the exact drift this site exists to avoid.
+node_modules/
+dist/
+.playwright-mcp/

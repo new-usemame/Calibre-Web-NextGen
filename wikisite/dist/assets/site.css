@@ -452,6 +452,9 @@ main { min-width: 0; padding: 2rem 0 4rem; }
   font-weight: 650;
   line-height: 1.22;
   letter-spacing: -0.008em;
+  /* a single long word ("Troubleshooting" at 2.35rem) is wider than the
+     ~280px content column at 320px viewports and must be allowed to break */
+  overflow-wrap: break-word;
   scroll-margin-top: calc(var(--header-h) + 20px);
   position: relative;
 }

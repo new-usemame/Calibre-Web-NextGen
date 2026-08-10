@@ -69,6 +69,45 @@ def _clean_tier1_pr(**overrides) -> dict:
 CLEAN_DIFF = '+ msgstr "hallo"\n'
 
 
+def _live_lines() -> list[str]:
+    """auto-merge.yml lines with comments and blanks removed.
+
+    Text assertions over a workflow are only worth anything if a commented-out
+    or dead line cannot satisfy them — this file's own prose explains the gate
+    at length, so `#`-lines mention every token these tests look for.
+    """
+    out = []
+    for ln in AUTO_MERGE_WF.read_text().splitlines():
+        stripped = ln.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        out.append(ln)
+    return out
+
+
+def _unprotected_base_branch_body() -> str:
+    """The executable body of the `unprotected_base` handler.
+
+    Sliced from the `if` that tests the category to its closing `fi` at the
+    same indent, so an assertion about this branch cannot be satisfied by
+    something elsewhere in the workflow.
+    """
+    lines = _live_lines()
+    start = None
+    for i, ln in enumerate(lines):
+        if 'category" = "unprotected_base"' in ln:
+            start = i
+            break
+    assert start is not None, "no `unprotected_base` category branch found"
+    indent = len(lines[start]) - len(lines[start].lstrip())
+    body = [lines[start]]
+    for ln in lines[start + 1:]:
+        body.append(ln)
+        if ln.strip() == "fi" and (len(ln) - len(ln.lstrip())) == indent:
+            break
+    return "\n".join(body)
+
+
 # ─── the gate itself ───────────────────────────────────────────────────
 
 
@@ -151,23 +190,77 @@ def test_base_gate_runs_before_other_checks(policy):
 # ─── policy plumbing ───────────────────────────────────────────────────
 
 
-def test_policy_exposes_allowed_base_branches(policy):
-    assert hasattr(policy, "automerge_allowed_base_branches")
-    assert "main" in policy.automerge_allowed_base_branches
+def test_policy_exposes_exactly_the_default_branch(policy):
+    """Exact equality, not membership. `"main" in (...)` would happily accept
+    an allowlist that had also picked up `dev` or a feature branch."""
+    assert policy.automerge_allowed_base_branches == ("main",)
 
 
 def test_canonical_config_declares_the_key():
-    """The value is policy, so it belongs in the config SSOT, not in code."""
-    text = POLICY_PATH.read_text()
-    assert "AUTOMERGE_ALLOWED_BASE_BRANCHES" in text
+    """Parse the value rather than grep for the name — a commented-out line
+    mentioning the key would satisfy a substring check while leaving the
+    allowlist empty."""
+    parsed = tier_policy.load_policy(POLICY_PATH)
+    assert parsed.automerge_allowed_base_branches == ("main",)
+    assert parsed.raw.get("AUTOMERGE_ALLOWED_BASE_BRANCHES") == "main"
 
 
-def test_historical_defaults_are_also_closed():
+def test_historical_defaults_authorise_nothing():
     """load_policy() falls back to _HISTORICAL_DEFAULTS when the config file
-    is missing. That path must not be the wide-open one."""
-    allowed = tier_policy._HISTORICAL_DEFAULTS["AUTOMERGE_ALLOWED_BASE_BRANCHES"]
-    branches = [b.strip() for b in allowed.split(",") if b.strip()]
-    assert branches == ["main"]
+    is missing, and merges them under a config that omits the key.
+
+    Every other default here reproduces historical behaviour. This one must
+    not: defaulting to "main" would synthesise an authorisation nobody wrote
+    down, on the strength of an external fact (that main is the protected
+    default) which this module cannot verify."""
+    assert tier_policy._HISTORICAL_DEFAULTS["AUTOMERGE_ALLOWED_BASE_BRANCHES"] == ""
+
+
+def test_missing_config_key_refuses_every_base(tmp_path):
+    """The end-to-end consequence of the empty default: delete or misspell
+    the key and auto-merge stops, rather than quietly falling back."""
+    cfg = tmp_path / "tier-policy.config"
+    cfg.write_text(
+        "TIER1_PATHS_REGEX='\\.(po|pot|md)$|^README'\n"
+        "TIER2_MAX_ADDITIONS=80\n"
+        "TIER2_MAX_FILES=3\n"
+        # AUTOMERGE_ALLOWED_BASE_BRANCHES deliberately absent
+    )
+    p = tier_policy.load_policy(cfg)
+    assert p.automerge_allowed_base_branches == ()
+    r = tier_policy.validate_fork_pr(
+        _clean_tier1_pr(baseRefName="main"), CLEAN_DIFF, p, tier="safe-tier-1"
+    )
+    assert not r.ok, "an absent allowlist must refuse even the default branch"
+    assert r.category == "unprotected_base"
+
+
+# ─── near-miss base names ──────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "base",
+    [
+        "Main", "MAIN", "mAin",          # case
+        "main-old", "old-main", "mainx",  # suffix / prefix
+        "main/foo", "foo/main",           # path-ish
+        "refs/heads/main",                # fully-qualified ref
+        "ma\u0456n",                      # Cyrillic i lookalike
+        " main\t",                        # only whitespace-trimmed forms pass
+    ],
+)
+def test_near_miss_base_names_are_refused(policy, base):
+    """The comparison is exact and case-sensitive. `refs/heads/main` is in the
+    list because `baseRefName` is the short name — if a caller ever hands us
+    the long form, refusing is the right answer, not silently matching."""
+    r = tier_policy.validate_fork_pr(
+        _clean_tier1_pr(baseRefName=base), CLEAN_DIFF, policy, tier="safe-tier-1"
+    )
+    if base.strip() == "main":
+        assert r.ok, "surrounding whitespace is stripped; branch names cannot contain it"
+    else:
+        assert not r.ok, f"{base!r} must not be treated as the default branch"
+        assert r.category == "unprotected_base"
 
 
 def test_dump_policy_reports_allowed_bases():
@@ -214,9 +307,8 @@ def test_workflow_actually_passes_the_base_to_the_validator():
     """The module can only judge what the workflow hands it. `gh pr view`
     must request baseRefName into the JSON the validator reads, or the gate
     silently degrades to the fail-closed branch on every PR."""
-    text = AUTO_MERGE_WF.read_text()
     view_lines = [
-        ln for ln in text.splitlines()
+        ln for ln in _live_lines()
         if "gh pr view" in ln and "--json" in ln and "$pr_json" in ln
     ]
     assert view_lines, "expected the validator's `gh pr view ... > $pr_json` line"
@@ -267,22 +359,41 @@ def test_workflow_disarms_rather_than_only_declining_to_arm():
     months-long bug where a stripped tier label left the arm in place because
     nothing called --disable-auto. Refusing to re-arm is not the same as
     disarming, so the unprotected-base path must do the latter."""
-    text = AUTO_MERGE_WF.read_text()
-    idx = text.find("unprotected_base")
-    assert idx != -1, "expected an unprotected_base branch"
-    # Look only at the branch body, not the whole file.
-    branch = text[idx:idx + 1800]
-    assert "--disable-auto" in branch, (
+    body = _unprotected_base_branch_body()
+    assert "--disable-auto" in body, (
         "the unprotected_base path must call `gh pr merge --disable-auto`; "
-        "declining to arm leaves an existing sticky arm in force"
+        f"declining to arm leaves an existing sticky arm in force. Body:\n{body}"
     )
 
 
 def test_workflow_does_not_strip_tier_labels_for_an_unprotected_base():
     """A stacked PR's tier label is not wrong — its base is. Stripping the
-    label would thrash against the autopilot, which re-applies it."""
+    label would thrash against the autopilot, which re-applies it.
+
+    Asserted against the branch BODY, not the whole file: `unprotected_base`
+    appearing somewhere in the workflow is satisfied by a comment, or by a
+    handler that then falls through to the generic demote-and-strip path.
+    """
+    body = _unprotected_base_branch_body()
+    assert "--remove-label" not in body, (
+        "the unprotected_base path must not demote the PR; found a label strip "
+        f"in its body:\n{body}"
+    )
+    assert "exit 0" in body, (
+        "the unprotected_base path must stop before the arming step"
+    )
+
+
+def test_unprotected_base_path_never_reaches_the_arming_command():
+    """The base=main positive control proves the validator still says yes; it
+    cannot prove the workflow still reaches `gh pr merge --auto`. This pins the
+    other side — the refusal path must not fall through into arming, and the
+    arming command must still exist for PRs that pass."""
+    body = _unprotected_base_branch_body()
+    assert "--auto" not in body, (
+        "the unprotected_base path must not reach the arming command"
+    )
     text = AUTO_MERGE_WF.read_text()
-    assert "unprotected_base" in text, (
-        "auto-merge.yml must special-case the unprotected_base category "
-        "instead of routing it through the generic demote-and-strip path"
+    assert "--auto --squash" in text, (
+        "the workflow must still arm auto-merge for a PR that passes the gate"
     )

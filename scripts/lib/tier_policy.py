@@ -50,9 +50,15 @@ _HISTORICAL_DEFAULTS = {
         r"\b(Authorization\s*[:=]|app\.secret_key|csrf\.exempt|"
         r"@csrf_exempt|secret_key|alembic|eval\s*\(|exec\s*\()"
     ),
-    # Closed by default. If the config file is missing we must not guess a
-    # wider allowlist than the ruleset actually protects.
-    "AUTOMERGE_ALLOWED_BASE_BRANCHES": "main",
+    # EMPTY on purpose, unlike every other key here. The rest of this table
+    # reproduces the historical behaviour when the config file is absent;
+    # doing that for the base allowlist would mean synthesising an
+    # authorisation nobody wrote down. A missing or misspelled key would
+    # then silently authorise `main` on the strength of a default, and the
+    # claim "main is protected" is an external fact about the ruleset that
+    # this file cannot check. Empty means every base is refused, which is
+    # the safe direction for an unattended-merge authorisation.
+    "AUTOMERGE_ALLOWED_BASE_BRANCHES": "",
     "TIER1_REQUIRED_CHECKS": "validate-author,Fast Tests (Smoke + Unit)",
     "TIER2_REQUIRED_CHECKS": (
         "validate-author,Fast Tests (Smoke + Unit),Integration Tests (Docker)"
@@ -283,6 +289,16 @@ def validate_fork_pr(
     # protected, we must not arm. An absent ruleset is not a passing one.
     base = (pr.get("baseRefName") or "").strip()
     allowed = policy.automerge_allowed_base_branches
+    if not allowed:
+        return ValidationResult(
+            ok=False,
+            reason=(
+                "AUTOMERGE_ALLOWED_BASE_BRANCHES is empty or missing from "
+                "tier-policy.config, so no base is authorised for auto-merge. "
+                "Refusing rather than assuming a default."
+            ),
+            category="unprotected_base",
+        )
     if not base:
         return ValidationResult(
             ok=False,

@@ -187,10 +187,11 @@ jobs:
 
           # An unprotected base is not a defect in the PR — the diff may be
           # perfectly good tier-1 work — so it does NOT get demoted. The
-          # label is right; the base is wrong, and it usually fixes itself
-          # when the branch this one stacks on lands (GitHub re-targets the
-          # PR automatically). Stripping the label here would thrash
-          # against the autopilot, which would just re-apply it.
+          # label is right; the base is wrong. Stripping the label here
+          # would thrash against the autopilot, which would just re-apply
+          # it. GitHub re-targets a stacked PR only when the branch below
+          # it is DELETED after merging, so this does not always clear
+          # itself — sometimes the base has to be changed by hand.
           #
           # Comment at most once per PR: this fires on every `synchronize`,
           # and a stacked branch syncs often.
@@ -214,8 +215,18 @@ jobs:
               # makes the pipeline non-zero *because* it matched. That
               # inverts the test and re-comments on every sync. Capture
               # first, then match in-shell with no pipe at all.
-              existing=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
-                  --json comments --jq '.comments[].body' || true)
+              # NOT `|| true`: that collapses "no comments yet" together with
+              # auth failure, rate limiting and an API outage, and then posts
+              # again on the assumption the marker is absent — which is how
+              # "comment once" turns into a comment per sync during a partial
+              # outage, with the real failure invisible. The refusal has
+              # already happened either way; only the notice is at stake.
+              if ! existing=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
+                     --json comments --jq '.comments[].body'); then
+                  echo "::warning::could not read existing comments on #$PR_NUMBER; not commenting"
+                  echo "skip #$PR_NUMBER: $reason"
+                  exit 0
+              fi
               case "$existing" in
                   *"$marker"*)
                       echo "skip #$PR_NUMBER: $reason (already commented)" ;;

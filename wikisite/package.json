@@ -1,0 +1,15 @@
+{
+  "name": "cwng-wiki-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static documentation site for Calibre-Web NextGen (wiki.calibrewebnextgen.com). Content is GENERATED — never edit rendered content here.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "python3 -m http.server 8099 --directory dist"
+  },
+  "dependencies": {
+    "highlight.js": "^11.11.1",
+    "markdown-it": "^14.3.0"
+  }
+}

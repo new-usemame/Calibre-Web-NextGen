@@ -23,6 +23,11 @@ replit.nix
 cwa-wiki/
 docs/*
 !docs/install/
+# Wiki article sources. generate-wiki.py transcludes these into wiki-src
+# pages, so a doc that is ignored renders fine locally and then fails on a
+# clean clone or in CI with 'no such file'. Track the markdown; keep
+# ignoring everything else that lands in docs/.
+!docs/*.md
 .venv-activate.sh
 test_venv
 cwa.code-workspace

@@ -3,13 +3,14 @@ import { Link } from 'wouter';
 import ePub from 'epubjs';
 import {
   ChevronLeft, ChevronRight, X, List, Sun, Moon, Coffee, Loader2, Trash2,
-  SlidersHorizontal,
+  SlidersHorizontal, StickyNote,
 } from 'lucide-react';
 import {
   type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
   useSaveBookmark, useSaveReaderSettings,
 } from '../lib/queries';
 import { apiPost, apiDelete, apiPatch, apiUrl, resourceUrl } from '../lib/api';
+import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
@@ -116,6 +117,14 @@ export function Reader({ id }: { id: string }) {
   // (the create-color popover) so each has its own focus-trap lifecycle; the two
   // are mutually exclusive — opening one closes the other.
   const hlPopRef = useRef<HTMLDivElement>(null);
+  // Note composer (#325). A third overlay with its own trap, mutually exclusive
+  // with the two popovers above.
+  const notePopRef = useRef<HTMLDivElement>(null);
+  const noteFieldRef = useRef<HTMLTextAreaElement>(null);
+  // annotation_id -> note_text for every highlight in this book. Seeded from
+  // data.json on mount so a tapped highlight can show its note without a
+  // round-trip, and kept in step with every create/edit/remove.
+  const notesRef = useRef<Map<string, string>>(new Map());
   const renditionRef = useRef<any>(null);
   const bookRef = useRef<any>(null);
 
@@ -154,7 +163,19 @@ export function Reader({ id }: { id: string }) {
   // Pending text selection awaiting a highlight-color choice.
   const [pendingSel, setPendingSel] = useState<{ cfiRange: string; text: string } | null>(null);
   // Existing highlight the user tapped — drives the edit/remove popover (#782).
-  const [activeHl, setActiveHl] = useState<{ cfiRange: string; id: string; color: string } | null>(null);
+  // `note` is the row's current note_text ('' when it has none).
+  const [activeHl, setActiveHl] = useState<
+    { cfiRange: string; id: string; color: string; note: string } | null>(null);
+  // Open note composer (#325). 'create' writes the highlight and its note in a
+  // single POST; 'edit' PATCHes note_text on a highlight that already exists.
+  const [composer, setComposer] = useState<{
+    mode: 'create' | 'edit';
+    cfiRange: string;
+    text: string;
+    annotationId?: string;
+    color: HiliteColor;
+    note: string;
+  } | null>(null);
 
   const epubFormat = book?.formats.find((f) => f.format.toLowerCase() === 'epub');
 
@@ -164,47 +185,140 @@ export function Reader({ id }: { id: string }) {
   useFocusTrap(settingsRef, { onClose: () => setSettingsOpen(false), active: settingsOpen });
   useFocusTrap(popRef, { onClose: () => setPendingSel(null), active: !!pendingSel });
   useFocusTrap(hlPopRef, { onClose: () => setActiveHl(null), active: !!activeHl });
+  useFocusTrap(notePopRef, { onClose: () => setComposer(null), active: !!composer });
 
   // Open the edit/remove popover for a highlight the reader was tapped on (#782).
   // Closes the create-color popover so the two never show at once.
   const openHighlightEditor = useCallback((cfiRange: string, annotationId: string, color: string) => {
     setPendingSel(null);
-    setActiveHl({ cfiRange, id: annotationId, color });
+    setComposer(null);
+    setActiveHl({ cfiRange, id: annotationId, color, note: notesRef.current.get(annotationId) || '' });
   }, []);
 
   // Paint a highlight onto the live rendition (epub.js annotations API). The
   // data param stashes the server annotation id + color so the click callback
   // knows which row it represents; a real click callback (3rd arg) + 'cwng-hl'
   // className (4th arg) make tapping the highlight open the editor (#782).
-  const paintHighlight = useCallback((cfiRange: string, color: string, annotationId: string) => {
+  //
+  // A highlight carrying a note is drawn with a dashed outline as well as the
+  // fill (#325). epub.js paints into an SVG layer *inside the book iframe*, so
+  // Reader.module.css cannot reach it — the distinction has to travel as inline
+  // SVG attributes here. It is a shape difference, not a hue one, so it survives
+  // SC 1.4.1 and reads on the light, sepia and dark page themes alike.
+  const paintHighlight = useCallback((
+    cfiRange: string, color: string, annotationId: string, hasNote = false,
+  ) => {
+    const fill = HILITE_FILL[color] || HILITE_FILL.yellow;
     try {
       renditionRef.current?.annotations?.highlight(
         cfiRange,
-        { id: annotationId, color },
+        { id: annotationId, color, hasNote },
         () => openHighlightEditor(cfiRange, annotationId, color),
-        'cwng-hl',
-        { fill: HILITE_FILL[color] || HILITE_FILL.yellow, 'fill-opacity': '0.35' },
+        // ONE token only: epub.js does classList.add(className), which throws
+        // InvalidCharacterError on a space-separated list and then paints nothing.
+        hasNote ? 'cwng-hl-noted' : 'cwng-hl',
+        hasNote
+          ? {
+            fill, 'fill-opacity': '0.35', stroke: fill, 'stroke-width': '1.5',
+            'stroke-dasharray': '3 2', 'stroke-opacity': '0.95',
+          }
+          : { fill, 'fill-opacity': '0.35' },
       );
     } catch { /* epub.js throws on a stale/foreign CFI — ignore */ }
   }, [openHighlightEditor]);
 
+  // epub.js keys an annotation by (cfiRange + type), so changing how one is
+  // drawn means removing the old paint and re-adding it.
+  const repaintHighlight = useCallback((
+    cfiRange: string, color: string, annotationId: string, hasNote: boolean,
+  ) => {
+    try { renditionRef.current?.annotations?.remove(cfiRange, 'highlight'); } catch { /* noop */ }
+    paintHighlight(cfiRange, color, annotationId, hasNote);
+  }, [paintHighlight]);
+
   // Create a highlight from the pending selection, persist it, paint it. The
   // create endpoint returns the new annotation row (incl. its id) — capture it
   // so the just-created highlight is immediately removable (#782).
-  const createHighlight = useCallback(async (color: string) => {
-    const sel = pendingSel;
-    if (!sel) return;
-    setPendingSel(null);
+  // Write a new highlight (optionally carrying a note) and paint it. Takes the
+  // selection explicitly rather than reading `pendingSel`, because the note
+  // composer clears that state before it saves.
+  const persistHighlight = useCallback(async (
+    cfiRange: string, text: string, color: string, note: string,
+  ) => {
     try {
       const created = await apiPost<{ annotation_id?: string }>(`/annotations/${id}`, {
-        cfi_range: sel.cfiRange, highlighted_text: sel.text, highlight_color: color,
+        cfi_range: cfiRange, highlighted_text: text, highlight_color: color,
+        ...(note ? { note_text: note } : {}),
       });
-      paintHighlight(sel.cfiRange, color, created?.annotation_id ?? '');
+      const newId = created?.annotation_id ?? '';
+      if (note && newId) notesRef.current.set(newId, note);
+      paintHighlight(cfiRange, color, newId, !!note);
     } catch { /* surfaced as no-op; user can retry */ }
     try {
       (renditionRef.current?.getContents?.() || []).forEach((c: any) => c.window?.getSelection?.().removeAllRanges());
     } catch { /* noop */ }
-  }, [pendingSel, id, paintHighlight]);
+  }, [id, paintHighlight]);
+
+  const createHighlight = useCallback((color: string) => {
+    const sel = pendingSel;
+    if (!sel) return;
+    setPendingSel(null);
+    void persistHighlight(sel.cfiRange, sel.text, color, '');
+  }, [pendingSel, persistHighlight]);
+
+  // "Add note" on a fresh selection — hand the selection to the composer, which
+  // creates the highlight and its note together on save.
+  const startNoteForSelection = useCallback(() => {
+    const sel = pendingSel;
+    if (!sel) return;
+    setPendingSel(null);
+    setComposer({ mode: 'create', cfiRange: sel.cfiRange, text: sel.text, color: 'yellow', note: '' });
+  }, [pendingSel]);
+
+  // "Note" on an existing highlight — prefill from what we already hold.
+  const startNoteForHighlight = useCallback(() => {
+    const hl = activeHl;
+    if (!hl) return;
+    setActiveHl(null);
+    setComposer({
+      mode: 'edit', cfiRange: hl.cfiRange, text: '', annotationId: hl.id,
+      color: (HILITE_ORDER as readonly string[]).includes(hl.color)
+        ? hl.color as HiliteColor : 'yellow',
+      note: hl.note,
+    });
+  }, [activeHl]);
+
+  // Single write of record for the composer, so Save and Remove note cannot
+  // drift apart. Create mode POSTs highlight+note together; edit mode PATCHes
+  // note_text (an empty string clears it). Silent on failure, as everywhere
+  // else in this reader — the server stays the source of truth.
+  const commitNote = useCallback(async (
+    c: NonNullable<typeof composer>, rawNote: string,
+  ) => {
+    const note = rawNote.trim();
+    setComposer(null);
+    if (c.mode === 'create') {
+      await persistHighlight(c.cfiRange, c.text, c.color, note);
+      announce(note ? t('Note saved') : t('Highlight saved'));
+      return;
+    }
+    if (!c.annotationId) return;
+    try {
+      await apiPatch(`/annotations/${id}/${c.annotationId}`, { note_text: note });
+      if (note) notesRef.current.set(c.annotationId, note);
+      else notesRef.current.delete(c.annotationId);
+      repaintHighlight(c.cfiRange, c.color, c.annotationId, !!note);
+      announce(note ? t('Note saved') : t('Note removed'));
+    } catch { /* silent: server keeps the previous note */ }
+  }, [id, persistHighlight, repaintHighlight, announce, t]);
+
+  const saveNote = useCallback(() => {
+    if (composer) void commitNote(composer, composer.note);
+  }, [composer, commitNote]);
+
+  const removeNote = useCallback(() => {
+    if (composer) void commitNote(composer, '');
+  }, [composer, commitNote]);
 
   // Remove the tapped highlight server-side, then un-paint it (#782). Fails
   // silently (the reader has no toast) and leaves the highlight painted on
@@ -215,6 +329,7 @@ export function Reader({ id }: { id: string }) {
     setActiveHl(null);
     try {
       await apiDelete(`/annotations/${id}/${hl.id}`);
+      notesRef.current.delete(hl.id);
       try { renditionRef.current?.annotations?.remove(hl.cfiRange, 'highlight'); } catch { /* noop */ }
     } catch { /* silent: keep the highlight painted */ }
   }, [activeHl, id]);
@@ -230,10 +345,20 @@ export function Reader({ id }: { id: string }) {
     if (hl.color === color) return;
     try {
       await apiPatch(`/annotations/${id}/${hl.id}`, { highlight_color: color });
-      try { renditionRef.current?.annotations?.remove(hl.cfiRange, 'highlight'); } catch { /* noop */ }
-      paintHighlight(hl.cfiRange, color, hl.id);
+      // Recolouring must not silently drop the note marker.
+      repaintHighlight(hl.cfiRange, color, hl.id, !!notesRef.current.get(hl.id));
     } catch { /* silent: keep the highlight in its original color */ }
-  }, [activeHl, id, paintHighlight]);
+  }, [activeHl, id, repaintHighlight]);
+
+  // Land the caret in the note field when the composer opens, so a phone user
+  // can type immediately instead of hunting for the textarea.
+  useEffect(() => {
+    if (!composer) return;
+    const field = noteFieldRef.current;
+    if (!field) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [composer?.mode, composer?.annotationId, composer?.cfiRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     savedCfiRef.current = savedBookmark?.bookmark ?? savedCfiRef.current;
@@ -508,9 +633,12 @@ export function Reader({ id }: { id: string }) {
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
             if (cancelled || !d) return;
+            notesRef.current.clear();
             (d.annotations || []).forEach((a: any) => {
+              const note = (a.note_text || '').trim();
+              if (note && a.annotation_id) notesRef.current.set(a.annotation_id, note);
               if (a.cfi_range) {
-                paintHighlight(a.cfi_range, a.highlight_color || 'yellow', a.annotation_id);
+                paintHighlight(a.cfi_range, a.highlight_color || 'yellow', a.annotation_id, !!note);
               }
             });
           })
@@ -772,6 +900,10 @@ export function Reader({ id }: { id: string }) {
             <button key={c} className={styles.hiliteSwatch} style={{ background: HILITE_FILL[c] }}
               onClick={() => createHighlight(c)} aria-label={colorLabel(c)} title={colorLabel(c)} />
           ))}
+          <button className={styles.hiliteNote} onClick={startNoteForSelection} title={t('Add note')}>
+            <StickyNote size={15} aria-hidden="true" focusable={false} />
+            <span>{t('Add note')}</span>
+          </button>
           <button className={styles.hiliteCancel} onClick={() => setPendingSel(null)} aria-label={t('Cancel')}>
             <X size={16} aria-hidden="true" focusable={false} />
           </button>
@@ -781,14 +913,20 @@ export function Reader({ id }: { id: string }) {
       {/* Edit/remove popover for a tapped existing highlight (#782).
           Swatches recolor (PATCH); the Remove button deletes (DELETE) + unpaints. */}
       {activeHl && (
-        <div ref={hlPopRef} className={styles.hilitePop} role="dialog" aria-modal="true"
-          aria-label={t('Highlight color')} tabIndex={-1}>
+        <div ref={hlPopRef}
+          className={`${styles.hilitePop} ${activeHl.note ? styles.hilitePopStack : ''}`}
+          role="dialog" aria-modal="true" aria-label={t('Highlight color')} tabIndex={-1}>
           <span className={styles.hiliteLabel}>{t('Highlight')}</span>
           {HILITE_ORDER.map((c) => (
             <button key={c} className={styles.hiliteSwatch} style={{ background: HILITE_FILL[c] }}
               onClick={() => recolorHighlight(c)}
               aria-pressed={activeHl.color === c} aria-label={colorLabel(c)} title={colorLabel(c)} />
           ))}
+          <button className={styles.hiliteNote} onClick={startNoteForHighlight}
+            title={activeHl.note ? t('Edit note') : t('Add note')}>
+            <StickyNote size={15} aria-hidden="true" focusable={false} />
+            <span>{activeHl.note ? t('Edit note') : t('Add note')}</span>
+          </button>
           <button className={styles.hiliteRemove} onClick={removeHighlight} title={t('Remove highlight')}>
             <Trash2 size={15} aria-hidden="true" focusable={false} />
             <span>{t('Remove highlight')}</span>
@@ -796,6 +934,52 @@ export function Reader({ id }: { id: string }) {
           <button className={styles.hiliteCancel} onClick={() => setActiveHl(null)} aria-label={t('Cancel')}>
             <X size={16} aria-hidden="true" focusable={false} />
           </button>
+          {/* Reveal the note on tap, so reading one costs nothing (#325). */}
+          {activeHl.note && <p className={styles.hiliteNoteText}>{activeHl.note}</p>}
+        </div>
+      )}
+
+      {/* Note composer — create (highlight + note in one write) or edit (#325). */}
+      {composer && (
+        <div ref={notePopRef} className={styles.notePop} role="dialog" aria-modal="true"
+          aria-label={composer.mode === 'create' ? t('Add note') : t('Edit note')} tabIndex={-1}>
+          <div className={styles.noteHead}>
+            <span className={styles.hiliteLabel}>
+              {composer.mode === 'create' ? t('Add note') : t('Edit note')}
+            </span>
+            <button className={styles.hiliteCancel} onClick={() => setComposer(null)} aria-label={t('Cancel')}>
+              <X size={16} aria-hidden="true" focusable={false} />
+            </button>
+          </div>
+          {composer.mode === 'create' && composer.text && (
+            <p className={styles.noteQuote}>{composer.text}</p>
+          )}
+          {composer.mode === 'create' && (
+            <div className={styles.noteColors} role="group" aria-label={t('Highlight color')}>
+              {HILITE_ORDER.map((c) => (
+                <button key={c} className={styles.hiliteSwatch} style={{ background: HILITE_FILL[c] }}
+                  onClick={() => setComposer((s) => (s ? { ...s, color: c } : s))}
+                  aria-pressed={composer.color === c} aria-label={colorLabel(c)} title={colorLabel(c)} />
+              ))}
+            </div>
+          )}
+          <textarea ref={noteFieldRef} className={styles.noteInput} rows={3}
+            value={composer.note} aria-label={t('Note')} placeholder={t('Write a note…')}
+            onChange={(e) => setComposer((s) => (s ? { ...s, note: e.target.value } : s))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
+            }} />
+          <div className={styles.noteActions}>
+            {composer.mode === 'edit' && composer.note.trim() !== '' && (
+              <button className={styles.hiliteRemove} onClick={removeNote} title={t('Remove note')}>
+                <Trash2 size={15} aria-hidden="true" focusable={false} />
+                <span>{t('Remove note')}</span>
+              </button>
+            )}
+            <Button variant="primary" className={styles.noteSave} onClick={saveNote}>
+              {t('Save note')}
+            </Button>
+          </div>
         </div>
       )}
 

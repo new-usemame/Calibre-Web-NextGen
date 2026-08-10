@@ -16,7 +16,60 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Kindle books get their high-resolution cover now, not just print editions.**
+  The high-resolution Amazon cover lookup was keyed only on a book's ISBN, and a
+  Kindle edition usually has no ISBN at all — it has an ASIN. So the books most
+  likely to need a better cover were the ones the lookup could never reach, in
+  both places it runs: the upgrade applied to metadata-search results, and the
+  standalone "Amazon (high-res)" card in the cover picker, which simply never
+  appeared for those books. A stored Amazon identifier is now used as a lookup
+  key too, tried after the ISBN so nothing about the existing path changes. This
+  also covers books whose ISBN is a 979-prefixed one, which has no ISBN-10 form
+  and was previously a dead end. Reported by @briffaantoine with two worked
+  examples (#304).
+- **The cover picker now tells you where a picture actually came from.** Covers
+  offered by Hardcover, Google and the rest get swapped for a higher-resolution
+  copy when one exists, and that copy often comes from Amazon or Apple Books —
+  but the card kept the name of the provider that supplied the *metadata*, so a
+  card reading "Hardcover" could be showing you an Amazon image with nothing on
+  screen saying so. Cards now carry a second line naming the image's actual
+  source when it differs. Asked by @briffaantoine (#304).
+- **Looking at a book's other editions no longer sends a meaningless search to
+  every other source.** The editions list is a Hardcover feature and searches by
+  a Hardcover id, but that id was being handed to every enabled provider, which
+  each searched for it as plain text and came back with nothing — Goodreads in
+  particular looked broken because of it. The editions lookup now asks only the
+  source that understands it. Reported by @briffaantoine (#303).
+- **The reading app's catalog now calls "Discover" by the same name the website
+  does — and shows it in your language.** In an OPDS reader the entry was
+  labelled "Random Books", while the sidebar, the new interface and the link
+  itself all said Discover. Worse, on a German, Khmer or Norwegian server that
+  one entry stayed in English while everything around it was translated, because
+  the old wording had never been signed off by a translator. It now reads
+  Discover, translated, in all 28 languages. Reported by @chloeroform (#1097).
+
+- **The reading app's catalog now calls "Discover" by the same name the website
+  does — and shows it in your language.** In an OPDS reader the entry was
+  labelled "Random Books", while the sidebar, the new interface and the link
+  itself all said Discover. Worse, on a German, Khmer or Norwegian server that
+  one entry stayed in English while everything around it was translated, because
+  the old wording had never been signed off by a translator. It now reads
+  Discover, translated, in all 28 languages. Reported by @chloeroform (#1097).
+
 ### Added
+
+- **You can now write a note on a highlight while reading in the browser.**
+  Highlighting text in the new UI's reader only ever saved the colour — there
+  was nowhere to record *why* you highlighted it, even though notes made on a
+  Kobo or in KOReader have always shown up on the book's Highlights page. Select
+  a passage and the popup now offers **Add note** alongside the colours; tap a
+  highlight you have already made and you can add, edit or remove its note.
+  Highlights carrying a note are drawn with a dashed outline so you can pick
+  them out at a glance, and tapping one shows the note without opening the
+  editor. Notes sync into the same place as everything else, so they appear on
+  the Highlights page and in Markdown/CSV/JSON exports (#325).
 
 - **Two new cover fill styles that fill the e-reader frame instead of adding a
   border.** Every existing style pads the cover out to your device's shape,

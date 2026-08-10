@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Placeholder for a screenshot of the in-browser book reader">
+  <rect width="1600" height="900" fill="#f7f1e2"/>
+  <!-- text column -->
+  <g fill="#d8cdb4">
+    <rect x="480" y="80" width="640" height="14" rx="7"/><rect x="480" y="112" width="610" height="14" rx="7"/>
+    <rect x="480" y="144" width="640" height="14" rx="7"/><rect x="480" y="176" width="580" height="14" rx="7"/>
+    <rect x="480" y="208" width="640" height="14" rx="7"/><rect x="480" y="240" width="620" height="14" rx="7"/>
+    <rect x="480" y="272" width="540" height="14" rx="7"/>
+    <rect x="480" y="330" width="640" height="14" rx="7"/><rect x="480" y="362" width="600" height="14" rx="7"/>
+    <rect x="480" y="394" width="640" height="14" rx="7"/><rect x="480" y="426" width="560" height="14" rx="7"/>
+    <rect x="480" y="458" width="630" height="14" rx="7"/><rect x="480" y="490" width="500" height="14" rx="7"/>
+    <rect x="480" y="548" width="640" height="14" rx="7"/><rect x="480" y="580" width="615" height="14" rx="7"/>
+    <rect x="480" y="612" width="640" height="14" rx="7"/><rect x="480" y="644" width="570" height="14" rx="7"/>
+    <rect x="480" y="676" width="620" height="14" rx="7"/><rect x="480" y="708" width="430" height="14" rx="7"/>
+  </g>
+  <!-- chapter heading -->
+  <rect x="480" y="40" width="240" height="22" rx="11" fill="#0e6b4d" opacity="0.7"/>
+  <!-- page arrows -->
+  <circle cx="300" cy="450" r="26" fill="none" stroke="#c4b896" stroke-width="3"/>
+  <path d="M310 438 L292 450 L310 462" fill="none" stroke="#c4b896" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="1300" cy="450" r="26" fill="none" stroke="#c4b896" stroke-width="3"/>
+  <path d="M1290 438 L1308 450 L1290 462" fill="none" stroke="#c4b896" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- progress -->
+  <rect x="480" y="820" width="640" height="8" rx="4" fill="#e0d5ba"/>
+  <rect x="480" y="820" width="300" height="8" rx="4" fill="#0e6b4d"/>
+  <text x="800" y="868" font-family="ui-monospace, Menlo, monospace" font-size="18" fill="#9a8f74" text-anchor="middle">screenshot placeholder · 1600×900 · replace with reader.jpg</text>
+</svg>

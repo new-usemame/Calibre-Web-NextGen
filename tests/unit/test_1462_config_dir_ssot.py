@@ -393,8 +393,6 @@ class TestSeedDatabaseIsNotMistakenForTheLiveOne:
         monkeypatch.syspath_prepend(str(SCRIPTS_DIR))
         import auto_library
 
-        (tmp_path / "empty_library").mkdir()
-        (tmp_path / "empty_library" / "app.db").write_text("seed")
         (tmp_path / "frontend" / "node_modules" / "pkg").mkdir(parents=True)
         (tmp_path / "frontend" / "node_modules" / "pkg" / "app.db").write_text("noise")
 
@@ -518,8 +516,7 @@ class TestSeedDatabaseIsNotMistakenForTheLiveOne:
         config.mkdir()
         for sidecar in ("app.db-journal", "app.db-wal", "app.db-shm", "app.db.bak"):
             (config / sidecar).write_text("not a database")
-        seed = tmp_path / "empty_library" / "app.db"
-        seed.parent.mkdir()
+        seed = tmp_path / "config" / "app.db"
         seed.write_text("the seed database")
 
         monkeypatch.setenv("CWA_APP_ROOT", str(config))

@@ -1065,53 +1065,53 @@ msgstr "nie zainstalowane"
 msgid "Execution permissions missing"
 msgstr "Brak uprawnień do wykonywania pliku"
 
-#: cps/cover_picker.py:121 cps/spa_strings.py:483
+#: cps/cover_picker.py:138 cps/spa_strings.py:483
 msgid "Back to edit metadata"
 msgstr "Wróć do edycji metadanych"
 
-#: cps/cover_picker.py:124 cps/spa_strings.py:164
+#: cps/cover_picker.py:141 cps/spa_strings.py:164
 #: cps/templates/book_edit.html:39
 msgid "Back to book"
 msgstr "Wróć do książki"
 
-#: cps/cover_picker.py:132
+#: cps/cover_picker.py:149
 #, python-format
 msgid "Change cover — %(title)s"
 msgstr "Zmień okładkę — %(title)s"
 
-#: cps/cover_picker.py:240
+#: cps/cover_picker.py:258
 msgid "This book's cover is locked. Unlock it first."
 msgstr "Okładka tej książki jest zablokowana. Najpierw ją odblokuj."
 
-#: cps/cover_picker.py:253
+#: cps/cover_picker.py:271
 msgid "Provide a cover URL."
 msgstr "Podaj adres URL okładki."
 
-#: cps/cover_picker.py:260
+#: cps/cover_picker.py:278
 msgid "This book doesn't have an embedded cover we can extract."
 msgstr "Ta książka nie ma osadzonej okładki, którą można wyodrębnić."
 
-#: cps/cover_picker.py:264
+#: cps/cover_picker.py:282
 msgid "Unknown cover source."
 msgstr "Nieznane źródło okładki."
 
-#: cps/cover_picker.py:293
+#: cps/cover_picker.py:311
 msgid "Could not save lock state."
 msgstr "Nie udało się zapisać stanu blokady."
 
-#: cps/cover_picker.py:340
+#: cps/cover_picker.py:358
 msgid "Only http(s) URLs can be previewed."
 msgstr "Podgląd jest dostępny tylko dla adresów URL http(s)."
 
-#: cps/cover_picker.py:364
+#: cps/cover_picker.py:382
 msgid "Could not render the e-reader preview."
 msgstr "Nie udało się wyrenderować podglądu na czytniku."
 
-#: cps/cover_picker.py:367
+#: cps/cover_picker.py:385
 msgid "Could not load a source image to preview."
 msgstr "Nie udało się wczytać obrazu źródłowego do podglądu."
 
-#: cps/cover_picker.py:573 cps/cover_picker.py:587 cps/spa_strings.py:558
+#: cps/cover_picker.py:591 cps/cover_picker.py:605 cps/spa_strings.py:558
 msgid "Cover save failed."
 msgstr "Nie udało się zapisać okładki."
 

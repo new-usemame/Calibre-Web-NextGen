@@ -643,7 +643,7 @@ def _ensure_cfi_range(row, book) -> Optional[str]:
     return cfi
 
 
-def _data_json_row(r, cfi, pdf_quad) -> dict:
+def _data_json_row(r, cfi, pdf_quad, device_public_ids=None) -> dict:
     """Project one annotation row to the web-reader's data.json shape.
 
     Emits the canonical KoboSpan anchor (``start_kobospan`` /
@@ -654,6 +654,7 @@ def _data_json_row(r, cfi, pdf_quad) -> dict:
     export parity. Pure + dependency-free so the payload contract is
     unit-testable without a Flask request context."""
     from .services.kobo_position import _extract_kobospan_id
+    device_public_ids = device_public_ids or {}
     return {
         "annotation_id": r.annotation_id,
         "cfi_range": cfi,
@@ -667,11 +668,28 @@ def _data_json_row(r, cfi, pdf_quad) -> dict:
         "note_text": r.note_text,
         "chapter_progress": r.chapter_progress,
         "source": r.source,
+        "origin_device_id": device_public_ids.get(getattr(r, "origin_device_id", None)),
+        "assigned_device_id": device_public_ids.get(getattr(r, "assigned_device_id", None)),
         "position_type": getattr(r, "position_type", None),
         "pdf_page": getattr(r, "pdf_page", None),
         "pdf_quad": pdf_quad,
         "comic_page": getattr(r, "comic_page", None),
     }
+
+
+def _annotation_device_payload(user_id, session):
+    """Return the internal→public lookup and one rename-stable device map."""
+    devices = session.query(ub.Device).filter(ub.Device.user_id == user_id).all()
+    public_ids = {device.id: device.public_id for device in devices}
+    payload = {
+        device.public_id: {
+            "label": device.display_name,
+            "model": device.model,
+            "type": device.kind,
+        }
+        for device in devices
+    }
+    return public_ids, payload
 
 
 @annotations_bp.route("/annotations/<int:book_id>/data.json", methods=["GET"])
@@ -687,6 +705,7 @@ def annotations_data(book_id):
     """
     book = _resolve_book_or_404(book_id)
     rows = _load_user_annotations(current_user.id, book_id)
+    device_public_ids, devices = _annotation_device_payload(current_user.id, ub.session)
     out = []
     for r in rows:
         # CFI computation only applies to EPUB-origin rows. For PDF/comic
@@ -700,8 +719,8 @@ def annotations_data(book_id):
                 pdf_quad = json.loads(r.pdf_quad_json)
             except (ValueError, TypeError):
                 pdf_quad = None
-        out.append(_data_json_row(r, cfi, pdf_quad))
-    return jsonify({"annotations": out, "annotation_count": len(out)})
+        out.append(_data_json_row(r, cfi, pdf_quad, device_public_ids))
+    return jsonify({"annotations": out, "annotation_count": len(out), "devices": devices})
 
 
 @annotations_bp.route("/annotations/<int:book_id>", methods=["GET"])

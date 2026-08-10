@@ -368,7 +368,9 @@ def push_annotations():
         )
     from ...services.annotation_portable import validate_portable_payload
     for index, payload in enumerate(annotations):
-        error = validate_portable_payload(payload)
+        error = validate_portable_payload(
+            payload, book_uuid=getattr(book, "uuid", None),
+        )
         if error:
             return _reject(user, document, "invalid_annotation",
                            f"annotations[{index}]: {error}")

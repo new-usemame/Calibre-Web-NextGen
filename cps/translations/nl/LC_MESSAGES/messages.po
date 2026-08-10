@@ -12737,6 +12737,9 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"
 
 # Device and annotation management (SPA)
+msgid "Import and export"
+msgstr "Importeren en exporteren"
+
 msgid "1 selected."
 msgstr "1 geselecteerd."
 

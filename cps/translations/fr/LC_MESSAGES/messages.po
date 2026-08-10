@@ -13203,6 +13203,9 @@ msgstr "Afficher la section Lu / Non lu"
 #~ "Cliquer sur la couverture pour importer les métadonnées dans le formulaire"
 
 # Device and annotation management (SPA)
+msgid "Import and export"
+msgstr "Importer et exporter"
+
 msgid "1 selected."
 msgstr "1 sélectionné."
 

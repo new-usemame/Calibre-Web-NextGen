@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Download, Highlighter, Upload as UploadIcon } from 'lucide-react';
+import { ChevronLeft, Download, Highlighter, MoreHorizontal, Upload as UploadIcon } from 'lucide-react';
 import { apiGet, apiPatch, apiPost, apiUrl } from '../lib/api';
 import { useBook } from '../lib/queries';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -209,10 +209,17 @@ export function Annotations({ id }: { id: string }) {
           <button type="button" onClick={() => { setSelecting(!selecting); setSelected(new Set()); setFailed(new Set()); }}>{selecting ? t('Done') : t('Select')}</button>
         </div>
         <div className={styles.dataActions}>
-          <details><summary><Download size={14} aria-hidden="true" /> {t('Export')}</summary><div className={styles.exportMenu}>
+          <details className={styles.desktopDataAction}><summary><Download size={14} aria-hidden="true" /> {t('Export')}</summary><div className={styles.exportMenu}>
             {['md', 'csv', 'json'].map((format) => <a key={format} href={apiUrl(`/annotations/${id}/export.${format}`)} download target="_blank" rel="noopener">{format === 'md' ? 'Markdown' : format.toUpperCase()}</a>)}
           </div></details>
-          <a href={apiUrl('/annotations/import')}><UploadIcon size={14} aria-hidden="true" /> {t('Import')}</a>
+          <a className={styles.desktopDataAction} href={apiUrl('/annotations/import')}><UploadIcon size={14} aria-hidden="true" /> {t('Import')}</a>
+          <details className={styles.mobileDataAction}><summary role="button" aria-label={t('Import and export')}><MoreHorizontal aria-hidden="true" /></summary>
+            <div className={styles.exportMenu}>
+              <strong>{t('Export')}</strong>
+              {['md', 'csv', 'json'].map((format) => <a key={format} href={apiUrl(`/annotations/${id}/export.${format}`)} download target="_blank" rel="noopener">{format === 'md' ? 'Markdown' : format.toUpperCase()}</a>)}
+              <a href={apiUrl('/annotations/import')}><UploadIcon size={14} aria-hidden="true" /> {t('Import')}</a>
+            </div>
+          </details>
         </div>
       </div>
       {selecting && <BulkSelectionBar count={selected.size} sticky onClear={() => { setSelecting(false); setSelected(new Set()); }}>

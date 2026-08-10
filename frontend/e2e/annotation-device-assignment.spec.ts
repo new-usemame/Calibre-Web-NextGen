@@ -52,6 +52,9 @@ test('highlight assignment is keyboard named, mobile-safe, and axe-clean', async
   if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/book/2/annotations');
   await expect(page.getByRole('combobox', { name: 'Device: unknown' }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Import and export' }).click();
+  await expect(page.getByRole('link', { name: 'Markdown' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Import', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Select' }).click();
   const checkbox = page.getByRole('checkbox', { name: /Select highlight: Highlight 0/ });
   await checkbox.check();
@@ -60,7 +63,7 @@ test('highlight assignment is keyboard named, mobile-safe, and axe-clean', async
   expect(results.violations.filter((v) => ['critical', 'serious'].includes(v.impact || ''))).toEqual([]);
 });
 
-test('many device filters collapse and touch long-press enters selection', async ({ page }) => {
+test('many device filters collapse and touch long-press enters selection', async ({ page }, testInfo) => {
   const devices = Array.from({ length: 8 }, (_, index) => ({
     ...libra, public_id: `device-${index}`, label: `Reader ${index}`,
   }));
@@ -71,11 +74,22 @@ test('many device filters collapse and touch long-press enters selection', async
 
   await page.setViewportSize({ width: 390, height: 844 });
   const firstRow = page.getByRole('listitem').filter({ hasText: 'Highlight 0' });
-  const box = await firstRow.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.move(box!.x + 20, box!.y + 20);
-  await page.mouse.down();
+  const rowBody = firstRow.locator('div').first();
+  if (testInfo.project.name === 'mobile') {
+    await rowBody.evaluate((element) => element.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, pointerType: 'touch', pointerId: 1, isPrimary: true,
+    })));
+  } else {
+    const box = await firstRow.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + 20, box!.y + 20);
+    await page.mouse.down();
+  }
   await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
-  await page.mouse.up();
+  if (testInfo.project.name === 'mobile') {
+    await rowBody.evaluate((element) => element.dispatchEvent(new PointerEvent('pointerup', {
+      bubbles: true, pointerType: 'touch', pointerId: 1, isPrimary: true,
+    })));
+  } else await page.mouse.up();
   await expect(page.getByRole('button', { name: 'Select all 20' })).toBeFocused();
 });

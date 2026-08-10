@@ -13,6 +13,8 @@
 .viewActions, .dataActions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
 .toolbar button, .toolbar a, .toolbar summary, .toolbar select, .viewActions label { min-height: 40px; display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-muted); }
 .toolbar details { position: relative; }.toolbar summary { cursor: pointer; list-style: none; }.exportMenu { position: absolute; z-index: 9; right: 0; top: 44px; min-width: 150px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }.exportMenu a { width: 100%; border: 0; }
+.exportMenu strong { display: block; padding: var(--sp-2) var(--sp-3); color: var(--text-muted); font-size: var(--fs-xs); }
+.mobileDataAction { display: none; }
 .item { height: calc(100% - 6px); margin: 3px 0; display: flex; align-items: stretch; gap: var(--sp-2); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2); }
 .bar { width: 3px; border-radius: 2px; flex: none; }.body { flex: 1; min-width: 0; cursor: default; }
 .quote { margin: 0; color: var(--text); font-size: var(--fs-sm); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -26,7 +28,7 @@
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }.srOnly:not(:focus) { white-space: nowrap; }
 @media (max-width: 600px) {
   .container { padding: var(--sp-3); }.filters { display: none; }.mobileFilter { display: flex; flex-direction: column; gap: 4px; max-width: none; margin-bottom: var(--sp-2); color: var(--text-muted); }.mobileFilter select { min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 0 var(--sp-2); color: var(--text); background: var(--surface-1); }
-  .toolbar { align-items: stretch; }.dataActions details { display: none; }.dataActions a { min-width: 44px; font-size: 0; }.dataActions a svg { width: 18px; height: 18px; }.viewActions label { font-size: 0; }.viewActions label select { font-size: var(--fs-sm); border: 0; padding: 0; }
+  .toolbar { align-items: stretch; }.dataActions .desktopDataAction { display: none; }.dataActions .mobileDataAction { display: block; }.mobileDataAction summary { min-width: 44px; padding: 0; justify-content: center; }.mobileDataAction .exportMenu a { min-height: 44px; font-size: var(--fs-sm); }.mobileDataAction .exportMenu a svg { width: 18px; height: 18px; }.viewActions label { font-size: 0; }.viewActions label select { font-size: var(--fs-sm); border: 0; padding: 0; }
   .meta select { max-width: 150px; min-height: 36px; }.rowSelect { min-width: 40px; }.item { padding-inline: var(--sp-1); }.toast { flex-wrap: wrap; }
 }
 @media (pointer: coarse) { .toolbar button, .toolbar a, .toolbar summary, .meta select, .groupHeader button { min-height: 44px; } }

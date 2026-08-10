@@ -1,0 +1,13 @@
+# cwng-wiki — serves dist/ as static assets at wiki.calibrewebnextgen.com
+# Build first: node build.mjs   (dist/ is the [assets] directory below)
+# Deploy BY HAND: npx wrangler deploy   — nothing auto-deploys this worker.
+# Do not touch the sibling cwng-homepage / cwng-feedback workers.
+
+name = "cwng-wiki"
+compatibility_date = "2026-08-09"
+
+routes = [{ pattern = "wiki.calibrewebnextgen.com/*", zone_name = "calibrewebnextgen.com" }]
+
+[assets]
+directory = "./dist"
+not_found_handling = "404-page"

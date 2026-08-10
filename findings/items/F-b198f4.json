@@ -5,8 +5,14 @@
   "id": "F-b198f4",
   "origin_issue": 900,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-09",
+    "note": "Verified in code: config_sql.py:110 documents the idempotent one-time OR reconciliation across the legacy column, and hardcover_sync_enabled() is the single read path. Migrated as open; fix predated migration.",
+    "release": "v4.1.14"
+  },
   "severity": "ux",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Hardcover has two enable flags in two databases; reconcile them, then allow enabling by env var"
 }

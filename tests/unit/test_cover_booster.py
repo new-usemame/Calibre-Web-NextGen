@@ -120,21 +120,21 @@ class TestAmazonCdnProbe:
 
     def test_real_jpeg_cover_returns_url(self):
         with self._mock_head(200, "image/jpeg", 250000):
-            url = cover_booster._amazon_cdn_cover_for_isbn10("1853260010")
+            url = cover_booster._amazon_cdn_cover_for_key("1853260010")
         assert url == "https://m.media-amazon.com/images/P/1853260010.01._SCRM_SL2000_.jpg"
 
     def test_placeholder_gif_returns_none(self):
         with self._mock_head(200, "image/gif", 43):
-            assert cover_booster._amazon_cdn_cover_for_isbn10("0000000000") is None
+            assert cover_booster._amazon_cdn_cover_for_key("0000000000") is None
 
     def test_undersized_jpeg_returns_none(self):
         # Ranks below the placeholder threshold; treat as suspect.
         with self._mock_head(200, "image/jpeg", 1024):
-            assert cover_booster._amazon_cdn_cover_for_isbn10("1234567890") is None
+            assert cover_booster._amazon_cdn_cover_for_key("1234567890") is None
 
     def test_404_returns_none(self):
         with self._mock_head(404, "text/html", 0):
-            assert cover_booster._amazon_cdn_cover_for_isbn10("1234567890") is None
+            assert cover_booster._amazon_cdn_cover_for_key("1234567890") is None
 
     def test_request_exception_returns_none(self):
         with patch.object(
@@ -142,7 +142,7 @@ class TestAmazonCdnProbe:
             "head",
             side_effect=cover_booster.requests.RequestException("boom"),
         ):
-            assert cover_booster._amazon_cdn_cover_for_isbn10("1234567890") is None
+            assert cover_booster._amazon_cdn_cover_for_key("1234567890") is None
 
 
 @pytest.mark.unit
@@ -202,7 +202,7 @@ class TestBoostedCoverPathOrder:
         }
         amazon_url = "https://m.media-amazon.com/images/P/1853260010.01._SCRM_SL2000_.jpg"
         with patch.object(
-            cover_booster, "_amazon_cdn_cover_for_isbn10", return_value=amazon_url
+            cover_booster, "_amazon_cdn_cover_for_key", return_value=amazon_url
         ) as cdn_mock, patch.object(
             cover_booster, "_itunes_lookup_isbn"
         ) as itunes_lookup, patch.object(
@@ -227,7 +227,7 @@ class TestBoostedCoverPathOrder:
             "publishedDate": "1992",
         }
         with patch.object(
-            cover_booster, "_amazon_cdn_cover_for_isbn10", return_value=None
+            cover_booster, "_amazon_cdn_cover_for_key", return_value=None
         ), patch.object(
             cover_booster, "_itunes_lookup_isbn", return_value=None
         ), patch.object(
@@ -395,3 +395,148 @@ class TestSeriesVolumeNoCollapse:
         assert "vol1" in covers[0], f"Vol.1 cover was overwritten: {covers[0]}"
         assert "vol2" in covers[1], f"Vol.2 cover was overwritten: {covers[1]}"
         assert len(set(covers)) == 3, f"covers collapsed: {covers}"
+
+
+@pytest.mark.unit
+class TestAmazonAsinKey:
+    """Amazon's image CDN is keyed on an ASIN, and an ISBN-10 is simply the
+    ASIN a print edition happens to have. Kindle editions carry an ASIN and
+    frequently no ISBN at all, so an ISBN-only lookup can never reach them.
+
+    Reported on fork #304 with two worked examples: both books carry
+    `amazon: B0D...` identifiers, neither resolved here, and both resolve
+    against the CDN when the ASIN is used as the key.
+    """
+
+    def _mock_head(self, status, content_type, content_length):
+        response = types.SimpleNamespace(
+            status_code=status,
+            headers={"content-type": content_type, "content-length": str(content_length)},
+        )
+        return patch.object(cover_booster.requests, "head", return_value=response)
+
+    def _inert_itunes(self):
+        return patch.multiple(
+            cover_booster,
+            _itunes_lookup_isbn=lambda *_a, **_k: None,
+            _itunes_search=lambda *_a, **_k: None,
+        )
+
+    # --- key extraction -------------------------------------------------
+
+    @pytest.mark.parametrize("key", ["amazon", "asin", "amazon_asin", "mobi-asin"])
+    def test_asin_read_from_each_identifier_key(self, key):
+        assert cover_booster._asin_from({key: "B0DJ1TV47C"}) == "B0DJ1TV47C"
+
+    def test_asin_read_from_locale_specific_amazon_key(self):
+        # Calibre stores territory ASINs as amazon_uk / amazon_de / ...
+        assert cover_booster._asin_from({"amazon_uk": "B0DHV4TZ4L"}) == "B0DHV4TZ4L"
+
+    def test_asin_is_uppercased_and_stripped(self):
+        assert cover_booster._asin_from({"amazon": "  b0dj1tv47c "}) == "B0DJ1TV47C"
+
+    @pytest.mark.parametrize("bad", [
+        "",                 # empty
+        "B0DJ1TV4",         # too short
+        "B0DJ1TV47CX",      # too long
+        "B0DJ-1TV47",       # punctuation
+        "https://amazon.com/dp/B0DJ1TV47C",  # a URL, not an id
+        "B0DJ 1TV47",       # embedded space
+    ])
+    def test_malformed_asin_rejected(self, bad):
+        # Identifiers are user-editable and reach a URL; allowlist, don't sanitize.
+        assert cover_booster._asin_from({"amazon": bad}) is None
+
+    def test_no_amazon_identifier_returns_none(self):
+        assert cover_booster._asin_from({"goodreads": "219655872"}) is None
+
+    # --- key ordering / dedup -------------------------------------------
+
+    def test_isbn10_precedes_asin(self):
+        # The ISBN-10 is edition-keyed and has been the trusted path; the ASIN
+        # is an additional way in, never a replacement.
+        keys = cover_booster.amazon_cdn_keys(isbns=["9780441172719"], asins=["B0DJ1TV47C"])
+        assert keys == ["0441172717", "B0DJ1TV47C"]
+
+    def test_duplicate_keys_collapse(self):
+        # A print book's `amazon` identifier is usually its ISBN-10.
+        keys = cover_booster.amazon_cdn_keys(isbns=["0441172717"], asins=["0441172717"])
+        assert keys == ["0441172717"]
+
+    def test_unconvertible_isbn_still_allows_asin(self):
+        # 979-prefixed ISBN-13s have no ISBN-10 form, which stranded these books.
+        keys = cover_booster.amazon_cdn_keys(isbns=["9791234567896"], asins=["B0DHV4TZ4L"])
+        assert keys == ["B0DHV4TZ4L"]
+
+    def test_kill_switch_disables_asin_path_too(self):
+        with patch.object(cover_booster, "_AMAZON_CDN_ENABLED", False):
+            assert cover_booster.amazon_cdn_keys(isbns=["0441172717"], asins=["B0DJ1TV47C"]) == []
+
+    # --- end to end through boost_covers --------------------------------
+
+    def test_asin_only_record_gets_highres_cover(self):
+        """The reporter's 'Nine Month Contract': goodreads id + ASIN, no ISBN."""
+        record = {
+            "title": "Nine Month Contract",
+            "authors": ["Amy Daws"],
+            "identifiers": {"goodreads": "219655872", "amazon": "B0DJ1TV47C"},
+            "cover": "https://images.gr-assets.com/books/small.jpg",
+            "source": {"id": "goodreads", "description": "Goodreads"},
+        }
+        with self._inert_itunes(), self._mock_head(200, "image/jpeg", 279516):
+            boosted = cover_booster.boost_covers([record])
+        assert boosted[0]["cover"] == (
+            "https://m.media-amazon.com/images/P/B0DJ1TV47C.01._SCRM_SL2000_.jpg"
+        )
+
+    def test_asin_placeholder_leaves_cover_untouched(self):
+        """An unknown key gets the 43-byte GIF; that must not become a cover."""
+        original = "https://images.gr-assets.com/books/small.jpg"
+        record = {
+            "title": "Nine Month Contract",
+            "authors": ["Amy Daws"],
+            "identifiers": {"amazon": "B0QQQQQQQQ"},
+            "cover": original,
+            "source": {"id": "goodreads", "description": "Goodreads"},
+        }
+        with self._inert_itunes(), self._mock_head(200, "image/gif", 43):
+            boosted = cover_booster.boost_covers([record])
+        assert boosted[0]["cover"] == original
+
+    def test_isbn_record_unchanged_by_asin_support(self):
+        """Regression guard: the existing ISBN path keeps its exact behaviour."""
+        record = {
+            "title": "Dune",
+            "authors": ["Frank Herbert"],
+            "identifiers": {"isbn": "9780441172719"},
+            "cover": "https://example.com/small.jpg",
+            "source": {"id": "hardcover", "description": "Hardcover"},
+        }
+        with self._inert_itunes(), self._mock_head(200, "image/jpeg", 250000):
+            boosted = cover_booster.boost_covers([record])
+        assert boosted[0]["cover"] == (
+            "https://m.media-amazon.com/images/P/0441172717.01._SCRM_SL2000_.jpg"
+        )
+
+    def test_asin_probed_only_after_isbn_fails(self):
+        """Both keys present: the ISBN is tried first and the ASIN is the fallback."""
+        record = {
+            "title": "Seven Year Itch",
+            "authors": ["Amy Daws"],
+            "identifiers": {"isbn": "9780369764621", "amazon": "B0DHV4TZ4L"},
+            "cover": "https://images.gr-assets.com/books/small.jpg",
+            "source": {"id": "goodreads", "description": "Goodreads"},
+        }
+        probed = []
+
+        def _fake_probe(key):
+            probed.append(key)
+            return None if len(probed) == 1 else f"https://m.media-amazon.com/images/P/{key}.01._SCRM_SL2000_.jpg"
+
+        with self._inert_itunes(), patch.object(
+            cover_booster, "_amazon_cdn_cover_for_key", side_effect=_fake_probe
+        ):
+            boosted = cover_booster.boost_covers([record])
+
+        assert probed == ["0369764625", "B0DHV4TZ4L"]
+        assert boosted[0]["cover"].endswith("B0DHV4TZ4L.01._SCRM_SL2000_.jpg")

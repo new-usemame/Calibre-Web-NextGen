@@ -1,0 +1,11 @@
+{
+  "area": "tests",
+  "body": "## Observation\n\n`tests/unit/test_1094_failed_conversion_imports_original.py::TestConversionDeadline::test_convert_book_passes_the_deadline_to_the_converter`\nfailed once during a full `pytest -m \"smoke or unit\" -n auto` run on\n`feat/reader-notes` (2026-08-10), in a run whose only other change was six `.po`\nfiles and one test file — nothing touching conversion, deadlines or subprocess.\n\nThree controls, all pointing the same way:\n\n- passes **in isolation** on that branch\n- passes **in isolation** on `main`\n- **absent** from the same branch's own pre-fix full run 20 minutes earlier,\n  which failed 5 other tests and not this one\n\nSo it is order- or concurrency-dependent under xdist, not a defect in the change\nthat surfaced it.\n\n## Why it is worth a finding rather than a shrug\n\nA test that fails once per N full runs and passes on retry is the most expensive\nkind: it trains everyone to re-run rather than read, which is precisely the habit\nthat lets a genuine red through. That is not hypothetical here — this session\nwatched three real failures sit inside a wall of billing corpses, where the\n\"re-run it\" reflex would have laundered them.\n\nIt also lands on a specific seam: `--maxfail=3` in the Fast Tests lane truncates\nthe FAILED list to a prefix, so a flake occupying one of those three slots can\nhide a real failure behind it.\n\n## Where to look\n\nDeadline assertions are time-sensitive by construction, and under `-n auto` a\nworker can be descheduled long enough to blow a wall-clock margin — the usual\nshape is an assertion on elapsed/remaining time rather than on the value passed.\n`--dist=loadfile` already pins a file to one worker, so cross-file interference\nis the less likely half; shared module state or a monkeypatched clock leaking\nbetween tests in the same file is the more likely.\n\nReproduce with repeated full runs rather than targeted ones — a targeted run is\nexactly the condition under which it passes.",
+  "created": "2026-08-10",
+  "id": "F-8b3e17",
+  "refs": [],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "test_1094 TestConversionDeadline fails only under -n auto, and passes in isolation on both the branch and main"
+}

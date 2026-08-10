@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 1560" width="780" height="1560" role="img" aria-label="Placeholder for a screenshot of the library on a phone">
+  <rect width="780" height="1560" fill="#f4f0e8"/>
+  <!-- status bar -->
+  <rect x="280" y="18" width="220" height="26" rx="13" fill="#e0d9c8"/>
+  <!-- header -->
+  <rect x="32" y="76" width="200" height="26" rx="13" fill="#0e6b4d" opacity="0.85"/>
+  <rect x="32" y="128" width="716" height="56" rx="28" fill="#e9e3d6"/>
+  <circle cx="74" cy="156" r="14" fill="#cfc6b4"/>
+  <rect x="104" y="146" width="220" height="18" rx="9" fill="#cfc6b4"/>
+  <!-- cover grid 2 cols -->
+  <g>
+    <rect x="32" y="220" width="340" height="510" rx="14" fill="#0e6b4d" opacity="0.9"/>
+    <rect x="408" y="220" width="340" height="510" rx="14" fill="#b7ac95"/>
+    <rect x="32" y="800" width="340" height="510" rx="14" fill="#a8937b"/>
+    <rect x="408" y="800" width="340" height="510" rx="14" fill="#8d9b8f"/>
+  </g>
+  <g fill="#d9d2c2">
+    <rect x="32" y="746" width="220" height="18" rx="9"/><rect x="32" y="774" width="140" height="14" rx="7"/>
+    <rect x="408" y="746" width="200" height="18" rx="9"/><rect x="408" y="774" width="150" height="14" rx="7"/>
+    <rect x="32" y="1326" width="210" height="18" rx="9"/><rect x="32" y="1354" width="130" height="14" rx="7"/>
+    <rect x="408" y="1326" width="230" height="18" rx="9"/><rect x="408" y="1354" width="160" height="14" rx="7"/>
+  </g>
+  <!-- tab bar -->
+  <rect y="1440" width="780" height="120" fill="#ece6d9"/>
+  <g fill="#0e6b4d"><circle cx="120" cy="1496" r="18"/></g>
+  <g fill="#c4bba6"><circle cx="315" cy="1496" r="18"/><circle cx="510" cy="1496" r="18"/><circle cx="690" cy="1496" r="18"/></g>
+</svg>

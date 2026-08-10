@@ -1,0 +1,11 @@
+{
+  "area": "spa-topbar",
+  "body": "`.menuBtn` in `frontend/src/components/TopBar.module.css` is a flex item in a\ncrowded top bar with no `flex: none` and no explicit width, so it is squeezed\nwhenever the bar runs out of room. Measured on `main` (not a branch), /app/account:\n\n    390px -> button 22x28, icon 14x20\n    360px -> button 20x28, icon 12x20\n    320px -> button  8x28, icon  0x20   <- no glyph rendered at all\n\nAt 320px (Galaxy Fold folded, and the narrowest width the project checks) the\nprimary navigation control on mobile is invisible. It is still present and\nclickable — PR #1506 guarantees its hit area stays at least 30x44 there — so\nthis is a discoverability defect, not a dead control.\n\nNot fixed alongside the target-size work because it is not a target-size\nproblem: the bar genuinely cannot fit brand + search + hamburger + account menu\nat 320px, and the squeeze is how it currently copes. Fixing it means choosing\nwhat yields first — most likely dropping `.brandText` below ~360px, since\n`.triggerLabel` already hides at 420px and the search already collapses to an\nicon button. That is a layout decision, so it wants to be made deliberately\nrather than as a side effect.\n\nRelated: `/duplicates` and `/admin` are the only two routes that overflow\nhorizontally at 320px (`.scanBtn` is `white-space: nowrap` at 151px, reaching\n352px against a 320px viewport; `.userActions` reaches 323px). Same width, same\nclass of problem, likely worth one pass together.\n\nMethod + full inventory: `notes/UI-SWEEP-INVENTORY.md` (outer workspace).",
+  "created": "2026-08-09",
+  "id": "F-5a225c",
+  "refs": [],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "The mobile hamburger renders no glyph at 320px"
+}

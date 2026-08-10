@@ -7189,7 +7189,7 @@ msgstr ""
 
 #: cps/templates/annotations_import.html:18
 msgid "Import"
-msgstr ""
+msgstr "Importeren"
 
 #: cps/templates/annotations_import.html:23
 msgid "Import summary"
@@ -12735,3 +12735,174 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"
+
+# Device and annotation management (SPA)
+msgid "1 selected."
+msgstr "1 geselecteerd."
+
+msgid "Assign selected to device"
+msgstr "Selectie aan apparaat toewijzen"
+
+msgid "Assign to device"
+msgstr "Aan apparaat toewijzen"
+
+#, python-brace-format
+msgid "Assigned to {name}."
+msgstr "Toegewezen aan {name}."
+
+msgid "Book order"
+msgstr "Boekvolgorde"
+
+msgid "Could not assign."
+msgstr "Toewijzen is mislukt."
+
+msgid "Could not load e-readers."
+msgstr "E-readers konden niet worden geladen."
+
+msgid "Deleted device"
+msgstr "Verwijderd apparaat"
+
+msgid "Device"
+msgstr "Apparaat"
+
+msgid "Device name"
+msgstr "Apparaatnaam"
+
+msgid "Device renamed."
+msgstr "Apparaat hernoemd."
+
+msgid "Device restored."
+msgstr "Apparaat hersteld."
+
+#, python-brace-format
+msgid "Device: {name}"
+msgstr "Apparaat: {name}"
+
+msgid "Devices appear here after their first sync."
+msgstr "Apparaten verschijnen hier na hun eerste synchronisatie."
+
+msgid "E-readers"
+msgstr "E-readers"
+
+msgid "Export"
+msgstr "Exporteren"
+
+msgid "Filter by device"
+msgstr "Op apparaat filteren"
+
+msgid "Group by"
+msgstr "Groeperen op"
+
+msgid "KOReader"
+msgstr "KOReader"
+
+msgid "Kobo"
+msgstr "Kobo"
+
+msgid "Kobo setup"
+msgstr "Kobo-instelling"
+
+#, python-brace-format
+msgid "Last seen {when}"
+msgstr "Laatst gezien {when}"
+
+msgid "Manage e-readers"
+msgstr "E-readers beheren"
+
+msgid "Manage your Kobo sync URL in the classic account page."
+msgstr "Beheer je Kobo-synchronisatie-URL op de klassieke accountpagina."
+
+#, python-brace-format
+msgid "More actions for {name}"
+msgstr "Meer acties voor {name}"
+
+msgid "No e-readers yet."
+msgstr "Nog geen e-readers."
+
+msgid "Not assigned"
+msgstr "Niet toegewezen"
+
+msgid "Not seen lately"
+msgstr "Onlangs niet gezien"
+
+msgid "Remove device"
+msgstr "Apparaat verwijderen"
+
+#, python-brace-format
+msgid "Remove {name}?"
+msgstr "{name} verwijderen?"
+
+#, python-brace-format
+msgid "Rename {name}"
+msgstr "{name} hernoemen"
+
+msgid "Retry"
+msgstr "Opnieuw proberen"
+
+msgid "Select all in group"
+msgstr "Alles in de groep selecteren"
+
+#, python-brace-format
+msgid "Select all {n}"
+msgstr "Alle {n} selecteren"
+
+#, python-brace-format
+msgid "Select highlight: {text}"
+msgstr "Markering selecteren: {text}"
+
+msgid "Set up Kobo sync"
+msgstr "Kobo-synchronisatie instellen"
+
+msgid "This device will no longer sync."
+msgstr "Dit apparaat wordt niet meer gesynchroniseerd."
+
+msgid "Undo"
+msgstr "Ongedaan maken"
+
+msgid "Unknown device"
+msgstr "Onbekend apparaat"
+
+msgid "Unknown source"
+msgstr "Onbekende bron"
+
+msgid "Web reader"
+msgstr "Weblezer"
+
+msgid "unknown"
+msgstr "onbekend"
+
+#, python-brace-format
+msgid "{done} of {total}"
+msgstr "{done} van {total}"
+
+#, python-brace-format
+msgid "{name} removed."
+msgstr "{name} verwijderd."
+
+#, python-brace-format
+msgid "{name}, {n} highlights"
+msgstr "{name}, {n} markeringen"
+
+#, python-brace-format
+msgid "{n} assigned to {name}."
+msgstr "{n} toegewezen aan {name}."
+
+#, python-brace-format
+msgid "{n} failed."
+msgstr "{n} mislukt."
+
+#, python-brace-format
+msgid "{n} highlights"
+msgstr "{n} markeringen"
+
+#, python-brace-format
+msgid "{n} highlights assigned to this device will become Unknown device."
+msgstr "{n} markeringen die aan dit apparaat zijn toegewezen, worden Onbekend apparaat."
+
+#, python-brace-format
+msgid "{n} highlights were made on this device. They are not deleted. Their origin history is kept."
+msgstr "{n} markeringen zijn op dit apparaat gemaakt. Ze worden niet verwijderd. Hun herkomstgeschiedenis blijft bewaard."
+
+#, python-brace-format
+msgid "{ok} of {total} assigned to {name}."
+msgstr "{ok} van {total} toegewezen aan {name}."

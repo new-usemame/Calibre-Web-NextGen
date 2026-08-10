@@ -7305,9 +7305,9 @@ msgid "KoboReader.sqlite"
 msgstr ""
 
 #: cps/templates/annotations_import.html:18
-#, fuzzy
 msgid "Import"
-msgstr "Important :"
+msgstr "Importer"
+
 
 #: cps/templates/annotations_import.html:23
 msgid "Import summary"
@@ -13201,3 +13201,174 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr ""
 #~ "Cliquer sur la couverture pour importer les métadonnées dans le formulaire"
+
+# Device and annotation management (SPA)
+msgid "1 selected."
+msgstr "1 sélectionné."
+
+msgid "Assign selected to device"
+msgstr "Attribuer la sélection à l'appareil"
+
+msgid "Assign to device"
+msgstr "Attribuer à l'appareil"
+
+#, python-brace-format
+msgid "Assigned to {name}."
+msgstr "Attribué à {name}."
+
+msgid "Book order"
+msgstr "Ordre du livre"
+
+msgid "Could not assign."
+msgstr "Impossible d'attribuer."
+
+msgid "Could not load e-readers."
+msgstr "Impossible de charger les liseuses."
+
+msgid "Deleted device"
+msgstr "Appareil supprimé"
+
+msgid "Device"
+msgstr "Appareil"
+
+msgid "Device name"
+msgstr "Nom de l'appareil"
+
+msgid "Device renamed."
+msgstr "Appareil renommé."
+
+msgid "Device restored."
+msgstr "Appareil restauré."
+
+#, python-brace-format
+msgid "Device: {name}"
+msgstr "Appareil : {name}"
+
+msgid "Devices appear here after their first sync."
+msgstr "Les appareils apparaissent ici après leur première synchronisation."
+
+msgid "E-readers"
+msgstr "Liseuses"
+
+msgid "Export"
+msgstr "Exporter"
+
+msgid "Filter by device"
+msgstr "Filtrer par appareil"
+
+msgid "Group by"
+msgstr "Grouper par"
+
+msgid "KOReader"
+msgstr "KOReader"
+
+msgid "Kobo"
+msgstr "Kobo"
+
+msgid "Kobo setup"
+msgstr "Configuration Kobo"
+
+#, python-brace-format
+msgid "Last seen {when}"
+msgstr "Vu pour la dernière fois {when}"
+
+msgid "Manage e-readers"
+msgstr "Gérer les liseuses"
+
+msgid "Manage your Kobo sync URL in the classic account page."
+msgstr "Gérez votre URL de synchronisation Kobo sur la page de compte classique."
+
+#, python-brace-format
+msgid "More actions for {name}"
+msgstr "Plus d'actions pour {name}"
+
+msgid "No e-readers yet."
+msgstr "Aucune liseuse pour le moment."
+
+msgid "Not assigned"
+msgstr "Non attribué"
+
+msgid "Not seen lately"
+msgstr "Pas vu récemment"
+
+msgid "Remove device"
+msgstr "Supprimer l'appareil"
+
+#, python-brace-format
+msgid "Remove {name}?"
+msgstr "Supprimer {name} ?"
+
+#, python-brace-format
+msgid "Rename {name}"
+msgstr "Renommer {name}"
+
+msgid "Retry"
+msgstr "Réessayer"
+
+msgid "Select all in group"
+msgstr "Tout sélectionner dans le groupe"
+
+#, python-brace-format
+msgid "Select all {n}"
+msgstr "Tout sélectionner ({n})"
+
+#, python-brace-format
+msgid "Select highlight: {text}"
+msgstr "Sélectionner le surlignage : {text}"
+
+msgid "Set up Kobo sync"
+msgstr "Configurer la synchronisation Kobo"
+
+msgid "This device will no longer sync."
+msgstr "Cet appareil ne sera plus synchronisé."
+
+msgid "Undo"
+msgstr "Annuler"
+
+msgid "Unknown device"
+msgstr "Appareil inconnu"
+
+msgid "Unknown source"
+msgstr "Source inconnue"
+
+msgid "Web reader"
+msgstr "Lecteur Web"
+
+msgid "unknown"
+msgstr "inconnu"
+
+#, python-brace-format
+msgid "{done} of {total}"
+msgstr "{done} sur {total}"
+
+#, python-brace-format
+msgid "{name} removed."
+msgstr "{name} supprimé."
+
+#, python-brace-format
+msgid "{name}, {n} highlights"
+msgstr "{name}, {n} surlignages"
+
+#, python-brace-format
+msgid "{n} assigned to {name}."
+msgstr "{n} attribués à {name}."
+
+#, python-brace-format
+msgid "{n} failed."
+msgstr "{n} échecs."
+
+#, python-brace-format
+msgid "{n} highlights"
+msgstr "{n} surlignages"
+
+#, python-brace-format
+msgid "{n} highlights assigned to this device will become Unknown device."
+msgstr "{n} surlignages attribués à cet appareil deviendront Appareil inconnu."
+
+#, python-brace-format
+msgid "{n} highlights were made on this device. They are not deleted. Their origin history is kept."
+msgstr "{n} surlignages ont été créés sur cet appareil. Ils ne sont pas supprimés. Leur historique d'origine est conservé."
+
+#, python-brace-format
+msgid "{ok} of {total} assigned to {name}."
+msgstr "{ok} sur {total} attribués à {name}."

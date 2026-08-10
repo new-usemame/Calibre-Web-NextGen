@@ -7153,9 +7153,9 @@ msgid "KoboReader.sqlite"
 msgstr ""
 
 #: cps/templates/annotations_import.html:18
-#, fuzzy
 msgid "Import"
-msgstr "Pomembno:"
+msgstr ""
+
 
 #: cps/templates/annotations_import.html:23
 msgid "Import summary"

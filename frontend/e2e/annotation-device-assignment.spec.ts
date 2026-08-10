@@ -26,10 +26,14 @@ async function stubAnnotations(page: Page, count = 595, availableDevices = [libr
   return bulkSizes;
 }
 
-test('595 unknown highlights virtualize, filter, and bulk assign in 500-item chunks with partial failure', async ({ page }) => {
+test('595 unknown highlights virtualize, filter, and bulk assign in 500-item chunks with partial failure', async ({ page }, testInfo) => {
   const bulkSizes = await stubAnnotations(page);
   await page.goto('/app/book/2/annotations');
-  await expect(page.getByRole('radio', { name: /Unknown device, 595 highlights/ })).toBeVisible();
+  if (testInfo.project.name === 'mobile') {
+    await expect(page.locator('label').filter({ hasText: /^Device/ }).first().locator('select')).toContainText('Unknown device (595)');
+  } else {
+    await expect(page.getByRole('radio', { name: /Unknown device, 595 highlights/ })).toBeVisible();
+  }
   expect(await page.locator('[data-virtual-row]').count()).toBeLessThan(60);
   await page.getByLabel('Group by').selectOption('device');
   await expect(page.getByRole('listitem').filter({ hasText: 'Unknown device' }).first()).toBeVisible();
@@ -38,9 +42,9 @@ test('595 unknown highlights virtualize, filter, and bulk assign in 500-item chu
   await page.getByRole('button', { name: 'Select all 595' }).click();
   await page.getByRole('combobox', { name: 'Assign selected to device' }).selectOption('libra');
   await expect(page.getByText('594 of 595 assigned to Libra Colour.')).toBeVisible();
-  await expect(page.getByText('1 failed.')).toBeVisible();
+  await expect(page.locator('#main').getByText('1 failed.', { exact: true })).toBeVisible();
   expect(bulkSizes).toEqual([500, 95]);
-  await expect(page.getByText('1 selected')).toBeVisible();
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
 });
 
 test('highlight assignment is keyboard named, mobile-safe, and axe-clean', async ({ page }, testInfo) => {
@@ -71,8 +75,7 @@ test('many device filters collapse and touch long-press enters selection', async
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + 20, box!.y + 20);
   await page.mouse.down();
-  await page.waitForTimeout(600);
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
   await page.mouse.up();
-  await expect(page.getByText('1 selected')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Select all 20' })).toBeFocused();
 });

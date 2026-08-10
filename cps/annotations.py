@@ -322,6 +322,16 @@ def _ingest_bookmarks(sqlite_path: str) -> dict:
     from the Flask request context (current_user, ub.session,
     calibre_db). Lives so the request handler is one line; the
     actual work happens in the pure function below."""
+    origin_device_id = None
+    supplied_device = request.form.get("origin_device_id")
+    if supplied_device:
+        try:
+            from .services.device_registry import resolve_owned_device_best_effort
+            origin_device_id = resolve_owned_device_best_effort(
+                user_id=current_user.id, public_id=supplied_device,
+            )
+        except Exception:
+            log.warning("annotations: imported-device attribution failed", exc_info=True)
     return ingest_bookmarks(
         sqlite_path,
         user_id=current_user.id,
@@ -330,10 +340,12 @@ def _ingest_bookmarks(sqlite_path: str) -> dict:
             calibre_db.get_book_by_uuid(uuid) if "-" in (uuid or "") else None
         ),
         commit=ub.session_commit,
+        origin_device_id=origin_device_id,
     )
 
 
-def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict:
+def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
+                     origin_device_id=None) -> dict:
     """Walk the parsed bookmarks, resolve VolumeIDs via ``book_lookup``,
     INSERT new highlights into ``kobo_annotation_sync``. Dependencies
     are explicit so this function is unit-testable without a Flask app.
@@ -414,6 +426,7 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
             context_string=bm.context_string,
             chapter_progress=bm.chapter_progress,
             source="kobo",
+            origin_device_id=origin_device_id,
             hidden=False,
         )
         session.add(row)
@@ -798,7 +811,8 @@ WEBREADER_ID_PREFIX = "cwn-web-"
 WEBREADER_COLORS = ("yellow", "red", "green", "blue")
 
 
-def create_annotation(payload, *, user_id, book, session, commit):
+def create_annotation(payload, *, user_id, book, session, commit,
+                      origin_device_id=None):
     """Create a ``source='webreader'`` annotation from a reader selection.
 
     ``payload`` carries the KoboSpan anchors the reader derived from the live
@@ -850,6 +864,7 @@ def create_annotation(payload, *, user_id, book, session, commit):
             annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
             book_id=book.id,
             source="webreader",
+            origin_device_id=origin_device_id,
             highlighted_text=payload.get("highlighted_text"),
             highlight_color=color,
             note_text=payload.get("note_text"),
@@ -876,6 +891,7 @@ def create_annotation(payload, *, user_id, book, session, commit):
         annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
         book_id=book.id,
         source="webreader",
+        origin_device_id=origin_device_id,
         highlighted_text=payload.get("highlighted_text"),
         highlight_color=color,
         note_text=payload.get("note_text"),
@@ -1078,10 +1094,17 @@ def annotations_create(book_id):
     """Create a highlight from a web-reader selection (source='webreader')."""
     book = _resolve_book_or_404(book_id)
     payload = request.get_json(silent=True) or {}
+    origin_device_id = None
+    try:
+        from .services.device_registry import ensure_webreader_device_best_effort
+        origin_device_id = ensure_webreader_device_best_effort(user_id=current_user.id)
+    except Exception:
+        log.warning("annotations: web-reader attribution failed", exc_info=True)
     try:
         row = create_annotation(
             payload, user_id=current_user.id, book=book,
             session=ub.session, commit=ub.session_commit,
+            origin_device_id=origin_device_id,
         )
     except ValueError as e:
         return jsonify({"error": "bad_anchor", "message": str(e)}), 400

@@ -122,6 +122,29 @@ def test_client_last_modified_missing_malformed_valid(db_session, raw, expected)
         assert row.client_modified_at == datetime(2026, 8, 9, 14, 52, 21)
 
 
+def test_kobo_create_records_origin_once_and_update_cannot_replace_it(db_session):
+    from cps import ub
+    from cps.services.annotation_sync import _upsert_annotation
+    first = ub.Device(user_id=7, kind="kobo", display_name="First", active=True, created_by="auto")
+    second = ub.Device(user_id=7, kind="kobo", display_name="Second", active=True, created_by="auto")
+    db_session.add_all([first, second])
+    db_session.flush()
+    book = SimpleNamespace(id=5, uuid="b3d1b38b-74fd-43b7-a796-996e5a6a8b04")
+    user = SimpleNamespace(id=7)
+    row = _upsert_annotation(
+        db_session,
+        {"id": "origin-once", "highlightedText": "first"},
+        book, user, origin_device_id=first.id,
+    )
+    assert row.origin_device_id == first.id
+    row = _upsert_annotation(
+        db_session,
+        {"id": "origin-once", "highlightedText": "updated"},
+        book, user, origin_device_id=second.id,
+    )
+    assert row.origin_device_id == first.id
+
+
 def test_older_client_clock_cannot_overwrite_newer_annotation(db_session):
     from cps.services.annotation_sync import _upsert_annotation
     book, user = SimpleNamespace(id=5, uuid="b3d1b38b-74fd-43b7-a796-996e5a6a8b04"), SimpleNamespace(id=7)

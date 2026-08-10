@@ -149,7 +149,7 @@ def _book_uuid(book):
     return None
 
 
-def _upsert_annotation(session, payload, book, user):
+def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
     """Find-or-create Annotation row keyed on (user_id, book_id, annotation_id).
 
     Populates content fields AND position fields from the Kobo PATCH payload
@@ -205,6 +205,7 @@ def _upsert_annotation(session, payload, book, user):
             annotation_id=annotation_id,
             book_id=book.id,
             source="kobo",
+            origin_device_id=origin_device_id,
         )
         session.add(ann)
     # If a previously soft-deleted (hidden) annotation comes back, un-hide it.
@@ -430,14 +431,16 @@ def _mark_pending(session, annotation, user):
     return queued
 
 
-def dispatch_annotation_sync(payload_annotations, book, user) -> None:
+def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_id=None) -> None:
     """For each annotation in the PATCH payload, persist locally then push to each enabled handler."""
     from cps import ub
     if not payload_annotations:
         return
     jobs = []
     for payload in payload_annotations:
-        ann = _upsert_annotation(ub.session, payload, book, user)
+        ann = _upsert_annotation(
+            ub.session, payload, book, user, origin_device_id=origin_device_id,
+        )
         if ann is None:
             continue
         if _background_enqueue() is not None:

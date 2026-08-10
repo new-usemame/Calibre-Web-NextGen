@@ -20,7 +20,7 @@ import re
 from datetime import datetime, timezone
 from functools import wraps
 from typing import TypedDict, NotRequired
-from flask import Blueprint, request, make_response, jsonify, abort
+from flask import Blueprint, request, make_response, jsonify, abort, g
 from werkzeug.datastructures import Headers
 import requests
 from lxml import etree
@@ -135,7 +135,9 @@ def requires_reading_services_auth_and_config(f):
         if current_user.is_authenticated:
             try:
                 from .services.device_registry import register_kobo_device_best_effort
-                register_kobo_device_best_effort(user_id=current_user.id, headers=request.headers)
+                g.annotation_origin_device_id = register_kobo_device_best_effort(
+                    user_id=current_user.id, headers=request.headers, return_internal=True,
+                )
             except Exception:
                 log.warning("Best-effort Kobo device observation failed", exc_info=True)
             return f(*args, **kwargs)
@@ -379,7 +381,10 @@ def handle_annotations(entitlement_id):
                 updated = data.get("updatedAnnotations")
                 deleted = data.get("deletedAnnotationIds")
                 if updated:
-                    annotation_sync.dispatch_annotation_sync(updated, book, current_user)
+                    annotation_sync.dispatch_annotation_sync(
+                        updated, book, current_user,
+                        origin_device_id=getattr(g, "annotation_origin_device_id", None),
+                    )
                 if deleted:
                     annotation_sync.dispatch_annotation_deletes(
                         deleted, current_user, book_id=book.id,

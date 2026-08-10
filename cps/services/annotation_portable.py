@@ -80,7 +80,8 @@ def to_portable(row) -> dict:
     }
 
 
-def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional[object], str]:
+def apply_portable(payload, *, user_id, book, session, commit,
+                   origin_device_id=None) -> Tuple[Optional[object], str]:
     """Upsert an Annotation from a device-pushed portable dict.
 
     Find-or-create keyed on ``(user_id, book_id, annotation_id)``. New rows take the
@@ -114,7 +115,7 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
             source = "koreader"
         row = ub.Annotation(
             user_id=user_id, annotation_id=annotation_id,
-            book_id=book.id, source=source,
+            book_id=book.id, source=source, origin_device_id=origin_device_id,
         )
         session.add(row)
         created = True
@@ -207,5 +208,6 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
             raise
         return apply_portable(
             payload, user_id=user_id, book=book, session=session, commit=commit,
+            origin_device_id=origin_device_id,
         )
     return row, action

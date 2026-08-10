@@ -103,6 +103,27 @@ def test_apply_invalid_source_coerced(session):
     assert row.source == "koreader"
 
 
+def test_apply_portable_sets_origin_only_when_creating(session):
+    first = ub.Device(user_id=9, kind="koreader", display_name="First",
+                      active=True, created_by="auto")
+    second = ub.Device(user_id=9, kind="koreader", display_name="Second",
+                       active=True, created_by="auto")
+    session.add_all([first, second])
+    session.commit()
+    row, _ = apply_portable(
+        {"annotation_id": "portable-origin", "highlighted_text": "first"},
+        user_id=9, book=_book(), session=session, commit=session.commit,
+        origin_device_id=first.id,
+    )
+    assert row.origin_device_id == first.id
+    row, _ = apply_portable(
+        {"annotation_id": "portable-origin", "highlighted_text": "updated"},
+        user_id=9, book=_book(), session=session, commit=session.commit,
+        origin_device_id=second.id,
+    )
+    assert row.origin_device_id == first.id
+
+
 def test_apply_updates_existing(session):
     apply_portable(
         {"annotation_id": "dev-d", "color": "yellow", "note_text": "v1",

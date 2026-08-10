@@ -138,7 +138,10 @@ jobs:
           pr_json=$(mktemp)
           diff_text=$(mktemp)
           # `--json additions,files` mirrors what validate_fork_pr expects.
-          gh pr view "$PR_NUMBER" --repo "$REPO" --json additions,changedFiles,files > "$pr_json"
+          # baseRefName is load-bearing: the validator refuses to arm on a
+          # base the required-status-checks ruleset doesn't cover. Drop it
+          # from this --json list and every PR fails closed instead.
+          gh pr view "$PR_NUMBER" --repo "$REPO" --json additions,changedFiles,files,baseRefName > "$pr_json"
           gh pr diff "$PR_NUMBER" --repo "$REPO" > "$diff_text"
 
           result=$(python -m scripts.lib.tier_policy validate-fork-pr \
@@ -149,6 +152,35 @@ jobs:
           ok=$(jq -r '.ok' <<<"$result")
           category=$(jq -r '.category' <<<"$result")
           reason=$(jq -r '.reason' <<<"$result")
+
+          # An unprotected base is not a defect in the PR — the diff may be
+          # perfectly good tier-1 work — so it does NOT get demoted. The
+          # label is right; the base is wrong, and it usually fixes itself
+          # when the branch this one stacks on lands (GitHub re-targets the
+          # PR automatically). Stripping the label here would thrash
+          # against the autopilot, which would just re-apply it.
+          #
+          # Comment at most once per PR: this fires on every `synchronize`,
+          # and a stacked branch syncs often.
+          if [ "$ok" != "true" ] && [ "$category" = "unprotected_base" ]; then
+              marker="auto-merge held: unprotected base"
+              # Deliberately NOT `gh ... | grep -qF`: grep -q exits on the
+              # first match and SIGPIPEs gh, which under `set -o pipefail`
+              # makes the pipeline non-zero *because* it matched. That
+              # inverts the test and re-comments on every sync. Capture
+              # first, then match in-shell with no pipe at all.
+              existing=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
+                  --json comments --jq '.comments[].body' || true)
+              case "$existing" in
+                  *"$marker"*)
+                      echo "skip #$PR_NUMBER: $reason (already commented)" ;;
+                  *)
+                      gh pr comment "$PR_NUMBER" --repo "$REPO" \
+                          --body "🤖 $marker — $reason"
+                      echo "skip #$PR_NUMBER: $reason" ;;
+              esac
+              exit 0
+          fi
 
           if [ "$ok" != "true" ]; then
               # Demote to needs-review and stop. tier-2 demotion strips

@@ -923,6 +923,59 @@ ${sitemapUrls.map((u) => `  <url><loc>${u.loc}</loc><lastmod>${BUILD_DATE}</last
     if (thirdParty.test(content)) warn(`${rel}: third-party request reference found`);
   }
 
+  // ----- IDENTITY GATE: fatal, never a warning -----
+  //
+  // This is a public site. The operator's identity tokens must never reach it, and a
+  // review pass is the wrong instrument because it only runs when someone remembers.
+  // A leak here is not undoable once crawled, so this EXITS NON-ZERO rather than
+  // adding to `problems` (which only prints).
+  //
+  // Note what is NOT in this file: the operator's legal name and home address are
+  // themselves sensitive, so hardcoding them into a public repo would BE the leak.
+  // Literal tokens are supplied out-of-band via the PII_DENYLIST env var
+  // (newline- or comma-separated) or a gitignored .pii-denylist file. The structural
+  // patterns below always run and need no secrets.
+  const structuralPii = [
+    [/\/Users\/[A-Za-z0-9._-]+/g, 'local macOS home path'],
+    [/tel:\+?[0-9()\s.-]{7,}/gi, 'tel: link'],
+    [/(?:\+[0-9]{1,3}[ .-]?)?\(?[0-9]{3}\)?[ .-][0-9]{3}[ .-][0-9]{4}\b/g, 'phone-shaped string'],
+    [/[A-Za-z0-9._%+-]+@privaterelay\.appleid\.com/gi, 'Apple private-relay address'],
+  ];
+  let denylist = (process.env.PII_DENYLIST || '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+  const denyFile = path.join(HERE, '.pii-denylist');
+  if (fs.existsSync(denyFile)) {
+    denylist = denylist.concat(
+      fs.readFileSync(denyFile, 'utf8').split('\n').map((s) => s.trim())
+        .filter((s) => s && !s.startsWith('#')),
+    );
+  }
+
+  const leaks = [];
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const fp = path.join(dir, e.name);
+    return e.isDirectory() ? walk(fp) : [fp];
+  });
+  for (const fp of walk(DIST)) {
+    // read as latin1 so image bytes are scannable too — EXIF and embedded strings count
+    const buf = fs.readFileSync(fp, 'latin1');
+    const where = path.relative(DIST, fp);
+    for (const [re, label] of structuralPii) {
+      const m = buf.match(re);
+      if (m) leaks.push(`${where}: ${label} -> ${[...new Set(m)].slice(0, 3).join(', ')}`);
+    }
+    for (const tok of denylist) {
+      if (buf.toLowerCase().includes(tok.toLowerCase())) leaks.push(`${where}: denylisted token "${tok}"`);
+    }
+  }
+  if (leaks.length) {
+    console.error('\nFATAL: identity gate failed — personal information found in build output.\n');
+    for (const l of [...new Set(leaks)]) console.error('  ' + l);
+    console.error('\nNothing is published. Remove the content (or re-shoot the screenshot) and rebuild.');
+    process.exit(1);
+  }
+  console.log(`· Identity gate: clean (${walk(DIST).length} files scanned incl. image bytes`
+    + `${denylist.length ? `, ${denylist.length} denylisted tokens` : ', no denylist supplied'}).`);
+
   console.log(`· Wrote ${written.length} HTML pages + assets to dist/`);
   if (problems.length) {
     console.log('! Build warnings:');

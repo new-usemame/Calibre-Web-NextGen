@@ -4,3 +4,6 @@
 node_modules/
 dist/
 .playwright-mcp/
+
+# Out-of-band PII denylist (never commit real tokens here)
+.pii-denylist

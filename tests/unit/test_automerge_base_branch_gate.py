@@ -226,6 +226,29 @@ def test_workflow_actually_passes_the_base_to_the_validator():
     )
 
 
+def test_workflow_ties_the_base_to_the_actual_default_branch():
+    """The allowlist names branches literally; the ruleset is scoped to
+    ~DEFAULT_BRANCH. Rename the default branch while a stale `main` survives
+    and the two diverge — the allowlist would then authorise a branch nothing
+    protects, which is fail-OPEN. The workflow must resolve the real default
+    branch and require the base to be it."""
+    text = AUTO_MERGE_WF.read_text()
+    assert "defaultBranchRef" in text, (
+        "auto-merge.yml must resolve the repository's actual default branch "
+        "rather than trusting the literal name in the policy allowlist"
+    )
+    idx = text.find("defaultBranchRef")
+    branch = text[max(0, idx - 900):idx + 900]
+    assert "unprotected_base" in branch, (
+        "a base that is not the default branch must land in the "
+        "unprotected_base path"
+    )
+    # Fail closed: an unresolvable default branch is not permission to arm.
+    assert '-z "$default_branch"' in text, (
+        "an empty default-branch lookup must refuse, not fall through to arming"
+    )
+
+
 def test_workflow_reevaluates_when_the_base_changes():
     """A PR's base can change after it was armed. `edited` is the event that
     fires for that; without it the gate only ever sees the base a PR was

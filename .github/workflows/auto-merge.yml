@@ -100,7 +100,7 @@ jobs:
 
           echo "=== evaluating PR #$PR_NUMBER ==="
           META=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
-            --json state,mergeable,labels,files,headRefName,headRefOid,title,isDraft)
+            --json state,mergeable,labels,files,headRefName,headRefOid,title,isDraft,baseRefName)
 
           state=$(jq -r .state <<<"$META")
           mergeable=$(jq -r .mergeable <<<"$META")
@@ -159,6 +159,31 @@ jobs:
           ok=$(jq -r '.ok' <<<"$result")
           category=$(jq -r '.category' <<<"$result")
           reason=$(jq -r '.reason' <<<"$result")
+
+          # ─── Second, independent base check: is it the DEFAULT branch? ──
+          # The policy allowlist names branches literally ("main"), but the
+          # ruleset that supplies our required checks is scoped to
+          # ~DEFAULT_BRANCH. Those two meanings are equal today and can
+          # drift: rename the default branch while a stale `main` survives,
+          # and the allowlist would go on authorising a branch that nothing
+          # protects. Resolving the default branch and requiring the base to
+          # BE it keeps the gate tied to the ruleset's own semantics rather
+          # than to a name that used to match them.
+          #
+          # Fail closed when the lookup fails — an unresolvable default
+          # branch is not permission to proceed.
+          if [ "$ok" = "true" ]; then
+              base_ref=$(jq -r '.baseRefName // ""' <<<"$META")
+              default_branch=$(gh repo view "$REPO" \
+                  --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)
+              if [ -z "$default_branch" ]; then
+                  ok="false"; category="unprotected_base"
+                  reason="could not resolve this repository's default branch, so could not confirm the base is the ref branch protection covers; refusing to arm auto-merge."
+              elif [ "$base_ref" != "$default_branch" ]; then
+                  ok="false"; category="unprotected_base"
+                  reason="base branch \`$base_ref\` is not this repository's default branch (\`$default_branch\`), and the required-status-checks ruleset is scoped to the default branch — arming here would merge with no required checks at all."
+              fi
+          fi
 
           # An unprotected base is not a defect in the PR — the diff may be
           # perfectly good tier-1 work — so it does NOT get demoted. The

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Calibre-Web NextGen logo">
+  <rect x="4" y="5" width="6.5" height="22" rx="1.8" fill="currentColor" opacity="0.55"/>
+  <rect x="12.75" y="5" width="6.5" height="22" rx="1.8" fill="currentColor"/>
+  <rect x="21.5" y="5" width="6.5" height="22" rx="1.8" fill="currentColor" opacity="0.8" transform="rotate(9 24.75 27)"/>
+</svg>

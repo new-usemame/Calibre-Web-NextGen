@@ -75,8 +75,52 @@ const HTML = `<!doctype html>
 </body>
 </html>`;
 
+// Serve our own robots.txt so the apex stops depending on Cloudflare's managed
+// injection for it. The policy must stay IDENTICAL to what that injection emits
+// today, because the injection is currently the only thing expressing the
+// operator's ai-train=no opt-out — turning it off before this shipped would have
+// silently deleted the opt-out and left the apex with no robots.txt at all.
+//
+// Search and AI-ANSWER crawlers (OAI-SearchBot, PerplexityBot, Claude-SearchBot,
+// DuckAssistBot, ChatGPT-User, Perplexity-User, Googlebot, Bingbot) are
+// deliberately absent from the named groups, so they match `*` and are allowed.
+// Only model-TRAINING crawlers get a named group. Per the robots.txt spec a
+// crawler that finds a group naming it ignores `*` entirely — that is the whole
+// mechanism, so do not collapse these into one group and do not add a search
+// crawler to the list.
+const AI_TRAINING_CRAWLERS = [
+  "Amazonbot", "Applebot-Extended", "Bytespider", "CCBot", "ClaudeBot",
+  "CloudflareBrowserRenderingCrawler", "Google-Extended", "GPTBot",
+  "meta-externalagent",
+];
+
+const ROBOTS = [
+  "# Search and AI-answer crawlers are welcome.",
+  "# Model training crawlers are opted out below, matching the Content-Signal.",
+  "",
+  "User-agent: *",
+  "Content-Signal: search=yes,ai-train=no,use=reference",
+  "Allow: /",
+  "",
+  ...AI_TRAINING_CRAWLERS.flatMap((ua) => [`User-agent: ${ua}`, "Disallow: /", ""]),
+  "Sitemap: https://wiki.calibrewebnextgen.com/sitemap.xml",
+  "",
+].join("\n");
+
 export default {
-  async fetch() {
+  async fetch(request) {
+    const { pathname } = new URL(request.url);
+
+    if (pathname === "/robots.txt") {
+      return new Response(ROBOTS, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
     return new Response(HTML, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",

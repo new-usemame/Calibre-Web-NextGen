@@ -1,0 +1,12 @@
+{
+  "area": "opds",
+  "body": "Found while fixing #1097 (the Discover/Random naming split). With a de-locale user\nhitting `/opds` on the running image, the catalog root mixes translated and\nuntranslated entries:\n\n    <title>Alphabetical Books</title>     <- English\n    <title>Recently added Books</title>   <- English\n    <title>Entdecken</title>              <- ok (after the #1097 fix)\n    <title>Regale</title>                 <- ok\n    <title>Magic Shelves</title>          <- English\n\nMeasured against the compiled `.mo` inside the container, not the `.po`:\n\n    UNTRANSLATED  'Alphabetical Books'\n    UNTRANSLATED  'Recently added Books'\n    UNTRANSLATED  'Magic Shelves'\n    UNTRANSLATED  'Books organized in magic shelves'\n    ok            'Shelves' / 'Hot Books' / 'Top Rated Books' /\n                  'Currently Reading' / 'Unread Books'\n\nThese are exactly the keys the OPDS_ROOT_ENTRY_DEFS comment calls out as having\nbeen added later (books, recent, magic_shelves). #121 wrapped them in N_() so\npybabel would extract them, which worked — but extraction only puts a msgid in the\ncatalog, it does not translate it. So they have been empty since, sitting next to\nolder keys that are translated, which is what makes it read as a bug rather than\nas missing coverage.\n\nDeliberately not fixed in the #1097 PR: that change is one line and one msgid, and\nthis needs a translation pass rather than a code change. Worth checking the other\n27 locales before deciding scope — de is the one actually measured here.\n\nSame class as the fuzzy-drop in #1097: 'Random Books' was '#, fuzzy' in de/km/no,\nand msgfmt drops fuzzy entries silently.",
+  "created": "2026-08-09",
+  "id": "F-b443cb",
+  "origin_issue": 1097,
+  "refs": [],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "OPDS catalog root still shows four English strings to a German user"
+}

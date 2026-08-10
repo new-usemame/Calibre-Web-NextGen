@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Placeholder for a screenshot of the settings page">
+  <rect width="1600" height="900" fill="#f4f0e8"/>
+  <rect width="1600" height="60" fill="#e9e3d6"/>
+  <circle cx="32" cy="30" r="7" fill="#cdc3ae"/><circle cx="56" cy="30" r="7" fill="#cdc3ae"/><circle cx="80" cy="30" r="7" fill="#cdc3ae"/>
+  <!-- settings nav -->
+  <rect y="60" width="280" height="840" fill="#ece6d9"/>
+  <g fill="#cfc6b4">
+    <rect x="28" y="104" width="150" height="14" rx="7"/><rect x="28" y="146" width="120" height="14" rx="7"/>
+    <rect x="28" y="188" width="164" height="14" rx="7"/><rect x="28" y="230" width="104" height="14" rx="7"/>
+    <rect x="28" y="272" width="140" height="14" rx="7"/>
+  </g>
+  <rect x="20" y="90" width="240" height="36" rx="9" fill="#0e6b4d" opacity="0.14"/>
+  <!-- settings rows -->
+  <g>
+    <rect x="340" y="110" width="900" height="76" rx="12" fill="#faf7f0"/>
+    <rect x="372" y="132" width="220" height="14" rx="7" fill="#b7ac95"/><rect x="372" y="156" width="340" height="11" rx="5.5" fill="#d9d2c2"/>
+    <rect x="1140" y="128" width="64" height="32" rx="16" fill="#0e6b4d"/><circle cx="1188" cy="144" r="12" fill="#fff"/>
+    <rect x="340" y="206" width="900" height="76" rx="12" fill="#faf7f0"/>
+    <rect x="372" y="228" width="260" height="14" rx="7" fill="#b7ac95"/><rect x="372" y="252" width="300" height="11" rx="5.5" fill="#d9d2c2"/>
+    <rect x="1140" y="224" width="64" height="32" rx="16" fill="#d9d2c2"/><circle cx="1156" cy="240" r="12" fill="#fff"/>
+    <rect x="340" y="302" width="900" height="76" rx="12" fill="#faf7f0"/>
+    <rect x="372" y="324" width="200" height="14" rx="7" fill="#b7ac95"/><rect x="372" y="348" width="380" height="11" rx="5.5" fill="#d9d2c2"/>
+    <rect x="1140" y="320" width="64" height="32" rx="16" fill="#0e6b4d"/><circle cx="1188" cy="336" r="12" fill="#fff"/>
+    <rect x="340" y="398" width="900" height="76" rx="12" fill="#faf7f0"/>
+    <rect x="372" y="420" width="240" height="14" rx="7" fill="#b7ac95"/><rect x="372" y="444" width="320" height="11" rx="5.5" fill="#d9d2c2"/>
+    <rect x="1140" y="416" width="64" height="32" rx="16" fill="#d9d2c2"/><circle cx="1156" cy="432" r="12" fill="#fff"/>
+    <rect x="340" y="494" width="900" height="76" rx="12" fill="#faf7f0"/>
+    <rect x="372" y="516" width="280" height="14" rx="7" fill="#b7ac95"/><rect x="372" y="540" width="350" height="11" rx="5.5" fill="#d9d2c2"/>
+    <rect x="1140" y="512" width="64" height="32" rx="16" fill="#0e6b4d"/><circle cx="1188" cy="528" r="12" fill="#fff"/>
+  </g>
+  <rect x="340" y="620" width="150" height="44" rx="10" fill="#0e6b4d"/>
+  <text x="800" y="868" font-family="ui-monospace, Menlo, monospace" font-size="18" fill="#8a8172" text-anchor="middle">screenshot placeholder · 1600×900 · replace with settings.jpg</text>
+</svg>

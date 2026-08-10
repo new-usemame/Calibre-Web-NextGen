@@ -351,3 +351,72 @@
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .hiliteRemove:hover { background: var(--danger-soft); color: var(--danger); }
+
+/* #325 — note affordance in both popovers. Neutral (non-destructive) sibling of
+ * .hiliteRemove; icon + text so it never depends on the glyph alone. */
+.hiliteNote {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-left: 6px; padding: 5px 11px;
+  color: var(--reader-chrome-text); font-size: 13px; line-height: 1; white-space: nowrap;
+  border-radius: 999px; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.hiliteNote:hover { background: var(--reader-chrome-border); }
+
+/* When the tapped highlight carries a note the popover stops being a single
+ * pill row and stacks the note underneath, so the pill radius has to relax. */
+.hilitePopStack { flex-wrap: wrap; border-radius: 16px; row-gap: 6px; }
+.hiliteNoteText {
+  flex-basis: 100%; margin: 0; padding-top: 2px;
+  color: var(--reader-chrome-text); font-size: 13px; line-height: 1.45;
+  max-width: 44ch; overflow-wrap: anywhere;
+  border-top: 1px solid var(--reader-chrome-border);
+}
+
+/* #325 — note composer. A panel rather than a pill: it holds a textarea, and on
+ * a phone it is the full width of the screen above the keyboard. */
+.notePop {
+  position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px; z-index: 51;
+  width: min(480px, calc(100vw - 24px));
+  background: var(--reader-chrome); border: 1px solid var(--reader-chrome-border);
+  border-radius: 16px; padding: 12px 14px; box-shadow: var(--elev-3);
+}
+.noteHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* The passage being annotated, so the user can see what they are noting. */
+.noteQuote {
+  margin: 0; padding-left: 8px;
+  border-left: 3px solid var(--reader-chrome-border);
+  color: var(--reader-chrome-muted); font-size: 13px; line-height: 1.45;
+  max-height: 4.4em; overflow: hidden; overflow-wrap: anywhere;
+}
+.noteColors { display: flex; align-items: center; gap: 10px; }
+.noteInput {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 88px;
+  padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--reader-chrome-border);
+  background: var(--reader-chrome); color: var(--reader-chrome-text);
+  font: inherit; font-size: 15px; line-height: 1.5;
+}
+.noteInput:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.noteActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+/* Colour/hover come from the shared Button primitive (variant="primary", which
+ * pairs --accent with --on-accent); this only lifts the 38px primitive to the
+ * 44px target size the reader wants under a thumb. */
+.noteSave { min-height: 44px; height: auto; }
+/* Keep the destructive action a comfortable target inside the composer. */
+.noteActions .hiliteRemove { min-height: 44px; margin-left: 0; padding: 0 14px; }
+
+@media (max-width: 600px) {
+  /* Above the on-screen keyboard, edge to edge, clear of the home indicator. */
+  .notePop {
+    left: 8px; right: 8px; transform: none;
+    width: auto; max-width: none;
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  .noteInput { font-size: 16px; } /* iOS zooms a focused field below 16px */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hiliteNote, .noteSave { transition: none; }
+}

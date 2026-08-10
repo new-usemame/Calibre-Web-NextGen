@@ -1,0 +1,11 @@
+{
+  "area": "ci",
+  "body": "GitHub's auto-merge is sticky, and only one of the paths that withdraws\nauthorisation actually disarms it.\n\n`auto-merge.yml`'s generic validation-failure path strips the tier labels and\nadds `needs-review`, but never calls `gh pr merge --disable-auto`. So a PR that\nwas armed, then had its head updated into forbidden paths or over the tier-2\ncaps, keeps a live auto-merge request while carrying `needs-review`.\n`tier-label-guard.yml` has the same shape: it strips an untrusted labeller's\ntier label without disarming.\n\n`finish-armed-automerges.sh` re-checks the tier label at merge time, which\ncovers the finisher path -- that mitigation was added for exactly this class\n(its comment credits a K3 audit). Native GitHub auto-merge is not covered by\nit: if the required checks later go green on their own, GitHub merges.\n\n#1521 fixed this for the unprotected-base path only, where the refusal now\ndisarms explicitly. The general rule the review drew from it is the fix here:\nevery path that withdraws merge authorisation must also disable auto-merge,\nnot merely decline to grant it again.",
+  "created": "2026-08-10",
+  "id": "F-1760ca",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "withdrawing merge authorisation does not disable auto-merge"
+}

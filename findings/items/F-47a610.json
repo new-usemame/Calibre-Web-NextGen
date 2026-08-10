@@ -1,0 +1,11 @@
+{
+  "area": "ci",
+  "body": "`auto-merge.yml` gathers PR metadata, the file list and the diff through\nseparate live API calls, then calls `gh pr merge --auto --squash` without\n`--match-head-commit`. A push landing between validation and arming means the\narm applies to a head that was never validated -- the forbidden-path scan,\nthe tier-2 size caps and the sensitive-diff scan all ran against the old one.\n\nRaised by the cross-family review of #1521 and deliberately left out of that\nchange, which was scoped to the base branch. Fixing it properly means deciding\nwhat should happen when the head moves mid-evaluation: `--match-head-commit`\nmakes arming fail rather than silently re-target, and that failure needs a\nhandler, or every PR that gets a push while CI is queued starts reporting a\nscary error.\n\n`gh pr merge` supports `--match-head-commit <oid>`. The metadata call already\nreturns `headRefOid`, so the value is in hand; the work is threading it through\nand deciding the failure behaviour.\n\nNote the window is narrow and the same-repo/fork check bounds who can drive it.",
+  "created": "2026-08-10",
+  "id": "F-47a610",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "auto-merge arms without pinning the validated head (TOCTOU)"
+}

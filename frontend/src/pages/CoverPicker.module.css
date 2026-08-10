@@ -177,6 +177,9 @@
 .badgeWarn { left: 6px; bottom: 6px; top: auto; background: var(--danger); color: var(--cover-control-fg); }
 .cardInfo { display: flex; flex-direction: column; gap: 1px; padding: var(--sp-2) var(--sp-3); }
 .cardSource { font-size: var(--fs-sm); color: var(--text); font-weight: var(--fw-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Who actually serves the image, when that isn't the metadata provider (#304).
+   Subordinate to .cardSource: it qualifies that line rather than competing. */
+.cardImageOrigin { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cardDims { font-size: var(--fs-xs); color: var(--text-faint); min-height: 1em; }
 
 /* ---- provider detail ---- */

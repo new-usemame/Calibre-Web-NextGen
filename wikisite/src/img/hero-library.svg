@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" role="img" aria-label="Placeholder for a screenshot of the Calibre-Web NextGen library view">
+  <rect width="1600" height="1000" fill="#f4f0e8"/>
+  <!-- window chrome -->
+  <rect width="1600" height="64" fill="#e9e3d6"/>
+  <circle cx="34" cy="32" r="8" fill="#cdc3ae"/>
+  <circle cx="60" cy="32" r="8" fill="#cdc3ae"/>
+  <circle cx="86" cy="32" r="8" fill="#cdc3ae"/>
+  <rect x="620" y="18" width="360" height="28" rx="14" fill="#f9f6ef"/>
+  <!-- app sidebar -->
+  <rect y="64" width="190" height="936" fill="#ece6d9"/>
+  <rect x="24" y="96" width="120" height="16" rx="8" fill="#0e6b4d" opacity="0.85"/>
+  <g fill="#cfc6b4">
+    <rect x="24" y="150" width="140" height="12" rx="6"/><rect x="24" y="186" width="112" height="12" rx="6"/>
+    <rect x="24" y="222" width="132" height="12" rx="6"/><rect x="24" y="258" width="96" height="12" rx="6"/>
+    <rect x="24" y="294" width="124" height="12" rx="6"/><rect x="24" y="330" width="104" height="12" rx="6"/>
+  </g>
+  <!-- cover grid -->
+  <g>
+    <!-- row helper: cards 230x340 at x=250,530,810,1090,1370 rows y=110,500 -->
+    <g>
+      <rect x="250" y="110" width="200" height="300" rx="10" fill="#0e6b4d" opacity="0.9"/>
+      <rect x="530" y="110" width="200" height="300" rx="10" fill="#b7ac95"/>
+      <rect x="810" y="110" width="200" height="300" rx="10" fill="#8d9b8f"/>
+      <rect x="1090" y="110" width="200" height="300" rx="10" fill="#c9bfa9"/>
+      <rect x="1370" y="110" width="200" height="300" rx="10" fill="#a8937b"/>
+    </g>
+    <g fill="#d9d2c2">
+      <rect x="250" y="426" width="150" height="14" rx="7"/><rect x="250" y="452" width="100" height="11" rx="5.5"/>
+      <rect x="530" y="426" width="130" height="14" rx="7"/><rect x="530" y="452" width="90" height="11" rx="5.5"/>
+      <rect x="810" y="426" width="160" height="14" rx="7"/><rect x="810" y="452" width="110" height="11" rx="5.5"/>
+      <rect x="1090" y="426" width="140" height="14" rx="7"/><rect x="1090" y="452" width="95" height="11" rx="5.5"/>
+      <rect x="1370" y="426" width="120" height="14" rx="7"/><rect x="1370" y="452" width="85" height="11" rx="5.5"/>
+    </g>
+    <g>
+      <rect x="250" y="500" width="200" height="300" rx="10" fill="#a8937b"/>
+      <rect x="530" y="500" width="200" height="300" rx="10" fill="#0e6b4d" opacity="0.65"/>
+      <rect x="810" y="500" width="200" height="300" rx="10" fill="#c9bfa9"/>
+      <rect x="1090" y="500" width="200" height="300" rx="10" fill="#8d9b8f"/>
+      <rect x="1370" y="500" width="200" height="300" rx="10" fill="#b7ac95"/>
+    </g>
+    <g fill="#d9d2c2">
+      <rect x="250" y="816" width="140" height="14" rx="7"/><rect x="250" y="842" width="95" height="11" rx="5.5"/>
+      <rect x="530" y="816" width="155" height="14" rx="7"/><rect x="530" y="842" width="105" height="11" rx="5.5"/>
+      <rect x="810" y="816" width="125" height="14" rx="7"/><rect x="810" y="842" width="80" height="11" rx="5.5"/>
+      <rect x="1090" y="816" width="145" height="14" rx="7"/><rect x="1090" y="842" width="100" height="11" rx="5.5"/>
+      <rect x="1370" y="816" width="135" height="14" rx="7"/><rect x="1370" y="842" width="90" height="11" rx="5.5"/>
+    </g>
+  </g>
+  <text x="800" y="964" font-family="ui-monospace, Menlo, monospace" font-size="22" fill="#8a8172" text-anchor="middle">screenshot placeholder · 1600×1000 · replace with hero-library.jpg</text>
+</svg>

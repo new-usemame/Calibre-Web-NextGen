@@ -643,14 +643,8 @@ def _resolve_epub_path(book) -> Optional[str]:
     return None
 
 
-def _ensure_cfi_range(row, book) -> Optional[str]:
-    """If ``row.cfi_range`` is missing, try to compute it on the fly
-    via P2's converter, persist back to the DB, and return the new
-    value. Returns None when computation isn't possible (no EPUB on
-    disk, malformed position data, etc.) — caller renders the
-    annotation in the sidebar without an overlay."""
-    if row.cfi_range:
-        return row.cfi_range
+def _compute_annotation_cfi(row, book) -> Optional[str]:
+    """Resolve the row's native EPUB anchor against the current book file."""
     if not row.content_id or "!!" not in (row.content_id or ""):
         return None
     epub_path = _resolve_epub_path(book)
@@ -672,17 +666,65 @@ def _ensure_cfi_range(row, book) -> Optional[str]:
     except Exception as e:
         log.warning("annotations: cfi compute failed for %s: %s", row.annotation_id, e)
         return None
-    if cfi:
-        row.cfi_range = cfi
-        try:
-            ub.session_commit()
-        except Exception as e:
-            log.error("annotations: cfi persist failed: %s", e)
-            ub.session.rollback()
     return cfi
 
 
-def _data_json_row(r, cfi, pdf_quad, device_public_ids=None) -> dict:
+def _persist_cfi_range(row, cfi):
+    if not cfi or row.cfi_range == cfi:
+        return
+    row.cfi_range = cfi
+    try:
+        ub.session_commit()
+    except Exception as e:
+        log.error("annotations: cfi persist failed: %s", e)
+        ub.session.rollback()
+
+
+def _ensure_cfi_range(row, book) -> Optional[str]:
+    """Compute and cache a missing CFI, without revalidating cached rows."""
+    if row.cfi_range:
+        return row.cfi_range
+    cfi = _compute_annotation_cfi(row, book)
+    _persist_cfi_range(row, cfi)
+    return cfi
+
+
+def _resolve_annotation_anchor(row, book):
+    """Return ``(cfi, status)`` against the current file.
+
+    Native KoboSpan/child-index anchors are deliberately re-resolved even when
+    a CFI was cached earlier: a replacement KEPUB may retain the database row
+    while invalidating its original DOM anchor. CFI-only web-reader rows cannot
+    be validated server-side without epub.js, so a structurally present CFI is
+    treated as usable; the reader remains the final renderer.
+    """
+    position_type = getattr(row, "position_type", None)
+    if position_type == "pdf_quad":
+        return None, "ok" if row.pdf_page is not None and row.pdf_quad_json else "unresolved"
+    if position_type == "comic_page":
+        return None, "ok" if row.comic_page is not None else "unresolved"
+
+    from .services.kobo_position import _extract_kobospan_id, KOBO_SELECTOR_SENTINEL
+    has_selector = bool(
+        _extract_kobospan_id(row.start_container_path or "")
+        and _extract_kobospan_id(row.end_container_path or "")
+    )
+    start_child = getattr(row, "start_container_child_index", None)
+    end_child = getattr(row, "end_container_child_index", None)
+    has_child_anchor = (
+        start_child is not None and end_child is not None
+        and start_child != KOBO_SELECTOR_SENTINEL and end_child != KOBO_SELECTOR_SENTINEL
+    )
+    if has_selector or has_child_anchor:
+        current_cfi = _compute_annotation_cfi(row, book)
+        if current_cfi:
+            _persist_cfi_range(row, current_cfi)
+            return current_cfi, "ok"
+        return row.cfi_range, "unresolved"
+    return row.cfi_range, "ok" if row.cfi_range else "unresolved"
+
+
+def _data_json_row(r, cfi, pdf_quad, device_public_ids=None, anchor_status=None) -> dict:
     """Project one annotation row to the web-reader's data.json shape.
 
     Emits the canonical KoboSpan anchor (``start_kobospan`` /
@@ -694,6 +736,10 @@ def _data_json_row(r, cfi, pdf_quad, device_public_ids=None) -> dict:
     unit-testable without a Flask request context."""
     from .services.kobo_position import _extract_kobospan_id
     device_public_ids = device_public_ids or {}
+    if anchor_status is None:
+        anchor_status = "ok" if (
+            cfi or pdf_quad or getattr(r, "comic_page", None) is not None
+        ) else "unresolved"
     return {
         "annotation_id": r.annotation_id,
         "cfi_range": cfi,
@@ -709,6 +755,7 @@ def _data_json_row(r, cfi, pdf_quad, device_public_ids=None) -> dict:
         "source": r.source,
         "origin_device_id": device_public_ids.get(getattr(r, "origin_device_id", None)),
         "assigned_device_id": device_public_ids.get(getattr(r, "assigned_device_id", None)),
+        "anchor_status": anchor_status,
         "position_type": getattr(r, "position_type", None),
         "pdf_page": getattr(r, "pdf_page", None),
         "pdf_quad": pdf_quad,
@@ -749,16 +796,16 @@ def annotations_data(book_id):
     for r in rows:
         # CFI computation only applies to EPUB-origin rows. For PDF/comic
         # rows, skip the lookup — they have their own position fields.
-        cfi = None
-        if getattr(r, "position_type", None) in (None, "cfi"):
-            cfi = _ensure_cfi_range(r, book)
+        cfi, anchor_status = _resolve_annotation_anchor(r, book)
         pdf_quad = None
         if r.pdf_quad_json:
             try:
                 pdf_quad = json.loads(r.pdf_quad_json)
             except (ValueError, TypeError):
                 pdf_quad = None
-        out.append(_data_json_row(r, cfi, pdf_quad, device_public_ids))
+        out.append(_data_json_row(
+            r, cfi, pdf_quad, device_public_ids, anchor_status=anchor_status,
+        ))
     return jsonify({"annotations": out, "annotation_count": len(out), "devices": devices})
 
 

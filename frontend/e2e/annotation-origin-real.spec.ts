@@ -7,7 +7,15 @@ import { expect, test } from '@playwright/test';
  * cannot prove an origin producer is wired.
  */
 test('real web-reader create persists a non-null origin device', async ({ page }) => {
-  const bookId = 223;
+  // Ask the library which books exist rather than naming one. A hardcoded id
+  // passed against a dev container carrying hundreds of books and 404'd in CI,
+  // whose seed is three — the probe was coupled to one machine's data, which is
+  // the opposite of what an unstubbed integration test is for.
+  const catalog = await page.request.get('/api/v1/books?per_page=1');
+  expect(catalog.ok()).toBeTruthy();
+  const items = (await catalog.json() as { items?: { id: number }[] }).items ?? [];
+  expect(items.length, 'library seed must contain at least one book').toBeGreaterThan(0);
+  const bookId = items[0].id;
   const marker = `origin-e2e-${Date.now()}`;
   const csrfResponse = await page.request.get('/api/v1/auth/csrf');
   expect(csrfResponse.ok()).toBeTruthy();

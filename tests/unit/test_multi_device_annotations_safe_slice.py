@@ -230,3 +230,30 @@ def test_equal_client_clock_suppresses_only_identical_retry(db_session):
     assert row is not None
     assert row.note_text == "note two"
     assert row.client_modified_at == datetime(2026, 8, 9, 15, 0)
+
+
+@pytest.mark.parametrize("value, book_uuid, accepted", [
+    # A book whose Calibre uuid is not a canonical UUID forces its clients to
+    # build a content_id the grammar calls malformed. Accept ONLY on an exact
+    # match against the book's own record — direct proof of ownership, which is
+    # what the UUID grammar stood in for. Everything else still bounces.
+    ("bk-7!!c.html", "bk-7", True),    # exact match with our own record
+    ("bk-8!!c.html", "bk-7", False),   # a different book
+    ("bk-77!!c.html", "bk-7", False),  # prefix-similar, not equal
+    ("bk-7!!", "bk-7", False),         # empty chapter
+    ("../../etc/passwd", "bk-7", False),
+    ("bk-7!!c.html", None, False),     # nothing to corroborate against
+])
+def test_non_uuid_book_id_accepted_only_on_exact_match(value, book_uuid, accepted):
+    """Regression: validating content_id broke the KOReader push path.
+
+    The rejection fired on the *book's* uuid — our own data, not the client's —
+    so a legitimate push failed with a client-error type. Reject client input;
+    never reject because our own identifier has an unexpected shape.
+    """
+    from cps.services.annotation_content_id import normalize_content_id, ContentIdError
+    if accepted:
+        assert normalize_content_id(value, book_uuid=book_uuid) == value
+    else:
+        with pytest.raises(ContentIdError):
+            normalize_content_id(value, book_uuid=book_uuid)

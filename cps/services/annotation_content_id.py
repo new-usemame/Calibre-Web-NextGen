@@ -26,6 +26,20 @@ def _normal_uuid(value: str) -> str:
     return str(uuid.UUID(value))
 
 
+def _canonical_uuid_or_none(value):
+    """Normalize a SERVER-supplied book uuid, or return None if it isn't one.
+
+    Deliberately non-raising, unlike ``_normal_uuid``: client input is rejected,
+    our own data is merely unusable as a comparator.
+    """
+    if value is None:
+        return None
+    try:
+        return _normal_uuid(value)
+    except ContentIdError:
+        return None
+
+
 def _chapter(value: str) -> str:
     if not isinstance(value, str) or not value or len(value) > 1536:
         raise ContentIdError("content_id chapter path is missing or too long")
@@ -44,7 +58,12 @@ def normalize_content_id(value, *, book_uuid=None, allow_legacy_file_uri=False):
         return None
     if not isinstance(value, str) or not value or len(value) > MAX_CONTENT_ID_LENGTH:
         raise ContentIdError("content_id must be a non-empty bounded string")
-    expected = _normal_uuid(book_uuid) if book_uuid is not None else None
+    # The book's own uuid is OUR data, not the client's, so a non-canonical one
+    # is not a client error and must not raise ContentIdError. It only means we
+    # cannot bind this content_id to a specific book; the grammar check below
+    # still rejects anything malformed. Raising here made a legitimate KOReader
+    # push fail because the *server's* book record had a non-UUID uuid.
+    expected = _canonical_uuid_or_none(book_uuid)
     match = _CANONICAL.fullmatch(value)
     if match:
         actual = _normal_uuid(match.group(1))
@@ -56,6 +75,17 @@ def normalize_content_id(value, *, book_uuid=None, allow_legacy_file_uri=False):
         if match and expected:
             _chapter(match.group(1))
             return f"{expected}!!{_chapter(match.group(2))}"
+    # A book whose Calibre uuid is not a canonical UUID (legacy or imported
+    # rows) forces its clients to build a content_id we would otherwise call
+    # malformed — and dropping it would lose a real annotation over the shape
+    # of OUR identifier. Accept only on an exact match against the book's own
+    # record: that is direct proof of ownership, which is what the UUID grammar
+    # was standing in for. An arbitrary client value still cannot get through,
+    # because it has to equal the uuid we already hold.
+    if isinstance(book_uuid, str) and book_uuid:
+        prefix = f"{book_uuid}!!"
+        if value.startswith(prefix) and len(value) > len(prefix):
+            return f"{book_uuid}!!{_chapter(value[len(prefix):])}"
     raise ContentIdError("content_id has an unsupported shape")
 
 

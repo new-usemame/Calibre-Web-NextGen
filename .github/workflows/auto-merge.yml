@@ -34,7 +34,14 @@ name: auto-merge
 
 on:
   pull_request:
-    types: [labeled, synchronize, reopened]
+    # `edited` is what fires when a PR's BASE is changed. Without it, a PR
+    # armed while based on main and then re-targeted at a feature branch is
+    # never re-evaluated — and GitHub's auto-merge is sticky (see the
+    # disarm note in scripts/finish-armed-automerges.sh: a stripped tier
+    # label did nothing for months because nothing called --disable-auto).
+    # `edited` also fires on title/body edits, which is harmless: evaluate
+    # is idempotent and re-arming an already-armed PR is a no-op.
+    types: [labeled, synchronize, reopened, edited]
 
 permissions:
   pull-requests: write
@@ -163,6 +170,19 @@ jobs:
           # Comment at most once per PR: this fires on every `synchronize`,
           # and a stacked branch syncs often.
           if [ "$ok" != "true" ] && [ "$category" = "unprotected_base" ]; then
+              # Refusing to arm is not enough on its own. Arming is STICKY:
+              # a PR armed while based on main and later re-targeted at a
+              # feature branch stays armed, and this job would otherwise
+              # just decline to re-arm something already armed. Disarm
+              # explicitly so the refusal applies to the PR's current
+              # state, not only to new arming attempts.
+              #
+              # Unconditional and tolerant of failure: --disable-auto errors
+              # when auto-merge was never enabled, which is the common case.
+              gh pr merge "$PR_NUMBER" --repo "$REPO" --disable-auto 2>/dev/null \
+                  && echo "disarmed existing auto-merge on #$PR_NUMBER" \
+                  || echo "no auto-merge to disarm on #$PR_NUMBER"
+
               marker="auto-merge held: unprotected base"
               # Deliberately NOT `gh ... | grep -qF`: grep -q exits on the
               # first match and SIGPIPEs gh, which under `set -o pipefail`

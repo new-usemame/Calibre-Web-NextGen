@@ -226,6 +226,35 @@ def test_workflow_actually_passes_the_base_to_the_validator():
     )
 
 
+def test_workflow_reevaluates_when_the_base_changes():
+    """A PR's base can change after it was armed. `edited` is the event that
+    fires for that; without it the gate only ever sees the base a PR was
+    opened with."""
+    text = AUTO_MERGE_WF.read_text()
+    trigger = text.split("jobs:", 1)[0]
+    assert "edited" in trigger, (
+        "auto-merge.yml must trigger on `edited` so a base change re-runs the "
+        "gate; otherwise a PR armed on main and re-targeted at a feature "
+        "branch is never re-evaluated"
+    )
+
+
+def test_workflow_disarms_rather_than_only_declining_to_arm():
+    """Arming is sticky — scripts/finish-armed-automerges.sh documents a
+    months-long bug where a stripped tier label left the arm in place because
+    nothing called --disable-auto. Refusing to re-arm is not the same as
+    disarming, so the unprotected-base path must do the latter."""
+    text = AUTO_MERGE_WF.read_text()
+    idx = text.find("unprotected_base")
+    assert idx != -1, "expected an unprotected_base branch"
+    # Look only at the branch body, not the whole file.
+    branch = text[idx:idx + 1800]
+    assert "--disable-auto" in branch, (
+        "the unprotected_base path must call `gh pr merge --disable-auto`; "
+        "declining to arm leaves an existing sticky arm in force"
+    )
+
+
 def test_workflow_does_not_strip_tier_labels_for_an_unprotected_base():
     """A stacked PR's tier label is not wrong — its base is. Stripping the
     label would thrash against the autopilot, which re-applies it."""

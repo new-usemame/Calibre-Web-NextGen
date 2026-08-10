@@ -1182,7 +1182,11 @@ def annotations_create(book_id):
     except ValueError as e:
         return jsonify({"error": "bad_anchor", "message": str(e)}), 400
     _fanout_to_sync_targets(row, book)
-    return jsonify(_data_json_row(row, row.cfi_range, None)), 201
+    # Resolve the device map, or the row we just attributed answers
+    # origin_device_id: null and the reader renders "Unknown device" for the
+    # one highlight the user just watched itself be created.
+    device_public_ids, _ = _annotation_device_payload(current_user.id, ub.session)
+    return jsonify(_data_json_row(row, row.cfi_range, None, device_public_ids)), 201
 
 
 @annotations_bp.route("/annotations/<int:book_id>/<annotation_id>", methods=["PATCH"])
@@ -1224,15 +1228,12 @@ def annotations_edit(book_id, annotation_id):
     if row is None:
         abort(404)
     _fanout_to_sync_targets(row, book)
-    response = _data_json_row(row, row.cfi_range, None)
-    response.update({
-        "assigned_device_id": (
-            session_device.public_id if row.assigned_device_id and (
-                session_device := ub.session.query(ub.Device).filter_by(id=row.assigned_device_id).first()
-            ) else None
-        ),
-        "routing_revision": row.routing_revision,
-    })
+    # Same map data.json uses, so BOTH device fields resolve here. Without it
+    # only assigned_device_id was patched back in below and origin_device_id
+    # answered null on a row that has one.
+    device_public_ids, _ = _annotation_device_payload(current_user.id, ub.session)
+    response = _data_json_row(row, row.cfi_range, None, device_public_ids)
+    response.update({"routing_revision": row.routing_revision})
     return jsonify(response), 200
 
 

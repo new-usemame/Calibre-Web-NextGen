@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Download, Highlighter, MoreHorizontal, Upload as UploadIcon } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, Download, Highlighter, MoreHorizontal, Upload as UploadIcon } from 'lucide-react';
 import { apiGet, apiPatch, apiPost, apiUrl } from '../lib/api';
 import { useBook } from '../lib/queries';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -16,6 +16,7 @@ interface Annotation {
   annotation_id: string; highlighted_text: string; highlight_color: string | null;
   note_text: string | null; chapter_progress: number | null; source: string | null;
   origin_device_id: string | null; assigned_device_id: string | null;
+  anchor_status: 'ok' | 'unresolved';
 }
 interface DeviceSummary { label: string; model: string | null; type: string }
 interface ActiveDevice extends DeviceSummary { public_id: string; active: boolean }
@@ -257,6 +258,8 @@ export function Annotations({ id }: { id: string }) {
                     onClick={(event) => event.stopPropagation()} onChange={(event) => void setOneAssignment(row, event.target.value === 'unknown' ? null : event.target.value)}>
                     <option value="unknown">{t('Unknown device')}</option>{activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.label} — {device.model}</option>)}</select>}
                   {row.chapter_progress != null && <><span aria-hidden="true">·</span><span>{Math.round(row.chapter_progress * 100)}%</span></>}
+                  {row.anchor_status === 'unresolved' && <><span aria-hidden="true">·</span><span className={styles.anchorWarning}
+                    aria-label={t("Warning: this highlight can’t be shown in the book")}><AlertTriangle size={13} aria-hidden="true" focusable={false} />{t('Not in current file')}</span></>}
                   {failed.has(row.annotation_id) && <span className={styles.failure}>{t('Not assigned')}</span>}
                 </div>
               </div>

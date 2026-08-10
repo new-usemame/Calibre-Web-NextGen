@@ -12825,6 +12825,9 @@ msgstr "Nog geen e-readers."
 msgid "Not assigned"
 msgstr "Niet toegewezen"
 
+msgid "Not in current file"
+msgstr "Niet in het huidige bestand"
+
 msgid "Not seen lately"
 msgstr "Onlangs niet gezien"
 
@@ -12867,6 +12870,9 @@ msgstr "Onbekend apparaat"
 
 msgid "Unknown source"
 msgstr "Onbekende bron"
+
+msgid "Warning: this highlight can’t be shown in the book"
+msgstr "Waarschuwing: deze markering kan niet in het boek worden weergegeven"
 
 msgid "Web reader"
 msgstr "Weblezer"

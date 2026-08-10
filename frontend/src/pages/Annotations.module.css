@@ -24,6 +24,7 @@
 .rowSelect { display: grid; place-items: center; min-width: 44px; cursor: pointer; }.rowSelect input { width: 20px; height: 20px; }.selecting { min-height: 64px; cursor: pointer; }
 .groupHeader { height: calc(100% - 8px); margin: 4px 0; position: sticky; top: 0; display: flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-3); border-bottom: 1px solid var(--border); background: var(--surface-0); }.groupHeader span { color: var(--text-muted); }.groupHeader button { margin-left: auto; min-height: 40px; color: var(--accent); }
 .failure { color: var(--warning); }.failed { border-color: var(--warning); }
+.anchorWarning { display: inline-flex; align-items: center; gap: 3px; color: var(--warning); }
 .toast { position: fixed; z-index: 30; left: 50%; bottom: var(--sp-5); transform: translateX(-50%); display: flex; align-items: center; gap: var(--sp-3); min-width: min(520px, calc(100vw - 32px)); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--shadow-lg); }.toast button { min-height: 44px; color: var(--accent); font-weight: 700; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }.srOnly:not(:focus) { white-space: nowrap; }
 @media (max-width: 600px) {

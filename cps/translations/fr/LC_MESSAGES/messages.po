@@ -13291,6 +13291,9 @@ msgstr "Aucune liseuse pour le moment."
 msgid "Not assigned"
 msgstr "Non attribué"
 
+msgid "Not in current file"
+msgstr "Absent du fichier actuel"
+
 msgid "Not seen lately"
 msgstr "Pas vu récemment"
 
@@ -13333,6 +13336,9 @@ msgstr "Appareil inconnu"
 
 msgid "Unknown source"
 msgstr "Source inconnue"
+
+msgid "Warning: this highlight can’t be shown in the book"
+msgstr "Avertissement : ce surlignage ne peut pas être affiché dans le livre"
 
 msgid "Web reader"
 msgstr "Lecteur Web"

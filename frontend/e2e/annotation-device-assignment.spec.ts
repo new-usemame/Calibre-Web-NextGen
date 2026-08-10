@@ -10,6 +10,7 @@ async function stubAnnotations(page: Page, count = 595, availableDevices = [libr
     note_text: index % 3 === 0 ? `Note ${index}` : null, chapter_progress: index / count,
     source: 'kobo', origin_device_id: null,
     assigned_device_id: availableDevices.length > 1 ? availableDevices[index % availableDevices.length].public_id : null,
+    anchor_status: index === 0 ? 'unresolved' : 'ok',
   }));
   await page.route('**/annotations/2/data.json', (route) => route.fulfill({ json: {
     annotations, annotation_count: count,
@@ -51,6 +52,8 @@ test('highlight assignment is keyboard named, mobile-safe, and axe-clean', async
   await stubAnnotations(page, 20);
   if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/book/2/annotations');
+  await expect(page.getByText('Not in current file', { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Warning: this highlight can’t be shown in the book")).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Device: unknown' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Import and export' }).click();
   await expect(page.getByRole('link', { name: 'Markdown' })).toBeVisible();

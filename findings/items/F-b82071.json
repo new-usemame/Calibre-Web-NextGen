@@ -5,8 +5,14 @@
   "id": "F-b82071",
   "origin_issue": 899,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-09",
+    "note": "Verified in code, per CWNG NEW2's finding-mechanism method. The finding was 'cps/schedule.py has no logger at all — no import, no log. call anywhere', leaving the enabled-vs-token causes indistinguishable. Now: schedule.py:11 imports logger, and :288-297 emit four diagnostics — 'Hardcover sync is enabled/disabled via %s' (hardcover_sync_source()) and 'Hardcover token is configured via %s' / 'is not configured'. Both causes are separable and both carry the source. Credit: CWNG NEW2.",
+    "release": "v4.1.14"
+  },
   "severity": "ux",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Hardcover: log token presence + source, and distinguish HARDCOVER_TOKEN from HARDCOVER_TOKEN_FILE"
 }

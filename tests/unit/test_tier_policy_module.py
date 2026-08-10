@@ -168,7 +168,7 @@ def test_validate_rejects_unknown_tier(policy):
 
 def test_validate_tier1_translation_passes(policy):
     pr = {
-        "additions": 600, "changedFiles": 5,
+        "additions": 600, "changedFiles": 5, "baseRefName": "main",
         "files": [{"path": "cps/translations/de/LC_MESSAGES/messages.po"}],
     }
     r = tier_policy.validate_fork_pr(pr, '+ msgstr "hallo"\n', policy, tier="safe-tier-1")
@@ -177,7 +177,7 @@ def test_validate_tier1_translation_passes(policy):
 
 def test_validate_forbidden_path_demotes(policy):
     pr = {
-        "additions": 1, "changedFiles": 1,
+        "additions": 1, "changedFiles": 1, "baseRefName": "main",
         "files": [{"path": "requirements.txt"}],
     }
     r = tier_policy.validate_fork_pr(pr, "+flask==1.0\n", policy, tier="safe-tier-1")
@@ -188,7 +188,7 @@ def test_validate_forbidden_path_demotes(policy):
 def test_validate_tier2_loc_cap_demotes(policy):
     over = policy.tier2_max_additions + 10
     pr = {
-        "additions": over, "changedFiles": 1,
+        "additions": over, "changedFiles": 1, "baseRefName": "main",
         "files": [{"path": "cps/helpers/foo.py"}],
     }
     r = tier_policy.validate_fork_pr(pr, "+x = 1\n", policy, tier="safe-tier-2")
@@ -199,7 +199,7 @@ def test_validate_tier2_loc_cap_demotes(policy):
 def test_validate_tier2_file_cap_demotes(policy):
     n = policy.tier2_max_files + 1
     files = [{"path": f"cps/helpers/h{i}.py"} for i in range(n)]
-    pr = {"additions": 5, "changedFiles": n, "files": files}
+    pr = {"additions": 5, "changedFiles": n, "baseRefName": "main", "files": files}
     r = tier_policy.validate_fork_pr(pr, "+x = 1\n", policy, tier="safe-tier-2")
     assert not r.ok
     assert r.category == "tier_caps"
@@ -207,7 +207,7 @@ def test_validate_tier2_file_cap_demotes(policy):
 
 def test_validate_diff_content_demotes(policy):
     pr = {
-        "additions": 5, "changedFiles": 1,
+        "additions": 5, "changedFiles": 1, "baseRefName": "main",
         "files": [{"path": "cps/helpers/foo.py"}],
     }
     diff = (
@@ -223,7 +223,7 @@ def test_validate_diff_content_demotes(policy):
 
 def test_validate_ignores_diff_header_lines(policy):
     pr = {
-        "additions": 5, "changedFiles": 1,
+        "additions": 5, "changedFiles": 1, "baseRefName": "main",
         "files": [{"path": "cps/helpers/foo.py"}],
     }
     # '+++ b/cps/auth/forms.py' is a header, not added content.
@@ -259,7 +259,7 @@ def test_cli_validate_emits_json(tmp_path):
     pr_json = tmp_path / "pr.json"
     diff = tmp_path / "diff.txt"
     pr_json.write_text(json.dumps({
-        "additions": 5, "changedFiles": 1,
+        "additions": 5, "changedFiles": 1, "baseRefName": "main",
         "files": [{"path": "cps/helpers/foo.py"}],
     }))
     diff.write_text("+x = 1\n")
@@ -276,7 +276,7 @@ def test_cli_validate_forbidden_returns_ok_false(tmp_path):
     pr_json = tmp_path / "pr.json"
     diff = tmp_path / "diff.txt"
     pr_json.write_text(json.dumps({
-        "additions": 1, "changedFiles": 1,
+        "additions": 1, "changedFiles": 1, "baseRefName": "main",
         "files": [{"path": "requirements.txt"}],
     }))
     diff.write_text("+flask==1.0\n")

@@ -23,6 +23,11 @@ export interface CoverCandidate {
   height: number | null;
   candidate_id: string | null;
   flags: string[] | null;
+  // Who serves the image bytes, when that differs from the provider that
+  // supplied the metadata — a Hardcover record whose cover we upgraded to an
+  // Amazon image reads 'Amazon' here. Null when it would say nothing. The
+  // server decides; there is no host list on this side (fork #304).
+  image_origin?: string | null;
 }
 
 export type ProviderStatusKind =

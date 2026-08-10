@@ -5,8 +5,14 @@
   "id": "F-9c171e",
   "origin_issue": 838,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-09",
+    "note": "Verified in code: config_edit.html renders the Hardcover key field plus a token-source help block driven by config.hardcover_token_source(). Migrated as open; fix predated migration.",
+    "release": "v4.1.11"
+  },
   "severity": "correctness",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Surface Hardcover token status in admin"
 }

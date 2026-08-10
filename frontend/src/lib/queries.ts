@@ -843,10 +843,15 @@ export function useConvertFormat(id: string | number) {
   });
 }
 
-/** Search online metadata providers (reuses the legacy /metadata/search). */
+/** Search online metadata providers (reuses the legacy /metadata/search).
+ *  `providers` restricts the run to specific provider ids — used by the
+ *  editions drill-down, whose query is one provider's own identifier syntax
+ *  and means nothing to the rest (#303). Omit it for a normal search. */
 export function useMetadataSearch() {
   return useMutation({
-    mutationFn: (query: string) => apiPostForm<MetaSearchResponse>('/metadata/search', { query }),
+    mutationFn: ({ query, providers }: { query: string; providers?: string[] }) =>
+      apiPostForm<MetaSearchResponse>('/metadata/search',
+        providers?.length ? { query, providers: providers.join(',') } : { query }),
   });
 }
 

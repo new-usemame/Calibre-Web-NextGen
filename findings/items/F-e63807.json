@@ -5,8 +5,14 @@
   "id": "F-e63807",
   "origin_issue": 897,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-09",
+    "note": "Verified in code: the Hardcover key field and its env-token help block sit at the same level as the enable checkbox in config_edit.html, gated on hardcover_token_source() rather than on Enable Hardcover Sync. The reported hiding is gone.",
+    "release": "v4.1.14"
+  },
   "severity": "correctness",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Hardcover token status + env-token note are hidden until \"Enable Hardcover Sync\" is on"
 }

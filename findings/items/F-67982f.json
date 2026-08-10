@@ -5,8 +5,14 @@
   "id": "F-67982f",
   "origin_issue": 834,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-09",
+    "note": "Verified in code, not from the changelog: Account.tsx carries mail_body_text at :64, :89 and :178. Migrated from #834 as open on 2026-08-05; the fix predated the migration.",
+    "release": "v4.1.11"
+  },
   "severity": "chore",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Account page: email body template field missing"
 }

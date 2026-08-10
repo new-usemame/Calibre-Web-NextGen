@@ -46,6 +46,7 @@ from typing import Optional
 from flask import Blueprint, Response, abort, flash, jsonify, redirect, request, url_for
 from flask_babel import gettext as _
 from sqlalchemy import and_, func
+from sqlalchemy.exc import SQLAlchemyError
 
 from . import calibre_db, logger, ub
 from .cw_login import current_user
@@ -66,6 +67,16 @@ def _commit_required(commit):
     """Raise when CWNG's commit wrapper reports a rolled-back write."""
     if commit() is False:
         raise RuntimeError("database commit did not land")
+
+
+def _database_error_response(operation):
+    """Roll back a failed API write and keep the response JSON-shaped."""
+    try:
+        ub.session.rollback()
+    except Exception:
+        log.exception("annotations: rollback failed after %s", operation)
+    log.exception("annotations: %s failed", operation)
+    return jsonify({"error": "database_error"}), 500
 
 
 def _owned_device(public_id, user_id, session):
@@ -186,9 +197,13 @@ def restore_annotation_device(public_id, *, user_id, session, commit):
 @user_login_required
 def annotation_devices_list():
     active_only = request.args.get("active", "").lower() == "true"
-    return jsonify({"devices": list_annotation_devices(
-        user_id=current_user.id, session=ub.session, active_only=active_only,
-    )})
+    try:
+        devices = list_annotation_devices(
+            user_id=current_user.id, session=ub.session, active_only=active_only,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device list")
+    return jsonify({"devices": devices})
 
 
 @annotations_bp.route("/api/annotations/devices/<public_id>", methods=["PATCH"])
@@ -202,6 +217,8 @@ def annotation_device_rename(public_id):
         )
     except ValueError as error:
         return jsonify({"error": "invalid_label", "message": str(error)}), 400
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device rename")
     if device is None:
         abort(404)
     return jsonify(_device_json(device))
@@ -210,7 +227,10 @@ def annotation_device_rename(public_id):
 @annotations_bp.route("/api/annotations/devices/<public_id>/delete-preflight", methods=["GET"])
 @user_login_required
 def annotation_device_delete_preflight(public_id):
-    found = device_annotation_counts(public_id, user_id=current_user.id, session=ub.session)
+    try:
+        found = device_annotation_counts(public_id, user_id=current_user.id, session=ub.session)
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device delete preflight")
     if found is None:
         abort(404)
     return jsonify(found[1])
@@ -219,9 +239,12 @@ def annotation_device_delete_preflight(public_id):
 @annotations_bp.route("/api/annotations/devices/<public_id>", methods=["DELETE"])
 @user_login_required
 def annotation_device_delete(public_id):
-    result = soft_delete_annotation_device(
-        public_id, user_id=current_user.id, session=ub.session, commit=ub.session_commit,
-    )
+    try:
+        result = soft_delete_annotation_device(
+            public_id, user_id=current_user.id, session=ub.session, commit=ub.session_commit,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device soft-delete")
     if result is None:
         abort(404)
     device, counts = result
@@ -231,9 +254,12 @@ def annotation_device_delete(public_id):
 @annotations_bp.route("/api/annotations/devices/<public_id>/restore", methods=["POST"])
 @user_login_required
 def annotation_device_restore(public_id):
-    result = restore_annotation_device(
-        public_id, user_id=current_user.id, session=ub.session, commit=ub.session_commit,
-    )
+    try:
+        result = restore_annotation_device(
+            public_id, user_id=current_user.id, session=ub.session, commit=ub.session_commit,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device restore")
     if result is None:
         abort(404)
     device, restored, conflicts = result
@@ -1146,6 +1172,8 @@ def annotations_edit(book_id, annotation_id):
     except ValueError as e:
         ub.session.rollback()
         return jsonify({"error": "bad_color", "message": str(e)}), 400
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("single annotation update")
     if row is None:
         abort(404)
     _fanout_to_sync_targets(row, book)

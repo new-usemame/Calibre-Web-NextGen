@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from flask import Flask
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 
@@ -192,6 +193,63 @@ def test_bulk_reports_commit_wrapper_failure_instead_of_false_success(session):
                         "error_code": "database_error"}]
     session.refresh(annotation)
     assert annotation.assigned_device_id is None
+
+
+@pytest.mark.parametrize(
+    ("route_name", "dependency_name", "method", "path", "payload"),
+    [
+        ("annotation_devices_list", "list_annotation_devices", "GET",
+         "/api/annotations/devices", None),
+        ("annotation_device_rename", "rename_annotation_device", "PATCH",
+         "/api/annotations/devices/device-1", {"label": "Reader"}),
+        ("annotation_device_delete_preflight", "device_annotation_counts", "GET",
+         "/api/annotations/devices/device-1/delete-preflight", None),
+        ("annotation_device_delete", "soft_delete_annotation_device", "DELETE",
+         "/api/annotations/devices/device-1", None),
+        ("annotation_device_restore", "restore_annotation_device", "POST",
+         "/api/annotations/devices/device-1/restore", None),
+    ],
+)
+def test_device_routes_return_json_500_when_database_work_fails(
+        session, monkeypatch, route_name, dependency_name, method, path, payload):
+    from cps import annotations, ub
+
+    def fail(*args, **kwargs):
+        if dependency_name in ("device_annotation_counts", "restore_annotation_device"):
+            raise IntegrityError("device operation", {}, RuntimeError("constraint"))
+        raise RuntimeError("commit failed")
+
+    app = Flask(__name__)
+    monkeypatch.setattr(annotations, "current_user", SimpleNamespace(id=7))
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(annotations, dependency_name, fail)
+    route = getattr(annotations, route_name).__wrapped__
+    with app.test_request_context(path, method=method, json=payload):
+        result = route() if route_name == "annotation_devices_list" else route("device-1")
+    response, status = result
+    assert status == 500
+    assert response.is_json
+    assert response.get_json() == {"error": "database_error"}
+
+
+def test_single_reassignment_runtime_error_returns_json_500(session, monkeypatch):
+    from cps import annotations, ub
+
+    app = Flask(__name__)
+    monkeypatch.setattr(annotations, "current_user", SimpleNamespace(id=7))
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(annotations, "_resolve_book_or_404", lambda book_id: SimpleNamespace(id=book_id))
+    monkeypatch.setattr(
+        annotations, "reassign_annotation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("flush failed")),
+    )
+    with app.test_request_context(
+            "/annotations/5/a-1", method="PATCH",
+            json={"assigned_device_id": None, "expected_routing_revision": 1}):
+        response, status = annotations.annotations_edit.__wrapped__(5, "a-1")
+    assert status == 500
+    assert response.is_json
+    assert response.get_json() == {"error": "database_error"}
 
 
 def test_device_management_migration_twice_and_downgrade_are_reversible():

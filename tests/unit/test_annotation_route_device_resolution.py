@@ -135,3 +135,41 @@ def test_unresolvable_device_falls_back_to_null_rather_than_dropping_the_row(
     assert status == 201
     assert body["origin_device_id"] is None
     assert body["highlighted_text"] == "probe"
+
+
+def test_every_annotation_constructor_in_create_annotation_sets_origin():
+    """Guard a convergent-merge hazard that produces NO conflict.
+
+    ``create_annotation`` builds ``ub.Annotation(...)`` in more than one branch,
+    and a peer session is adding a third for standalone notes between the two
+    that exist today. If that lands first, adding ``origin_device_id`` to the
+    two constructors git knows about applies cleanly and silently skips the new
+    one — every web-reader row would carry an origin except standalone notes,
+    which get NULL. A valid row, no conflict, no failing behavioural test, and
+    nothing in the diff to look at.
+
+    Source-level on purpose: the defect is the ABSENCE of an argument in a
+    branch that may not exist yet, which no behavioural test on today's code can
+    reach. Parsed with ast rather than grepped so a reformat can't fool it.
+    """
+    import ast
+    import inspect
+    from cps import annotations as ann
+
+    tree = ast.parse(inspect.getsource(ann.create_annotation).lstrip())
+    missing = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if name != "Annotation":
+            continue
+        if "origin_device_id" not in {kw.arg for kw in node.keywords if kw.arg}:
+            missing.append(node.lineno)
+
+    assert not missing, (
+        "ub.Annotation(...) built without origin_device_id in create_annotation at "
+        f"line(s) {missing} (relative to the function). Every construction path must "
+        "attribute the row, or that path's annotations are silently unattributed."
+    )

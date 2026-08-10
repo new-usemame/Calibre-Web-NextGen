@@ -15,12 +15,14 @@ alternative for each record, replacing record.cover when one is found.
 
 Sources tried, in order, per record:
 
-  1. Amazon image CDN by ISBN-10 - public CloudFront-fronted host with
-     CORS open, no auth, no scraping. Edition-keyed by ISBN-10/ASIN, so
-     when the record has an ISBN we get the correct-edition cover at up
-     to ~2000px tall. Validated via HEAD against an image/jpeg
-     content-type and a minimum byte count (Amazon serves a 43-byte GIF
-     placeholder for unknown ASINs).
+  1. Amazon image CDN by ASIN - public CloudFront-fronted host with
+     CORS open, no auth, no scraping. Edition-keyed, so we get the
+     correct-edition cover at up to ~2000px tall. An ISBN-10 is simply
+     the ASIN a print edition happens to have, and is tried first; a
+     Kindle edition's own ASIN is tried after it, and is often the only
+     key such a book has (fork #304). Validated via HEAD against an
+     image/jpeg content-type and a minimum byte count (Amazon serves a
+     43-byte GIF placeholder for unknown keys).
   2. iTunes lookup by ISBN - exact-edition match against Apple Books.
   3. iTunes search by title+author - fuzzy match. Only run when the
      record has no ISBN, or as a secondary signal that's gated to within
@@ -71,12 +73,73 @@ _HIGHRES_HINTS = (
 # Amazon dynamic-image sizing token: ._SX475_., ._SY450_., ._UL320_., etc.
 _AMAZON_SIZE_TOKEN = re.compile(r"\._(?:S[XLY]|UL|UY|UX|CR|AC|FM)\d+(?:_,\d+,\d+,\d+,\d+)?_\.")
 
-# Amazon image CDN: public CloudFront-fronted host, CORS open, ISBN-10 keyed.
-_AMAZON_CDN_URL = "https://m.media-amazon.com/images/P/{isbn10}.01._SCRM_SL2000_.jpg"
-# For unknown ASINs Amazon serves a 43-byte image/gif placeholder; real covers
+# Amazon image CDN: public CloudFront-fronted host, CORS open, ASIN keyed
+# (an ISBN-10 is the ASIN of a print edition, so both go in the same slot).
+_AMAZON_CDN_URL = "https://m.media-amazon.com/images/P/{key}.01._SCRM_SL2000_.jpg"
+# For unknown keys Amazon serves a 43-byte image/gif placeholder; real covers
 # are JPEGs measured in tens-to-hundreds of kilobytes. Anything below this
 # threshold is almost certainly the placeholder, not a cover.
 _AMAZON_CDN_MIN_BYTES = 5_000
+
+# Identifier keys that carry an ASIN. Calibre writes territory-specific ids as
+# amazon_uk / amazon_de / ..., so the amazon_* prefix is matched as a family.
+_ASIN_IDENTIFIER_KEYS = ("amazon", "asin", "amazon_asin", "mobi-asin")
+# Identifiers are user-editable and this value is interpolated into a URL, so
+# it is allowlisted rather than sanitized: Amazon keys are exactly 10
+# alphanumerics (B0DJ1TV47C for Kindle, 0441172717 for print).
+_ASIN_RE = re.compile(r"^[A-Z0-9]{10}$")
+
+# Which service actually serves the image bytes, keyed by host fragment. The
+# boost pass swaps a record's cover for a higher-res URL from one of these
+# without touching record["source"], so after a boost the source names the
+# provider that supplied the *metadata* while the image comes from somewhere
+# else entirely (fork #304: "how do I know if the cover is coming from
+# hardcover or Amazon?" - you couldn't). Values are metadata-provider __id__
+# strings so callers can compare against a record's own source id and drop
+# the label when it would say nothing.
+_IMAGE_ORIGIN_HOSTS = (
+    ("m.media-amazon.com", "amazon"),
+    ("ssl-images-amazon.com", "amazon"),
+    ("images-amazon.com", "amazon"),
+    ("mzstatic.com", "applebooks"),
+)
+
+# Display label per origin id, for the badge the picker renders.
+IMAGE_ORIGIN_LABELS = {
+    "amazon": "Amazon",
+    "applebooks": "Apple Books",
+}
+
+
+def image_origin(cover_url: str) -> Optional[str]:
+    """Return the provider id of the service serving ``cover_url``'s bytes.
+
+    Derived from the URL rather than from which code path produced it, so a
+    provider that natively returns an Amazon image is labelled the same as one
+    the boost pass rewrote. Returns None for hosts we can't attribute.
+    """
+    if not cover_url or not isinstance(cover_url, str):
+        return None
+    for fragment, origin in _IMAGE_ORIGIN_HOSTS:
+        if fragment in cover_url:
+            return origin
+    return None
+
+
+def stamp_cover_origins(records: List[Dict]) -> List[Dict]:
+    """Set ``record["cover_origin"]`` on every record with an attributable cover.
+
+    Runs over all records, not just boosted ones: the boost pass skips covers
+    that are already high-res, and those are exactly the Amazon URLs a provider
+    returned natively - equally in need of attribution.
+    """
+    for rec in records:
+        if not isinstance(rec, dict):
+            continue
+        origin = image_origin(rec.get("cover") or "")
+        if origin:
+            rec["cover_origin"] = origin
+    return records
 
 
 def boost_covers(records: List[Dict]) -> List[Dict]:
@@ -86,9 +149,13 @@ def boost_covers(records: List[Dict]) -> List[Dict]:
     Inputs are dicts (post-asdict()) keyed like MetaRecord: title, authors,
     identifiers (with optional 'isbn'), cover, source, etc. Records with no
     title or no cover are skipped.
+
+    Every return path stamps ``cover_origin`` (see ``stamp_cover_origins``) so
+    attribution does not depend on whether a record was boosted, or on the boost
+    pass being enabled at all.
     """
     if os.environ.get("CWA_COVER_BOOST", "1").lower() in ("0", "false", "no", "off"):
-        return records
+        return stamp_cover_origins(records)
     if not records:
         return records
 
@@ -106,7 +173,7 @@ def boost_covers(records: List[Dict]) -> List[Dict]:
             break
 
     if not candidates:
-        return records
+        return stamp_cover_origins(records)
 
     # parallel.fan_out, not concurrent.futures: this runs on the request
     # greenlet (the cover picker and metadata search both call it inline) and
@@ -126,7 +193,7 @@ def boost_covers(records: List[Dict]) -> List[Dict]:
                 rec.get("title"), upgraded, rec.get("cover"),
             )
             rec["cover"] = upgraded
-    return records
+    return stamp_cover_origins(records)
 
 
 def _boosted_cover_for(record: Dict) -> Optional[str]:
@@ -137,16 +204,17 @@ def _boosted_cover_for(record: Dict) -> Optional[str]:
     isbn = _isbn_from(record.get("identifiers") or {})
     record_year = _year_from(record.get("publishedDate"))
 
-    # Path A: Amazon image CDN by ISBN-10. Edition-keyed and authoritative
-    # (the Wordsworth Classics "Flaming June" Wuthering Heights cover, etc.
-    # only show up here for many trade paperbacks). Skipped when no ISBN or
-    # when the operator turned the path off.
-    if _AMAZON_CDN_ENABLED and isbn:
-        isbn10 = _to_isbn10(isbn)
-        if isbn10:
-            url = _amazon_cdn_cover_for_isbn10(isbn10)
-            if url:
-                return url
+    # Path A: Amazon image CDN. Edition-keyed and authoritative (the
+    # Wordsworth Classics "Flaming June" Wuthering Heights cover, etc. only
+    # show up here for many trade paperbacks). The ISBN-10 is tried first and
+    # the record's ASIN second - a Kindle edition usually has no ISBN at all,
+    # which is the case an ISBN-only lookup could never reach (fork #304).
+    # Returns nothing when the operator turned the path off.
+    for key in amazon_cdn_keys(isbns=[isbn] if isbn else (),
+                               asins=[_asin_from(record.get("identifiers") or {})]):
+        url = _amazon_cdn_cover_for_key(key)
+        if url:
+            return url
 
     # Path B: iTunes lookup by ISBN. Exact-edition match against Apple Books.
     # Apple's catalog occasionally cross-references unrelated books to the
@@ -191,6 +259,45 @@ def _isbn_from(identifiers: Dict) -> Optional[str]:
     return None
 
 
+def _asin_from(identifiers: Dict) -> Optional[str]:
+    """Return the ASIN stored on a record/book, or None.
+
+    Kindle editions are frequently published with an ASIN and no ISBN, so this
+    is the only Amazon-CDN key those books have (fork #304).
+    """
+    for key, val in (identifiers or {}).items():
+        name = str(key or "").strip().lower()
+        if name not in _ASIN_IDENTIFIER_KEYS and not name.startswith("amazon_"):
+            continue
+        candidate = str(val or "").strip().upper()
+        if _ASIN_RE.match(candidate):
+            return candidate
+    return None
+
+
+def amazon_cdn_keys(isbns: Iterable[str] = (), asins: Iterable[str] = ()) -> List[str]:
+    """Ordered, de-duplicated Amazon image-CDN keys for a record or book.
+
+    ISBN-10s come first: they are edition-keyed and have been the trusted path
+    since this module shipped. ASINs follow as an additional way in, never a
+    replacement. Both the booster's own upgrade pass and the cover picker's
+    standalone Amazon candidate resolve their keys here so the normalization
+    and the CWA_COVER_BOOST_AMAZON_CDN kill switch have one home.
+    """
+    if not _AMAZON_CDN_ENABLED:
+        return []
+    keys: List[str] = []
+    for isbn in isbns or ():
+        isbn10 = _to_isbn10(str(isbn or ""))
+        if isbn10 and isbn10 not in keys:
+            keys.append(isbn10)
+    for asin in asins or ():
+        candidate = str(asin or "").strip().upper()
+        if _ASIN_RE.match(candidate) and candidate not in keys:
+            keys.append(candidate)
+    return keys
+
+
 def _to_isbn10(isbn: str) -> Optional[str]:
     """Return the ISBN-10 form of ``isbn`` (already-10 stays as-is, 13 with
     978 prefix is converted). 979-prefixed ISBN-13s have no ISBN-10 form;
@@ -216,12 +323,13 @@ def _year_from(published_date: object) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
-def _amazon_cdn_cover_for_isbn10(isbn10: str) -> Optional[str]:
-    """HEAD-probe Amazon's image CDN for ``isbn10``. Returns the URL when
-    Amazon serves a real cover (image/jpeg above the placeholder threshold);
-    None for the 43-byte image/gif Amazon serves for unknown ASINs.
+def _amazon_cdn_cover_for_key(key: str) -> Optional[str]:
+    """HEAD-probe Amazon's image CDN for ``key`` (an ISBN-10 or an ASIN).
+    Returns the URL when Amazon serves a real cover (image/jpeg above the
+    placeholder threshold); None for the 43-byte image/gif Amazon serves for
+    unknown keys.
     """
-    url = _AMAZON_CDN_URL.format(isbn10=isbn10)
+    url = _AMAZON_CDN_URL.format(key=key)
     try:
         resp = requests.head(
             url,

@@ -1,0 +1,11 @@
+{
+  "area": "testing",
+  "body": "`tests/unit/test_802_metadata_change_dispatch.py::test_enforcer_missing_log_logs_single_info_not_warning_spam`\nfails on a clean `origin/main` checkout on this machine.\n\nConfirmed unrelated to any in-flight branch: it fails identically with a feature\nbranch's changes stashed, and the file references nothing in the cover or\nmetadata-provider surface.\n\nNotable because CI reports `main` green, so either the test is excluded from the\nFast Tests / Integration selection, or it depends on ambient state present\nlocally and absent in CI. Either way the local `tests/unit` run is not clean,\nwhich erodes the signal a tick relies on when it runs the suite before merging.\n\nDetermine which of the two before assuming the test is simply wrong: a test that\npasses in CI only because CI never runs it is a coverage gap, not a flake.",
+  "created": "2026-08-10",
+  "id": "F-777bf4",
+  "refs": [],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "Pre-existing red: test_802 enforcer_missing_log fails locally while CI reports main green"
+}

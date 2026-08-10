@@ -34,7 +34,14 @@ name: auto-merge
 
 on:
   pull_request:
-    types: [labeled, synchronize, reopened]
+    # `edited` is what fires when a PR's BASE is changed. Without it, a PR
+    # armed while based on main and then re-targeted at a feature branch is
+    # never re-evaluated — and GitHub's auto-merge is sticky (see the
+    # disarm note in scripts/finish-armed-automerges.sh: a stripped tier
+    # label did nothing for months because nothing called --disable-auto).
+    # `edited` also fires on title/body edits, which is harmless: evaluate
+    # is idempotent and re-arming an already-armed PR is a no-op.
+    types: [labeled, synchronize, reopened, edited]
 
 permissions:
   pull-requests: write
@@ -93,7 +100,7 @@ jobs:
 
           echo "=== evaluating PR #$PR_NUMBER ==="
           META=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
-            --json state,mergeable,labels,files,headRefName,headRefOid,title,isDraft)
+            --json state,mergeable,labels,files,headRefName,headRefOid,title,isDraft,baseRefName)
 
           state=$(jq -r .state <<<"$META")
           mergeable=$(jq -r .mergeable <<<"$META")
@@ -138,7 +145,10 @@ jobs:
           pr_json=$(mktemp)
           diff_text=$(mktemp)
           # `--json additions,files` mirrors what validate_fork_pr expects.
-          gh pr view "$PR_NUMBER" --repo "$REPO" --json additions,changedFiles,files > "$pr_json"
+          # baseRefName is load-bearing: the validator refuses to arm on a
+          # base the required-status-checks ruleset doesn't cover. Drop it
+          # from this --json list and every PR fails closed instead.
+          gh pr view "$PR_NUMBER" --repo "$REPO" --json additions,changedFiles,files,baseRefName > "$pr_json"
           gh pr diff "$PR_NUMBER" --repo "$REPO" > "$diff_text"
 
           result=$(python -m scripts.lib.tier_policy validate-fork-pr \
@@ -149,6 +159,84 @@ jobs:
           ok=$(jq -r '.ok' <<<"$result")
           category=$(jq -r '.category' <<<"$result")
           reason=$(jq -r '.reason' <<<"$result")
+
+          # ─── Second, independent base check: is it the DEFAULT branch? ──
+          # The policy allowlist names branches literally ("main"), but the
+          # ruleset that supplies our required checks is scoped to
+          # ~DEFAULT_BRANCH. Those two meanings are equal today and can
+          # drift: rename the default branch while a stale `main` survives,
+          # and the allowlist would go on authorising a branch that nothing
+          # protects. Resolving the default branch and requiring the base to
+          # BE it keeps the gate tied to the ruleset's own semantics rather
+          # than to a name that used to match them.
+          #
+          # Fail closed when the lookup fails — an unresolvable default
+          # branch is not permission to proceed.
+          if [ "$ok" = "true" ]; then
+              base_ref=$(jq -r '.baseRefName // ""' <<<"$META")
+              default_branch=$(gh repo view "$REPO" \
+                  --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)
+              if [ -z "$default_branch" ]; then
+                  ok="false"; category="unprotected_base"
+                  reason="could not resolve this repository's default branch, so could not confirm the base is the ref branch protection covers; refusing to arm auto-merge."
+              elif [ "$base_ref" != "$default_branch" ]; then
+                  ok="false"; category="unprotected_base"
+                  reason="base branch \`$base_ref\` is not this repository's default branch (\`$default_branch\`), and the required-status-checks ruleset is scoped to the default branch — arming here would merge with no required checks at all."
+              fi
+          fi
+
+          # An unprotected base is not a defect in the PR — the diff may be
+          # perfectly good tier-1 work — so it does NOT get demoted. The
+          # label is right; the base is wrong. Stripping the label here
+          # would thrash against the autopilot, which would just re-apply
+          # it. GitHub re-targets a stacked PR only when the branch below
+          # it is DELETED after merging, so this does not always clear
+          # itself — sometimes the base has to be changed by hand.
+          #
+          # Comment at most once per PR: this fires on every `synchronize`,
+          # and a stacked branch syncs often.
+          if [ "$ok" != "true" ] && [ "$category" = "unprotected_base" ]; then
+              # Refusing to arm is not enough on its own. Arming is STICKY:
+              # a PR armed while based on main and later re-targeted at a
+              # feature branch stays armed, and this job would otherwise
+              # just decline to re-arm something already armed. Disarm
+              # explicitly so the refusal applies to the PR's current
+              # state, not only to new arming attempts.
+              #
+              # Unconditional and tolerant of failure: --disable-auto errors
+              # when auto-merge was never enabled, which is the common case.
+              gh pr merge "$PR_NUMBER" --repo "$REPO" --disable-auto 2>/dev/null \
+                  && echo "disarmed existing auto-merge on #$PR_NUMBER" \
+                  || echo "no auto-merge to disarm on #$PR_NUMBER"
+
+              marker="auto-merge held: unprotected base"
+              # Deliberately NOT `gh ... | grep -qF`: grep -q exits on the
+              # first match and SIGPIPEs gh, which under `set -o pipefail`
+              # makes the pipeline non-zero *because* it matched. That
+              # inverts the test and re-comments on every sync. Capture
+              # first, then match in-shell with no pipe at all.
+              # NOT `|| true`: that collapses "no comments yet" together with
+              # auth failure, rate limiting and an API outage, and then posts
+              # again on the assumption the marker is absent — which is how
+              # "comment once" turns into a comment per sync during a partial
+              # outage, with the real failure invisible. The refusal has
+              # already happened either way; only the notice is at stake.
+              if ! existing=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
+                     --json comments --jq '.comments[].body'); then
+                  echo "::warning::could not read existing comments on #$PR_NUMBER; not commenting"
+                  echo "skip #$PR_NUMBER: $reason"
+                  exit 0
+              fi
+              case "$existing" in
+                  *"$marker"*)
+                      echo "skip #$PR_NUMBER: $reason (already commented)" ;;
+                  *)
+                      gh pr comment "$PR_NUMBER" --repo "$REPO" \
+                          --body "🤖 $marker — $reason"
+                      echo "skip #$PR_NUMBER: $reason" ;;
+              esac
+              exit 0
+          fi
 
           if [ "$ok" != "true" ]; then
               # Demote to needs-review and stop. tier-2 demotion strips

@@ -209,3 +209,24 @@ def test_older_client_clock_cannot_overwrite_newer_annotation(db_session):
     db_session.flush()
     assert _upsert_annotation(db_session, older, book, user) is None
     assert row.highlighted_text == "new"
+
+
+def test_equal_client_clock_suppresses_only_identical_retry(db_session):
+    from cps.services.annotation_sync import _upsert_annotation
+    book = SimpleNamespace(id=5, uuid="b3d1b38b-74fd-43b7-a796-996e5a6a8b04")
+    user = SimpleNamespace(id=7)
+    first = {
+        "id": "same-second", "highlightedText": "first", "noteText": "note one",
+        "clientLastModifiedUtc": "2026-08-09T15:00:00Z",
+        "location": {"span": {"chapterFilename": "OEBPS/c.xhtml", "startChar": 1,
+                                "endChar": 4, "startPath": "span#kobo.1.1",
+                                "endPath": "span#kobo.1.1"}},
+    }
+    row = _upsert_annotation(db_session, first, book, user)
+    db_session.flush()
+    assert _upsert_annotation(db_session, dict(first), book, user) is None
+    changed = dict(first, noteText="note two")
+    row = _upsert_annotation(db_session, changed, book, user)
+    assert row is not None
+    assert row.note_text == "note two"
+    assert row.client_modified_at == datetime(2026, 8, 9, 15, 0)

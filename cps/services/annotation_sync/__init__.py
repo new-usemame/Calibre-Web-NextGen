@@ -149,6 +149,37 @@ def _book_uuid(book):
     return None
 
 
+def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
+    """True only when applying the payload would leave every stored field unchanged."""
+    def supplied(mapping, key, current):
+        return mapping.get(key) if key in mapping else current
+
+    chapter_progress = span.get("chapterProgress")
+    next_context = annotation.context_string
+    if "contextString" in span or "context" in span:
+        next_context = span.get("contextString") or span.get("context")
+    current = (
+        annotation.highlighted_text, annotation.note_text, annotation.highlight_color,
+        annotation.chapter_progress, annotation.content_id,
+        annotation.start_container_path, annotation.end_container_path,
+        annotation.start_offset, annotation.end_offset,
+        annotation.context_string, bool(annotation.hidden),
+    )
+    incoming = (
+        supplied(payload, "highlightedText", annotation.highlighted_text),
+        supplied(payload, "noteText", annotation.note_text),
+        supplied(payload, "highlightColor", annotation.highlight_color),
+        chapter_progress if chapter_progress is not None else annotation.chapter_progress,
+        normalized_content_id or annotation.content_id,
+        supplied(span, "startPath", annotation.start_container_path),
+        supplied(span, "endPath", annotation.end_container_path),
+        supplied(span, "startChar", annotation.start_offset),
+        supplied(span, "endChar", annotation.end_offset),
+        next_context, False,
+    )
+    return incoming == current
+
+
 def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
     """Find-or-create Annotation row keyed on (user_id, book_id, annotation_id).
 
@@ -195,10 +226,14 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
             log.info("Ignoring stale or undated update for annotation %s", annotation_id)
             return None
         if client_time == stored:
-            # The safe slice has no annotation actor key yet, so it cannot
-            # honestly break equal-clock ties. Treat retries and conflicts as
-            # no-ops until the attribution phase can supply an actor tie-break.
-            return None
+            # Kobo clocks have second precision. A byte-equivalent retry is a
+            # no-op, but a real edit can share the same second and must not be
+            # eaten merely because its clock ties. Equal-clock divergent
+            # payloads therefore use arrival order as the deterministic tie.
+            if _kobo_payload_matches_row(
+                ann, payload, span, normalized_content_id,
+            ):
+                return None
     if ann is None:
         ann = ub.Annotation(
             user_id=user.id,

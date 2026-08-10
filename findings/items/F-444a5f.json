@@ -1,0 +1,11 @@
+{
+  "area": "testing",
+  "body": "`tests/unit/test_802_metadata_change_dispatch.py::test_enforcer_missing_log_logs_single_info_not_warning_spam`\nfails on `origin/main`.\n\nFound while checking the blast radius of #1521 (auto-merge base gate). A/B'd\ndeliberately rather than assumed: the test was run on the PR branch (red), then\non a clean `origin/main` checkout (also red), so it is pre-existing and unrelated\nto that diff.\n\nFull local unit suite on the PR branch: 1785 passed, 1 failed — this one.\n\nNot investigated further in that pass; the fix under review was a CI merge-gate\nchange and chasing an unrelated enforcer-logging assertion would have widened it.\n\nWorth checking whether CI sees this too, or whether it is another host-environment\nfailure of the `test_ingest_batch_dirty` family (read-only `/config` on the macOS\nhost, green in CI's container). If it is host-only, the value here is a skip\nmarker or a container guard so the local suite stops reporting a false red; if CI\nis genuinely red, the enforcer's missing-log path regressed.",
+  "created": "2026-08-10",
+  "id": "F-444a5f",
+  "refs": [],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "test_enforcer_missing_log_logs_single_info_not_warning_spam is red on main"
+}

@@ -1,0 +1,13 @@
+{
+  "area": "auth",
+  "body": "`auto_redirect_decision` reads the session counter and compares it with `>`\nBEFORE incrementing (cps/oauth_auto_redirect.py:138-141), so counts 0, 1, 2\nand 3 all initiate an OAuth start: four, not the three the constant names.\n`render_login` applies the same `>` reading (cps/web.py:2621-2626).\n\nNot a bypass and not a lockout: the counter is cleared on logout\n(cps/logout.py:24) and on a successful OAuth callback (cps/oauth_bb.py:1005),\nand the fall-through renders the login page normally. The defect is that the\nconstant misdescribes the limit, so anyone tuning it reasons off a number\nthat is one lower than the behaviour.\n\nFix is either `>= MAX_LOGIN_REDIRECTS` at both sites or a rename that states\nthe off-by-one. Both sites must change together or the guard and the counter\ndisagree.\n\nSurfaced while reviewing #1488 (explicit OAuth auto-forward setting), which\nmakes this path reachable for installs that keep standard login enabled, so\nmore deployments will exercise it. Predates that PR; deliberately not widened\ninto it.",
+  "created": "2026-08-09",
+  "id": "F-56992b",
+  "refs": [
+    "#1488"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "MAX_LOGIN_REDIRECTS=3 permits four automatic OAuth starts"
+}

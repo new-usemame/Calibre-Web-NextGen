@@ -3844,6 +3844,10 @@ msgid "≥"
 msgstr "≥"
 
 #: cps/spa_strings.py
+msgid "(no text captured)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(replace cover)"
 msgstr "(zamień okładkę)"
 
@@ -4247,6 +4251,10 @@ msgid "Could not load users."
 msgstr "Nie udało się wczytać użytkowników."
 
 #: cps/spa_strings.py
+msgid "Could not open that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Nie udało się odczytać tego archiwum komiksu."
 
@@ -4604,6 +4612,10 @@ msgid "Encryption"
 msgstr "SSL"
 
 #: cps/spa_strings.py
+msgid "Exit full screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Expires in"
 msgstr "Wygasa za"
 
@@ -4694,6 +4706,10 @@ msgid "From address"
 msgstr "Adres nadawcy"
 
 #: cps/spa_strings.py
+msgid "Full screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Full user table & restrictions"
 msgstr "Pełna tabela użytkowników i ograniczenia"
 
@@ -4704,6 +4720,10 @@ msgstr "Wygeneruj nowy link"
 #: cps/spa_strings.py
 msgid "Give your smart shelf a name."
 msgstr "Nadaj nazwę swojej inteligentnej półce."
+
+#: cps/spa_strings.py
+msgid "Go to this highlight"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Go to your library"
@@ -4777,6 +4797,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Highlights"
 msgstr "Zakreślenia"
+
+#: cps/spa_strings.py
+msgid "Highlights and notes"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Hot"
@@ -5108,6 +5132,10 @@ msgstr ""
 "urządzenia Kobo."
 
 #: cps/spa_strings.py
+msgid "No highlights yet. Select text in the book to make one."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "Brak wyników \"{items}\" dla \"{query}\"."
@@ -5173,6 +5201,10 @@ msgstr ""
 "Na innym urządzeniu, na którym jesteś już zalogowany, zeskanuj ten kod lub "
 "otwórz poniższy link, aby autoryzować to urządzenie."
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "One column"
+msgstr "Jedna kolumna"
+
 #: cps/spa_strings.py
 msgid "Open Account"
 msgstr "Otwórz konto"
@@ -5200,6 +5232,12 @@ msgstr "Otwórz poniższy link na zalogowanym urządzeniu."
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
 msgstr "Serwer OpenLDAP"
+
+#: cps/spa_strings.py
+msgid ""
+"Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
+"you can edit it first."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Opens in classic view"
@@ -5331,6 +5369,14 @@ msgstr "Rejestrowanie…"
 msgid "Reload"
 msgstr "Odśwież"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Reload metadata for \"{title}\" from the file on disk? Any title, author or "
+"series you edited here is replaced by what the file contains. This cannot be "
+"undone."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Reload metadata from disk"
 msgstr "Wczytaj ponownie metadane z dysku"
@@ -5392,6 +5438,10 @@ msgid "Report Issue on GitHub"
 msgstr "Zgłoś problem na GitHubie"
 
 #: cps/spa_strings.py
+msgid "Report this problem"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Require group membership"
 msgstr "Wymagaj przynależności do grupy"
 
@@ -5412,6 +5462,13 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
 msgstr "Logowanie przez nagłówek reverse proxy"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Revoke the app password \"{label}\"? Any device still using it loses access "
+"immediately, and the password cannot be recovered."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Rows per load"
@@ -5770,6 +5827,10 @@ msgid "This format opens in the full-screen reader."
 msgstr "Ten format otwiera się w czytniku pełnoekranowym."
 
 #: cps/spa_strings.py
+msgid "This highlight has no saved position"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This magic link expired. Generate a new one to try again."
 msgstr "Ten magic link wygasł. Wygeneruj nowy, aby spróbować ponownie."
 
@@ -5812,6 +5873,10 @@ msgstr "Najwyżej oceniane"
 #: cps/spa_strings.py
 msgid "Trust authentication header"
 msgstr "Ufaj nagłówkowi uwierzytelniania"
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Two columns"
+msgstr "Dwie kolumny"
 
 #: cps/spa_strings.py
 msgid "UI / display configuration"
@@ -10892,6 +10957,12 @@ msgstr ""
 "Instancja Calibre-Web NextGen jest nieskonfigurowana, skontaktuj się z "
 "administratorem"
 
+#: cps/templates/http_error.html
+msgid ""
+"Report this — the details are filled in for you, and nothing is sent until "
+"you post it:"
+msgstr ""
+
 # | msgid "Create a Shelf"
 #: cps/templates/http_error.html
 msgid "Create Issue"
@@ -11381,14 +11452,6 @@ msgstr "Arial"
 #: cps/templates/read.html
 msgid "Spread"
 msgstr "Rozkładówka"
-
-#: cps/templates/read.html
-msgid "Two columns"
-msgstr "Dwie kolumny"
-
-#: cps/templates/read.html
-msgid "One column"
-msgstr "Jedna kolumna"
 
 #: cps/templates/read.html
 msgid "Reflow text when sidebars are open."

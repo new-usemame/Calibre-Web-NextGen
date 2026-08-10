@@ -390,9 +390,21 @@ export function Account() {
             {account.app_passwords.map((ap) => (
               <li key={ap.id} className={styles.appPwItem}>
                 <span className={styles.appPwName}>{ap.label}</span>
+                {/* Same class as #1496: destructive, irreversible, and unguarded.
+                    Revoking cuts off whatever device still holds the password, the
+                    value can never be shown again, and these render as a list of
+                    identical trash buttons — so a misclick lands on the wrong row
+                    and the only recovery is generating a new one and reconfiguring
+                    the device. */}
                 <button type="button" className={styles.revokeBtn}
                   disabled={revokeAppPw.isPending}
-                  onClick={() => revokeAppPw.mutate(ap.id)}
+                  onClick={() => {
+                    if (revokeAppPw.isPending) return;
+                    if (!window.confirm(
+                      t('Revoke the app password "{label}"? Any device still using it loses access immediately, and the password cannot be recovered.', { label: ap.label })
+                    )) return;
+                    revokeAppPw.mutate(ap.id);
+                  }}
                   aria-label={t('Revoke {label}', { label: ap.label })}>
                   <Trash2 size={14} aria-hidden="true" focusable={false} />
                 </button>

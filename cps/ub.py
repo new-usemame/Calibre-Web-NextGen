@@ -995,8 +995,12 @@ class Annotation(Base):
     chapter_progress = Column(Float, nullable=True)
     cfi_range = Column(String, nullable=True)
     # Sub-project (3)/(4) — polymorphic position support for non-CFI formats.
-    # position_type values: 'cfi' (default for EPUB), 'pdf_quad', 'comic_page'.
-    # NULL on legacy rows means EPUB CFI (backward compatible).
+    # position_type values: 'cfi' (default for EPUB), 'pdf_quad', 'comic_page',
+    # 'koreader_xpointer', and 'unanchored'.
+    # NULL on legacy rows means EPUB CFI (backward compatible) — which is exactly
+    # why 'unanchored' has to be an explicit non-NULL value: absence is already
+    # taken, so a note with no anchor cannot be expressed by leaving this empty.
+    # It would be resolved as a CFI instead. See #325.
     position_type = Column(String, nullable=True)
     pdf_page = Column(Integer, nullable=True)         # 1-indexed PDF page number
     pdf_quad_json = Column(Text, nullable=True)       # JSON: [[x,y,w,h], ...] in PDF user-space coords
@@ -1044,7 +1048,9 @@ class Annotation(Base):
     )
 
     _VALID_SOURCES = {"kobo", "webreader", "koreader"}
-    _VALID_POSITION_TYPES = {"cfi", "pdf_quad", "comic_page", "koreader_xpointer"}
+    _VALID_POSITION_TYPES = {
+        "cfi", "pdf_quad", "comic_page", "koreader_xpointer", "unanchored",
+    }
 
     @validates("source")
     def _validate_source(self, _key, value):

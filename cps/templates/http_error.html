@@ -43,8 +43,12 @@
    </div>
   {% if issue %}
     <div class="row">
-    <div class="col errorlink">Please report this issue with all related information:
-        <a href="https://github.com/new-usemame/Calibre-Web-NextGen/issues/new/choose">{{_('Create Issue')}}</a>
+    <div class="col errorlink">{{_('Report this — the details are filled in for you, and nothing is sent until you post it:')}}
+        {# rel=noreferrer is load-bearing here, not boilerplate: without it the
+           Referer header hands GitHub this instance's URL, which is exactly the
+           fact the prefilled body is careful not to contain. #}
+        <a href="{{ issue_url or 'https://github.com/new-usemame/Calibre-Web-NextGen/issues/new/choose' }}"
+           target="_blank" rel="noopener noreferrer">{{_('Create Issue')}}</a>
     </div>
       </div>
     {% endif %}

@@ -15,12 +15,38 @@ RELEASE_HEADING = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]", re.MULTILINE)
 ENTRY_LEAD = re.compile(r"^- \*\*", re.MULTILINE)
 
 
+def _distinct_entries(text: str) -> set[str]:
+    """The set of distinct top-level release-note bullets in ``text``.
+
+    A bullet runs from its ``- **`` line to the next bullet or heading, and is
+    normalised on whitespace so that a re-wrap is not read as a different entry.
+
+    DISTINCT, not a count, because two concurrent PRs can each move the same
+    entry into the same section: git merges both insertions cleanly and the file
+    ends up carrying one bullet twice. Removing the copy takes the raw count
+    down by one while losing nothing, and a count-based guard fires on that
+    repair -- red on the correct fix, with no way to say so. Comparing distinct
+    bodies keeps every case the count caught: swallowing two entries into one
+    still drops a distinct body, and a pure re-wording still contributes exactly
+    one body before and after.
+    """
+    entries: set[str] = set()
+    for block in re.split(r"^(?=- \*\*)|^(?=#)", text, flags=re.MULTILINE):
+        if not block.startswith("- **"):
+            continue
+        entries.add(" ".join(block.split()))
+    return entries
+
+
 def structural_regressions(base: str, proposed: str) -> list[str]:
     """Return user-facing errors for structure lost from ``base``."""
     errors: list[str] = []
 
-    base_entries = len(ENTRY_LEAD.findall(base))
-    proposed_entries = len(ENTRY_LEAD.findall(proposed))
+    # Counts, not a set difference: re-wording an entry replaces one body with
+    # another, so every body in `base` legitimately disappears on a re-word and
+    # a set difference would reject the edit this guard exists to allow.
+    base_entries = len(_distinct_entries(base))
+    proposed_entries = len(_distinct_entries(proposed))
     if proposed_entries < base_entries:
         errors.append(
             "CHANGELOG.md loses "

@@ -9,6 +9,7 @@ import { BASE_PREFIX } from '../lib/api';
 import { useMe } from '../lib/queries';
 import { AUTH_ROUTES } from '../lib/routes';
 import { useT } from '../lib/i18n';
+import { collectContext, reportTarget } from '../lib/reportBuilder';
 import { useWhatsNewUnread } from '../lib/whatsNew';
 import styles from './TopBar.module.css';
 import { canUploadBooks } from '../lib/permissions';
@@ -150,6 +151,14 @@ function HelpMenu() {
   const t = useT();
   const { open, close, triggerRef, wrapperProps, onTriggerClick } = useMenu();
   const unread = useWhatsNewUnread();
+  // Prefill the issue with the version, the route SHAPE and a coarse browser,
+  // instead of handing over a blank form and asking the reporter to look all
+  // that up — which is what .github/ISSUE_TEMPLATE/bug_report.md does today.
+  // Composed on open (so the route is the one the user is actually on) and
+  // never sent: the user reviews and edits it in GitHub's own form.
+  const reportHref = open
+    ? reportTarget('bug', collectContext(), '').url
+    : HELP_LINKS.issue;
   return (
     <div className={styles.menu} {...wrapperProps}>
       <button
@@ -175,7 +184,7 @@ function HelpMenu() {
             onSelect={close} />
           <MenuItem
             icon={<IconWithBadge base={<Bug size={16} />} badge={<GithubMark />} />}
-            label={t('Report Issue on GitHub')} href={HELP_LINKS.issue} onSelect={close} />
+            label={t('Report Issue on GitHub')} href={reportHref} onSelect={close} />
           <MenuItem
             icon={<IconWithBadge base={<Bug size={16} />} badge={<DiscordMark />} />}
             label={t('Report Issue on Discord')} href={HELP_LINKS.discord} onSelect={close} />

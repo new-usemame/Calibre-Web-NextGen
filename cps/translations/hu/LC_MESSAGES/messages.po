@@ -3781,6 +3781,10 @@ msgid "≥"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "(no text captured)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(replace cover)"
 msgstr ""
 
@@ -4175,6 +4179,10 @@ msgid "Could not load users."
 msgstr "Nem sikerült betölteni a felhasználókat."
 
 #: cps/spa_strings.py
+msgid "Could not open that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr ""
 
@@ -4525,6 +4533,10 @@ msgid "Encryption"
 msgstr "Titkosítás típusa"
 
 #: cps/spa_strings.py
+msgid "Exit full screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Expires in"
 msgstr ""
 
@@ -4613,6 +4625,10 @@ msgid "From address"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Full screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Full user table & restrictions"
 msgstr ""
 
@@ -4623,6 +4639,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Give your smart shelf a name."
 msgstr "Adjon nevet az intelligens polcnak."
+
+#: cps/spa_strings.py
+msgid "Go to this highlight"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Go to your library"
@@ -4695,6 +4715,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Highlights"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Highlights and notes"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5021,6 +5045,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No highlights yet. Select text in the book to make one."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "Nincs találat itt: {items}, erre: „{query}”."
@@ -5084,6 +5112,10 @@ msgid ""
 "link below to authorise this device."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "One column"
+msgstr "Egy oszlop"
+
 #: cps/spa_strings.py
 msgid "Open Account"
 msgstr ""
@@ -5110,6 +5142,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
+"you can edit it first."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5238,6 +5276,14 @@ msgstr ""
 msgid "Reload"
 msgstr ""
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Reload metadata for \"{title}\" from the file on disk? Any title, author or "
+"series you edited here is replaced by what the file contains. This cannot be "
+"undone."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Reload metadata from disk"
 msgstr ""
@@ -5299,6 +5345,10 @@ msgid "Report Issue on GitHub"
 msgstr "Probléma jelentése a GitHubon"
 
 #: cps/spa_strings.py
+msgid "Report this problem"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Require group membership"
 msgstr ""
 
@@ -5316,6 +5366,13 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Revoke the app password \"{label}\"? Any device still using it loses access "
+"immediately, and the password cannot be recovered."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5670,6 +5727,10 @@ msgid "This format opens in the full-screen reader."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This highlight has no saved position"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This magic link expired. Generate a new one to try again."
 msgstr ""
 
@@ -5710,6 +5771,10 @@ msgstr "Legjobbra értékeltek"
 #: cps/spa_strings.py
 msgid "Trust authentication header"
 msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Two columns"
+msgstr "Két oszlop"
 
 #: cps/spa_strings.py
 msgid "UI / display configuration"
@@ -10652,6 +10717,12 @@ msgid ""
 msgstr "Calibre-Web Automated nincs konfigurálva, keresse a rendszergazdát!"
 
 #: cps/templates/http_error.html
+msgid ""
+"Report this — the details are filled in for you, and nothing is sent until "
+"you post it:"
+msgstr ""
+
+#: cps/templates/http_error.html
 msgid "Create Issue"
 msgstr "Hibajegy létrehozás"
 
@@ -11147,14 +11218,6 @@ msgstr "Arial"
 #: cps/templates/read.html
 msgid "Spread"
 msgstr "Elrendezés"
-
-#: cps/templates/read.html
-msgid "Two columns"
-msgstr "Két oszlop"
-
-#: cps/templates/read.html
-msgid "One column"
-msgstr "Egy oszlop"
 
 #: cps/templates/read.html
 msgid "Reflow text when sidebars are open."

@@ -51,6 +51,9 @@ export function Annotations({ id }: { id: string }) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [toast, setToast] = useState<{ text: string; failed?: number; undo?: Record<string, string | null>; target?: string | null } | null>(null);
   const filterFirstRef = useRef<HTMLButtonElement>(null);
+  const selectAllRef = useRef<HTMLButtonElement>(null);
+  const longPressRef = useRef<{ timer: ReturnType<typeof setTimeout>; annotationId: string } | null>(null);
+  const suppressClickRef = useRef<string | null>(null);
 
   // Wouter reuses this component for /book/A/annotations → /book/B/annotations.
   // Reset all book-local state explicitly so selection and undo cannot leak.
@@ -62,6 +65,9 @@ export function Annotations({ id }: { id: string }) {
     if (!data) return;
     setAssignments(Object.fromEntries(data.annotations.map((row) => [row.annotation_id, row.assigned_device_id])));
   }, [data]);
+  useEffect(() => {
+    if (selecting) selectAllRef.current?.focus();
+  }, [selecting]);
 
   const annotations = data?.annotations ?? [];
   const devices = data?.devices ?? {};
@@ -158,12 +164,27 @@ export function Annotations({ id }: { id: string }) {
   const toggle = (annotationId: string) => setSelected((current) => {
     const next = new Set(current); if (next.has(annotationId)) next.delete(annotationId); else next.add(annotationId); return next;
   });
+  const startLongPress = (annotationId: string, pointerType: string) => {
+    if (selecting || !pointerType) return;
+    const timer = setTimeout(() => {
+      suppressClickRef.current = annotationId;
+      setSelecting(true);
+      setSelected(new Set([annotationId]));
+      announce(t('1 selected.'));
+      longPressRef.current = null;
+    }, 550);
+    longPressRef.current = { timer, annotationId };
+  };
+  const cancelLongPress = () => {
+    if (longPressRef.current) clearTimeout(longPressRef.current.timer);
+    longPressRef.current = null;
+  };
 
   return (
     <main className={styles.container}>
       <Link href={`/book/${id}`} className={styles.back}><ChevronLeft size={16} aria-hidden="true" /> {t('Back to book')}</Link>
       <div className={styles.header}><Highlighter size={22} aria-hidden="true" /><h1>{t('Highlights')}{book ? ` — ${book.title}` : ''}</h1><span>{annotations.length}</span></div>
-      <div className={styles.filters} role="radiogroup" aria-label={t('Filter by device')}
+      <div className={`${styles.filters} ${filters.length > 7 ? styles.filtersCollapsed : ''}`} role="radiogroup" aria-label={t('Filter by device')}
         onKeyDown={(event) => {
           if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
           event.preventDefault(); const index = filters.findIndex((item) => item.id === filter);
@@ -177,7 +198,7 @@ export function Annotations({ id }: { id: string }) {
           className={filter === item.id ? styles.filterActive : styles.filter}
           onClick={() => { setFilter(item.id); setSelected(new Set()); }}>{item.label} <span>{item.count}</span></button>)}
       </div>
-      <label className={styles.mobileFilter}>{t('Device')}
+      <label className={`${styles.mobileFilter} ${filters.length > 7 ? styles.desktopFilterSelect : ''}`}>{t('Device')}
         <select value={filter} onChange={(event) => { setFilter(event.target.value); setSelected(new Set()); }}>
           {filters.map((item) => <option key={item.id} value={item.id}>{item.label} ({item.count})</option>)}
         </select>
@@ -195,7 +216,7 @@ export function Annotations({ id }: { id: string }) {
         </div>
       </div>
       {selecting && <BulkSelectionBar count={selected.size} sticky onClear={() => { setSelecting(false); setSelected(new Set()); }}>
-        <button type="button" onClick={() => setSelected(new Set(filtered.map((row) => row.annotation_id)))}>{t('Select all {n}', { n: filtered.length })}</button>
+        <button ref={selectAllRef} type="button" onClick={() => setSelected(new Set(filtered.map((row) => row.annotation_id)))}>{t('Select all {n}', { n: filtered.length })}</button>
         <select aria-label={t('Assign selected to device')} disabled={!selected.size || busy} defaultValue=""
           onChange={(event) => { const value = event.target.value; if (value !== '') void applyBulk(value === 'unknown' ? null : value); event.currentTarget.value = ''; }}>
           <option value="" disabled>{t('Assign to device')}</option><option value="unknown">{t('Unknown device')}</option>
@@ -213,7 +234,12 @@ export function Annotations({ id }: { id: string }) {
           ) : (() => {
             const row = entry.annotation; const current = assignmentOf(row); const quoteName = row.highlighted_text.slice(0, 60);
             return <div className={`${styles.item} ${selecting ? styles.selecting : ''} ${failed.has(row.annotation_id) ? styles.failed : ''}`}
-              onClick={() => { if (selecting) toggle(row.annotation_id); }}>
+              onPointerDown={(event) => startLongPress(row.annotation_id, event.pointerType)}
+              onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerMove={cancelLongPress}
+              onClick={() => {
+                if (suppressClickRef.current === row.annotation_id) { suppressClickRef.current = null; return; }
+                if (selecting) toggle(row.annotation_id);
+              }}>
               {selecting && <label className={styles.rowSelect} onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected.has(row.annotation_id)} onChange={() => toggle(row.annotation_id)} aria-label={t('Select highlight: {text}', { text: quoteName })} /><span className={styles.srOnly}>{t('Select highlight: {text}', { text: quoteName })}</span></label>}
               <span className={styles.bar} role="img" aria-label={colorName(row.highlight_color)} style={{ background: COLOR_HEX[row.highlight_color || 'yellow'] || COLOR_HEX.yellow }} />
               <div className={styles.body}>

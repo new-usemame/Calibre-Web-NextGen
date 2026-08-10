@@ -69,3 +69,11 @@ test('device manager is axe-clean and has no 390px overflow', async ({ page }, t
   expect(results.violations.filter((v) => ['critical', 'serious'].includes(v.impact || ''))).toEqual([]);
   await assertNoHorizontalOverflow(page);
 });
+
+test('account summary makes the e-reader manager discoverable', async ({ page }) => {
+  await stubDevices(page);
+  await page.goto('/app/account');
+  const card = page.getByRole('region', { name: 'E-readers' });
+  await expect(card).toContainText('Libra Colour · 312 highlights');
+  await expect(card.getByRole('link', { name: 'Manage e-readers' })).toHaveAttribute('href', '/app/account/devices');
+});

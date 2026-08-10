@@ -4,16 +4,18 @@ import { assertNoHorizontalOverflow } from './utils';
 
 const libra = { public_id: 'libra', label: 'Libra Colour', type: 'kobo', model: 'Kobo Libra Colour', firmware: '4.45', first_seen: null, last_seen: null, annotation_count: 0, active: true };
 
-async function stubAnnotations(page: Page, count = 595) {
+async function stubAnnotations(page: Page, count = 595, availableDevices = [libra]) {
   const annotations = Array.from({ length: count }, (_, index) => ({
     annotation_id: `ann-${index}`, highlighted_text: `Highlight ${index}`, highlight_color: 'yellow',
     note_text: index % 3 === 0 ? `Note ${index}` : null, chapter_progress: index / count,
-    source: 'kobo', origin_device_id: null, assigned_device_id: null,
+    source: 'kobo', origin_device_id: null,
+    assigned_device_id: availableDevices.length > 1 ? availableDevices[index % availableDevices.length].public_id : null,
   }));
   await page.route('**/annotations/2/data.json', (route) => route.fulfill({ json: {
-    annotations, annotation_count: count, devices: { libra: { label: 'Libra Colour', model: 'Kobo Libra Colour', type: 'kobo' } },
+    annotations, annotation_count: count,
+    devices: Object.fromEntries(availableDevices.map((device) => [device.public_id, { label: device.label, model: device.model, type: device.type }])),
   } }));
-  await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: { devices: [libra] } }));
+  await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: { devices: availableDevices } }));
   const bulkSizes: number[] = [];
   await page.route('**/api/annotations/assignments/bulk', async (route) => {
     const body = await route.request().postDataJSON();
@@ -52,4 +54,25 @@ test('highlight assignment is keyboard named, mobile-safe, and axe-clean', async
   await assertNoHorizontalOverflow(page);
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze();
   expect(results.violations.filter((v) => ['critical', 'serious'].includes(v.impact || ''))).toEqual([]);
+});
+
+test('many device filters collapse and touch long-press enters selection', async ({ page }) => {
+  const devices = Array.from({ length: 8 }, (_, index) => ({
+    ...libra, public_id: `device-${index}`, label: `Reader ${index}`,
+  }));
+  await stubAnnotations(page, 20, devices);
+  await page.goto('/app/book/2/annotations');
+  await expect(page.getByRole('radiogroup', { name: 'Filter by device' })).toBeHidden();
+  await expect(page.locator('label').filter({ hasText: /^Device/ }).first().locator('select')).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const firstRow = page.getByRole('listitem').filter({ hasText: 'Highlight 0' });
+  const box = await firstRow.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + 20, box!.y + 20);
+  await page.mouse.down();
+  await page.waitForTimeout(600);
+  await page.mouse.up();
+  await expect(page.getByText('1 selected')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Select all 20' })).toBeFocused();
 });

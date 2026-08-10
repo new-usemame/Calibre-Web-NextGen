@@ -8,13 +8,14 @@ import hashlib
 import hmac
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import sessionmaker
 
 log = logging.getLogger(__name__)
 SCHEME = "kobo-header-hmac-sha256-v1"
 KOREADER_SCHEME = "koreader-client-hmac-sha256-v1"
+LAST_SEEN_WRITE_INTERVAL = timedelta(minutes=5)
 
 
 def _bounded_header(value, limit):
@@ -82,7 +83,19 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
     else:
         device = identity.device
         observed_is_newer = device.last_seen_at is None or now >= device.last_seen_at.replace(tzinfo=now.tzinfo)
-        if observed_is_newer:
+        metadata_changed = bool(
+            (model and model != device.model)
+            or (firmware and firmware != device.firmware_version)
+        )
+        last_seen_due = (
+            device.last_seen_at is None
+            or now - device.last_seen_at.replace(tzinfo=now.tzinfo) >= LAST_SEEN_WRITE_INTERVAL
+        )
+        # The registry is on every authenticated Kobo request. A SELECT is
+        # cheap and non-blocking; an UPDATE competes for SQLite's writer lock.
+        # Persist a coarse heartbeat, unless changed metadata makes this
+        # observation materially different and worth writing immediately.
+        if observed_is_newer and (last_seen_due or metadata_changed):
             device.last_seen_at = now
             identity.last_seen_at = now
             if model:

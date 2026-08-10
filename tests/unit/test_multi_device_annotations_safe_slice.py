@@ -54,6 +54,25 @@ def test_known_device_model_change_updates_and_warns(db_session, caplog):
     assert "Kobo Clara HD" in caplog.text and "Kobo Libra Colour" in caplog.text
 
 
+def test_known_device_last_seen_write_is_throttled(db_session):
+    from cps.services.device_registry import upsert_kobo_device
+    headers = {"x-kobo-deviceid": "d" * 64, "x-kobo-devicemodel": "Kobo Clara HD",
+               "x-kobo-appversion": "4.45"}
+    first_seen = datetime(2026, 8, 9, 1, 0)
+    device = upsert_kobo_device(
+        db_session, user_id=7, headers=headers, secret_key="test-secret",
+        seen_at=first_seen,
+    )
+    db_session.commit()
+    upsert_kobo_device(
+        db_session, user_id=7, headers=headers, secret_key="test-secret",
+        seen_at=datetime(2026, 8, 9, 1, 0, 30),
+    )
+    db_session.commit()
+    db_session.refresh(device)
+    assert device.last_seen_at == first_seen
+
+
 def test_registry_failure_does_not_break_reading_services_request(monkeypatch):
     from cps import readingservices
     from cps.services import device_registry

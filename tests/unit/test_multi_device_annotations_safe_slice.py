@@ -88,17 +88,53 @@ def test_backfill_is_conservative_and_idempotent():
     from cps import ub
     engine = create_engine("sqlite:///:memory:")
     with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE annotation (id INTEGER PRIMARY KEY, content_id TEXT)"))
+        conn.execute(text("CREATE TABLE annotation (id INTEGER PRIMARY KEY, book_id INTEGER, content_id TEXT)"))
         uuid = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
-        conn.execute(text("INSERT INTO annotation VALUES (1, :v), (2, :u)"), {
-            "v": f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/c.xhtml", "u": "opaque-old-value"})
+        wrong = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        conn.execute(text("INSERT INTO annotation VALUES (1, 5, :v), (2, 5, :u), (3, 5, :w), (4, 99, :m)"), {
+            "v": f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/c.xhtml",
+            "u": "opaque-old-value",
+            "w": f"file:///mnt/onboard/{wrong}.epub#(6)OEBPS/wrong.xhtml",
+            "m": f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/missing.xhtml",
+        })
     ub.migrate_multi_device_annotation_safe_slice(engine, None)
+    lookup = lambda book_id: uuid if book_id == 5 else None
+    ub.backfill_annotation_content_ids(engine, lookup)
     once = engine.connect().execute(text("SELECT id, content_id FROM annotation ORDER BY id")).fetchall()
-    ub.migrate_multi_device_annotation_safe_slice(engine, None)
+    ub.backfill_annotation_content_ids(engine, lookup)
     twice = engine.connect().execute(text("SELECT id, content_id FROM annotation ORDER BY id")).fetchall()
     assert once == twice
     assert once[0][1] == f"{uuid}!!OEBPS/c.xhtml"
     assert once[1][1] == "opaque-old-value"
+    assert once[2][1] == f"file:///mnt/onboard/{wrong}.epub#(6)OEBPS/wrong.xhtml"
+    assert once[3][1] == f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/missing.xhtml"
+
+
+def test_backfill_repairs_journaled_wrong_book_without_overwriting_later_edits():
+    from cps import ub
+    engine = create_engine("sqlite:///:memory:")
+    actual = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+    wrong = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    original = f"file:///mnt/onboard/{wrong}.epub#(6)OEBPS/wrong.xhtml"
+    normalized = f"{wrong}!!OEBPS/wrong.xhtml"
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE annotation (id INTEGER PRIMARY KEY, book_id INTEGER, content_id TEXT)"
+        ))
+        conn.execute(text("INSERT INTO annotation VALUES (1, 5, :normalized)"), {
+            "normalized": normalized,
+        })
+    ub.migrate_multi_device_annotation_safe_slice(engine, None)
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO annotation_content_id_migration "
+            "(annotation_row_id, original_content_id, normalized_content_id, migrated_at) "
+            "VALUES (1, :original, :normalized, CURRENT_TIMESTAMP)"
+        ), {"original": original, "normalized": normalized})
+    ub.backfill_annotation_content_ids(engine, lambda _book_id: actual)
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT content_id FROM annotation WHERE id=1")).scalar() == original
+        assert conn.execute(text("SELECT COUNT(*) FROM annotation_content_id_migration")).scalar() == 0
 
 
 @pytest.mark.parametrize("raw, expected", [

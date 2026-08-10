@@ -2749,13 +2749,17 @@ def migrate_annotation_device_origin(engine, _session):
 
 
 def migrate_multi_device_annotation_safe_slice(engine, _session):
-    """Create the additive registry, timestamp, and conservative backfill."""
+    """Create the additive registry and timestamp schema.
+
+    The content-id backfill runs only after the Calibre database is available;
+    startup reaches this migration before ``calibre_db.init_db()``, so this
+    stage cannot prove an annotation's authoritative book UUID.
+    """
     Base.metadata.create_all(
         engine,
         tables=[Device.__table__, DeviceIdentity.__table__, AnnotationContentIdMigration.__table__],
         checkfirst=True,
     )
-    from .services.annotation_content_id import normalize_content_id_for_backfill
     with engine.begin() as conn:
         if not conn.execute(text(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='annotation'"
@@ -2768,25 +2772,90 @@ def migrate_multi_device_annotation_safe_slice(engine, _session):
             except exc.OperationalError as error:
                 if "duplicate column" not in str(error).lower():
                     raise
-        rows = conn.execute(text("SELECT id, content_id FROM annotation WHERE content_id IS NOT NULL")).fetchall()
+
+
+def backfill_annotation_content_ids(engine, book_uuid_lookup):
+    """Journal and normalize only book-verified legacy annotation ids.
+
+    ``book_uuid_lookup(book_id)`` reads Calibre's authoritative book record.
+    Missing books, lookup errors, malformed UUIDs, and filename/book mismatches
+    leave the stored value byte-for-byte unchanged. The repair block also
+    reverses an earlier unsafe migration when its journaled canonical UUID does
+    not belong to the row's actual book and nobody edited the value afterward.
+    """
+    from .services.annotation_content_id import (
+        ContentIdError,
+        normalize_content_id,
+        normalize_content_id_for_backfill,
+    )
+    with engine.begin() as conn:
+        tables = {row[0] for row in conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ))}
+        if not {"annotation", "annotation_content_id_migration"} <= tables:
+            return
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(annotation)"))}
+        if not {"id", "book_id", "content_id"} <= columns:
+            return
+        rows = conn.execute(text(
+            "SELECT a.id, a.book_id, a.content_id, "
+            "m.original_content_id, m.normalized_content_id "
+            "FROM annotation a LEFT JOIN annotation_content_id_migration m "
+            "ON m.annotation_row_id=a.id WHERE a.content_id IS NOT NULL"
+        )).fetchall()
         changed = 0
-        for row_id, original in rows:
-            normalized = normalize_content_id_for_backfill(original)
-            if normalized == original:
+        repaired = 0
+        for row_id, book_id, current, journal_original, journal_normalized in rows:
+            try:
+                book_uuid = book_uuid_lookup(book_id)
+            except Exception:
+                log.warning(
+                    "[annotation-content-id] book lookup failed for book %s",
+                    book_id, exc_info=True,
+                )
+                continue
+            if not book_uuid:
+                continue
+            if journal_normalized is not None:
+                if current != journal_normalized:
+                    continue
+                try:
+                    normalize_content_id(journal_normalized, book_uuid=book_uuid)
+                except ContentIdError:
+                    conn.execute(text(
+                        "UPDATE annotation SET content_id=:original "
+                        "WHERE id=:row_id AND content_id=:normalized"
+                    ), {"original": journal_original, "row_id": row_id,
+                        "normalized": journal_normalized})
+                    conn.execute(text(
+                        "DELETE FROM annotation_content_id_migration "
+                        "WHERE annotation_row_id=:row_id"
+                    ), {"row_id": row_id})
+                    current = journal_original
+                    repaired += 1
+                else:
+                    continue
+            normalized = normalize_content_id_for_backfill(
+                current, book_uuid=book_uuid,
+            )
+            if normalized == current:
                 continue
             conn.execute(text(
                 "INSERT OR IGNORE INTO annotation_content_id_migration "
                 "(annotation_row_id, original_content_id, normalized_content_id, migrated_at) "
                 "VALUES (:row_id, :original, :normalized, :migrated_at)"
-            ), {"row_id": row_id, "original": original, "normalized": normalized,
+            ), {"row_id": row_id, "original": current, "normalized": normalized,
                 "migrated_at": datetime.now(timezone.utc)})
             result = conn.execute(text(
                 "UPDATE annotation SET content_id=:normalized "
                 "WHERE id=:row_id AND content_id=:original"
-            ), {"normalized": normalized, "row_id": row_id, "original": original})
+            ), {"normalized": normalized, "row_id": row_id, "original": current})
             changed += result.rowcount
-        if changed:
-            log.info("[annotation-content-id] conservatively normalized %d rows", changed)
+        if changed or repaired:
+            log.info(
+                "[annotation-content-id] normalized %d verified row(s); "
+                "repaired %d unsafe prior migration(s)", changed, repaired,
+            )
 
 
 def migrate_device_management_slice(engine, _session):

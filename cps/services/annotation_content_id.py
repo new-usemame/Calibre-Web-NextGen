@@ -59,12 +59,21 @@ def normalize_content_id(value, *, book_uuid=None, allow_legacy_file_uri=False):
     raise ContentIdError("content_id has an unsupported shape")
 
 
-def normalize_content_id_for_backfill(value):
-    """Normalize only rows whose book UUID is provable from the row itself."""
+def normalize_content_id_for_backfill(value, *, book_uuid):
+    """Normalize only when the filename UUID matches the row's Calibre book UUID.
+
+    ``book_uuid`` must come from the authoritative Calibre ``books`` row joined
+    through this annotation's own ``book_id``. A UUID-looking filename is only
+    corroborating evidence; it is never allowed to choose the target book.
+    """
     if value is None:
         return None
     try:
-        return normalize_content_id(value)
+        expected = _normal_uuid(book_uuid)
+    except ContentIdError:
+        return value
+    try:
+        return normalize_content_id(value, book_uuid=expected)
     except ContentIdError:
         pass
     if not isinstance(value, str) or len(value) > MAX_CONTENT_ID_LENGTH:
@@ -77,6 +86,10 @@ def normalize_content_id_for_backfill(value):
         filename[:-5] if filename.lower().endswith(".epub") else filename
     )
     try:
-        return normalize_content_id(value, book_uuid=stem, allow_legacy_file_uri=True)
+        if _normal_uuid(stem) != expected:
+            return value
+        return normalize_content_id(
+            value, book_uuid=expected, allow_legacy_file_uri=True,
+        )
     except ContentIdError:
         return value

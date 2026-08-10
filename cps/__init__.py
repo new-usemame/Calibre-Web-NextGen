@@ -196,6 +196,13 @@ def create_app():
     from .calibre_init import init_calibre_db_from_config
     init_calibre_db_from_config(config, cli_param.settings_path)
     calibre_db.init_db()
+    # The annotation content-id backfill needs both databases: app.db owns the
+    # annotation, while metadata.db is authoritative for book UUID. Running it
+    # earlier would let a filename choose the book and can cross-link rows.
+    ub.backfill_annotation_content_ids(
+        ub.session.bind,
+        lambda book_id: getattr(calibre_db.get_book(book_id), "uuid", None),
+    )
 
     updater_thread.init_updater(config, web_server)
     # Perform dry run of updater and exit afterward

@@ -18,6 +18,17 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Kindle books get their high-resolution cover now, not just print editions.**
+  The high-resolution Amazon cover lookup was keyed only on a book's ISBN, and a
+  Kindle edition usually has no ISBN at all — it has an ASIN. So the books most
+  likely to need a better cover were the ones the lookup could never reach, in
+  both places it runs: the upgrade applied to metadata-search results, and the
+  standalone "Amazon (high-res)" card in the cover picker, which simply never
+  appeared for those books. A stored Amazon identifier is now used as a lookup
+  key too, tried after the ISBN so nothing about the existing path changes. This
+  also covers books whose ISBN is a 979-prefixed one, which has no ISBN-10 form
+  and was previously a dead end. Reported by @briffaantoine with two worked
+  examples (#304).
 - **The cover picker now tells you where a picture actually came from.** Covers
   offered by Hardcover, Google and the rest get swapped for a higher-resolution
   copy when one exists, and that copy often comes from Amazon or Apple Books —

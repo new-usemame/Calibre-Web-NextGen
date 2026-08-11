@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
+import os
 import sys
 
 from . import create_app, limiter
@@ -16,7 +17,23 @@ def request_username():
     return request.authorization.username
 
 
+def hide_console_windows():
+    import ctypes
+
+    kernel32 = ctypes.WinDLL('kernel32')
+    user32 = ctypes.WinDLL('user32')
+
+    SW_HIDE = 0
+
+    hWnd = kernel32.GetConsoleWindow()
+    if hWnd:
+        user32.ShowWindow(hWnd, SW_HIDE)
+
+
 def main():
+    if os.name == "nt":
+        hide_console_windows()
+
     app = create_app()
 
     from .cwa_functions import switch_theme, library_refresh, convert_library, epub_fixer, cover_enforcer_ui, cwa_stats, cwa_check_status, cwa_settings, cwa_logs, profile_pictures, cwa_internal

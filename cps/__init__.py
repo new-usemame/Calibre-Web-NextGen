@@ -5,8 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-__package__ = "cps"
-
 import sys
 import os
 import mimetypes

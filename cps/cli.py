@@ -42,8 +42,7 @@ class CliParameter(object):
 
     def arg_parser(self):
         parser = argparse.ArgumentParser(description='Calibre-Web NextGen is a web app providing '
-                                                     'a interface for browsing, reading and downloading eBooks\n',
-                                         prog='cps.py')
+                                                     'a interface for browsing, reading and downloading eBooks\n')
         parser.add_argument('-p', metavar='path', help='path and name to settings db, e.g. /opt/cw.db')
         parser.add_argument('-g', metavar='path', help='path and name to gdrive db, e.g. /opt/gd.db')
         parser.add_argument('-c', metavar='path', help='path and name to SSL certfile, '

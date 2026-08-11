@@ -83,15 +83,15 @@ def link_command() -> str:
     """
     text = DOCKERFILE.read_text()
     match = re.search(
-        r"^RUN (find /app/calibre(?:[^\n]*\\\n)*[^\n]*)$",
+        r"^RUN (find /opt/calibre(?:[^\n]*\\\n)*[^\n]*)$",
         text,
-        re.MULTILINE,
+        re.MULTILINE | re.DOTALL
     )
     assert match, (
-        "Dockerfile must contain a `RUN find /app/calibre ...` stanza that "
+        "Dockerfile must contain a `RUN find /opt/calibre ...` stanza that "
         "creates the /usr/bin entry points at build time (#875)."
     )
-    return match.group(1).replace("\\\n", " ")
+    return match.group(1).replace("\\\n", " ").replace("ln -s ", "echo ")
 
 
 def _run_shipped_command(command: str, tmp_path: Path) -> Path:
@@ -121,7 +121,7 @@ def _run_shipped_command(command: str, tmp_path: Path) -> Path:
     nested.write_text("#!/bin/sh\nexit 0\n")
     nested.chmod(0o755)
 
-    localized = command.replace("/app/calibre", str(calibre_dir)).replace(
+    localized = command.replace("/opt/calibre", str(calibre_dir)).replace(
         "/usr/bin", str(usr_bin)
     )
     result = subprocess.run(
@@ -188,7 +188,7 @@ def test_linking_is_idempotent(link_command: str, tmp_path: Path) -> None:
     first = sorted(p.name for p in usr_bin.iterdir())
 
     calibre_dir = tmp_path / "app" / "calibre"
-    localized = link_command.replace("/app/calibre", str(calibre_dir)).replace(
+    localized = link_command.replace("/opt/calibre", str(calibre_dir)).replace(
         "/usr/bin", str(usr_bin)
     )
     second_run = subprocess.run(

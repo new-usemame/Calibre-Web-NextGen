@@ -14,7 +14,7 @@ The Dockerfile now creates those links at build time. These tests do two
 things:
 
 1. Extract the shipped ``find ... -exec ln`` expression out of the
-   Dockerfile and *execute it* against a synthetic ``/app/calibre`` tree, so
+   Dockerfile and *execute it* against a synthetic ``/opt/calibre`` tree, so
    the assertions are about what the command actually does, not about which
    words appear in the file. A rewrite that keeps the words but breaks the
    behaviour goes red.
@@ -85,24 +85,24 @@ def link_command() -> str:
     match = re.search(
         r"^RUN (find /opt/calibre(?:[^\n]*\\\n)*[^\n]*)$",
         text,
-        re.MULTILINE | re.DOTALL
+        re.MULTILINE,
     )
     assert match, (
         "Dockerfile must contain a `RUN find /opt/calibre ...` stanza that "
         "creates the /usr/bin entry points at build time (#875)."
     )
-    return match.group(1).replace("\\\n", " ").replace("ln -s ", "echo ")
+    return match.group(1).replace("\\\n", " ")
 
 
 def _run_shipped_command(command: str, tmp_path: Path) -> Path:
     """Execute the shipped command against a synthetic tree.
 
-    Builds a fake /app/calibre containing every top-level file the real
+    Builds a fake /opt/calibre containing every top-level file the real
     bundle has, plus a fake /usr/bin, then rewrites only the two absolute
     paths so the command under test is otherwise byte-identical to what the
     image build runs.
     """
-    calibre_dir = tmp_path / "app" / "calibre"
+    calibre_dir = tmp_path / "opt" / "calibre"
     usr_bin = tmp_path / "usr" / "bin"
     (calibre_dir / "lib").mkdir(parents=True)
     usr_bin.mkdir(parents=True)
@@ -187,7 +187,7 @@ def test_linking_is_idempotent(link_command: str, tmp_path: Path) -> None:
     usr_bin = _run_shipped_command(link_command, tmp_path)
     first = sorted(p.name for p in usr_bin.iterdir())
 
-    calibre_dir = tmp_path / "app" / "calibre"
+    calibre_dir = tmp_path / "opt" / "calibre"
     localized = link_command.replace("/opt/calibre", str(calibre_dir)).replace(
         "/usr/bin", str(usr_bin)
     )

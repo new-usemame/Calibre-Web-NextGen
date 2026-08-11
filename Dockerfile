@@ -442,7 +442,6 @@ COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 RUN find /opt/calibre -maxdepth 1 -type f -perm -u+x \
   ! -name 'calibre_postinstall' ! -name 'calibre-complete' \
   -exec ln -sf {} /usr/bin/ \; && \
-  ln -s /opt/calibre /app && \
   test -x /usr/bin/calibredb
 
 # Deliberately NO global CALIBRE_CONFIG_DIRECTORY here. (A misspelled

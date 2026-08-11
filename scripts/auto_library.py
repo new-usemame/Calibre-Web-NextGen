@@ -455,7 +455,7 @@ class AutoLibrary:
         # Auto-register any .zip files the operator dropped in. First-
         # boot only — once calibre's customize.py.json has entries, we
         # skip the scan to keep boot fast. Operator can add more later
-        # via `docker exec calibre-web /app/calibre/calibre-customize -a
+        # via `docker exec calibre-web /opt/calibre/calibre-customize -a
         # /config/.config/calibre/plugins/<new>.zip`.
         registered = calibre_user_plugins.auto_register_plugins()
         if registered:

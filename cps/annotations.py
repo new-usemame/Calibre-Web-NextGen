@@ -623,6 +623,53 @@ def create_annotation(payload, *, user_id, book, session, commit):
     start_span = (payload.get("start_kobospan") or "").strip()
     cfi_range = (payload.get("cfi_range") or "").strip()
 
+    # A standalone note (#325): a thought about the book that is not attached to
+    # any passage. Deliberately explicit rather than inferred from "no anchor
+    # supplied", because a highlight that lost its anchor is a bug and must keep
+    # raising below.
+    #
+    # It carries NO position at all — not even the "cfi"/-99 pair the CFI-only
+    # branch uses for Kobo compatibility. That pair is a sentinel meaning "web
+    # origin, no KoboSpan"; putting it on a row with nothing to point at would
+    # make the row look like a pushable highlight to any code that keys on the
+    # container fields, and the device would end up with a note at a position we
+    # invented. A Kobo cannot represent this row at all, and that is fine — it is
+    # a CWNG-native concept, marked so it can be excluded by predicate rather
+    # than guessed at.
+    #
+    # NOTE FOR ANYONE ADDING A FIELD TO WEB-READER ROWS: this is the THIRD
+    # ub.Annotation(...) constructor in this function, alongside the CFI-only
+    # branch below and the KoboSpan one after it. A field added to the other two
+    # and missed here produces a row that is valid, merges without conflict, and
+    # is silently missing that field for every standalone note. Add it in all
+    # three or none.
+    #
+    if (payload.get("position_type") or "").strip() == "unanchored":
+        note = (payload.get("note_text") or "").strip()
+        if not note:
+            raise ValueError("create_annotation: an unanchored note needs note_text")
+        progress = payload.get("chapter_progress")
+        row = ub.Annotation(
+            user_id=user_id,
+            annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
+            book_id=book.id,
+            source="webreader",
+            note_text=note,
+            # No highlighted passage, so no colour to render on it.
+            highlighted_text=None,
+            highlight_color=None,
+            content_id=content_id,
+            position_type="unanchored",
+            # Ordering only ("roughly here in the book"), never an anchor: a
+            # future push path must not be able to take it for a position.
+            chapter_progress=float(progress) if progress is not None else None,
+            context_string=payload.get("context_string"),
+            hidden=False,
+        )
+        session.add(row)
+        commit()
+        return row
+
     # The SPA epub.js reader produces a portable EPUB CFI (not a KoboSpan). Accept
     # a CFI-only web-reader highlight: it stands on its cfi_range, exports like any
     # other, and renders back in the reader. KoboSpan stays the path for the kepub

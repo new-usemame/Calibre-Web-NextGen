@@ -12,6 +12,9 @@ interface Annotation {
   annotation_id: string;
   highlighted_text: string;
   highlight_color: string | null;
+  /** 'unanchored' means a note ABOUT the book with no passage — it has neither a
+   *  quote nor a colour, so it must not be drawn with either. NULL is legacy CFI. */
+  position_type?: string | null;
   note_text: string | null;
   chapter_progress: number | null;
   source: string | null;
@@ -64,19 +67,34 @@ export function Annotations({ id }: { id: string }) {
         <EmptyState message={t('No highlights yet. Highlight while reading, or import from a Kobo device.')} />
       ) : (
         <ul className={styles.list}>
-          {annotations.map((a) => (
+          {annotations.map((a) => {
+            /*
+             * A standalone note has no passage and no colour. The API projects a
+             * default colour for it (`r.highlight_color or "yellow"`, a legacy
+             * fallback for old rows), so rendering it unconditionally puts a
+             * swatch announced as "Yellow" beside an EMPTY blockquote — a
+             * highlight that appears to exist and to have lost its text. The row
+             * is a note; draw it as one.
+             */
+            const unanchored = a.position_type === 'unanchored';
+            return (
             <li key={a.annotation_id} className={styles.item}>
-              <span className={styles.bar} role="img" aria-label={colorName(a.highlight_color)}
-                style={{ background: COLOR_HEX[a.highlight_color || 'yellow'] || '#e6c34a' }} />
+              {!unanchored && (
+                <span className={styles.bar} role="img" aria-label={colorName(a.highlight_color)}
+                  style={{ background: COLOR_HEX[a.highlight_color || 'yellow'] || '#e6c34a' }} />
+              )}
               <div className={styles.body}>
-                <blockquote className={styles.quote}>{a.highlighted_text}</blockquote>
+                {!unanchored && (
+                  <blockquote className={styles.quote}>{a.highlighted_text}</blockquote>
+                )}
                 {a.note_text && <p className={styles.note}>{a.note_text}</p>}
                 {a.chapter_progress != null && (
                   <span className={styles.progress}>{Math.round(a.chapter_progress * 100)}%</span>
                 )}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </main>

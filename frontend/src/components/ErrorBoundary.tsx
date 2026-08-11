@@ -16,6 +16,7 @@
  */
 import { Component, createRef, type ErrorInfo, type ReactNode } from 'react';
 import { useT, type TFunction } from '../lib/i18n';
+import { collectContext, reportTarget } from '../lib/reportBuilder';
 import styles from './ErrorBoundary.module.css';
 
 /**
@@ -54,6 +55,9 @@ interface State {
    * and loop straight back to the blank screen this exists to prevent. */
   hasError: boolean;
   error: unknown;
+  /** Component names only — the most useful field for locating a crash, and
+   *  safe to publish. Captured so "Report this problem" can precompose it. */
+  componentStack?: string;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -70,6 +74,14 @@ export class ErrorBoundary extends Component<Props, State> {
     // nothing on screen AND the user had to be talked through opening devtools
     // to tell us anything; the fallback below now surfaces the message too.
     console.error('[CWNG] Unhandled UI error:', error, info.componentStack);
+    // Held for the report link below. Guarded because this runs on the crash
+    // path: a throw here would replace the recovery UI with the blank screen
+    // this boundary exists to prevent.
+    try {
+      this.setState({ componentStack: info?.componentStack || undefined });
+    } catch {
+      /* the fallback renders fine without it */
+    }
     // The crash unmounts whatever the user had focused, which would otherwise
     // drop focus to <body> — keyboard and screen-reader users would have to hunt
     // for the recovery controls. RouteA11y can't cover this: it reacts to route
@@ -79,7 +91,30 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidUpdate(prev: Props) {
     if (this.state.hasError && prev.resetKey !== this.props.resetKey) {
-      this.setState({ hasError: false, error: null });
+      this.setState({ hasError: false, error: null, componentStack: undefined });
+    }
+  }
+
+  /**
+   * The precomposed report URL, or null if composing it fails for any reason.
+   *
+   * This page is the sharpest case for precomposition in the whole app: it is
+   * already holding the error object while asking the user to report it. Before
+   * this, both here and the classic error page handed over a blank form and
+   * asked the reporter to type out the version and their browser by hand.
+   *
+   * Nothing is transmitted — `reportTarget` composes a link, and only the user
+   * clicking it (in their own GitHub session) posts anything at all.
+   */
+  private reportHref(): string | null {
+    try {
+      const ctx = collectContext({
+        errorMessage: errorText(this.state.error),
+        componentStack: this.state.componentStack,
+      });
+      return reportTarget('bug', ctx, '').url;
+    } catch {
+      return null;
     }
   }
 
@@ -96,6 +131,7 @@ export class ErrorBoundary extends Component<Props, State> {
       }
     };
     const home = this.props.homeHref || '/';
+    const reportHref = this.reportHref();
 
     return (
       // The fallback IS the whole page at this point, so it owns the main
@@ -129,6 +165,25 @@ export class ErrorBoundary extends Component<Props, State> {
           <details className={styles.details}>
             <summary className={styles.summary}>{t('Technical details')}</summary>
             <pre className={styles.pre}>{errorText(error)}</pre>
+            {reportHref && (
+              <p className={styles.reportRow}>
+                {/* rel=noreferrer matters here beyond the usual tab-nabbing
+                    reason: Referer would hand GitHub the instance URL, which is
+                    exactly the fact this feature exists to keep private. */}
+                <a
+                  className={styles.reportLink}
+                  href={reportHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="app-error-report"
+                >
+                  {t('Report this problem')}
+                </a>
+                <span className={styles.reportNote}>
+                  {t('Opens a prefilled report on GitHub. Nothing is sent until you post it, and you can edit it first.')}
+                </span>
+              </p>
+            )}
           </details>
         </div>
       </main>

@@ -3697,6 +3697,10 @@ msgid "≥"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "(no text captured)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(replace cover)"
 msgstr ""
 
@@ -3716,6 +3720,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "A few random picks from your library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "A note about the book, not tied to a passage"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -3869,6 +3877,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Basic configuration"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Black"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4091,6 +4103,10 @@ msgid "Could not load users."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not open that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr ""
 
@@ -4112,6 +4128,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save that note."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4439,6 +4459,10 @@ msgid "Encryption"
 msgstr "SSL"
 
 #: cps/spa_strings.py
+msgid "Exit full screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Expires in"
 msgstr ""
 
@@ -4527,6 +4551,10 @@ msgid "From address"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Full screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Full user table & restrictions"
 msgstr ""
 
@@ -4536,6 +4564,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Give your smart shelf a name."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Go to this highlight"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4609,6 +4641,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Highlights"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Highlights and notes"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4935,6 +4971,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No highlights yet. Select text in the book to make one."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr ""
@@ -4998,6 +5038,10 @@ msgid ""
 "link below to authorise this device."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "One column"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Open Account"
 msgstr ""
@@ -5024,6 +5068,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
+"you can edit it first."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5150,6 +5200,14 @@ msgstr ""
 msgid "Reload"
 msgstr ""
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Reload metadata for \"{title}\" from the file on disk? Any title, author or "
+"series you edited here is replaced by what the file contains. This cannot be "
+"undone."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Reload metadata from disk"
 msgstr ""
@@ -5211,6 +5269,10 @@ msgid "Report Issue on GitHub"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Report this problem"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Require group membership"
 msgstr ""
 
@@ -5228,6 +5290,13 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Revoke the app password \"{label}\"? Any device still using it loses access "
+"immediately, and the password cannot be recovered."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5582,6 +5651,10 @@ msgid "This format opens in the full-screen reader."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This highlight has no saved position"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This magic link expired. Generate a new one to try again."
 msgstr ""
 
@@ -5621,6 +5694,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Two columns"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5725,6 +5802,10 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Write a note"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10382,6 +10463,12 @@ msgid ""
 msgstr "ទីតាំង database Calibre"
 
 #: cps/templates/http_error.html
+msgid ""
+"Report this — the details are filled in for you, and nothing is sent until "
+"you post it:"
+msgstr ""
+
+#: cps/templates/http_error.html
 #, fuzzy
 msgid "Create Issue"
 msgstr "បង្កើតធ្នើ"
@@ -10846,11 +10933,6 @@ msgid "Open annotations page"
 msgstr ""
 
 #: cps/templates/read.html
-#, fuzzy
-msgid "Black"
-msgstr "មកក្រោយ"
-
-#: cps/templates/read.html
 msgid "Font Sizes"
 msgstr ""
 
@@ -10889,14 +10971,6 @@ msgstr ""
 #, fuzzy
 msgid "Spread"
 msgstr "អាន"
-
-#: cps/templates/read.html
-msgid "Two columns"
-msgstr ""
-
-#: cps/templates/read.html
-msgid "One column"
-msgstr ""
 
 #: cps/templates/read.html
 msgid "Reflow text when sidebars are open."

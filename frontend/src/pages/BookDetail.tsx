@@ -445,9 +445,19 @@ export function BookDetail() {
                   <Pencil size={14} aria-hidden="true" focusable={false} />
                   {t('Edit')}
                 </Link>
+                {/* Destructive: reload overwrites whatever the user curated here with
+                    what the file on disk says, and there is no undo. It sits in the
+                    same row as the per-format download buttons, so it was being hit
+                    by accident while reaching for a download (#1496, @JamesHACS).
+                    Every other destructive action in the SPA confirms first; this was
+                    the one that didn't. */}
                 <button type="button" className={styles.downloadBtn}
                   disabled={reloadMetadata.isPending}
                   onClick={() => {
+                    if (reloadMetadata.isPending) return;
+                    if (!window.confirm(
+                      t('Reload metadata for "{title}" from the file on disk? Any title, author or series you edited here is replaced by what the file contains. This cannot be undone.', { title: book.title })
+                    )) return;
                     setReloadMessage('');
                     reloadMetadata.mutate(undefined, {
                       onSuccess: (result) => setReloadMessage(result.message),

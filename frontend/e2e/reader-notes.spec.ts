@@ -302,6 +302,32 @@ async function waitForReaderRender(page: Page): Promise<void> {
   await page.locator('iframe').waitFor({ state: 'visible', timeout: 40_000 });
 }
 
+/*
+ * Wait until a reader setting is actually PERSISTED, before testing that it
+ * persists.
+ *
+ * `persistSetting` debounces the save, so clicking a control and reloading races
+ * the write: the UI updates instantly and the server may not have been told yet.
+ * Locally the race went one way and in CI the other — the black-theme test
+ * applied the theme correctly, reloaded before the save landed, and came back to
+ * the previous theme, failing deterministically on both projects and every retry
+ * while the feature worked.
+ *
+ * Polling the server closes it honestly: a test that a choice survives a reload
+ * has to establish that the choice was saved, not assume it.
+ */
+async function waitForSavedSetting<K extends string>(
+  page: Page, key: K, value: string,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      const res = await page.request.get('/api/v1/reader/settings');
+      if (!res.ok()) return null;
+      return ((await res.json()).reader ?? {})[key] ?? null;
+    }, { timeout: 20_000, message: `reader setting ${key} should reach the server` })
+    .toBe(value);
+}
+
 test.describe('reader notes (#325)', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -645,6 +671,7 @@ test.describe('reader column count (#325)', () => {
         .not.toBe(twoUp);
 
       // The preference is persisted server-side, so it must come back.
+      await waitForSavedSetting(page, 'spread', 'nonespread');
       await page.reload();
       await waitForReaderRender(page);
       await page.getByRole('button', { name: 'Reading appearance' }).click();
@@ -652,5 +679,192 @@ test.describe('reader column count (#325)', () => {
         .toHaveAttribute('aria-pressed', 'true');
       // ...and be APPLIED, not merely remembered by the button.
       await expect.poll(layout, { timeout: 15_000 }).toBe(oneUp);
+    });
+});
+
+/*
+ * The Black page theme (#325).
+ *
+ * Classic has had four page themes for years and stores the choice as
+ * `blackTheme`; this reader mapped that value onto `dark`, so a reader who chose
+ * Black got the warm near-black instead and had no way back to it. Same shape as
+ * the column preference: a saved answer being quietly downgraded.
+ *
+ * Asserts that Black and Dark produce DIFFERENT grounds. Checking only that
+ * Black "works" would pass if it were an alias for Dark, which is precisely the
+ * bug — so the test has to compare the two.
+ */
+test.describe('reader black page theme (#325)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test('Black is a distinct pure-black ground, and it persists', async ({ page }) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, 1);
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+
+    const ground = () => page.evaluate(() => {
+      const doc = document.querySelector('iframe')?.contentDocument;
+      const body = doc?.querySelector('body');
+      if (!body || !doc?.defaultView) return null;
+      return doc.defaultView.getComputedStyle(body).backgroundColor;
+    });
+
+    await page.getByRole('button', { name: 'Reading appearance' }).click();
+    await expect(page.getByRole('button', { name: 'Black', exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Dark', exact: true }).click();
+    await expect.poll(ground, { timeout: 15_000 }).not.toBe(null);
+    const darkGround = await ground();
+
+    await page.getByRole('button', { name: 'Black', exact: true }).click();
+    await expect.poll(ground, { timeout: 15_000 }).toBe('rgb(0, 0, 0)');
+    const blackGround = await ground();
+
+    // The point of the feature: Black is not an alias for Dark.
+    expect(blackGround, 'Black must differ from Dark').not.toBe(darkGround);
+
+    // Stored as blackTheme server-side, so it must survive a reload -- both the
+    // pressed state AND the actual ground, since the bug was that the value came
+    // back and was then mapped onto something else.
+    await waitForSavedSetting(page, 'theme', 'blackTheme');
+    await page.reload();
+    await waitForReaderRender(page);
+    await expect.poll(ground, { timeout: 15_000 }).toBe('rgb(0, 0, 0)');
+    await page.getByRole('button', { name: 'Reading appearance' }).click();
+    await expect(page.getByRole('button', { name: 'Black', exact: true }))
+      .toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+/*
+ * A standalone note in the highlights drawer (#325).
+ *
+ * A note ABOUT the book has no passage by design. Before this, the drawer drew
+ * it as a BROKEN highlight: jump greyed out with "This highlight has no saved
+ * position", and "(no text captured)" where the quote goes. Both sentences are
+ * true of a highlight whose anchor a regenerated KEPUB destroyed, and false of
+ * a note that never had one — and nothing in the row let a reader tell which
+ * they were looking at. A deliberate state reported as a failure.
+ *
+ * Created through the API because the reader has no UI for making one yet; the
+ * backend landed first on purpose. That is also why this is worth a test: the
+ * rows can already exist before anything in the reader can produce them.
+ */
+test.describe('reader drawer: standalone notes (#325)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test('a note with no passage is not drawn as a broken highlight', async ({ page }) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, 3);
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+
+    const NOTE = `A thought about the whole book. ${Date.now()}`;
+    const created = await page.evaluate(async ([id, note]) => {
+      const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
+      const res = await fetch(`/annotations/${id}`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify({ position_type: 'unanchored', note_text: note }),
+      });
+      return { status: res.status, body: res.ok ? await res.json() : null };
+    }, [String(bookId), NOTE] as const);
+    expect(created.status, 'the backend accepts an unanchored note').toBe(201);
+    expect(created.body.position_type).toBe('unanchored');
+
+    await page.reload();
+    await waitForReaderRender(page);
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    const row = drawer(page).locator('li', { hasText: NOTE });
+    await expect(row).toBeVisible();
+
+    // It must NOT claim a lost position or a missing quote — those describe a
+    // damaged highlight, which this is not.
+    await expect(row).not.toContainText('(no text captured)');
+    const jump = row.getByRole('button');
+    await expect(jump).toBeDisabled();
+    await expect(jump).toHaveAttribute('title', 'A note about the book, not tied to a passage');
+
+    // ...while an ordinary highlight in the same list still reads as one.
+    await page.evaluate(async ([id]) => {
+      const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
+      for (const a of ((await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json()).annotations || [])) {
+        if (a.position_type === 'unanchored') {
+          await fetch(`/annotations/${id}/${a.annotation_id}`, {
+            method: 'DELETE', credentials: 'include', headers: { 'X-CSRFToken': csrf },
+          });
+        }
+      }
+    }, [String(bookId)] as const);  });
+});
+
+/*
+ * Writing a note that is not attached to a passage (#325).
+ *
+ * The operator's ask was "see and do highlights and notes". A note about the
+ * book — not about a sentence in it — had no way in at all: both readers require
+ * you to select text first, which is the wrong shape for "the argument in
+ * chapter 3 never lands".
+ *
+ * Drives the real flow rather than the API: open the drawer, click Write a note,
+ * type, save. The API path is already covered by the drawer-rendering test; what
+ * this adds is that a person can get there.
+ */
+test.describe('reader: writing a standalone note (#325)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test('a note can be written without selecting anything, and it lasts',
+    async ({ page }) => {
+      test.setTimeout(120_000);
+      const bookId = await openReaderOnEpub(page, 1);
+      expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+
+      const NOTE = `The frame narrative never pays off. ${Date.now()}`;
+
+      await page.getByRole('button', { name: 'Highlights and notes' }).click();
+      const start = page.getByRole('button', { name: 'Write a note' });
+      await expect(start).toBeVisible();
+      // Reachable with a thumb: this is a primary action on a phone.
+      const box = await start.boundingBox();
+      expect(box!.height, 'Write a note touch target').toBeGreaterThanOrEqual(44);
+
+      await start.click();
+      // The composer opens ready to type — no selection was made, so there is
+      // nothing else the reader could want focused.
+      await expect(page.locator('textarea')).toBeFocused();
+      // ...and it must not offer highlight-only affordances for a note that has
+      // no passage to colour.
+      await expect(page.getByRole('dialog').getByRole('button', { name: 'Yellow' }))
+        .toHaveCount(0);
+
+      await setNote(page, NOTE);
+      await page.getByRole('button', { name: 'Save note' }).click();
+
+      // Stored as a genuinely unanchored row, not as a highlight with no text.
+      await expect.poll(async () => await page.evaluate(async (id) => {
+        const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+        return (j.annotations || []).filter((a: { position_type: string; note_text: string }) =>
+          a.position_type === 'unanchored').map((a: { note_text: string }) => a.note_text);
+      }, bookId!)).toContain(NOTE);
+
+      // It survives a reload and reads as a note in the drawer.
+      await page.reload();
+      await waitForReaderRender(page);
+      await page.getByRole('button', { name: 'Highlights and notes' }).click();
+      const row = drawer(page).locator('li', { hasText: NOTE });
+      await expect(row).toBeVisible();
+      await expect(row).not.toContainText('(no text captured)');
+
+      // Clean up after ourselves so the shared fixture is left as found.
+      await page.evaluate(async (id) => {
+        const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
+        const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+        for (const a of (j.annotations || [])) {
+          if (a.position_type === 'unanchored') {
+            await fetch(`/annotations/${id}/${a.annotation_id}`, {
+              method: 'DELETE', credentials: 'include', headers: { 'X-CSRFToken': csrf },
+            });
+          }
+        }
+      }, bookId!);
     });
 });

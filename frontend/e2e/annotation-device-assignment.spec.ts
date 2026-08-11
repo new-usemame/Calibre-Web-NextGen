@@ -96,3 +96,48 @@ test('many device filters collapse and touch long-press enters selection', async
   } else await page.mouse.up();
   await expect(page.getByRole('button', { name: 'Select all 20' })).toBeFocused();
 });
+
+/*
+ * #1544 fixed this on the plain list; this page was rewritten to a virtualized
+ * list on a branch at the same time, so the two changes MERGED WITHOUT A
+ * CONFLICT and the fix had to be re-grafted onto the new renderer by hand. A
+ * hand-graft nothing exercises is exactly what the clean merge already hid
+ * once, so pin the behaviour here rather than trusting the graft.
+ */
+test('a standalone note is drawn as a note, not as a highlight that lost its text', async ({ page }) => {
+  const annotations = [
+    { annotation_id: 'ann-note', highlighted_text: '', highlight_color: null, position_type: 'unanchored',
+      note_text: 'The middle section drags.', chapter_progress: null, source: 'webreader',
+      origin_device_id: null, assigned_device_id: null, anchor_status: 'unanchored' },
+    { annotation_id: 'ann-quote', highlighted_text: 'A real passage.', highlight_color: 'yellow', position_type: null,
+      note_text: null, chapter_progress: 0.5, source: 'kobo',
+      origin_device_id: null, assigned_device_id: null, anchor_status: 'ok' },
+  ];
+  await page.route('**/annotations/2/data.json', (route) => route.fulfill({ json: {
+    annotations, annotation_count: 2, devices: {},
+  } }));
+  await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: { devices: [libra] } }));
+  await page.goto('/app/book/2/annotations');
+
+  const note = page.getByRole('listitem').filter({ hasText: 'The middle section drags.' });
+  await expect(note).toBeVisible();
+  // The API projects `highlight_color or "yellow"` for legacy rows, so an
+  // unguarded render puts a swatch announced as "Yellow" beside an empty quote.
+  await expect(note.getByRole('img')).toHaveCount(0);
+  await expect(note.locator('blockquote')).toHaveCount(0);
+  // 'unanchored' is not 'unresolved': nothing failed to resolve, so the row must
+  // not claim the book can't show it.
+  await expect(note).not.toContainText('Not in current file');
+
+  // The ordinary highlight in the same list is unaffected — a guard that hid the
+  // swatch for everything would pass every assertion above.
+  const quote = page.getByRole('listitem').filter({ hasText: 'A real passage.' });
+  await expect(quote.getByRole('img')).toHaveCount(1);
+  await expect(quote.locator('blockquote')).toHaveText('A real passage.');
+
+  // The accessibility tree must agree with the screen: a screen-reader user is
+  // otherwise the only one still told this row is a highlight.
+  await page.getByRole('button', { name: 'Select' }).click();
+  await expect(page.getByLabel('Select note: The middle section drags.')).toBeVisible();
+  await expect(page.getByLabel('Select highlight: A real passage.')).toBeVisible();
+});

@@ -3913,6 +3913,10 @@ msgid "(replace cover)"
 msgstr "(remplacer la couverture)"
 
 #: cps/spa_strings.py
+msgid "1 selected."
+msgstr "1 sélectionné."
+
+#: cps/spa_strings.py
 msgid "2:3 (publisher cover — no padding for typical covers)"
 msgstr ""
 "2:3 (couverture d’éditeur — aucune marge pour les couvertures courantes)"
@@ -3932,6 +3936,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "A few random picks from your library"
 msgstr "Une sélection aléatoire de votre bibliothèque"
+
+#: cps/spa_strings.py
+msgid "A note about the book, not tied to a passage"
+msgstr "Une note sur le livre, sans passage associé"
 
 #: cps/spa_strings.py
 msgid ""
@@ -4043,6 +4051,19 @@ msgid "Ask in Discord"
 msgstr "Poser une question sur Discord"
 
 #: cps/spa_strings.py
+msgid "Assign selected to device"
+msgstr "Attribuer la sélection à l'appareil"
+
+#: cps/spa_strings.py
+msgid "Assign to device"
+msgstr "Attribuer à l'appareil"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Assigned to {name}."
+msgstr "Attribué à {name}."
+
+#: cps/spa_strings.py
 msgid "Authentication"
 msgstr "Authentification"
 
@@ -4090,6 +4111,10 @@ msgstr "DN de base"
 msgid "Basic configuration"
 msgstr "Configuration de base"
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Black"
+msgstr "Noir"
+
 #: cps/spa_strings.py
 msgid "Book default"
 msgstr "Valeur par défaut du livre"
@@ -4097,6 +4122,10 @@ msgstr "Valeur par défaut du livre"
 #: cps/spa_strings.py
 msgid "Book density"
 msgstr "Densité des livres"
+
+#: cps/spa_strings.py
+msgid "Book order"
+msgstr "Ordre du livre"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4119,10 +4148,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
 msgstr "Sources intégrées (laisser vide pour désactiver) :"
-
-#: cps/spa_strings.py
-msgid "Bulk actions"
-msgstr "Actions groupées"
 
 #: cps/spa_strings.py
 msgid "CA certificate path"
@@ -4271,6 +4296,10 @@ msgid "Copy link"
 msgstr "Copier le lien"
 
 #: cps/spa_strings.py
+msgid "Could not assign."
+msgstr "Impossible d'attribuer."
+
+#: cps/spa_strings.py
 msgid "Could not create shelf."
 msgstr "Impossible de créer l’étagère."
 
@@ -4293,6 +4322,10 @@ msgstr "Impossible de charger les propositions."
 #: cps/spa_strings.py
 msgid "Could not load duplicates."
 msgstr "Impossible de charger les doublons."
+
+#: cps/spa_strings.py
+msgid "Could not load e-readers."
+msgstr "Impossible de charger les liseuses."
 
 #: cps/spa_strings.py
 msgid "Could not load highlights."
@@ -4341,6 +4374,10 @@ msgstr "Impossible d’enregistrer l’ordre."
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
 msgstr "Impossible d’enregistrer les paramètres de lecture."
+
+#: cps/spa_strings.py
+msgid "Could not save that note."
+msgstr "Impossible d'enregistrer cette note."
 
 #: cps/spa_strings.py
 msgid "Could not save the default library filter."
@@ -4523,6 +4560,10 @@ msgid "Delete {name}"
 msgstr "Supprimer {name}"
 
 #: cps/spa_strings.py
+msgid "Deleted device"
+msgstr "Appareil supprimé"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Deleted tag {name}"
 msgstr "Étiquette {name} supprimée"
@@ -4540,6 +4581,31 @@ msgstr "Dense"
 #: cps/templates/cwa_settings.html cps/templates/search_form.html
 msgid "Description"
 msgstr "Description"
+
+#: cps/spa_strings.py
+msgid "Device"
+msgstr "Appareil"
+
+#: cps/spa_strings.py
+msgid "Device name"
+msgstr "Nom de l'appareil"
+
+#: cps/spa_strings.py
+msgid "Device renamed."
+msgstr "Appareil renommé."
+
+#: cps/spa_strings.py
+msgid "Device restored."
+msgstr "Appareil restauré."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Device: {name}"
+msgstr "Appareil : {name}"
+
+#: cps/spa_strings.py
+msgid "Devices appear here after their first sync."
+msgstr "Les appareils apparaissent ici après leur première synchronisation."
 
 #: cps/spa_strings.py
 msgid "Disable standard password login"
@@ -4602,6 +4668,10 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "E-reader preview"
 msgstr "Aperçu sur liseuse"
+
+#: cps/spa_strings.py
+msgid "E-readers"
+msgstr "Liseuses"
 
 #: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
@@ -4683,6 +4753,10 @@ msgid "Expires in"
 msgstr "Expire dans"
 
 #: cps/spa_strings.py
+msgid "Export"
+msgstr "Exporter"
+
+#: cps/spa_strings.py
 msgid "Expose only selected shelves over OPDS"
 msgstr "N’exposer que les étagères sélectionnées via OPDS"
 
@@ -4725,6 +4799,10 @@ msgstr ""
 #: cps/templates/cover_picker.html
 msgid "Fill style"
 msgstr "Style de remplissage"
+
+#: cps/spa_strings.py
+msgid "Filter by device"
+msgstr "Filtrer par appareil"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4796,6 +4874,10 @@ msgstr "Aller à votre bibliothèque"
 #: cps/templates/cover_picker.html
 msgid "Gradient — palette-matched top/bottom blend"
 msgstr "Dégradé — fondu haut/bas assorti à la palette"
+
+#: cps/spa_strings.py
+msgid "Group by"
+msgstr "Grouper par"
 
 #: cps/spa_strings.py
 msgid "Group claim"
@@ -4894,6 +4976,15 @@ msgstr "Identifiants"
 msgid "Image from {source}"
 msgstr "Image provenant de {source}"
 
+#: cps/spa_strings.py cps/templates/annotations_import.html
+msgid "Import"
+msgstr "Importer"
+
+# Device and annotation management (SPA)
+#: cps/spa_strings.py
+msgid "Import and export"
+msgstr "Importer et exporter"
+
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
 msgstr "Importé sous"
@@ -4920,6 +5011,10 @@ msgstr ""
 "Elle a peut-être été déplacée, ou se trouve encore dans l’interface "
 "classique."
 
+#: cps/spa_strings.py
+msgid "KOReader"
+msgstr "KOReader"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr "Avancement KOReader"
@@ -4933,12 +5028,20 @@ msgid "Key path"
 msgstr "Chemin de la clé"
 
 #: cps/spa_strings.py
+msgid "Kobo"
+msgstr "Kobo"
+
+#: cps/spa_strings.py
 msgid "Kobo Clara HD / 2E / BW / Colour (1072×1448)"
 msgstr "Kobo Clara HD / 2E / BW / Colour (1072×1448)"
 
 #: cps/spa_strings.py
 msgid "Kobo Libra Color / Libra 2 (1264×1680)"
 msgstr "Kobo Libra Color / Libra 2 (1264×1680)"
+
+#: cps/spa_strings.py
+msgid "Kobo setup"
+msgstr "Configuration Kobo"
 
 #: cps/spa_strings.py
 msgid "Kobo sync on"
@@ -4956,6 +5059,11 @@ msgstr "Langues — inclure"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last modified"
 msgstr "Dernière modification"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Last seen {when}"
+msgstr "Vu pour la dernière fois {when}"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last synced"
@@ -5040,8 +5148,17 @@ msgid "Manage admin role from OAuth group"
 msgstr "Gérer le rôle administrateur depuis le groupe OAuth"
 
 #: cps/spa_strings.py
+msgid "Manage e-readers"
+msgstr "Gérer les liseuses"
+
+#: cps/spa_strings.py
 msgid "Manage shelves"
 msgstr "Gérer les étagères"
+
+#: cps/spa_strings.py
+msgid "Manage your Kobo sync URL in the classic account page."
+msgstr ""
+"Gérez votre URL de synchronisation Kobo sur la page de compte classique."
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/book_table.html
@@ -5094,6 +5211,11 @@ msgstr "Min."
 #: cps/spa_strings.py
 msgid "Minimum rating"
 msgstr "Note minimale"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {name}"
+msgstr "Plus d'actions pour {name}"
 
 #: cps/spa_strings.py
 msgid "More cover options (search providers, e-reader preview)"
@@ -5186,6 +5308,10 @@ msgid "No duplicate groups found."
 msgstr "Aucun groupe de doublons trouvé."
 
 #: cps/spa_strings.py
+msgid "No e-readers yet."
+msgstr "Aucune liseuse pour le moment."
+
+#: cps/spa_strings.py
 msgid "No excluded tags"
 msgstr "Aucune étiquette exclue"
 
@@ -5235,8 +5361,20 @@ msgid "No {items} yet."
 msgstr "Aucun élément dans {items} pour le moment."
 
 #: cps/spa_strings.py
+msgid "Not assigned"
+msgstr "Non attribué"
+
+#: cps/spa_strings.py
 msgid "Not configured"
 msgstr "Non configuré"
+
+#: cps/spa_strings.py
+msgid "Not in current file"
+msgstr "Absent du fichier actuel"
+
+#: cps/spa_strings.py
+msgid "Not seen lately"
+msgstr "Pas vu récemment"
 
 #: cps/spa_strings.py
 msgid "Not set"
@@ -5462,6 +5600,10 @@ msgstr "Rechargement…"
 msgid "Remember me"
 msgstr "Se souvenir de moi"
 
+#: cps/spa_strings.py
+msgid "Remove device"
+msgstr "Supprimer l'appareil"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Retirer des favoris"
@@ -5487,8 +5629,18 @@ msgid "Remove rule"
 msgstr "Supprimer la règle"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove {name}?"
+msgstr "Supprimer {name} ?"
+
+#: cps/spa_strings.py
 msgid "Rename"
 msgstr "Renommer"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Rename {name}"
+msgstr "Renommer {name}"
 
 #: cps/spa_strings.py
 msgid "Reorder"
@@ -5531,6 +5683,10 @@ msgid ""
 msgstr ""
 "Réinitialiser le mot de passe de {name} ? Son mot de passe actuel cessera de "
 "fonctionner et un nouveau lui sera envoyé par courrier électronique."
+
+#: cps/spa_strings.py
+msgid "Retry"
+msgstr "Réessayer"
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
@@ -5637,8 +5793,27 @@ msgid "Select"
 msgstr "Sélectionner"
 
 #: cps/spa_strings.py
+msgid "Select all in group"
+msgstr "Tout sélectionner dans le groupe"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select all {n}"
+msgstr "Tout sélectionner ({n})"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select highlight: {text}"
+msgstr "Sélectionner le surlignage : {text}"
+
+#: cps/spa_strings.py
 msgid "Select multiple"
 msgstr "Sélection multiple"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select note: {text}"
+msgstr "Sélectionner la note : {text}"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
@@ -5706,6 +5881,10 @@ msgid ""
 msgstr ""
 "Indiquez une URL de métadonnées pour remplir automatiquement les points "
 "d’accès ci-dessous, ou saisissez-les manuellement."
+
+#: cps/spa_strings.py
+msgid "Set up Kobo sync"
+msgstr "Configurer la synchronisation Kobo"
 
 #: cps/spa_strings.py
 msgid "Settings saved."
@@ -5898,6 +6077,10 @@ msgid "That URL is not a usable image."
 msgstr "Cette URL ne correspond pas à une image utilisable."
 
 #: cps/spa_strings.py
+msgid "This device will no longer sync."
+msgstr "Cet appareil ne sera plus synchronisé."
+
+#: cps/spa_strings.py
 msgid "This format opens in the full-screen reader."
 msgstr "Ce format s’ouvre dans le lecteur plein écran."
 
@@ -5962,8 +6145,20 @@ msgid "Unarchive"
 msgstr "Désarchiver"
 
 #: cps/spa_strings.py
+msgid "Undo"
+msgstr "Annuler"
+
+#: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Afficher"
+
+#: cps/spa_strings.py
+msgid "Unknown device"
+msgstr "Appareil inconnu"
+
+#: cps/spa_strings.py
+msgid "Unknown source"
+msgstr "Source inconnue"
 
 #: cps/spa_strings.py
 msgid "Unlock the cover above to apply a new one."
@@ -6052,6 +6247,14 @@ msgstr "Visionneuse"
 msgid "Waiting for you to authorise…"
 msgstr "En attente de votre autorisation…"
 
+#: cps/spa_strings.py
+msgid "Warning: this highlight can’t be shown in the book"
+msgstr "Avertissement : ce surlignage ne peut pas être affiché dans le livre"
+
+#: cps/spa_strings.py
+msgid "Web reader"
+msgstr "Lecteur Web"
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "When locked, fetching metadata will not overwrite this cover."
 msgstr ""
@@ -6061,6 +6264,10 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
 msgstr "Date de la première synchronisation de la progression de lecture"
+
+#: cps/spa_strings.py
+msgid "Write a note"
+msgstr "Écrire une note"
 
 #: cps/spa_strings.py
 msgid "Write a note…"
@@ -6139,6 +6346,10 @@ msgid "type (isbn, amazon, doi…)"
 msgstr "type (isbn, amazon, doi…)"
 
 #: cps/spa_strings.py
+msgid "unknown"
+msgstr "inconnu"
+
+#: cps/spa_strings.py
 msgid "value"
 msgstr "valeur"
 
@@ -6193,13 +6404,62 @@ msgstr "{count} résultats pour « {query} »"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{done} of {total}"
+msgstr "{done} sur {total}"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{field} (comma separated)"
 msgstr "{field} (séparés par des virgules)"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{name} removed."
+msgstr "{name} supprimé."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name}, {n} highlights"
+msgstr "{name}, {n} surlignages"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} assigned to {name}."
+msgstr "{n} attribués à {name}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} failed."
+msgstr "{n} échecs."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} found"
 msgstr "{n} trouvé(s)"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} highlights"
+msgstr "{n} surlignages"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} highlights assigned to this device will become Unknown device."
+msgstr "{n} surlignages attribués à cet appareil deviendront Appareil inconnu."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights were made on this device. They are not deleted. Their origin "
+"history is kept."
+msgstr ""
+"{n} surlignages ont été créés sur cet appareil. Ils ne sont pas supprimés. "
+"Leur historique d'origine est conservé."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{ok} of {total} assigned to {name}."
+msgstr "{ok} sur {total} attribués à {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7288,11 +7548,6 @@ msgstr ""
 #: cps/templates/annotations_import.html
 msgid "KoboReader.sqlite"
 msgstr ""
-
-#: cps/templates/annotations_import.html
-msgid "Import"
-msgstr "Importer"
-
 
 #: cps/templates/annotations_import.html
 msgid "Import summary"
@@ -9204,9 +9459,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -11407,10 +11662,6 @@ msgid "Open annotations page"
 msgstr ""
 
 #: cps/templates/read.html
-msgid "Black"
-msgstr "Noir"
-
-#: cps/templates/read.html
 msgid "Font Sizes"
 msgstr "Taille de police"
 
@@ -12497,6 +12748,9 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#~ msgid "Bulk actions"
+#~ msgstr "Actions groupées"
+
 #~ msgid "Random Books"
 #~ msgstr "Livres au hasard"
 
@@ -13124,183 +13378,3 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr ""
 #~ "Cliquer sur la couverture pour importer les métadonnées dans le formulaire"
-
-# Device and annotation management (SPA)
-msgid "Import and export"
-msgstr "Importer et exporter"
-
-msgid "1 selected."
-msgstr "1 sélectionné."
-
-msgid "Assign selected to device"
-msgstr "Attribuer la sélection à l'appareil"
-
-msgid "Assign to device"
-msgstr "Attribuer à l'appareil"
-
-#, python-brace-format
-msgid "Assigned to {name}."
-msgstr "Attribué à {name}."
-
-msgid "Book order"
-msgstr "Ordre du livre"
-
-msgid "Could not assign."
-msgstr "Impossible d'attribuer."
-
-msgid "Could not load e-readers."
-msgstr "Impossible de charger les liseuses."
-
-msgid "Deleted device"
-msgstr "Appareil supprimé"
-
-msgid "Device"
-msgstr "Appareil"
-
-msgid "Device name"
-msgstr "Nom de l'appareil"
-
-msgid "Device renamed."
-msgstr "Appareil renommé."
-
-msgid "Device restored."
-msgstr "Appareil restauré."
-
-#, python-brace-format
-msgid "Device: {name}"
-msgstr "Appareil : {name}"
-
-msgid "Devices appear here after their first sync."
-msgstr "Les appareils apparaissent ici après leur première synchronisation."
-
-msgid "E-readers"
-msgstr "Liseuses"
-
-msgid "Export"
-msgstr "Exporter"
-
-msgid "Filter by device"
-msgstr "Filtrer par appareil"
-
-msgid "Group by"
-msgstr "Grouper par"
-
-msgid "KOReader"
-msgstr "KOReader"
-
-msgid "Kobo"
-msgstr "Kobo"
-
-msgid "Kobo setup"
-msgstr "Configuration Kobo"
-
-#, python-brace-format
-msgid "Last seen {when}"
-msgstr "Vu pour la dernière fois {when}"
-
-msgid "Manage e-readers"
-msgstr "Gérer les liseuses"
-
-msgid "Manage your Kobo sync URL in the classic account page."
-msgstr "Gérez votre URL de synchronisation Kobo sur la page de compte classique."
-
-#, python-brace-format
-msgid "More actions for {name}"
-msgstr "Plus d'actions pour {name}"
-
-msgid "No e-readers yet."
-msgstr "Aucune liseuse pour le moment."
-
-msgid "Not assigned"
-msgstr "Non attribué"
-
-msgid "Not in current file"
-msgstr "Absent du fichier actuel"
-
-msgid "Not seen lately"
-msgstr "Pas vu récemment"
-
-msgid "Remove device"
-msgstr "Supprimer l'appareil"
-
-#, python-brace-format
-msgid "Remove {name}?"
-msgstr "Supprimer {name} ?"
-
-#, python-brace-format
-msgid "Rename {name}"
-msgstr "Renommer {name}"
-
-msgid "Retry"
-msgstr "Réessayer"
-
-msgid "Select all in group"
-msgstr "Tout sélectionner dans le groupe"
-
-#, python-brace-format
-msgid "Select all {n}"
-msgstr "Tout sélectionner ({n})"
-
-#, python-brace-format
-msgid "Select highlight: {text}"
-msgstr "Sélectionner le surlignage : {text}"
-
-msgid "Set up Kobo sync"
-msgstr "Configurer la synchronisation Kobo"
-
-msgid "This device will no longer sync."
-msgstr "Cet appareil ne sera plus synchronisé."
-
-msgid "Undo"
-msgstr "Annuler"
-
-msgid "Unknown device"
-msgstr "Appareil inconnu"
-
-msgid "Unknown source"
-msgstr "Source inconnue"
-
-msgid "Warning: this highlight can’t be shown in the book"
-msgstr "Avertissement : ce surlignage ne peut pas être affiché dans le livre"
-
-msgid "Web reader"
-msgstr "Lecteur Web"
-
-msgid "unknown"
-msgstr "inconnu"
-
-#, python-brace-format
-msgid "{done} of {total}"
-msgstr "{done} sur {total}"
-
-#, python-brace-format
-msgid "{name} removed."
-msgstr "{name} supprimé."
-
-#, python-brace-format
-msgid "{name}, {n} highlights"
-msgstr "{name}, {n} surlignages"
-
-#, python-brace-format
-msgid "{n} assigned to {name}."
-msgstr "{n} attribués à {name}."
-
-#, python-brace-format
-msgid "{n} failed."
-msgstr "{n} échecs."
-
-#, python-brace-format
-msgid "{n} highlights"
-msgstr "{n} surlignages"
-
-#, python-brace-format
-msgid "{n} highlights assigned to this device will become Unknown device."
-msgstr "{n} surlignages attribués à cet appareil deviendront Appareil inconnu."
-
-#, python-brace-format
-msgid "{n} highlights were made on this device. They are not deleted. Their origin history is kept."
-msgstr "{n} surlignages ont été créés sur cet appareil. Ils ne sont pas supprimés. Leur historique d'origine est conservé."
-
-#, python-brace-format
-msgid "{ok} of {total} assigned to {name}."
-msgstr "{ok} sur {total} attribués à {name}."

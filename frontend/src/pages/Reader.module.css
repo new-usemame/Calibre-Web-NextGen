@@ -507,3 +507,15 @@
 @media (prefers-reduced-motion: reduce) {
   .hiliteNote, .noteSave { transition: none; }
 }
+
+/* "Write a note" — the way into a note that is not attached to a passage.
+ * Lives at the top of the drawer because that is where a reader's notes already
+ * are, and a full-width row keeps it comfortably past 44px on a phone. */
+.annNewNote {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; min-height: 44px; padding: 0 10px; margin-bottom: 8px;
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+  background: transparent; color: var(--text);
+  font-size: var(--fs-sm); text-align: left; cursor: pointer;
+}
+.annNewNote:hover { background: var(--surface-2); }

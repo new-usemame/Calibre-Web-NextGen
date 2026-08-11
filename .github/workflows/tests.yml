@@ -66,6 +66,15 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
+      # The frontend's unit suites are Node programs run from pytest
+      # (tests/unit/test_frontend_unit_suites_run.py). Without a pinned node the
+      # runner's default decides whether they execute at all, and a suite that
+      # silently stops running is the hole this job exists to close.
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
       - name: Install system dependencies
         run: |
           sudo apt-get update

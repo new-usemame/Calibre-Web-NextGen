@@ -17,6 +17,12 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **The reader's Black page theme is back, and it is actually black.** The
+  classic reader has four page themes; the new UI's reader only ever showed
+  three, and anyone who had chosen **Black** was quietly given the dark theme
+  instead — a warm near-black — with no way to get back to it. Black is now its
+  own choice with a true black page, which is what an OLED screen wants at
+  night (#325).
 - **The reader remembers whether you want one column or two.** The new UI's
   reader always laid pages out in two columns on a wide screen, even if you had
   chosen a single column in the classic view — the preference was being saved
@@ -78,6 +84,12 @@ is for things you can see or feel when running the app.
   it back. It now names the password you are about to revoke.
 
 ### Added
+- **You can now write a note about a book without highlighting anything first.**
+  Notes could only ever be attached to a passage, so there was nowhere to put a
+  thought about the book as a whole — "the argument in chapter 3 never lands"
+  had to be pinned to a sentence that was not really the point. **Write a note**
+  at the top of the reader's Highlights and notes panel opens a blank note, and
+  it appears alongside your highlights on the book's Highlights page (#325).
 
 - **The new UI's reader can go full screen.** The classic reader has always had
   a full-screen button; the new one didn't, so on a laptop or tablet you read

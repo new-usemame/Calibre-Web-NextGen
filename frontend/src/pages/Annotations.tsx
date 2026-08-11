@@ -14,9 +14,14 @@ import styles from './Annotations.module.css';
 
 interface Annotation {
   annotation_id: string; highlighted_text: string; highlight_color: string | null;
+  /** 'unanchored' means a note ABOUT the book with no passage — it has neither a
+   *  quote nor a colour, so it must not be drawn with either. NULL is legacy CFI. */
+  position_type?: string | null;
   note_text: string | null; chapter_progress: number | null; source: string | null;
   origin_device_id: string | null; assigned_device_id: string | null;
-  anchor_status: 'ok' | 'unresolved';
+  /* 'unanchored' is a THIRD state, not a flavour of unresolved: nothing failed to
+   * resolve, so the row must not carry the "can't be shown in the book" warning. */
+  anchor_status: 'ok' | 'unresolved' | 'unanchored';
 }
 interface DeviceSummary { label: string; model: string | null; type: string }
 interface ActiveDevice extends DeviceSummary { public_id: string; active: boolean }
@@ -240,7 +245,21 @@ export function Annotations({ id }: { id: string }) {
               {selecting && <button type="button" onClick={() => setSelected((current) => new Set([...current, ...filtered.filter((row) => assignmentOf(row) === entry.id).map((row) => row.annotation_id)]))}>{t('Select all in group')}</button>}
             </div>
           ) : (() => {
-            const row = entry.annotation; const current = assignmentOf(row); const quoteName = row.highlighted_text.slice(0, 60);
+            const row = entry.annotation; const current = assignmentOf(row);
+            /* A standalone note has no passage and no colour. The API projects a default
+             * colour for it (`r.highlight_color or "yellow"`, a legacy fallback for old
+             * rows), so drawing the swatch and the blockquote unconditionally shows a
+             * swatch announced as "Yellow" beside an EMPTY quote — a highlight that looks
+             * like it lost its text. Draw the row as what it is. Credit: the rule and the
+             * reasoning come from #1544 on main; this keeps them through the merge. */
+            const unanchored = row.position_type === 'unanchored';
+            const quoteName = (unanchored ? row.note_text || '' : row.highlighted_text).slice(0, 60);
+            /* Announcing a note as "Select highlight" is the same category error in the
+             * accessibility tree that the swatch is on screen — a screen-reader user
+             * would be the only one still told this row is a highlight. */
+            const selectLabel = unanchored
+              ? t('Select note: {text}', { text: quoteName })
+              : t('Select highlight: {text}', { text: quoteName });
             return <div className={`${styles.item} ${selecting ? styles.selecting : ''} ${failed.has(row.annotation_id) ? styles.failed : ''}`}
               onPointerDown={(event) => startLongPress(row.annotation_id, event.pointerType)}
               onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerMove={cancelLongPress}
@@ -248,10 +267,10 @@ export function Annotations({ id }: { id: string }) {
                 if (suppressClickRef.current === row.annotation_id) { suppressClickRef.current = null; return; }
                 if (selecting) toggle(row.annotation_id);
               }}>
-              {selecting && <label className={styles.rowSelect} onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected.has(row.annotation_id)} onChange={() => toggle(row.annotation_id)} aria-label={t('Select highlight: {text}', { text: quoteName })} /><span className={styles.srOnly}>{t('Select highlight: {text}', { text: quoteName })}</span></label>}
-              <span className={styles.bar} role="img" aria-label={colorName(row.highlight_color)} style={{ background: COLOR_HEX[row.highlight_color || 'yellow'] || COLOR_HEX.yellow }} />
+              {selecting && <label className={styles.rowSelect} onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected.has(row.annotation_id)} onChange={() => toggle(row.annotation_id)} aria-label={selectLabel} /><span className={styles.srOnly}>{selectLabel}</span></label>}
+              {!unanchored && <span className={styles.bar} role="img" aria-label={colorName(row.highlight_color)} style={{ background: COLOR_HEX[row.highlight_color || 'yellow'] || COLOR_HEX.yellow }} />}
               <div className={styles.body}>
-                <blockquote className={styles.quote}>{row.highlighted_text}</blockquote>{row.note_text && <p className={styles.note}>{row.note_text}</p>}
+                {!unanchored && <blockquote className={styles.quote}>{row.highlighted_text}</blockquote>}{row.note_text && <p className={styles.note}>{row.note_text}</p>}
                 <div className={styles.meta}><span>{sourceLabel(row.source)}</span><span aria-hidden="true">·</span>
                   {group === 'device' ? <span>{deviceLabel(current)}</span> : <select className={!current ? styles.unknown : ''} value={current || 'unknown'}
                     aria-label={t('Device: {name}', { name: current ? deviceLabel(current) : t('unknown') })}

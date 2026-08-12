@@ -7,7 +7,13 @@
 Maintenance note: bol.com can reject automated traffic and changes page markup.
 Embedded JSON-LD product data is expected to break first, followed by product-link
 selectors. Recorded fixtures detect parser drift; live opt-in searches detect an
-anti-bot change. Every upstream or parsing failure intentionally returns no results.
+anti-bot change.
+
+Unreachable-network and parsing failures intentionally return no results. An HTTP
+status refusal does not: bol.com answers a genuine no-match with 200 and an empty
+result list, so a 429/403 never means "no such book" and is raised for the search
+layer to name. Same reasoning as the Goodreads scraper, where swallowing it made
+throttling indistinguishable from a missing book (#303).
 """
 
 from __future__ import annotations
@@ -49,10 +55,15 @@ class BolCom(Metadata):
             response = session.get(self.SEARCH_URL.format(quote_plus(query.strip())), timeout=self.TIMEOUT)
             response.raise_for_status()
             links = self._parse_search(response.text)
+        except requests.HTTPError as exc:
+            # Refused, not empty — see the module docstring (#303).
+            log.warning("bol.com search refused: %s", exc)
+            raise
         except (requests.RequestException, ValueError, TypeError) as exc:
             log.warning("bol.com search failed: %s", exc)
             return []
         records = []
+        refusal = None
         for link in links[:self.MAX_RESULTS]:
             try:
                 response = session.get(link, timeout=self.TIMEOUT)
@@ -60,8 +71,14 @@ class BolCom(Metadata):
                 record = self._parse_book(response.text, link, generic_cover)
                 if record:
                     records.append(record)
+            except requests.HTTPError as exc:
+                log.warning("bol.com book fetch refused: %s", exc)
+                refusal = exc
             except (requests.RequestException, ValueError, TypeError) as exc:
                 log.warning("bol.com book fetch failed: %s", exc)
+        # Search matched but every page was refused: not an empty result.
+        if refusal is not None and not records:
+            raise refusal
         return records
 
     @classmethod

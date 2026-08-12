@@ -183,26 +183,6 @@ async function turnPage(page: Page, times = 1) {
 }
 
 test.describe('reader: a jump is not a reading position', () => {
-  /*
-   * Put the book back.
-   *
-   * A lane keeps this spec off other specs' books; cleanup is what stops it
-   * poisoning whoever inherits this one later. Leaving a highlight behind broke
-   * a neighbour whose precondition is "the test book starts with no
-   * annotations", and the failure landed on the innocent spec, not this one.
-   * Registered as afterEach so it runs even when the test fails part-way.
-   */
-  let bookUnderTest: number | null = null;
-  test.afterEach(async ({ page }) => {
-    if (bookUnderTest === null) return;
-    await clearAnnotations(page, bookUnderTest).catch(() => undefined);
-    await page.request.post(`/api/v1/books/${bookUnderTest}/bookmark`, {
-      data: { format: 'epub', bookmark: '' },
-      headers: { 'X-CSRFToken': await csrfToken(page) },
-    }).catch(() => undefined);
-    bookUnderTest = null;
-  });
-
   test('opening a saved highlight leaves the saved place alone, and reading on saves again', async ({ page }, testInfo) => {
     /*
      * Desktop only, and that is a deliberate scope, not an oversight.
@@ -225,26 +205,7 @@ test.describe('reader: a jump is not a reading position', () => {
       testInfo.project.name !== 'desktop',
       'arranges per-(user,book) server state; concurrent projects would clobber it',
     );
-    /*
-     * Lane 4, and the number is load-bearing.
-     *
-     * This spec arranges state destructively -- it clears the book's bookmark
-     * and leaves a highlight behind -- and `reader-notes.spec.ts` already
-     * occupies lanes 0, 1, 2 and 3 (`openReaderOnEpub(page, N)`, varying by
-     * project). The suite is `fullyParallel` with two workers in CI, so sharing
-     * a lane means racing on one book.
-     *
-     * Both collisions were seen for real. On lane 0 this wiped the bookmark the
-     * search test was asserting on, which surfaced as `null` where a CFI was
-     * expected. Moving to lane 2 then broke the drawer test, whose precondition
-     * is "the test book starts with no annotations" -- the highlight left here.
-     * Neither reproduces single-worker locally, and both read as the feature
-     * under test failing.
-     *
-     * The library has 41 eligible EPUBs, so lane 4 is genuinely its own book.
-     */
-    const bookId = await pickEpub(page, 4);
-    bookUnderTest = bookId;
+    const bookId = await pickEpub(page, 0);
     test.skip(!bookId, 'no EPUB with enough prose in this library');
 
     // Start from a known-clean position so a previous run cannot supply the
@@ -267,22 +228,9 @@ test.describe('reader: a jump is not a reading position', () => {
     const positionA = await waitForSavedChange(page, bookId!, null);
     expect(positionA, 'reading should save a position before we test preserving it').toBeTruthy();
 
-    /*
-     * Read on until the book crosses into a DIFFERENT spine section.
-     *
-     * A fixed number of page turns is what a book's chapter lengths happen to
-     * allow, not what this test needs. With a fixed count the section-boundary
-     * guard below fired on whichever book the lane landed on and the test
-     * SKIPPED -- reporting green while asserting nothing, which is worse than
-     * failing. Paging until the section actually changes makes the test work on
-     * any book with more than one section, and reaches the skip only for a book
-     * that genuinely has one.
-     */
-    let positionB = positionA;
-    for (let i = 0; i < 20 && spineSection(positionB) === spineSection(positionA); i += 1) {
-      await turnPage(page, 2);
-      positionB = (await waitForSavedChange(page, bookId!, positionB)) ?? positionB;
-    }
+    // Read on to a clearly different position B, and capture it.
+    await turnPage(page, 4);
+    const positionB = await waitForSavedChange(page, bookId!, positionA);
     expect(positionB, 'paging further should save a different position').toBeTruthy();
     expect(positionB).not.toBe(positionA);
 

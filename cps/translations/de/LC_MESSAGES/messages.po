@@ -4259,7 +4259,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
-msgstr ""
+msgstr "Highlights und Notizen konnten nicht geladen werden."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."

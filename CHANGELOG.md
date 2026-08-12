@@ -17,6 +17,14 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **More of the interface reads in German.** Coverage went from 1,891 to 2,071
+  translated phrases: 121 phrases that had no German at all now have it, and 59
+  entries that gettext had guessed and marked provisional — provisional entries
+  are dropped when the catalogue is compiled, so they were showing in English
+  regardless — are now confirmed translations. One of them was **Import**, which
+  had been guessed as "Wichtig:" ("Important:"). Contributed by
+  [@chaosblog](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1549)
+  ([#1549](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1549)).
 - **The highlights page admits it holds your notes too.** Notes you write about a
   book — the ones not attached to any particular sentence — have been showing up
   in the highlights list for a while, but the page still called everything a

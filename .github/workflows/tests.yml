@@ -498,6 +498,7 @@ jobs:
     if: |
       always() && (
       startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.ref == 'refs/heads/dev' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_e2e) ||
       (github.event_name == 'pull_request' && needs.changed_paths.outputs.frontend == 'true')
@@ -881,6 +882,9 @@ jobs:
           # fork carve-out mirrors the e2e job's own continue-on-error, so the
           # two cannot disagree about what is being gated.
           IS_FRONTEND_PR: ${{ needs.changed_paths.outputs.frontend == 'true' && github.event.pull_request.head.repo.fork != true }}
+          # Every push to main runs and gates on the SPA e2e suite. Keep this
+          # event-scoped so workflow_dispatch continues to honor run_e2e.
+          IS_MAIN_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           echo "Fast Tests:        ${{ needs.fast-tests.result }}"
           echo "Frontend Build:    ${{ needs.frontend-build.result }}"
@@ -889,6 +893,29 @@ jobs:
           echo "Is tier-2 PR:      $IS_TIER2_PR"
           echo "Is build PR:       $IS_BUILD_PR"
           echo "Is frontend PR:    $IS_FRONTEND_PR"
+          echo "Is main push:      $IS_MAIN_PUSH"
+
+          # A required summary must positively prove that every hard-gated
+          # main-push lane completed. Reject skipped/cancelled as well as
+          # failure; otherwise a later broken job condition silently turns
+          # coverage off while this required check stays green.
+          if [[ "$IS_MAIN_PUSH" == "true" ]]; then
+            if [[ "${{ needs.fast-tests.result }}" != "success" ]]; then
+              echo "❌ Fast tests did not succeed on a push to main"
+              echo "   Actual result: ${{ needs.fast-tests.result }}"
+              exit 1
+            fi
+            if [[ "${{ needs.frontend-build.result }}" != "success" ]]; then
+              echo "❌ Frontend build did not succeed on a push to main"
+              echo "   Actual result: ${{ needs.frontend-build.result }}"
+              exit 1
+            fi
+            if [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
+              echo "❌ SPA e2e suite did not succeed on a push to main"
+              echo "   Actual result: ${{ needs.e2e-tests.result }}"
+              exit 1
+            fi
+          fi
 
           if [[ "${{ needs.fast-tests.result }}" == "failure" ]]; then
             echo "❌ Fast tests failed"
@@ -940,9 +967,11 @@ jobs:
           # (#1130). Warning-and-continuing is how a red suite kept satisfying
           # merge-gate condition (a): this summary is the single required
           # check, and auto-merge.yml fires on it, so "just warn" meant the
-          # gate reported its own failure as a pass. Tag and main runs stay
-          # advisory here — the job itself is already non-advisory there, and
-          # failing the summary too would block auto-revert decisions.
+          # gate reported its own failure as a pass. Main pushes are also a
+          # hard gate here: branch protection reads this summary, so relying
+          # only on the failed e2e job would still let the required check pass.
+          # Tag and dev runs stay advisory in the summary; the e2e job itself
+          # remains non-advisory there.
           if [[ "${{ needs.e2e-tests.result }}" == "failure" ]]; then
             if [[ "$IS_FRONTEND_PR" == "true" ]]; then
               echo "❌ SPA e2e suite failed on a frontend PR — this is a hard gate."

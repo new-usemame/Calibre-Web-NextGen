@@ -4264,8 +4264,8 @@ msgid "Could not load e-readers."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Could not load highlights."
-msgstr "Nie udało się wczytać zakreśleń."
+msgid "Could not load highlights and notes."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -5249,13 +5249,6 @@ msgid "No excluded tags"
 msgstr "Brak wykluczonych tagów"
 
 #: cps/spa_strings.py
-msgid ""
-"No highlights yet. Highlight while reading, or import from a Kobo device."
-msgstr ""
-"Brak jeszcze zakreśleń. Zakreślaj podczas czytania lub zaimportuj z "
-"urządzenia Kobo."
-
-#: cps/spa_strings.py
 msgid "No highlights yet. Select text in the book to make one."
 msgstr ""
 
@@ -5319,6 +5312,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Note saved"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Nothing here yet. Highlight or write a note while reading, or import from a "
+"Kobo device."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6339,7 +6338,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{name}, {n} highlights"
+msgid "{name}, {n} highlights and notes"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6359,19 +6358,20 @@ msgstr "znaleziono: {n}"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{n} highlights"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} highlights assigned to this device will become Unknown device."
+msgid "{n} highlights and notes"
 msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
-"{n} highlights were made on this device. They are not deleted. Their origin "
-"history is kept."
+"{n} highlights and notes assigned to this device will become Unknown device."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes were made on this device. They are not deleted. "
+"Their origin history is kept."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -12747,6 +12747,15 @@ msgstr "Udostępniaj wybrane półki przez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
+
+#~ msgid "Could not load highlights."
+#~ msgstr "Nie udało się wczytać zakreśleń."
+
+#~ msgid ""
+#~ "No highlights yet. Highlight while reading, or import from a Kobo device."
+#~ msgstr ""
+#~ "Brak jeszcze zakreśleń. Zakreślaj podczas czytania lub zaimportuj z "
+#~ "urządzenia Kobo."
 
 #~ msgid "Bulk actions"
 #~ msgstr "Działania zbiorcze"

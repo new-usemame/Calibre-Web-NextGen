@@ -4328,8 +4328,8 @@ msgid "Could not load e-readers."
 msgstr "Impossible de charger les liseuses."
 
 #: cps/spa_strings.py
-msgid "Could not load highlights."
-msgstr "Impossible de charger les surlignages."
+msgid "Could not load highlights and notes."
+msgstr "Impossible de charger les surlignages et les notes."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -5316,13 +5316,6 @@ msgid "No excluded tags"
 msgstr "Aucune étiquette exclue"
 
 #: cps/spa_strings.py
-msgid ""
-"No highlights yet. Highlight while reading, or import from a Kobo device."
-msgstr ""
-"Aucun surlignage pour l’instant. Surlignez pendant la lecture, ou importez "
-"depuis un appareil Kobo."
-
-#: cps/spa_strings.py
 msgid "No highlights yet. Select text in the book to make one."
 msgstr ""
 "Aucun surlignage pour le moment. Sélectionnez du texte dans le livre pour en "
@@ -5391,6 +5384,12 @@ msgstr "Note supprimée"
 #: cps/spa_strings.py
 msgid "Note saved"
 msgstr "Note enregistrée"
+
+#: cps/spa_strings.py
+msgid ""
+"Nothing here yet. Highlight or write a note while reading, or import from a "
+"Kobo device."
+msgstr "Rien pour l’instant. Surlignez ou écrivez une note pendant la lecture, ou importez depuis un appareil Kobo."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -6419,8 +6418,8 @@ msgstr "{name} supprimé."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{name}, {n} highlights"
-msgstr "{name}, {n} surlignages"
+msgid "{name}, {n} highlights and notes"
+msgstr "{name}, {n} surlignages et notes"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6439,22 +6438,21 @@ msgstr "{n} trouvé(s)"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{n} highlights"
-msgstr "{n} surlignages"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} highlights assigned to this device will become Unknown device."
-msgstr "{n} surlignages attribués à cet appareil deviendront Appareil inconnu."
+msgid "{n} highlights and notes"
+msgstr "{n} surlignages et notes"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
-"{n} highlights were made on this device. They are not deleted. Their origin "
-"history is kept."
-msgstr ""
-"{n} surlignages ont été créés sur cet appareil. Ils ne sont pas supprimés. "
-"Leur historique d'origine est conservé."
+"{n} highlights and notes assigned to this device will become Unknown device."
+msgstr "{n} surlignages et notes attribués à cet appareil deviendront Appareil inconnu."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes were made on this device. They are not deleted. "
+"Their origin history is kept."
+msgstr "{n} surlignages et notes ont été créés sur cet appareil. Ils ne sont pas supprimés. Leur historique d'origine est conservé."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12747,6 +12745,36 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "Could not load highlights."
+#~ msgstr "Impossible de charger les surlignages."
+
+#~ msgid ""
+#~ "No highlights yet. Highlight while reading, or import from a Kobo device."
+#~ msgstr ""
+#~ "Aucun surlignage pour l’instant. Surlignez pendant la lecture, ou "
+#~ "importez depuis un appareil Kobo."
+
+#, python-brace-format
+#~ msgid "{name}, {n} highlights"
+#~ msgstr "{name}, {n} surlignages"
+
+#, python-brace-format
+#~ msgid "{n} highlights"
+#~ msgstr "{n} surlignages"
+
+#, python-brace-format
+#~ msgid "{n} highlights assigned to this device will become Unknown device."
+#~ msgstr ""
+#~ "{n} surlignages attribués à cet appareil deviendront Appareil inconnu."
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights were made on this device. They are not deleted. Their "
+#~ "origin history is kept."
+#~ msgstr ""
+#~ "{n} surlignages ont été créés sur cet appareil. Ils ne sont pas "
+#~ "supprimés. Leur historique d'origine est conservé."
 
 #~ msgid "Bulk actions"
 #~ msgstr "Actions groupées"

@@ -4209,8 +4209,8 @@ msgid "Could not load e-readers."
 msgstr "E-readers konden niet worden geladen."
 
 #: cps/spa_strings.py
-msgid "Could not load highlights."
-msgstr "Kan markeringen niet laden."
+msgid "Could not load highlights and notes."
+msgstr "Kan markeringen en notities niet laden."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -5194,13 +5194,6 @@ msgid "No excluded tags"
 msgstr "Geen uitgesloten labels"
 
 #: cps/spa_strings.py
-msgid ""
-"No highlights yet. Highlight while reading, or import from a Kobo device."
-msgstr ""
-"Nog geen markeringen. Markeer tijdens het lezen, of importeer van een Kobo-"
-"apparaat."
-
-#: cps/spa_strings.py
 msgid "No highlights yet. Select text in the book to make one."
 msgstr "Nog geen markeringen. Selecteer tekst in het boek om er een te maken."
 
@@ -5266,6 +5259,12 @@ msgstr "Notitie verwijderd"
 #: cps/spa_strings.py
 msgid "Note saved"
 msgstr "Notitie opgeslagen"
+
+#: cps/spa_strings.py
+msgid ""
+"Nothing here yet. Highlight or write a note while reading, or import from a "
+"Kobo device."
+msgstr "Nog niets. Markeer of schrijf een notitie tijdens het lezen, of importeer van een Kobo-apparaat."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -6293,8 +6292,8 @@ msgstr "{name} verwijderd."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{name}, {n} highlights"
-msgstr "{name}, {n} markeringen"
+msgid "{name}, {n} highlights and notes"
+msgstr "{name}, {n} markeringen en notities"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6313,24 +6312,21 @@ msgstr "{n} gevonden"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{n} highlights"
-msgstr "{n} markeringen"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} highlights assigned to this device will become Unknown device."
-msgstr ""
-"{n} markeringen die aan dit apparaat zijn toegewezen, worden Onbekend "
-"apparaat."
+msgid "{n} highlights and notes"
+msgstr "{n} markeringen en notities"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
-"{n} highlights were made on this device. They are not deleted. Their origin "
-"history is kept."
-msgstr ""
-"{n} markeringen zijn op dit apparaat gemaakt. Ze worden niet verwijderd. Hun "
-"herkomstgeschiedenis blijft bewaard."
+"{n} highlights and notes assigned to this device will become Unknown device."
+msgstr "{n} markeringen en notities die aan dit apparaat zijn toegewezen, worden Onbekend apparaat."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes were made on this device. They are not deleted. "
+"Their origin history is kept."
+msgstr "{n} markeringen en notities zijn op dit apparaat gemaakt. Ze worden niet verwijderd. Hun herkomstgeschiedenis blijft bewaard."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12420,6 +12416,37 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Could not load highlights."
+#~ msgstr "Kan markeringen niet laden."
+
+#~ msgid ""
+#~ "No highlights yet. Highlight while reading, or import from a Kobo device."
+#~ msgstr ""
+#~ "Nog geen markeringen. Markeer tijdens het lezen, of importeer van een "
+#~ "Kobo-apparaat."
+
+#, python-brace-format
+#~ msgid "{name}, {n} highlights"
+#~ msgstr "{name}, {n} markeringen"
+
+#, python-brace-format
+#~ msgid "{n} highlights"
+#~ msgstr "{n} markeringen"
+
+#, python-brace-format
+#~ msgid "{n} highlights assigned to this device will become Unknown device."
+#~ msgstr ""
+#~ "{n} markeringen die aan dit apparaat zijn toegewezen, worden Onbekend "
+#~ "apparaat."
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights were made on this device. They are not deleted. Their "
+#~ "origin history is kept."
+#~ msgstr ""
+#~ "{n} markeringen zijn op dit apparaat gemaakt. Ze worden niet verwijderd. "
+#~ "Hun herkomstgeschiedenis blijft bewaard."
 
 #~ msgid "Bulk actions"
 #~ msgstr "Bulkacties"

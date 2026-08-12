@@ -84,6 +84,11 @@ is for things you can see or feel when running the app.
   it back. It now names the password you are about to revoke.
 
 ### Added
+- **Highlights made on a Kobo now say which device they came from.** The
+  reader's Highlights and notes panel showed a bare internal word like "kobo";
+  it now shows the name you gave the device. Highlights with no device recorded
+  — everything made before this was tracked — are listed exactly as before, just
+  without a label (#325).
 - **You can now write a note about a book without highlighting anything first.**
   Notes could only ever be attached to a passage, so there was nowhere to put a
   thought about the book as a whole — "the argument in chapter 3 never lands"

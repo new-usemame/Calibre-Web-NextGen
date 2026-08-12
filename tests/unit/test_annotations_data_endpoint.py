@@ -184,6 +184,49 @@ class TestEnsureCfiRange:
         book = _make_book(tmp_path, with_epub=True)
         assert ann_mod._ensure_cfi_range(row, book) is None
 
+
+@pytest.mark.unit
+class TestAnchorStatus:
+    def test_cached_cfi_does_not_hide_kobospan_missing_from_current_file(
+            self, memory_db, tmp_path, monkeypatch):
+        from cps import annotations as ann_mod, config, ub
+
+        row = ub.Annotation(
+            user_id=7, book_id=1, annotation_id="stranded",
+            highlighted_text="text no longer in this file",
+            cfi_range="epubcfi(/cached/but/stale)",
+            content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter1.html",
+            start_container_path="span#kobo\\.99\\.99", start_offset=0,
+            end_container_path="span#kobo\\.99\\.99", end_offset=5,
+            source="kobo",
+        )
+        memory_db.add(row); memory_db.commit()
+        book = _make_book(tmp_path, with_epub=True)
+        monkeypatch.setattr(config, "get_book_path", lambda: str(tmp_path / "library"))
+
+        cfi, status = ann_mod._resolve_annotation_anchor(row, book)
+        assert cfi == "epubcfi(/cached/but/stale)"
+        assert status == "unresolved"
+
+    def test_current_kobospan_is_ok(self, memory_db, tmp_path, monkeypatch):
+        from cps import annotations as ann_mod, config, ub
+
+        row = ub.Annotation(
+            user_id=7, book_id=1, annotation_id="current",
+            highlighted_text="hello",
+            content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter1.html",
+            start_container_path="span#kobo\\.1\\.1", start_offset=0,
+            end_container_path="span#kobo\\.1\\.1", end_offset=5,
+            source="kobo",
+        )
+        memory_db.add(row); memory_db.commit()
+        book = _make_book(tmp_path, with_epub=True)
+        monkeypatch.setattr(config, "get_book_path", lambda: str(tmp_path / "library"))
+
+        cfi, status = ann_mod._resolve_annotation_anchor(row, book)
+        assert cfi and cfi.startswith("epubcfi(")
+        assert status == "ok"
+
     def test_returns_none_when_no_epub_on_disk(self, memory_db, tmp_path, monkeypatch):
         from cps import ub, annotations as ann_mod, config
 
@@ -238,6 +281,8 @@ class TestDataJsonRow:
             pdf_page=None,
             pdf_quad_json=None,
             comic_page=None,
+            origin_device_id=11,
+            assigned_device_id=12,
         )
 
     def test_emits_kobospan_anchors(self):
@@ -260,6 +305,46 @@ class TestDataJsonRow:
         # server must not mangle it into a CSS class or a name.
         d = _data_json_row(self._row(), None, None)
         assert d["highlight_color"] == "#F6F3B3"
+
+    def test_adds_public_device_ids_without_changing_existing_keys(self):
+        from cps.annotations import _data_json_row
+
+        d = _data_json_row(self._row(), "cfi", None, {11: "origin-public", 12: "assigned-public"})
+        assert d["origin_device_id"] == "origin-public"
+        assert d["assigned_device_id"] == "assigned-public"
+        assert d["source"] == "kobo"
+        assert d["highlighted_text"] == "was a bright cold day"
+
+    def test_emits_explicit_anchor_status(self):
+        from cps.annotations import _data_json_row
+
+        assert _data_json_row(self._row(), "cfi", None, anchor_status="ok")["anchor_status"] == "ok"
+        assert _data_json_row(
+            self._row(), "stale-cfi", None, anchor_status="unresolved",
+        )["anchor_status"] == "unresolved"
+
+    def test_unknown_historical_devices_are_explicit_nulls(self):
+        from cps.annotations import _data_json_row
+
+        row = self._row()
+        row.origin_device_id = None
+        row.assigned_device_id = None
+        d = _data_json_row(row, "cfi", None, {})
+        assert d["origin_device_id"] is None
+        assert d["assigned_device_id"] is None
+
+    def test_device_envelope_is_keyed_once_by_public_id(self, memory_db):
+        from cps import annotations as ann_mod, ub
+
+        device = ub.Device(user_id=7, kind="kobo", display_name="Reader", model="Kobo Libra",
+                           active=True, created_by="auto")
+        memory_db.add(device)
+        memory_db.commit()
+        internal, payload = ann_mod._annotation_device_payload(7, memory_db)
+        assert internal == {device.id: device.public_id}
+        assert payload == {device.public_id: {
+            "label": "Reader", "model": "Kobo Libra", "type": "kobo",
+        }}
 
     def test_missing_anchor_yields_none_not_crash(self):
         from cps.annotations import _data_json_row

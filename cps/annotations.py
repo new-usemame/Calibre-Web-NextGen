@@ -45,6 +45,8 @@ from typing import Optional
 
 from flask import Blueprint, Response, abort, flash, jsonify, redirect, request, url_for
 from flask_babel import gettext as _
+from sqlalchemy import and_, func
+from sqlalchemy.exc import SQLAlchemyError
 
 from . import calibre_db, logger, ub
 from .cw_login import current_user
@@ -59,6 +61,210 @@ annotations_bp = Blueprint("annotations", __name__)
 # Defense-in-depth file-size cap. Typical real-device KoboReader.sqlite
 # files are 30-50 MB; reject anything over 100 MB.
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+
+
+def _commit_required(commit):
+    """Raise when CWNG's commit wrapper reports a rolled-back write."""
+    if commit() is False:
+        raise RuntimeError("database commit did not land")
+
+
+def _database_error_response(operation):
+    """Roll back a failed API write and keep the response JSON-shaped."""
+    try:
+        ub.session.rollback()
+    except Exception:
+        log.exception("annotations: rollback failed after %s", operation)
+    log.exception("annotations: %s failed", operation)
+    return jsonify({"error": "database_error"}), 500
+
+
+def _owned_device(public_id, user_id, session):
+    return session.query(ub.Device).filter(
+        ub.Device.public_id == public_id, ub.Device.user_id == user_id,
+    ).first()
+
+
+def _device_json(device, annotation_count=0):
+    return {
+        "public_id": device.public_id,
+        "label": device.display_name,
+        "type": device.kind,
+        "model": device.model,
+        "firmware": device.firmware_version,
+        "first_seen": device.first_seen_at.isoformat() if device.first_seen_at else None,
+        "last_seen": device.last_seen_at.isoformat() if device.last_seen_at else None,
+        "annotation_count": int(annotation_count),
+        "active": bool(device.active),
+    }
+
+
+def list_annotation_devices(*, user_id, session, active_only=False):
+    """List devices with one aggregate assigned-annotation count query."""
+    query = (
+        session.query(ub.Device, func.count(ub.Annotation.id))
+        .outerjoin(ub.Annotation, and_(
+            ub.Annotation.assigned_device_id == ub.Device.id,
+            ub.Annotation.user_id == user_id,
+        ))
+        .filter(ub.Device.user_id == user_id)
+    )
+    if active_only:
+        query = query.filter(ub.Device.active.is_(True))
+    rows = query.group_by(ub.Device.id).order_by(ub.Device.display_name, ub.Device.id).all()
+    return [_device_json(device, count) for device, count in rows]
+
+
+def rename_annotation_device(public_id, *, user_id, label, session, commit):
+    if not isinstance(label, str) or label != label.strip() or not 1 <= len(label) <= 60:
+        raise ValueError("device label must be 1-60 characters without surrounding whitespace")
+    if any(ord(char) < 32 or ord(char) == 127 for char in label):
+        raise ValueError("device label contains control characters")
+    device = _owned_device(public_id, user_id, session)
+    if device is None:
+        return None
+    device.display_name = label
+    _commit_required(commit)
+    return device
+
+
+def device_annotation_counts(public_id, *, user_id, session):
+    device = _owned_device(public_id, user_id, session)
+    if device is None:
+        return None
+    origin = session.query(func.count(ub.Annotation.id)).filter(
+        ub.Annotation.user_id == user_id, ub.Annotation.origin_device_id == device.id,
+    ).scalar()
+    assigned = session.query(func.count(ub.Annotation.id)).filter(
+        ub.Annotation.user_id == user_id, ub.Annotation.assigned_device_id == device.id,
+    ).scalar()
+    return device, {"origin_count": int(origin), "assigned_count": int(assigned)}
+
+
+def soft_delete_annotation_device(public_id, *, user_id, session, commit):
+    found = device_annotation_counts(public_id, user_id=user_id, session=session)
+    if found is None:
+        return None
+    device, counts = found
+    assigned = session.query(ub.Annotation).filter(
+        ub.Annotation.user_id == user_id, ub.Annotation.assigned_device_id == device.id,
+    ).all()
+    for annotation in assigned:
+        snapshot = session.query(ub.DeviceRetiredAssignment).filter_by(
+            device_id=device.id, annotation_id=annotation.id,
+        ).first()
+        if snapshot is None:
+            session.add(ub.DeviceRetiredAssignment(device_id=device.id, annotation_id=annotation.id))
+        annotation.assigned_device_id = None
+        annotation.routing_revision = (annotation.routing_revision or 0) + 1
+    session.query(ub.AnnotationDeviceState).filter_by(device_id=device.id).update(
+        {ub.AnnotationDeviceState.desired: False}, synchronize_session=False,
+    )
+    device.active = False
+    _commit_required(commit)
+    return device, counts
+
+
+def restore_annotation_device(public_id, *, user_id, session, commit):
+    device = _owned_device(public_id, user_id, session)
+    if device is None:
+        return None
+    restored = 0
+    conflicts = 0
+    snapshots = session.query(ub.DeviceRetiredAssignment).filter_by(device_id=device.id).all()
+    for snapshot in snapshots:
+        annotation = session.query(ub.Annotation).filter_by(id=snapshot.annotation_id, user_id=user_id).first()
+        if annotation is not None and annotation.assigned_device_id is None:
+            annotation.assigned_device_id = device.id
+            annotation.routing_revision = (annotation.routing_revision or 0) + 1
+            state = session.query(ub.AnnotationDeviceState).filter_by(
+                annotation_id=annotation.id, device_id=device.id,
+            ).first()
+            if state is None:
+                state = ub.AnnotationDeviceState(annotation_id=annotation.id, device_id=device.id)
+                session.add(state)
+            state.desired = True
+            restored += 1
+        elif annotation is not None:
+            conflicts += 1
+        session.delete(snapshot)
+    device.active = True
+    _commit_required(commit)
+    return device, restored, conflicts
+
+
+@annotations_bp.route("/api/annotations/devices", methods=["GET"])
+@user_login_required
+def annotation_devices_list():
+    active_only = request.args.get("active", "").lower() == "true"
+    try:
+        devices = list_annotation_devices(
+            user_id=current_user.id, session=ub.session, active_only=active_only,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device list")
+    return jsonify({"devices": devices})
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>", methods=["PATCH"])
+@user_login_required
+def annotation_device_rename(public_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        device = rename_annotation_device(
+            public_id, user_id=current_user.id, label=data.get("label"),
+            session=ub.session, commit=ub.session_commit,
+        )
+    except ValueError as error:
+        return jsonify({"error": "invalid_label", "message": str(error)}), 400
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device rename")
+    if device is None:
+        abort(404)
+    return jsonify(_device_json(device))
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>/delete-preflight", methods=["GET"])
+@user_login_required
+def annotation_device_delete_preflight(public_id):
+    try:
+        found = device_annotation_counts(public_id, user_id=current_user.id, session=ub.session)
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device delete preflight")
+    if found is None:
+        abort(404)
+    return jsonify(found[1])
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>", methods=["DELETE"])
+@user_login_required
+def annotation_device_delete(public_id):
+    try:
+        result = soft_delete_annotation_device(
+            public_id, user_id=current_user.id, session=ub.session, commit=ub.session_commit,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device soft-delete")
+    if result is None:
+        abort(404)
+    device, counts = result
+    return jsonify({"device": _device_json(device), **counts})
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>/restore", methods=["POST"])
+@user_login_required
+def annotation_device_restore(public_id):
+    try:
+        result = restore_annotation_device(
+            public_id, user_id=current_user.id, session=ub.session, commit=ub.session_commit,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("device restore")
+    if result is None:
+        abort(404)
+    device, restored, conflicts = result
+    return jsonify({"device": _device_json(device), "restored_assignment_count": restored,
+                    "assignment_conflict_count": conflicts})
 
 
 @annotations_bp.route("/annotations/import", methods=["GET"])
@@ -142,6 +348,16 @@ def _ingest_bookmarks(sqlite_path: str) -> dict:
     from the Flask request context (current_user, ub.session,
     calibre_db). Lives so the request handler is one line; the
     actual work happens in the pure function below."""
+    origin_device_id = None
+    supplied_device = request.form.get("origin_device_id")
+    if supplied_device:
+        try:
+            from .services.device_registry import resolve_owned_device_best_effort
+            origin_device_id = resolve_owned_device_best_effort(
+                user_id=current_user.id, public_id=supplied_device,
+            )
+        except Exception:
+            log.warning("annotations: imported-device attribution failed", exc_info=True)
     return ingest_bookmarks(
         sqlite_path,
         user_id=current_user.id,
@@ -150,10 +366,12 @@ def _ingest_bookmarks(sqlite_path: str) -> dict:
             calibre_db.get_book_by_uuid(uuid) if "-" in (uuid or "") else None
         ),
         commit=ub.session_commit,
+        origin_device_id=origin_device_id,
     )
 
 
-def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict:
+def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
+                     origin_device_id=None) -> dict:
     """Walk the parsed bookmarks, resolve VolumeIDs via ``book_lookup``,
     INSERT new highlights into ``kobo_annotation_sync``. Dependencies
     are explicit so this function is unit-testable without a Flask app.
@@ -168,11 +386,12 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
     skipped_existing = 0
     skipped_orphan = 0
     skipped_hidden = 0
+    skipped_invalid_content_id = 0
     total_seen = 0
 
     # Cache: VolumeID -> CW book_id (or None for not-in-library).
     # Same VolumeID often appears across many bookmarks; resolve once.
-    uuid_cache: dict[str, Optional[int]] = {}
+    uuid_cache = {}
 
     for bm in parse_kobo_bookmarks(sqlite_path):
         total_seen += 1
@@ -186,11 +405,12 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
         # skipped (design doc §11 row 2).
         volume_uuid = bm.volume_id
         if volume_uuid in uuid_cache:
-            book_id = uuid_cache[volume_uuid]
+            book_id, resolved_uuid = uuid_cache[volume_uuid]
         else:
             book = book_lookup(volume_uuid)
             book_id = book.id if book else None
-            uuid_cache[volume_uuid] = book_id
+            resolved_uuid = (getattr(book, "uuid", None) or volume_uuid) if book else None
+            uuid_cache[volume_uuid] = (book_id, resolved_uuid)
 
         if book_id is None:
             skipped_orphan += 1
@@ -206,6 +426,15 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
             skipped_existing += 1
             continue
 
+        from .services.annotation_content_id import normalize_content_id, ContentIdError
+        try:
+            content_id = normalize_content_id(
+                bm.content_id, book_uuid=resolved_uuid, allow_legacy_file_uri=True
+            )
+        except ContentIdError:
+            skipped_invalid_content_id += 1
+            continue
+
         row = ub.Annotation(
             user_id=user_id,
             annotation_id=bm.bookmark_id,
@@ -213,7 +442,7 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
             highlighted_text=bm.text,
             highlight_color=bm.color,
             note_text=bm.annotation,
-            content_id=bm.content_id,
+            content_id=content_id,
             start_container_path=bm.start_container_path,
             start_container_child_index=bm.start_container_child_index,
             start_offset=bm.start_offset,
@@ -223,6 +452,7 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
             context_string=bm.context_string,
             chapter_progress=bm.chapter_progress,
             source="kobo",
+            origin_device_id=origin_device_id,
             hidden=False,
         )
         session.add(row)
@@ -240,6 +470,7 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit) -> dict
         "skipped_existing": skipped_existing,
         "skipped_orphan": skipped_orphan,
         "skipped_hidden": skipped_hidden,
+        "skipped_invalid_content_id": skipped_invalid_content_id,
         "total_seen": total_seen,
     }
 
@@ -412,14 +643,8 @@ def _resolve_epub_path(book) -> Optional[str]:
     return None
 
 
-def _ensure_cfi_range(row, book) -> Optional[str]:
-    """If ``row.cfi_range`` is missing, try to compute it on the fly
-    via P2's converter, persist back to the DB, and return the new
-    value. Returns None when computation isn't possible (no EPUB on
-    disk, malformed position data, etc.) — caller renders the
-    annotation in the sidebar without an overlay."""
-    if row.cfi_range:
-        return row.cfi_range
+def _compute_annotation_cfi(row, book) -> Optional[str]:
+    """Resolve the row's native EPUB anchor against the current book file."""
     if not row.content_id or "!!" not in (row.content_id or ""):
         return None
     epub_path = _resolve_epub_path(book)
@@ -441,17 +666,76 @@ def _ensure_cfi_range(row, book) -> Optional[str]:
     except Exception as e:
         log.warning("annotations: cfi compute failed for %s: %s", row.annotation_id, e)
         return None
-    if cfi:
-        row.cfi_range = cfi
-        try:
-            ub.session_commit()
-        except Exception as e:
-            log.error("annotations: cfi persist failed: %s", e)
-            ub.session.rollback()
     return cfi
 
 
-def _data_json_row(r, cfi, pdf_quad) -> dict:
+def _persist_cfi_range(row, cfi):
+    if not cfi or row.cfi_range == cfi:
+        return
+    row.cfi_range = cfi
+    try:
+        ub.session_commit()
+    except Exception as e:
+        log.error("annotations: cfi persist failed: %s", e)
+        ub.session.rollback()
+
+
+def _ensure_cfi_range(row, book) -> Optional[str]:
+    """Compute and cache a missing CFI, without revalidating cached rows."""
+    if row.cfi_range:
+        return row.cfi_range
+    cfi = _compute_annotation_cfi(row, book)
+    _persist_cfi_range(row, cfi)
+    return cfi
+
+
+def _resolve_annotation_anchor(row, book):
+    """Return ``(cfi, status)`` against the current file.
+
+    Native KoboSpan/child-index anchors are deliberately re-resolved even when
+    a CFI was cached earlier: a replacement KEPUB may retain the database row
+    while invalidating its original DOM anchor. CFI-only web-reader rows cannot
+    be validated server-side without epub.js, so a structurally present CFI is
+    treated as usable; the reader remains the final renderer.
+    """
+    position_type = getattr(row, "position_type", None)
+    if position_type == "unanchored":
+        # A standalone note was never placed in the book, so "unresolved" would
+        # be a lie: nothing failed. Without this branch it falls through to the
+        # CFI path, finds no cfi_range, and reports the same status as a
+        # highlight whose anchor was destroyed by a regenerated KEPUB — the UI
+        # would warn "this highlight can't be shown in the book" about a note
+        # that is not a highlight and was never meant to be shown there.
+        #
+        # Neither this resolver nor the sentinel is wrong alone; they merged
+        # without a conflict and composed into a wrong answer.
+        return None, "unanchored"
+    if position_type == "pdf_quad":
+        return None, "ok" if row.pdf_page is not None and row.pdf_quad_json else "unresolved"
+    if position_type == "comic_page":
+        return None, "ok" if row.comic_page is not None else "unresolved"
+
+    from .services.kobo_position import _extract_kobospan_id, KOBO_SELECTOR_SENTINEL
+    has_selector = bool(
+        _extract_kobospan_id(row.start_container_path or "")
+        and _extract_kobospan_id(row.end_container_path or "")
+    )
+    start_child = getattr(row, "start_container_child_index", None)
+    end_child = getattr(row, "end_container_child_index", None)
+    has_child_anchor = (
+        start_child is not None and end_child is not None
+        and start_child != KOBO_SELECTOR_SENTINEL and end_child != KOBO_SELECTOR_SENTINEL
+    )
+    if has_selector or has_child_anchor:
+        current_cfi = _compute_annotation_cfi(row, book)
+        if current_cfi:
+            _persist_cfi_range(row, current_cfi)
+            return current_cfi, "ok"
+        return row.cfi_range, "unresolved"
+    return row.cfi_range, "ok" if row.cfi_range else "unresolved"
+
+
+def _data_json_row(r, cfi, pdf_quad, device_public_ids=None, anchor_status=None) -> dict:
     """Project one annotation row to the web-reader's data.json shape.
 
     Emits the canonical KoboSpan anchor (``start_kobospan`` /
@@ -462,6 +746,11 @@ def _data_json_row(r, cfi, pdf_quad) -> dict:
     export parity. Pure + dependency-free so the payload contract is
     unit-testable without a Flask request context."""
     from .services.kobo_position import _extract_kobospan_id
+    device_public_ids = device_public_ids or {}
+    if anchor_status is None:
+        anchor_status = "ok" if (
+            cfi or pdf_quad or getattr(r, "comic_page", None) is not None
+        ) else "unresolved"
     return {
         "annotation_id": r.annotation_id,
         "cfi_range": cfi,
@@ -475,11 +764,29 @@ def _data_json_row(r, cfi, pdf_quad) -> dict:
         "note_text": r.note_text,
         "chapter_progress": r.chapter_progress,
         "source": r.source,
+        "origin_device_id": device_public_ids.get(getattr(r, "origin_device_id", None)),
+        "assigned_device_id": device_public_ids.get(getattr(r, "assigned_device_id", None)),
+        "anchor_status": anchor_status,
         "position_type": getattr(r, "position_type", None),
         "pdf_page": getattr(r, "pdf_page", None),
         "pdf_quad": pdf_quad,
         "comic_page": getattr(r, "comic_page", None),
     }
+
+
+def _annotation_device_payload(user_id, session):
+    """Return the internal→public lookup and one rename-stable device map."""
+    devices = session.query(ub.Device).filter(ub.Device.user_id == user_id).all()
+    public_ids = {device.id: device.public_id for device in devices}
+    payload = {
+        device.public_id: {
+            "label": device.display_name,
+            "model": device.model,
+            "type": device.kind,
+        }
+        for device in devices
+    }
+    return public_ids, payload
 
 
 @annotations_bp.route("/annotations/<int:book_id>/data.json", methods=["GET"])
@@ -495,21 +802,22 @@ def annotations_data(book_id):
     """
     book = _resolve_book_or_404(book_id)
     rows = _load_user_annotations(current_user.id, book_id)
+    device_public_ids, devices = _annotation_device_payload(current_user.id, ub.session)
     out = []
     for r in rows:
         # CFI computation only applies to EPUB-origin rows. For PDF/comic
         # rows, skip the lookup — they have their own position fields.
-        cfi = None
-        if getattr(r, "position_type", None) in (None, "cfi"):
-            cfi = _ensure_cfi_range(r, book)
+        cfi, anchor_status = _resolve_annotation_anchor(r, book)
         pdf_quad = None
         if r.pdf_quad_json:
             try:
                 pdf_quad = json.loads(r.pdf_quad_json)
             except (ValueError, TypeError):
                 pdf_quad = None
-        out.append(_data_json_row(r, cfi, pdf_quad))
-    return jsonify({"annotations": out, "annotation_count": len(out)})
+        out.append(_data_json_row(
+            r, cfi, pdf_quad, device_public_ids, anchor_status=anchor_status,
+        ))
+    return jsonify({"annotations": out, "annotation_count": len(out), "devices": devices})
 
 
 @annotations_bp.route("/annotations/<int:book_id>", methods=["GET"])
@@ -587,7 +895,8 @@ WEBREADER_ID_PREFIX = "cwn-web-"
 WEBREADER_COLORS = ("yellow", "red", "green", "blue")
 
 
-def create_annotation(payload, *, user_id, book, session, commit):
+def create_annotation(payload, *, user_id, book, session, commit,
+                      origin_device_id=None):
     """Create a ``source='webreader'`` annotation from a reader selection.
 
     ``payload`` carries the KoboSpan anchors the reader derived from the live
@@ -619,6 +928,9 @@ def create_annotation(payload, *, user_id, book, session, commit):
         book_uuid = getattr(book, "uuid", None)
         if chapter and book_uuid:
             content_id = f"{book_uuid}!!{chapter}"
+    if content_id is not None:
+        from .services.annotation_content_id import normalize_content_id
+        content_id = normalize_content_id(content_id, book_uuid=getattr(book, "uuid", None))
 
     start_span = (payload.get("start_kobospan") or "").strip()
     cfi_range = (payload.get("cfi_range") or "").strip()
@@ -655,6 +967,10 @@ def create_annotation(payload, *, user_id, book, session, commit):
             book_id=book.id,
             source="webreader",
             note_text=note,
+            # A standalone note is made on a device like any other annotation;
+            # it just cannot be placed in the book. Attribution is orthogonal to
+            # anchoring, so it carries an origin exactly like the other two.
+            origin_device_id=origin_device_id,
             # No highlighted passage, so no colour to render on it.
             highlighted_text=None,
             highlight_color=None,
@@ -683,6 +999,7 @@ def create_annotation(payload, *, user_id, book, session, commit):
             annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
             book_id=book.id,
             source="webreader",
+            origin_device_id=origin_device_id,
             highlighted_text=payload.get("highlighted_text"),
             highlight_color=color,
             note_text=payload.get("note_text"),
@@ -709,6 +1026,7 @@ def create_annotation(payload, *, user_id, book, session, commit):
         annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
         book_id=book.id,
         source="webreader",
+        origin_device_id=origin_device_id,
         highlighted_text=payload.get("highlighted_text"),
         highlight_color=color,
         note_text=payload.get("note_text"),
@@ -736,6 +1054,12 @@ def create_annotation(payload, *, user_id, book, session, commit):
 # Sentinel for "field not supplied" so edit can distinguish "set note to None"
 # (clear it) from "don't touch the note".
 _UNSET = object()
+
+
+class AssignmentError(ValueError):
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
 
 
 def _find_owned_annotation(annotation_id, user_id, book_id, session):
@@ -771,8 +1095,108 @@ def edit_annotation(annotation_id, *, user_id, book_id, session, commit,
     if note is not _UNSET:
         row.note_text = note
     row.last_synced = datetime.now(timezone.utc)
-    commit()
+    if commit is not None:
+        _commit_required(commit)
     return row
+
+
+def reassign_annotation(annotation_id, *, user_id, book_id, assigned_device_public_id,
+                        expected_routing_revision, session, commit):
+    """Change routing intent while retaining provenance and old device state."""
+    row = _find_owned_annotation(annotation_id, user_id, book_id, session)
+    if row is None:
+        raise AssignmentError("not_found")
+    if expected_routing_revision is not None:
+        if isinstance(expected_routing_revision, bool) or not isinstance(expected_routing_revision, int):
+            raise AssignmentError("invalid_revision")
+        if (row.routing_revision or 1) != expected_routing_revision:
+            raise AssignmentError("revision_conflict")
+    target = None
+    if assigned_device_public_id is not None:
+        if not isinstance(assigned_device_public_id, str):
+            raise AssignmentError("device_not_found")
+        target = _owned_device(assigned_device_public_id, user_id, session)
+        if target is None:
+            raise AssignmentError("device_not_found")
+        if not target.active:
+            raise AssignmentError("device_inactive")
+    target_id = target.id if target else None
+    old_id = row.assigned_device_id
+    if old_id == target_id:
+        if target is not None:
+            state = session.query(ub.AnnotationDeviceState).filter_by(
+                annotation_id=row.id, device_id=target.id,
+            ).first()
+            if state is None:
+                session.add(ub.AnnotationDeviceState(
+                    annotation_id=row.id, device_id=target.id,
+                    desired=True, delivery_status="pending",
+                ))
+            else:
+                state.desired = True
+        if commit is not None:
+            if commit() is False:
+                raise AssignmentError("database_error")
+        else:
+            session.flush()
+        return row
+    if old_id is not None:
+        old_state = session.query(ub.AnnotationDeviceState).filter_by(
+            annotation_id=row.id, device_id=old_id,
+        ).first()
+        if old_state is None:
+            old_state = ub.AnnotationDeviceState(
+                annotation_id=row.id, device_id=old_id, desired=False, delivery_status="pending",
+            )
+            session.add(old_state)
+        else:
+            old_state.desired = False
+    if target is not None:
+        new_state = session.query(ub.AnnotationDeviceState).filter_by(
+            annotation_id=row.id, device_id=target.id,
+        ).first()
+        if new_state is None:
+            new_state = ub.AnnotationDeviceState(
+                annotation_id=row.id, device_id=target.id, desired=True, delivery_status="pending",
+            )
+            session.add(new_state)
+        else:
+            new_state.desired = True
+            new_state.delivery_status = "pending"
+            new_state.last_error_code = None
+    row.assigned_device_id = target_id
+    row.routing_revision = (row.routing_revision or 1) + 1
+    if commit is not None:
+        if commit() is False:
+            raise AssignmentError("database_error")
+    else:
+        session.flush()
+    return row
+
+
+def bulk_reassign_annotations(items, *, user_id, assigned_device_public_id, session, commit):
+    """Apply and commit every item independently, returning mixed results."""
+    results = []
+    for item in items:
+        annotation_id = item.get("annotation_id") if isinstance(item, dict) else None
+        try:
+            if not isinstance(item, dict) or not isinstance(item.get("book_id"), int) or not annotation_id:
+                raise AssignmentError("invalid_item")
+            reassign_annotation(
+                annotation_id, user_id=user_id, book_id=item["book_id"],
+                assigned_device_public_id=assigned_device_public_id,
+                expected_routing_revision=item.get("expected_routing_revision"),
+                session=session, commit=commit,
+            )
+            results.append({"annotation_id": annotation_id, "ok": True})
+        except AssignmentError as error:
+            session.rollback()
+            results.append({"annotation_id": annotation_id, "ok": False, "error_code": error.code})
+        except Exception:
+            session.rollback()
+            log.exception("annotations: per-item reassignment failed")
+            results.append({"annotation_id": annotation_id, "ok": False, "error_code": "database_error"})
+    return results
 
 
 def delete_annotation(annotation_id, *, user_id, book_id, session, commit):
@@ -805,15 +1229,26 @@ def annotations_create(book_id):
     """Create a highlight from a web-reader selection (source='webreader')."""
     book = _resolve_book_or_404(book_id)
     payload = request.get_json(silent=True) or {}
+    origin_device_id = None
+    try:
+        from .services.device_registry import ensure_webreader_device_best_effort
+        origin_device_id = ensure_webreader_device_best_effort(user_id=current_user.id)
+    except Exception:
+        log.warning("annotations: web-reader attribution failed", exc_info=True)
     try:
         row = create_annotation(
             payload, user_id=current_user.id, book=book,
             session=ub.session, commit=ub.session_commit,
+            origin_device_id=origin_device_id,
         )
     except ValueError as e:
         return jsonify({"error": "bad_anchor", "message": str(e)}), 400
     _fanout_to_sync_targets(row, book)
-    return jsonify(_data_json_row(row, row.cfi_range, None)), 201
+    # Resolve the device map, or the row we just attributed answers
+    # origin_device_id: null and the reader renders "Unknown device" for the
+    # one highlight the user just watched itself be created.
+    device_public_ids, _ = _annotation_device_payload(current_user.id, ub.session)
+    return jsonify(_data_json_row(row, row.cfi_range, None, device_public_ids)), 201
 
 
 @annotations_bp.route("/annotations/<int:book_id>/<annotation_id>", methods=["PATCH"])
@@ -828,16 +1263,57 @@ def annotations_edit(book_id, annotation_id):
     if "note_text" in data:
         kwargs["note"] = data.get("note_text")
     try:
+        if "assigned_device_id" in data:
+            reassign_annotation(
+                annotation_id, user_id=current_user.id, book_id=book_id,
+                assigned_device_public_id=data.get("assigned_device_id"),
+                expected_routing_revision=data.get("expected_routing_revision"),
+                session=ub.session, commit=None,
+            )
         row = edit_annotation(
             annotation_id, user_id=current_user.id, book_id=book_id,
             session=ub.session, commit=ub.session_commit, **kwargs,
         )
+    except AssignmentError as error:
+        ub.session.rollback()
+        status = 404 if error.code in ("not_found", "device_not_found") else (
+            409 if error.code in ("revision_conflict", "device_inactive") else (
+                500 if error.code == "database_error" else 400
+            )
+        )
+        return jsonify({"error": error.code}), status
     except ValueError as e:
+        ub.session.rollback()
         return jsonify({"error": "bad_color", "message": str(e)}), 400
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("single annotation update")
     if row is None:
         abort(404)
     _fanout_to_sync_targets(row, book)
-    return jsonify(_data_json_row(row, row.cfi_range, None)), 200
+    # Same map data.json uses, so BOTH device fields resolve here. Without it
+    # only assigned_device_id was patched back in below and origin_device_id
+    # answered null on a row that has one.
+    device_public_ids, _ = _annotation_device_payload(current_user.id, ub.session)
+    response = _data_json_row(row, row.cfi_range, None, device_public_ids)
+    response.update({"routing_revision": row.routing_revision})
+    return jsonify(response), 200
+
+
+@annotations_bp.route("/api/annotations/assignments/bulk", methods=["POST"])
+@user_login_required
+def annotation_assignments_bulk():
+    data = request.get_json(silent=True) or {}
+    items = data.get("items")
+    if "assigned_device_id" not in data:
+        return jsonify({"error": "missing_assigned_device_id"}), 400
+    if not isinstance(items, list) or not items or len(items) > 500:
+        return jsonify({"error": "invalid_items", "max_items": 500}), 400
+    results = bulk_reassign_annotations(
+        items, user_id=current_user.id,
+        assigned_device_public_id=data.get("assigned_device_id"),
+        session=ub.session, commit=ub.session_commit,
+    )
+    return jsonify({"results": results}), 200
 
 
 @annotations_bp.route("/annotations/<int:book_id>/<annotation_id>", methods=["DELETE"])

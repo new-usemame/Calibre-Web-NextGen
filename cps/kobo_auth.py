@@ -168,6 +168,13 @@ def requires_kobo_auth(f):
             )
             if user is not None:
                 login_user(user)
+                try:
+                    from .services.device_registry import register_kobo_device_best_effort
+                    g.annotation_origin_device_id = register_kobo_device_best_effort(
+                        user_id=user.id, headers=request.headers, return_internal=True,
+                    )
+                except Exception:
+                    log.warning("Best-effort Kobo device observation failed", exc_info=True)
                 [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
                 return f(*args, **kwargs)
         log.debug("Received Kobo request without a recognizable auth token.")

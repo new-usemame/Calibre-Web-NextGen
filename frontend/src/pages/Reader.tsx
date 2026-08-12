@@ -45,6 +45,10 @@ interface AnnRow {
   /** 'webreader' | 'kobo' | 'koreader' | null — shown so a device highlight is
    *  identifiable, and because only some origins carry a usable CFI. */
   source: string | null;
+  /** Public id of the device that MADE this highlight, or null. Resolved
+   *  against the `devices` map in the same response — never rendered raw, and
+   *  never used to filter: see the loader below. */
+  origin_device_id?: string | null;
   /** 'cfi' | 'pdf_quad' | 'comic_page' | 'koreader_xpointer' | 'unanchored' |
    *  null. Only 'unanchored' concerns this list: such a row is a note ABOUT the
    *  book with no passage attached, so it must not be drawn as a highlight that
@@ -197,6 +201,10 @@ export function Reader({ id }: { id: string }) {
   // data.json on mount so a tapped highlight can show its note without a
   // round-trip, and kept in step with every create/edit/remove.
   const notesRef = useRef<Map<string, string>>(new Map());
+  /* public_id -> label, from the same response as the rows. An OLDER backend
+   * omits the envelope entirely, which is how a client can tell; an empty map
+   * then means every row is simply unlabelled rather than wrong. */
+  const [devices, setDevices] = useState<Record<string, { label?: string }>>({});
   const renditionRef = useRef<any>(null);
   const bookRef = useRef<any>(null);
 
@@ -885,6 +893,18 @@ export function Reader({ id }: { id: string }) {
           .then((d) => {
             if (cancelled || !d) return;
             notesRef.current.clear();
+            /*
+             * Take the rows and the device map from the SAME response, and take
+             * every row regardless of whether its device resolves.
+             *
+             * This is an outer join on purpose. On a real library only a
+             * minority of rows carry attribution at all — measured 3 of 14 on
+             * the household instance, the rest predating the feature — so
+             * filtering on resolution would empty most of the drawer to add a
+             * label. An unresolved id renders as no label; it never removes a
+             * highlight the reader made.
+             */
+            setDevices((d.devices || {}) as Record<string, { label?: string }>);
             setAnnList((d.annotations || []) as AnnRow[]);
             (d.annotations || []).forEach((a: any) => {
               const note = (a.note_text || '').trim();
@@ -1146,11 +1166,26 @@ export function Reader({ id }: { id: string }) {
                               {row.note_text}
                             </span>
                           )}
-                          {/* Origin matters to a reader who syncs a device: it
-                              explains why some rows cannot be jumped to. */}
-                          {row.source && row.source !== 'webreader' && (
-                            <span className={styles.annSource}>{row.source}</span>
-                          )}
+                          {/*
+                            * Which device made it. Matters to a reader who syncs
+                            * one, because it explains why some rows cannot be
+                            * jumped to.
+                            *
+                            * Prefer the device's own label over the raw `source`
+                            * slug — "Kobo Clara" is what the reader named it;
+                            * "kobo" is what our schema calls it. Falls back to
+                            * the slug when the id does not resolve, and shows
+                            * nothing at all rather than an id when neither is
+                            * available.
+                            */}
+                          {(() => {
+                            const label = row.origin_device_id
+                              ? devices[row.origin_device_id]?.label
+                              : undefined;
+                            const shown = label
+                              || (row.source && row.source !== 'webreader' ? row.source : '');
+                            return shown ? <span className={styles.annSource}>{shown}</span> : null;
+                          })()}
                         </span>
                       </button>
                     </li>

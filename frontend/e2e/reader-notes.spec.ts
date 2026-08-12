@@ -868,3 +868,97 @@ test.describe('reader: writing a standalone note (#325)', () => {
       }, bookId!);
     });
 });
+
+/*
+ * Device labels in the highlights drawer (#325).
+ *
+ * The affordance was built when the drawer landed and deliberately left unwired:
+ * the backend had no attribution yet, so labelling would have rendered a field
+ * that resolved to nothing. It is wired now that a real non-NULL
+ * `origin_device_id` is observable on the wire, not merely promised.
+ *
+ * The property under test is the OUTER JOIN, and it is the one that would hurt
+ * a real library: on the household instance only 3 of 14 rows carry attribution
+ * at all, the rest predating the feature. Filtering rows on whether their device
+ * resolves would empty most of the drawer in order to add a label — a strictly
+ * worse reader experience delivered as a feature.
+ */
+test.describe('reader drawer: device labels (#325)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test('every highlight is listed, whether or not its device resolves', async ({ page }) => {
+    test.setTimeout(120_000);
+    const bookId = await openReaderOnEpub(page, 2);
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+
+    /*
+     * Seed the rows this asserts on. openReaderOnEpub clears the book first, so
+     * without this the drawer and the server both hold zero and "listed ===
+     * total" is 0 === 0 -- true, and about nothing. The positive control below
+     * caught exactly that on the first run.
+     *
+     * A MIXED set on purpose: an anchored highlight and an unanchored note. They
+     * differ in attribution and in what the row renders, which is the difference
+     * the outer join has to survive.
+     */
+    await page.evaluate(async (id) => {
+      const csrf = (await (await fetch('/api/v1/auth/csrf', { credentials: 'include' })).json()).csrf_token;
+      const post = (body: unknown) => fetch(`/annotations/${id}`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify(body),
+      });
+      await post({ cfi_range: 'epubcfi(/6/4!/4/2/2,/1:0,/1:12)', highlighted_text: 'a passage', highlight_color: 'yellow' });
+      await post({ position_type: 'unanchored', note_text: 'a thought about the whole book' });
+    }, bookId!);
+
+    const server = await page.evaluate(async (id) => {
+      const j = await (await fetch(`/annotations/${id}/data.json`, { credentials: 'include' })).json();
+      const rows = j.annotations || [];
+      return {
+        total: rows.length,
+        withOrigin: rows.filter((a: { origin_device_id?: string | null }) => a.origin_device_id != null).length,
+        hasDevicesEnvelope: 'devices' in j,
+      };
+    }, bookId!);
+
+    // Positive control: without rows, every assertion below is vacuously true.
+    expect(server.total, 'the test book has highlights to list').toBeGreaterThan(0);
+
+    await page.reload();
+    await waitForReaderRender(page);
+    await page.getByRole('button', { name: 'Highlights and notes' }).click();
+    await expect(drawer(page)).toBeVisible();
+    const listed = await drawer(page).locator('li').count();
+
+    /*
+     * The row count is the server's row count -- the drawer lists everything
+     * stored, and does not quietly drop a class of row.
+     *
+     * WHAT THIS DOES NOT CATCH, stated because I checked: filtering rows on
+     * whether their device RESOLVES is invisible here. Every row this test can
+     * create through the API is attributed (the web reader is itself a
+     * registered device), so a `.filter(r => r.origin_device_id)` in the loader
+     * keeps all of them and the count still matches -- verified by mutation.
+     * The rows that would expose it are the unattributed ones predating the
+     * feature: 11 of 14 on the household instance. Reproducing that here means
+     * either a fixture the API cannot make or asserting against a book this
+     * spec does not own, which is the collision F-08685b describes.
+     *
+     * So this guards "no class of row is dropped" -- mutation-verified against
+     * a loader that discards unanchored notes -- and the outer-join rule itself
+     * rests on the loader's comment and on review, not on this assertion.
+     */
+    expect(listed, 'every stored highlight is listed, attributed or not')
+      .toBe(server.total);
+
+    // And no row renders a raw public id -- an unresolved device is unlabelled,
+    // never a uuid shown to a reader.
+    const text = (await drawer(page).innerText()).toLowerCase();
+    expect(text, 'a device id must never be rendered raw')
+      .not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
+
+    // Leave the shared fixture as found (F-08685b).
+    await clearAnnotationsViaApi(page, bookId!);
+  });
+});

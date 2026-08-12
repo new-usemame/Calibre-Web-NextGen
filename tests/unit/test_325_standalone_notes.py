@@ -57,18 +57,57 @@ def _make(payload, book=None):
 def test_null_position_type_still_means_legacy_cfi():
     """Regression guard for the reason the sentinel is non-NULL.
 
-    If NULL ever stops meaning "legacy EPUB CFI", then absence becomes available
-    and this design should be revisited. Until then, a NULL-typed note would be
-    sent down the CFI resolution path, which is why we cannot express "no anchor"
-    by leaving the column empty."""
-    import inspect
+    If NULL ever stops meaning "legacy EPUB CFI", absence becomes available and
+    this design should be revisited. Until then a NULL-typed note would be sent
+    down the CFI resolution path, which is why "no anchor" cannot be expressed
+    by leaving the column empty.
 
-    body = inspect.getsource(ann)
-    assert 'position_type", None) in (None, "cfi")' in body, (
-        "annotations.py no longer treats NULL position_type as legacy CFI; the "
-        "'unanchored' sentinel exists precisely because absence was already taken"
+    Was a source-pin on the literal ``position_type", None) in (None, "cfi")``.
+    That expression no longer exists: the anchor-status work replaced it with a
+    dispatch that handles the explicit types and lets everything else -- NULL
+    included -- fall through to the CFI path. The INVARIANT survived; only the
+    spelling changed, which is what a source-pin cannot tell apart. Asserted
+    behaviourally instead, so a future refactor is free and a semantic change
+    still fails.
+    """
+    from types import SimpleNamespace
+
+    legacy = SimpleNamespace(
+        position_type=None, cfi_range="epubcfi(/6/4!/4/2,/1:0,/1:9)",
+        pdf_page=None, pdf_quad_json=None, comic_page=None,
+        start_container_path=None, end_container_path=None,
+        start_container_child_index=None, end_container_child_index=None,
+    )
+    cfi, status = ann._resolve_annotation_anchor(legacy, SimpleNamespace(id=1, uuid="u"))
+    assert cfi == legacy.cfi_range and status == "ok", (
+        "a NULL position_type must still resolve as legacy EPUB CFI; if it no "
+        "longer does, absence is available and the 'unanchored' sentinel can be "
+        "revisited"
     )
 
+
+def test_unanchored_note_is_not_reported_as_a_failed_anchor():
+    """A deliberate non-placement must not read as a broken one.
+
+    The resolver predates the sentinel and dispatches on the explicit position
+    types, so 'unanchored' fell through to the CFI path, found no cfi_range and
+    returned "unresolved" -- the same status as a highlight whose anchor a
+    regenerated KEPUB destroyed. The UI would warn that a note cannot be shown
+    in the book, about a note that was never placed in it.
+
+    The two branches merged with no conflict; the bug is in the composition.
+    """
+    from types import SimpleNamespace
+
+    note = SimpleNamespace(
+        position_type="unanchored", cfi_range=None,
+        pdf_page=None, pdf_quad_json=None, comic_page=None,
+        start_container_path=None, end_container_path=None,
+        start_container_child_index=None, end_container_child_index=None,
+    )
+    cfi, status = ann._resolve_annotation_anchor(note, SimpleNamespace(id=1, uuid="u"))
+    assert cfi is None
+    assert status == "unanchored", f"expected a distinct status, got {status!r}"
 
 def test_unanchored_is_a_registered_position_type():
     """The column is validated -- an unregistered value raises rather than storing."""

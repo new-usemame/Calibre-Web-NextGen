@@ -97,7 +97,8 @@ class Policy:
 class ValidationResult:
     ok: bool
     reason: str = ""
-    # forbidden_path | forbidden_diff | tier_caps | unprotected_base | ok
+    # forbidden_path | tier1_paths | forbidden_diff | tier_caps |
+    # unprotected_base | ok
     category: str = ""
 
     def to_dict(self) -> dict:
@@ -335,6 +336,42 @@ def validate_fork_pr(
             ),
             category="forbidden_path",
         )
+
+    # 1b. Tier-1 path allowlist.
+    #
+    # TIER1_PATHS_REGEX has been in tier-policy.config and on the Policy
+    # dataclass since the module was written, and until now it was never
+    # consulted -- loaded, exposed in `describe`, and enforced nowhere. Tier-1
+    # is defined as ".po under cps/translations, *.md, README*, no code", and
+    # that definition was carried entirely by whoever applied the label.
+    #
+    # Nothing else covers the gap. tier-label-guard.yml gates WHO may apply the
+    # label, not WHAT the PR touches. The forbidden-path check above covers only
+    # auth/csrf/session/admin/migrations/deps/container, so the whole of `cps/`
+    # outside those areas passed. And auto-merge.yml's CHANGES-vs-upstream
+    # requirement explicitly *exempts* tier-1 on the stated grounds that it is
+    # ".po + *.md only" -- a premise nothing established.
+    #
+    # Observed 2026-08-10: #1529, an auto-revert labelled `safe-tier-1`,
+    # reverted cps/opds.py and deleted a 194-line regression test. It was
+    # eligible to auto-merge without human eyes and nothing in this path would
+    # have stopped it.
+    #
+    # Fails closed: an unrecognised path demotes to needs-review rather than
+    # merging. Widening tier-1 is a config edit, which is the point.
+    if tier == "safe-tier-1":
+        off_allowlist = [p for p in paths if not policy.tier1_paths_regex.search(p)]
+        if off_allowlist:
+            shown = ", ".join(off_allowlist[:5])
+            more = f" (+{len(off_allowlist) - 5} more)" if len(off_allowlist) > 5 else ""
+            return ValidationResult(
+                ok=False,
+                reason=(
+                    f"safe-tier-1 allows only translations and docs, but this PR "
+                    f"changes {shown}{more}; demoted to needs-review."
+                ),
+                category="tier1_paths",
+            )
 
     # 2. Tier-2 size caps. Tier-1 has no LOC cap because translations can
     # legitimately span many files / many lines.

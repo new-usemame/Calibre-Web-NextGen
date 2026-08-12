@@ -1,0 +1,11 @@
+{
+  "area": "tests",
+  "body": "`tests/unit/test_1094_failed_conversion_imports_original.py::TestConversionDeadline::test_convert_book_passes_the_deadline_to_the_converter`\nfailed once in a full local `python3 -m pytest tests/unit/ -q` (1 failed, 5924 passed), and passes\neverywhere else it was tried.\n\nNot reproduced:\n- the file alone: 49 passed\n- paired with `test_1009_...` and with `test_1074_...`: 66 and 53 passed\n- the single test by node id: 1 passed\n- CI \"Fast Tests (Smoke + Unit)\" on the same commit (6e23c316a): SUCCESS\n\nSo it is order- or ambient-state-dependent, not a defect in the deadline arithmetic itself, and it\ndoes not currently gate anything. Deliberately NOT bisected -- the coarse bisect was abandoned\nrather than guessed at, so the polluter is unknown. Recording it because an intermittent local red\nthat CI never sees is exactly the shape that later gets dismissed as \"just flaky\" and then wedges a\ntick.\n\nWorth noting for whoever picks this up: an explicit multi-file invocation\n(`pytest f1.py f2.py ... f7.py`) reported `collected 0 items` with no error, while the same files\nindividually collect fine. That is either a second small bug in the harness or a shell artifact in\nhow the list was built; it made the obvious bisect route unreliable and should be checked first.",
+  "created": "2026-08-11",
+  "id": "F-36a362",
+  "refs": [],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "test_convert_book_passes_the_deadline_to_the_converter fails only in a full serial local run"
+}

@@ -1,0 +1,15 @@
+.viewport {
+  position: relative;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 240px;
+  height: min(68vh, 760px);
+  scrollbar-gutter: stable;
+}
+
+.canvas { position: relative; width: 100%; }
+.row { position: absolute; inset: 0 0 auto; width: 100%; }
+
+@media (max-width: 600px) {
+  .viewport { height: calc(100dvh - 240px); min-height: 320px; }
+}

@@ -175,6 +175,54 @@ def test_validate_tier1_translation_passes(policy):
     assert r.ok
 
 
+def test_validate_tier1_code_change_demotes(policy):
+    """safe-tier-1 must refuse a code file, not just a forbidden one.
+
+    Regression for the real shape: #1529 was an auto-revert labelled
+    `safe-tier-1` that reverted `cps/opds.py` and deleted a 194-line
+    regression test. `cps/opds.py` is not in FORBIDDEN_PATHS_REGEX
+    (auth/csrf/session/admin/migrations/deps/container), so the forbidden-path
+    check passed it, and TIER1_PATHS_REGEX -- which exists precisely to say
+    "translations and docs only" -- was loaded but never consulted. The PR was
+    eligible to auto-merge with no human eyes.
+    """
+    pr = {
+        "additions": 3, "changedFiles": 1, "baseRefName": "main",
+        "files": [{"path": "cps/opds.py"}],
+    }
+    r = tier_policy.validate_fork_pr(pr, "+x = 1\n", policy, tier="safe-tier-1")
+    assert not r.ok
+    assert r.category == "tier1_paths"
+    assert "cps/opds.py" in r.reason
+
+
+def test_validate_tier1_names_every_offending_path(policy):
+    """The demotion has to say which files, or nobody can act on it."""
+    pr = {
+        "additions": 4, "changedFiles": 3, "baseRefName": "main",
+        "files": [
+            {"path": "cps/translations/de/LC_MESSAGES/messages.po"},
+            {"path": "cps/opds.py"},
+            {"path": "cps/kobo.py"},
+        ],
+    }
+    r = tier_policy.validate_fork_pr(pr, "+x = 1\n", policy, tier="safe-tier-1")
+    assert not r.ok
+    assert "cps/opds.py" in r.reason and "cps/kobo.py" in r.reason
+    # The legitimate file is not reported as a problem.
+    assert "messages.po" not in r.reason
+
+
+def test_validate_tier2_code_change_is_unaffected_by_the_tier1_allowlist(policy):
+    """Tier-2 exists to carry small code changes; it must not inherit the gate."""
+    pr = {
+        "additions": 3, "changedFiles": 1, "baseRefName": "main",
+        "files": [{"path": "cps/opds.py"}],
+    }
+    r = tier_policy.validate_fork_pr(pr, "+x = 1\n", policy, tier="safe-tier-2")
+    assert r.ok
+
+
 def test_validate_forbidden_path_demotes(policy):
     pr = {
         "additions": 1, "changedFiles": 1, "baseRefName": "main",

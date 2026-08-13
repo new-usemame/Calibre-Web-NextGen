@@ -17,6 +17,16 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **PDFs open past page one on iPad.** In the new interface a PDF showed its
+  first page and nothing else on iPadOS, in both Safari and Firefox, while the
+  same book was fine on a Mac, on Android and in the classic interface. The
+  reader was handing the file to whatever PDF viewer the browser ships, and on
+  iPhone and iPad that viewer only ever draws one page inside an embedded frame.
+  PDFs now open in the same viewer the classic interface has always used, which
+  draws every page the same way on every browser, and brings PDF text search,
+  thumbnails and annotations to the new reader with it. Reported by
+  [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1584)
+  ([#1584](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1584)).
 - **Errors explain themselves again instead of turning into a blank 500.** Some
   failures replaced their own explanation with `TypeError: '>' not supported
   between instances of ... and 'int'` and took down the page that was handling

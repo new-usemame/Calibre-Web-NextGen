@@ -39,7 +39,8 @@ See https://github.com/adobe-type-tools/cmap-resources
 	  <script src="{{ url_for('static', filename='js/libs/pdf.mjs') }}" type="module"></script>
 
     <script type="text/javascript">
-    window.addEventListener('webviewerloaded', function() {
+    (function () {
+      function configureViewer() {
         PDFViewerApplicationOptions.set('disableAutoFetch', true);
         PDFViewerApplicationOptions.set('disableRange', false);
         PDFViewerApplicationOptions.set('disableStream', true);
@@ -49,7 +50,29 @@ See https://github.com/adobe-type-tools/cmap-resources
         PDFViewerApplicationOptions.set('imageResourcesPath', "{{ url_for('static', filename='css/images/') }}");
         PDFViewerApplicationOptions.set('workerSrc', "{{ url_for('static', filename='js/libs/pdf.worker.mjs') }}");
         PDFViewerApplicationOptions.set('defaultUrl',"{{ url_for('web.serve_book', book_id=pdffile, book_format='pdf') }}")
-    });
+      }
+
+      // pdf.js fires 'webviewerloaded' on parent.document whenever it can reach
+      // it — that is its hook for an embedding page — and only falls back to its
+      // own document when the parent is cross-origin. Embedded same-origin (the
+      // new UI's reader iframe) the event therefore never arrives here, every
+      // option above was skipped, and the viewer fell back to its packaged
+      // default workerSrc of '../build/pdf.worker.mjs', which this app does not
+      // ship. The worker 404'd, the fake-worker fallback 404'd with it, and the
+      // document rendered zero pages. Listen wherever the event will actually be
+      // delivered. `once` keeps a long-lived parent (the SPA shell) from
+      // accumulating a handler per PDF opened.
+      var target = document;
+      try {
+        if (window.parent && window.parent !== window && window.parent.document) {
+          target = window.parent.document;
+        }
+      } catch (e) { /* cross-origin parent: pdf.js will dispatch on our document */ }
+      target.addEventListener('webviewerloaded', configureViewer, { once: true });
+      if (target !== document) {
+        document.addEventListener('webviewerloaded', configureViewer, { once: true });
+      }
+    })();
     </script>
 
     <script src="{{ url_for('static', filename='js/libs/viewer.mjs') }}" type="module"></script>

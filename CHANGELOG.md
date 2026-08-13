@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.34] - 2026-08-13
+
 ### Fixed
 - **PDFs open past page one on iPad.** In the new interface a PDF showed its
   first page and nothing else on iPadOS, in both Safari and Firefox, while the

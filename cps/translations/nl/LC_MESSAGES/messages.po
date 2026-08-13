@@ -5910,6 +5910,10 @@ msgstr "Sorteervolgorde"
 msgid "Source details"
 msgstr "Brondetails"
 
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
+msgstr "Start de enige OAuth-provider automatisch"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Started reading"
 msgstr "Begonnen met lezen"
@@ -6175,6 +6179,17 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
 msgstr "Wanneer de leesvoortgang voor het eerst is gesynchroniseerd"
+
+#: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add ?"
+"local=1 to the login URL to reach the password form, which keeps working as "
+"long as standard password login is left enabled."
+msgstr ""
+"Als automatisch starten aanstaat, gaat de inlogpagina rechtstreeks naar de "
+"provider. Voeg ?local=1 toe aan de inlog-URL om het wachtwoordformulier te "
+"bereiken; dat blijft werken zolang standaard inloggen met wachtwoord "
+"ingeschakeld blijft."
 
 #: cps/spa_strings.py
 msgid "Write a note"
@@ -8257,7 +8272,8 @@ msgstr "Inloggen op afstand inschakelen ('magic link')"
 
 #: cps/templates/config_edit.html
 msgid "Allow users to hide books from their personal library"
-msgstr "Gebruikers toestaan om boeken te verbergen in hun persoonlijke bibliotheek"
+msgstr ""
+"Gebruikers toestaan om boeken te verbergen in hun persoonlijke bibliotheek"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8297,7 +8313,9 @@ msgstr "Server Externe Port (voor port doorgestuurde API oproepen)"
 
 #: cps/templates/config_edit.html
 msgid "Sync Kobo annotations to Hardcover (Requires API key per user)"
-msgstr "Synchroniseer aantekeningen naar Hardcover (API sleutel per gebruiker vereist)"
+msgstr ""
+"Synchroniseer aantekeningen naar Hardcover (API sleutel per gebruiker "
+"vereist)"
 
 #: cps/templates/config_edit.html
 msgid "Pad book covers to Kobo screen aspect ratio"
@@ -8529,7 +8547,8 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Following Settings are Needed For User Import"
-msgstr "De volgende instellingen zijn nodig voor het importeren van gebruikers:"
+msgstr ""
+"De volgende instellingen zijn nodig voor het importeren van gebruikers:"
 
 #: cps/templates/config_edit.html
 msgid "LDAP Group Object Filter"
@@ -8826,6 +8845,18 @@ msgstr ""
 msgid ""
 "Hides the standard login form. Users must log in via OAuth or LDAP. Ensure "
 "you have a working alternative login method before enabling."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Automatically forward to the only OAuth provider"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"When enabled and exactly one OAuth provider is active, visiting the login "
+"page starts it automatically. Add ?local=1 to the login URL to open the "
+"normal login page instead. That page still accepts a username and password "
+"only while the setting above is left off."
 msgstr ""
 
 #: cps/templates/config_edit.html

@@ -1,0 +1,13 @@
+{
+  "area": "autopilot",
+  "body": "Hard rule 6 sends dependency/licence changes to the operator, and the\ndocumented procedure is \"demote to defer, write `notes/dep-review-<PR>.md`\".\nThere is no step that actually *delivers* the request to anyone. Writing the\nnote and restating the hold on the thread is the whole mechanism.\n\nSo \"escalated\" in the tick log means \"a file was written\". The operator is\nnever paged, and nothing re-raises the hold as it ages.\n\n## Measured 2026-08-13\n\nPR #1442 was held on 2026-08-08 (`fork-pr-1442-HELD-rule6`), CI green 8/8.\n`notes/dep-review-1442.md` says \"Operator decision required\". The tick logs\nsay escalated on 08-08 and re-escalated on 08-13T06:46.\n\nNo ntfy of any kind had been sent since **2026-07-19** — grepping\n`state/completed.log` for delivery rows shows the July escalations recorded\nan explicit `HTTP 200`, and nothing for #1442. The hold sat 5 days. Two\ncontributors were blocked; one asked three times; a third party joined to ask\nwho the decision-maker even was.\n\nThis tick sent the ping by hand (`--tier needs-you`, HTTP 200) and it should\nhave gone out on 08-08.\n\n## Why it persists\n\nA hold with no expiry is indistinguishable from a decision to do nothing, and\nthe tick that inherits it sees a note file that reads as \"handled\". Each\nsubsequent tick then re-states the hold to the contributor rather than\nquestioning whether anyone was ever asked — which is what happened on 08-09\nand again on 08-13.\n\n## Fix\n\nTwo parts, both small:\n\n1. The hold path must send the ntfy at the moment the hold is created, and log\n   the delivery result (`HTTP 200`) alongside the hold row, so \"escalated\" is\n   falsifiable from the ledger.\n2. Holds need an expiry: a sweep that re-pings any `dep-review-*.md` whose PR\n   is still open past a threshold, on the monotonic since-anchor pattern\n   already used for the quiet-hold fix (46ac4e5). Without it the first ping\n   failing silently reproduces the same five-day gap.\n\nRelated: F-8d8c15 (the follow-up board cannot see PRs, so a contributor\nblocked behind a hold is also invisible to the board).",
+  "created": "2026-08-13",
+  "id": "F-6a005a",
+  "refs": [
+    "#1442"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "A rule-6 hold has no delivery step, so the escalation never reaches the operator"
+}

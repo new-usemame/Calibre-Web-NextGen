@@ -2661,14 +2661,13 @@ def login():
     # only suppresses automatic startup; normal SPA-or-Classic routing below
     # still decides which login surface is shown.
     #
-    # ``config_disable_standard_login`` is required as well as the login type:
-    # the two are independent settings, and with the local form still enabled
-    # ``login_post`` below goes on accepting local credentials. Auto-starting
-    # in that state would hide a form whose handler still works, and would
-    # leave an admin with no way back in at the canonical URL if the provider
-    # is unreachable.
+    # Disabling standard login keeps the v4.1.33 auto-start behavior. The
+    # explicit auto-forward setting additionally allows an admin to auto-start
+    # the sole provider while retaining local credentials as a break-glass
+    # path through ``?local=1``.
     if (config.config_login_type == constants.LOGIN_OAUTH
-            and config.config_disable_standard_login
+            and (config.config_disable_standard_login
+                 or getattr(config, "config_enable_oauth_auto_forward", False))
             and feature_support['oauth']):
         oauth_endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
             request.args,

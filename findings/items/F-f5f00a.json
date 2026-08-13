@@ -1,0 +1,14 @@
+{
+  "area": "ci",
+  "body": "Measured 2026-08-13 while draining the community translation queue.\n\nThe main ruleset sets `strict_required_status_checks_policy: true`, so a PR must be\nup to date with main to merge. Merging #1554 (ru) triggered `Update Translations`,\nwhich pushed its own \"Update translations\" commit to main (197f46cd -> 5523e5c9).\nThat immediately flipped #1553 from BLOCKED to BEHIND, discarding an in-flight\nFast Tests run and requiring another `gh pr update-branch`.\n\nFor a fork PR the cost is higher than one CI cycle: every push/label event re-queues\nits runs as `action_required`, so each refresh also needs a manual\n`POST /actions/runs/<id>/approve` per run. Draining N translation PRs serially\ntherefore costs N refreshes, N CI cycles and N approval rounds, and the window to\nmerge is only as long as the gap between main commits.\n\nNot user-facing, and not worth weakening the strict policy for. Options if it bites\nagain: merge translation PRs in one batch before `Update Translations` fires, or have\nthat workflow skip its commit when the merge it followed was itself a catalog update.\n\nAlso observed: `gh pr view` returns a stale `headRefOid` for a few seconds after\n`gh pr update-branch` — it reported the old head and BEHIND, while git confirmed the\nnew head was already up to date. Re-read the head before acting on it.",
+  "created": "2026-08-13",
+  "id": "F-f5f00a",
+  "refs": [
+    "#1553",
+    "#1554"
+  ],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "Merging a .po PR auto-generates a main commit that puts every other PR BEHIND, so serial translation merges each cost a full refresh + CI + fork-approval cycle"
+}

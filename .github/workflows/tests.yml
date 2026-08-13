@@ -676,8 +676,20 @@ jobs:
           # the first page is visible", which a one-page PDF cannot detect.
           docker cp tests/fixtures/sample_books/three_page_sample.pdf \
             cwn-e2e:/tmp/three_page_sample.pdf
-          docker exec cwn-e2e calibredb add /tmp/three_page_sample.pdf \
-            --with-library /calibre-library
+          added=$(docker exec cwn-e2e calibredb add /tmp/three_page_sample.pdf \
+            --with-library /calibre-library | tee /dev/stderr \
+            | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
+          [ -n "$added" ] || { echo "::error::calibredb add reported no book id"; exit 1; }
+          # Backdate it, because a new book is a NEW book: the default sort is
+          # newest-first, and several specs walk the library from the top to find
+          # something readable. Landing a PDF at position one displaced that and
+          # made reader-phase1 time out — a fixture breaking specs it has nothing
+          # to do with, which is the trap the book-lane convention exists to
+          # avoid. Oldest keeps it out of everyone's way; the PDF spec finds it
+          # by format, not by position.
+          docker exec cwn-e2e calibredb set_metadata \
+            --field timestamp:2001-01-01T00:00:00+00:00 "$added" \
+            --with-library /calibre-library >/dev/null
           jar=$(mktemp)
           csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf \
             | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')

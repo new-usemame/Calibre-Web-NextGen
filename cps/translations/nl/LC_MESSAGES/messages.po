@@ -8257,7 +8257,7 @@ msgstr "Inloggen op afstand inschakelen ('magic link')"
 
 #: cps/templates/config_edit.html
 msgid "Allow users to hide books from their personal library"
-msgstr ""
+msgstr "Gebruikers toestaan om boeken te verbergen in hun persoonlijke bibliotheek"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8289,7 +8289,7 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Convert missing KEPUBs now"
-msgstr ""
+msgstr "Converteer ontbrekende KEPUBs nu"
 
 #: cps/templates/config_edit.html
 msgid "Server External Port (for port forwarded API calls)"
@@ -8297,7 +8297,7 @@ msgstr "Server Externe Port (voor port doorgestuurde API oproepen)"
 
 #: cps/templates/config_edit.html
 msgid "Sync Kobo annotations to Hardcover (Requires API key per user)"
-msgstr ""
+msgstr "Synchroniseer aantekeningen naar Hardcover (API sleutel per gebruiker vereist)"
 
 #: cps/templates/config_edit.html
 msgid "Pad book covers to Kobo screen aspect ratio"
@@ -8519,7 +8519,7 @@ msgstr "LDAP Server is OpenLDAP?"
 
 #: cps/templates/config_edit.html
 msgid "Auto-create users from LDAP"
-msgstr ""
+msgstr "Automatisch gebruikers aanmaken uit LDAP"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8529,8 +8529,7 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Following Settings are Needed For User Import"
-msgstr ""
-"De volgende instellingen zijn nodig voor het importeren van gebruikers:"
+msgstr "De volgende instellingen zijn nodig voor het importeren van gebruikers:"
 
 #: cps/templates/config_edit.html
 msgid "LDAP Group Object Filter"
@@ -8562,7 +8561,7 @@ msgstr "LDAP Lid Gebruiker Filter"
 
 #: cps/templates/config_edit.html
 msgid "Important:"
-msgstr ""
+msgstr "Belangrijk:"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -9092,7 +9091,7 @@ msgstr "Voeg toegestane/geweigerde aangepaste kolomwaarden toe"
 
 #: cps/templates/cover_picker.html
 msgid "Use a URL"
-msgstr ""
+msgstr "Gebruik een URL"
 
 #: cps/templates/cover_picker.html
 #, fuzzy
@@ -9208,7 +9207,7 @@ msgstr ""
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Starting..."
-msgstr ""
+msgstr "Starten..."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Cancelling..."
@@ -9220,7 +9219,7 @@ msgstr ""
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Search by title/author"
-msgstr ""
+msgstr "Zoek op titel/auteur"
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Run on selected book"

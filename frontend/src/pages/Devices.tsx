@@ -59,8 +59,8 @@ function RemoveDialog({ device, counts, onCancel, onRemove }: {
         aria-labelledby={`${descriptionId}-title`} aria-describedby={descriptionId}>
         <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name: device.label })}</h2>
         <div id={descriptionId}>
-          {counts.origin_count > 0 && <p>{t('{n} highlights were made on this device. They are not deleted. Their origin history is kept.', { n: counts.origin_count })}</p>}
-          {counts.assigned_count > 0 && <p>{t('{n} highlights assigned to this device will become Unknown device.', { n: counts.assigned_count })}</p>}
+          {counts.origin_count > 0 && <p>{t('{n} highlights and notes were made on this device. They are not deleted. Their origin history is kept.', { n: counts.origin_count })}</p>}
+          {counts.assigned_count > 0 && <p>{t('{n} highlights and notes assigned to this device will become Unknown device.', { n: counts.assigned_count })}</p>}
           <p>{t('This device will no longer sync.')}</p>
         </div>
         <div className={styles.dialogActions}>
@@ -136,7 +136,7 @@ export function Devices() {
                   </form>
                 ) : <h2>{device.label}</h2>}
                 <p>{[device.model, device.firmware && `FW ${device.firmware}`].filter(Boolean).join(' · ')}</p>
-                <p>{t('{n} highlights', { n: device.annotation_count })} · {t('Last seen {when}', { when: relativeWhen(device.last_seen) })}
+                <p>{t('{n} highlights and notes', { n: device.annotation_count })} · {t('Last seen {when}', { when: relativeWhen(device.last_seen) })}
                   {device.last_seen && Date.now() - new Date(device.last_seen).getTime() > 30 * 86400000 && <> · {t('Not seen lately')}</>}</p>
               </div>
               <div className={styles.cardActions}>

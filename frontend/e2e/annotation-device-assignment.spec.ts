@@ -33,7 +33,7 @@ test('595 unknown highlights virtualize, filter, and bulk assign in 500-item chu
   if (testInfo.project.name === 'mobile') {
     await expect(page.locator('label').filter({ hasText: /^Device/ }).first().locator('select')).toContainText('Unknown device (595)');
   } else {
-    await expect(page.getByRole('radio', { name: /Unknown device, 595 highlights/ })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /Unknown device, 595 highlights and notes/ })).toBeVisible();
   }
   expect(await page.locator('[data-virtual-row]').count()).toBeLessThan(60);
   await page.getByLabel('Group by').selectOption('device');

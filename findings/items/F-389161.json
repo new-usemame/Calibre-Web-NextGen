@@ -1,0 +1,14 @@
+{
+  "area": "ci",
+  "body": "`TIER1_PATHS_REGEX` (`\\.(po|pot|md)$|^README`) has been in\n`.github/policy/tier-policy.config` and on the `Policy` dataclass since the module was\nwritten. It was parsed, exposed in `describe`, and **consulted nowhere**. `validate_fork_pr`\nnever referenced it, so a PR labelled `safe-tier-1` was path-checked only against\n`FORBIDDEN_PATHS_REGEX` (auth/csrf/session/admin/migrations/deps/container) -- leaving the\nwhole of `cps/` outside those areas eligible to auto-merge with no human eyes.\n\nMeasured before the fix, with negative controls to show the validator could still refuse:\n\n    validate-fork-pr --tier safe-tier-1  files=[cps/opds.py]      -> {\"ok\": true}\n    validate-fork-pr --tier safe-tier-1  files=[requirements.txt] -> forbidden_path\n    validate-fork-pr --tier safe-tier-1  base=some-feature-branch -> unprotected_base\n\nNothing else covered it, and each near-miss is worth naming because each looks like it does:\n\n- `tier-label-guard.yml` restricts **who** may apply the label, never **what** the PR touches.\n- `auto-merge.yml`'s CHANGES-vs-upstream requirement runs only `if [ \"$tier\" = \"safe-tier-2\" ]`,\n  and its own comment states the reason: *\"Tier-1 (.po + *.md only) is exempt.\"* That premise\n  was never established anywhere -- the exemption rests on the unchecked property.\n- The tier table in CLAUDE.md defines tier-1 as \".po / *.md / README, no code\", so the rule was\n  documented policy carried entirely by whoever applied the label.\n\nReal instance: **#1529**, an auto-revert opened by our own automation, sat labelled\n`safe-tier-1` while reverting `cps/opds.py` and deleting `test_1097_opds_discover_naming.py`\n(194 lines). Simulated against `main` it merged CLEAN and left the CHANGELOG entry claiming\nthe fix had shipped -- code reverted, regression test gone, release notes still advertising it.\nClosed by hand on 2026-08-12 rather than merged.\n\nFixed by enforcing the allowlist in `validate_fork_pr` for `safe-tier-1`, failing closed with a\nnew `tier1_paths` category that names the offending files. Red/green: two new tests fail\nwithout the change, 25 pass with it; tier-2 is deliberately unaffected.\n\nFollow-up worth a deliberate decision rather than a silent widening: `findings/items/*.json`\nis not on the allowlist, so ledger-only PRs (#1487, and #1534 which I merged as tier-1 myself)\nnow demote to needs-review. That may be the right call or the allowlist may want extending --\nbut extending it is a config edit, which is precisely the deliberation the gate exists to force.",
+  "created": "2026-08-12",
+  "id": "F-389161",
+  "refs": [
+    "#1529",
+    "#1487"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "safe-tier-1's path allowlist was loaded but never enforced"
+}

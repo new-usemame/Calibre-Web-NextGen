@@ -1,0 +1,11 @@
+{
+  "area": "spa-error-states",
+  "body": "`/app/authors/9999999` (any id that does not exist) does not render an error\npage. It renders a normal, fully functional author page whose *name* is the\nstring \"Page not found\":\n\n    < Show all Authors\n    AUTHOR   Page not found\n    [Upload books] [All|Unread|Read] [Newest v] [Select] [refresh]\n                     \"No books here.\"\n\nSo the eyebrow label still says AUTHOR, the failure message occupies the slot\nwhere the author's name belongs, and the toolbar below offers Upload / filter /\nsort / select / refresh actions against an entity that does not exist. The page\nthen contradicts itself: \"Page not found\" in the title, \"No books here.\" in the\nbody — two different explanations of the same condition, neither of which says\nthe URL is wrong.\n\nMeasured on `main`, 1440px and 390px, dark theme, logged in as admin. It is\nstable, not a flash: identical at 3s, 10s and 25s. The API calls all return 200\n(`/api/v1/authors` succeeds), so this is a client-side lookup miss being fed\ninto the normal render path rather than an error path.\n\nAdjacent, checked in the same pass and NOT defects — recorded so nobody\nre-derives them:\n\n- `/app/book/9999999` resolves to a clean \"Book not found\" with a \"← Library\"\n  link. Correct, though `<main>` is empty for the first several seconds before\n  it appears.\n- `/app/shelf/1` correctly reports \"You are not allowed to view this shelf\" off\n  a genuine 403 from `/api/v1/shelves/1`.\n- `/app/search?query=<no matches>`, `/app/archived` and the 404 route all\n  render sensible empty states.\n- No horizontal overflow in any of these states at 390px or 1440px.\n\nThe author page is the only one of the seven that fails this way, which is why\nit looks like a missing 404 branch in that route rather than a systemic gap.\n\nMethod + full inventory: `notes/UI-SWEEP-INVENTORY.md` (outer workspace).",
+  "created": "2026-08-09",
+  "id": "F-6f88a0",
+  "refs": [],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "A nonexistent entity renders its error as the entity's own name"
+}

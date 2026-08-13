@@ -171,7 +171,7 @@ export function Account() {
         <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('E-readers')}</h2>
         {devices.data?.devices.length ? (
           <ul className={styles.deviceSummary}>
-            {devices.data.devices.map((device) => <li key={device.public_id}>{device.label} · {t('{n} highlights', { n: device.annotation_count })}</li>)}
+            {devices.data.devices.map((device) => <li key={device.public_id}>{device.label} · {t('{n} highlights and notes', { n: device.annotation_count })}</li>)}
           </ul>
         ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
         <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>

@@ -4312,6 +4312,10 @@ msgid "Could not open that highlight."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "No se pudo leer este archivo de cómic."
 
@@ -4354,6 +4358,10 @@ msgstr "No se pudo guardar el título."
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "No se pudo guardar tu posición de lectura."
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
@@ -4701,6 +4709,10 @@ msgstr "Activar la sincronización con Kobo"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "Encriptado"
+
+#: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5273,6 +5285,10 @@ msgid "No highlights yet. Select text in the book to make one."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "No hay {items} que coincidan con «{query}»."
@@ -5710,12 +5726,28 @@ msgid "Scopes"
 msgstr "Ámbitos (scopes)"
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Buscar título, autor…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
 msgstr "Buscando en todas las fuentes…"
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5880,6 +5912,11 @@ msgstr "Mostrar libros ocultos"
 #: cps/spa_strings.py
 msgid "Show password"
 msgstr "Mostrar contraseña"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -6329,6 +6366,11 @@ msgstr "{count} archivos en cola para importar"
 #, python-brace-format
 msgid "{count} files rejected"
 msgstr "{count} archivos rechazados"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} matches"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format

@@ -4288,6 +4288,10 @@ msgid "Could not open that highlight."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Nie udało się odczytać tego archiwum komiksu."
 
@@ -4329,6 +4333,10 @@ msgstr "Nie udało się zapisać tytułu."
 
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4680,6 +4688,10 @@ msgstr "Włącz synchronizację Kobo"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "SSL"
+
+#: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5253,6 +5265,10 @@ msgid "No highlights yet. Select text in the book to make one."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "Brak wyników \"{items}\" dla \"{query}\"."
@@ -5690,12 +5706,28 @@ msgid "Scopes"
 msgstr "Zakresy (scopes)"
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Szukaj tytułu, autora…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
 msgstr "Przeszukiwanie każdego źródła…"
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5861,6 +5893,11 @@ msgstr "Pokaż ukryte książki"
 #: cps/spa_strings.py
 msgid "Show password"
 msgstr "Pokaż hasło"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -6305,6 +6342,11 @@ msgstr "{count} plików oczekuje w kolejce do importu"
 #, python-brace-format
 msgid "{count} files rejected"
 msgstr "{count} plików odrzuconych"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} matches"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9961,8 +10003,8 @@ msgid ""
 "Add these two services to your docker-compose file and run \"docker compose "
 "up -d\". After that you stay up to date automatically — no button to press."
 msgstr ""
-"Dodaj te dwie usługi do pliku docker-compose i uruchom \"docker compose up "
-"-d\". Od tej pory aktualizacje odbywają się automatycznie — bez klikania "
+"Dodaj te dwie usługi do pliku docker-compose i uruchom \"docker compose up -"
+"d\". Od tej pory aktualizacje odbywają się automatycznie — bez klikania "
 "żadnego przycisku."
 
 #: cps/templates/cwa_settings.html cps/templates/update_now_modal.html

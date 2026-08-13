@@ -4139,6 +4139,10 @@ msgid "Could not open that highlight."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr ""
 
@@ -4180,6 +4184,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4522,6 +4530,10 @@ msgstr "启用 Kobo 同步"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "加密"
+
+#: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5089,6 +5101,10 @@ msgid "No highlights yet. Select text in the book to make one."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr ""
@@ -5514,11 +5530,27 @@ msgid "Scopes"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
@@ -5681,6 +5713,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Show password"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6116,6 +6153,11 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} files rejected"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} matches"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9153,8 +9195,8 @@ msgid ""
 "innocenat\">innocenat</a>."
 msgstr ""
 "此工具改编自 <a href=\"https://github.com/innocenat\">innocenat</a> 制作的 "
-"<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-"
-"fix.netlify.app</a> 工具。"
+"<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-fix.netlify."
+"app</a> 工具。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -9173,8 +9215,8 @@ msgid ""
 "temporarily lock metadata.db. To stop a running backfill, restart the "
 "container after disabling."
 msgstr ""
-"注意：启用此功能会在启动时启动校验和回填服务，该服务可能会暂时锁定 "
-"metadata.db。要停止正在运行的回填，请在禁用后重新启动容器。"
+"注意：启用此功能会在启动时启动校验和回填服务，该服务可能会暂时锁定 metadata."
+"db。要停止正在运行的回填，请在禁用后重新启动容器。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -10029,8 +10071,8 @@ msgid ""
 "users with edit rights will see a badge on the Duplicates sidebar button and "
 "a notification popup when they login."
 msgstr ""
-"检测到未解决的重复项时显示弹出通知。管理员和具有编辑权限的用户在登录时，将在"
-"“重复项”侧边栏按钮上看到一个徽章，并会看到一个弹出通知。"
+"检测到未解决的重复项时显示弹出通知。管理员和具有编辑权限的用户在登录时，将"
+"在“重复项”侧边栏按钮上看到一个徽章，并会看到一个弹出通知。"
 
 #: cps/templates/cwa_settings.html
 #, fuzzy

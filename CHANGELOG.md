@@ -123,6 +123,15 @@ is for things you can see or feel when running the app.
   dismisses either one is easier to hit.
 
 ### Added
+- **You can search inside a book you're reading.** Open a book, click the new
+  search button in the reader toolbar, and type — results show the surrounding
+  sentence with your term marked, grouped so you can tell which chapter each one
+  is in, and clicking one takes you straight there — without moving the place you
+  were reading, so you can look something up and still come back. Neither the old
+  reader nor the new one has ever been able to do this. Long books are searched a chapter at
+  a time so the page stays responsive, and if a very common word turns up more
+  matches than are useful, the list says so rather than quietly showing you part
+  of the answer.
 - **Highlights made on a Kobo now say which device they came from.** The
   reader's Highlights and notes panel showed a bare internal word like "kobo";
   it now shows the name you gave the device. Highlights with no device recorded

@@ -431,8 +431,8 @@ msgid ""
 "LDAP CACertificate, Certificate or Key Location is not Valid, Please Enter "
 "Correct Path"
 msgstr ""
-"Der angegebene Speicherort für LDAP-CA-Zertifikat, -Zertifikat oder "
-"-Schlüsseldatei ist falsch,Bitte den korrekten Pfad eingeben."
+"Der angegebene Speicherort für LDAP-CA-Zertifikat, -Zertifikat oder -"
+"Schlüsseldatei ist falsch,Bitte den korrekten Pfad eingeben."
 
 #: cps/admin.py cps/templates/admin.html
 msgid "Add New User"
@@ -4282,6 +4282,10 @@ msgid "Could not open that highlight."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Lesen des Comic-Archivs fehlgeschlagen."
 
@@ -4323,6 +4327,10 @@ msgstr "Titel konnte nicht gespeichert werden."
 
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4667,6 +4675,10 @@ msgstr "Synchronisation mit Kobo aktivieren"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "Verschlüsselung"
+
+#: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5234,6 +5246,10 @@ msgid "No highlights yet. Select text in the book to make one."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "Keine Treffer in {items} für „{query}“."
@@ -5659,11 +5675,27 @@ msgid "Scopes"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
@@ -5826,6 +5858,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Show password"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6263,6 +6300,11 @@ msgstr "{count} Dateien für den Import vorgemerkt"
 #, python-brace-format
 msgid "{count} files rejected"
 msgstr "{count} Dateien abgelehnt"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} matches"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -12743,9 +12785,9 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ "        <a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
 #~ "wiki/Configuration#database-configuration\">see here</a>!"
 #~ msgstr ""
-#~ "CWA ist so konfiguriert, dass es deine Calibre-Datenbank "
-#~ "(<code>metadata.db</code>-Datei) irgendwo in dem Pfad <code>/calibre-"
-#~ "library</code> sucht.\n"
+#~ "CWA ist so konfiguriert, dass es deine Calibre-Datenbank (<code>metadata."
+#~ "db</code>-Datei) irgendwo in dem Pfad <code>/calibre-library</code> "
+#~ "sucht.\n"
 #~ "        CWA durchsucht automatisch das Verzeichnis, das du auf <code>/"
 #~ "calibre-library</code> in der docker-compose-Datei verbunden hast, um "
 #~ "eine existierende Calibre-\n"

@@ -4352,6 +4352,10 @@ msgid "Could not open that highlight."
 msgstr "Impossible d'ouvrir ce passage surligné."
 
 #: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr "Impossible d’ouvrir ce résultat de recherche."
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Impossible de lire cette archive de bande dessinée."
 
@@ -4394,6 +4398,10 @@ msgstr "Impossible d’enregistrer le titre."
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "Impossible d’enregistrer votre position de lecture."
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
+msgstr "Impossible d’effectuer une recherche dans ce livre."
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
@@ -4743,6 +4751,10 @@ msgstr "Activer la synchronisation Kobo"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "Chiffrement"
+
+#: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr "Saisissez au moins 2 caractères"
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5322,6 +5334,10 @@ msgstr ""
 "créer un."
 
 #: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr "Aucun résultat trouvé dans ce livre."
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "Aucun résultat dans {items} pour « {query} »."
@@ -5389,7 +5405,9 @@ msgstr "Note enregistrée"
 msgid ""
 "Nothing here yet. Highlight or write a note while reading, or import from a "
 "Kobo device."
-msgstr "Rien pour l’instant. Surlignez ou écrivez une note pendant la lecture, ou importez depuis un appareil Kobo."
+msgstr ""
+"Rien pour l’instant. Surlignez ou écrivez une note pendant la lecture, ou "
+"importez depuis un appareil Kobo."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -5768,12 +5786,28 @@ msgid "Scopes"
 msgstr "Portées"
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr "Rechercher dans le livre"
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr "Terme de recherche"
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr "Rechercher dans ce livre"
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Chercher un titre, un auteur…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
 msgstr "Recherche dans toutes les sources…"
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
+msgstr "Recherche dans le livre…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5938,6 +5972,11 @@ msgstr "Afficher les livres masqués"
 #: cps/spa_strings.py
 msgid "Show password"
 msgstr "Afficher le mot de passe"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
+msgstr "Affichage des {count} premiers résultats."
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -6388,6 +6427,11 @@ msgstr "{count} fichiers rejetés"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{count} matches"
+msgstr "{count} résultats"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{count} result"
 msgstr "{count} résultat"
 
@@ -6445,14 +6489,18 @@ msgstr "{n} surlignages et notes"
 #, python-brace-format
 msgid ""
 "{n} highlights and notes assigned to this device will become Unknown device."
-msgstr "{n} surlignages et notes attribués à cet appareil deviendront Appareil inconnu."
+msgstr ""
+"{n} surlignages et notes attribués à cet appareil deviendront Appareil "
+"inconnu."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "{n} highlights and notes were made on this device. They are not deleted. "
 "Their origin history is kept."
-msgstr "{n} surlignages et notes ont été créés sur cet appareil. Ils ne sont pas supprimés. Leur historique d'origine est conservé."
+msgstr ""
+"{n} surlignages et notes ont été créés sur cet appareil. Ils ne sont pas "
+"supprimés. Leur historique d'origine est conservé."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9457,9 +9505,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
-"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
-"href=\"https://github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
+"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
+"github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"

@@ -12,7 +12,7 @@ fi
 
 # Verify essential directories exist and are accessible
 echo "[cwa-init] Verifying essential directories..."
-for dir in "/app/calibre-web-automated" "/config" "/calibre-library" "/app/calibre"; do
+for dir in "/app/calibre-web-automated" "/config" "/calibre-library" "/opt/calibre"; do
   if [[ ! -d "$dir" ]]; then
     echo "[cwa-init] ERROR: Essential directory $dir does not exist!"
     exit 1
@@ -283,7 +283,8 @@ HOST_KERNEL="${HOST_KERNEL_RAW%%-*}"
 
 version_ge() { [ "$(printf '%s\n' "$2" "$1" | sort -V | tail -n1)" = "$1" ]; }
 
-QT_SENTINEL="/app/calibre/.qt6_processed"
+CALIBRE_DIR="/opt/calibre"
+QT_SENTINEL="$CALIBRE_DIR/.qt6_processed"
 if [ ! -f "$QT_SENTINEL" ]; then
   echo "[cwa-init][qt6] Starting Qt6 compatibility check..."
 
@@ -307,7 +308,7 @@ if [ ! -f "$QT_SENTINEL" ]; then
         processed_count=0
         error_count=0
 
-        for f in /app/calibre/lib/libQt6*.so*; do
+        for f in $CALIBRE_DIR/lib/libQt6*.so*; do
           [ -f "$f" ] || continue
           echo "[cwa-init][qt6] Processing: $(basename "$f")"
           processed_count=$((processed_count + 1))

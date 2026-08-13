@@ -277,7 +277,7 @@ class AutoLibrary:
                 create_appdb(self.app_db)
             except ImportError as error:
                 print("[cwa-auto-library]: ERROR: Could not create new app.db")
-                print(e)
+                print(error)
                 sys.exit(1)
             service_user.chown_to_service_user(self.config_dir, "[cwa-auto-library]")
             print(f"[cwa-auto-library] app.db successfully created in {self.app_db}")
@@ -422,7 +422,7 @@ class AutoLibrary:
         self.metadb_path = os.path.join(self.library_dir, "metadata.db")
         create_metadb(self.metadb_path)
         service_user.chown_to_service_user(self.library_dir, "[cwa-auto-library]")
-        print(f"[cwa-auto-library] app.db successfully created in {self.metadb_path}")
+        print(f"[cwa-auto-library] metadata.db successfully created in {self.metadb_path}")
         return
 
     def bootstrap_calibre_user_plugins_dir(self):

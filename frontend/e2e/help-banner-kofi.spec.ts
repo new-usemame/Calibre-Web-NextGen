@@ -121,7 +121,14 @@ test('clicking the Ko-fi banner opens Ko-fi and dismisses it durably', async ({ 
   expect(renderedStyle.bannerHeight).toBeCloseTo(40, 4);
   expect(renderedStyle.linkWidth).toBe(renderedStyle.bannerWidth);
   expect(renderedStyle.linkHeight).toBeCloseTo(40, 4);
-  expect(renderedStyle.background).toBe(
+  // Endpoint stops are dropped from the serialised value when the browser can see
+  // they are redundant at parse time, but kept when the stop arrives through a
+  // var() — substitution happens after that normalisation, so the same gradient
+  // serialises as "…rgb(7, 56, 77) 0%…100%)" once the colours live in tokens.
+  // The contract this test cares about is the three colours and the 58% midpoint,
+  // not whether the browser printed the redundant endpoints, so drop those first.
+  const withoutRedundantStops = renderedStyle.background.replace(/ (?:0|100)%(?=,|\)|$)/g, '');
+  expect(withoutRedundantStops).toBe(
     'linear-gradient(90deg, rgb(7, 56, 77), rgb(8, 70, 94) 58%, rgb(6, 68, 94))',
   );
   expect(renderedStyle.borderBottom).toBe('0px');

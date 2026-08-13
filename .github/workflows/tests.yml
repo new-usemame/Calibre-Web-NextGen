@@ -498,6 +498,7 @@ jobs:
     if: |
       always() && (
       startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.ref == 'refs/heads/dev' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_e2e) ||
       (github.event_name == 'pull_request' && needs.changed_paths.outputs.frontend == 'true')
@@ -660,6 +661,48 @@ jobs:
             exit 1
           fi
 
+      - name: Seed a multi-page PDF book (spec fixture)
+        run: |
+          # reader-pdf-viewer.spec.ts needs a book with a PDF format, and the
+          # ingest seed above is EPUB-only — so the spec found no PDF and failed
+          # on the fixture rather than on anything real, exactly the #1130 shape
+          # the shelves seed below exists to prevent.
+          #
+          # calibredb writes the format straight into the library. Ingest is the
+          # wrong instrument here: it converts on the way in, so dropping a PDF
+          # in that folder is not a reliable way to end up with a PDF format.
+          #
+          # The fixture is three pages deliberately. #1584's symptom was "only
+          # the first page is visible", which a one-page PDF cannot detect.
+          docker cp tests/fixtures/sample_books/three_page_sample.pdf \
+            cwn-e2e:/tmp/three_page_sample.pdf
+          added=$(docker exec cwn-e2e calibredb add /tmp/three_page_sample.pdf \
+            --with-library /calibre-library | tee /dev/stderr \
+            | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
+          [ -n "$added" ] || { echo "::error::calibredb add reported no book id"; exit 1; }
+          # Backdate it, because a new book is a NEW book: the default sort is
+          # newest-first, and several specs walk the library from the top to find
+          # something readable. Landing a PDF at position one displaced that and
+          # made reader-phase1 time out — a fixture breaking specs it has nothing
+          # to do with, which is the trap the book-lane convention exists to
+          # avoid. Oldest keeps it out of everyone's way; the PDF spec finds it
+          # by format, not by position.
+          docker exec cwn-e2e calibredb set_metadata \
+            --field timestamp:2001-01-01T00:00:00+00:00 "$added" \
+            --with-library /calibre-library >/dev/null
+          jar=$(mktemp)
+          csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
+          curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
+            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
+            -d '{"username":"admin","password":"admin123"}' -o /dev/null
+          # Assert through the same endpoint the spec reads, so a book that was
+          # added but is invisible to the API fails here and not as a spec.
+          pdfs=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?per_page=200' \
+            | python3 -c 'import sys,json;d=json.load(sys.stdin);print(sum(1 for b in d.get("items",[]) if any(str(f).lower()=="pdf" for f in b.get("formats",[]))))')
+          echo "books with a PDF format: $pdfs"
+          [ "${pdfs:-0}" -ge 1 ] || { echo "::error::no PDF-format book after seeding"; exit 1; }
+
       - name: Seed shelves and series
         run: |
           # The library the harness gets had three books and NO shelves, so
@@ -780,20 +823,75 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
-      # The whole point of running on a PR: without this the container serves
-      # main's SPA and the suite says nothing about the change under review.
-      - name: Overlay this PR's SPA bundle into the container
-        if: github.event_name == 'pull_request'
+      # Without this the container serves whatever SPA the pulled image already
+      # had, and the suite says nothing about the commit under test.
+      #
+      # This ran on `pull_request` only, which quietly made the main-push leg
+      # added in #1557 test THE WRONG CODE. The image resolves to `:dev` for any
+      # non-tag ref, and `:dev` for the head commit is built by a separate
+      # workflow that RACES this job — measured on the 2026-08-12 main push:
+      #
+      #     21:32:22  e2e pulls ghcr.io/...:dev
+      #     21:32:28  build-amd64 for the head commit STARTS
+      #     21:34:22  build-amd64 finishes — the :dev holding that commit first
+      #               exists here, two minutes after it was pulled
+      #
+      # So the container under test predated the head commit by one merge, and
+      # the overlay that would have corrected it was skipped. Every result was
+      # attributed to a commit that was not in the artifact. That is worse than a
+      # cancelled run: a cancelled run verifies nothing, this verified the wrong
+      # thing while looking identical from outside — same green tick, same step
+      # count. Step count proves the suite RAN; it cannot prove WHAT it ran
+      # against.
+      #
+      # Running the overlay on a main push too makes the SPA under test the head
+      # commit's, which is the same contract a PR already gets.
+      #
+      # The `dev` leg has the SAME defect and is arguably worse:
+      # docker-image-build-dev.yml triggers on `push: branches: [main]`, so
+      # `:dev` is built from MAIN. A push to `dev` therefore pulled an image
+      # built from a DIFFERENT BRANCH and ran dev's specs against it. Covered
+      # here too.
+      #
+      # After this, the overlay pins artifact identity on every ref that resolves
+      # to `:dev` — PR, main push, dev push. Tags are the only case that skips
+      # it, and correctly so: there the image IS the tag, which is already
+      # pinned. That makes "did the overlay run" a usable second instrument
+      # alongside step count — steps prove the suite RAN, the overlay proves
+      # WHAT it ran against.
+      #
+      # ⚠️ Stated rather than glossed: the API in the container is still `:dev`,
+      # i.e. one merge behind. This leg is an SPA gate, not a full-stack one (it
+      # says so above), so a backend regression on main is still invisible until
+      # the next push. Pinning the head commit's own image DIGEST is the complete
+      # fix; it needs this job to wait on the image build, which is a bigger
+      # change than this one.
+      - name: Overlay the SPA bundle under test into the container
+        if: >-
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' &&
+           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'))
         working-directory: frontend
         run: |
           npm ci
           npm run build          # writes ../cps/static/app
           docker cp ../cps/static/app/. cwn-e2e:/app/calibre-web-automated/cps/static/app/
+          # Jinja templates too. Not every user-facing surface is React: the PDF
+          # reader is a server-rendered pdf.js page the SPA embeds, so a fix that
+          # spans both (#1584) had its SPA half tested here and its template half
+          # silently skipped — the spec guarding it would have failed against the
+          # `:dev` template while passing on the merged result, which teaches the
+          # next author to delete the guard. Templates are read per render and
+          # are not restart-gated, same as the bundle above.
+          docker cp ../cps/templates/. cwn-e2e:/app/calibre-web-automated/cps/templates/
           # The bundle is static; no restart needed. Confirm the shell still
           # answers so a broken overlay fails here rather than as 30 confusing
-          # spec failures.
+          # spec failures. /login is Jinja-rendered, so it also catches a template
+          # that references something this `:dev` backend does not have — the one
+          # real hazard of overlaying templates onto an older API.
           curl -fsS http://localhost:8083/app/ -o /dev/null
-          echo "PR bundle in place"
+          curl -fsS http://localhost:8083/login -o /dev/null
+          echo "PR bundle + templates in place"
 
       - name: Run SPA e2e harness
         working-directory: frontend
@@ -881,6 +979,9 @@ jobs:
           # fork carve-out mirrors the e2e job's own continue-on-error, so the
           # two cannot disagree about what is being gated.
           IS_FRONTEND_PR: ${{ needs.changed_paths.outputs.frontend == 'true' && github.event.pull_request.head.repo.fork != true }}
+          # Every push to main runs and gates on the SPA e2e suite. Keep this
+          # event-scoped so workflow_dispatch continues to honor run_e2e.
+          IS_MAIN_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           echo "Fast Tests:        ${{ needs.fast-tests.result }}"
           echo "Frontend Build:    ${{ needs.frontend-build.result }}"
@@ -889,6 +990,29 @@ jobs:
           echo "Is tier-2 PR:      $IS_TIER2_PR"
           echo "Is build PR:       $IS_BUILD_PR"
           echo "Is frontend PR:    $IS_FRONTEND_PR"
+          echo "Is main push:      $IS_MAIN_PUSH"
+
+          # A required summary must positively prove that every hard-gated
+          # main-push lane completed. Reject skipped/cancelled as well as
+          # failure; otherwise a later broken job condition silently turns
+          # coverage off while this required check stays green.
+          if [[ "$IS_MAIN_PUSH" == "true" ]]; then
+            if [[ "${{ needs.fast-tests.result }}" != "success" ]]; then
+              echo "❌ Fast tests did not succeed on a push to main"
+              echo "   Actual result: ${{ needs.fast-tests.result }}"
+              exit 1
+            fi
+            if [[ "${{ needs.frontend-build.result }}" != "success" ]]; then
+              echo "❌ Frontend build did not succeed on a push to main"
+              echo "   Actual result: ${{ needs.frontend-build.result }}"
+              exit 1
+            fi
+            if [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
+              echo "❌ SPA e2e suite did not succeed on a push to main"
+              echo "   Actual result: ${{ needs.e2e-tests.result }}"
+              exit 1
+            fi
+          fi
 
           if [[ "${{ needs.fast-tests.result }}" == "failure" ]]; then
             echo "❌ Fast tests failed"
@@ -940,9 +1064,11 @@ jobs:
           # (#1130). Warning-and-continuing is how a red suite kept satisfying
           # merge-gate condition (a): this summary is the single required
           # check, and auto-merge.yml fires on it, so "just warn" meant the
-          # gate reported its own failure as a pass. Tag and main runs stay
-          # advisory here — the job itself is already non-advisory there, and
-          # failing the summary too would block auto-revert decisions.
+          # gate reported its own failure as a pass. Main pushes are also a
+          # hard gate here: branch protection reads this summary, so relying
+          # only on the failed e2e job would still let the required check pass.
+          # Tag and dev runs stay advisory in the summary; the e2e job itself
+          # remains non-advisory there.
           if [[ "${{ needs.e2e-tests.result }}" == "failure" ]]; then
             if [[ "$IS_FRONTEND_PR" == "true" ]]; then
               echo "❌ SPA e2e suite failed on a frontend PR — this is a hard gate."

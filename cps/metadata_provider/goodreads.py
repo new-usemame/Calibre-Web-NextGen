@@ -7,8 +7,14 @@
 Maintenance note: Goodreads has no supported public API. Embedded JSON-LD is
 expected to break after Goodreads changes its page data shape; search-result
 links/selectors are the next likely failure. Detect rot via the recorded parser
-fixtures plus a live opt-in search returning an empty provider row. Network,
-anti-bot, and parse failures deliberately degrade to no results.
+fixtures plus a live opt-in search returning an empty provider row.
+
+Unreachable-network and parse failures deliberately degrade to no results. An
+HTTP status refusal does not: Goodreads answers a genuine no-match with 200 and
+an empty result list, so a 429/403 never means "no such book" and is raised for
+the search layer to name. Swallowing it made a throttled search identical to a
+missing book, which is what #303's reporter hit when a repeated lookup stopped
+finding a book it had just found.
 """
 
 from __future__ import annotations
@@ -50,11 +56,16 @@ class Goodreads(Metadata):
             response = session.get(self.SEARCH_URL.format(quote_plus(query.strip())), timeout=self.TIMEOUT)
             response.raise_for_status()
             links = self._parse_search(response.text)
+        except requests.HTTPError as exc:
+            # Refused, not empty — see the module docstring (#303).
+            log.warning("Goodreads search refused: %s", exc)
+            raise
         except (requests.RequestException, ValueError, TypeError) as exc:
             log.warning("Goodreads search failed: %s", exc)
             return []
 
         records = []
+        refusal = None
         # Sequential by design: politely avoid parallel page hammering.
         for link in links[:self.MAX_RESULTS]:
             try:
@@ -63,8 +74,15 @@ class Goodreads(Metadata):
                 record = self._parse_book(response.text, link, generic_cover)
                 if record:
                     records.append(record)
+            except requests.HTTPError as exc:
+                log.warning("Goodreads book fetch refused: %s", exc)
+                refusal = exc
             except (requests.RequestException, ValueError, TypeError) as exc:
                 log.warning("Goodreads book fetch failed: %s", exc)
+        # The search matched but every page was refused. Reporting that as no
+        # results is the same lie as above; a partial read still wins.
+        if refusal is not None and not records:
+            raise refusal
         return records
 
     @classmethod

@@ -4288,8 +4288,8 @@ msgid "Could not load e-readers."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Could not load highlights."
-msgstr "No se pudieron cargar los subrayados."
+msgid "Could not load highlights and notes."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -4309,6 +4309,10 @@ msgstr "No se pudieron cargar los usuarios."
 
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not open that search result."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4354,6 +4358,10 @@ msgstr "No se pudo guardar el título."
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "No se pudo guardar tu posición de lectura."
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
@@ -4701,6 +4709,10 @@ msgstr "Activar la sincronización con Kobo"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "Encriptado"
+
+#: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5269,14 +5281,11 @@ msgid "No excluded tags"
 msgstr "Sin etiquetas excluidas"
 
 #: cps/spa_strings.py
-msgid ""
-"No highlights yet. Highlight while reading, or import from a Kobo device."
+msgid "No highlights yet. Select text in the book to make one."
 msgstr ""
-"Aún no hay subrayados. Subraya mientras lees, o impórtalos desde un "
-"dispositivo Kobo."
 
 #: cps/spa_strings.py
-msgid "No highlights yet. Select text in the book to make one."
+msgid "No matches found in this book."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5340,6 +5349,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Note saved"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Nothing here yet. Highlight or write a note while reading, or import from a "
+"Kobo device."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5711,12 +5726,28 @@ msgid "Scopes"
 msgstr "Ámbitos (scopes)"
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Buscar título, autor…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
 msgstr "Buscando en todas las fuentes…"
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5883,6 +5914,11 @@ msgid "Show password"
 msgstr "Mostrar contraseña"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Shuffle picks"
 msgstr "Aleatorizar selección"
 
@@ -5941,6 +5977,10 @@ msgstr "Orden de clasificación"
 #: cps/spa_strings.py
 msgid "Source details"
 msgstr "Detalles de la fuente"
+
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Started reading"
@@ -6211,6 +6251,13 @@ msgid "When reading progress was first synced"
 msgstr "Cuándo se sincronizó por primera vez el progreso de lectura"
 
 #: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add ?"
+"local=1 to the login URL to reach the password form, which keeps working as "
+"long as standard password login is left enabled."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Write a note"
 msgstr ""
 
@@ -6333,6 +6380,11 @@ msgstr "{count} archivos rechazados"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{count} matches"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{count} result"
 msgstr "{count} resultado"
 
@@ -6363,7 +6415,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{name}, {n} highlights"
+msgid "{name}, {n} highlights and notes"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6383,19 +6435,20 @@ msgstr "{n} encontrado(s)"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{n} highlights"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} highlights assigned to this device will become Unknown device."
+msgid "{n} highlights and notes"
 msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
-"{n} highlights were made on this device. They are not deleted. Their origin "
-"history is kept."
+"{n} highlights and notes assigned to this device will become Unknown device."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes were made on this device. They are not deleted. "
+"Their origin history is kept."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8969,6 +9022,18 @@ msgstr ""
 "Oculta el formulario de inicio de sesión estándar. Los usuarios deberán "
 "iniciar sesión mediante OAuth o LDAP. Asegúrate de tener un método de inicio "
 "de sesión alternativo funcionando antes de activarlo."
+
+#: cps/templates/config_edit.html
+msgid "Automatically forward to the only OAuth provider"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"When enabled and exactly one OAuth provider is active, visiting the login "
+"page starts it automatically. Add ?local=1 to the login URL to open the "
+"normal login page instead. That page still accepts a username and password "
+"only while the setting above is left off."
+msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Enable OAuth Group-Based Admin Role Management"
@@ -12838,6 +12903,15 @@ msgstr "Exponer las estanterías seleccionadas en OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostrar Selección Leidos/No Leidos"
+
+#~ msgid "Could not load highlights."
+#~ msgstr "No se pudieron cargar los subrayados."
+
+#~ msgid ""
+#~ "No highlights yet. Highlight while reading, or import from a Kobo device."
+#~ msgstr ""
+#~ "Aún no hay subrayados. Subraya mientras lees, o impórtalos desde un "
+#~ "dispositivo Kobo."
 
 #~ msgid "Bulk actions"
 #~ msgstr "Acciones masivas"

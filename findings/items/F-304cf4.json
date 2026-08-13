@@ -1,0 +1,11 @@
+{
+  "area": "db",
+  "body": "Same shape as the #1556 logger bug (fixed in #1587): a defaulted parameter\ndeclared before `*args`, so a positional caller silently binds to the wrong\nslot.\n\n    cps/db.py:1629 fill_indexpage(..., join_archive_read=..., config_read_column=..., *args)\n    cps/db.py:1942 get_search_results(..., offset=..., order=..., limit=..., *args)\n\nLower severity than the logger case: neither is printf-style, and current\ncallers pass these explicitly, so nothing is broken today. The risk is the\nsame trap for the next caller who passes a positional argument expecting it\nto land in *args.\n\nFound while tracing blast radius for #1556. Deliberately not folded into\nPR #1587 to keep that diff to the defect.",
+  "created": "2026-08-13",
+  "id": "F-304cf4",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "db.py: fill_indexpage and get_search_results put defaulted params before *args"
+}

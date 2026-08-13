@@ -2787,6 +2787,7 @@ def _configuration_update_helper():
 
         # security configuration
         _config_checkbox(to_save, "config_disable_standard_login")
+        _config_checkbox(to_save, "config_enable_oauth_auto_forward")
         _config_checkbox(to_save, "config_enable_oauth_group_admin_management")
         _config_checkbox(to_save, "config_check_extensions")
         _config_checkbox(to_save, "config_use_https")

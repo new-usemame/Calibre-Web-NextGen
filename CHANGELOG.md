@@ -16,7 +16,82 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.34] - 2026-08-13
+
 ### Fixed
+- **PDFs open past page one on iPad.** In the new interface a PDF showed its
+  first page and nothing else on iPadOS, in both Safari and Firefox, while the
+  same book was fine on a Mac, on Android and in the classic interface. The
+  reader was handing the file to whatever PDF viewer the browser ships, and on
+  iPhone and iPad that viewer only ever draws one page inside an embedded frame.
+  PDFs now open in the same viewer the classic interface has always used, which
+  draws every page the same way on every browser, and brings PDF text search,
+  thumbnails and annotations to the new reader with it. Reported by
+  [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1584)
+  ([#1584](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1584)).
+- **Errors explain themselves again instead of turning into a blank 500.** Some
+  failures replaced their own explanation with `TypeError: '>' not supported
+  between instances of ... and 'int'` and took down the page that was handling
+  them. Uploading a book with an unwritable ingest folder was the clearest case:
+  the app already had the right sentence ready — "Ingest folder is not writable.
+  Check your /cwa-book-ingest volume permissions." — but the crash happened while
+  writing the log line, so nobody ever saw it and the upload returned a 500. The
+  same fault sat on the "reload metadata from disk" failure path and on ingest
+  folder creation. Reported by
+  [@Thovi98](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1556)
+  ([#1556](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1556)).
+- **"No results" no longer covers for a metadata source that is throttling you.**
+  Searching Get Metadata for the same book twice could find it on the first click
+  and not on the second, with nothing changed in between. Goodreads and bol.com
+  answer a real no-match with an ordinary empty page, so when they instead refuse
+  a repeated request the app was reading that refusal as "this book does not
+  exist" and printing "No results for this query" — the two were impossible to
+  tell apart. A refused search now says so, and says to wait a minute and try
+  again. Two related pieces of bad advice went with it: a refusal from Goodreads
+  or bol.com used to suggest setting an API key, which neither one has (Goodreads
+  closed its API in 2020, which is exactly why it is scraped), and an ordinary
+  "page not found" from a Goodreads book whose id happened to contain 403 was
+  misreported as a refusal. Reported by
+  [@briffaantoine](https://github.com/new-usemame/Calibre-Web-NextGen/issues/303)
+  ([#303](https://github.com/new-usemame/Calibre-Web-NextGen/issues/303)).
+- **Eight more settings read in Dutch.** Hiding books from a personal library,
+  "Convert missing KEPUBs now", syncing Kobo annotations to Hardcover,
+  auto-creating users from LDAP, "Important:", "Use a URL" in the cover picker,
+  "Starting..." in the cover enforcer, and the EPUB fixer's search box were all
+  showing in English on a Dutch interface. Contributed by
+  [@VHE1987](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1553)
+  ([#1553](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1553)).
+- **More of the interface reads in Russian.** Coverage went from 2,618 to 2,719
+  translated phrases: 101 phrases that had no Russian at all now have it,
+  including the cover and metadata enforcement screens, the notes and highlights
+  panel in the reader, assigning books to an e-reader, and the message you get
+  when a KEPUB conversion cannot be queued. Contributed by
+  [@standhaftsohnsergius](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1554)
+  ([#1554](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1554)).
+- **Opening one of your highlights no longer loses your place — or marks the book
+  finished.** Tapping a highlight in the "Highlights and notes" list jumped the
+  book to that passage and then saved *that* as your reading position, so closing
+  the book afterwards reopened at the highlight instead of where you had actually
+  read to. Worse, the same save reports how far through the book you are, and the
+  server treats 99% as finished — so glancing at a highlight near the end of a
+  book could mark the whole book read and pass that on to a connected Kobo or
+  Hardcover account. Jumping to a highlight is now treated as looking, not
+  reading: your place stays put until you turn a page yourself.
+- **More of the interface reads in German.** Coverage went from 1,891 to 2,071
+  translated phrases: 121 phrases that had no German at all now have it, and 59
+  entries that gettext had guessed and marked provisional — provisional entries
+  are dropped when the catalogue is compiled, so they were showing in English
+  regardless — are now confirmed translations. One of them was **Import**, which
+  had been guessed as "Wichtig:" ("Important:"). Contributed by
+  [@chaosblog](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1549)
+  ([#1549](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1549)).
+- **The highlights page admits it holds your notes too.** Notes you write about a
+  book — the ones not attached to any particular sentence — have been showing up
+  in the highlights list for a while, but the page still called everything a
+  highlight: the heading, the empty state, the per-device counts, and what a
+  screen reader announced. A book with three highlights and two notes reported
+  "5 highlights". It now reads **Highlights and notes** throughout, matching what
+  the reader already called it, and the counts say what they are counting.
 - **The reader's Black page theme is back, and it is actually black.** The
   classic reader has four page themes; the new UI's reader only ever showed
   three, and anyone who had chosen **Black** was quietly given the dark theme
@@ -83,7 +158,43 @@ is for things you can see or feel when running the app.
   misclick cut off whichever device still used that password with no way to get
   it back. It now names the password you are about to revoke.
 
+- **Four small controls are easier to hit**, most noticeably the ☰ menu button
+  on phones — the main way you open navigation there, and narrower than the
+  minimum size accessibility guidance asks for. They all look exactly the same;
+  the area that responds to your finger or pointer around them is bigger. The
+  others are **Delete format** on the edit-book page, **Revoke** on an app
+  password, and the Kobo/OPDS shelf checkboxes, where the whole row now responds
+  rather than just the small square.
+- **The notice bar across the top of the page follows your theme.** It was one
+  fixed dark-teal band whichever theme you picked, so on **Light** and **Sepia**
+  it sat on the page as a near-black slab, and on **High contrast** it ignored
+  that theme's stronger borders entirely. It keeps its own teal identity — it is
+  meant to look distinct from the rest of the UI — but now comes in a version
+  made for each theme. The Ko-fi bar gets the same treatment, and the × that
+  dismisses either one is easier to hit.
+
 ### Added
+- **Sending everyone straight to your single sign-on no longer means giving up
+  the password form.** If you run exactly one OAuth provider, Calibre-Web NextGen
+  can take people to it the moment they hit the login page. Until now that
+  automatic jump was welded to "Disable Standard Login", so switching it on also
+  switched off password login for everyone — including you, if the provider ever
+  went down. The two are now separate settings: turn on **Start the only OAuth
+  provider automatically** under Admin → Security, and the password form stays
+  available at `/login?local=1` as a way back in. Off by default, so nothing
+  changes until you ask for it. The setting appears on both the classic and the
+  new admin pages. Contributed by
+  [@lduesing](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1488)
+  ([#1488](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1488)).
+- **You can search inside a book you're reading.** Open a book, click the new
+  search button in the reader toolbar, and type — results show the surrounding
+  sentence with your term marked, grouped so you can tell which chapter each one
+  is in, and clicking one takes you straight there — without moving the place you
+  were reading, so you can look something up and still come back. Neither the old
+  reader nor the new one has ever been able to do this. Long books are searched a chapter at
+  a time so the page stays responsive, and if a very common word turns up more
+  matches than are useful, the list says so rather than quietly showing you part
+  of the answer.
 - **Highlights made on a Kobo now say which device they came from.** The
   reader's Highlights and notes panel showed a bare internal word like "kobo";
   it now shows the name you gave the device. Highlights with no device recorded

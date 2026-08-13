@@ -1,0 +1,11 @@
+{
+  "area": "reader",
+  "body": "`searchBook` documents that past a couple of hundred hits it \"stops and says it stopped\". The cap\nis applied only AFTER `section.search(query)` has returned its complete array\n(frontend/src/lib/reader/searchBook.ts).\n\nThe installed epub.js `search()` traverses every text node in the section and pushes every match\nbefore returning; its `maxSeqEle` parameter controls adjacent-node phrase matching, not the result\ncount. So a single huge chapter with thousands of matches is fully scanned and fully allocated\nbefore all but 200 are discarded.\n\nThe cap therefore bounds the returned list and the number of LATER sections, not the cost of the\ncurrent one -- the section that most needs bounding. Compounded by the scan being synchronous:\nthe main thread cannot process the user's own abort while it runs.\n\nBounding it requires changing the core's contract (a per-section limit passed into the search, or\nchunked traversal), which is why it was not folded into the UI PR.\n\nFound by adversarial review (Terra).",
+  "created": "2026-08-12",
+  "id": "F-3abc47",
+  "refs": [],
+  "severity": "perf",
+  "source": "audit",
+  "status": "open",
+  "title": "The search hit cap does not bound work inside a single section"
+}

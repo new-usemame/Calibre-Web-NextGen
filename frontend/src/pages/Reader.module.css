@@ -346,6 +346,85 @@
 
 .tocItem:hover { background: var(--surface-2); color: var(--text); }
 
+/* Search shares the TOC drawer shell, then becomes a compact form + result
+ * list. All content here is on the app surface, so use app tokens regardless of
+ * the separately-selected reading-page theme. */
+.searchField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.searchField input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.searchField input:focus-visible,
+.searchResult:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.searchStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 32px;
+  margin: var(--sp-2) 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.searchResults { margin-top: var(--sp-1); }
+.searchResults li { margin-bottom: var(--sp-1); }
+
+.searchResult {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.searchResult:hover { background: var(--surface-2); }
+
+.searchChapter {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.searchExcerpt {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+  overflow-wrap: anywhere;
+}
+
+.searchExcerpt mark {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
 /* Progress */
 .progressBar {
   height: 3px;
@@ -436,7 +515,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .annJump { transition: none; }
+  .annJump, .searchResult { transition: none; }
 }
 
 /* #325 — note affordance in both popovers. Neutral (non-destructive) sibling of

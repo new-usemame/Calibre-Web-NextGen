@@ -4328,8 +4328,8 @@ msgid "Could not load e-readers."
 msgstr "Impossible de charger les liseuses."
 
 #: cps/spa_strings.py
-msgid "Could not load highlights."
-msgstr "Impossible de charger les surlignages."
+msgid "Could not load highlights and notes."
+msgstr "Impossible de charger les surlignages et les notes."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -4350,6 +4350,10 @@ msgstr "Impossible de charger les utilisateurs."
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
 msgstr "Impossible d'ouvrir ce passage surligné."
+
+#: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr "Impossible d’ouvrir ce résultat de recherche."
 
 #: cps/spa_strings.py
 msgid "Could not read this comic archive."
@@ -4394,6 +4398,10 @@ msgstr "Impossible d’enregistrer le titre."
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "Impossible d’enregistrer votre position de lecture."
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
+msgstr "Impossible d’effectuer une recherche dans ce livre."
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
@@ -4743,6 +4751,10 @@ msgstr "Activer la synchronisation Kobo"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "Chiffrement"
+
+#: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr "Saisissez au moins 2 caractères"
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5316,17 +5328,14 @@ msgid "No excluded tags"
 msgstr "Aucune étiquette exclue"
 
 #: cps/spa_strings.py
-msgid ""
-"No highlights yet. Highlight while reading, or import from a Kobo device."
-msgstr ""
-"Aucun surlignage pour l’instant. Surlignez pendant la lecture, ou importez "
-"depuis un appareil Kobo."
-
-#: cps/spa_strings.py
 msgid "No highlights yet. Select text in the book to make one."
 msgstr ""
 "Aucun surlignage pour le moment. Sélectionnez du texte dans le livre pour en "
 "créer un."
+
+#: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr "Aucun résultat trouvé dans ce livre."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5391,6 +5400,14 @@ msgstr "Note supprimée"
 #: cps/spa_strings.py
 msgid "Note saved"
 msgstr "Note enregistrée"
+
+#: cps/spa_strings.py
+msgid ""
+"Nothing here yet. Highlight or write a note while reading, or import from a "
+"Kobo device."
+msgstr ""
+"Rien pour l’instant. Surlignez ou écrivez une note pendant la lecture, ou "
+"importez depuis un appareil Kobo."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -5769,12 +5786,28 @@ msgid "Scopes"
 msgstr "Portées"
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr "Rechercher dans le livre"
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr "Terme de recherche"
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr "Rechercher dans ce livre"
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Chercher un titre, un auteur…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
 msgstr "Recherche dans toutes les sources…"
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
+msgstr "Recherche dans le livre…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5941,6 +5974,11 @@ msgid "Show password"
 msgstr "Afficher le mot de passe"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
+msgstr "Affichage des {count} premiers résultats."
+
+#: cps/spa_strings.py
 msgid "Shuffle picks"
 msgstr "Mélanger la sélection"
 
@@ -5999,6 +6037,10 @@ msgstr "Ordre de tri"
 #: cps/spa_strings.py
 msgid "Source details"
 msgstr "Détails de la source"
+
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
+msgstr "Démarrer automatiquement le seul fournisseur OAuth"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Started reading"
@@ -6266,6 +6308,17 @@ msgid "When reading progress was first synced"
 msgstr "Date de la première synchronisation de la progression de lecture"
 
 #: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add ?"
+"local=1 to the login URL to reach the password form, which keeps working as "
+"long as standard password login is left enabled."
+msgstr ""
+"Lorsque le démarrage automatique est activé, la page de connexion mène "
+"directement au fournisseur. Ajoutez ?local=1 à l’URL de connexion pour "
+"accéder au formulaire de mot de passe, qui continue de fonctionner tant que "
+"la connexion standard par mot de passe reste activée."
+
+#: cps/spa_strings.py
 msgid "Write a note"
 msgstr "Écrire une note"
 
@@ -6389,6 +6442,11 @@ msgstr "{count} fichiers rejetés"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{count} matches"
+msgstr "{count} résultats"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{count} result"
 msgstr "{count} résultat"
 
@@ -6419,8 +6477,8 @@ msgstr "{name} supprimé."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{name}, {n} highlights"
-msgstr "{name}, {n} surlignages"
+msgid "{name}, {n} highlights and notes"
+msgstr "{name}, {n} surlignages et notes"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6439,22 +6497,25 @@ msgstr "{n} trouvé(s)"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{n} highlights"
-msgstr "{n} surlignages"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} highlights assigned to this device will become Unknown device."
-msgstr "{n} surlignages attribués à cet appareil deviendront Appareil inconnu."
+msgid "{n} highlights and notes"
+msgstr "{n} surlignages et notes"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
-"{n} highlights were made on this device. They are not deleted. Their origin "
-"history is kept."
+"{n} highlights and notes assigned to this device will become Unknown device."
 msgstr ""
-"{n} surlignages ont été créés sur cet appareil. Ils ne sont pas supprimés. "
-"Leur historique d'origine est conservé."
+"{n} surlignages et notes attribués à cet appareil deviendront Appareil "
+"inconnu."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes were made on this device. They are not deleted. "
+"Their origin history is kept."
+msgstr ""
+"{n} surlignages et notes ont été créés sur cet appareil. Ils ne sont pas "
+"supprimés. Leur historique d'origine est conservé."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8956,6 +9017,18 @@ msgstr ""
 "connexion fonctionnelle avant d'activer cette option."
 
 #: cps/templates/config_edit.html
+msgid "Automatically forward to the only OAuth provider"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"When enabled and exactly one OAuth provider is active, visiting the login "
+"page starts it automatically. Add ?local=1 to the login URL to open the "
+"normal login page instead. That page still accepts a username and password "
+"only while the setting above is left off."
+msgstr ""
+
+#: cps/templates/config_edit.html
 msgid "Enable OAuth Group-Based Admin Role Management"
 msgstr ""
 "Activer la gestion des rôles administratifs basée sur les groupes OAuth"
@@ -9459,9 +9532,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
-"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
-"href=\"https://github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
+"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
+"github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -12747,6 +12820,36 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "Could not load highlights."
+#~ msgstr "Impossible de charger les surlignages."
+
+#~ msgid ""
+#~ "No highlights yet. Highlight while reading, or import from a Kobo device."
+#~ msgstr ""
+#~ "Aucun surlignage pour l’instant. Surlignez pendant la lecture, ou "
+#~ "importez depuis un appareil Kobo."
+
+#, python-brace-format
+#~ msgid "{name}, {n} highlights"
+#~ msgstr "{name}, {n} surlignages"
+
+#, python-brace-format
+#~ msgid "{n} highlights"
+#~ msgstr "{n} surlignages"
+
+#, python-brace-format
+#~ msgid "{n} highlights assigned to this device will become Unknown device."
+#~ msgstr ""
+#~ "{n} surlignages attribués à cet appareil deviendront Appareil inconnu."
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights were made on this device. They are not deleted. Their "
+#~ "origin history is kept."
+#~ msgstr ""
+#~ "{n} surlignages ont été créés sur cet appareil. Ils ne sont pas "
+#~ "supprimés. Leur historique d'origine est conservé."
 
 #~ msgid "Bulk actions"
 #~ msgstr "Actions groupées"

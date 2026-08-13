@@ -680,6 +680,11 @@
                 <div class="help-block">{{_('Hides the standard login form. Users must log in via OAuth or LDAP. Ensure you have a working alternative login method before enabling.')}}</div>
             </div>
             <div class="form-group">
+                <input type="checkbox" id="config_enable_oauth_auto_forward" name="config_enable_oauth_auto_forward" {% if config.config_enable_oauth_auto_forward %}checked{% endif %}>
+                <label for="config_enable_oauth_auto_forward">{{_('Automatically forward to the only OAuth provider')}}</label>
+                <div class="help-block">{{_('When enabled and exactly one OAuth provider is active, visiting the login page starts it automatically. Add ?local=1 to the login URL to open the normal login page instead. That page still accepts a username and password only while the setting above is left off.')}}</div>
+            </div>
+            <div class="form-group">
                 <input type="checkbox" id="config_enable_oauth_group_admin_management" name="config_enable_oauth_group_admin_management" {% if config.config_enable_oauth_group_admin_management %}checked{% endif %}>
                 <label for="config_enable_oauth_group_admin_management">{{_('Enable OAuth Group-Based Admin Role Management')}}</label>
                 <div class="help-block">{{_('When enabled, admin privileges are automatically granted or revoked based on OAuth group membership. Disable this to manually manage admin roles in the user management panel, preventing OAuth logins from overriding local role assignments.')}}</div>

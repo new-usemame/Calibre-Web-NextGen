@@ -579,6 +579,7 @@ export interface SecurityConfig {
   ldap: SecurityLdap;
   oauth: {
     redirect_host: string; disable_standard_login: boolean;
+    enable_oauth_auto_forward: boolean;
     enable_group_admin_management: boolean; generic: SecurityOauthGeneric;
     providers: { name: string; client_id: string; has_secret: boolean; active: boolean }[];
   };
@@ -593,7 +594,8 @@ export interface SecurityUpdate {
   remote_login?: boolean;
   ldap?: Partial<Omit<SecurityLdap, 'has_password'>> & { serv_password?: string };
   oauth?: {
-    redirect_host?: string; disable_standard_login?: boolean; enable_group_admin_management?: boolean;
+    redirect_host?: string; disable_standard_login?: boolean; enable_oauth_auto_forward?: boolean;
+    enable_group_admin_management?: boolean;
     generic?: Partial<Omit<SecurityOauthGeneric, 'has_secret' | 'active'>> & { client_secret?: string };
     providers?: { name: string; client_id?: string; client_secret?: string }[];
   };

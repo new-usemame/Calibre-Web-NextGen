@@ -1,0 +1,11 @@
+{
+  "area": "reader",
+  "body": "`searchBook` returns an empty result before touching the book for any trimmed query shorter than\n`MIN_QUERY_LENGTH = 2` (frontend/src/lib/reader/searchBook.ts). The comment justifies it as\n\"never what the reader meant\", and for Latin scripts that holds.\n\nIt is false for CJK and other scripts where a single visible character is a complete word. For\nthose books a whole class of valid in-book queries silently returns nothing -- and it returns\n\"nothing typed yet\", not \"no matches\", so the reader gets no signal at all.\n\nNot a cosmetic i18n nit: search is simply unusable for some queries in those languages.\n\nFixing it properly needs a script-aware rule (or a submit action / lower cap for potentially\nexpensive one-character scans) rather than lowering the constant, since the constant also exists\nto stop a full-book scan on a query that matches everything.\n\nFound by adversarial review (Terra) during the search-UI work; left unfixed deliberately so a\ncorrectness decision about non-Latin books is not buried inside a UI PR.",
+  "created": "2026-08-12",
+  "id": "F-29b691",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Search rejects one-character queries, which are real words in CJK"
+}

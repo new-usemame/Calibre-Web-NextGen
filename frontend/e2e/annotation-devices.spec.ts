@@ -39,7 +39,7 @@ test('device manager renames and removes only through counted confirmation, then
   const calls = await stubDevices(page);
   await page.goto('/app/account/devices');
   await expect(page.getByRole('heading', { name: 'E-readers' })).toBeVisible();
-  await expect(page.getByText('312 highlights')).toBeVisible();
+  await expect(page.getByText('312 highlights and notes')).toBeVisible();
 
   await page.getByRole('button', { name: 'Rename Libra Colour' }).click();
   const input = page.getByRole('textbox', { name: 'Device name' });
@@ -50,8 +50,8 @@ test('device manager renames and removes only through counted confirmation, then
   await page.getByRole('button', { name: 'More actions for Travel Kobo' }).click();
   await page.getByRole('button', { name: 'Remove device' }).click();
   const dialog = page.getByRole('alertdialog', { name: 'Remove Travel Kobo?' });
-  await expect(dialog).toContainText('4 highlights were made on this device');
-  await expect(dialog).toContainText('2 highlights assigned to this device');
+  await expect(dialog).toContainText('4 highlights and notes were made on this device');
+  await expect(dialog).toContainText('2 highlights and notes assigned to this device');
   await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
   await dialog.getByRole('button', { name: 'Remove device' }).click();
   await expect(page.getByText('Travel Kobo removed.')).toBeVisible();
@@ -74,6 +74,6 @@ test('account summary makes the e-reader manager discoverable', async ({ page })
   await stubDevices(page);
   await page.goto('/app/account');
   const card = page.getByRole('region', { name: 'E-readers' });
-  await expect(card).toContainText('Libra Colour · 312 highlights');
+  await expect(card).toContainText('Libra Colour · 312 highlights and notes');
   await expect(card.getByRole('link', { name: 'Manage e-readers' })).toHaveAttribute('href', '/app/account/devices');
 });

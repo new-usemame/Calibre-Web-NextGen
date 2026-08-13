@@ -1,0 +1,11 @@
+{
+  "area": "ci",
+  "body": "scripts/preflight.sh runs five checks — identity, project root, repo/ checkout,\nSTOP files, autopilot test suite — and NONE of them consults main's build status:\n\n    grep -nE 'gh run|gh api.*(check-runs|commits)|conclusion|statusCheckRollup' \\\n         scripts/preflight.sh   ->   no matches\n\nThe comment at scripts/autopilot-tick.sh:156 says \"a genuinely red main still reds\npreflight\". That is true only of the working tree being dirty, not of CI. A red\nmain passes preflight cleanly today.\n\nConsequence: the only thing between a red main and a published tag is the\njudgement inside /CWNG_goal_act plus /CWNG_verify. Everything mechanical upstream\nof that is blind to it, which is the wrong shape for a gate that guards an\nirreversible act (a published release can never be retracted).\n\nNote the failure mode is NOT the one you would guess. On main pushes the lanes all\nrun for real (Detect changed paths is skipped; Fast/Frontend/Integration/E2E ran\n15/9/18/21 steps) and Test Suite Summary DID report failure when e2e failed. So the\nsummary is not laundering skipped lanes here. The exposure is CANCELLED runs:\nconcurrency cancel-in-progress cancels superseded runs, Test Suite Summary gates on\nresult == \"failure\", and \"cancelled\" is neither success nor failure (F-81d428). Two\nrecent main runs are in that state.",
+  "created": "2026-08-12",
+  "id": "F-894f7d",
+  "refs": [],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "preflight never checks main's CI, so a tick can drain onto a red main"
+}

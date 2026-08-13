@@ -169,7 +169,7 @@ class TestGatherCoverCandidates:
             patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
             patch.object(
                 picker.cover_booster,
-                "_amazon_cdn_cover_for_isbn10",
+                "_amazon_cdn_cover_for_key",
                 return_value=highres_url,
             ) as probe,
         ):
@@ -190,11 +190,74 @@ class TestGatherCoverCandidates:
         assert statuses[0].status == "disabled"
         probe.assert_called_once_with("0441172717")
 
+    def test_amazon_highres_candidate_uses_book_asin_when_no_isbn(self):
+        """A Kindle edition carries an ASIN and no ISBN, so the ISBN-only
+        lookup gave it no high-resolution candidate at all (fork #304)."""
+        highres_url = "https://m.media-amazon.com/images/P/B0DJ1TV47C.01._SCRM_SL2000_.jpg"
+
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
+            patch.object(
+                picker.cover_booster,
+                "_amazon_cdn_cover_for_key",
+                return_value=highres_url,
+            ) as probe,
+        ):
+            candidates, _ = picker.gather_cover_candidates(
+                providers=[], query="", static_cover="generic_cover.svg", locale="en",
+                book_isbns=[], book_asins=["B0DJ1TV47C"],
+            )
+
+        assert [(c.source_id, c.source_name, c.cover_url) for c in candidates] == [
+            ("amazon_highres", "Amazon (high-res)", highres_url),
+        ]
+        assert candidates[0].candidate_id == "amazon_highres:B0DJ1TV47C"
+        probe.assert_called_once_with("B0DJ1TV47C")
+
+    def test_amazon_highres_candidate_id_unchanged_for_isbn_books(self):
+        """candidate_id is the apply step's handle; an ISBN book's id must not
+        drift now that the same slot also carries ASINs."""
+        highres_url = "https://m.media-amazon.com/images/P/0441172717.01._SCRM_SL2000_.jpg"
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_key", return_value=highres_url),
+        ):
+            candidates, _ = picker.gather_cover_candidates(
+                providers=[], query="", static_cover="generic_cover.svg", locale="en",
+                book_isbns=["9780441172719"],
+            )
+        assert candidates[0].candidate_id == "amazon_highres:0441172717"
+
+    @pytest.mark.parametrize("book_asins", [[], [""], ["not-an-asin"], ["B0DJ1TV4"]])
+    def test_amazon_highres_candidate_rejects_malformed_asin(self, book_asins):
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_key") as probe,
+        ):
+            candidates, _ = picker.gather_cover_candidates(
+                providers=[], query="", static_cover="generic_cover.svg", locale="en",
+                book_isbns=[], book_asins=book_asins,
+            )
+        assert candidates == []
+        probe.assert_not_called()
+
+    def test_amazon_highres_asin_respects_kill_switch(self):
+        with (
+            patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", False),
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_key") as probe,
+        ):
+            candidates, _ = picker.gather_cover_candidates(
+                providers=[], query="", static_cover="generic_cover.svg", locale="en",
+                book_isbns=[], book_asins=["B0DJ1TV47C"],
+            )
+        assert candidates == []
+        probe.assert_not_called()
+
     @pytest.mark.parametrize("book_isbns", [[], [""], ["not-an-isbn"], ["9791234567896"]])
     def test_amazon_highres_candidate_skips_missing_or_unconvertible_isbn(self, book_isbns):
         with (
             patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
-            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_isbn10") as probe,
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_key") as probe,
         ):
             candidates, _ = picker.gather_cover_candidates(
                 providers=[], query="", static_cover="generic_cover.svg", locale="en",
@@ -207,7 +270,7 @@ class TestGatherCoverCandidates:
     def test_amazon_highres_candidate_respects_existing_cdn_kill_switch(self):
         with (
             patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", False),
-            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_isbn10") as probe,
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_key") as probe,
         ):
             candidates, _ = picker.gather_cover_candidates(
                 providers=[], query="", static_cover="generic_cover.svg", locale="en",
@@ -227,7 +290,7 @@ class TestGatherCoverCandidates:
             patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
             patch.object(
                 picker.cover_booster,
-                "_amazon_cdn_cover_for_isbn10",
+                "_amazon_cdn_cover_for_key",
                 side_effect=TimeoutError("CDN unavailable"),
             ),
             patch.object(picker, "boost_covers", side_effect=lambda records: records),
@@ -249,7 +312,7 @@ class TestGatherCoverCandidates:
         ]
         with (
             patch.object(picker.cover_booster, "_AMAZON_CDN_ENABLED", True),
-            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_isbn10", return_value=highres_url),
+            patch.object(picker.cover_booster, "_amazon_cdn_cover_for_key", return_value=highres_url),
             patch.object(picker, "boost_covers", side_effect=lambda records: records),
         ):
             candidates, _ = picker.gather_cover_candidates(
@@ -307,17 +370,28 @@ class TestGatherCoverCandidates:
             ]),
             _fake_provider("bad", "Bad", search_raises=ConnectionError("nope")),
         ]
+        seen = []
+
+        # The failing provider is handed to the classifier alongside the
+        # exception: a 403 is a wrong key for a provider that takes one and
+        # plain throttling for a keyless scraper, and only the provider tells
+        # the two apart (fork #303).
+        def classify(exc, provider=None):
+            seen.append(getattr(provider, "__id__", None))
+            return ("error", str(exc)[:30])
+
         with patch.object(picker, "boost_covers", side_effect=lambda r: r):
             candidates, statuses = picker.gather_cover_candidates(
                 providers=providers, query="X",
                 static_cover="g.svg", locale="en",
-                classify_failure=lambda exc: ("error", str(exc)[:30]),
+                classify_failure=classify,
             )
         bad_status = next(s for s in statuses if s.id == "bad")
         assert bad_status.status == "error"
         good_status = next(s for s in statuses if s.id == "good")
         assert good_status.status == "ok"
         assert len(candidates) == 1
+        assert seen == ["bad"]
 
     def test_generic_cover_filtered_out(self):
         # Real providers fall back to a generic SVG when they can't find a

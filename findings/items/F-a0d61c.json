@@ -5,8 +5,14 @@
   "id": "F-a0d61c",
   "origin_issue": 1237,
   "refs": [],
+  "resolution": {
+    "commit": "2697951b",
+    "date": "2026-08-10",
+    "note": "Fixed by 2697951b (#1526). pybabel extract now passes --add-location=file: source filenames stay, line numbers go. The bot therefore no longer rewrites '#:' when a code change shifts line numbers, so the '#:' / '#, fuzzy' adjacency this finding describes stops producing conflicts — the '#:' line simply does not change. --add-location=file rather than the --no-location direction sketched above, which answers the open concern here: Weblate and Poedit keep the per-locale filename they read for context, and only the churning half is dropped. One-time normalization of all 28 catalogs shipped in the same commit; 85,347 line-numbered refs removed, all catalogs verified semantically identical.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Community translation PRs still go CONFLICTING when they remove a fuzzy flag"
 }

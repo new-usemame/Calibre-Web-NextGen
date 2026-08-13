@@ -89,6 +89,23 @@ def _book_isbns(book) -> list[str]:
     ]
 
 
+def _book_asins(book) -> list[str]:
+    """Return every stored Amazon identifier for cover-source lookups.
+
+    A Kindle edition commonly carries an ASIN and no ISBN, so without this the
+    book gets no high-resolution Amazon candidate at all (fork #304). Calibre
+    writes territory ids as amazon_uk / amazon_de / ..., matched as a family.
+    """
+    asins: list[str] = []
+    for identifier in (book.identifiers or []):
+        name = (identifier.type or "").strip().lower()
+        if not identifier.val:
+            continue
+        if name in ("amazon", "asin", "amazon_asin", "mobi-asin") or name.startswith("amazon_"):
+            asins.append(identifier.val)
+    return asins
+
+
 def _is_provider_enabled_for_user(provider) -> bool:
     """Honor both per-user and global provider toggles, same as
     cps.search_metadata.metadata_search."""
@@ -182,6 +199,7 @@ def cover_picker_candidates(book_id):
         classify_empty=_classify_empty_provider,
         extract_embedded=lambda: cover_extract.extract_embedded_cover(book),
         book_isbns=_book_isbns(book),
+        book_asins=_book_asins(book),
     )
 
     return jsonify({

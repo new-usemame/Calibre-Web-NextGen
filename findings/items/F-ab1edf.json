@@ -5,8 +5,14 @@
   "id": "F-ab1edf",
   "origin_issue": 995,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-09",
+    "note": "Verified in code: cps/constants.py:69 and :73 place metadata_change_logs and metadata_temp under CONFIG_DIR. Ordinary staleness rather than a migration error — the fix landed the day after the migration.",
+    "release": "v4.1.31"
+  },
   "severity": "ux",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Move writable runtime directories (cps/cache, metadata_change_logs, metadata_temp) out of the application tree"
 }

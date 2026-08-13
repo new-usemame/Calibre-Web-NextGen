@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Mail, Globe, KeyRound, Check, Smartphone, Trash2, Copy } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'wouter';
 import {
   useAccount, useMe, useUpdateProfile, useChangePassword,
   useCreateAppPassword, useRevokeAppPassword,
@@ -9,6 +11,7 @@ import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { ApiError } from '../lib/api';
+import { apiGet } from '../lib/api';
 import { UI_BODY_FONTS, UI_DISPLAY_FONTS } from '../lib/fonts';
 import { THEMES, resolveTheme } from '../lib/themes';
 import { useT } from '../lib/i18n';
@@ -28,6 +31,9 @@ export function Account() {
   const changePassword = useChangePassword();
   const createAppPw = useCreateAppPassword();
   const revokeAppPw = useRevokeAppPassword();
+  const devices = useQuery<{ devices: { public_id: string; label: string; annotation_count: number }[] }>({
+    queryKey: ['annotation-devices'], queryFn: () => apiGet('/api/annotations/devices?active=true'),
+  });
 
   // Profile form
   const [email, setEmail] = useState('');
@@ -160,6 +166,16 @@ export function Account() {
   return (
     <main className={styles.container}>
       <h1 className={styles.title}>{t('Account')}</h1>
+
+      <section className={styles.card} aria-labelledby="account-ereaders-title">
+        <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('E-readers')}</h2>
+        {devices.data?.devices.length ? (
+          <ul className={styles.deviceSummary}>
+            {devices.data.devices.map((device) => <li key={device.public_id}>{device.label} · {t('{n} highlights and notes', { n: device.annotation_count })}</li>)}
+          </ul>
+        ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
+        <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
+      </section>
 
       {/* Identity */}
       <section className={styles.card}>
@@ -374,9 +390,21 @@ export function Account() {
             {account.app_passwords.map((ap) => (
               <li key={ap.id} className={styles.appPwItem}>
                 <span className={styles.appPwName}>{ap.label}</span>
+                {/* Same class as #1496: destructive, irreversible, and unguarded.
+                    Revoking cuts off whatever device still holds the password, the
+                    value can never be shown again, and these render as a list of
+                    identical trash buttons — so a misclick lands on the wrong row
+                    and the only recovery is generating a new one and reconfiguring
+                    the device. */}
                 <button type="button" className={styles.revokeBtn}
                   disabled={revokeAppPw.isPending}
-                  onClick={() => revokeAppPw.mutate(ap.id)}
+                  onClick={() => {
+                    if (revokeAppPw.isPending) return;
+                    if (!window.confirm(
+                      t('Revoke the app password "{label}"? Any device still using it loses access immediately, and the password cannot be recovered.', { label: ap.label })
+                    )) return;
+                    revokeAppPw.mutate(ap.id);
+                  }}
                   aria-label={t('Revoke {label}', { label: ap.label })}>
                   <Trash2 size={14} aria-hidden="true" focusable={false} />
                 </button>

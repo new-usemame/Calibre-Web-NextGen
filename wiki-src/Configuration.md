@@ -6,6 +6,7 @@ Reading-sync setups have their own pages: **[[KOReader Sync]]** and **[[Kobo Syn
 - [Calibre desktop coexistence](#calibre-desktop-coexistence)
 - [Calibre plugins (DeDRM and others)](#calibre-plugins-dedrm-and-others)
 - [Reverse proxy / Cloudflare Tunnel](#reverse-proxy--cloudflare-tunnel)
+- [Reverse proxy with a prefix](#reverse-proxy-with-a-prefix)
 - [Hardcover metadata provider](#hardcover-metadata-provider)
 
 ---
@@ -23,6 +24,10 @@ Reading-sync setups have their own pages: **[[KOReader Sync]]** and **[[Kobo Syn
 ---
 
 {{repo:README.md#reverse-proxy--cloudflare-tunnel|heading}}
+
+---
+
+{{repo:README.md#reverse-proxy-with-a-prefix|heading}}
 
 ---
 

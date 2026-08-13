@@ -15,6 +15,7 @@ import { Shelves } from './pages/Shelves';
 import { Shelf } from './pages/Shelf';
 import { AdvancedSearch } from './pages/AdvancedSearch';
 import { Account } from './pages/Account';
+import { Devices } from './pages/Devices';
 import { EditBook } from './pages/EditBook';
 import { CoverPicker } from './pages/CoverPicker';
 import { Upload } from './pages/Upload';
@@ -234,6 +235,7 @@ export function App() {
 
           {/* Account / settings */}
           <Route path={SPA_ROUTES.account}>{() => <Account />}</Route>
+          <Route path={SPA_ROUTES.devices}>{() => <Devices />}</Route>
 
           {/* Upload */}
           <Route path={SPA_ROUTES.upload}>{() => <Upload />}</Route>

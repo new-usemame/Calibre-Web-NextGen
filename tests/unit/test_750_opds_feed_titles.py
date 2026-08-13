@@ -84,7 +84,9 @@ def babel_app_context():
         ("opds.feed_unread_books", "Unread Books"),
         ("opds.feed_hot", "Hot Books"),
         ("opds.feed_new", "Recently added Books"),
-        ("opds.feed_discover", "Random Books"),
+        # Renamed in #1097 so OPDS stops being the one surface calling this
+        # feature something the sidebar, the new UI and the route don't.
+        ("opds.feed_discover", "Discover"),
         ("opds.feed_best_rated", "Top Rated Books"),
         ("opds.feed_booksindex", "Alphabetical Books"),
         # index feeds

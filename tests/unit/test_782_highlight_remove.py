@@ -37,6 +37,7 @@ id capture, no remove call, no msgid) and passes on the branch.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -114,18 +115,30 @@ def test_reader_passes_click_callback_and_classname(reader_src):
 def test_reader_captures_id_on_load(reader_src):
     # Saved highlights come from /annotations/<id>/data.json; each row's
     # annotation_id must reach paintHighlight so a tap can target the row.
-    assert (
-        "paintHighlight(a.cfi_range, a.highlight_color || 'yellow', a.annotation_id)"
-        in reader_src
+    #
+    # Matches the ARGUMENT, not the whole call. These pins guard an invariant —
+    # "the id reaches the paint site" — and pinning the exact literal made them
+    # fail on any signature change instead: #1508 appended a `hasNote` argument
+    # and broke both, with the id still flowing correctly. A pin that reds on
+    # every legitimate refactor teaches people to update it without reading it,
+    # which is how the regression it exists to catch eventually walks through.
+    assert re.search(
+        r"paintHighlight\(\s*a\.cfi_range\s*,[^)]*\ba\.annotation_id\b", reader_src
     ), "the load loop must pass the saved annotation_id into paintHighlight"
 
 
 def test_reader_captures_id_on_create(reader_src):
     # The create POST returns the new annotation row (incl. its id); capture it
     # so a just-created highlight is immediately removable.
-    assert "paintHighlight(sel.cfiRange, color, created?.annotation_id" in reader_src, (
-        "createHighlight must capture the returned annotation_id and paint with it"
-    )
+    #
+    # Two-step so an indirection through a local (#1508's `newId`) still passes,
+    # while dropping the id entirely still fails: find whatever the response id
+    # is bound to, then require THAT name at the paint site.
+    bound = re.search(r"(?:const|let|var)\s+(\w+)\s*=\s*created\?\.annotation_id", reader_src)
+    assert bound, "createHighlight must capture the annotation_id the POST returned"
+    assert re.search(
+        rf"paintHighlight\([^)]*\b{re.escape(bound.group(1))}\b", reader_src
+    ), "the captured annotation_id must be the one painted with"
 
 
 # ---------------------------------------------------------------------------

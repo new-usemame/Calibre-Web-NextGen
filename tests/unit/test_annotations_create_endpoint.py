@@ -220,3 +220,51 @@ def test_create_requires_kobospan_or_cfi(memory_db, tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         ann_mod.create_annotation({"highlighted_text": "x"}, user_id=7, book=book,
                                   session=memory_db, commit=memory_db.commit)
+
+
+@pytest.mark.unit
+def test_web_create_attributes_origin_and_attribution_failure_never_loses_highlight(
+    memory_db, tmp_path, monkeypatch,
+):
+    from flask import Flask
+    from cps import annotations as ann_mod, config, ub
+    from cps.services import device_registry
+    monkeypatch.setattr(config, "get_book_path", lambda: str(tmp_path / "library"))
+    book = _make_book(tmp_path, with_epub=False)
+    device = ub.Device(user_id=7, kind="webreader", display_name="Web reader",
+                       active=True, created_by="auto")
+    memory_db.add(device)
+    memory_db.commit()
+    monkeypatch.setattr(ann_mod, "_resolve_book_or_404", lambda _book_id: book)
+    monkeypatch.setattr(ann_mod, "current_user", SimpleNamespace(id=7))
+    monkeypatch.setattr(ann_mod, "_fanout_to_sync_targets", lambda *_args: None)
+    calls = []
+
+    def resolve(*_args, **_kwargs):
+        calls.append("ok")
+        return device.id
+
+    monkeypatch.setattr(device_registry, "ensure_webreader_device_best_effort", resolve, raising=False)
+    app = Flask(__name__)
+    with app.test_request_context("/annotations/1", method="POST", json={
+        "cfi_range": "epubcfi(/6/4!/4/2,/1:0,/1:9)", "highlighted_text": "attributed",
+    }):
+        response, status = ann_mod.annotations_create.__wrapped__(1)
+    assert status == 201
+    assert calls == ["ok"]
+    attributed = memory_db.query(ub.Annotation).filter_by(highlighted_text="attributed").one()
+    assert attributed.origin_device_id == device.id
+
+    def explode(*_args, **_kwargs):
+        calls.append("failed")
+        raise RuntimeError("registry unavailable")
+
+    monkeypatch.setattr(device_registry, "ensure_webreader_device_best_effort", explode)
+    with app.test_request_context("/annotations/1", method="POST", json={
+        "cfi_range": "epubcfi(/6/4!/4/2,/1:0,/1:9)", "highlighted_text": "still saved",
+    }):
+        response, status = ann_mod.annotations_create.__wrapped__(1)
+    assert status == 201
+    assert calls[-1] == "failed"
+    saved = memory_db.query(ub.Annotation).filter_by(highlighted_text="still saved").one()
+    assert saved.origin_device_id is None

@@ -161,6 +161,7 @@ def _security_payload():
         "oauth": {
             "redirect_host": config.config_oauth_redirect_host or "",
             "disable_standard_login": bool(config.config_disable_standard_login),
+            "enable_oauth_auto_forward": bool(getattr(config, "config_enable_oauth_auto_forward", False)),
             "enable_group_admin_management": bool(config.config_enable_oauth_group_admin_management),
             "generic": oauth_generic,
             # Built-in GitHub/Google providers (client id + write-only secret).
@@ -355,8 +356,10 @@ def admin_update_security():
     # --- security checkboxes (always applicable) ----------------------------
     if "oauth" in data:
         put_bool("config_disable_standard_login", oauth.get("disable_standard_login"))
+        put_bool("config_enable_oauth_auto_forward", oauth.get("enable_oauth_auto_forward"))
         put_bool("config_enable_oauth_group_admin_management", oauth.get("enable_group_admin_management"))
         _config_checkbox(to_save, "config_disable_standard_login")
+        _config_checkbox(to_save, "config_enable_oauth_auto_forward")
         _config_checkbox(to_save, "config_enable_oauth_group_admin_management")
 
     # --- SSL / HTTPS --------------------------------------------------------

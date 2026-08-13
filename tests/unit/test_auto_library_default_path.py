@@ -49,6 +49,7 @@ import os
 import shutil
 import sqlite3
 import types
+import sys
 from pathlib import Path
 
 import pytest
@@ -57,9 +58,12 @@ pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AUTO_LIB = REPO_ROOT / "scripts" / "auto_library.py"
-EMPTY_APPDB = REPO_ROOT / "empty_library" / "app.db"
-EMPTY_METADB = REPO_ROOT / "empty_library" / "metadata.db"
 
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+
+sys.path.insert(0, str(SCRIPTS_DIR))
+
+from auto_library import create_appdb, create_metadb
 
 def _load_module():
     spec = importlib.util.spec_from_file_location("auto_library_under_test", AUTO_LIB)
@@ -89,8 +93,6 @@ def lib(tmp_path, monkeypatch):
     # crash tests is that check_for_app_db() itself must establish a usable
     # (non-None) handle in every branch. Pre-seeding it would mask the #1075
     # regression.
-    al.empty_appdb = str(EMPTY_APPDB)
-    al.empty_metadb = str(EMPTY_METADB)
     al.dirs_path = str(tmp_path / "dirs.json")
     Path(al.dirs_path).write_text('{"calibre_library_dir": "/calibre-library"}')
 
@@ -144,12 +146,17 @@ def test_fresh_install_keeps_app_db_non_none(lib):
 
 
 def test_fresh_install_full_flow_via_set_library_location(lib):
+    from cryptography.fernet import Fernet
+    from cps import config_sql, ub
+
     """The real one-shot sequence (copy app.db -> new library -> persist location
     to BOTH dirs.json and app.db) completes without SystemExit — this is the boot
     crash #1075 shipped. Driven through the public set_library_location()."""
     _mod, al, _cfg, library = lib
 
     al.check_for_app_db()
+    key = Fernet.generate_key()
+    config_sql.load_configuration(ub.session, key)
     assert al.check_for_existing_library() is False  # nothing anywhere, empty tree
     al.make_new_library()
     al.set_library_location()  # update_dirs_json() + update_calibre_web_db()
@@ -171,7 +178,7 @@ def test_fresh_install_full_flow_via_set_library_location(lib):
 
 def test_app_db_at_default_skips_walk(lib, monkeypatch):
     _mod, al, _cfg, _library = lib
-    shutil.copyfile(EMPTY_APPDB, al.DEFAULT_APPDB_PATH)
+    create_appdb(al.DEFAULT_APPDB_PATH)
     monkeypatch.setattr(os, "walk", _walk_must_not_run)
 
     al.check_for_app_db()  # must not walk /config
@@ -190,7 +197,7 @@ def test_root_metadb_is_authoritative_over_larger_subfolder(lib):
     _make_calibre_db(library / "metadata.db")  # small root DB, but a real one
     sub = library / "NestedLibrary"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")  # larger, but nested below root
+    create_metadb(sub / "metadata.db")  # larger, but nested below root
     assert os.path.getsize(sub / "metadata.db") > os.path.getsize(library / "metadata.db")
 
     assert al.check_for_existing_library() is True
@@ -202,7 +209,7 @@ def test_metadb_walk_prunes_book_folders(lib, monkeypatch):
     """The walk must not descend into a library's per-book folders once its
     metadata.db is found — that deep recursion is the #1022 cost."""
     _mod, al, _cfg, library = lib
-    shutil.copyfile(EMPTY_METADB, library / "metadata.db")
+    create_metadb(library / "metadata.db")
     book = library / "Some Author" / "Some Book (1)"
     book.mkdir(parents=True)
     (book / "book.epub").write_text("x")
@@ -236,7 +243,7 @@ def test_metadb_single_subfolder_found(lib):
     _mod, al, _cfg, library = lib
     sub = library / "MyLibrary"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    create_metadb(sub / "metadata.db")
     assert not os.path.exists(library / "metadata.db")
 
     assert al.check_for_existing_library() is True
@@ -253,7 +260,7 @@ def test_metadb_multiple_subfolders_largest_wins(lib):
     small.mkdir()
     big.mkdir()
     _make_calibre_db(small / "metadata.db")
-    shutil.copyfile(EMPTY_METADB, big / "metadata.db")
+    create_metadb(big / "metadata.db")
     assert os.path.getsize(big / "metadata.db") > os.path.getsize(small / "metadata.db")
 
     assert al.check_for_existing_library() is True
@@ -280,7 +287,6 @@ def test_no_library_anywhere_returns_false(lib):
 
 def test_is_calibre_database_accepts_a_real_library(tmp_path):
     mod = _load_module()
-    assert mod.is_calibre_database(str(EMPTY_METADB)) is True
     assert mod.is_calibre_database(str(_make_calibre_db(tmp_path / "metadata.db"))) is True
 
 
@@ -331,7 +337,7 @@ def test_empty_root_metadb_does_not_shadow_real_nested_library(lib):
     (library / "metadata.db").write_bytes(b"")  # stale placeholder at the root
     sub = library / "MyLibrary"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")  # the actual library
+    create_metadb(sub / "metadata.db")  # the actual library
 
     assert al.check_for_existing_library() is True
     assert al.metadb_path == str(sub / "metadata.db")
@@ -344,7 +350,7 @@ def test_non_database_root_metadb_does_not_shadow_real_nested_library(lib):
     (library / "metadata.db").write_bytes(b"leftover junk from a failed restore")
     sub = library / "Books"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    create_metadb(sub / "metadata.db")
 
     assert al.check_for_existing_library() is True
     assert al.metadb_path == str(sub / "metadata.db")
@@ -357,7 +363,7 @@ def test_selected_library_can_answer_the_startup_query(lib):
     (library / "metadata.db").write_bytes(b"")
     sub = library / "MyLibrary"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    create_metadb(sub / "metadata.db")
 
     assert al.check_for_existing_library() is True
 
@@ -374,7 +380,7 @@ def test_invalid_candidate_is_recorded_and_walk_continues_below_it(lib):
     (library / "metadata.db").write_bytes(b"")
     sub = library / "MyLibrary"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    create_metadb(sub / "metadata.db")
 
     al.check_for_existing_library()
 
@@ -440,7 +446,7 @@ def test_a_backup_does_not_shadow_a_real_library_below_it(lib):
     _make_calibre_db(library / "metadata.db.old", pad_rows=200)
     sub = library / "MyLibrary"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    create_metadb(sub / "metadata.db")
 
     assert al.check_for_existing_library() is True
     assert al.metadb_path == str(sub / "metadata.db")
@@ -451,7 +457,7 @@ def test_sqlite_sidecars_are_never_candidates(lib):
     _mod, al, _cfg, library = lib
     sub = library / "MyLibrary"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    create_metadb(sub / "metadata.db")
     for suffix in ("-wal", "-shm", "-journal"):
         (library / f"metadata.db{suffix}").write_bytes(b"x" * 32)
 
@@ -467,7 +473,7 @@ def test_invalid_root_candidate_still_prunes_the_real_librarys_book_folders(lib,
     (library / "metadata.db").write_bytes(b"")
     sub = library / "MyLibrary"
     sub.mkdir()
-    shutil.copyfile(EMPTY_METADB, sub / "metadata.db")
+    create_metadb(sub / "metadata.db")
     book = sub / "Some Author" / "Some Book (1)"
     book.mkdir(parents=True)
     (book / "book.epub").write_text("x")

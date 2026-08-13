@@ -92,7 +92,7 @@ def gather_cover_candidates(
     static_cover: str,
     locale: str,
     is_provider_enabled: Callable[[object], bool] = lambda _p: True,
-    classify_failure: Callable[[Exception], tuple] = lambda exc: ("error", str(exc) or exc.__class__.__name__),
+    classify_failure: Callable[..., tuple] = lambda exc, _provider=None: ("error", str(exc) or exc.__class__.__name__),
     classify_empty: Callable[[object], tuple] = lambda _p: ("empty", "No results"),
     extract_embedded: Optional[Callable[[], "ExtractedCover | None"]] = None,
     book_isbns: Iterable[str] = (),
@@ -178,7 +178,10 @@ def gather_cover_candidates(
         # number (fork #954 verification: 10 of 16 all reporting 5316ms).
         elapsed_ms = result.elapsed_ms
         if result.exception is not None:
-            status, message = classify_failure(result.exception)
+            # The provider goes with it: a 403 is a wrong key for a provider
+            # that takes one and plain throttling for a keyless scraper, and
+            # the cover picker must not misadvise either (fork #303).
+            status, message = classify_failure(result.exception, p)
             log.warning("cover-picker provider %s failed (%s) in %dms: %s",
                         p.__class__.__name__, status, elapsed_ms, result.exception)
             statuses.append(ProviderStatus(

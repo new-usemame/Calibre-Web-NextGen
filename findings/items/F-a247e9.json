@@ -1,0 +1,11 @@
+{
+  "area": "logging",
+  "body": "`_Logger.error_or_exception` still branches on `sys.version_info > (3, 7)`,\nwith an else-branch calling `self.exception(message, stack_info=True, ...)`.\nThe shipped image is Python 3.13, so the else-branch is unreachable and the\ncondition is always true.\n\nDead code on an error path is worse than dead code elsewhere: it is the code\npeople read when diagnosing a failure, and it implies a supported\nconfiguration that does not exist.\n\nFound while fixing #1556 (PR #1587). Left out of that diff on purpose — the\nfix was a signature change and widening it would have grown blast radius on\na module every other module imports.",
+  "created": "2026-08-13",
+  "id": "F-a247e9",
+  "refs": [],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "logger.py carries a dead sys.version_info > (3, 7) branch"
+}

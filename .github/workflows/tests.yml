@@ -834,11 +834,22 @@ jobs:
           npm ci
           npm run build          # writes ../cps/static/app
           docker cp ../cps/static/app/. cwn-e2e:/app/calibre-web-automated/cps/static/app/
+          # Jinja templates too. Not every user-facing surface is React: the PDF
+          # reader is a server-rendered pdf.js page the SPA embeds, so a fix that
+          # spans both (#1584) had its SPA half tested here and its template half
+          # silently skipped — the spec guarding it would have failed against the
+          # `:dev` template while passing on the merged result, which teaches the
+          # next author to delete the guard. Templates are read per render and
+          # are not restart-gated, same as the bundle above.
+          docker cp ../cps/templates/. cwn-e2e:/app/calibre-web-automated/cps/templates/
           # The bundle is static; no restart needed. Confirm the shell still
           # answers so a broken overlay fails here rather than as 30 confusing
-          # spec failures.
+          # spec failures. /login is Jinja-rendered, so it also catches a template
+          # that references something this `:dev` backend does not have — the one
+          # real hazard of overlaying templates onto an older API.
           curl -fsS http://localhost:8083/app/ -o /dev/null
-          echo "PR bundle in place"
+          curl -fsS http://localhost:8083/login -o /dev/null
+          echo "PR bundle + templates in place"
 
       - name: Run SPA e2e harness
         working-directory: frontend

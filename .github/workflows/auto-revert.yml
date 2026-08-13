@@ -12,6 +12,12 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Deliberately NO `actions: write`, even though the confirmation step below
+  # re-runs jobs. That step authenticates with secrets.GH_PAT, exactly as the
+  # PR-open step does, so the capability rides on the PAT and this workflow's
+  # GITHUB_TOKEN stays narrow. `test_no_workflow_grants_dangerous_permissions`
+  # in tests/unit/test_workflow_safety_invariants.py pins that — widening
+  # permissions here would be an unexplained escalation needing an exemption.
 
 jobs:
   revert-on-red:
@@ -142,8 +148,70 @@ jobs:
             echo "leaving main just as red. Fix the spec instead."
             echo "revert=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Open revert PR for the head commit
+      # ── Guard 3: did the failure REPRODUCE? ────────────────────────────────
+      #
+      # Guards 1 and 2 both ask "could this commit have caused it?" and answer
+      # from static facts — which paths changed, which job went red. Neither can
+      # see a FLAKE, which makes every commit look guilty in turn at whatever
+      # rate the spec flakes, and #1564's e2e-lane filter narrows that to one
+      # lane only.
+      #
+      # OBSERVED 2026-08-12 on run 31648495770: `Fast Tests (Smoke + Unit)` went
+      # red on a main push with `1 failed, 6061 passed`, the one failure being
+      # tests/unit/test_ingest_startup_sweep_1360.py — a bash ingest-timing
+      # probe. The head commit changed frontend/ and cps/spa_strings.py, which
+      # that test does not read. Guard 1 passed it (not findings/-only), guard 2
+      # passed it (not the e2e lane), and #1575 was opened to delete 531 lines
+      # of a working feature. main is green on that same commit today.
+      #
+      # A third static rule would not have caught it either, so this guard asks
+      # a different question: does the failure REPRODUCE on the same commit? A
+      # flake clears; a real regression does not.
+      #
+      # Rather than poll a re-run to completion inside this job, let the re-run
+      # deliver its own verdict — it fires `workflow_run` again, re-entering
+      # this workflow with run_attempt incremented:
+      #
+      #   attempt 1, revert-worthy -> re-run the failed jobs, revert nothing
+      #   attempt >= 2             -> the same commit failed twice; revert
+      #
+      # If the re-run goes green the run's conclusion is `success` and the job
+      # `if:` above never fires, so the flake case costs one CI re-run and no
+      # revert. The attempt check is also what BOUNDS this: attempt 2 never
+      # re-runs again, so there is no loop.
+      - name: Require the failure to reproduce before destroying work
+        id: confirm
         if: steps.triage.outputs.revert == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          if [ "${RUN_ATTEMPT:-1}" -ge 2 ]; then
+            echo "attempt $RUN_ATTEMPT: this commit failed the same way on a"
+            echo "fresh run of the SAME tree. Not a flake — confirmed."
+            echo "confirmed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "attempt 1: one failure is not evidence a commit is guilty."
+          echo "Re-running the failed jobs on $RUN_ID to see if it reproduces."
+          if gh run rerun "$RUN_ID" --repo "$GITHUB_REPOSITORY" --failed; then
+            echo "Re-run queued. Its completion re-enters this workflow as"
+            echo "attempt 2, which is where the revert decision is made."
+          else
+            # Fail CLOSED on reverting, matching the triage step: a revert we
+            # skip leaves main red, which is loud; a revert we open wrongly
+            # deletes correct work quietly.
+            echo "::warning::could not re-run $RUN_ID; not reverting on a single"
+            echo "::warning::unconfirmed failure"
+          fi
+          echo "confirmed=false" >> "$GITHUB_OUTPUT"
+
+      - name: Open revert PR for the head commit
+        if: steps.triage.outputs.revert == 'true' && steps.confirm.outputs.confirmed == 'true'
         env:
           # NOT secrets.GITHUB_TOKEN. "Allow GitHub Actions to create and approve
           # pull requests" is off at the repo level, so the default token cannot

@@ -23,6 +23,11 @@ replit.nix
 cwa-wiki/
 docs/*
 !docs/install/
+# Wiki article sources. generate-wiki.py transcludes these into wiki-src
+# pages, so a doc that is ignored renders fine locally and then fails on a
+# clean clone or in CI with 'no such file'. Track the markdown; keep
+# ignoring everything else that lands in docs/.
+!docs/*.md
 .venv-activate.sh
 test_venv
 cwa.code-workspace
@@ -236,6 +241,14 @@ metadata_temp/
 
 # Claude Code workspace cache (per-developer local skill state).
 .claude/
+
+# Git worktrees created inside the checkout. A worktree here is untracked, so
+# it makes `git status --porcelain` non-empty, which trips the autopilot
+# preflight's clean-tree gate (scripts/preflight.sh) and fails every tick until
+# someone removes it. Ignoring is also strictly safer than leaving it visible:
+# while untracked, a plain `git clean -fd` in the checkout would DELETE a live
+# worktree along with any uncommitted work in it.
+.worktrees/
 
 # Playwright MCP capture artifacts (per-session page/console snapshots).
 # These can incidentally contain auth headers, CSRF tokens, or API keys

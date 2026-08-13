@@ -4,6 +4,10 @@
 
 ---
 
+{{repo:README.md#supporting-the-project|heading}}
+
+---
+
 ## Translations
 
 The interface ships with a wide set of locales. Completion is auto-refreshed on every push to `main`, so the live status table (with per-language completion percentages) lives in the [README](https://github.com/new-usemame/Calibre-Web-NextGen#translations) rather than here, where it would drift.

@@ -49,7 +49,37 @@ if [ -f "$POT" ]; then
 fi
 
 # 1. Extract messages
+#
+# --add-location=file keeps the source FILENAME on each `#:` reference and drops
+# the line NUMBER. The filename is what a translator uses ("where does this
+# string appear?"); the line number is pure churn, and it is the largest
+# remaining conflict generator in this repo — 85,347 line-numbered `#:` lines
+# across the POT and 28 catalogs, every one of them a candidate conflict line.
+#
+# freeze_pot_creation_date.py (step 1c) already removed the header half of this
+# problem, and measured on PR #938 that location churn merged cleanly there. It
+# does — when only ONE side moved. The case that conflicts is when BOTH sides
+# shift line numbers on the SAME `#:` line, which is exactly what a feature
+# branch does: it adds strings to cps/spa_strings.py (shifting every later
+# anchor) while main independently edits another instrumented file, so both
+# rewrite `#: cps/cover_picker.py:138 cps/spa_strings.py:483`. Same line, two
+# edits, unavoidable conflict — no unchanged line exists to split the hunk.
+# Observed 2026-08-10 blocking fork PRs #1508 and #1515, both on nl/messages.po,
+# with zero translated content in dispute.
+#
+# Safe because nothing reads source locations. The three catalog readers in this
+# repo — cps/api/i18n.py (SPA catalog), cps/render_template.py (missing-string
+# notice) and scripts/generate_translation_status.py (status table) — use only
+# msgid/msgstr/flags/obsolete. Verified by control: extracting with and without
+# this flag and msgmerging both into nl/messages.po produced byte-identical
+# (msgid, msgstr) pairs. test_po_source_location_churn.py pins both halves.
+#
+# msgmerge takes locations from the POT, so this one flag fans out to all 28
+# locales; there is deliberately no second flag on the msgmerge call (the POT
+# stays the single control point, and `--add-location=TYPE` is not portable
+# across the gettext builds this runs on).
 "${PYBABEL_CMD[@]}" extract -F "$CONFIG" -o "$POT" \
+    --add-location=file \
     --project="Calibre-Web Automated" \
     --version="$VERSION" \
     --msgid-bugs-address="https://github.com/crocodilestick/Calibre-Web-Automated" \

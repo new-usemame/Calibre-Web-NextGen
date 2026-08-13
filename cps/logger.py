@@ -31,13 +31,17 @@ logging.addLevelName(logging.CRITICAL, "CRIT")
 
 class _Logger(logging.Logger):
 
-    def error_or_exception(self, message, stacklevel=2, *args, **kwargs):
+    # `stacklevel` is keyword-only on purpose: it used to sit in front of
+    # `*args`, so `error_or_exception("failed: %s", err)` bound `err` to
+    # `stacklevel` and logging blew up on `while stacklevel > 0`, taking the
+    # surrounding error handler down with it (fork issue #1556).
+    def error_or_exception(self, message, *args, stacklevel=2, **kwargs):
         is_debug = self.getEffectiveLevel() <= logging.DEBUG
         if sys.version_info > (3, 7):
             if is_debug:
-                self.exception(message, stacklevel=stacklevel, *args, **kwargs)
+                self.exception(message, *args, stacklevel=stacklevel, **kwargs)
             else:
-                self.error(message, stacklevel=stacklevel, *args, **kwargs)
+                self.error(message, *args, stacklevel=stacklevel, **kwargs)
         else:
             if is_debug:
                 self.exception(message, stack_info=True, *args, **kwargs)

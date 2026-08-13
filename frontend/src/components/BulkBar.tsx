@@ -15,6 +15,22 @@ interface BulkBarProps {
   onChanged?: () => void;
 }
 
+export function BulkSelectionBar({ count, onClear, children, sticky = false }: {
+  count: number; onClear: () => void; children: React.ReactNode; sticky?: boolean;
+}) {
+  const t = useT();
+  return (
+    <div className={`${styles.bar} ${sticky ? styles.sticky : ''}`} role="region"
+      aria-label={t('{n} selected', { n: count })}>
+      <span className={styles.count}>{t('{n} selected', { n: count })}</span>
+      <div className={styles.actions}>{children}</div>
+      <button className={styles.clear} onClick={onClear} aria-label={t('Clear selection')}>
+        <X size={18} aria-hidden="true" focusable={false} />
+      </button>
+    </div>
+  );
+}
+
 /** Floating action bar for the catalog's multi-select mode. Fans each action
  *  out over the selected book ids via the existing per-book endpoints. */
 export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
@@ -122,10 +138,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
         </button>
       </div>
     )}
-    <div className={styles.bar} role="toolbar" aria-label={t('Bulk actions')}>
-      <span className={styles.count}>{t('{n} selected', { n: count })}</span>
-
-      <div className={styles.actions}>
+    <BulkSelectionBar count={count} onClear={onClear}>
         <button className={styles.action} disabled={busy}
           onClick={() => doMarkRead(true)}>
           <CheckCheck size={15} aria-hidden="true" focusable={false} /> {t('Mark read')}
@@ -174,12 +187,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
         )}
 
         {busy && <Spinner size={16} />}
-      </div>
-
-      <button className={styles.clear} onClick={onClear} aria-label={t('Clear selection')}>
-        <X size={18} aria-hidden="true" focusable={false} />
-      </button>
-    </div>
+    </BulkSelectionBar>
     </>
   );
 }

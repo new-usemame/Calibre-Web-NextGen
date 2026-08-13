@@ -56,6 +56,112 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.34',
+    date: '2026-08-13',
+    items: [
+      {
+        title: 'Search inside the book you are reading',
+        body: 'Open a book, click the search button in the reader toolbar and type. Results show the sentence around each match with your term marked, grouped by chapter, and clicking one takes you there without moving the place you were reading — so you can look something up and still come back. Neither reader could do this before.',
+        category: 'Reading',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Your highlights and notes now live inside the reader',
+        body: 'Seeing what you had marked meant leaving the book for the Highlights page and losing your place. The reader now has a highlighter button in the top bar with a count, opening a list of every highlight in the book with its note; picking one takes you to that passage. Highlights made on a Kobo or in KOReader are listed too, and now say which device they came from.',
+        category: 'Reading',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Write a note on a highlight, in the browser',
+        body: 'Highlighting text in the new reader only ever saved the colour, with nowhere to record why you highlighted it — even though notes made on a Kobo or in KOReader always showed up on the Highlights page. Select a passage and the popup now offers Add note alongside the colours, and tapping a highlight lets you add, edit or remove its note. Highlights carrying a note are drawn with a dashed outline.',
+        category: 'Reading',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Write a note about a book without highlighting anything',
+        body: 'Notes could only ever be attached to a passage, so a thought about the book as a whole had to be pinned to a sentence that was not really the point. Write a note at the top of the reader\'s Highlights and notes panel opens a blank note, and it appears alongside your highlights on the book\'s Highlights page.',
+        category: 'Reading',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'PDFs open past page one on an iPad',
+        body: 'In the new interface a PDF showed its first page and nothing else on iPadOS, in Safari and Firefox, while the same book was fine on a Mac and on Android. PDFs now open in the same viewer the classic interface has always used, which draws every page on every browser — and brings PDF text search, thumbnails and annotations to the new reader with it.',
+        category: 'Reading',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Opening a highlight no longer loses your place, or marks the book read',
+        body: 'Tapping a highlight jumped the book to that passage and then saved that as your reading position, so closing the book reopened at the highlight instead of where you had actually read to. The same save reports how far through you are, and the server treats 99% as finished — so glancing at a highlight near the end could mark the whole book read and pass that on to a connected Kobo or Hardcover account. Jumping to a highlight is now treated as looking, not reading.',
+        category: 'Reading',
+      },
+      {
+        title: 'The reader can go full screen, in black, in one column or two',
+        body: 'Three things the classic reader had and the new one did not. There is now a full-screen control in the top bar, hidden on devices that cannot do it rather than shown as a button that does nothing. Black is its own page theme again with a true black page, which is what an OLED screen wants at night — anyone who had chosen it was quietly given the warm dark theme instead. And a single-column preference is honoured rather than saved and ignored.',
+        category: 'Reading',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Reload metadata from disk asks before it overwrites your edits',
+        body: 'It sits in the same row as the download buttons on a book\'s page, so reaching for a download and landing one button over rewrote the title, author and series from whatever the file said — with no undo and no warning. It now asks first and names the book. Revoking an app password asks too: those buttons render as a column of identical trash icons, and a misclick cut off whichever device was using it.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Kindle books get their high-resolution cover',
+        body: 'The high-resolution Amazon cover lookup was keyed only on a book\'s ISBN, and a Kindle edition usually has no ISBN — it has an ASIN. So the books most likely to need a better cover were the ones the lookup could never reach. A stored Amazon identifier now works as a key too, which also covers 979-prefixed ISBNs that were previously a dead end.',
+        category: 'Library',
+      },
+      {
+        title: 'The cover picker says where a picture actually came from',
+        body: 'Covers offered by Hardcover, Google and the rest get swapped for a higher-resolution copy when one exists, and that copy often comes from Amazon or Apple Books — but the card kept the name of the source that supplied the metadata. A card reading "Hardcover" could be showing you an Amazon image with nothing saying so. Cards now name the image\'s real source when it differs.',
+        category: 'Library',
+      },
+      {
+        title: 'A metadata source that is throttling you now says so',
+        body: 'Searching Get Metadata for the same book twice could find it on the first click and not on the second, with nothing changed in between. Goodreads and bol.com answer a real no-match with an ordinary empty page, so a refusal was being read as "this book does not exist" and reported as "No results for this query". A refusal now says what it is and to try again in a minute.',
+        category: 'Library',
+      },
+      {
+        title: 'Two new cover fill styles that fill the frame instead of adding a border',
+        body: 'Every existing style pads the cover out to your device\'s shape, leaving a mirrored, blurred or coloured band down the sides. Stretch to fill scales the cover to the frame and accepts a little distortion; Crop to fill keeps the proportions honest and trims a strip off the two long edges. The six original styles are untouched and Edge mirror is still the default.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Check your e-reader address' },
+      },
+      {
+        title: 'Send everyone to your single sign-on without giving up the password form',
+        body: 'If you run exactly one OAuth provider, the login page can take people to it immediately — but that jump used to be welded to "Disable Standard Login", so switching it on switched off password login for everyone, including you if the provider went down. They are now separate settings: turn on Start the only OAuth provider automatically under Admin → Security, and the password form stays reachable at /login?local=1 as a way back in. Off by default.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Reporting a problem fills the report in for you',
+        body: 'Reporting a bug meant landing on a blank form asking for your version, your browser and which page you were on — and if the app had just crashed, the error was gone from the screen by the time you got there. Report Issue on GitHub now opens a report with all of that already filled in. Nothing is sent by your library: the report is written in your browser and handed to you as a link, and your address, library name, file paths and book titles are never included.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Errors explain themselves instead of turning into a blank 500',
+        body: 'Some failures replaced their own explanation with a crash and took down the page handling them. Uploading a book with an unwritable ingest folder was the clearest case: the app had the right sentence ready — check your /cwa-book-ingest volume permissions — but crashed while writing the log line, so nobody ever saw it. The same fault sat on the reload-metadata and ingest-folder-creation paths.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Dutch, Russian and German all read further',
+        body: 'Russian went from 2,618 to 2,719 translated phrases, German from 1,891 to 2,071, and eight more settings now read in Dutch. Many of these were entries gettext had guessed from a similar English sentence and marked provisional — a provisional entry is dropped when the catalogue is compiled, so they had been showing in English while a translation sat unused. One had guessed "Import" as "Wichtig:" ("Important:").',
+        category: 'Under the hood',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'Smaller controls are easier to hit, and the notice bar follows your theme',
+        body: 'The ☰ menu button on phones, Delete format, Revoke on an app password and the Kobo/OPDS shelf checkboxes all keep their appearance but respond over a larger area — the shelf rows respond in full rather than just the small square. The notice bar was one fixed dark-teal band whichever theme you picked, sitting on Light and Sepia as a near-black slab; it now comes in a version made for each theme. In the reader, the five toolbar buttons went from 34 to 44 pixels, and typing in a reader panel no longer loses the cursor.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Two smaller corrections',
+        body: 'The Highlights page called everything a highlight — a book with three highlights and two notes reported "5 highlights" — and now reads Highlights and notes throughout, with counts that say what they are counting. In an OPDS reading app, Discover was labelled "Random Books" and stayed in English on a translated server; it now reads Discover, translated, in all 28 languages.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.33',
     date: '2026-08-08',
     items: [

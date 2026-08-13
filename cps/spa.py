@@ -176,12 +176,22 @@ def _render_shell(index_path, prefix):
     #    tab icon); reuse the app's existing /static/favicon.ico, prefix-aware.
     #  * the mount prefix (even "") so the SPA reads an authoritative value rather
     #    than guessing from the URL. json.dumps → safely-quoted JS string.
+    #  * the running version, so the SPA can name its own build. The classic UI
+    #    has always had this via the ``cwng_app_version`` context processor; the
+    #    SPA had no way to learn it, which meant the single most useful field in
+    #    a bug report was the one field the reporter had to look up by hand.
+    #    Deliberately NOT sourced from /api/about: that endpoint gates its
+    #    version map behind role_admin() (#1287) because it exposes the kernel
+    #    build, the Python build and every dependency version — a CVE
+    #    fingerprint. This is only our own release tag, which identifies our
+    #    build rather than the user, and is what the classic feedback popup
+    #    already shows to every user regardless of role.
     static = prefix + "/static"
     inject = (
         '<link rel="icon" href="%s/favicon.ico">'
         '<link rel="apple-touch-icon" sizes="180x180" href="%s/img/apple-touch-icon.png">'
-        '<script>window.__CWNG_PREFIX__=%s;</script>'
-    ) % (static, static, json.dumps(prefix))
+        '<script>window.__CWNG_PREFIX__=%s;window.__CWNG_VERSION__=%s;</script>'
+    ) % (static, static, json.dumps(prefix), json.dumps(constants.INSTALLED_VERSION))
     html = html.replace("</head>", inject + "</head>", 1)
     return Response(html, mimetype="text/html")
 

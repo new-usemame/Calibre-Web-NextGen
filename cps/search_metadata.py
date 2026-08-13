@@ -367,7 +367,7 @@ def _classify_empty_provider(provider) -> tuple:
     return ("empty", "No results for this query")
 
 
-def _classify_provider_failure(exc: Exception) -> tuple:
+def _classify_provider_failure(exc: Exception, provider=None) -> tuple:
     """Map a provider exception to a (status, message) UI hint pair.
 
     Returns one of:
@@ -375,15 +375,42 @@ def _classify_provider_failure(exc: Exception) -> tuple:
       ("rate_limited",  "...")  – we hit a quota (429)
       ("missing_key",   "...")  – provider needs an API key we don't have
       ("error",         "...")  – everything else
+
+    ``provider`` is optional — cps/services/cover_picker.py defaults this
+    callable to a one-arg lambda — and decides exactly one case: a 401/403 means
+    "your key is wrong" only for a provider that takes a key. The best-effort
+    scrapers have none to fix (Goodreads closed its API in 2020, which is why it
+    is scraped at all), so for them the same status is the site refusing us, and
+    a "go set an API key" hint sends the user after one that does not exist.
+    PROVIDER_KEY_REGISTRY is the single source of truth for which take one.
     """
     text = str(exc) or exc.__class__.__name__
     lowered = text.lower()
-    if "429" in text or "too many requests" in lowered or "quota" in lowered:
-        return ("rate_limited", text)
-    if "503" in text or "service unavailable" in lowered:
-        return ("blocked", text)
-    if "401" in text or "403" in text or "forbidden" in lowered or "unauthorized" in lowered:
-        return ("missing_key", text)
+    pid = getattr(provider, "__id__", None)
+    takes_key = pid is None or pid in PROVIDER_KEY_REGISTRY
+    code = getattr(getattr(exc, "response", None), "status_code", None)
+
+    def is_status(*codes: int) -> bool:
+        # Prefer the real status code. str(HTTPError) carries the request URL,
+        # and Goodreads book ids are plain integers — /book/show/4031234
+        # contains "403" — so substring matching alone turned an ordinary 404
+        # into a refusal (fork #303). Fall back to the text for non-HTTP
+        # exceptions, which is all this had to work with before.
+        if code is not None:
+            return code in codes
+        return any(str(c) in text for c in codes)
+
+    if is_status(429) or "too many requests" in lowered or "quota" in lowered:
+        return ("rate_limited",
+                "Rate-limited by this source. Wait a minute and search again.")
+    if is_status(503) or "service unavailable" in lowered:
+        return ("blocked", "This source is temporarily unavailable. Try again shortly.")
+    if is_status(401, 403) or "forbidden" in lowered or "unauthorized" in lowered:
+        if takes_key:
+            return ("missing_key", text)
+        return ("blocked",
+                "This source refused the request, usually short-lived "
+                "throttling. Wait a minute and search again.")
     if "token missing" in lowered or "api key" in lowered:
         return ("missing_key", text)
     return ("error", text)
@@ -407,7 +434,15 @@ def metadata_search():
           ]
         }
     """
-    query = request.form.to_dict().get("query")
+    form = request.form.to_dict()
+    query = form.get("query")
+    # Optional comma-separated provider allowlist. The editions drill-down asks
+    # for one provider's own identifier syntax (`hardcover-id:<id>`); without
+    # this every other enabled provider was handed that literal string, searched
+    # for it, and came back empty — visible to users as "Goodreads finds
+    # nothing" and, less visibly, as a pointless request to each of those sites
+    # (fork #303). Absent or empty means every enabled provider, as before.
+    only = {p for p in (form.get("providers") or "").split(",") if p.strip()}
     results: list = []
     provider_status: list = []
     active = current_user.view_settings.get("metadata", {})
@@ -421,6 +456,19 @@ def metadata_search():
     for provider in cl:
         is_active = metadata_provider_enabled(provider.__id__, active)
         is_global = bool(global_enabled.get(provider.__id__, True))
+        # A restricted run reports the others as "not asked", not as "disabled":
+        # the user's own toggles are unchanged and the status row shouldn't
+        # claim otherwise.
+        if only and provider.__id__ not in only:
+            provider_status.append({
+                "id": provider.__id__,
+                "name": provider.__name__,
+                "status": "disabled",
+                "count": 0,
+                "message": "Not searched for this lookup",
+                "duration_ms": 0,
+            })
+            continue
         if not is_active or not is_global:
             provider_status.append({
                 "id": provider.__id__,
@@ -453,7 +501,7 @@ def metadata_search():
         # identical duration (fork #954).
         elapsed_ms = result.elapsed_ms
         if result.exception is not None:
-            status, message = _classify_provider_failure(result.exception)
+            status, message = _classify_provider_failure(result.exception, provider)
             log.warning(
                 "Metadata provider %s failed (%s) in %dms: %s",
                 provider.__class__.__name__, status, elapsed_ms, result.exception,

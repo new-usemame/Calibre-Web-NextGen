@@ -16,7 +16,233 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.34] - 2026-08-13
+
+### Fixed
+- **PDFs open past page one on iPad.** In the new interface a PDF showed its
+  first page and nothing else on iPadOS, in both Safari and Firefox, while the
+  same book was fine on a Mac, on Android and in the classic interface. The
+  reader was handing the file to whatever PDF viewer the browser ships, and on
+  iPhone and iPad that viewer only ever draws one page inside an embedded frame.
+  PDFs now open in the same viewer the classic interface has always used, which
+  draws every page the same way on every browser, and brings PDF text search,
+  thumbnails and annotations to the new reader with it. Reported by
+  [@chloeroform](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1584)
+  ([#1584](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1584)).
+- **Errors explain themselves again instead of turning into a blank 500.** Some
+  failures replaced their own explanation with `TypeError: '>' not supported
+  between instances of ... and 'int'` and took down the page that was handling
+  them. Uploading a book with an unwritable ingest folder was the clearest case:
+  the app already had the right sentence ready — "Ingest folder is not writable.
+  Check your /cwa-book-ingest volume permissions." — but the crash happened while
+  writing the log line, so nobody ever saw it and the upload returned a 500. The
+  same fault sat on the "reload metadata from disk" failure path and on ingest
+  folder creation. Reported by
+  [@Thovi98](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1556)
+  ([#1556](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1556)).
+- **"No results" no longer covers for a metadata source that is throttling you.**
+  Searching Get Metadata for the same book twice could find it on the first click
+  and not on the second, with nothing changed in between. Goodreads and bol.com
+  answer a real no-match with an ordinary empty page, so when they instead refuse
+  a repeated request the app was reading that refusal as "this book does not
+  exist" and printing "No results for this query" — the two were impossible to
+  tell apart. A refused search now says so, and says to wait a minute and try
+  again. Two related pieces of bad advice went with it: a refusal from Goodreads
+  or bol.com used to suggest setting an API key, which neither one has (Goodreads
+  closed its API in 2020, which is exactly why it is scraped), and an ordinary
+  "page not found" from a Goodreads book whose id happened to contain 403 was
+  misreported as a refusal. Reported by
+  [@briffaantoine](https://github.com/new-usemame/Calibre-Web-NextGen/issues/303)
+  ([#303](https://github.com/new-usemame/Calibre-Web-NextGen/issues/303)).
+- **Eight more settings read in Dutch.** Hiding books from a personal library,
+  "Convert missing KEPUBs now", syncing Kobo annotations to Hardcover,
+  auto-creating users from LDAP, "Important:", "Use a URL" in the cover picker,
+  "Starting..." in the cover enforcer, and the EPUB fixer's search box were all
+  showing in English on a Dutch interface. Contributed by
+  [@VHE1987](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1553)
+  ([#1553](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1553)).
+- **More of the interface reads in Russian.** Coverage went from 2,618 to 2,719
+  translated phrases: 101 phrases that had no Russian at all now have it,
+  including the cover and metadata enforcement screens, the notes and highlights
+  panel in the reader, assigning books to an e-reader, and the message you get
+  when a KEPUB conversion cannot be queued. Contributed by
+  [@standhaftsohnsergius](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1554)
+  ([#1554](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1554)).
+- **Opening one of your highlights no longer loses your place — or marks the book
+  finished.** Tapping a highlight in the "Highlights and notes" list jumped the
+  book to that passage and then saved *that* as your reading position, so closing
+  the book afterwards reopened at the highlight instead of where you had actually
+  read to. Worse, the same save reports how far through the book you are, and the
+  server treats 99% as finished — so glancing at a highlight near the end of a
+  book could mark the whole book read and pass that on to a connected Kobo or
+  Hardcover account. Jumping to a highlight is now treated as looking, not
+  reading: your place stays put until you turn a page yourself.
+- **More of the interface reads in German.** Coverage went from 1,891 to 2,071
+  translated phrases: 121 phrases that had no German at all now have it, and 59
+  entries that gettext had guessed and marked provisional — provisional entries
+  are dropped when the catalogue is compiled, so they were showing in English
+  regardless — are now confirmed translations. One of them was **Import**, which
+  had been guessed as "Wichtig:" ("Important:"). Contributed by
+  [@chaosblog](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1549)
+  ([#1549](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1549)).
+- **The highlights page admits it holds your notes too.** Notes you write about a
+  book — the ones not attached to any particular sentence — have been showing up
+  in the highlights list for a while, but the page still called everything a
+  highlight: the heading, the empty state, the per-device counts, and what a
+  screen reader announced. A book with three highlights and two notes reported
+  "5 highlights". It now reads **Highlights and notes** throughout, matching what
+  the reader already called it, and the counts say what they are counting.
+- **The reader's Black page theme is back, and it is actually black.** The
+  classic reader has four page themes; the new UI's reader only ever showed
+  three, and anyone who had chosen **Black** was quietly given the dark theme
+  instead — a warm near-black — with no way to get back to it. Black is now its
+  own choice with a true black page, which is what an OLED screen wants at
+  night (#325).
+- **The reader remembers whether you want one column or two.** The new UI's
+  reader always laid pages out in two columns on a wide screen, even if you had
+  chosen a single column in the classic view — the preference was being saved
+  and then ignored. Reading appearance now offers **One column** and **Two
+  columns**, the page re-flows as soon as you pick, and the choice follows you
+  to your next book and your next device (#325).
+- **The reader's buttons are big enough to hit on a phone.** Close, contents,
+  appearance, highlights and full screen were 34 pixels square in the new UI's
+  reader — reachable with a mouse, fiddly with a thumb while turning pages. They
+  are now 44, the size Apple and Google both recommend, and the book title
+  shortens to make room instead of the buttons shrinking (#325).
+- **Typing in the reader no longer loses your place in the box.** Opening a
+  panel in the new UI's reader — the contents list, the appearance controls, the
+  highlight popover or the note box — put the cursor back at the top of that
+  panel every time anything else on the page updated. In the note box the top is
+  the close button, so a note you were part-way through writing could quietly
+  stop receiving what you typed. The cursor now stays where you put it (#325).
+
+- **Kindle books get their high-resolution cover now, not just print editions.**
+  The high-resolution Amazon cover lookup was keyed only on a book's ISBN, and a
+  Kindle edition usually has no ISBN at all — it has an ASIN. So the books most
+  likely to need a better cover were the ones the lookup could never reach, in
+  both places it runs: the upgrade applied to metadata-search results, and the
+  standalone "Amazon (high-res)" card in the cover picker, which simply never
+  appeared for those books. A stored Amazon identifier is now used as a lookup
+  key too, tried after the ISBN so nothing about the existing path changes. This
+  also covers books whose ISBN is a 979-prefixed one, which has no ISBN-10 form
+  and was previously a dead end. Reported by @briffaantoine with two worked
+  examples (#304).
+- **The cover picker now tells you where a picture actually came from.** Covers
+  offered by Hardcover, Google and the rest get swapped for a higher-resolution
+  copy when one exists, and that copy often comes from Amazon or Apple Books —
+  but the card kept the name of the provider that supplied the *metadata*, so a
+  card reading "Hardcover" could be showing you an Amazon image with nothing on
+  screen saying so. Cards now carry a second line naming the image's actual
+  source when it differs. Asked by @briffaantoine (#304).
+- **Looking at a book's other editions no longer sends a meaningless search to
+  every other source.** The editions list is a Hardcover feature and searches by
+  a Hardcover id, but that id was being handed to every enabled provider, which
+  each searched for it as plain text and came back with nothing — Goodreads in
+  particular looked broken because of it. The editions lookup now asks only the
+  source that understands it. Reported by @briffaantoine (#303).
+- **The reading app's catalog now calls "Discover" by the same name the website
+  does — and shows it in your language.** In an OPDS reader the entry was
+  labelled "Random Books", while the sidebar, the new interface and the link
+  itself all said Discover. Worse, on a German, Khmer or Norwegian server that
+  one entry stayed in English while everything around it was translated, because
+  the old wording had never been signed off by a translator. It now reads
+  Discover, translated, in all 28 languages. Reported by @chloeroform (#1097).
+- **"Reload metadata from disk" no longer wipes out details you edited without
+  asking first.** It sits in the same row as the download buttons on a book's
+  page, so reaching for a download and landing one button over rewrote the
+  book's title, author and series from whatever the file itself said — with no
+  undo and no warning. It now asks first, naming the book, and does nothing if
+  you say no. Reported by @JamesHACS (#1496).
+- **Revoking an app password now asks first too.** Found while fixing the
+  above: the revoke buttons render as a column of identical trash icons, and a
+  misclick cut off whichever device still used that password with no way to get
+  it back. It now names the password you are about to revoke.
+
+- **Four small controls are easier to hit**, most noticeably the ☰ menu button
+  on phones — the main way you open navigation there, and narrower than the
+  minimum size accessibility guidance asks for. They all look exactly the same;
+  the area that responds to your finger or pointer around them is bigger. The
+  others are **Delete format** on the edit-book page, **Revoke** on an app
+  password, and the Kobo/OPDS shelf checkboxes, where the whole row now responds
+  rather than just the small square.
+- **The notice bar across the top of the page follows your theme.** It was one
+  fixed dark-teal band whichever theme you picked, so on **Light** and **Sepia**
+  it sat on the page as a near-black slab, and on **High contrast** it ignored
+  that theme's stronger borders entirely. It keeps its own teal identity — it is
+  meant to look distinct from the rest of the UI — but now comes in a version
+  made for each theme. The Ko-fi bar gets the same treatment, and the × that
+  dismisses either one is easier to hit.
+
 ### Added
+- **Sending everyone straight to your single sign-on no longer means giving up
+  the password form.** If you run exactly one OAuth provider, Calibre-Web NextGen
+  can take people to it the moment they hit the login page. Until now that
+  automatic jump was welded to "Disable Standard Login", so switching it on also
+  switched off password login for everyone — including you, if the provider ever
+  went down. The two are now separate settings: turn on **Start the only OAuth
+  provider automatically** under Admin → Security, and the password form stays
+  available at `/login?local=1` as a way back in. Off by default, so nothing
+  changes until you ask for it. The setting appears on both the classic and the
+  new admin pages. Contributed by
+  [@lduesing](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1488)
+  ([#1488](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1488)).
+- **You can search inside a book you're reading.** Open a book, click the new
+  search button in the reader toolbar, and type — results show the surrounding
+  sentence with your term marked, grouped so you can tell which chapter each one
+  is in, and clicking one takes you straight there — without moving the place you
+  were reading, so you can look something up and still come back. Neither the old
+  reader nor the new one has ever been able to do this. Long books are searched a chapter at
+  a time so the page stays responsive, and if a very common word turns up more
+  matches than are useful, the list says so rather than quietly showing you part
+  of the answer.
+- **Highlights made on a Kobo now say which device they came from.** The
+  reader's Highlights and notes panel showed a bare internal word like "kobo";
+  it now shows the name you gave the device. Highlights with no device recorded
+  — everything made before this was tracked — are listed exactly as before, just
+  without a label (#325).
+- **You can now write a note about a book without highlighting anything first.**
+  Notes could only ever be attached to a passage, so there was nowhere to put a
+  thought about the book as a whole — "the argument in chapter 3 never lands"
+  had to be pinned to a sentence that was not really the point. **Write a note**
+  at the top of the reader's Highlights and notes panel opens a blank note, and
+  it appears alongside your highlights on the book's Highlights page (#325).
+
+- **The new UI's reader can go full screen.** The classic reader has always had
+  a full-screen button; the new one didn't, so on a laptop or tablet you read
+  with the browser's chrome eating the top of the page. There's now a
+  full-screen control in the reader's top bar. It's hidden on devices that
+  can't do it (an iPhone can only full-screen video, not a page) rather than
+  shown as a button that does nothing (#325).
+
+- **Your highlights and notes are now listed inside the reader, and you can jump
+  straight back to one.** Seeing what you had marked up meant leaving the book
+  for the Highlights page and losing your place — the classic reader has had an
+  in-reader panel for this all along. The new UI's reader now has a highlighter
+  button in the top bar, with a count, opening a drawer that lists every
+  highlight in the book with its note. Picking one takes you to that passage.
+  Highlights that came from a Kobo or KOReader are listed and labelled too,
+  though a few of those have no saved position to jump to (#325).
+- **Reporting a problem now fills the report in for you.** Reporting a bug meant
+  landing on a blank GitHub form that asked you to type out your version, your
+  browser and which page you were on — and if the app had just crashed, the
+  error message was gone from the screen by the time you got there. The "Report
+  Issue on GitHub" item in the Help menu, and the link on an error page, now
+  open a report that already has all of that filled in, including the error
+  itself when there is one. Nothing is sent by your library: it writes the
+  report in your browser and hands you a link, so you see the whole thing and
+  can edit or delete any of it before deciding whether to post it. Your address,
+  your library's name, your file paths and your book titles are never included.
+
+- **You can now write a note on a highlight while reading in the browser.**
+  Highlighting text in the new UI's reader only ever saved the colour — there
+  was nowhere to record *why* you highlighted it, even though notes made on a
+  Kobo or in KOReader have always shown up on the book's Highlights page. Select
+  a passage and the popup now offers **Add note** alongside the colours; tap a
+  highlight you have already made and you can add, edit or remove its note.
+  Highlights carrying a note are drawn with a dashed outline so you can pick
+  them out at a glance, and tapping one shows the note without opening the
+  editor. Notes sync into the same place as everything else, so they appear on
+  the Highlights page and in Markdown/CSV/JSON exports (#325).
 
 - **Two new cover fill styles that fill the e-reader frame instead of adding a
   border.** Every existing style pads the cover out to your device's shape,

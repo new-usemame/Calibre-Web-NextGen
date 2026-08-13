@@ -145,7 +145,10 @@
 }
 .formatName { flex: 1; font-weight: 600; color: var(--text); font-size: var(--fs-sm); }
 .formatDownload { color: var(--accent); font-size: var(--fs-sm); }
-.formatDelete { color: var(--text-muted); padding: var(--sp-1); }
+.formatDelete {
+  position: relative; color: var(--text-muted); padding: var(--sp-1);
+}
+.formatDelete::before { content: ''; position: absolute; inset: -1px; }
 .formatDelete:hover:not(:disabled) { color: var(--danger); }
 .convertForm { display: flex; align-items: flex-end; gap: var(--sp-3); flex-wrap: wrap; }
 .convertToLabel { font-size: var(--fs-sm); color: var(--text-muted); padding-bottom: calc(var(--sp-2) + 1px); }

@@ -515,6 +515,36 @@ class TestMigrationPreservesAllUserData:
             "unsynced row — that would lie about its origin"
         )
 
+    def test_annotation_migration_sequence_matches_production(self):
+        """This class hand-lists the annotation migrations; production doesn't.
+
+        The list above claims to match ``migrate_Database()``'s flow, and that
+        claim silently went stale: two migrations were added to production and
+        not here, so a pre-H1 fixture kept a schema the ORM had already moved
+        past and the failure surfaced as an unrelated ``no such column``.
+
+        Pin the correspondence so the next added migration fails HERE, naming
+        itself, instead of somewhere confusing three tests away.
+        """
+        import inspect
+        import re
+        from cps import ub
+
+        production = re.findall(
+            r"^\s*(migrate_annotation_\w+|migrate_kobo_annotation_\w+|"
+            r"migrate_multi_device_annotation_\w+|migrate_device_management_\w+)\(",
+            inspect.getsource(ub.migrate_Database), re.M,
+        )
+        replayed = re.findall(
+            r"ub\.(migrate_\w+)\(engine, session\)",
+            inspect.getsource(self.test_orm_can_still_read_old_rows_after_migration),
+        )
+        missing = [m for m in production if m not in replayed]
+        assert not missing, (
+            "migrate_Database() runs annotation migrations this test never replays, "
+            f"so its fixture drifts from production: {missing}"
+        )
+
     def test_orm_can_still_read_old_rows_after_migration(self):
         """A pre-H1 row inserted by the Hardcover sync code path must
         be readable through the ORM after the migration runs.
@@ -532,6 +562,8 @@ class TestMigrationPreservesAllUserData:
         ub.migrate_annotation_polymorphic_position(engine, session)
         ub.migrate_annotation_device_origin(engine, session)
         ub.migrate_annotation_koreader_identity(engine, session)
+        ub.migrate_multi_device_annotation_safe_slice(engine, session)
+        ub.migrate_device_management_slice(engine, session)
 
         # Fresh session: ORM read must work on every row.
         s2 = session_maker()

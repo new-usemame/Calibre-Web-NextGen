@@ -25,7 +25,125 @@ jobs:
         run: |
           git config user.name 'new-usemame'
           git config user.email '248195428+new-usemame@users.noreply.github.com'
+
+      # This job's whole premise is "Test Suite failed on a push to main, so the
+      # head commit broke it." That is only sound for a failure the head commit
+      # could plausibly have caused.
+      #
+      # It stopped being sound the moment the SPA e2e suite began running on main
+      # (#1557), because that lane FLAKES UNDER LOAD. This is not a stopgap
+      # awaiting spec fixes — there is no spec fix that stops a load flake, so on
+      # a lane like this the filter below is the correct PERMANENT posture. Do not
+      # "restore" the old behaviour later on the grounds that the specs look
+      # healthy; they looked healthy before too.
+      #
+      # MEASURED on run 31641476559 (main push, 2026-08-12) — read off the summary
+      # line, not the ✘ lines:
+      #     364 passed | 3 flaky | 1 failed | 52 skipped
+      #     socket hang up ...... 6      expect(received) .... 0
+      #     Timeout exceeded .... 2      Received: ........... 0
+      # ZERO assertion failures. Every symptom is transport or timeout — the
+      # server dropping connections under parallel e2e load, filed as F-7a530b
+      # (with F-4939f6 for a sibling). `reader-rtl` failed at 20.4s and passed on
+      # retry in 2.3s; a 9x swing is a load signature, not a broken spec. And the
+      # lane is demonstrably not deterministically red: da2d93ea9, a main push
+      # after #1557, ran e2e green in 21 steps.
+      #
+      # ⚠️ Do NOT read this as "there are broken specs to go fix." There is no
+      # tags / RTL / display-options product regression. Counting ✘ lines instead
+      # of reading the summary produced exactly that false conclusion once
+      # already, and it is the same error this job makes: reading "a failure on
+      # this push" as "a failure caused by this push".
+      #
+      # What this job did on 2026-08-12: opened a revert of "Correct a finding:
+      # the flake is load, not test order" — i.e. it reverted the documentation of
+      # the very phenomenon that triggered it.
+      #
+      # So: revert only when something OTHER than the e2e lane failed.
+      # `Test Suite Summary` is excluded too, because it fails as a CONSEQUENCE of
+      # e2e failing; treating it as an independent signal would re-admit exactly
+      # the case being excluded.
+      - name: Decide whether this failure is revert-worthy
+        id: triage
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          # ── Guard 1: is this commit even CAPABLE of breaking a test? ────────
+          #
+          # The job-name filter below handles a failure whose CAUSE is the e2e
+          # lane. It does not handle a FLAKE, which makes every commit look
+          # guilty in turn, indefinitely, at whatever rate the spec flakes. A
+          # content test catches that class regardless of why the suite is red:
+          # if the commit changed nothing any test can read, it cannot be the
+          # cause, whatever the cause turns out to be.
+          #
+          # The allowlist is deliberately ONE ENTRY and was MEASURED, not
+          # assumed. The tempting version of this rule — "docs commits are
+          # inert" — is FALSE in this repo:
+          #     grep -rln CHANGELOG tests/  -> 5 files
+          #     grep -rln README    tests/  -> 5 files
+          #     grep -rln findings/ tests/ frontend/e2e/  -> none
+          # CHANGELOG.md and README are both under test. Only findings/ is
+          # genuinely unread. Widening this list requires re-running that grep,
+          # not an intuition about what "looks like docs".
+          #
+          # Both commits this has already threatened were findings-only:
+          # fc48fae (2 files) and 2bae9887b (4 files).
+          INERT_RE='^findings/'
+
+          files=$(git show --name-only --format= "$HEAD_SHA" | sed '/^$/d')
+          if [ -z "$files" ]; then
+            # No file list (e.g. an empty or unusual commit) is not evidence of
+            # innocence. Fall through to the job-name check rather than assuming.
+            echo "no file list for $HEAD_SHA; falling through to job triage"
+          elif ! printf '%s\n' "$files" | grep -qvE "$INERT_RE"; then
+            echo "$HEAD_SHA touches only test-inert paths:"
+            printf '  %s\n' $files
+            echo "It cannot have caused ANY test failure, whatever the cause is."
+            echo "revert=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # No `| head`/`| tail` here: a pipeline returns the LAST command's
+          # status, so piping would mask a failed `gh` call as success.
+          if ! jobs_json=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs); then
+            echo "::warning::could not read run $RUN_ID; not reverting"
+            echo "revert=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          failed=$(jq -r '[.jobs[] | select(.conclusion=="failure") | .name] | join("|")' <<<"$jobs_json")
+          echo "failed jobs: ${failed:-<none>}"
+
+          # Fail CLOSED on reverting. A missed revert leaves main red, which is
+          # loud and visible; a wrong revert silently destroys someone's correct
+          # work. When the signal is unreadable, prefer the loud failure.
+          if [ -z "$failed" ]; then
+            echo "::warning::Test Suite reported failure but no job did; not reverting"
+            echo "revert=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          other=$(jq -r '
+            [.jobs[]
+             | select(.conclusion=="failure")
+             | select(.name != "E2E Tests (SPA)" and .name != "Test Suite Summary")
+             | .name] | join("|")' <<<"$jobs_json")
+
+          if [ -n "$other" ]; then
+            echo "revert-worthy failure(s): $other"
+            echo "revert=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only the SPA e2e lane failed. Not reverting — an e2e breakage is"
+            echo "usually pre-existing and would revert an innocent commit while"
+            echo "leaving main just as red. Fix the spec instead."
+            echo "revert=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Open revert PR for the head commit
+        if: steps.triage.outputs.revert == 'true'
         env:
           # NOT secrets.GITHUB_TOKEN. "Allow GitHub Actions to create and approve
           # pull requests" is off at the repo level, so the default token cannot
@@ -39,9 +157,16 @@ jobs:
           # workflow opening and self-approving a PR -- so it stays off. Scoping the
           # capability to this one workflow via the PAT is the narrower fix.
           GH_TOKEN: ${{ secrets.GH_PAT }}
+          # Passed via env rather than interpolated straight into the shell.
+          # head_sha is GitHub-generated hex so this is not exploitable today,
+          # but `${{ }}` inside `run:` is the workflow-injection shape, and the
+          # next field someone adds here may not be hex.
+          BAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
-          BAD_SHA=${{ github.event.workflow_run.head_sha }}
-          BAD_TITLE=$(git log -1 --format='%s' $BAD_SHA)
+          # BAD_TITLE is a commit message — attacker-influencable text. It is only
+          # ever used as a quoted shell variable, never re-interpolated.
+          BAD_TITLE=$(git log -1 --format='%s' "$BAD_SHA")
           BRANCH="auto-revert/${BAD_SHA:0:7}"
           git checkout -b "$BRANCH" main
           # Allow empty in case the commit was already reverted
@@ -52,5 +177,5 @@ jobs:
           gh pr create \
             --base main --head "$BRANCH" \
             --title "revert: $BAD_TITLE [auto-revert]" \
-            --body "Automatic revert of ${BAD_SHA:0:7} after CI failure on main. See run ${{ github.event.workflow_run.html_url }}." \
+            --body "Automatic revert of ${BAD_SHA:0:7} after CI failure on main. See run ${RUN_URL}." \
             --label "safe-tier-1"

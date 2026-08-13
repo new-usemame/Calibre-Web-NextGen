@@ -366,16 +366,17 @@ function MetadataFetch({ defaultQuery, onApply }:
   const seq = useRef(0);
 
   // Single search path for the normal form, the editions drill-down, and Back.
-  // `ed` is the title-level snapshot captured before drilling in; when present we
-  // keep only Hardcover edition rows (a `hardcover-id:<id>` query still fans out
-  // to every enabled provider, so other providers return noise for that string).
+  // `ed` is the title-level snapshot captured before drilling in; when present
+  // the search is restricted server-side to Hardcover, because `hardcover-id:<id>`
+  // is that provider's own syntax and reads as a literal search string to every
+  // other one (#303). The row filter below stays as a belt-and-braces guard.
   const doSearch = (q: string, ed?: { prevQuery: string; prevResults: MetaResult[] }) => {
     const term = q.trim();
     if (!term) return;
     const mine = ++seq.current;
     setErr(null);
     setQuery(term);
-    search.mutate(term, {
+    search.mutate({ query: term, providers: ed ? ['hardcover'] : undefined }, {
       onSuccess: (r) => {
         if (mine !== seq.current) return; // superseded/abandoned — ignore
         if (ed) {

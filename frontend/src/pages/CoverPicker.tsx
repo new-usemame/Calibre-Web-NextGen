@@ -322,6 +322,12 @@ function CandidateCard({ candidate: c, locked, preview, onPick }: {
       </div>
       <div className={styles.cardInfo}>
         <span className={styles.cardSource}>{c.source_name}</span>
+        {/* The metadata came from source_name, but once we upgrade a cover to a
+            higher-resolution copy the picture itself can come from elsewhere.
+            Say so rather than letting the provider name imply both (#304). */}
+        {c.image_origin && (
+          <span className={styles.cardImageOrigin}>{t('Image from {source}', { source: c.image_origin })}</span>
+        )}
         <span className={styles.cardDims}>{dims || (c.year ? c.year : ' ')}</span>
       </div>
     </button>

@@ -185,7 +185,11 @@ OPDS_ROOT_ENTRY_DEFS = {
     },
     'random': {
         'endpoint': 'opds.feed_discover',
-        'title': N_('Random Books'),
+        # Issue #1097: this said 'Random Books' while the sidebar, the new UI,
+        # the route (/opds/discover) and the endpoint all said Discover — and
+        # 'Random Books' is fuzzy in de/km/no, so msgfmt dropped it and those
+        # locales showed an English entry among translated siblings.
+        'title': N_('Discover'),
         'description': N_('Show Random Books'),
         'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_RANDOM),
     },

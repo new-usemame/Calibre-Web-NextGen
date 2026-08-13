@@ -17,6 +17,20 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **"No results" no longer covers for a metadata source that is throttling you.**
+  Searching Get Metadata for the same book twice could find it on the first click
+  and not on the second, with nothing changed in between. Goodreads and bol.com
+  answer a real no-match with an ordinary empty page, so when they instead refuse
+  a repeated request the app was reading that refusal as "this book does not
+  exist" and printing "No results for this query" — the two were impossible to
+  tell apart. A refused search now says so, and says to wait a minute and try
+  again. Two related pieces of bad advice went with it: a refusal from Goodreads
+  or bol.com used to suggest setting an API key, which neither one has (Goodreads
+  closed its API in 2020, which is exactly why it is scraped), and an ordinary
+  "page not found" from a Goodreads book whose id happened to contain 403 was
+  misreported as a refusal. Reported by
+  [@briffaantoine](https://github.com/new-usemame/Calibre-Web-NextGen/issues/303)
+  ([#303](https://github.com/new-usemame/Calibre-Web-NextGen/issues/303)).
 - **Eight more settings read in Dutch.** Hiding books from a personal library,
   "Convert missing KEPUBs now", syncing Kobo annotations to Hardcover,
   auto-creating users from LDAP, "Important:", "Use a URL" in the cover picker,

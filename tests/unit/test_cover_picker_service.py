@@ -370,17 +370,28 @@ class TestGatherCoverCandidates:
             ]),
             _fake_provider("bad", "Bad", search_raises=ConnectionError("nope")),
         ]
+        seen = []
+
+        # The failing provider is handed to the classifier alongside the
+        # exception: a 403 is a wrong key for a provider that takes one and
+        # plain throttling for a keyless scraper, and only the provider tells
+        # the two apart (fork #303).
+        def classify(exc, provider=None):
+            seen.append(getattr(provider, "__id__", None))
+            return ("error", str(exc)[:30])
+
         with patch.object(picker, "boost_covers", side_effect=lambda r: r):
             candidates, statuses = picker.gather_cover_candidates(
                 providers=providers, query="X",
                 static_cover="g.svg", locale="en",
-                classify_failure=lambda exc: ("error", str(exc)[:30]),
+                classify_failure=classify,
             )
         bad_status = next(s for s in statuses if s.id == "bad")
         assert bad_status.status == "error"
         good_status = next(s for s in statuses if s.id == "good")
         assert good_status.status == "ok"
         assert len(candidates) == 1
+        assert seen == ["bad"]
 
     def test_generic_cover_filtered_out(self):
         # Real providers fall back to a generic SVG when they can't find a

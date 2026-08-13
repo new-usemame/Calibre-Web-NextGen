@@ -40,6 +40,7 @@ run_tests.sh
 SECURITY.md
 state
 wiki-src
+wikisite
 
 # Test infrastructure (not needed in production image). Dev dependencies now
 # live in pyproject.toml's [project.optional-dependencies].dev extra, which the

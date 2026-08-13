@@ -162,6 +162,18 @@ is for things you can see or feel when running the app.
   dismisses either one is easier to hit.
 
 ### Added
+- **Sending everyone straight to your single sign-on no longer means giving up
+  the password form.** If you run exactly one OAuth provider, Calibre-Web NextGen
+  can take people to it the moment they hit the login page. Until now that
+  automatic jump was welded to "Disable Standard Login", so switching it on also
+  switched off password login for everyone — including you, if the provider ever
+  went down. The two are now separate settings: turn on **Start the only OAuth
+  provider automatically** under Admin → Security, and the password form stays
+  available at `/login?local=1` as a way back in. Off by default, so nothing
+  changes until you ask for it. The setting appears on both the classic and the
+  new admin pages. Contributed by
+  [@lduesing](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1488)
+  ([#1488](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1488)).
 - **You can search inside a book you're reading.** Open a book, click the new
   search button in the reader toolbar, and type — results show the surrounding
   sentence with your term marked, grouped so you can tell which chapter each one

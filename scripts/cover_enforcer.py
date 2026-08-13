@@ -95,22 +95,84 @@ change_logs_dir = _CHANGE_LOGS_DIR
 metadata_temp_dir = _METADATA_TEMP_DIR
 
 
-# Creates a lock file unless one already exists meaning an instance of the script is
-# already running, then the script is closed, the user is notified and the program
-# exits with code 2
-try:
-    lock = open(tempfile.gettempdir() + '/cover_enforcer.lock', 'x')
-    lock.close()
-except FileExistsError:
+def _lock_path() -> str:
+    # Resolved per call, not once at import: the tempdir is what tests redirect.
+    return os.path.join(tempfile.gettempdir(), 'cover_enforcer.lock')
+
+
+def _pid_is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Running under another user, so it exists. Treat it as a live holder.
+        return True
+    return True
+
+
+def _lock_owner(path: str):
+    """The pid recorded in the lock, or None if it predates this format."""
+    try:
+        with open(path) as handle:
+            recorded = handle.read().strip()
+    except FileNotFoundError:
+        return None
+    return int(recorded) if recorded.isdigit() else None
+
+
+def removeLock():
+    # Tolerant on purpose: cwa-init sweeps /tmp/*.lock at container start, so the
+    # file can legitimately be gone by the time atexit runs.
+    try:
+        os.remove(_lock_path())
+    except FileNotFoundError:
+        pass
+
+
+def _acquire_lock_or_exit():
+    """Take the single-instance lock, reclaiming one left behind by a killed run.
+
+    The lock is released through atexit, which does not run on SIGKILL, so a
+    killed enforcer used to block every later run until something removed the
+    file by hand. Recording the owning pid lets a later run tell "already
+    running" apart from "died holding the lock".
+
+    The pid is written to a temp file and hard-linked into place, so the lock
+    never exists in a readable-but-empty state for another run to misjudge.
+    """
+    path = _lock_path()
+    staging = f"{path}.{os.getpid()}"
+
+    for _ in range(2):
+        with open(staging, 'w') as handle:
+            handle.write(str(os.getpid()))
+        try:
+            os.link(staging, path)
+        except FileExistsError:
+            owner = _lock_owner(path)
+            if owner is None or not _pid_is_alive(owner):
+                # A lock from before this format, or one whose holder is gone.
+                print(f"[cover-metadata-enforcer]: reclaiming a stale lock left by {owner or 'an earlier run'}")
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
+                continue
+            print("[cover-metadata-enforcer]: CANCELLING... cover-metadata-enforcer was initiated but is already running")
+            sys.exit(2)
+        else:
+            atexit.register(removeLock)
+            return
+        finally:
+            try:
+                os.remove(staging)
+            except FileNotFoundError:
+                pass
+
+    # Another run won the reclaim; it holds the lock, so this one still stands down.
     print("[cover-metadata-enforcer]: CANCELLING... cover-metadata-enforcer was initiated but is already running")
     sys.exit(2)
-
-# Defining function to delete the lock on script exit
-def removeLock():
-    os.remove(tempfile.gettempdir() + '/cover_enforcer.lock')
-
-# Will automatically run when the script exits
-atexit.register(removeLock)
 
 
 class Book:
@@ -953,6 +1015,11 @@ class Enforcer:
 
 
 def main():
+    # Single-instance guard. Taken here rather than at import so that merely
+    # importing this module -- which nine test modules and several tools do --
+    # cannot exit the interpreter over a lockfile left by a killed run.
+    _acquire_lock_or_exit()
+
     parser = argparse.ArgumentParser(
         prog='cover-enforcer',
         description='Upon receiving a log, valid directory or an "-all" flag, this \

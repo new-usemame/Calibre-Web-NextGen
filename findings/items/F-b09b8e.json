@@ -1,0 +1,13 @@
+{
+  "area": "ingest",
+  "body": "Both scripts already take their single-instance lock inside\n`_acquire_lock_or_exit()` rather than at import, so they avoid the test-poisoning\nhalf of F-9032c8. Neither records the owning pid.\n\n    lock = open(tempfile.gettempdir() + '/convert_library.lock', 'x')\n    except FileExistsError: sys.exit(2)\n\nRelease is still `atexit.register(removeLock)`, which does not run on SIGKILL. So\na killed run still leaves a lock that blocks every later run of that service\nuntil `cwa-init` sweeps `/tmp/*.lock` on the next container start.\n\nUser-visible shape: library conversion, or the Kindle EPUB fixer, silently stops\ndoing its job for the rest of the container's life, with only a log line saying\nit \"is already running\" when nothing is.\n\nPR #1510 fixed exactly this for `cover_enforcer.py` by recording the pid and\nreclaiming the lock when that process is gone. The same helper shape applies\nhere; it was left out of #1510 to keep that change to one file.\n\nNote `removeLock()` in both scripts is also an unguarded `os.remove`, which\nraises at exit when cwa-init already swept the file.",
+  "created": "2026-08-09",
+  "id": "F-b09b8e",
+  "refs": [
+    "#1510"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "convert_library and kindle_epub_fixer avoid the import-time lock but cannot reclaim one from a killed run"
+}

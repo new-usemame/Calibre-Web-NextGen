@@ -91,7 +91,8 @@ def build_pull_payload(user_id: int, book_id: int, session) -> dict:
 
 
 def apply_push(annotations, *, user, book, session, commit,
-               deleted_ids=None, delete_source="koreader") -> dict:
+               deleted_ids=None, delete_source="koreader",
+               origin_device_id=None) -> dict:
     """Upsert each pushed portable annotation, fan out to enabled sync targets,
     and return a counts summary keyed by action (created/updated/deleted/skipped).
 
@@ -109,6 +110,7 @@ def apply_push(annotations, *, user, book, session, commit,
     for payload in annotations:
         row, action = apply_portable(
             payload, user_id=user.id, book=book, session=session, commit=commit,
+            origin_device_id=origin_device_id,
         )
         summary[action] = summary.get(action, 0) + 1
         if row is None or action == "skipped":
@@ -366,15 +368,36 @@ def push_annotations():
         )
     from ...services.annotation_portable import validate_portable_payload
     for index, payload in enumerate(annotations):
-        error = validate_portable_payload(payload)
+        error = validate_portable_payload(
+            payload, book_uuid=getattr(book, "uuid", None),
+        )
         if error:
             return _reject(user, document, "invalid_annotation",
                            f"annotations[{index}]: {error}")
+
+    origin_device_id = None
+    try:
+        from ...services.device_registry import (
+            register_koreader_device_best_effort,
+            resolve_owned_device_best_effort,
+        )
+        if data.get("origin_device_id"):
+            origin_device_id = resolve_owned_device_best_effort(
+                user_id=user.id, public_id=data.get("origin_device_id"),
+            )
+        elif data.get("device_id"):
+            origin_device_id = register_koreader_device_best_effort(
+                user_id=user.id, device_id=data.get("device_id"),
+                device_name=data.get("device"),
+            )
+    except Exception:
+        log.warning("KOReader annotation attribution failed", exc_info=True)
 
     summary = apply_push(
         annotations, user=user, book=book,
         session=ub.session, commit=ub.session_commit,
         deleted_ids=deleted_ids, delete_source=delete_source,
+        origin_device_id=origin_device_id,
     )
     summary["document"] = document
     # `reconciled` means the device NAMED deletions on this push, not that any

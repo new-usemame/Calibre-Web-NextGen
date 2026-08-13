@@ -12,8 +12,8 @@ msgstr ""
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
-"proton.me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
+"me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -1994,8 +1994,8 @@ msgstr "Gedownloade boeken"
 msgid "The latest Books"
 msgstr "Nieuwe boeken"
 
-#: cps/opds.py
-msgid "Random Books"
+#: cps/opds.py cps/render_template.py cps/spa_strings.py
+msgid "Discover"
 msgstr "Willekeurige boeken"
 
 #: cps/opds.py cps/render_template.py cps/templates/user_table.html
@@ -2169,10 +2169,6 @@ msgstr "Gelezen/Ongelezen boeken tonen"
 #: cps/render_template.py
 msgid "Show unread"
 msgstr "Ongelezen boeken tonen"
-
-#: cps/render_template.py cps/spa_strings.py
-msgid "Discover"
-msgstr "Willekeurige boeken"
 
 #: cps/render_template.py cps/templates/user_table.html
 #, fuzzy
@@ -3791,8 +3787,16 @@ msgid "≥"
 msgstr "≥"
 
 #: cps/spa_strings.py
+msgid "(no text captured)"
+msgstr "(geen tekst vastgelegd)"
+
+#: cps/spa_strings.py
 msgid "(replace cover)"
 msgstr "(omslag vervangen)"
+
+#: cps/spa_strings.py
+msgid "1 selected."
+msgstr "1 geselecteerd."
 
 #: cps/spa_strings.py
 msgid "2:3 (publisher cover — no padding for typical covers)"
@@ -3813,6 +3817,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "A few random picks from your library"
 msgstr "Enkele willekeurige keuzes uit je bibliotheek"
+
+#: cps/spa_strings.py
+msgid "A note about the book, not tied to a passage"
+msgstr "Een notitie over het boek, niet gekoppeld aan een passage"
 
 #: cps/spa_strings.py
 msgid ""
@@ -3842,6 +3850,10 @@ msgstr "Account: {name}"
 #: cps/spa_strings.py
 msgid "Add identifier"
 msgstr "Identificatiecode toevoegen"
+
+#: cps/spa_strings.py
+msgid "Add note"
+msgstr "Notitie toevoegen"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Add to favorites"
@@ -3920,6 +3932,19 @@ msgid "Ask in Discord"
 msgstr "Vraag het in Discord"
 
 #: cps/spa_strings.py
+msgid "Assign selected to device"
+msgstr "Selectie aan apparaat toewijzen"
+
+#: cps/spa_strings.py
+msgid "Assign to device"
+msgstr "Aan apparaat toewijzen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Assigned to {name}."
+msgstr "Toegewezen aan {name}."
+
+#: cps/spa_strings.py
 msgid "Authentication"
 msgstr "Authenticatie"
 
@@ -3967,6 +3992,10 @@ msgstr "Basis DN"
 msgid "Basic configuration"
 msgstr "Basisconfiguratie"
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Black"
+msgstr "Zwart"
+
 #: cps/spa_strings.py
 msgid "Book default"
 msgstr "Boek standaard"
@@ -3974,6 +4003,10 @@ msgstr "Boek standaard"
 #: cps/spa_strings.py
 msgid "Book density"
 msgstr "Boekdichtheid"
+
+#: cps/spa_strings.py
+msgid "Book order"
+msgstr "Boekvolgorde"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3996,10 +4029,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
 msgstr "Ingebouwde providers (laat leeg om uit te schakelen):"
-
-#: cps/spa_strings.py
-msgid "Bulk actions"
-msgstr "Bulkacties"
 
 #: cps/spa_strings.py
 msgid "CA certificate path"
@@ -4116,7 +4145,8 @@ msgstr "Compact"
 msgid "Configured"
 msgstr "Geconfigureerd"
 
-# #973 — consolidating tags from the Tag view (merge on rename collision, delete).
+# #973 — consolidating tags from the Tag view (merge on rename collision,
+# delete).
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Confirm delete tag {name}"
@@ -4147,6 +4177,10 @@ msgid "Copy link"
 msgstr "Link kopiëren"
 
 #: cps/spa_strings.py
+msgid "Could not assign."
+msgstr "Toewijzen is mislukt."
+
+#: cps/spa_strings.py
 msgid "Could not create shelf."
 msgstr "Kan boekenplank niet aanmaken."
 
@@ -4171,8 +4205,12 @@ msgid "Could not load duplicates."
 msgstr "Kan duplicaten niet laden."
 
 #: cps/spa_strings.py
-msgid "Could not load highlights."
-msgstr "Kan markeringen niet laden."
+msgid "Could not load e-readers."
+msgstr "E-readers konden niet worden geladen."
+
+#: cps/spa_strings.py
+msgid "Could not load highlights and notes."
+msgstr "Kan markeringen en notities niet laden."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -4189,6 +4227,14 @@ msgstr "Kan dit tekstbestand niet laden."
 #: cps/spa_strings.py
 msgid "Could not load users."
 msgstr "Kan gebruikers niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not open that highlight."
+msgstr "Kan die markering niet openen."
+
+#: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr "Kan dat zoekresultaat niet openen."
 
 #: cps/spa_strings.py
 msgid "Could not read this comic archive."
@@ -4215,6 +4261,10 @@ msgid "Could not save reader settings."
 msgstr "Kan lezersinstellingen niet opslaan."
 
 #: cps/spa_strings.py
+msgid "Could not save that note."
+msgstr "Kan die notitie niet opslaan."
+
+#: cps/spa_strings.py
 msgid "Could not save the default library filter."
 msgstr "Kan het standaard bibliotheekfilter niet opslaan."
 
@@ -4229,6 +4279,10 @@ msgstr "Kan titel niet opslaan."
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "Kan je leespositie niet opslaan."
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
+msgstr "Kan dit boek niet doorzoeken."
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
@@ -4393,6 +4447,10 @@ msgid "Delete {name}"
 msgstr "{name} verwijderen"
 
 #: cps/spa_strings.py
+msgid "Deleted device"
+msgstr "Verwijderd apparaat"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Deleted tag {name}"
 msgstr "Label {name} verwijderd"
@@ -4410,6 +4468,31 @@ msgstr "Compact"
 #: cps/templates/cwa_settings.html cps/templates/search_form.html
 msgid "Description"
 msgstr "Omschrijving"
+
+#: cps/spa_strings.py
+msgid "Device"
+msgstr "Apparaat"
+
+#: cps/spa_strings.py
+msgid "Device name"
+msgstr "Apparaatnaam"
+
+#: cps/spa_strings.py
+msgid "Device renamed."
+msgstr "Apparaat hernoemd."
+
+#: cps/spa_strings.py
+msgid "Device restored."
+msgstr "Apparaat hersteld."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Device: {name}"
+msgstr "Apparaat: {name}"
+
+#: cps/spa_strings.py
+msgid "Devices appear here after their first sync."
+msgstr "Apparaten verschijnen hier na hun eerste synchronisatie."
 
 #: cps/spa_strings.py
 msgid "Disable standard password login"
@@ -4474,6 +4557,10 @@ msgid "E-reader preview"
 msgstr "E-reader voorbeeld"
 
 #: cps/spa_strings.py
+msgid "E-readers"
+msgstr "E-readers"
+
+#: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
 msgstr "Elk type (isbn, amazon, google, doi…) mag één keer voorkomen."
 
@@ -4492,6 +4579,10 @@ msgstr "Randspiegeling — breid het artwork uit (aanbevolen)"
 #: cps/templates/user_table.html
 msgid "Edit"
 msgstr "Bewerken"
+
+#: cps/spa_strings.py
+msgid "Edit note"
+msgstr "Notitie bewerken"
 
 #: cps/spa_strings.py
 msgid "Edit public shelves"
@@ -4540,8 +4631,20 @@ msgid "Encryption"
 msgstr "Encryptie"
 
 #: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr "Voer ten minste 2 tekens in"
+
+#: cps/spa_strings.py
+msgid "Exit full screen"
+msgstr "Volledig scherm verlaten"
+
+#: cps/spa_strings.py
 msgid "Expires in"
 msgstr "Verloopt over"
+
+#: cps/spa_strings.py
+msgid "Export"
+msgstr "Exporteren"
 
 #: cps/spa_strings.py
 msgid "Expose only selected shelves over OPDS"
@@ -4588,6 +4691,10 @@ msgid "Fill style"
 msgstr "Opvulstijl"
 
 #: cps/spa_strings.py
+msgid "Filter by device"
+msgstr "Op apparaat filteren"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Filter {items}"
 msgstr "{items} filteren"
@@ -4631,6 +4738,10 @@ msgid "From address"
 msgstr "Van-adres"
 
 #: cps/spa_strings.py
+msgid "Full screen"
+msgstr "Volledig scherm"
+
+#: cps/spa_strings.py
 msgid "Full user table & restrictions"
 msgstr "Volledige gebruikerstabel & beperkingen"
 
@@ -4643,6 +4754,10 @@ msgid "Give your smart shelf a name."
 msgstr "Geef je slimme boekenplank een naam."
 
 #: cps/spa_strings.py
+msgid "Go to this highlight"
+msgstr "Ga naar deze markering"
+
+#: cps/spa_strings.py
 msgid "Go to your library"
 msgstr "Ga naar je bibliotheek"
 
@@ -4650,6 +4765,10 @@ msgstr "Ga naar je bibliotheek"
 #: cps/templates/cover_picker.html
 msgid "Gradient — palette-matched top/bottom blend"
 msgstr "Kleurverloop — op palet afgestemde menging van boven- en onderkant"
+
+#: cps/spa_strings.py
+msgid "Group by"
+msgstr "Groeperen op"
 
 #: cps/spa_strings.py
 msgid "Group claim"
@@ -4708,8 +4827,16 @@ msgid "Highlight"
 msgstr "Markeren"
 
 #: cps/spa_strings.py
+msgid "Highlight saved"
+msgstr "Markering opgeslagen"
+
+#: cps/spa_strings.py
 msgid "Highlights"
 msgstr "Markeringen"
+
+#: cps/spa_strings.py
+msgid "Highlights and notes"
+msgstr "Markeringen en notities"
 
 #: cps/spa_strings.py
 msgid "Hot"
@@ -4740,6 +4867,15 @@ msgstr "Identificatoren"
 msgid "Image from {source}"
 msgstr "Afbeelding van {source}"
 
+#: cps/spa_strings.py cps/templates/annotations_import.html
+msgid "Import"
+msgstr "Importeren"
+
+# Device and annotation management (SPA)
+#: cps/spa_strings.py
+msgid "Import and export"
+msgstr "Importeren en exporteren"
+
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
 msgstr "Geïmporteerd als"
@@ -4766,6 +4902,10 @@ msgstr ""
 "Het is misschien verplaatst, of het staat mogelijk nog in de klassieke "
 "interface."
 
+#: cps/spa_strings.py
+msgid "KOReader"
+msgstr "KOReader"
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr "KOReader-voortgang"
@@ -4779,12 +4919,20 @@ msgid "Key path"
 msgstr "Sleutelpad"
 
 #: cps/spa_strings.py
+msgid "Kobo"
+msgstr "Kobo"
+
+#: cps/spa_strings.py
 msgid "Kobo Clara HD / 2E / BW / Colour (1072×1448)"
 msgstr "Kobo Clara HD / 2E / BW / Colour (1072×1448)"
 
 #: cps/spa_strings.py
 msgid "Kobo Libra Color / Libra 2 (1264×1680)"
 msgstr "Kobo Libra Color / Libra 2 (1264×1680)"
+
+#: cps/spa_strings.py
+msgid "Kobo setup"
+msgstr "Kobo-instelling"
 
 #: cps/spa_strings.py
 msgid "Kobo sync on"
@@ -4802,6 +4950,11 @@ msgstr "Talen — opnemen"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last modified"
 msgstr "Laatst gewijzigd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Last seen {when}"
+msgstr "Laatst gezien {when}"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last synced"
@@ -4886,8 +5039,16 @@ msgid "Manage admin role from OAuth group"
 msgstr "Beheerdersrol beheren via OAuth-groep"
 
 #: cps/spa_strings.py
+msgid "Manage e-readers"
+msgstr "E-readers beheren"
+
+#: cps/spa_strings.py
 msgid "Manage shelves"
 msgstr "Boekenplanken beheren"
+
+#: cps/spa_strings.py
+msgid "Manage your Kobo sync URL in the classic account page."
+msgstr "Beheer je Kobo-synchronisatie-URL op de klassieke accountpagina."
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/book_table.html
@@ -4940,6 +5101,11 @@ msgstr "Min"
 #: cps/spa_strings.py
 msgid "Minimum rating"
 msgstr "Minimale beoordeling"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {name}"
+msgstr "Meer acties voor {name}"
 
 #: cps/spa_strings.py
 msgid "More cover options (search providers, e-reader preview)"
@@ -5032,15 +5198,20 @@ msgid "No duplicate groups found."
 msgstr "Geen duplicaat groepen gevonden."
 
 #: cps/spa_strings.py
+msgid "No e-readers yet."
+msgstr "Nog geen e-readers."
+
+#: cps/spa_strings.py
 msgid "No excluded tags"
 msgstr "Geen uitgesloten labels"
 
 #: cps/spa_strings.py
-msgid ""
-"No highlights yet. Highlight while reading, or import from a Kobo device."
-msgstr ""
-"Nog geen markeringen. Markeer tijdens het lezen, of importeer van een Kobo-"
-"apparaat."
+msgid "No highlights yet. Select text in the book to make one."
+msgstr "Nog geen markeringen. Selecteer tekst in het boek om er een te maken."
+
+#: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr "Geen resultaten gevonden in dit boek."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5074,12 +5245,44 @@ msgid "No {items} yet."
 msgstr "Nog geen {items}."
 
 #: cps/spa_strings.py
+msgid "Not assigned"
+msgstr "Niet toegewezen"
+
+#: cps/spa_strings.py
 msgid "Not configured"
 msgstr "Niet geconfigureerd"
 
 #: cps/spa_strings.py
+msgid "Not in current file"
+msgstr "Niet in het huidige bestand"
+
+#: cps/spa_strings.py
+msgid "Not seen lately"
+msgstr "Onlangs niet gezien"
+
+#: cps/spa_strings.py
 msgid "Not set"
 msgstr "Niet ingesteld"
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Note"
+msgstr "Notitie"
+
+#: cps/spa_strings.py
+msgid "Note removed"
+msgstr "Notitie verwijderd"
+
+#: cps/spa_strings.py
+msgid "Note saved"
+msgstr "Notitie opgeslagen"
+
+#: cps/spa_strings.py
+msgid ""
+"Nothing here yet. Highlight or write a note while reading, or import from a "
+"Kobo device."
+msgstr ""
+"Nog niets. Markeer of schrijf een notitie tijdens het lezen, of importeer "
+"van een Kobo-apparaat."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -5096,6 +5299,10 @@ msgid ""
 msgstr ""
 "Scan op een ander apparaat waarop je al bent aangemeld deze code of open de "
 "onderstaande link om dit apparaat te autoriseren."
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "One column"
+msgstr "Éé kolom"
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -5124,6 +5331,14 @@ msgstr "Open de onderstaande link op je aangemelde apparaat."
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
 msgstr "OpenLDAP server"
+
+#: cps/spa_strings.py
+msgid ""
+"Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
+"you can edit it first."
+msgstr ""
+"Opent een vooraf ingevuld rapport op GitHub. Er wordt niets verzonden totdat "
+"u het plaatst, en u kunt het eerst bewerken."
 
 #: cps/spa_strings.py
 msgid "Opens in classic view"
@@ -5253,6 +5468,17 @@ msgstr "Registreren…"
 msgid "Reload"
 msgstr "Herladen"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Reload metadata for \"{title}\" from the file on disk? Any title, author or "
+"series you edited here is replaced by what the file contains. This cannot be "
+"undone."
+msgstr ""
+"Metagegevens van “{title}” opnieuw laden vanaf het bestand op schijf? Alle "
+"titel-, auteur- of reeksgegevens die u hier hebt bewerkt, worden vervangen "
+"door wat het bestand bevat. Dit kan niet ongedaan worden gemaakt."
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Reload metadata from disk"
 msgstr "Metagegevens vanaf schijf herladen"
@@ -5264,6 +5490,10 @@ msgstr "Herladen…"
 #: cps/spa_strings.py
 msgid "Remember me"
 msgstr "Onthoud mij"
+
+#: cps/spa_strings.py
+msgid "Remove device"
+msgstr "Apparaat verwijderen"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
@@ -5282,12 +5512,26 @@ msgid "Remove identifier"
 msgstr "Identifier verwijderen"
 
 #: cps/spa_strings.py
+msgid "Remove note"
+msgstr "Notitie verwijderen"
+
+#: cps/spa_strings.py
 msgid "Remove rule"
 msgstr "Regel verwijderen"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove {name}?"
+msgstr "{name} verwijderen?"
+
+#: cps/spa_strings.py
 msgid "Rename"
 msgstr "Hernoemen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Rename {name}"
+msgstr "{name} hernoemen"
 
 #: cps/spa_strings.py
 msgid "Reorder"
@@ -5310,6 +5554,10 @@ msgid "Report Issue on GitHub"
 msgstr "Probleem melden op GitHub"
 
 #: cps/spa_strings.py
+msgid "Report this problem"
+msgstr "Dit probleem melden"
+
+#: cps/spa_strings.py
 msgid "Require group membership"
 msgstr "Groepslidmaatschap vereisen"
 
@@ -5328,8 +5576,21 @@ msgstr ""
 "meer en er wordt een vervangend wachtwoord gemaild."
 
 #: cps/spa_strings.py
+msgid "Retry"
+msgstr "Opnieuw proberen"
+
+#: cps/spa_strings.py
 msgid "Reverse-proxy header login"
 msgstr "Reverse-proxy header aanmelding"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Revoke the app password \"{label}\"? Any device still using it loses access "
+"immediately, and the password cannot be recovered."
+msgstr ""
+"Het app-wachtwoord “{label}” intrekken? Elk apparaat dat het nog gebruikt, "
+"verliest onmiddellijk de toegang en het wachtwoord kan niet worden hersteld."
 
 #: cps/spa_strings.py
 msgid "Rows per load"
@@ -5368,6 +5629,10 @@ msgid "Save name"
 msgstr "Naam opslaan"
 
 #: cps/spa_strings.py
+msgid "Save note"
+msgstr "Notitie opslaan"
+
+#: cps/spa_strings.py
 msgid "Save security settings"
 msgstr "Beveiligingsinstellingen opslaan"
 
@@ -5393,12 +5658,28 @@ msgid "Scopes"
 msgstr "Scopes"
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr "Zoeken in het boek"
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr "Zoekterm"
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr "Dit boek doorzoeken"
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Zoeken op titel, auteur…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
 msgstr "Elke bron doorzoeken…"
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
+msgstr "Dit boek wordt doorzocht…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5417,8 +5698,27 @@ msgid "Select"
 msgstr "Selecteer"
 
 #: cps/spa_strings.py
+msgid "Select all in group"
+msgstr "Alles in de groep selecteren"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select all {n}"
+msgstr "Alle {n} selecteren"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select highlight: {text}"
+msgstr "Markering selecteren: {text}"
+
+#: cps/spa_strings.py
 msgid "Select multiple"
 msgstr "Meerdere selecteren"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select note: {text}"
+msgstr "Notitie selecteren: {text}"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
@@ -5488,6 +5788,10 @@ msgstr ""
 "vullen, of voer ze handmatig in."
 
 #: cps/spa_strings.py
+msgid "Set up Kobo sync"
+msgstr "Kobo-synchronisatie instellen"
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Instellingen opgeslagen."
 
@@ -5540,6 +5844,11 @@ msgstr "Verborgen boeken tonen"
 #: cps/spa_strings.py
 msgid "Show password"
 msgstr "Wachtwoord tonen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
+msgstr "De eerste {count} resultaten worden weergegeven."
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -5600,6 +5909,10 @@ msgstr "Sorteervolgorde"
 #: cps/spa_strings.py
 msgid "Source details"
 msgstr "Brondetails"
+
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
+msgstr "Start de enige OAuth-provider automatisch"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Started reading"
@@ -5678,8 +5991,16 @@ msgid "That URL is not a usable image."
 msgstr "Die URL is geen bruikbare afbeelding."
 
 #: cps/spa_strings.py
+msgid "This device will no longer sync."
+msgstr "Dit apparaat wordt niet meer gesynchroniseerd."
+
+#: cps/spa_strings.py
 msgid "This format opens in the full-screen reader."
 msgstr "Dit formaat wordt geopend in de lezer op volledig scherm."
+
+#: cps/spa_strings.py
+msgid "This highlight has no saved position"
+msgstr "Deze markering heeft geen opgeslagen positie"
 
 #: cps/spa_strings.py
 msgid "This magic link expired. Generate a new one to try again."
@@ -5727,6 +6048,10 @@ msgstr "Best beoordeeld"
 msgid "Trust authentication header"
 msgstr "Authenticatie-header vertrouwen"
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Two columns"
+msgstr "Twee kolommen"
+
 #: cps/spa_strings.py
 msgid "UI / display configuration"
 msgstr "UI / weergave-configuratie"
@@ -5736,8 +6061,20 @@ msgid "Unarchive"
 msgstr "Dearchiveren"
 
 #: cps/spa_strings.py
+msgid "Undo"
+msgstr "Ongedaan maken"
+
+#: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Zichtbaar maken"
+
+#: cps/spa_strings.py
+msgid "Unknown device"
+msgstr "Onbekend apparaat"
+
+#: cps/spa_strings.py
+msgid "Unknown source"
+msgstr "Onbekende bron"
 
 #: cps/spa_strings.py
 msgid "Unlock the cover above to apply a new one."
@@ -5825,6 +6162,14 @@ msgstr "Viewer"
 msgid "Waiting for you to authorise…"
 msgstr "Wachten tot je autoriseert…"
 
+#: cps/spa_strings.py
+msgid "Warning: this highlight can’t be shown in the book"
+msgstr "Waarschuwing: deze markering kan niet in het boek worden weergegeven"
+
+#: cps/spa_strings.py
+msgid "Web reader"
+msgstr "Weblezer"
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "When locked, fetching metadata will not overwrite this cover."
 msgstr ""
@@ -5834,6 +6179,25 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
 msgstr "Wanneer de leesvoortgang voor het eerst is gesynchroniseerd"
+
+#: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add ?"
+"local=1 to the login URL to reach the password form, which keeps working as "
+"long as standard password login is left enabled."
+msgstr ""
+"Als automatisch starten aanstaat, gaat de inlogpagina rechtstreeks naar de "
+"provider. Voeg ?local=1 toe aan de inlog-URL om het wachtwoordformulier te "
+"bereiken; dat blijft werken zolang standaard inloggen met wachtwoord "
+"ingeschakeld blijft."
+
+#: cps/spa_strings.py
+msgid "Write a note"
+msgstr "Een notitie schrijven"
+
+#: cps/spa_strings.py
+msgid "Write a note…"
+msgstr "Schrijf een notitie…"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5909,6 +6273,10 @@ msgid "type (isbn, amazon, doi…)"
 msgstr "type (isbn, amazon, doi…)"
 
 #: cps/spa_strings.py
+msgid "unknown"
+msgstr "onbekend"
+
+#: cps/spa_strings.py
 msgid "value"
 msgstr "waarde"
 
@@ -5948,6 +6316,11 @@ msgstr "{count} bestanden afgewezen"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{count} matches"
+msgstr "{count} resultaten"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{count} result"
 msgstr "{count} resultaat"
 
@@ -5963,13 +6336,65 @@ msgstr "{count} resultaten voor \"{query}\""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{done} of {total}"
+msgstr "{done} van {total}"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{field} (comma separated)"
 msgstr "{field} (door komma's gescheiden)"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{name} removed."
+msgstr "{name} verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name}, {n} highlights and notes"
+msgstr "{name}, {n} markeringen en notities"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} assigned to {name}."
+msgstr "{n} toegewezen aan {name}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} failed."
+msgstr "{n} mislukt."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} found"
 msgstr "{n} gevonden"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} highlights and notes"
+msgstr "{n} markeringen en notities"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes assigned to this device will become Unknown device."
+msgstr ""
+"{n} markeringen en notities die aan dit apparaat zijn toegewezen, worden "
+"Onbekend apparaat."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes were made on this device. They are not deleted. "
+"Their origin history is kept."
+msgstr ""
+"{n} markeringen en notities zijn op dit apparaat gemaakt. Ze worden niet "
+"verwijderd. Hun herkomstgeschiedenis blijft bewaard."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{ok} of {total} assigned to {name}."
+msgstr "{ok} van {total} toegewezen aan {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6278,8 +6703,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
-"(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
+"%(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -7062,10 +7487,6 @@ msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "KoboReader.sqlite"
-msgstr ""
-
-#: cps/templates/annotations_import.html
-msgid "Import"
 msgstr ""
 
 #: cps/templates/annotations_import.html
@@ -7852,6 +8273,7 @@ msgstr "Inloggen op afstand inschakelen ('magic link')"
 #: cps/templates/config_edit.html
 msgid "Allow users to hide books from their personal library"
 msgstr ""
+"Gebruikers toestaan om boeken te verbergen in hun persoonlijke bibliotheek"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -7883,7 +8305,7 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Convert missing KEPUBs now"
-msgstr ""
+msgstr "Converteer ontbrekende KEPUBs nu"
 
 #: cps/templates/config_edit.html
 msgid "Server External Port (for port forwarded API calls)"
@@ -7892,6 +8314,8 @@ msgstr "Server Externe Port (voor port doorgestuurde API oproepen)"
 #: cps/templates/config_edit.html
 msgid "Sync Kobo annotations to Hardcover (Requires API key per user)"
 msgstr ""
+"Synchroniseer aantekeningen naar Hardcover (API sleutel per gebruiker "
+"vereist)"
 
 #: cps/templates/config_edit.html
 msgid "Pad book covers to Kobo screen aspect ratio"
@@ -8113,7 +8537,7 @@ msgstr "LDAP Server is OpenLDAP?"
 
 #: cps/templates/config_edit.html
 msgid "Auto-create users from LDAP"
-msgstr ""
+msgstr "Automatisch gebruikers aanmaken uit LDAP"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8156,7 +8580,7 @@ msgstr "LDAP Lid Gebruiker Filter"
 
 #: cps/templates/config_edit.html
 msgid "Important:"
-msgstr ""
+msgstr "Belangrijk:"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8424,6 +8848,18 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
+msgid "Automatically forward to the only OAuth provider"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"When enabled and exactly one OAuth provider is active, visiting the login "
+"page starts it automatically. Add ?local=1 to the login URL to open the "
+"normal login page instead. That page still accepts a username and password "
+"only while the setting above is left off."
+msgstr ""
+
+#: cps/templates/config_edit.html
 msgid "Enable OAuth Group-Based Admin Role Management"
 msgstr ""
 
@@ -8686,7 +9122,7 @@ msgstr "Voeg toegestane/geweigerde aangepaste kolomwaarden toe"
 
 #: cps/templates/cover_picker.html
 msgid "Use a URL"
-msgstr ""
+msgstr "Gebruik een URL"
 
 #: cps/templates/cover_picker.html
 #, fuzzy
@@ -8802,7 +9238,7 @@ msgstr ""
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Starting..."
-msgstr ""
+msgstr "Starten..."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Cancelling..."
@@ -8814,7 +9250,7 @@ msgstr ""
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Search by title/author"
-msgstr ""
+msgstr "Zoek op titel/auteur"
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Run on selected book"
@@ -10535,6 +10971,12 @@ msgid ""
 msgstr "E-mailserver is niet geconfigureerd, neem contact op met de beheerder!"
 
 #: cps/templates/http_error.html
+msgid ""
+"Report this — the details are filled in for you, and nothing is sent until "
+"you post it:"
+msgstr ""
+
+#: cps/templates/http_error.html
 msgid "Create Issue"
 msgstr "Probleem melden"
 
@@ -10995,10 +11437,6 @@ msgid "Open annotations page"
 msgstr ""
 
 #: cps/templates/read.html
-msgid "Black"
-msgstr "Zwart"
-
-#: cps/templates/read.html
 msgid "Font Sizes"
 msgstr "Lettertypegrootte"
 
@@ -11036,20 +11474,8 @@ msgid "Spread"
 msgstr "Verspreiden"
 
 #: cps/templates/read.html
-msgid "Two columns"
-msgstr "Twee kolommen"
-
-#: cps/templates/read.html
-msgid "One column"
-msgstr "Éé kolom"
-
-#: cps/templates/read.html
 msgid "Reflow text when sidebars are open."
 msgstr "Tekstindeling automatisch aanpassen als het zijpaneel geopend is."
-
-#: cps/templates/read.html
-msgid "Note"
-msgstr ""
 
 #: cps/templates/read.html
 msgid "Add a note (optional)"
@@ -12069,6 +12495,44 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#~ msgid "Could not load highlights."
+#~ msgstr "Kan markeringen niet laden."
+
+#~ msgid ""
+#~ "No highlights yet. Highlight while reading, or import from a Kobo device."
+#~ msgstr ""
+#~ "Nog geen markeringen. Markeer tijdens het lezen, of importeer van een "
+#~ "Kobo-apparaat."
+
+#, python-brace-format
+#~ msgid "{name}, {n} highlights"
+#~ msgstr "{name}, {n} markeringen"
+
+#, python-brace-format
+#~ msgid "{n} highlights"
+#~ msgstr "{n} markeringen"
+
+#, python-brace-format
+#~ msgid "{n} highlights assigned to this device will become Unknown device."
+#~ msgstr ""
+#~ "{n} markeringen die aan dit apparaat zijn toegewezen, worden Onbekend "
+#~ "apparaat."
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights were made on this device. They are not deleted. Their "
+#~ "origin history is kept."
+#~ msgstr ""
+#~ "{n} markeringen zijn op dit apparaat gemaakt. Ze worden niet verwijderd. "
+#~ "Hun herkomstgeschiedenis blijft bewaard."
+
+#~ msgid "Bulk actions"
+#~ msgstr "Bulkacties"
+
+#~ msgid "Random Books"
+#~ msgstr "Willekeurige boeken"
+
+#, fuzzy
 #~ msgid "Enable Hardcover Auto-Fetch"
 #~ msgstr "Zet Kobo sync aan"
 
@@ -12238,11 +12702,10 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
-#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
-#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
-#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
-#~ "bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
+#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
+#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
+#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

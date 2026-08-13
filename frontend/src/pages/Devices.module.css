@@ -1,0 +1,33 @@
+.container { max-width: 860px; margin: 0 auto; padding: var(--sp-5); color: var(--text); }
+.back { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); margin-bottom: var(--sp-3); }
+.heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.heading h1, .card h2, .setup h2, .empty h2 { margin: 0; }
+.list { list-style: none; display: grid; gap: var(--sp-2); margin: 0; padding: 0; }
+.card { position: relative; display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
+.cardMain { min-width: 0; }
+.cardMain p { color: var(--text-muted); margin: var(--sp-1) 0 0; overflow-wrap: anywhere; }
+.cardActions { display: flex; align-items: flex-start; position: relative; }
+.cardActions > button, .renameForm button { min-width: 44px; min-height: 44px; border-radius: var(--r-md); color: var(--text-muted); }
+.cardActions > button:hover { background: var(--surface-2); color: var(--text); }
+.menu { position: absolute; z-index: 3; right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--shadow-md); }
+.menu button { width: 100%; min-height: 44px; text-align: left; padding: 0 var(--sp-3); color: var(--danger); }
+.renameForm { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.renameForm input { min-width: min(260px, 100%); min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 0 var(--sp-2); background: var(--surface-0); color: var(--text); }
+.setup, .empty { margin-top: var(--sp-5); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
+.setup p, .empty p { color: var(--text-muted); }
+.scrim { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: var(--sp-4); background: rgb(0 0 0 / .65); }
+.dialog { width: min(520px, 100%); padding: var(--sp-5); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--shadow-lg); }
+.dialog p { color: var(--text-muted); line-height: 1.5; }
+.dialogActions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
+.button, .dangerButton { min-height: 44px; padding: 0 var(--sp-4); border-radius: var(--r-md); border: 1px solid var(--border); }
+.dangerButton { background: var(--danger); color: white; border-color: transparent; }
+.toast { position: fixed; z-index: 60; left: 50%; bottom: var(--sp-5); transform: translateX(-50%); display: flex; align-items: center; gap: var(--sp-4); min-width: min(420px, calc(100vw - 32px)); padding: var(--sp-3) var(--sp-4); background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-lg); }
+.toast button { margin-left: auto; min-height: 44px; color: var(--accent); font-weight: 700; }
+@media (max-width: 600px) {
+  .container { padding: var(--sp-4); }
+  .card { padding: var(--sp-3); }
+  .cardActions { flex-direction: column; }
+  .dialogActions { flex-direction: column-reverse; }
+  .dialogActions button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

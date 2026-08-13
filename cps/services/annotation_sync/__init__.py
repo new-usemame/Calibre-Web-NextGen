@@ -28,6 +28,25 @@ from .base import AnnotationSyncTargetHandler, SyncResult
 log = logging.getLogger(__name__)
 
 _HANDLERS: Dict[str, AnnotationSyncTargetHandler] = {}
+_CLIENT_TIME_MISSING = object()
+
+
+def parse_client_modified_utc(value):
+    """Parse a client clock to naive UTC; distinguish missing from invalid."""
+    if value is _CLIENT_TIME_MISSING:
+        return _CLIENT_TIME_MISSING
+    if not isinstance(value, str) or not value.strip():
+        return None
+    raw = value.strip()
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc).replace(tzinfo=None)
 
 # Background dispatch seam (#920)
 # ------------------------------
@@ -130,7 +149,38 @@ def _book_uuid(book):
     return None
 
 
-def _upsert_annotation(session, payload, book, user):
+def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
+    """True only when applying the payload would leave every stored field unchanged."""
+    def supplied(mapping, key, current):
+        return mapping.get(key) if key in mapping else current
+
+    chapter_progress = span.get("chapterProgress")
+    next_context = annotation.context_string
+    if "contextString" in span or "context" in span:
+        next_context = span.get("contextString") or span.get("context")
+    current = (
+        annotation.highlighted_text, annotation.note_text, annotation.highlight_color,
+        annotation.chapter_progress, annotation.content_id,
+        annotation.start_container_path, annotation.end_container_path,
+        annotation.start_offset, annotation.end_offset,
+        annotation.context_string, bool(annotation.hidden),
+    )
+    incoming = (
+        supplied(payload, "highlightedText", annotation.highlighted_text),
+        supplied(payload, "noteText", annotation.note_text),
+        supplied(payload, "highlightColor", annotation.highlight_color),
+        chapter_progress if chapter_progress is not None else annotation.chapter_progress,
+        normalized_content_id or annotation.content_id,
+        supplied(span, "startPath", annotation.start_container_path),
+        supplied(span, "endPath", annotation.end_container_path),
+        supplied(span, "startChar", annotation.start_offset),
+        supplied(span, "endChar", annotation.end_offset),
+        next_context, False,
+    )
+    return incoming == current
+
+
+def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
     """Find-or-create Annotation row keyed on (user_id, book_id, annotation_id).
 
     Populates content fields AND position fields from the Kobo PATCH payload
@@ -142,6 +192,23 @@ def _upsert_annotation(session, payload, book, user):
     annotation_id = payload.get("id")
     if not annotation_id:
         return None
+    raw_client_time = payload.get("clientLastModifiedUtc", _CLIENT_TIME_MISSING)
+    client_time = parse_client_modified_utc(raw_client_time)
+    if raw_client_time is not _CLIENT_TIME_MISSING and client_time is None:
+        log.warning("Rejecting annotation %s with malformed clientLastModifiedUtc", annotation_id)
+        return None
+    span = (payload.get("location") or {}).get("span") or {}
+    normalized_content_id = None
+    chapter_filename = span.get("chapterFilename")
+    if chapter_filename and _book_uuid(book):
+        from cps.services.annotation_content_id import normalize_content_id, ContentIdError
+        try:
+            normalized_content_id = normalize_content_id(
+                f"{_book_uuid(book)}!!{chapter_filename}", book_uuid=_book_uuid(book)
+            )
+        except ContentIdError:
+            log.warning("Rejecting annotation %s with invalid content location", annotation_id)
+            return None
     ann = (
         session.query(ub.Annotation)
         .filter(
@@ -151,12 +218,29 @@ def _upsert_annotation(session, payload, book, user):
         )
         .first()
     )
+    if ann is not None and ann.client_modified_at is not None:
+        stored = ann.client_modified_at
+        if stored.tzinfo is not None:
+            stored = stored.astimezone(timezone.utc).replace(tzinfo=None)
+        if client_time is _CLIENT_TIME_MISSING or client_time < stored:
+            log.info("Ignoring stale or undated update for annotation %s", annotation_id)
+            return None
+        if client_time == stored:
+            # Kobo clocks have second precision. A byte-equivalent retry is a
+            # no-op, but a real edit can share the same second and must not be
+            # eaten merely because its clock ties. Equal-clock divergent
+            # payloads therefore use arrival order as the deterministic tie.
+            if _kobo_payload_matches_row(
+                ann, payload, span, normalized_content_id,
+            ):
+                return None
     if ann is None:
         ann = ub.Annotation(
             user_id=user.id,
             annotation_id=annotation_id,
             book_id=book.id,
             source="kobo",
+            origin_device_id=origin_device_id,
         )
         session.add(ann)
     # If a previously soft-deleted (hidden) annotation comes back, un-hide it.
@@ -169,15 +253,11 @@ def _upsert_annotation(session, payload, book, user):
     if "highlightColor" in payload:
         ann.highlight_color = payload.get("highlightColor")
     # Position fields — pulled from Kobo's location.span block.
-    span = (payload.get("location") or {}).get("span") or {}
     chapter_progress = span.get("chapterProgress")
     if chapter_progress is not None:
         ann.chapter_progress = chapter_progress
-    chapter_filename = span.get("chapterFilename")
-    if chapter_filename:
-        uuid = _book_uuid(book)
-        if uuid:
-            ann.content_id = f"{uuid}!!{chapter_filename}"
+    if normalized_content_id:
+        ann.content_id = normalized_content_id
     if "startPath" in span:
         ann.start_container_path = span.get("startPath")
     if "endPath" in span:
@@ -188,6 +268,8 @@ def _upsert_annotation(session, payload, book, user):
         ann.end_offset = span.get("endChar")
     if "contextString" in span or "context" in span:
         ann.context_string = span.get("contextString") or span.get("context")
+    if client_time is not _CLIENT_TIME_MISSING:
+        ann.client_modified_at = client_time
     ann.last_synced = _now()
     session.flush()
     return ann
@@ -384,14 +466,16 @@ def _mark_pending(session, annotation, user):
     return queued
 
 
-def dispatch_annotation_sync(payload_annotations, book, user) -> None:
+def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_id=None) -> None:
     """For each annotation in the PATCH payload, persist locally then push to each enabled handler."""
     from cps import ub
     if not payload_annotations:
         return
     jobs = []
     for payload in payload_annotations:
-        ann = _upsert_annotation(ub.session, payload, book, user)
+        ann = _upsert_annotation(
+            ub.session, payload, book, user, origin_device_id=origin_device_id,
+        )
         if ann is None:
             continue
         if _background_enqueue() is not None:

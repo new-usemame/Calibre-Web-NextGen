@@ -1,0 +1,17 @@
+{
+  "area": "spa-reader",
+  "body": "`frontend/e2e/reader-notes.spec.ts:171` — *\"reader notes (#325) › a note can be\nwritten, survives a reload, is editable and removable\"*, `[mobile]` project —\nfails intermittently at line 199:\n\n    Error: the noted highlight is repainted after a reload\n    expect(received).toBe(expected)   Expected: 1   Received: 0\n\nLanded today (`17c6ae125`, #1508, 11:28) with the notes feature.\n\nWHY THIS IS A FLAKE AND NOT A REGRESSION — established by control, not inference:\n\n  #1506 (ui/target-size-sc258) E2E at 15:46  -> PASS\n  #1507 (ui/help-banner-theming) E2E 15:51   -> FAIL (3 retries, all fail)\n  #1505 (ui/book-card-action-row) E2E 15:54  -> PASS\n  #1507 re-run, same head, 16:05             -> FAIL again\n  #1506 RE-RUN, HEAD UNCHANGED, 16:14        -> FAIL   <- the control\n\nThe same commit that passed at 15:46 fails at 16:14 with nothing changed. That\nis the whole argument: a re-run on an unchanged head is what separates \"this\nbranch broke it\" from \"this test is unreliable\", and it inverted the conclusion.\nBefore that control the evidence looked damning for #1507 — two of three\nbranches on the same base passed, so the odd one out appeared responsible.\n\nNone of the three branches can reach the reader. #1506 touches TopBar/Account/\nEditBook CSS; #1507 touches HelpBanner + tokens. The reader route is rendered\n**outside the app shell** (`App.tsx:144`, \"Full-screen reader — outside the app\nshell (no sidebar/topbar)\"), so `AnnouncementBanner` never mounts there, and\n`--cwng-banner-h` exists only in `cps/templates/layout.html` — the classic UI,\nnot the SPA.\n\nThe three in-run retries are NOT independent evidence: they execute in the same\njob on the same runner, so a resource-dependent failure takes all three and\nlooks like a hard reproduction. Only a fresh run on an unchanged head is a\ncontrol.\n\nNote the failure is on `[mobile]` only and takes ~21s each attempt, i.e. it is\nwaiting for something that never arrives rather than asserting a wrong value —\n`pageUntilNotedPainted` never finds the repainted mark. Ordering/timing between\nthe reload and the annotation fetch is the place to look.\n\nOwner: the reader work (CWNG READER) shipped this feature and test today.\nSecond known flake alongside F-8b3e17 (test_1094 TestConversionDeadline) and\n`sp2-display-options.spec.ts:61` \"Customize panel can restore hidden Table\nview\", which showed the same profile earlier today.",
+  "created": "2026-08-10",
+  "id": "F-943f51",
+  "refs": [],
+  "resolution": {
+    "commit": "d239befa3",
+    "date": "2026-08-10",
+    "note": "Root-caused and fixed by CWNG READER in #1509 (d239befa3), two causes: a fixed 5s sleep after page.reload() replaced with a condition-based wait on the same budget as the first open, and a stride partition (i % SPEC_SLOTS === offset) that selected nothing for higher offsets when only 3 EPUBs clear the size floor — replaced with rotation. Residual, not claimed closed: fullyParallel spreads 6 spec-project combos over 3 books, so two specs can still share one and clear each other's fixtures; the tell is a note read back with another run's timestamp.",
+    "release": ""
+  },
+  "severity": "test",
+  "source": "audit",
+  "status": "resolved",
+  "title": "reader-notes repaint-after-reload is flaky and reds unrelated PRs"
+}

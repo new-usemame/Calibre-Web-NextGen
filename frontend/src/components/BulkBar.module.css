@@ -15,6 +15,7 @@
   box-shadow: var(--elev-3);
   animation: rise var(--dur-base) var(--ease-out) both;
 }
+.sticky { position: sticky; left: auto; top: 0; bottom: auto; transform: none; width: 100%; max-width: none; z-index: 8; animation: none; border-radius: var(--r-md); }
 
 @keyframes rise {
   from { opacity: 0; transform: translate(-50%, 12px); }

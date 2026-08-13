@@ -1996,9 +1996,9 @@ msgstr "Libros descargados"
 msgid "The latest Books"
 msgstr "Últimos libros"
 
-#: cps/opds.py
-msgid "Random Books"
-msgstr "Libros ao chou"
+#: cps/opds.py cps/render_template.py cps/spa_strings.py
+msgid "Discover"
+msgstr "Descubrir"
 
 #: cps/opds.py cps/render_template.py cps/templates/user_table.html
 msgid "Show Random Books"
@@ -2173,10 +2173,6 @@ msgstr "Mostrar lidos e non lidos"
 #: cps/render_template.py
 msgid "Show unread"
 msgstr "Mostrar non lidos"
-
-#: cps/render_template.py cps/spa_strings.py
-msgid "Discover"
-msgstr "Descubrir"
 
 #: cps/render_template.py cps/templates/user_table.html
 #, fuzzy
@@ -3765,7 +3761,15 @@ msgid "≥"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "(no text captured)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(replace cover)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "1 selected."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -3784,6 +3788,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "A few random picks from your library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "A note about the book, not tied to a passage"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -3811,6 +3819,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Add identifier"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add note"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
@@ -3888,6 +3900,19 @@ msgid "Ask in Discord"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Assign selected to device"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Assign to device"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Assigned to {name}."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Authentication"
 msgstr ""
 
@@ -3935,12 +3960,20 @@ msgstr ""
 msgid "Basic configuration"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Black"
+msgstr "Negro"
+
 #: cps/spa_strings.py
 msgid "Book default"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Book density"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book order"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -3960,10 +3993,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Bulk actions"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4111,6 +4140,10 @@ msgid "Copy link"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not assign."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not create shelf."
 msgstr ""
 
@@ -4135,7 +4168,11 @@ msgid "Could not load duplicates."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Could not load highlights."
+msgid "Could not load e-readers."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load highlights and notes."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4152,6 +4189,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load users."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not open that highlight."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not open that search result."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4179,6 +4224,10 @@ msgid "Could not save reader settings."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not save that note."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save the default library filter."
 msgstr ""
 
@@ -4192,6 +4241,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4354,6 +4407,10 @@ msgid "Delete {name}"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Deleted device"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Deleted tag {name}"
 msgstr ""
@@ -4371,6 +4428,31 @@ msgstr ""
 #: cps/templates/cwa_settings.html cps/templates/search_form.html
 msgid "Description"
 msgstr "Descrición"
+
+#: cps/spa_strings.py
+msgid "Device"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Device name"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Device renamed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Device restored."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Device: {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Devices appear here after their first sync."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Disable standard password login"
@@ -4433,6 +4515,10 @@ msgid "E-reader preview"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "E-readers"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
 msgstr ""
 
@@ -4451,6 +4537,10 @@ msgstr ""
 #: cps/templates/user_table.html
 msgid "Edit"
 msgstr "Editar"
+
+#: cps/spa_strings.py
+msgid "Edit note"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit public shelves"
@@ -4499,7 +4589,19 @@ msgid "Encryption"
 msgstr "Cifraxe"
 
 #: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Exit full screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Expires in"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Export"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4545,6 +4647,10 @@ msgid "Fill style"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Filter by device"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Filter {items}"
 msgstr ""
@@ -4587,6 +4693,10 @@ msgid "From address"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Full screen"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Full user table & restrictions"
 msgstr ""
 
@@ -4599,12 +4709,20 @@ msgid "Give your smart shelf a name."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Go to this highlight"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Go to your library"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Gradient — palette-matched top/bottom blend"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Group by"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4664,7 +4782,15 @@ msgid "Highlight"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Highlight saved"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Highlights and notes"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4696,6 +4822,14 @@ msgstr "Identificadores"
 msgid "Image from {source}"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/annotations_import.html
+msgid "Import"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Import and export"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
 msgstr ""
@@ -4718,6 +4852,10 @@ msgstr ""
 msgid "It may have moved, or it might still live in the classic interface."
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "KOReader"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr ""
@@ -4731,11 +4869,19 @@ msgid "Key path"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Kobo"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Kobo Clara HD / 2E / BW / Colour (1072×1448)"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Kobo Libra Color / Libra 2 (1264×1680)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Kobo setup"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4753,6 +4899,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last modified"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Last seen {when}"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
@@ -4838,7 +4989,15 @@ msgid "Manage admin role from OAuth group"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Manage e-readers"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Manage shelves"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Manage your Kobo sync URL in the classic account page."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
@@ -4891,6 +5050,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Minimum rating"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {name}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4982,12 +5146,19 @@ msgid "No duplicate groups found."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No e-readers yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No excluded tags"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"No highlights yet. Highlight while reading, or import from a Kobo device."
+msgid "No highlights yet. Select text in the book to make one."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No matches found in this book."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5021,11 +5192,41 @@ msgid "No {items} yet."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Not assigned"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Not configured"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Not in current file"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Not seen lately"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Not set"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Note"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Note removed"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Note saved"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Nothing here yet. Highlight or write a note while reading, or import from a "
+"Kobo device."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5040,6 +5241,10 @@ msgstr ""
 msgid ""
 "On another device where you’re already signed in, scan this code or open the "
 "link below to authorise this device."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/read.html
+msgid "One column"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5068,6 +5273,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
+"you can edit it first."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5194,6 +5405,14 @@ msgstr ""
 msgid "Reload"
 msgstr ""
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Reload metadata for \"{title}\" from the file on disk? Any title, author or "
+"series you edited here is replaced by what the file contains. This cannot be "
+"undone."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Reload metadata from disk"
 msgstr ""
@@ -5204,6 +5423,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Remember me"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Remove device"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
@@ -5223,11 +5446,25 @@ msgid "Remove identifier"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Remove note"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Remove rule"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove {name}?"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Rename"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Rename {name}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5251,6 +5488,10 @@ msgid "Report Issue on GitHub"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Report this problem"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Require group membership"
 msgstr ""
 
@@ -5267,7 +5508,18 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Retry"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Reverse-proxy header login"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Revoke the app password \"{label}\"? Any device still using it loses access "
+"immediately, and the password cannot be recovered."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5307,6 +5559,10 @@ msgid "Save name"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Save note"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Save security settings"
 msgstr ""
 
@@ -5331,11 +5587,27 @@ msgid "Scopes"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
@@ -5355,7 +5627,26 @@ msgid "Select"
 msgstr "Seleccionar"
 
 #: cps/spa_strings.py
+msgid "Select all in group"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select all {n}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select highlight: {text}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Select multiple"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Select note: {text}"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
@@ -5424,6 +5715,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Set up Kobo sync"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr ""
 
@@ -5475,6 +5770,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Show password"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5535,6 +5835,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Source details"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
@@ -5614,7 +5918,15 @@ msgid "That URL is not a usable image."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This device will no longer sync."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This format opens in the full-screen reader."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This highlight has no saved position"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5659,6 +5971,10 @@ msgstr ""
 msgid "Trust authentication header"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Two columns"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "UI / display configuration"
 msgstr ""
@@ -5668,7 +5984,19 @@ msgid "Unarchive"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Undo"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Unhide"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unknown device"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unknown source"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5755,12 +6083,35 @@ msgstr ""
 msgid "Waiting for you to authorise…"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Warning: this highlight can’t be shown in the book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Web reader"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "When locked, fetching metadata will not overwrite this cover."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add ?"
+"local=1 to the login URL to reach the password form, which keeps working as "
+"long as standard password login is left enabled."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Write a note"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Write a note…"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5831,6 +6182,10 @@ msgid "type (isbn, amazon, doi…)"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "unknown"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "value"
 msgstr ""
 
@@ -5870,6 +6225,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{count} matches"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{count} result"
 msgstr ""
 
@@ -5885,12 +6245,60 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{done} of {total}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{field} (comma separated)"
 msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{name} removed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name}, {n} highlights and notes"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} assigned to {name}."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} found"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} highlights and notes"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes assigned to this device will become Unknown device."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes were made on this device. They are not deleted. "
+"Their origin history is kept."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{ok} of {total} assigned to {name}."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7001,10 +7409,6 @@ msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "KoboReader.sqlite"
-msgstr ""
-
-#: cps/templates/annotations_import.html
-msgid "Import"
 msgstr ""
 
 #: cps/templates/annotations_import.html
@@ -8377,6 +8781,18 @@ msgstr ""
 msgid ""
 "Hides the standard login form. Users must log in via OAuth or LDAP. Ensure "
 "you have a working alternative login method before enabling."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Automatically forward to the only OAuth provider"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"When enabled and exactly one OAuth provider is active, visiting the login "
+"page starts it automatically. Add ?local=1 to the login URL to open the "
+"normal login page instead. That page still accepts a username and password "
+"only while the setting above is left off."
 msgstr ""
 
 #: cps/templates/config_edit.html
@@ -10478,6 +10894,12 @@ msgstr ""
 "administrador"
 
 #: cps/templates/http_error.html
+msgid ""
+"Report this — the details are filled in for you, and nothing is sent until "
+"you post it:"
+msgstr ""
+
+#: cps/templates/http_error.html
 msgid "Create Issue"
 msgstr "Crear una incidencia"
 
@@ -10940,10 +11362,6 @@ msgid "Open annotations page"
 msgstr ""
 
 #: cps/templates/read.html
-msgid "Black"
-msgstr "Negro"
-
-#: cps/templates/read.html
 msgid "Font Sizes"
 msgstr ""
 
@@ -10985,22 +11403,8 @@ msgid "Spread"
 msgstr "Lido"
 
 #: cps/templates/read.html
-#, fuzzy
-msgid "Two columns"
-msgstr "Columna de lectura non válida"
-
-#: cps/templates/read.html
-#, fuzzy
-msgid "One column"
-msgstr "Columna de lectura non válida"
-
-#: cps/templates/read.html
 msgid "Reflow text when sidebars are open."
 msgstr "Refluxo do texto cando as barras laterais están abertas."
-
-#: cps/templates/read.html
-msgid "Note"
-msgstr ""
 
 #: cps/templates/read.html
 msgid "Add a note (optional)"
@@ -12024,6 +12428,9 @@ msgstr "sincronizar andeis seleccionados con Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Mostrar selección lidos/non lidos"
+
+#~ msgid "Random Books"
+#~ msgstr "Libros ao chou"
 
 #, fuzzy
 #~ msgid "Enable Hardcover Auto-Fetch"

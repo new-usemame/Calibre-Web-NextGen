@@ -1,0 +1,17 @@
+{
+  "area": "autopilot",
+  "body": "On 2026-08-10 a sweep in the shared `repo/` checkout walked ~12 open PR branches in one\npattern -- checkout, merge main, commit, back to main, `pull --ff-only`, next -- and was\nkilled part-way through when the Mac rebooted at ~14:42Z.\n\n**The deterministic floor does not do this.** `finish-armed-automerges.sh` refreshes a BEHIND\nbranch server-side via `gh api -X PUT repos/<repo>/pulls/<N>/update-branch`; it never checks\nout a branch locally. No other script under `scripts/` performs a checkout+merge sweep over\nopen PRs (`draft-cherry-pick.sh` checks out, but only for a single upstream cherry-pick).\nThe commit messages are also hand-written prose -- e.g. `a83785086` \"Merge main; collapse the\nduplicate Fixed heading under [Unreleased]\" -- where the floor writes templated ledger rows.\nSo the actor was phase-7 (`claude -p /CWNG-tick`), improvising branch maintenance, inside the\ntick's 22-minute life before the reboot.\n\nTwo distinct harms, both observed:\n\n1. **HEAD moves under concurrent sessions.** `repo/` is shared with interactive sessions.\n   Two of them had HEAD change mid-command while reading or testing. The tick's own section 0\n   exists to re-park a stray branch, which shows the design assumes `repo/` sits on the base --\n   phase-7 checking out feature branches violates the invariant the floor then repairs.\n\n2. **A half-applied sweep leaves branches carrying a stale resolution.** The sweep resolved the\n   same CHANGELOG conflict on each branch it touched. It died mid-run, so some branches carry a\n   resolution and some do not, and all of them predate the canonical fix that later landed\n   (#1532). Merging any of them now silently re-creates the defect: `git merge-tree --write-tree`\n   shows #1506, #1507 and #1515 all merging CLEAN with the entry duplicated, because two\n   convergent edits produce no conflict. `test_no_section_repeats_a_kind_heading` does not catch\n   it -- the headings are correct; the duplication is in the body.\n\nAttribution caveat: every session authenticates as `new-usemame`, so neither git nor the API\ncan name the writer. \"Not the deterministic floor\" is proven from the code; \"therefore phase-7\"\nrests on the timing window and the prose commit messages.\n\nSuggested direction (not implemented): phase-7 should never check out a branch in `repo/`.\nGive it a dedicated worktree, or push it toward the server-side `update-branch` the floor\nalready uses. A sweep that mutates N branches should also be resumable or transactional, so a\nkill leaves none half-done rather than some.\n\nDetection worth keeping regardless: before merging anything into a file two actors have\ntouched, simulate it --\n\n    T=$(git merge-tree --write-tree origin/main origin/<branch> | head -1)\n    git show \"$T:CHANGELOG.md\" | grep -c '<entry text>'   # expect 1\n\n-- which inspects the merge result without performing it, and is the only instrument that sees\nthis class coming rather than afterwards.",
+  "created": "2026-08-10",
+  "id": "F-0b6d6c",
+  "refs": [
+    "#1530",
+    "#1532",
+    "#1506",
+    "#1507",
+    "#1515"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Phase-7 mutates other sessions' branches in the shared repo/ checkout"
+}

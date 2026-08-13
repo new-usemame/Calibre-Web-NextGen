@@ -28,7 +28,7 @@ from sqlalchemy import exc
 _VALID_SOURCES = {"kobo", "webreader", "koreader"}
 
 
-def validate_portable_payload(payload) -> Optional[str]:
+def validate_portable_payload(payload, *, book_uuid=None) -> Optional[str]:
     """Return a validation error for fields that would make an upsert unsafe."""
     if not isinstance(payload, dict):
         return None  # non-object entries are deliberately counted as skipped
@@ -48,6 +48,12 @@ def validate_portable_payload(payload) -> Optional[str]:
             return f"{field} must be an integer or null"
     if "hidden" in payload and not isinstance(payload.get("hidden"), bool):
         return "hidden must be a boolean"
+    if "content_id" in payload and payload.get("content_id") is not None:
+        from .annotation_content_id import ContentIdError, normalize_content_id
+        try:
+            normalize_content_id(payload.get("content_id"), book_uuid=book_uuid)
+        except ContentIdError as error:
+            return f"content_id: {error}"
     return None
 
 
@@ -80,7 +86,8 @@ def to_portable(row) -> dict:
     }
 
 
-def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional[object], str]:
+def apply_portable(payload, *, user_id, book, session, commit,
+                   origin_device_id=None) -> Tuple[Optional[object], str]:
     """Upsert an Annotation from a device-pushed portable dict.
 
     Find-or-create keyed on ``(user_id, book_id, annotation_id)``. New rows take the
@@ -114,7 +121,7 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
             source = "koreader"
         row = ub.Annotation(
             user_id=user_id, annotation_id=annotation_id,
-            book_id=book.id, source=source,
+            book_id=book.id, source=source, origin_device_id=origin_device_id,
         )
         session.add(row)
         created = True
@@ -142,7 +149,10 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
     if "color" in payload:
         row.highlight_color = payload.get("color")
     if payload.get("content_id"):
-        row.content_id = payload.get("content_id")
+        from .annotation_content_id import normalize_content_id
+        row.content_id = normalize_content_id(
+            payload.get("content_id"), book_uuid=getattr(book, "uuid", None),
+        )
     if payload.get("context_string"):
         row.context_string = payload.get("context_string")
     if payload.get("chapter_progress") is not None:
@@ -207,5 +217,6 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
             raise
         return apply_portable(
             payload, user_id=user_id, book=book, session=session, commit=commit,
+            origin_device_id=origin_device_id,
         )
     return row, action

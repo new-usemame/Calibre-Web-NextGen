@@ -1,0 +1,11 @@
+{
+  "area": "spa-bookcover",
+  "body": "`BookCover` has a proper designed fallback — `.fallbackTitle` (4-line clamp),\n`.fallbackAuthor` (ellipsised) and `.fallbackMark` (the NEXTGEN wordmark in\n`--accent-text`) in `BookCover.module.css`. It renders correctly for books with\n**no cover recorded**: verified live, those cards show a tidy title/author/mark\nblock.\n\nIt does NOT cover the other missing-cover case. When a cover IS recorded but the\nimage request **fails** (file moved or deleted on disk, proxy error, slow or\ndropped network), the `<img>` simply breaks and the browser paints its own\nbroken-image glyph plus the raw `alt` string as unstyled text in the corner of an\nempty box:\n\n    [broken icon] The Importance of Being Earnest: A Trivial Comedy for Serious People\n    [broken icon] Crime and Punishment\n    [broken icon] Frankenstein; or, the modern prometheus\n\nReproduced by aborting `**/cover/**` with Playwright route interception at 1440px\nand 390px, dark theme. Both widths, catalog grid and the Discover rail. The\ndesigned fallback and the broken-image state appear side by side in the same\ngrid, which is what makes it obvious: the right-hand cards render the intended\nNEXTGEN fallback while the intercepted ones render browser chrome.\n\nSo the gap is the `onError` path on the `<img>`, not the fallback itself — the\ncomponent already knows how to draw this, it just doesn't switch to it when a\nload fails rather than being absent. Worth checking whether the same applies to\nthe reader and to `MoreByAuthor`, which reuse the cover component.\n\nNote the real-world case is the unstyled one: a cover recorded in `metadata.db`\nwhose file is missing is a routine outcome of moving a library, and it is more\ncommon than a book with no cover at all.\n\nMethod + full inventory: `notes/UI-SWEEP-INVENTORY.md` (outer workspace).",
+  "created": "2026-08-09",
+  "id": "F-8f8a5b",
+  "refs": [],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "A cover that fails to load shows browser alt text, not the designed fallback"
+}

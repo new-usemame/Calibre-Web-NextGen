@@ -122,7 +122,7 @@ def test_app_paths_module_exists_and_is_importable_without_cps():
         "sys.meta_path.insert(0, Blocker())\n"
         "import app_paths\n"
         "app_paths.app_root(); app_paths.config_dir(); app_paths.app_db_path()\n"
-        "app_paths.dirs_json(); app_paths.empty_library_file('app.db')\n"
+        "app_paths.dirs_json()\n"
         "print('OK')\n"
     )
     result = subprocess.run(
@@ -149,23 +149,11 @@ def test_app_root_resolves_to_this_checkout_not_slash_app(app_paths):
     assert not str(app_paths.app_root()).startswith("/app/")
 
 
-def test_empty_library_seed_files_exist_under_the_resolved_root(app_paths):
-    """The exact file the traceback died on — findable from any checkout path."""
-    seed = app_paths.empty_library_file("app.db")
-    assert seed == REPO_ROOT / "empty_library" / "app.db"
-    assert seed.is_file(), (
-        "auto_library.check_for_app_db() copies this file; #1462 was it "
-        "resolving to /app/... and raising FileNotFoundError"
-    )
-    assert app_paths.empty_library_file("metadata.db").is_file()
-
-
 def test_app_root_honours_cwa_app_root_override(app_paths, monkeypatch, tmp_path):
     """Packagers who relocate the tree get an explicit knob."""
     monkeypatch.setenv("CWA_APP_ROOT", str(tmp_path))
     assert app_paths.app_root() == tmp_path
     assert app_paths.dirs_json() == tmp_path / "dirs.json"
-    assert app_paths.empty_library_file("app.db") == tmp_path / "empty_library" / "app.db"
 
 
 def test_dirs_json_defaults_under_app_root_and_honours_its_override(
@@ -305,7 +293,6 @@ def test_auto_library_reads_the_library_dir_from_dirs_json(
     )
     # app.db must follow CALIBRE_DBPATH too, through the same resolver.
     assert lib.DEFAULT_APPDB_PATH == str(app_paths.app_db_path())
-    assert lib.empty_appdb == str(REPO_ROOT / "empty_library" / "app.db")
 
 
 def test_auto_library_creates_a_missing_library_dir(app_paths, monkeypatch, tmp_path):
@@ -410,12 +397,6 @@ def test_container_layout_resolves_to_exactly_the_old_literals(app_paths, monkey
 
     assert str(app_paths.app_root()) == "/app/calibre-web-automated"
     assert str(app_paths.dirs_json()) == "/app/calibre-web-automated/dirs.json"
-    assert str(app_paths.empty_library_file("app.db")) == (
-        "/app/calibre-web-automated/empty_library/app.db"
-    )
-    assert str(app_paths.empty_library_file("metadata.db")) == (
-        "/app/calibre-web-automated/empty_library/metadata.db"
-    )
     assert str(app_paths.script_path("cover_enforcer.py")) == (
         "/app/calibre-web-automated/scripts/cover_enforcer.py"
     )
@@ -433,7 +414,6 @@ def test_container_layout_resolves_without_the_env_override(app_paths, monkeypat
     monkeypatch.delenv("CWA_APP_ROOT", raising=False)
     app_dir = tmp_path / "app" / "calibre-web-automated"
     (app_dir / "scripts").mkdir(parents=True)
-    (app_dir / "empty_library").mkdir()
     module_copy = app_dir / "scripts" / "app_paths.py"
     module_copy.write_text(
         (SCRIPTS_DIR / "app_paths.py").read_text(encoding="utf-8"), encoding="utf-8"
@@ -445,7 +425,6 @@ def test_container_layout_resolves_without_the_env_override(app_paths, monkeypat
 
     assert relocated.app_root() == app_dir
     assert relocated.dirs_json() == app_dir / "dirs.json"
-    assert relocated.empty_library_file("app.db") == app_dir / "empty_library" / "app.db"
 
 
 def test_sys_path_bootstrap_points_at_the_resolved_root(app_paths, monkeypatch):

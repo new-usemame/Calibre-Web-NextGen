@@ -31,6 +31,11 @@
 
 .cardTitle svg { color: var(--accent); }
 
+.deviceSummary { margin: 0 0 var(--sp-3); padding-left: var(--sp-5); color: var(--text-muted); }
+.deviceSummary li + li { margin-top: var(--sp-1); }
+.muted { margin: 0 0 var(--sp-3); color: var(--text-muted); }
+.manageDevices { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: var(--fw-medium); }
+
 /* Identity */
 .identity {
   display: flex;
@@ -116,6 +121,7 @@
 .toggle {
   display: flex;
   align-items: center;
+  min-height: 24px;
   gap: var(--sp-2);
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -158,7 +164,10 @@
   border: 1px solid var(--border); border-radius: var(--r-md);
 }
 .appPwName { font-size: var(--fs-sm); color: var(--text); }
-.revokeBtn { color: var(--text-muted); padding: var(--sp-1); }
+.revokeBtn {
+  position: relative; color: var(--text-muted); padding: var(--sp-1);
+}
+.revokeBtn::before { content: ''; position: absolute; inset: -1px; }
 .revokeBtn:hover:not(:disabled) { color: var(--danger); }
 
 .appPwForm { display: flex; gap: var(--sp-2); align-items: stretch; }

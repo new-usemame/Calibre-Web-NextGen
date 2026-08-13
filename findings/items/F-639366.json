@@ -1,0 +1,11 @@
+{
+  "area": "outreach",
+  "body": "`scripts/post-release-outreach.sh` skip checks include \"No `new-usemame` comment already on the\nthread (defense-in-depth dupe check)\". Correct for its purpose -- it stops us announcing the same\nfix twice -- but it has an unintended consequence:\n\n**A thread we have already commented on can never receive a correction through the normal path.**\nAnd a thread where our advice was wrong is, by construction, a thread we already commented on. So\nthe guard is guaranteed to block exactly the case that most needs a follow-up.\n\nLive instance, verified 2026-08-12: `janeczku/calibre-web#2610` (\"Annotations on Kobo ebook\ndisappear after syncing with Kobo\") is OPEN, and its `updatedAt` equals our own 2026-05-19 comment\n-- we have the last word. That comment tells users to import from `KoboReader.sqlite`, which cannot\nwork for anyone on that thread, because the complaint is that Nickel deleted those rows. The advice\nanswers a different question from the one asked and has stood for ~3 months.\n\nNot a code defect; a policy gap in an automated gate. Options: (a) leave corrections fully manual\nand operator-driven, (b) add an explicit operator-approved correction exception that bypasses the\ndupe check for a named thread. Either is defensible; what is not defensible is the current state,\nwhere nobody notices the gap exists because the guard silently skips the thread rather than\nreporting that it had something to say.\n\nProposal + verified evidence + a draft body:\n`notes/PROPOSED-CORRECTION-cw-2610-awaiting-operator.md` (deliberately NOT in\n`drafts/outreach/janeczku/`, which the poster globs and would treat as a posting candidate).",
+  "created": "2026-08-13",
+  "id": "F-639366",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "The outreach dupe-guard makes self-correction impossible on any thread we got wrong"
+}

@@ -1,0 +1,13 @@
+{
+  "area": "ci",
+  "body": "Observed on #1546 (adds `wikisite` to `.dockerignore`): `Detect changed paths` ran, and\n`Integration Tests (Docker)` came back SKIPPED.\n\nA `.dockerignore` edit is close to the only change that is *always* build-affecting — it\ndecides what reaches the build context, and `Dockerfile:366` is a blanket\n`COPY --chown=abc:abc . /app/calibre-web-automated/`. An over-broad line there removes a\npath the image needs, and no PR check would catch it. The failure would first appear on\nthe `:dev` build after merge, which is after the point where a PR check is useful.\n\nSame argument applies to the neighbours: verify whether `Dockerfile`, `.dockerignore` and\nthe compose files are all classified as docker-lane triggers, not just `Dockerfile`.\n\n#1546 itself is safe — verified by inspection that nothing outside `wikisite/` references\nthe path, and it is the consistent sibling of `cwa-wiki`, `wiki_images` and `wiki-src`,\nwhich are already ignored. The finding is about the lane that should have proven it and\ndid not run.",
+  "created": "2026-08-12",
+  "id": "F-409038",
+  "refs": [
+    "https://github.com/new-usemame/Calibre-Web-NextGen/pull/1546"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "The CI path filter treats .dockerignore as non-build-affecting, so the Docker lane skips the one file that always is"
+}

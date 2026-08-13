@@ -5792,6 +5792,10 @@ msgstr ""
 msgid "Source details"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Started reading"
 msgstr ""
@@ -6048,6 +6052,13 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add ?"
+"local=1 to the login URL to reach the password form, which keeps working as "
+"long as standard password login is left enabled."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8672,6 +8683,18 @@ msgstr ""
 msgid ""
 "Hides the standard login form. Users must log in via OAuth or LDAP. Ensure "
 "you have a working alternative login method before enabling."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Automatically forward to the only OAuth provider"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"When enabled and exactly one OAuth provider is active, visiting the login "
+"page starts it automatically. Add ?local=1 to the login URL to open the "
+"normal login page instead. That page still accepts a username and password "
+"only while the setting above is left off."
 msgstr ""
 
 #: cps/templates/config_edit.html

@@ -1,0 +1,15 @@
+{
+  "area": "autopilot",
+  "body": "`scripts/gen-followup-board.sh` makes exactly one data call:\n\n    gh issue list --repo \"$REPO\" --state open --limit 300 --json ...\n\n`gh issue list` does not return pull requests. So every section the board\ncomputes — `never_acked`, `owe_reply`, `breaches` — is derived from issues\nonly, and a contributor waiting on a **PR** cannot appear in any of them.\n\nThe board is the mechanism the tick trusts to answer \"is a person waiting?\",\nand `state/next-pick.json` inherits the same blindness because it is\nboard-backed. A tick that clears every board row can still leave several\npeople waiting and will report zero obligations while doing it.\n\n## Measured 2026-08-13\n\nBoard generated 12:55:07Z reported `never_acked=0 owe_reply=0 breaches=0`.\nAt that moment three community PRs had a person waiting on us:\n\n* **#1442** — @chloeroform asked to merge on 08-12T23:21Z and again on\n  08-13T06:40Z; @Thovi98 asked a direct question at 09:43Z. Unanswered at\n  board time. The underlying rule-6 hold had been open since 08-08 (5 days).\n* **#1482** — waiting on our side since 06:49Z, CI green.\n* **#1503** — @siuwai1999's `safe-tier-1` translation PR, green and\n  `community-reviewed`, idle 4 days with no one looking at it.\n\nAll three were found only by hand-listing open PRs, off-board.\n\n## Why it matters more than the issue side\n\nAn issue with no reply is visible in the tracker and the reporter can bump it.\nA PR that is green and merely unattended looks *fine* from outside — the\ncontributor sees a passing build and assumes it is queued, so they wait longer\nbefore asking. #1442 took three asks across five days.\n\n## Fix\n\nExtend the board to a second `gh pr list` call and fold PRs into the same\nsections, keyed on the same \"last comment is not ours\" predicate already used\nfor issues. A PR needs one extra state the issue path does not have: green +\nmergeable + no maintainer action since the contributor's last push is itself\nan owed action, even when nobody has commented.\n\nRelated: the rule-6 hold on #1442 was recorded in `notes/dep-review-1442.md`\nand restated on the thread but never delivered to the operator (no ntfy since\n2026-07-19), which is a separate defect in the same family — a hold with no\ndelivery step and no expiry.",
+  "created": "2026-08-13",
+  "id": "F-8d8c15",
+  "refs": [
+    "#1442",
+    "#1482",
+    "#1503"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Follow-up board is blind to PRs, so a waiting contributor is invisible to it"
+}

@@ -1,0 +1,11 @@
+{
+  "area": "triage",
+  "body": "`owe_reply` applies a 48-hour grace before a thread counts as owed, which is\nright for an ordinary comment and wrong for an escalation.\n\nObserved 2026-08-13 on PR #1442. At 17:13Z @chloeroform wrote \"Could a human\nplease step in and take over here? This is getting ridiculous.\" The board\ngenerated at 18:11Z reported `owe_reply=0`, `never_acked=0`, breaches 0 — a\ncorrect application of the grace, since the comment was under an hour old. A\ntick that trusted the zeros would have left that sitting for two days.\n\nThe board reads recency and authorship. It has no notion of a comment that is\n*asking to be escalated*, so the one signal that should bypass the grace is the\none it cannot see. The grace exists to stop us pestering people mid-conversation;\nsomeone asking for a human is the opposite situation.\n\nThis is the third distinct way the board has under-reported a waiting person:\nPRs were invisible entirely, F-222645 covered the red-PR half, and now an\nescalation inside the grace window. The pattern is that the board models\n*elapsed time since our last comment* and not *what was said*.\n\nSuggested shape: a phrase/intent check over comments newer than the grace, which\npromotes a thread to `owe_reply` (or a distinct `escalated` section) regardless\nof age. Keep it narrow — a request for a human, a statement that the thread is\nstuck, an explicit complaint about response time — so it does not become a\nsentiment classifier firing on ordinary frustration with the bug itself.\n\nCost of not fixing it: escalations are exactly the threads where latency is most\nexpensive, and the grace guarantees we are at worst 48h late on every one.",
+  "created": "2026-08-13",
+  "id": "F-08240d",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "The follow-up board's 48h grace hides an explicit request for a human"
+}

@@ -412,7 +412,7 @@ Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input w
 To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
 
 ```
-docker exec -e HOME=/config calibre-web /app/calibre/calibre-customize -a "/config/.config/calibre/plugins/<plugin file>.zip"
+docker exec -e HOME=/config calibre-web /opt/calibre/calibre-customize -a "/config/.config/calibre/plugins/<plugin file>.zip"
 ```
 
 The feature is off by default because it runs third-party plugin code inside your container — only install plugins you trust, from their official release pages. Which plugins are appropriate to use is your call.
@@ -643,34 +643,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `████████████████████` 99% | 2719/2735 | 0 |
-| Spanish (`es`) | `███████████████████░` 97% | 2641/2735 | 0 |
-| Polish (`pl`) | `███████████████████░` 95% | 2605/2735 | 0 |
-| French (`fr`) | `█████████████████░░░` 84% | 2291/2735 | 127 |
-| German (`de`) | `███████████████░░░░░` 76% | 2071/2735 | 62 |
-| Dutch (`nl`) | `█████████████░░░░░░░` 67% | 1827/2735 | 292 |
-| Hungarian (`hu`) | `████████████░░░░░░░░` 60% | 1646/2735 | 121 |
-| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 52% | 1408/2735 | 310 |
-| Japanese (`ja`) | `██████████░░░░░░░░░░` 48% | 1320/2735 | 247 |
-| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 44% | 1214/2735 | 318 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `█████████░░░░░░░░░░░` 43% | 1176/2735 | 348 |
-| Italian (`it`) | `███████░░░░░░░░░░░░░` 35% | 957/2735 | 269 |
-| Korean (`ko`) | `███████░░░░░░░░░░░░░` 35% | 948/2735 | 269 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `███████░░░░░░░░░░░░░` 34% | 918/2735 | 249 |
-| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 29% | 790/2735 | 286 |
-| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 27% | 749/2735 | 313 |
-| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 26% | 701/2735 | 360 |
-| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 25% | 677/2735 | 361 |
-| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 25% | 678/2735 | 362 |
-| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 21% | 584/2735 | 388 |
-| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 506/2735 | 399 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 477/2735 | 408 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2735 | 372 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 16% | 431/2735 | 435 |
-| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2735 | 357 |
-| Finnish (`fi`) | `███░░░░░░░░░░░░░░░░░` 13% | 354/2735 | 388 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 11% | 289/2735 | 385 |
-| Khmer (`km`) | `██░░░░░░░░░░░░░░░░░░` 8% | 207/2735 | 343 |
+| Russian (`ru`) | `████████████████████` 99% | 2719/2739 | 0 |
+| Spanish (`es`) | `███████████████████░` 96% | 2641/2739 | 0 |
+| Polish (`pl`) | `███████████████████░` 95% | 2605/2739 | 0 |
+| French (`fr`) | `█████████████████░░░` 84% | 2293/2739 | 127 |
+| German (`de`) | `███████████████░░░░░` 76% | 2071/2739 | 62 |
+| Dutch (`nl`) | `█████████████░░░░░░░` 67% | 1837/2739 | 292 |
+| Hungarian (`hu`) | `████████████░░░░░░░░` 60% | 1646/2739 | 121 |
+| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 51% | 1408/2739 | 310 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████░░░░░░░░░░` 50% | 1383/2739 | 182 |
+| Japanese (`ja`) | `██████████░░░░░░░░░░` 48% | 1320/2739 | 247 |
+| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 44% | 1214/2739 | 318 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `█████████░░░░░░░░░░░` 43% | 1176/2739 | 348 |
+| Italian (`it`) | `███████░░░░░░░░░░░░░` 35% | 957/2739 | 269 |
+| Korean (`ko`) | `███████░░░░░░░░░░░░░` 35% | 948/2739 | 269 |
+| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 29% | 790/2739 | 286 |
+| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 27% | 749/2739 | 313 |
+| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 26% | 701/2739 | 360 |
+| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 25% | 678/2739 | 362 |
+| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 25% | 677/2739 | 361 |
+| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 21% | 584/2739 | 388 |
+| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 506/2739 | 399 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 477/2739 | 408 |
+| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2739 | 372 |
+| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 16% | 431/2739 | 435 |
+| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2739 | 357 |
+| Finnish (`fi`) | `███░░░░░░░░░░░░░░░░░` 13% | 354/2739 | 388 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 11% | 289/2739 | 385 |
+| Khmer (`km`) | `██░░░░░░░░░░░░░░░░░░` 8% | 207/2739 | 343 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

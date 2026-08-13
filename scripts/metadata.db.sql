@@ -167,23 +167,8 @@ CREATE TABLE annotations ( id INTEGER PRIMARY KEY,
     searchable_text TEXT NOT NULL DEFAULT "",
     UNIQUE(book, user_type, user, format, annot_type, annot_id)
 );
-PRAGMA writable_schema=ON;
-INSERT INTO sqlite_schema(type,name,tbl_name,rootpage,sql)VALUES('table','annotations_fts','annotations_fts',0,'CREATE VIRTUAL TABLE annotations_fts USING fts5(searchable_text, content = ''annotations'', content_rowid = ''id'', tokenize = ''unicode61 remove_diacritics 2'')');
-CREATE TABLE IF NOT EXISTS 'annotations_fts_data'(id INTEGER PRIMARY KEY, block BLOB);
-INSERT INTO annotations_fts_data VALUES(1,X'');
-INSERT INTO annotations_fts_data VALUES(10,X'00000000000000');
-CREATE TABLE IF NOT EXISTS 'annotations_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS 'annotations_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
-CREATE TABLE IF NOT EXISTS 'annotations_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID;
-INSERT INTO annotations_fts_config VALUES('version',4);
-INSERT INTO sqlite_schema(type,name,tbl_name,rootpage,sql)VALUES('table','annotations_fts_stemmed','annotations_fts_stemmed',0,'CREATE VIRTUAL TABLE annotations_fts_stemmed USING fts5(searchable_text, content = ''annotations'', content_rowid = ''id'', tokenize = ''porter unicode61 remove_diacritics 2'')');
-CREATE TABLE IF NOT EXISTS 'annotations_fts_stemmed_data'(id INTEGER PRIMARY KEY, block BLOB);
-INSERT INTO annotations_fts_stemmed_data VALUES(1,X'');
-INSERT INTO annotations_fts_stemmed_data VALUES(10,X'00000000000000');
-CREATE TABLE IF NOT EXISTS 'annotations_fts_stemmed_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS 'annotations_fts_stemmed_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
-CREATE TABLE IF NOT EXISTS 'annotations_fts_stemmed_config'(k PRIMARY KEY, v) WITHOUT ROWID;
-INSERT INTO annotations_fts_stemmed_config VALUES('version',4);
+CREATE VIRTUAL TABLE annotations_fts USING fts5(searchable_text, content = 'annotations', content_rowid = 'id', tokenize = 'unicode61 remove_diacritics 2');
+CREATE VIRTUAL TABLE annotations_fts_stemmed USING fts5(searchable_text, content = 'annotations', content_rowid = 'id', tokenize = 'porter unicode61 remove_diacritics 2');
 DELETE FROM sqlite_sequence;
 INSERT INTO sqlite_sequence VALUES('books',1);
 CREATE TRIGGER annotations_fts_insert_trg AFTER INSERT ON annotations 
@@ -657,5 +642,4 @@ CREATE TRIGGER series_update_trg
         BEGIN
           UPDATE series SET sort=title_sort(NEW.name) WHERE id=NEW.id;
         END;
-PRAGMA writable_schema=OFF;
 COMMIT;

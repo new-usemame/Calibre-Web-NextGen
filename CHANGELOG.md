@@ -17,6 +17,17 @@ is for things you can see or feel when running the app.
 ## [Unreleased]
 
 ### Fixed
+- **Errors explain themselves again instead of turning into a blank 500.** Some
+  failures replaced their own explanation with `TypeError: '>' not supported
+  between instances of ... and 'int'` and took down the page that was handling
+  them. Uploading a book with an unwritable ingest folder was the clearest case:
+  the app already had the right sentence ready — "Ingest folder is not writable.
+  Check your /cwa-book-ingest volume permissions." — but the crash happened while
+  writing the log line, so nobody ever saw it and the upload returned a 500. The
+  same fault sat on the "reload metadata from disk" failure path and on ingest
+  folder creation. Reported by
+  [@Thovi98](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1556)
+  ([#1556](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1556)).
 - **"No results" no longer covers for a metadata source that is throttling you.**
   Searching Get Metadata for the same book twice could find it on the first click
   and not on the second, with nothing changed in between. Goodreads and bol.com

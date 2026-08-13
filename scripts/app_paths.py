@@ -65,8 +65,6 @@ __all__ = [
     "stray_legacy_config_dir",
     "dirs_json",
     "app_db_path",
-    "empty_library_dir",
-    "empty_library_file",
     "scripts_dir",
     "script_path",
     "ensure_app_root_on_sys_path",
@@ -243,21 +241,6 @@ def dirs_json():
     if override is not None:
         return override if override.is_absolute() else app_root() / override
     return app_root() / "dirs.json"
-
-
-def empty_library_dir():
-    """Directory holding the seed ``app.db`` / ``metadata.db``."""
-    return app_root() / "empty_library"
-
-
-def empty_library_file(name):
-    """Path to a seed database, e.g. ``empty_library_file("app.db")``.
-
-    This is the path #1462 was reported against: ``auto_library.py`` copies it
-    into place on first run, and resolving it to ``/app/...`` outside Docker
-    aborted the install with ``FileNotFoundError``.
-    """
-    return empty_library_dir() / name
 
 
 def ensure_app_root_on_sys_path():

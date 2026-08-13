@@ -119,9 +119,9 @@ def test_binary_source_lines_interpolate_their_release_args(dockerfile_text: str
         dockerfile_text,
         re.MULTILINE,
     ), "kepubify mirror FROM must interpolate KEPUBIFY_RELEASE"
-    # calibre: https://download.calibre-ebook.com/${CALIBRE_RELEASE}/calibre-${CALIBRE_RELEASE}-...
+    # calibre: https://download.calibre-ebook.com/linux-installer.sh...
     assert re.search(
-        r"download\.calibre-ebook\.com/\$\{CALIBRE_RELEASE\}/calibre-\$\{CALIBRE_RELEASE\}",
+        r"https://download\.calibre-ebook\.com/linux-installer\.sh | sh /dev/stdin version=\$\{CALIBRE_RELEASE\}",
         dockerfile_text,
     ), "calibre download URL must interpolate CALIBRE_RELEASE"
     for arg in ("CALIBRE_RELEASE", "KEPUBIFY_RELEASE"):

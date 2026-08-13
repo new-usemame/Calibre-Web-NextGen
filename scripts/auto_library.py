@@ -36,6 +36,18 @@ def _is_definitely_not_a_database(error) -> bool:
     return any(signal in message for signal in _NOT_A_DATABASE_SIGNALS)
 
 
+def create_appdb(appdb_path):
+    app_paths.ensure_app_root_on_sys_path()
+    from cps import ub
+    ub.init_db(appdb_path)
+
+
+def create_metadb(metadb_path):
+    with open(os.path.join(app_paths.scripts_dir(), "metadata.db.sql"), "r") as f:
+        with sqlite3.connect(metadb_path) as conn:
+            conn.executescript(f.read())
+
+
 def is_calibre_database(path) -> bool:
     """True when *path* is a readable SQLite file carrying Calibre's schema.
 
@@ -99,9 +111,6 @@ class AutoLibrary:
         # shipped dirs.json still says /calibre-library, so Docker is unchanged.
         self.library_dir = library_paths.get_calibre_library_dir()
         self.dirs_path = str(app_paths.dirs_json())
-
-        self.empty_appdb = str(app_paths.empty_library_file("app.db"))
-        self.empty_metadb = str(app_paths.empty_library_file("metadata.db"))
 
         # Canonical location. app.db always lives at <config dir>/app.db;
         # check_for_app_db() tries it first and only falls back to a full
@@ -258,15 +267,20 @@ class AutoLibrary:
         ]
         if len(db_files) == 0:
             self._refuse_if_legacy_config_dir_is_ambiguous()
-            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from {self.empty_appdb}")
+            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, creating new one...")
             self.ensure_dir_exists(
                 self.config_dir,
                 "config directory",
                 "Set CALIBRE_DBPATH to a directory this user can write to.",
             )
-            shutil.copyfile(self.empty_appdb, self.DEFAULT_APPDB_PATH)
+            try:
+                create_appdb(self.app_db)
+            except ImportError as error:
+                print("[cwa-auto-library]: ERROR: Could not create new app.db")
+                print(error)
+                sys.exit(1)
             service_user.chown_to_service_user(self.config_dir, "[cwa-auto-library]")
-            print(f"[cwa-auto-library] app.db successfully copied to {self.config_dir}")
+            print(f"[cwa-auto-library] app.db successfully created in {self.app_db}")
         else:
             return
 
@@ -365,7 +379,7 @@ class AutoLibrary:
 
     # Uses sql to update CW's app.db with the correct library location (config_calibre_dir in the settings table)
     def update_calibre_web_db(self):
-        if os.path.exists(self.metadb_path): # type: ignore
+        if os.path.exists(self.app_db): # type: ignore
             try:
                 print("[cwa-auto-library]: Updating Settings Database with library location...")
                 con = sqlite3.connect(self.app_db, timeout=30)
@@ -405,9 +419,10 @@ class AutoLibrary:
             "library directory",
             f"Set 'calibre_library_dir' in {self.dirs_path} to a directory this user can write to.",
         )
-        shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
+        self.metadb_path = os.path.join(self.library_dir, "metadata.db")
+        create_metadb(self.metadb_path)
         service_user.chown_to_service_user(self.library_dir, "[cwa-auto-library]")
-        self.metadb_path = f"{self.library_dir}/metadata.db"
+        print(f"[cwa-auto-library] metadata.db successfully created in {self.metadb_path}")
         return
 
     def bootstrap_calibre_user_plugins_dir(self):
@@ -455,7 +470,7 @@ class AutoLibrary:
         # Auto-register any .zip files the operator dropped in. First-
         # boot only — once calibre's customize.py.json has entries, we
         # skip the scan to keep boot fast. Operator can add more later
-        # via `docker exec calibre-web /app/calibre/calibre-customize -a
+        # via `docker exec calibre-web /opt/calibre/calibre-customize -a
         # /config/.config/calibre/plugins/<new>.zip`.
         registered = calibre_user_plugins.auto_register_plugins()
         if registered:

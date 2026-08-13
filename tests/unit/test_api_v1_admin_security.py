@@ -290,3 +290,80 @@ def test_post_oauth_preserves_group_access_fields(monkeypatch):
     assert captured.get("config_1_oauth_client_id") == "gh-id"
     assert captured.get("config_1_oauth_client_secret") == "GITHUB-SECRET"      # write-only preserve
     assert captured.get("config_2_oauth_client_id") == ""
+
+
+# ── OAuth auto-forward setting on the SPA admin surface ──────────────────────
+
+@pytest.mark.unit
+def test_get_exposes_oauth_auto_forward():
+    """The React Security page has to be able to SEE the setting.
+
+    It was added to the classic config page first; a setting that exists only
+    there is invisible to an admin who never opens the Jinja form."""
+    from cps.api import admin_security as mod
+    from cps.api import admin as admin_mod
+    with _ctx():
+        with patch.object(admin_mod, "current_user", _admin()), \
+             patch.object(mod, "config", _fake_config(config_enable_oauth_auto_forward=True)), \
+             patch.object(mod, "_generic_oauth_row", _fake_generic_row), \
+             patch.object(mod, "_builtin_oauth_rows", _fake_builtin_rows):
+            resp = inspect.unwrap(mod.admin_get_security)()
+    assert resp.get_json()["oauth"]["enable_oauth_auto_forward"] is True
+
+
+@pytest.mark.unit
+def test_get_oauth_auto_forward_defaults_false_before_migration():
+    """A config row predating the column must read as off, not raise."""
+    from cps.api import admin_security as mod
+    from cps.api import admin as admin_mod
+    cfg = _fake_config()
+    assert not hasattr(cfg, "config_enable_oauth_auto_forward")
+    with _ctx():
+        with patch.object(admin_mod, "current_user", _admin()), \
+             patch.object(mod, "config", cfg), \
+             patch.object(mod, "_generic_oauth_row", _fake_generic_row), \
+             patch.object(mod, "_builtin_oauth_rows", _fake_builtin_rows):
+            resp = inspect.unwrap(mod.admin_get_security)()
+    assert resp.get_json()["oauth"]["enable_oauth_auto_forward"] is False
+
+
+def _capture_oauth_save(auto_forward):
+    """Run the SPA security POST and return the form-shaped to_save it built.
+
+    The security checkboxes are appended AFTER ``_configuration_oauth_helper``
+    runs, so this keeps the live dict rather than a copy taken at call time -
+    a snapshot here would miss every checkbox and read as "not saved"."""
+    from cps.api import admin_security as mod
+    from cps.api import admin as admin_mod
+    captured = {}
+
+    def fake_oauth_helper(to_save):
+        captured["live"] = to_save
+        return (False, None)
+
+    body = {"login_type": 2, "oauth": {"enable_oauth_auto_forward": auto_forward,
+                                       "generic": {"client_id": "cid"}}}
+    with _ctx(method="POST", body=body):
+        with patch.object(admin_mod, "current_user", _admin()), \
+             patch.object(mod, "config", _fake_config(config_login_type=2)), \
+             patch.object(mod, "_generic_oauth_row", _fake_generic_row), \
+             patch.object(mod, "_builtin_oauth_rows", _fake_builtin_rows), \
+             patch.object(mod, "_configuration_oauth_helper", fake_oauth_helper), \
+             patch.object(mod, "_config_int", lambda *a, **k: False), \
+             patch.object(mod, "_config_string", lambda *a, **k: False), \
+             patch.object(mod, "_config_checkbox", lambda *a, **k: False), \
+             patch.object(mod, "_security_payload", lambda: {}):
+            inspect.unwrap(mod.admin_update_security)()
+    return captured["live"]
+
+
+@pytest.mark.unit
+def test_post_oauth_auto_forward_true_is_saved():
+    assert _capture_oauth_save(True).get("config_enable_oauth_auto_forward") == "on"
+
+
+@pytest.mark.unit
+def test_post_oauth_auto_forward_false_is_absent_so_checkbox_clears_it():
+    # Checkbox semantics: absent from the form means off. Sending "on" for a
+    # false value would make the setting impossible to turn back off.
+    assert "config_enable_oauth_auto_forward" not in _capture_oauth_save(False)

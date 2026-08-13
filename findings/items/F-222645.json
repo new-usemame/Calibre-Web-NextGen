@@ -1,0 +1,11 @@
+{
+  "area": "autopilot",
+  "body": "`pr_idle_green` is the board's only PR-side obligation, and it requires\n`.ci_failing == 0` by construction. `owe_reply` requires the last comment to be\nsomeone else's. A contributor PR that is RED, whose last comment is OURS,\ntherefore matches no predicate at all and is invisible until\n`needs_review_breach` fires at seven days.\n\nThat is the exact window in which the obligation is largest, because a red\ncontributor PR is owed an action either way: if we broke it, it is ours to fix;\nif they broke it, it is ours to say so.\n\n## Measured 2026-08-13 on #1488\n\n@lduesing's OAuth auto-forward PR. On 08-09 we reviewed it, pushed three commits\nto their branch, and told them the pending checks were only our Actions billing\nlock -- \"nothing for you to fix and no need to rebase\".\n\nThe checks then ran on 08-10 and went red. `test_615_residual_i18n[fr]` and\n`[nl]` failed on two msgids that **our own commit** `f3238ef` added to\n`cps/spa_strings.py` without translations. The contributor's diff was never\nimplicated.\n\nIt then sat for 3.5 days. Board state at 16:11Z on 08-13 was\n`never_acked=0 breaches=0 owe_reply=0` with the PR section reading 0, while\nthe person had been told the opposite of the truth and was waiting.\n\n- `pr_idle_green`: false, `ci_failing` = 5.\n- `owe_reply`: false, last comment was ours (08-09T18:34Z).\n- `never_acked`: false, we had commented.\n- `needs_review_breach`: would not fire until 08-17, seven days after 08-10.\n\n## Fix\n\nAdd a `pr_idle_red` predicate beside `pr_idle_green`: `kind == \"pr\"`,\n`author != self`, not draft, `ci_checks > 0`, `ci_failing > 0`, idle > 1 day.\nDeliberately do **not** condition it on who authored the breaking commit --\nthat needs an extra API field and gets the disposition wrong in both\ndirections. Redness plus silence is the obligation, whoever caused it.\n\nRelated: F-8d8c15 (the board could not see PRs at all -- fixed 99b6cbc, which\nis what made this narrower hole reachable).",
+  "created": "2026-08-13",
+  "id": "F-222645",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "A contributor PR that is red is invisible to the follow-up board"
+}

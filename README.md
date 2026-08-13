@@ -643,8 +643,8 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
+| Russian (`ru`) | `████████████████████` 99% | 2719/2735 | 0 |
 | Spanish (`es`) | `███████████████████░` 97% | 2641/2735 | 0 |
-| Russian (`ru`) | `███████████████████░` 96% | 2618/2735 | 0 |
 | Polish (`pl`) | `███████████████████░` 95% | 2605/2735 | 0 |
 | French (`fr`) | `█████████████████░░░` 84% | 2291/2735 | 127 |
 | German (`de`) | `███████████████░░░░░` 76% | 2071/2735 | 62 |

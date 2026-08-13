@@ -16,6 +16,18 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Metadata and cover enforcement no longer stops until the next restart if the
+  enforcer is killed.** The enforcer takes a lock so two copies can't run over
+  each other, and released it only on a clean exit. If it was killed instead —
+  an out-of-memory kill, a `docker stop` that ran out of patience — the lock
+  stayed behind and every later run cancelled itself, so edits you made in the
+  web interface kept appearing on screen but stopped being written into the book
+  files. Nothing said so; the message went to a log. A run now checks whether
+  the process that left the lock is still alive and takes over if it isn't, so
+  enforcement resumes on its own instead of waiting for a container restart.
+
 ## [v4.1.34] - 2026-08-13
 
 ### Fixed

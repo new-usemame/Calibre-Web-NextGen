@@ -5811,6 +5811,10 @@ msgstr "Ordre de tri"
 msgid "Source details"
 msgstr "Détails de la source"
 
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
+msgstr "Démarrer automatiquement le seul fournisseur OAuth"
+
 #: cps/spa_strings.py:882 cps/templates/detail.html:1023
 msgid "Started reading"
 msgstr "Lecture commencée"
@@ -6047,6 +6051,17 @@ msgstr ""
 #: cps/spa_strings.py:936 cps/templates/detail.html:1023
 msgid "When reading progress was first synced"
 msgstr "Date de la première synchronisation de la progression de lecture"
+
+#: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add "
+"?local=1 to the login URL to reach the password form, which keeps working as"
+" long as standard password login is left enabled."
+msgstr ""
+"Lorsque le démarrage automatique est activé, la page de connexion mène "
+"directement au fournisseur. Ajoutez ?local=1 à l’URL de connexion pour "
+"accéder au formulaire de mot de passe, qui continue de fonctionner tant que "
+"la connexion standard par mot de passe reste activée."
 
 #: cps/spa_strings.py:937
 msgid ""

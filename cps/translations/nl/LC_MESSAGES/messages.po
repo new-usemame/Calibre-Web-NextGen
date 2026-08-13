@@ -5687,6 +5687,10 @@ msgstr "Sorteervolgorde"
 msgid "Source details"
 msgstr "Brondetails"
 
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
+msgstr "Start de enige OAuth-provider automatisch"
+
 #: cps/spa_strings.py:882 cps/templates/detail.html:1023
 msgid "Started reading"
 msgstr "Begonnen met lezen"
@@ -5924,6 +5928,17 @@ msgstr ""
 #: cps/spa_strings.py:936 cps/templates/detail.html:1023
 msgid "When reading progress was first synced"
 msgstr "Wanneer de leesvoortgang voor het eerst is gesynchroniseerd"
+
+#: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add "
+"?local=1 to the login URL to reach the password form, which keeps working as"
+" long as standard password login is left enabled."
+msgstr ""
+"Als automatisch starten aanstaat, gaat de inlogpagina rechtstreeks naar de "
+"provider. Voeg ?local=1 toe aan de inlog-URL om het wachtwoordformulier te "
+"bereiken; dat blijft werken zolang standaard inloggen met wachtwoord "
+"ingeschakeld blijft."
 
 #: cps/spa_strings.py:937
 msgid ""

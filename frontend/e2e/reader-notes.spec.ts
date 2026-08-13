@@ -414,7 +414,8 @@ test.describe('reader notes (#325)', () => {
   });
 });
 
-const drawer = (page: Page) => page.getByRole('navigation', { name: 'Highlights and notes' });
+const drawer = (page: Page, name = 'Highlights and notes') =>
+  page.getByRole('navigation', { name });
 
 test.describe('reader highlights & notes drawer (#325)', () => {
   test.describe.configure({ mode: 'serial' });
@@ -581,7 +582,7 @@ test.describe('reader toolbar touch targets (#325)', () => {
       expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
 
       const NAMES = ['Close reader', 'Table of contents', 'Reading appearance',
-                     'Highlights and notes', 'Full screen'];
+                     'Highlights and notes', 'Search inside book', 'Full screen'];
       const undersized: string[] = [];
       const stolen: string[] = [];
 
@@ -960,5 +961,90 @@ test.describe('reader drawer: device labels (#325)', () => {
 
     // Leave the shared fixture as found (F-08685b).
     await clearAnnotationsViaApi(page, bookId!);
+  });
+});
+
+test.describe('reader search inside the book', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test('finds book text and moves the rendition to the selected result', async ({ page }) => {
+    test.setTimeout(180_000);
+    const bookId = await openReaderOnEpub(page, 0);
+    expect(bookId, 'an EPUB that renders in the reader').not.toBeNull();
+    await waitForReaderRender(page);
+    expect(await pageUntilText(page), 'the EPUB has searchable prose').toBe(true);
+
+    // Take a phrase from the real fixture book, rather than coupling this test
+    // to whichever seeded title currently occupies the lane.
+    const query = await page.frames().find((frame) => frame !== page.mainFrame())!.evaluate(() => {
+      const text = (document.body?.innerText || '').replace(/\s+/g, ' ');
+      const phrase = text.match(/\b[A-Za-zÀ-ÿ]{6,}\s+[A-Za-zÀ-ÿ]{6,}\b/);
+      return phrase?.[0] || text.match(/\b[A-Za-zÀ-ÿ]{8,}\b/)?.[0] || '';
+    });
+    expect(query.length, 'a distinctive query can be taken from the book').toBeGreaterThanOrEqual(2);
+
+    /*
+     * Distinguish "no bookmark" from "the request failed".
+     *
+     * Collapsing both to `null` makes a transport hiccup indistinguishable from
+     * a cleared reading position, and the assertion below then reports the
+     * feature as broken when the instrument was. Fail loudly on a bad response
+     * instead.
+     */
+    const bookmark = async () => {
+      const response = await page.request.get(`/api/v1/books/${bookId}/bookmark?format=epub`);
+      if (!response.ok()) throw new Error(`bookmark read failed: HTTP ${response.status()}`);
+      return (await response.json()).bookmark as string | null;
+    };
+    // Move away from the passage before searching for it. The saved bookmark is
+    // the observable CFI, so the assertion below proves navigation rather than
+    // merely proving that a result row disappeared.
+    const atQuery = await bookmark();
+    for (let i = 0; i < 4; i++) {
+      await page.getByRole('button', { name: 'Next page', exact: true }).click();
+      await page.waitForTimeout(500);
+    }
+    await expect.poll(bookmark, { timeout: 15_000 }).not.toBe(atQuery);
+    const before = await bookmark();
+
+    await page.getByRole('button', { name: 'Search inside book' }).click();
+    const searchDrawer = drawer(page, 'Search this book');
+    await expect(searchDrawer).toBeVisible();
+    const field = searchDrawer.getByRole('searchbox', { name: 'Search term' });
+    await expect(field).toBeFocused();
+    await field.fill(query);
+
+    const results = searchDrawer.locator('li');
+    await expect(results.first()).toBeVisible({ timeout: 90_000 });
+    expect(await results.count(), 'the fixture query has search results').toBeGreaterThan(0);
+    await results.first().getByRole('button').click();
+    await expect(searchDrawer).toBeHidden();
+
+    /*
+     * Navigation is proved by the passage being ON SCREEN, not by the bookmark
+     * moving.
+     *
+     * Using the saved bookmark as the proof of navigation was the obvious choice
+     * and it encodes a bug: a search hit is a preview, and a preview must NOT
+     * move the reader's saved place (#1566 -- past 99% it also marks the book
+     * finished). Asserting the visible text is both independent of persistence
+     * and a stronger claim: it says we landed on the passage, where "the
+     * bookmark changed" only ever said we moved somewhere.
+     */
+    await expect.poll(async () => {
+      const frame = page.frames().find((f) => f !== page.mainFrame());
+      const text = await frame?.evaluate(
+        () => (document.body?.innerText || '').replace(/\s+/g, ' '),
+      ).catch(() => '');
+      return (text || '').includes(query);
+    }, { timeout: 20_000 }).toBe(true);
+
+    // And the reading position stayed where the reader actually was. Well past
+    // the 800ms save debounce and its round-trip.
+    await page.waitForTimeout(3_000);
+    expect(
+      await bookmark(),
+      'a search hit is a preview: it must not become the saved reading position',
+    ).toBe(before);
   });
 });

@@ -4,6 +4,7 @@ import ePub from 'epubjs';
 import {
   ChevronLeft, ChevronRight, X, List, Sun, Moon, Coffee, Loader2, Trash2,
   SlidersHorizontal, StickyNote, Highlighter, MoonStar, Maximize, Minimize,
+  Search,
 } from 'lucide-react';
 import {
   type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
@@ -16,6 +17,10 @@ import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import {
+  DEFAULT_HIT_CAP, MIN_QUERY_LENGTH, searchBook, type SearchHit,
+} from '../lib/reader/searchBook';
+import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
 import styles from './Reader.module.css';
 
 // Highlight colors as ARIA/label keys (SC 1.4.1: a color must never be conveyed
@@ -181,6 +186,13 @@ export function Reader({ id }: { id: string }) {
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const tocRef = useRef<HTMLElement>(null);
+  const searchRef = useRef<HTMLElement>(null);
+  const searchFieldRef = useRef<HTMLInputElement>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  // The in-flight scan, so the next one can wait for it to finish touching the
+  // book's shared spine items. See the search effect for why abort alone is not
+  // enough.
+  const searchRunRef = useRef<Promise<unknown> | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   // Edit/remove popover for an existing highlight (#782). Separate from popRef
@@ -255,6 +267,13 @@ export function Reader({ id }: { id: string }) {
   const [rtl, setRtl] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
+  const [searchTruncated, setSearchTruncated] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchComplete, setSearchComplete] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [annOpen, setAnnOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Resolved once: whether this browser can do element fullscreen at all.
@@ -334,6 +353,12 @@ export function Reader({ id }: { id: string }) {
   const closeActiveHl = useCallback(() => setActiveHl(null), []);
   const closeComposer = useCallback(() => setComposer(null), []);
   const closeAnnDrawer = useCallback(() => setAnnOpen(false), []);
+  const closeSearch = useCallback(() => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    setSearching(false);
+    setSearchOpen(false);
+  }, []);
 
   useFocusTrap(tocRef, { onClose: closeToc, active: tocOpen });
   useFocusTrap(settingsRef, { onClose: closeSettings, active: settingsOpen });
@@ -341,6 +366,13 @@ export function Reader({ id }: { id: string }) {
   useFocusTrap(hlPopRef, { onClose: closeActiveHl, active: !!activeHl });
   useFocusTrap(notePopRef, { onClose: closeComposer, active: !!composer });
   useFocusTrap(annRef, { onClose: closeAnnDrawer, active: annOpen });
+  useFocusTrap(searchRef, { onClose: closeSearch, active: searchOpen });
+
+  // Declared after the trap registration: the trap first establishes the
+  // drawer boundary, then this puts the caret where a search starts.
+  useEffect(() => {
+    if (searchOpen) searchFieldRef.current?.focus();
+  }, [searchOpen]);
 
   /*
    * Land the caret in the note field when the composer opens, so a phone user
@@ -367,6 +399,81 @@ export function Reader({ id }: { id: string }) {
     field.focus();
     field.setSelectionRange(field.value.length, field.value.length);
   }, [composer?.mode, composer?.annotationId, composer?.cfiRange]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Search only after typing settles. Every replacement, close and unmount
+  // aborts the scan so an obsolete full-book walk cannot compete with the next.
+  useEffect(() => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+
+    const query = searchQuery.trim();
+    if (!searchOpen || query.length < MIN_QUERY_LENGTH) {
+      setSearching(false);
+      setSearchHits([]);
+      setSearchTruncated(false);
+      setSearchComplete(false);
+      setSearchError(null);
+      return;
+    }
+
+    setSearching(true);
+    setSearchHits([]);
+    setSearchTruncated(false);
+    setSearchComplete(false);
+    setSearchError(null);
+
+    const timer = window.setTimeout(() => {
+      const epubBook = bookRef.current;
+      if (!epubBook) {
+        setSearching(false);
+        setSearchError(t('Could not search this book.'));
+        return;
+      }
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+      /*
+       * Wait for the previous scan to actually STOP before starting this one.
+       *
+       * Aborting is not stopping. The signal is only checked between sections,
+       * so an aborted scan is still inside `section.load()`/`search()` and will
+       * still run its `finally` -> `section.unload()`. Spine items belong to the
+       * Book and are shared, not copied per scan, so that late unload can clear
+       * the very document this scan is reading. searchBook treats the resulting
+       * throw as one unreadable chapter and continues, which means the failure
+       * is SILENTLY MISSING MATCHES -- the one failure a search must not have.
+       *
+       * Serialising costs one section's latency on a query the reader has
+       * already stopped typing, and buys a correct result set.
+       */
+      const prior = searchRunRef.current;
+      const run = (async () => {
+        if (prior) await prior.catch(() => undefined);
+        if (controller.signal.aborted) return;
+        return searchBook(epubBook, query, { signal: controller.signal });
+      })();
+      searchRunRef.current = run;
+      void run.then((outcome) => {
+        if (controller.signal.aborted || !outcome) return;
+        setSearchHits(outcome.hits);
+        setSearchTruncated(outcome.truncated);
+        setSearchComplete(true);
+        setSearching(false);
+      }).catch(() => {
+        if (controller.signal.aborted) return;
+        setSearchError(t('Could not search this book.'));
+        setSearchComplete(true);
+        setSearching(false);
+      });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      searchAbortRef.current?.abort();
+      searchAbortRef.current = null;
+    };
+  }, [searchOpen, searchQuery, t]);
+
+  useEffect(() => () => searchAbortRef.current?.abort(), []);
 
   // Open the edit/remove popover for a highlight the reader was tapped on (#782).
   // Closes the create-color popover so the two never show at once.
@@ -576,6 +683,32 @@ export function Reader({ id }: { id: string }) {
       announce(t('Could not open that highlight.'));
     }
   }, [announce, t]);
+
+  const goToSearchResult = useCallback((cfi: string) => {
+    closeSearch();
+    /*
+     * A search hit is a preview, exactly like a highlight jump, and arms the
+     * same flag -- see previewingRef.
+     *
+     * This is the composition that does NOT come for free. The two changes
+     * merged with no conflict: the preview flag landed on `goToAnnotation`, and
+     * search arrived as its own `display()` caller that the flag had never heard
+     * of. Nothing was overwritten and nothing was reported, so search would have
+     * shipped the same defect the flag exists to prevent -- looking up a word
+     * near the end of a book would move the reader's place there and, past 99%,
+     * mark the book finished.
+     */
+    previewingRef.current = true;
+    try {
+      Promise.resolve(renditionRef.current?.display(cfi)).catch(() => {
+        previewingRef.current = false;
+        announce(t('Could not open that search result.'));
+      });
+    } catch {
+      previewingRef.current = false;
+      announce(t('Could not open that search result.'));
+    }
+  }, [announce, closeSearch, t]);
 
   const toggleFullscreen = useCallback(() => {
     const d = document as FsDoc;
@@ -1086,16 +1219,23 @@ export function Reader({ id }: { id: string }) {
         </Link>
         <span className={styles.bookTitle} aria-hidden="true">{book.title}</span>
         <div className={styles.barControls}>
-          <button className={styles.iconBtn} onClick={() => setTocOpen((o) => !o)}
+          <button className={styles.iconBtn} onClick={() => { closeSearch(); setTocOpen((o) => !o); }}
             aria-label={t('Table of contents')} aria-expanded={tocOpen} title={t('Contents')}>
             <List size={19} aria-hidden="true" focusable={false} />
           </button>
-          <button className={styles.iconBtn} onClick={() => { setTocOpen(false); setAnnOpen((o) => !o); }}
+          <button className={styles.iconBtn} onClick={() => {
+            setTocOpen(false); closeSearch(); setAnnOpen((o) => !o);
+          }}
             aria-label={t('Highlights and notes')} aria-expanded={annOpen} title={t('Highlights and notes')}>
             <Highlighter size={19} aria-hidden="true" focusable={false} />
             {annList.length > 0 && (
               <span className={styles.annCount} aria-hidden="true">{annList.length}</span>
             )}
+          </button>
+          <button className={styles.iconBtn} onClick={() => {
+            setTocOpen(false); setAnnOpen(false); setSettingsOpen(false); setSearchOpen(true);
+          }} aria-label={t('Search inside book')} aria-expanded={searchOpen} title={t('Search inside book')}>
+            <Search size={19} aria-hidden="true" focusable={false} />
           </button>
           {canFullscreen && (
             <button className={styles.iconBtn} onClick={toggleFullscreen}
@@ -1107,7 +1247,7 @@ export function Reader({ id }: { id: string }) {
                 : <Maximize size={19} aria-hidden="true" focusable={false} />}
             </button>
           )}
-          <button className={styles.iconBtn} onClick={() => setSettingsOpen((o) => !o)}
+          <button className={styles.iconBtn} onClick={() => { closeSearch(); setSettingsOpen((o) => !o); }}
             aria-label={t('Reading appearance')} aria-expanded={settingsOpen} title={t('Reading appearance')}>
             <SlidersHorizontal size={19} aria-hidden="true" focusable={false} />
           </button>
@@ -1136,6 +1276,58 @@ export function Reader({ id }: { id: string }) {
                 ))}
               </ul>
             )}
+          </nav>
+        </>
+      )}
+
+      {/* Full-book search drawer. The result excerpts are book-controlled text,
+          so matching is rendered as React text + <mark>, never injected HTML. */}
+      {searchOpen && (
+        <>
+          <div className={styles.tocScrim} onClick={closeSearch} aria-hidden="true" />
+          <nav ref={searchRef} className={styles.toc} aria-label={t('Search this book')} tabIndex={-1}>
+            <div className={styles.panelHeading}>
+              <p className={styles.tocHeading}>{t('Search this book')}</p>
+              <button className={styles.iconBtn} onClick={closeSearch} aria-label={t('Close')}>
+                <X size={18} aria-hidden="true" focusable={false} />
+              </button>
+            </div>
+            <label className={styles.searchField} htmlFor="reader-book-search">
+              <span>{t('Search term')}</span>
+              <input ref={searchFieldRef} id="reader-book-search" type="search"
+                value={searchQuery} placeholder={t('Enter at least 2 characters')}
+                onChange={(event) => setSearchQuery(event.target.value)} />
+            </label>
+            <p className={styles.searchStatus} role="status">
+              {searching ? (
+                <><Loader2 className={styles.spin} size={16} aria-hidden="true" focusable={false} />
+                  {t('Searching this book…')}</>
+              ) : searchError ? searchError
+                : searchComplete && searchTruncated
+                  ? t('Showing the first {count} matches.', { count: Math.min(DEFAULT_HIT_CAP, searchHits.length) })
+                  : searchComplete ? t('{count} matches', { count: searchHits.length }) : ''}
+            </p>
+            {searchComplete && searchHits.length === 0 && !searchError ? (
+              <p className={styles.tocEmpty}>{t('No matches found in this book.')}</p>
+            ) : searchHits.length > 0 ? (
+              <ul className={styles.searchResults} role="list">
+                {searchHits.map((hit, index) => (
+                  <li key={`${hit.cfi}-${index}`}>
+                    <button className={styles.searchResult} onClick={() => goToSearchResult(hit.cfi)}>
+                      <span className={styles.searchChapter}>
+                        {chapterLabelForHref(hit.href, toc)}
+                      </span>
+                      <span className={styles.searchExcerpt}>
+                        {splitSearchExcerpt(hit.excerpt, searchQuery).map((part, partIndex) =>
+                          part.matched
+                            ? <mark key={partIndex}>{part.text}</mark>
+                            : <span key={partIndex}>{part.text}</span>)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </nav>
         </>
       )}

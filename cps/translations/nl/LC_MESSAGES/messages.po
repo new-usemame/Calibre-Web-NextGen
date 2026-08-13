@@ -12,8 +12,8 @@ msgstr ""
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
-"proton.me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
+"me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -4233,6 +4233,10 @@ msgid "Could not open that highlight."
 msgstr "Kan die markering niet openen."
 
 #: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr "Kan dat zoekresultaat niet openen."
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Kan dit comic-archief niet lezen."
 
@@ -4275,6 +4279,10 @@ msgstr "Kan titel niet opslaan."
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "Kan je leespositie niet opslaan."
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
+msgstr "Kan dit boek niet doorzoeken."
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
@@ -4621,6 +4629,10 @@ msgstr "Zet Kobo sync aan"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
 msgstr "Encryptie"
+
+#: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr "Voer ten minste 2 tekens in"
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5198,6 +5210,10 @@ msgid "No highlights yet. Select text in the book to make one."
 msgstr "Nog geen markeringen. Selecteer tekst in het boek om er een te maken."
 
 #: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr "Geen resultaten gevonden in dit boek."
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "Geen overeenkomende {items} voor \"{query}\"."
@@ -5264,7 +5280,9 @@ msgstr "Notitie opgeslagen"
 msgid ""
 "Nothing here yet. Highlight or write a note while reading, or import from a "
 "Kobo device."
-msgstr "Nog niets. Markeer of schrijf een notitie tijdens het lezen, of importeer van een Kobo-apparaat."
+msgstr ""
+"Nog niets. Markeer of schrijf een notitie tijdens het lezen, of importeer "
+"van een Kobo-apparaat."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -5640,12 +5658,28 @@ msgid "Scopes"
 msgstr "Scopes"
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr "Zoeken in het boek"
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr "Zoekterm"
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr "Dit boek doorzoeken"
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Zoeken op titel, auteur…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
 msgstr "Elke bron doorzoeken…"
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
+msgstr "Dit boek wordt doorzocht…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5810,6 +5844,11 @@ msgstr "Verborgen boeken tonen"
 #: cps/spa_strings.py
 msgid "Show password"
 msgstr "Wachtwoord tonen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
+msgstr "De eerste {count} resultaten worden weergegeven."
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -6262,6 +6301,11 @@ msgstr "{count} bestanden afgewezen"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{count} matches"
+msgstr "{count} resultaten"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{count} result"
 msgstr "{count} resultaat"
 
@@ -6319,14 +6363,18 @@ msgstr "{n} markeringen en notities"
 #, python-brace-format
 msgid ""
 "{n} highlights and notes assigned to this device will become Unknown device."
-msgstr "{n} markeringen en notities die aan dit apparaat zijn toegewezen, worden Onbekend apparaat."
+msgstr ""
+"{n} markeringen en notities die aan dit apparaat zijn toegewezen, worden "
+"Onbekend apparaat."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "{n} highlights and notes were made on this device. They are not deleted. "
 "Their origin history is kept."
-msgstr "{n} markeringen en notities zijn op dit apparaat gemaakt. Ze worden niet verwijderd. Hun herkomstgeschiedenis blijft bewaard."
+msgstr ""
+"{n} markeringen en notities zijn op dit apparaat gemaakt. Ze worden niet "
+"verwijderd. Hun herkomstgeschiedenis blijft bewaard."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6640,8 +6688,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
-"(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
+"%(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -12624,11 +12672,10 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
-#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
-#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
-#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
-#~ "bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
+#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
+#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
+#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

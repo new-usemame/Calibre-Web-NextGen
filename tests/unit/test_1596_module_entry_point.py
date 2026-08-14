@@ -64,14 +64,31 @@ def _run_help(args, cwd):
     )
 
 
-def _poison(directory):
-    """Drop a cps.py in `directory` that fails loudly if it ever gets imported.
+_SHADOW = 'raise SystemExit("shadowed: the cwd copy of cps was imported")\n'
+
+# Both shapes a user can leave in their mounted /config. A module and a package
+# take different paths through the import system, and the package form is the
+# one a half-extracted archive or a stray checkout actually produces -- so
+# pinning only `cps.py` would leave the more likely accident uncovered.
+POISON_FORMS = ("module", "package")
+
+
+def _poison(directory, form="module"):
+    """Plant a `cps` in `directory` that fails loudly if it ever gets imported.
 
     Stands in for whatever a user might leave in their mounted /config.
     """
-    (directory / "cps.py").write_text(
-        'raise SystemExit("shadowed: the cwd copy of cps was imported")\n'
-    )
+    if form == "module":
+        (directory / "cps.py").write_text(_SHADOW)
+    elif form == "package":
+        package = directory / "cps"
+        package.mkdir()
+        (package / "__init__.py").write_text(_SHADOW)
+        # A package is only a viable hijack if `-m` can find an entry point,
+        # so give it the same one the real package has.
+        (package / "__main__.py").write_text(_SHADOW)
+    else:  # pragma: no cover - guards a typo in a parametrize list
+        raise ValueError(f"unknown poison form: {form}")
 
 
 class TestModuleEntryPoint:
@@ -126,31 +143,34 @@ class TestModuleEntryPoint:
 class TestCwdCannotShadowTheApplication:
     """/config is a user-mounted volume and it is the service's cwd."""
 
-    def test_minus_P_ignores_a_cps_py_sitting_in_the_cwd(self, tmp_path):
+    @pytest.mark.parametrize("form", POISON_FORMS)
+    def test_minus_P_ignores_a_cps_sitting_in_the_cwd(self, tmp_path, form):
         """The guard that lets the units run without chdir'ing into the app root."""
-        _poison(tmp_path)
+        _poison(tmp_path, form)
 
         result = _run_help(["-P", "-m", "cps"], cwd=tmp_path)
 
         assert result.returncode == 0, (
-            "-P must keep cwd off sys.path so a stray /config/cps.py cannot be "
-            f"imported in place of the app.\nstderr:\n{result.stderr}"
+            f"-P must keep cwd off sys.path so a stray /config/cps ({form} form) "
+            f"cannot be imported in place of the app.\nstderr:\n{result.stderr}"
         )
         assert "shadowed" not in result.stderr.lower()
 
-    def test_without_minus_P_the_cwd_copy_wins(self, tmp_path):
+    @pytest.mark.parametrize("form", POISON_FORMS)
+    def test_without_minus_P_the_cwd_copy_wins(self, tmp_path, form):
         """Control: proves the -P above is load-bearing, not decoration.
 
         If this ever stops shadowing, the guard is being kept for a hazard that
         no longer exists and the test above has quietly stopped proving anything.
         """
-        _poison(tmp_path)
+        _poison(tmp_path, form)
 
         result = _run_help(["-m", "cps"], cwd=tmp_path)
 
         assert result.returncode != 0 and "shadowed" in result.stderr.lower(), (
-            "expected the cwd copy of cps to win without -P; if it no longer "
-            f"does, revisit why the units pass -P.\nstderr:\n{result.stderr}"
+            f"expected the cwd copy of cps ({form} form) to win without -P; if "
+            f"it no longer does, revisit why the units pass -P.\n"
+            f"stderr:\n{result.stderr}"
         )
 
 
@@ -226,3 +246,106 @@ class TestS6UnitsUseTheModule:
             "__main__.py should import the entry point rather than reimplement it"
         )
         assert "main()" in body
+
+
+class TestFailedFirstRunLeavesNoPhantomDatabase:
+    """cwa-init must not invent an app.db the initializer failed to create.
+
+    `sqlite3 <path>` creates the file it is pointed at. Running it after a
+    failed `python3 -P -m cps -d` therefore replaces "no database" with a
+    0-byte one, and cps.ub.init_db() branches on os.path.exists(): the
+    existing-file branch migrates, and only the fresh branch calls
+    create_admin_user()/create_anonymous_user(). The user gets a schema with no
+    admin account, no login, and no retry -- the enclosing
+    `if [[ ! -f /config/app.db ]]` never fires again.
+    """
+
+    # Every sqlite3 call, not just the first-run one. The unconditional
+    # "ensure correct binary paths" call further down runs on EVERY start, so
+    # it is the one a failed first run actually reaches; guarding only the
+    # first-run block would leave the phantom database exactly as reachable.
+    GUARD = "if [[ -f /config/app.db ]]"
+
+    def test_every_sqlite3_call_is_guarded_on_the_database_existing(self):
+        lines = INIT_RUN.read_text().splitlines()
+
+        calls = [i for i, line in enumerate(lines) if "sqlite3 /config/app.db" in line]
+        assert calls, "expected cwa-init to touch app.db with sqlite3 at all"
+
+        unguarded = []
+        for index in calls:
+            # Walk back to the nearest enclosing app.db conditional.
+            preceding = [
+                line.strip()
+                for line in lines[:index]
+                if "/config/app.db ]]" in line
+            ]
+            if not preceding or not preceding[-1].startswith(self.GUARD):
+                unguarded.append(index + 1)
+
+        assert not unguarded, (
+            f"sqlite3 calls on lines {unguarded} of {INIT_RUN.name} are not "
+            f"inside an `{self.GUARD}` guard. sqlite3 creates the file it is "
+            "pointed at, so an unguarded call turns a failed first run into a "
+            "phantom 0-byte app.db — and cps.ub.init_db() then takes its "
+            "existing-database branch and never creates the admin user."
+        )
+
+    def test_sqlite3_status_is_captured_not_reread(self):
+        """`$?` after an `if [[ ]]` reports the test, not the command."""
+        body = INIT_RUN.read_text()
+
+        assert "sqlite_rc=$?" in body, (
+            "capture sqlite3's exit status immediately; the old "
+            "`elif [[ $? > 0 ]]` re-read $? from the preceding [[ ]] and "
+            "compared it as a string"
+        )
+        # Comments are stripped: the fix's own comment quotes the old form to
+        # explain it, and a test that cannot tell code from prose would fail on
+        # its own documentation.
+        code = "\n".join(
+            line for line in body.splitlines() if not line.strip().startswith("#")
+        )
+        assert "$? > 0" not in code, (
+            "the string-comparing rc check is back (shellcheck SC2071): `>` "
+            "inside [[ ]] compares strings, and $? there re-reads the "
+            "preceding test rather than the command"
+        )
+
+    def test_phantom_database_would_skip_admin_creation(self):
+        """Pins WHY the guard matters, so nobody 'simplifies' it away.
+
+        If init_db ever creates the admin user on both branches, this test
+        fails and the guard above can be reconsidered on purpose rather than
+        by accident.
+        """
+        source = (REPO_ROOT / "cps" / "ub.py").read_text()
+        tree = ast.parse(source)
+
+        init_db = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "init_db"
+        )
+        branch = next(
+            node
+            for node in init_db.body
+            if isinstance(node, ast.If)
+            and "exists" in ast.dump(node.test)
+        )
+
+        def calls(statements):
+            return {
+                n.func.id
+                for stmt in statements
+                for n in ast.walk(stmt)
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+            }
+
+        assert "create_admin_user" in calls(branch.orelse), (
+            "expected the fresh-database branch to create the admin user"
+        )
+        assert "create_admin_user" not in calls(branch.body), (
+            "init_db now creates an admin user even when app.db already "
+            "exists — re-evaluate the cwa-init phantom-database guard"
+        )

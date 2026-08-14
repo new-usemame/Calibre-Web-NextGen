@@ -27,6 +27,14 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A first start that fails no longer leaves you with a server you can't log
+  in to.** If creating the settings database failed on first run, startup went
+  on to create an empty one anyway. That empty file looked like an existing
+  install on the next boot, so the step that creates your admin account was
+  skipped and there was no way in — and no way to retry, because the file now
+  existed. The failure is now reported and the empty file is never created, so
+  the next start tries again properly.
+
 - **Metadata and cover enforcement no longer stops until the next restart if the
   enforcer is killed.** The enforcer takes a lock so two copies can't run over
   each other, and released it only on a clean exit. If it was killed instead —

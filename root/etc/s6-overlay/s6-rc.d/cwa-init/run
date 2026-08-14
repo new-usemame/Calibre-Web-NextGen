@@ -79,16 +79,34 @@ if [[ ! -f /config/app.db ]]; then
   if ! cwa-as-abc python3 -P -m cps -d > /dev/null 2>&1; then
     echo "[cwa-init] ERROR: could not create app.db (python3 -P -m cps -d failed)"
   fi
-  # handle app.db updates for kepubify and ext binary path
-  # borrowed from crocodilestick because it's a better solution than what i was doing
-  sqlite3 /config/app.db <<EOS
+
+  # Only touch app.db if the initializer actually produced one.
+  #
+  # sqlite3 CREATES the file it is pointed at, so running it after a failed
+  # init manufactures a 0-byte /config/app.db out of nothing. That is worse
+  # than the missing file it replaces: cps.ub.init_db() branches on
+  # os.path.exists(), and the existing-file branch runs migrations while the
+  # fresh-database branch is the one that calls create_admin_user() and
+  # create_anonymous_user(). A phantom app.db therefore yields a server with a
+  # schema, no admin account and no way to log in -- and because the file now
+  # exists, this block never runs again to retry.
+  #
+  # Leaving the path absent keeps first-run recoverable: the next start takes
+  # the first-run path again.
+  if [[ -f /config/app.db ]]; then
+    # handle app.db updates for kepubify and ext binary path
+    # borrowed from crocodilestick because it's a better solution than what i was doing
+    sqlite3 /config/app.db <<EOS
     update settings set config_kepubifypath='/usr/bin/kepubify' where config_kepubifypath is NULL or LENGTH(config_kepubifypath)=0;
 EOS
-
-  if [[ $? == 0 ]]; then
-    echo "Successfully set kepubify paths in '/config/app.db'!"
-  elif [[ $? > 0 ]]; then
-    echo "Could not set binary paths for '/config/app.db' (see errors above)."
+    # Captured immediately: the old `elif [[ $? > 0 ]]` re-read $? from the
+    # preceding [[ ]], not from sqlite3, and compared it as a string.
+    sqlite_rc=$?
+    if [[ $sqlite_rc -eq 0 ]]; then
+      echo "Successfully set kepubify paths in '/config/app.db'!"
+    else
+      echo "Could not set binary paths for '/config/app.db' (see errors above)."
+    fi
   fi
 fi
 
@@ -211,18 +229,25 @@ fi
 #  Ensure correct binary paths in app.db
 #------------------------------------------------------------------------------------------------------------------------
 
-echo "[cwa-init] Setting binary paths in '/config/app.db' to the correct ones..."
+# Same guard as the first-run block above, and this is the call that actually
+# needed it: this one runs on EVERY start, so a failed first run reaches it
+# with no /config/app.db and sqlite3 creates a 0-byte one. Guarding only the
+# first-run block would have achieved nothing.
+if [[ -f /config/app.db ]]; then
+    echo "[cwa-init] Setting binary paths in '/config/app.db' to the correct ones..."
 
-sqlite3 /config/app.db <<EOS
+    sqlite3 /config/app.db <<EOS
     update settings set config_kepubifypath='/usr/bin/kepubify', config_converterpath='/usr/bin/ebook-convert', config_binariesdir='/usr/bin';
 EOS
+    sqlite_rc=$?
 
-if [[ $? == 0 ]]
-then
-    echo "[cwa-init] Successfully set binary paths in '/config/app.db'!"
-elif [[ $? > 0 ]]
-then
-    echo "[cwa-init] Service could not successfully set binary paths for '/config/app.db' (see errors above)."
+    if [[ $sqlite_rc -eq 0 ]]; then
+        echo "[cwa-init] Successfully set binary paths in '/config/app.db'!"
+    else
+        echo "[cwa-init] Service could not successfully set binary paths for '/config/app.db' (see errors above)."
+    fi
+else
+    echo "[cwa-init] No '/config/app.db' to configure — first-run initialization did not produce one."
 fi
 
 #------------------------------------------------------------------------------------------------------------------------

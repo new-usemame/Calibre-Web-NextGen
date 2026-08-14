@@ -68,7 +68,17 @@ export CALIBRE_DBPATH=/config
 
 if [[ ! -f /config/app.db ]]; then
   echo "First time run, creating app.db..."
-  cwa-as-abc python3 -m cps -d > /dev/null 2>&1
+  # -P for the same reason as svc-calibre-web-automated: cwd here is /config,
+  # a user-writable volume, and `python -m` would otherwise import a stray
+  # /config/cps.py or /config/cps/ instead of the application.
+  #
+  # The failure is reported rather than swallowed. stdout stays discarded (the
+  # first-run banner is noise), but with the output going to /dev/null a failed
+  # app.db creation used to surface only as the sqlite3 call below failing
+  # against a database that was never made -- which names the wrong cause.
+  if ! cwa-as-abc python3 -P -m cps -d > /dev/null 2>&1; then
+    echo "[cwa-init] ERROR: could not create app.db (python3 -P -m cps -d failed)"
+  fi
   # handle app.db updates for kepubify and ext binary path
   # borrowed from crocodilestick because it's a better solution than what i was doing
   sqlite3 /config/app.db <<EOS

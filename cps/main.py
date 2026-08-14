@@ -18,6 +18,16 @@ def request_username():
 
 
 def hide_console_windows():
+    """Hide the console window on Windows. No-op everywhere else.
+
+    Call this from a script entry point, never from main(). main() is also the
+    `cps` console script (pyproject [project.scripts]), and a Windows user who
+    types `cps` in a terminal wants that terminal: hiding it takes their server
+    output and their Ctrl-C with it while the process keeps running.
+    """
+    if os.name != "nt":
+        return
+
     import ctypes
 
     kernel32 = ctypes.WinDLL('kernel32')
@@ -31,9 +41,6 @@ def hide_console_windows():
 
 
 def main():
-    if os.name == "nt":
-        hide_console_windows()
-
     app = create_app()
 
     from .cwa_functions import switch_theme, library_refresh, convert_library, epub_fixer, cover_enforcer_ui, cwa_stats, cwa_check_status, cwa_settings, cwa_logs, profile_pictures, cwa_internal

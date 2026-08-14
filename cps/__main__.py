@@ -6,8 +6,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-from cps.main import main
+from cps.main import hide_console_windows, main
 
 
 if __name__ == '__main__':
+    hide_console_windows()
     main()

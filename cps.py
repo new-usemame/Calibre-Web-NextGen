@@ -14,8 +14,9 @@ import sys
 path = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, path)
 
-from cps.main import main
+from cps.main import hide_console_windows, main
 
 
 if __name__ == '__main__':
+    hide_console_windows()
     main()

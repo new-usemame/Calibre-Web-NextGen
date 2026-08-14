@@ -14,13 +14,20 @@ installs the package editable (Dockerfile STEP 6,
 cwd. The container's own working directory is ``/config``, not the app root,
 so nothing else was holding that invocation up.
 
-That makes the entry point a real contract with two halves and no coverage:
+Dropping the chdir has a second consequence the units now guard with ``-P``:
+``python -m`` puts the cwd at ``sys.path[0]``, and the cwd here is ``/config``
+-- a volume the *user* mounts and writes. A stray ``/config/cps.py`` or
+``/config/cps/`` would be imported in place of the application. Verified: both
+forms hijack startup without ``-P`` and are ignored with it.
+
+That makes the entry point a real contract with three halves and no coverage:
 
 1. ``python -m cps`` must work **from an arbitrary cwd**. Testing it from the
    repo root would pass even if the editable install were the only thing
    making it work in production, so every test here runs from ``tmp_path``.
 2. ``cps.py`` must keep working, because bare-metal and systemd installs (and
    ``AI_README.md``) still invoke it by path.
+3. The cwd must not be able to supply the ``cps`` that gets imported.
 
 Without a pin, a later edit can silently restore cwd-dependence or drop
 ``__main__.py`` and the failure only shows up as a container that will not
@@ -28,6 +35,7 @@ boot — and in ``cwa-init`` it would not even be visible, since that call
 redirects to ``/dev/null``.
 """
 
+import ast
 import subprocess
 import sys
 from pathlib import Path
@@ -56,6 +64,16 @@ def _run_help(args, cwd):
     )
 
 
+def _poison(directory):
+    """Drop a cps.py in `directory` that fails loudly if it ever gets imported.
+
+    Stands in for whatever a user might leave in their mounted /config.
+    """
+    (directory / "cps.py").write_text(
+        'raise SystemExit("shadowed: the cwd copy of cps was imported")\n'
+    )
+
+
 class TestModuleEntryPoint:
     """`python -m cps` — what the s6 longrun actually execs."""
 
@@ -65,11 +83,11 @@ class TestModuleEntryPoint:
         cwd is tmp_path on purpose. The s6 unit no longer chdirs into the app
         root, so resolving `cps` from somewhere else is the whole contract.
         """
-        result = _run_help(["-m", "cps"], cwd=tmp_path)
+        result = _run_help(["-P", "-m", "cps"], cwd=tmp_path)
 
         assert result.returncode == 0, (
-            "`python -m cps --help` must succeed from an arbitrary cwd; the s6 "
-            f"longrun runs it with cwd=/config.\nstderr:\n{result.stderr}"
+            "`python -P -m cps --help` must succeed from an arbitrary cwd; the s6 "
+            f"longrun runs exactly that with cwd=/config.\nstderr:\n{result.stderr}"
         )
         assert "usage:" in result.stdout.lower(), (
             f"expected argparse usage on stdout, got:\n{result.stdout!r}"
@@ -83,7 +101,7 @@ class TestModuleEntryPoint:
         without replacing it, so the invocation the PR *promotes* printed the
         least useful name of the three.
         """
-        usage = _run_help(["-m", "cps"], cwd=tmp_path).stdout.splitlines()[0]
+        usage = _run_help(["-P", "-m", "cps"], cwd=tmp_path).stdout.splitlines()[0]
 
         assert "__main__" not in usage, (
             f"--help must not call the program __main__.py; got: {usage!r}"
@@ -105,15 +123,89 @@ class TestModuleEntryPoint:
         assert "usage:" in result.stdout.lower()
 
 
+class TestCwdCannotShadowTheApplication:
+    """/config is a user-mounted volume and it is the service's cwd."""
+
+    def test_minus_P_ignores_a_cps_py_sitting_in_the_cwd(self, tmp_path):
+        """The guard that lets the units run without chdir'ing into the app root."""
+        _poison(tmp_path)
+
+        result = _run_help(["-P", "-m", "cps"], cwd=tmp_path)
+
+        assert result.returncode == 0, (
+            "-P must keep cwd off sys.path so a stray /config/cps.py cannot be "
+            f"imported in place of the app.\nstderr:\n{result.stderr}"
+        )
+        assert "shadowed" not in result.stderr.lower()
+
+    def test_without_minus_P_the_cwd_copy_wins(self, tmp_path):
+        """Control: proves the -P above is load-bearing, not decoration.
+
+        If this ever stops shadowing, the guard is being kept for a hazard that
+        no longer exists and the test above has quietly stopped proving anything.
+        """
+        _poison(tmp_path)
+
+        result = _run_help(["-m", "cps"], cwd=tmp_path)
+
+        assert result.returncode != 0 and "shadowed" in result.stderr.lower(), (
+            "expected the cwd copy of cps to win without -P; if it no longer "
+            f"does, revisit why the units pass -P.\nstderr:\n{result.stderr}"
+        )
+
+
+class TestConsoleHidingStaysOutOfMain:
+    """`cps` (the console script) must not hide a Windows user's terminal.
+
+    pyproject exposes ``cps = "cps.main:main"``, so anything main() does on
+    import-and-call happens to someone who just typed ``cps`` at a prompt.
+    Hiding their console loses the server output and their Ctrl-C while the
+    process keeps running. Only the two *script* entry points hide it, which is
+    what cps.py did before #1596 moved the call into main().
+    """
+
+    def _main_fn(self):
+        tree = ast.parse((REPO_ROOT / "cps" / "main.py").read_text())
+        return next(
+            n for n in tree.body
+            if isinstance(n, ast.FunctionDef) and n.name == "main"
+        )
+
+    def test_main_does_not_hide_the_console(self):
+        calls = [
+            n.func.id
+            for n in ast.walk(self._main_fn())
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        ]
+
+        assert "hide_console_windows" not in calls, (
+            "main() is the `cps` console-script entry point; hiding the console "
+            "there hits users who invoked it from a terminal on purpose."
+        )
+
+    @pytest.mark.parametrize(
+        "entry", [REPO_ROOT / "cps.py", REPO_ROOT / "cps" / "__main__.py"],
+        ids=["cps.py", "cps/__main__.py"],
+    )
+    def test_script_entry_points_still_hide_it(self, entry):
+        body = entry.read_text()
+
+        assert "hide_console_windows()" in body, (
+            f"{entry.name} must keep the Windows console-hiding behaviour that "
+            "cps.py had before the entry point moved."
+        )
+
+
 class TestS6UnitsUseTheModule:
     """Pin the boot command itself, so a revert cannot be silent."""
 
     @pytest.mark.parametrize("unit", [SVC_RUN, INIT_RUN], ids=["svc", "cwa-init"])
-    def test_unit_invokes_the_module(self, unit):
+    def test_unit_invokes_the_module_with_safe_path(self, unit):
         body = unit.read_text()
 
-        assert "python3 -m cps" in body, (
-            f"{unit.name} must start the app as a module; found:\n{body}"
+        assert "python3 -P -m cps" in body, (
+            f"{unit.name} must start the app as a module with -P; without it the "
+            f"unit's cwd (/config, user-writable) lands on sys.path[0].\nfound:\n{body}"
         )
 
     @pytest.mark.parametrize("unit", [SVC_RUN, INIT_RUN], ids=["svc", "cwa-init"])
@@ -130,5 +222,7 @@ class TestS6UnitsUseTheModule:
         """__main__.py stays a thin shim — the logic belongs in cps/main.py."""
         body = (REPO_ROOT / "cps" / "__main__.py").read_text()
 
-        assert "from cps.main import main" in body
+        assert "from cps.main import" in body, (
+            "__main__.py should import the entry point rather than reimplement it"
+        )
         assert "main()" in body

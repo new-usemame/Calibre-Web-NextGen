@@ -16,6 +16,15 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Changed
+
+- **Running it outside Docker no longer means hunting down `cps.py`.** If you
+  install Calibre-Web NextGen as a Python package — packaging it for a distro,
+  running it under systemd, or just off a checkout — you can now start it with
+  `python -m cps`, the ordinary way to start a Python application. Starting it
+  by the path to `cps.py` still works and is unchanged, so nothing you have set
+  up needs touching. Thanks to @chloeroform.
+
 ### Fixed
 
 - **Metadata and cover enforcement no longer stops until the next restart if the

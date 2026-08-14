@@ -837,6 +837,37 @@ def _make_session_factory(engine):
     return factory
 
 
+def rank_typeahead_names(names, query):
+    """Order typeahead suggestions best-match-first: exact, then prefix, then
+    anywhere, alphabetical within each rank.
+
+    The suggestion query is a `LIKE %query%`, which on its own returns whatever
+    order the name index yields. That put "Conduct of life -- Fiction" ahead of
+    the tag "Life" and "Paranormal Romance" ahead of "Romance" (#1398), and the
+    editor pre-selects the first row, so Enter applied a tag the user had not
+    typed. Callers cap the list AFTER ranking, so an exact match can no longer
+    be truncated away by a library with many partial matches.
+
+    Ordering only -- nothing is filtered out, so free-text entry of a genuinely
+    new value is unaffected.
+    """
+    needle = (query or '').strip().lower()
+    if not needle:
+        return sorted(names, key=lambda name: name.lower())
+
+    def sort_key(name):
+        lowered = name.lower()
+        if lowered == needle:
+            rank = 0
+        elif lowered.startswith(needle):
+            rank = 1
+        else:
+            rank = 2
+        return rank, lowered
+
+    return sorted(names, key=sort_key)
+
+
 class CalibreDB:
     _init = False
     engine = None
@@ -1838,8 +1869,11 @@ class CalibreDB:
         query = query or ''
         entries = self.session.query(database).filter(tag_filter). \
             filter(func.lower(database.name).ilike("%" + query + "%")).all()
-        # json_dumps = json.dumps([dict(name=escape(r.name.replace(*replace))) for r in entries])
-        json_dumps = json.dumps([dict(name=r.name.replace(*replace)) for r in entries])
+        # Ranked here rather than in one caller so the classic editor and the SPA
+        # editor agree on which suggestion is the best match (#1398).
+        names = rank_typeahead_names([r.name.replace(*replace) for r in entries], query)
+        # json_dumps = json.dumps([dict(name=escape(name)) for name in names])
+        json_dumps = json.dumps([dict(name=name) for name in names])
         return json_dumps
 
     def check_exists_book(self, authr, title):

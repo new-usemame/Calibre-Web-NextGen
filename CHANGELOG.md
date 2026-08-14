@@ -27,6 +27,19 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Typing a tag that already exists now offers that tag first, and Enter adds
+  what you actually typed.** Typing "Romance" pre-selected "Paranormal Romance",
+  and pressing Enter applied it, because suggestions came back in no particular
+  order and the menu always highlighted its first row. On a large library the
+  exact match could be missing altogether, since only the first 25 matches are
+  shown and nothing put the best one among them. Suggestions are now ordered
+  exact match, then values starting with what you typed, then the rest, and no
+  suggestion is highlighted until you arrow into the list — so Enter adds your
+  text and ArrowDown then Enter takes a suggestion. This also makes it possible
+  again to type a value that sits inside an existing one, like adding "foo" when
+  "Fools and Jesters" exists. Applies to tags, authors, series and publishers in
+  both the new and the classic editor. Reported by @magdalar.
+
 - **Books you just imported now show up at the top of "Newest".** Drop several
   books into the ingest folder at once and most of them landed somewhere in the
   middle of the library instead of at the front, sorted as if they had been

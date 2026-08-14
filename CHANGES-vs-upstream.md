@@ -73,6 +73,18 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
   map, with a test that enumerates `cps/` so the next copy fails. `TBD`,
   release TBD.
 
+- **Every imported book gets the import time, not its publication date**
+  (fork #1331, second cause) — `calibredb add` derives `books.timestamp` from
+  the file's own metadata, which for most EPUBs is the publication date, so an
+  old novel imported today filed itself under its publication year and sat in
+  the middle of "Newest". `ingest_processor` already corrected this, but only
+  for `last_added_book_id`, while `_parse_added_book_ids` exists precisely
+  because one add can report several ids (`Added book ids: 4, 5`) — so every
+  book in a batch except the last kept a publication date. The correction moves
+  to `stamp_books_with_import_time()` over the whole batch. Needs no tie to
+  occur, which is why the total-order fix above did not cover it; @Oakwhisper
+  flagged that gap on the thread. `TBD`, release TBD.
+
 - **Amazon high-res covers reachable by ASIN, not only ISBN** (fork #304) — the
   CDN probe is edition-keyed and an ISBN-10 is just a print edition's ASIN, but
   only ISBNs were ever passed, so Kindle-only books were unreachable in both the

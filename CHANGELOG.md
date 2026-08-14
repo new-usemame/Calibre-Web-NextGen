@@ -27,6 +27,18 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Books you just imported now show up at the top of "Newest".** Drop several
+  books into the ingest folder at once and most of them landed somewhere in the
+  middle of the library instead of at the front, sorted as if they had been
+  added years ago. `calibredb` takes a book's "date added" from the file's own
+  metadata, which for most EPUBs is its publication date, so a 1998 novel
+  imported today was filed under 1998. That was already corrected on the way
+  in, but only for the last book of each batch — every other book in the same
+  run kept its publication date. All of them are stamped now. Existing books
+  keep the dates they have; this applies to imports from here on. Reported by
+  @jdaybell, and @Oakwhisper caught that the earlier tie-break fix, while real,
+  was not the whole cause.
+
 - **Reading on a Kobo now moves KOReader too.** Read a few chapters on the
   Kobo, open the same book in KOReader or a KOReader-based device, and it
   stayed wherever that device last was. The book page showed the Kobo's

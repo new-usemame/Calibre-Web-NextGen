@@ -825,6 +825,50 @@ _ACSM_PLUGIN_RAN_GUIDANCE = (
 )
 
 
+def stamp_books_with_import_time(connection, book_ids, now=None):
+    """Set ``books.timestamp`` to the import time for every freshly added book.
+
+    ``calibredb add`` derives ``timestamp`` from the file's own metadata, which
+    for most EPUBs is the publication date and can be years old. Left alone, a
+    book imported today lands wherever its publication date falls in "Newest"
+    rather than at the top, which is fork #1331 as @Oakwhisper described it: one
+    book added that day, sitting in the middle of the list.
+
+    One ``calibredb add`` can report several ids — ``_parse_added_book_ids``
+    handles ``Added book ids: 4, 5`` precisely because that happens — so every
+    id from the run needs the same correction. Stamping only the last one leaves
+    the rest of the batch carrying publication dates, which is what made the
+    ordering look arbitrary rather than simply wrong.
+
+    :param connection: Open sqlite3 connection to ``metadata.db`` with the
+        ``title_sort`` function registered, since updating ``books`` fires a
+        trigger that calls it.
+    :param book_ids: The ids ``calibredb add`` reported. ``None`` entries and
+        duplicates are ignored; a non-integer id is skipped rather than raising.
+    :param now: Timestamp to write, in calibre's stored format. Defaults to the
+        current time.
+    :return: Number of rows updated.
+    """
+    ids = set()
+    for book_id in book_ids or []:
+        try:
+            ids.add(int(book_id))
+        except (TypeError, ValueError):
+            continue
+    if not ids:
+        return 0
+    if now is None:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00")
+    ordered = sorted(ids)
+    placeholders = ",".join("?" * len(ordered))
+    cur = connection.cursor()
+    cur.execute(
+        "UPDATE books SET timestamp = ? WHERE id IN ({})".format(placeholders),
+        [now, *ordered],
+    )
+    return cur.rowcount
+
+
 def _acsm_plugin_failure_reason(converter_output):
     """The line where an ACSM plugin reported its own failure, or None.
 
@@ -1639,16 +1683,21 @@ class NewBookProcessor:
             # so they appear at the top of "Recently Added" views.
             # calibredb sets timestamp from EPUB metadata (publication date), which can be
             # years in the past, making new imports invisible in recently-added sorting.
-            if self.last_added_book_id is not None:
+            # Every id from this add, not just the last: one add can report
+            # several (see _parse_added_book_ids), and any id left unstamped
+            # keeps the publication date calibredb gave it (fork #1331).
+            imported_ids = self.last_added_book_ids or (
+                [self.last_added_book_id] if self.last_added_book_id is not None else []
+            )
+            if imported_ids:
                 try:
                     with sqlite3.connect(self.metadata_db, timeout=30) as con:
                         if not self._register_title_sort_function(con):
                             print("[ingest-processor] INFO: Skipping timestamp adjust (title_sort SQL function unavailable).", flush=True)
                         else:
-                            cur = con.cursor()
                             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00")
-                            cur.execute('UPDATE books SET timestamp = ? WHERE id = ?', (now, self.last_added_book_id))
-                            print(f"[ingest-processor] INFO: Set timestamp to {now} for newly imported book id={self.last_added_book_id}.", flush=True)
+                            affected = stamp_books_with_import_time(con, imported_ids, now)
+                            print(f"[ingest-processor] INFO: Set timestamp to {now} for {affected} newly imported book(s): {imported_ids}.", flush=True)
                 except Exception as e:
                     print(f"[ingest-processor] WARN: Failed to set timestamp for new book: {e}", flush=True)
 

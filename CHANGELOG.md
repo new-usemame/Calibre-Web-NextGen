@@ -48,9 +48,11 @@ is for things you can see or feel when running the app.
   backwards, and switching sort and back could reorder them again. Every sort
   now has a definite order all the way down, so a list stays put, pages line up
   instead of repeating or skipping a book, and the newest thing you added is at
-  the top. Same fix in the classic interface, and it also covers sorting by
-  publication date (books with no date set), by last modified, by series
-  position, and by downloads. Reported by @jdaybell.
+  the top. The same fault was in the classic interface, in the OPDS feeds your
+  e-reader pulls, in shelves and magic shelves, and in the duplicate finder, and
+  it also affected sorting by publication date (where every book with no date
+  set ties), by last modified, by series position, and by downloads — all fixed
+  together. Reported by @jdaybell.
 
 - **A first start that fails no longer leaves you with a server you can't log
   in to.** If creating the settings database failed on first run, startup went

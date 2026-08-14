@@ -16,6 +16,7 @@ from sqlalchemy.sql.expression import func, true
 
 from . import calibre_db, config, db, logger, ub
 from .render_template import render_title_template
+from .sort_orders import BOOK_SORT_ORDERS
 from .usermanagement import login_required_if_no_ano, user_login_required
 from .services import hardcover
 from .services.worker import WorkerThread
@@ -636,9 +637,9 @@ def render_show_shelf(shelf_type, shelf_id, page_no, sort_param):
                 if sort_param == 'zyx':
                     change_shelf_order(shelf_id, [db.Books.sort.desc()])
                 if sort_param == 'new':
-                    change_shelf_order(shelf_id, [db.Books.timestamp.desc()])
+                    change_shelf_order(shelf_id, BOOK_SORT_ORDERS["new"])
                 if sort_param == 'old':
-                    change_shelf_order(shelf_id, [db.Books.timestamp])
+                    change_shelf_order(shelf_id, BOOK_SORT_ORDERS["old"])
                 if sort_param == 'authaz':
                     change_shelf_order(shelf_id, [db.Books.author_sort.asc(), db.Series.name, db.Books.series_index])
                 if sort_param == 'authza':
@@ -804,7 +805,7 @@ def shelf_available_books(shelf_id):
         # A plain Books query returns Books instances directly (no `.Books`).
         entries = (calibre_db.session.query(db.Books)
                    .filter(calibre_db.common_filters())
-                   .order_by(db.Books.timestamp.desc())
+                   .order_by(*BOOK_SORT_ORDERS["new"])
                    .limit(limit).all())
 
     # Normalise the two shapes: search rows expose the book at `.Books`; the plain

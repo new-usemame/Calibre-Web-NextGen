@@ -208,7 +208,7 @@ def _load_books_by_ids(book_ids=None, user_id=None):
     query = _book_query(book_ids)
     if user_id is not None:
         query = query.filter(get_common_filters(user_id=user_id))
-    return query.order_by(db.Books.title, db.Books.timestamp.desc()).all()
+    return query.order_by(db.Books.title, db.Books.timestamp.desc(), db.Books.id.desc()).all()
 
 
 def _current_max_book_id():

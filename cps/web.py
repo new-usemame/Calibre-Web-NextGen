@@ -695,7 +695,11 @@ def render_discover_books(book_id):
 def render_hot_books(page, order):
     if current_user.check_visibility(constants.SIDEBAR_HOT):
         if order[1] not in ['hotasc', 'hotdesc']:
-            order = [func.count(ub.Downloads.book_id).desc()], 'hotdesc'
+            # Through the shared map, not rebuilt here: an order spelled out at
+            # a second call site is a second place to forget the tiebreaker,
+            # and this one is reached by anyone opening /hot with some other
+            # sort stored (#1331).
+            order = BOOK_SORT_ORDERS['hotdesc'], 'hotdesc'
 
         random = false()
         if current_user.show_detail_random():
@@ -1852,7 +1856,7 @@ def list_books():
         else:
             order = [db.Books.sort.asc()]
     elif not state:
-        order = [db.Books.timestamp.desc()]
+        order = BOOK_SORT_ORDERS["new"]
 
     total_count = filtered_count = calibre_db.session.query(db.Books).filter(
         calibre_db.common_filters(allow_show_archived=True)).count()

@@ -226,6 +226,33 @@ def test_the_classic_ui_reads_the_shared_map():
 
 
 @pytest.mark.unit
+def test_no_view_builds_its_own_order_beside_the_map():
+    """The hot list rebuilt its ORDER BY inline when it was reached with some
+    other sort stored, so fixing the map alone would have left that path
+    untiebroken. Enumerated over cps/, because the next copy will not be there.
+    """
+    import pathlib
+
+    cps = pathlib.Path(__file__).resolve().parents[2] / "cps"
+    offenders = []
+    for path in list(cps.glob("*.py")) + list(cps.glob("api/*.py")):
+        if path.name == "sort_orders.py":
+            continue
+        for number, line in enumerate(path.read_text().splitlines(), start=1):
+            code = line.split("#", 1)[0]
+            if ".label(" in code:
+                continue  # a counted column, not an ordering (per-user download stats)
+            if "db.Books.id" in code or "BOOK_SORT_ORDERS" in code:
+                continue  # already carries its tiebreaker
+            if ("db.Books.timestamp.desc()" in code
+                    or "func.count(ub.Downloads.book_id).desc()" in code):
+                offenders.append(f"{path.name}:{number}")
+    assert not offenders, (
+        "a book ORDER BY is spelled out outside cps/sort_orders.py, where it "
+        f"can lose its tiebreaker independently (#1331): {offenders}")
+
+
+@pytest.mark.unit
 def test_an_unknown_sort_still_falls_back_to_newest():
     """Behaviour that predates this change and must survive it."""
     from unittest.mock import patch

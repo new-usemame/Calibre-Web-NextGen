@@ -22,6 +22,7 @@ from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic
 from .usermanagement import requires_basic_auth_if_no_ano, auth
 from .helper import get_download_link, get_book_cover
 from .pagination import Pagination
+from .sort_orders import BOOK_SORT_ORDERS
 from .web import render_read_books
 
 
@@ -626,7 +627,7 @@ def feed_new():
         abort(404)
     off = request.args.get("offset") or 0
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
-                                                  db.Books, True, [db.Books.timestamp.desc()],
+                                                  db.Books, True, BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)
 
@@ -651,7 +652,7 @@ def feed_best_rated():
     off = request.args.get("offset") or 0
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books, db.Books.ratings.any(db.Ratings.rating > 9),
-                                                  [db.Books.timestamp.desc()],
+                                                  BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)
 
@@ -663,7 +664,7 @@ def feed_hot():
         abort(404)
     off = request.args.get("offset") or 0
     all_books = ub.session.query(ub.Downloads, func.count(ub.Downloads.book_id)).order_by(
-        func.count(ub.Downloads.book_id).desc()).group_by(ub.Downloads.book_id)
+        *BOOK_SORT_ORDERS["hotdesc"]).group_by(ub.Downloads.book_id)
     hot_books = all_books.offset(off).limit(config.config_books_per_page)
     entries = list()
     for book in hot_books:
@@ -863,7 +864,7 @@ def feed_format(book_id):
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books,
                                                   db.Books.data.any(db.Data.format == book_id.upper()),
-                                                  [db.Books.timestamp.desc()],
+                                                  BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination,
                                feed_title=_feed_title_with_name(book_id.upper()))
@@ -900,7 +901,7 @@ def feed_languages(book_id):
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books,
                                                   db.Books.languages.any(db.Languages.id == book_id),
-                                                  [db.Books.timestamp.desc()],
+                                                  BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination,
                                feed_title=_feed_title_with_name(_language_display_name(book_id)))
@@ -1010,7 +1011,7 @@ def feed_magic_shelf(shelf_id):
 
     per_page = int(config.config_books_per_page) if config.config_books_per_page else 20
     page = int(off) // per_page + 1
-    sort_order = [db.Books.timestamp.desc()]
+    sort_order = BOOK_SORT_ORDERS["new"]
     query, __ = magic_shelf.build_book_query_for_magic_shelf(
         shelf_id,
         sort_order=sort_order,
@@ -1123,7 +1124,7 @@ def feed_currently_reading():
         0,
         db.Books,
         in_progress_filter,
-        [db.Books.timestamp.desc()],
+        BOOK_SORT_ORDERS["new"],
         True,
         config.config_read_column,
         db.books_series_link,
@@ -1278,7 +1279,7 @@ def render_xml_dataset(data_table, book_id):
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books,
                                                   getattr(db.Books, data_table.__tablename__).any(data_table.id == book_id),
-                                                  [db.Books.timestamp.desc()],
+                                                  BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination,
                                feed_title=_feed_title_with_name(_dataset_display_name(data_table, book_id)))

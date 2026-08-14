@@ -300,7 +300,7 @@ def list_books():
         off = per_page * (page - 1)
         all_hot_ids = [row[0] for row in (ub.session.query(ub.Downloads.book_id)
                    .group_by(ub.Downloads.book_id)
-                   .order_by(func.count(ub.Downloads.book_id).desc()))]
+                   .order_by(*BOOK_SORT_ORDERS["hotdesc"]))]
         # Filter before paginating: otherwise a hidden/restricted book leaves a
         # short page while the header still counts it.
         visible_hot_ids = _visible_hot_book_ids(all_hot_ids)

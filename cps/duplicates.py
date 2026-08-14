@@ -897,7 +897,7 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
     # than trying to do complex joins for duplicate detection
     books_query = (calibre_db.session.query(db.Books)
                    .filter(get_common_filters(user_id=user_id))  # Respect user permissions and library filtering
-                   .order_by(db.Books.title, db.Books.timestamp.desc()))
+                   .order_by(db.Books.title, db.Books.timestamp.desc(), db.Books.id.desc()))
 
     if candidate_ids is not None:
         if not candidate_ids:

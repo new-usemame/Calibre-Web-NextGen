@@ -17,6 +17,7 @@ from . import api_v1
 from .books import _row_to_item
 from .. import ub, config, db, calibre_db, logger, magic_shelf
 from ..cw_login import current_user
+from ..sort_orders import BOOK_SORT_ORDERS
 from ..usermanagement import login_required_if_no_ano, user_login_required
 
 log = logger.create()
@@ -107,7 +108,7 @@ def magic_shelf_books(shelf_id):
 
     series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
     entries, _random, pagination = calibre_db.fill_indexpage(
-        page, per_page, db.Books, query_filter, [db.Books.timestamp.desc()],
+        page, per_page, db.Books, query_filter, BOOK_SORT_ORDERS["new"],
         True, config.config_read_column, *series_join)
     return jsonify({
         "id": shelf.id, "name": display_name, "icon": shelf.icon or "🪄",

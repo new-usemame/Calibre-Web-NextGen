@@ -83,7 +83,7 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
   book in a batch except the last kept a publication date. The correction moves
   to `stamp_books_with_import_time()` over the whole batch. Needs no tie to
   occur, which is why the total-order fix above did not cover it; @Oakwhisper
-  flagged that gap on the thread. `TBD`, release TBD.
+  flagged that gap on the thread. `b60fc301`, release TBD.
 
 - **Amazon high-res covers reachable by ASIN, not only ISBN** (fork #304) — the
   CDN probe is edition-keyed and an ISBN-10 is just a print edition's ASIN, but

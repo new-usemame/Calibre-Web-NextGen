@@ -41,8 +41,14 @@ class CliParameter(object):
         self.arg_parser()
 
     def arg_parser(self):
+        # prog is pinned because argparse otherwise derives it from
+        # basename(sys.argv[0]) -- which under `python -m cps` is the literal
+        # `__main__.py`. `cps` is the one name that reads correctly for both
+        # the module invocation the container uses and the cps.py script that
+        # bare-metal installs still call.
         parser = argparse.ArgumentParser(description='Calibre-Web NextGen is a web app providing '
-                                                     'a interface for browsing, reading and downloading eBooks\n')
+                                                     'a interface for browsing, reading and downloading eBooks\n',
+                                         prog='cps')
         parser.add_argument('-p', metavar='path', help='path and name to settings db, e.g. /opt/cw.db')
         parser.add_argument('-g', metavar='path', help='path and name to gdrive db, e.g. /opt/gd.db')
         parser.add_argument('-c', metavar='path', help='path and name to SSL certfile, '

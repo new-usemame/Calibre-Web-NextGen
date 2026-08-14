@@ -1616,6 +1616,8 @@ def HandleStateRequest(book_uuid):
 
         if request_bookmark and request_bookmark.get("ProgressPercent") is not None:
             push_reading_state_to_hardcover(current_user, book, request_bookmark["ProgressPercent"])
+            share_kobo_progress_with_koreader(
+                current_user.id, book.id, request_bookmark["ProgressPercent"])
 
         ub.session.merge(kobo_reading_state)
         ub.session_commit()
@@ -1623,6 +1625,47 @@ def HandleStateRequest(book_uuid):
             "RequestResult": "Success",
             "UpdateResults": [update_results_response],
         })
+
+
+def share_kobo_progress_with_koreader(user_id, book_id, percentage):
+    """Publish a Kobo's reading percentage onto the carrier KOReader pulls from.
+
+    #1425 gap 1. KOReader fetches ``KOSyncProgress`` over kosync; a Kobo sync
+    wrote ``KoboBookmark`` and never that table, so a KOReader device had
+    nothing to fetch and carried on from where *it* last was. Same shape as
+    #1366, where the web reader was the missing producer.
+
+    What transfers is the percentage, not the position. A Kobo reports a
+    ``KoboSpan`` addressing the kepub *that device holds*, which KOReader's
+    engine cannot resolve, so the row is stored percentage-only and served as
+    ``position_kind: "percentage"``. Clients that have not advertised support
+    for that are served nothing, exactly as before (see
+    ``record_percentage_only_progress``).
+
+    Best-effort, and deliberately so: a Kobo's own sync is the required write
+    here, and it must not fail because the KOReader carrier could not be
+    written. On failure the device keeps its state and the next PUT retries.
+
+    :param user_id: Owner of the reading position.
+    :param book_id: Calibre book id — the key ``update_progress`` converges on.
+    :param percentage: Reading progress, 0-100, as the device reported it.
+    :return: None
+    """
+    # Imported lazily: ``kosync`` imports this module for
+    # ``push_reading_state_to_hardcover``, so a module-level import is a cycle.
+    from .progress_syncing.protocols.kosync import record_percentage_only_progress
+
+    try:
+        # A SAVEPOINT only contains what is flushed after it, so the Kobo's own
+        # bookmark, statistics and status writes have to be settled first or a
+        # rollback here would take them with it (#1318, same precondition the
+        # web reader path documents).
+        ub.session_flush()
+        with ub.session.begin_nested():
+            record_percentage_only_progress(user_id, book_id, percentage, device="Kobo")
+    except Exception as e:
+        log.warning("Could not share Kobo progress with KOReader for user %s book %s: %s",
+                    user_id, book_id, e)
 
 
 def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: int):

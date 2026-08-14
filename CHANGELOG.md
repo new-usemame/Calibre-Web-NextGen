@@ -27,6 +27,19 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Reading on a Kobo now moves KOReader too.** Read a few chapters on the
+  Kobo, open the same book in KOReader or a KOReader-based device, and it
+  stayed wherever that device last was. The book page showed the Kobo's
+  progress, so it looked like the sync had worked — but nothing ever reached
+  the other device, because the Kobo's position was never written to the place
+  KOReader pulls from. It is now. As with the web reader, the two sides share a
+  percentage rather than an exact spot: a Kobo describes a position inside the
+  copy of the file that device holds, which KOReader's engine cannot resolve,
+  so it lands near where you stopped. Needs the NextGen Progress Sync plugin on
+  the device; older plugins are served nothing rather than a position they
+  would mis-seek on. Reported by @IceSentry, and kept honest by @sroebert's
+  testing.
+
 - **A first start that fails no longer leaves you with a server you can't log
   in to.** If creating the settings database failed on first run, startup went
   on to create an empty one anyway. That empty file looked like an existing

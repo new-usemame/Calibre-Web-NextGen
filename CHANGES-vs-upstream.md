@@ -61,6 +61,14 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Book lists have a total order, so "Newest" is newest** (fork #1331) — every
+  list pages with LIMIT/OFFSET over an ORDER BY that named one non-unique
+  column, so SQLite ordered tied rows by whatever its plan walked; a bulk ingest
+  gives a whole run one timestamp, and the same query flipped its order once an
+  index existed. The orders now live in one `cps/sort_orders.py` shared by the
+  classic UI and `/api/v1` (both had carried their own copy, both missing the
+  same tiebreakers) and each ends on a unique column. `TBD`, release TBD.
+
 - **Amazon high-res covers reachable by ASIN, not only ISBN** (fork #304) — the
   CDN probe is edition-keyed and an ISBN-10 is just a print edition's ASIN, but
   only ISBNs were ever passed, so Kindle-only books were unreachable in both the

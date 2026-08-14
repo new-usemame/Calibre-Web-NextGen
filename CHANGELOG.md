@@ -40,6 +40,18 @@ is for things you can see or feel when running the app.
   would mis-seek on. Reported by @IceSentry, and kept honest by @sroebert's
   testing.
 
+- **"Newest" now actually opens on your newest book.** Books that arrived in the
+  same batch — an ingest run, a folder import, anything that adds more than one
+  book at once — all carry the same "date added", and the library had nothing to
+  break that tie with, so it handed them back in whatever order the database
+  happened to walk. A shelf of twenty books added together could come out
+  backwards, and switching sort and back could reorder them again. Every sort
+  now has a definite order all the way down, so a list stays put, pages line up
+  instead of repeating or skipping a book, and the newest thing you added is at
+  the top. Same fix in the classic interface, and it also covers sorting by
+  publication date (books with no date set), by last modified, by series
+  position, and by downloads. Reported by @jdaybell.
+
 - **A first start that fails no longer leaves you with a server you can't log
   in to.** If creating the settings database failed on first run, startup went
   on to create an empty one anyway. That empty file looked like an existing

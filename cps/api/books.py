@@ -15,6 +15,7 @@ from .. import calibre_db, config, db, ub, isoLanguages, logger
 from ..cw_login import current_user
 from ..helper import edit_book_read_status, book_is_in_progress, get_convert_options, \
     get_kosync_progress_display
+from ..sort_orders import BOOK_SORT_ORDERS
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
@@ -70,28 +71,11 @@ def _original_filename(book_id):
     except Exception:
         return None
 
-# Stateless sort map — mirrors web.py sort options without calling get_sort_function
-# (which writes per-user state and must not be called from a read-only API endpoint).
-SORT_MAP = {
-    "new": [db.Books.timestamp.desc()],
-    "old": [db.Books.timestamp],
-    "abc": [func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id],
-    "zyx": [func.ng_sort_key(db.Books.sort).desc(), db.Books.sort.desc(), db.Books.id.desc()],
-    "pubnew": [db.Books.pubdate.desc()],
-    "pubold": [db.Books.pubdate],
-    "modifiednew": [db.Books.last_modified.desc()],
-    "modifiedold": [db.Books.last_modified],
-    "authaz": [func.ng_sort_key(db.Books.author_sort), db.Books.author_sort,
-               func.ng_sort_key(db.Series.name), db.Series.name, db.Books.series_index],
-    "authza": [func.ng_sort_key(db.Books.author_sort).desc(), db.Books.author_sort.desc(),
-               func.ng_sort_key(db.Series.name).desc(), db.Series.name.desc(), db.Books.series_index.desc()],
-    # Series reading order — mirrors web.py get_sort_function's seriesasc/seriesdesc.
-    # Every list_books path already joins db.Series (series_join), so ordering by
-    # db.Books.series_index needs no extra plumbing. Used by the new-UI series view
-    # so a series reads 1, 2, 3… instead of newest-first (fork #573).
-    "seriesasc": [db.Books.series_index.asc()],
-    "seriesdesc": [db.Books.series_index.desc()],
-}
+# The sort options, shared with the classic UI's get_sort_function — which
+# additionally writes per-user view state and so cannot be called from a
+# read-only API endpoint. Only the ORDER BY is common, and it lives in one place
+# so a sort cannot be correct in one UI and wrong in the other (fork #1331).
+SORT_MAP = BOOK_SORT_ORDERS
 
 
 def _real_user_id():

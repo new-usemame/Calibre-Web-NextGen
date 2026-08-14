@@ -43,6 +43,7 @@ from .helper import check_valid_domain, check_email, check_username, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
     edit_book_read_status, valid_password, get_kosync_progress_display
 from .pagination import Pagination
+from .sort_orders import BOOK_SORT_ORDERS, book_sort_order
 from .redirect import get_redirect_location
 from .cw_babel import get_available_locale
 from .usermanagement import login_required_if_no_ano
@@ -501,45 +502,20 @@ def query_char_list(data_colum, db_link):
 
 
 def get_sort_function(sort_param, data):
-    order = [db.Books.timestamp.desc()]
     if sort_param == 'stored':
         sort_param = current_user.get_view_property(data, 'stored')
     else:
         current_user.set_view_property(data, 'stored', sort_param)
-    if sort_param == 'pubnew':
-        order = [db.Books.pubdate.desc()]
-    if sort_param == 'pubold':
-        order = [db.Books.pubdate]
-    if sort_param == 'abc':
-        order = [func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id]
-    if sort_param == 'zyx':
-        order = [func.ng_sort_key(db.Books.sort).desc(), db.Books.sort.desc(), db.Books.id.desc()]
-    if sort_param == 'new':
-        order = [db.Books.timestamp.desc()]
-    if sort_param == 'old':
-        order = [db.Books.timestamp]
-    if sort_param == 'authaz':
-        order = [func.ng_sort_key(db.Books.author_sort), db.Books.author_sort,
-                 func.ng_sort_key(db.Series.name), db.Series.name, db.Books.series_index]
-    if sort_param == 'authza':
-        order = [func.ng_sort_key(db.Books.author_sort).desc(), db.Books.author_sort.desc(),
-                 func.ng_sort_key(db.Series.name).desc(), db.Series.name.desc(), db.Books.series_index.desc()]
-    if sort_param == 'seriesasc':
-        order = [db.Books.series_index.asc()]
-    if sort_param == 'seriesdesc':
-        order = [db.Books.series_index.desc()]
-    if sort_param == 'hotdesc':
-        order = [func.count(ub.Downloads.book_id).desc()]
-    if sort_param == 'hotasc':
-        order = [func.count(ub.Downloads.book_id).asc()]
     if sort_param is None:
         if data == "series":
             # A series page reads in series order by default — matching the
             # OPDS series feed — not newest-first. An explicitly chosen sort
             # is stored above and honored on the next visit. (fork #334 audit)
-            return [db.Books.series_index.asc()], "seriesasc"
+            return BOOK_SORT_ORDERS["seriesasc"], "seriesasc"
         sort_param = "new"
-    return order, sort_param
+    # The ORDER BY itself is shared with the new UI's /api/v1 lists so the two
+    # cannot disagree, and so every sort keeps its unique tiebreaker (#1331).
+    return book_sort_order(sort_param), sort_param
 
 
 def cwa_get_library_location() -> str:

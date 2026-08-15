@@ -82,7 +82,13 @@ def test_registry_failure_does_not_break_reading_services_request(monkeypatch):
     monkeypatch.setattr(readingservices, "current_user", SimpleNamespace(is_authenticated=True, id=7))
     monkeypatch.setattr(device_registry, "sessionmaker", lambda **_kwargs: (_ for _ in ()).throw(OSError("disk")))
     wrapped = readingservices.requires_reading_services_auth_and_config(lambda: ("upstream", 207))
-    with app.test_request_context("/api/v3/content/x/annotations", headers={"x-kobo-deviceid": "b" * 64}):
+    # PATCH, not GET: device registration happens on the upload direction, and a
+    # GET on this path is now intercepted by the annotation-download guard before
+    # the decorator's pass-through can run (that guard is the subject of its own
+    # test module). The property under test -- a registry failure must not break
+    # the request -- is unchanged.
+    with app.test_request_context("/api/v3/content/x/annotations", method="PATCH",
+                                  headers={"x-kobo-deviceid": "b" * 64}):
         assert wrapped() == ("upstream", 207)
 
 
@@ -169,8 +175,15 @@ def test_client_last_modified_missing_malformed_valid(db_session, raw, expected)
                              SimpleNamespace(id=5, uuid="b3d1b38b-74fd-43b7-a796-996e5a6a8b04"),
                              SimpleNamespace(id=7))
     if expected == "malformed":
-        assert row is None
-        assert db_session.query(ub.Annotation).count() == 0
+        # A malformed CLOCK READING must not destroy the user's words. This
+        # previously asserted the annotation was discarded, which is the same
+        # data-loss shape as the content-location gate: the highlight text is
+        # irreplaceable, the timestamp is an ordering hint. Store it, drop only
+        # the hint.
+        assert row is not None
+        assert row.highlighted_text == "text"
+        assert row.client_modified_at is None
+        assert db_session.query(ub.Annotation).count() == 1
     elif expected == "missing":
         assert row.client_modified_at is None
     else:

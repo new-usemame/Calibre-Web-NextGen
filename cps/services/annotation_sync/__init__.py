@@ -195,8 +195,16 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
     raw_client_time = payload.get("clientLastModifiedUtc", _CLIENT_TIME_MISSING)
     client_time = parse_client_modified_utc(raw_client_time)
     if raw_client_time is not _CLIENT_TIME_MISSING and client_time is None:
-        log.warning("Rejecting annotation %s with malformed clientLastModifiedUtc", annotation_id)
-        return None
+        # Same rule as the content location below: a malformed CLOCK READING is
+        # not a reason to destroy the user's words. Degrade to "no timestamp
+        # supplied" -- an already-handled state -- so the highlight is still
+        # stored and only the ordering hint is lost.
+        log.warning(
+            "Annotation %s has a malformed clientLastModifiedUtc %r; storing it "
+            "without a client timestamp rather than discarding the highlight",
+            annotation_id, raw_client_time,
+        )
+        client_time = _CLIENT_TIME_MISSING
     span = (payload.get("location") or {}).get("span") or {}
     normalized_content_id = None
     chapter_filename = span.get("chapterFilename")

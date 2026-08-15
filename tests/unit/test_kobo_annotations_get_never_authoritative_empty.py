@@ -59,7 +59,7 @@ def _view():
 
 def test_get_for_a_book_we_own_is_not_proxied_and_is_not_success(app, monkeypatch, no_proxy):
     monkeypatch.setattr(
-        rs, "get_book_by_entitlement_id",
+        rs, "resolve_entitlement_ownership",
         lambda eid: SimpleNamespace(id=347, title="Flatland", uuid=BOOK_UUID),
     )
     with app.test_request_context(
@@ -76,7 +76,7 @@ def test_get_for_a_book_we_own_is_not_proxied_and_is_not_success(app, monkeypatc
 def test_get_for_content_we_do_not_own_still_proxies(app, monkeypatch):
     """A real Kobo store book is Kobo's data; its cloud IS authoritative there."""
     sentinel = object()
-    monkeypatch.setattr(rs, "get_book_by_entitlement_id", lambda eid: None)
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda eid: None)
     monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
 
     with app.test_request_context("/api/v3/content/not-ours/annotations", method="GET"):
@@ -86,7 +86,7 @@ def test_get_for_content_we_do_not_own_still_proxies(app, monkeypatch):
 def test_patch_upload_direction_still_proxies(app, monkeypatch):
     """Uploads are harmless and must keep working -- only the download is destructive."""
     sentinel = object()
-    monkeypatch.setattr(rs, "get_book_by_entitlement_id", lambda eid: None)
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda eid: None)
     monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
 
     with app.test_request_context(
@@ -94,3 +94,68 @@ def test_patch_upload_direction_still_proxies(app, monkeypatch):
         json={"updatedAnnotations": []},
     ):
         assert _view()(BOOK_UUID) is sentinel
+
+
+# --- fail-closed: uncertainty must never fall through to the destructive path ---
+
+def test_ownership_lookup_error_fails_closed(app, monkeypatch, no_proxy):
+    """A DB hiccup must not be read as 'not our book'.
+
+    `get_book_by_entitlement_id` swallows every exception and returns None, which
+    is indistinguishable from a genuinely foreign entitlement. If the guard used
+    that, a transient metadata-DB failure would re-open the exact path that
+    deleted 87 highlights. Uncertainty fails closed.
+    """
+    def _boom(_uuid):
+        raise RuntimeError("metadata db unavailable")
+
+    monkeypatch.setattr(rs.calibre_db, "get_book_by_uuid", _boom)
+    with app.test_request_context(f"/api/v3/content/{BOOK_UUID}/annotations", method="GET"):
+        resp = _view()(BOOK_UUID)
+    assert resp.status_code == 503
+    assert resp.headers.get("Retry-After")
+
+
+def test_guard_runs_even_when_kobo_sync_is_disabled(app, monkeypatch, no_proxy):
+    """Switching Kobo sync off must not re-open the destructive download.
+
+    The decorator proxies everything when sync is disabled, so before this the
+    guard never ran in that state -- an admin toggling the setting could hand the
+    device an answer that deletes its highlights.
+    """
+    monkeypatch.setattr(rs.config, "config_kobo_sync", False, raising=False)
+    monkeypatch.setattr(
+        rs, "resolve_entitlement_ownership",
+        lambda eid: SimpleNamespace(id=347, title="Flatland", uuid=BOOK_UUID),
+    )
+    decorated = rs.requires_reading_services_auth_and_config(
+        lambda *_a, **_k: pytest.fail("handler should not be reached"))
+    with app.test_request_context(f"/api/v3/content/{BOOK_UUID}/annotations", method="GET"):
+        resp = decorated()
+    assert resp.status_code == 503
+
+
+def test_guard_runs_even_without_an_authenticated_session(app, monkeypatch, no_proxy):
+    """A lost or expired Kobo session must not re-open the destructive download."""
+    monkeypatch.setattr(rs.config, "config_kobo_sync", True, raising=False)
+    monkeypatch.setattr(rs, "current_user", SimpleNamespace(is_authenticated=False, id=None))
+    monkeypatch.setattr(
+        rs, "resolve_entitlement_ownership",
+        lambda eid: SimpleNamespace(id=347, title="Flatland", uuid=BOOK_UUID),
+    )
+    decorated = rs.requires_reading_services_auth_and_config(
+        lambda *_a, **_k: pytest.fail("handler should not be reached"))
+    with app.test_request_context(f"/api/v3/content/{BOOK_UUID}/annotations", method="GET"):
+        resp = decorated()
+    assert resp.status_code == 503
+
+
+def test_foreign_content_still_proxies_when_sync_disabled(app, monkeypatch):
+    """The guard must not become a blanket block: a real Kobo store book still proxies."""
+    sentinel = object()
+    monkeypatch.setattr(rs.config, "config_kobo_sync", False, raising=False)
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda eid: None)
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    decorated = rs.requires_reading_services_auth_and_config(lambda *_a, **_k: sentinel)
+    with app.test_request_context("/api/v3/content/not-ours/annotations", method="GET"):
+        assert decorated() is sentinel

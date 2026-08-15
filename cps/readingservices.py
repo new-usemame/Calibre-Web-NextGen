@@ -129,6 +129,12 @@ def requires_reading_services_auth_and_config(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # The destructive-download guard runs FIRST, ahead of every pass-through
+        # below. Kobo sync being switched off, or a missing/expired session, must
+        # not re-open a path that deletes annotations off the user's device.
+        guarded = _guard_request_if_annotation_download()
+        if guarded is not None:
+            return guarded
         if not config.config_kobo_sync:
             log.debug("Kobo sync disabled, proxying to Kobo")
             return proxy_to_kobo_reading_services()
@@ -146,14 +152,86 @@ def requires_reading_services_auth_and_config(f):
     return decorated_function
 
 
+#: Ownership could not be determined (e.g. the metadata DB errored). Distinct
+#: from ``None``, which means "definitively not a book we serve". Conflating the
+#: two is what makes a destructive fallback fire on a transient failure.
+OWNERSHIP_UNKNOWN = object()
+
+
 def get_book_by_entitlement_id(entitlement_id):
-    """Get book from database by UUID (entitlement_id)."""
+    """Get book from database by UUID (entitlement_id).
+
+    Returns ``None`` both for "not ours" and for a lookup failure. Callers whose
+    fallback is destructive must use :func:`resolve_entitlement_ownership`
+    instead, which keeps those two cases apart.
+    """
     try:
         book = calibre_db.get_book_by_uuid(entitlement_id)
         return book
     except Exception as e:
         log.error(f"Error getting book by entitlement ID {entitlement_id}: {e}")
         return None
+
+
+def resolve_entitlement_ownership(entitlement_id):
+    """Tri-state ownership: the Books row, ``None``, or ``OWNERSHIP_UNKNOWN``."""
+    try:
+        return calibre_db.get_book_by_uuid(entitlement_id)
+    except Exception:
+        log.exception(
+            "Could not determine ownership of entitlement %s; treating as UNKNOWN",
+            entitlement_id,
+        )
+        return OWNERSHIP_UNKNOWN
+
+
+def _annotation_download_guard(entitlement_id):
+    """503 when we must not proxy this book's annotation download, else ``None``.
+
+    Kobo's cloud has never heard of a sideloaded book and answers the download
+    with a success-shaped empty set, which Nickel acts on by DELETING every local
+    Bookmark row for the book (upstream calibre-web #2610; measured 2026-08-15,
+    87 highlights deleted in one sync). For a sideloaded book the device is
+    frequently the only copy, so a 200-empty is destructive even though the verb
+    is GET.
+
+    Fails CLOSED: an entitlement we cannot resolve is refused too, because the
+    fallback here destroys data that exists nowhere else.
+    """
+    owner = resolve_entitlement_ownership(entitlement_id)
+    if owner is None:
+        return None  # definitively not ours -- Kobo's cloud IS authoritative
+    if owner is OWNERSHIP_UNKNOWN:
+        log.warning(
+            "Refusing annotation download for entitlement %s: ownership unknown, "
+            "and proxying on uncertainty can delete the device's only copy",
+            entitlement_id,
+        )
+    else:
+        log.info(
+            "Not proxying annotation download for locally-owned book %s (%s); "
+            "Kobo's empty answer would delete the device's copy",
+            owner.id, entitlement_id,
+        )
+    response = make_response(
+        jsonify({"error": "Annotation download unavailable for sideloaded content"}), 503,
+    )
+    response.headers["Retry-After"] = "3600"
+    return response
+
+
+_ANNOTATION_PATH_RE = re.compile(r"^/api/v3/content/(?P<eid>[^/]+)/annotations/?$")
+
+
+def _guard_request_if_annotation_download():
+    """Apply the download guard from the OUTERMOST layer, before any auth/config
+    pass-through can hand this request to Kobo. Returns a response or ``None``."""
+    if request.method != "GET":
+        return None
+    match = _ANNOTATION_PATH_RE.match(request.path or "")
+    if not match:
+        return None
+    return _annotation_download_guard(match.group("eid"))
 
 
 def get_book_identifiers(book):
@@ -367,35 +445,12 @@ def handle_annotations(entitlement_id):
     path independent of any sync target lands in sub-project (2).
     """
     if request.method == "GET":
-        book = get_book_by_entitlement_id(entitlement_id)
-        if book is not None:
-            # This entitlement is a book WE delivered. Kobo's cloud has never heard
-            # of it, so it answers the download direction with a success-shaped
-            # "no annotations" -- and Nickel acts on that by DELETING every local
-            # Bookmark row for the book (upstream calibre-web #2610).
-            #
-            # Measured on real hardware 2026-08-15: 88 correctly-anchored highlights
-            # at 11:58; one sync at 12:07 uploaded a single annotation and deleted
-            # the other 87. For a sideloaded book the device is frequently the only
-            # copy, so a 200-empty here is a DESTRUCTIVE operation even though the
-            # verb is GET.
-            #
-            # We deliberately do not answer with our own snapshot either: an
-            # internally-complete server view would tell a second device to drop
-            # annotations it has not uploaded yet. 503 + Retry-After is the one
-            # response that cannot be read as "you have none" -- it is explicitly
-            # non-authoritative, so the device keeps what it holds.
-            log.info(
-                "Not proxying annotation download for locally-owned book %s (%s); "
-                "Kobo's empty answer would delete the device's copy",
-                book.id, entitlement_id,
-            )
-            response = make_response(
-                jsonify({"error": "Annotation download unavailable for sideloaded content"}),
-                503,
-            )
-            response.headers["Retry-After"] = "3600"
-            return response
+        # Same guard as the decorator, kept here as defense in depth so the
+        # handler is safe if it is ever reached by another route or called
+        # directly. Single implementation, so the two cannot drift.
+        guarded = _annotation_download_guard(entitlement_id)
+        if guarded is not None:
+            return guarded
 
     if request.method == "PATCH":
         try:

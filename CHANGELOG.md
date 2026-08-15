@@ -52,6 +52,12 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Deleted tags no longer stay behind in the Kobo copy.** Removing one tag
+  from a book updated the EPUB, but the KEPUB merged the shorter list with its
+  old tags and kept every deleted value. Tags are now replaced from the library
+  metadata instead, and clearing a publisher, description or publication date
+  now reaches the KEPUB too.
+
 - **Arabic, Hebrew and Farsi titles now read the right way round.** Book titles,
   authors, series names, descriptions and custom column values written in a
   right-to-left script were rendered left-to-right on the book page and on the

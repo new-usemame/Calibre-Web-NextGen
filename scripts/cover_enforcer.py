@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 import unicodedata
@@ -711,6 +712,85 @@ class Enforcer:
                 if lower_name.endswith(".kepub") or lower_name.endswith(".kepub.epub"):
                     tool = 'ebook-meta'
                     cmd = [tool, file, '--from-opf', book.new_metadata_path]
+
+                    try:
+                        opf_root = ET.parse(book.new_metadata_path).getroot()
+                    except (ET.ParseError, OSError) as error:
+                        print(
+                            f"[cover-metadata-enforcer] Warning: could not parse "
+                            f"metadata OPF '{book.new_metadata_path}': {error}; "
+                            "using --from-opf without replacement flags",
+                            flush=True,
+                        )
+                    else:
+                        metadata = next(
+                            (element for element in opf_root.iter()
+                             if element.tag.rsplit('}', 1)[-1] == 'metadata'),
+                            opf_root,
+                        )
+
+                        dc_values = {}
+                        calibre_values = {}
+                        for element in metadata:
+                            local_name = element.tag.rsplit('}', 1)[-1]
+                            value = ''.join(element.itertext()).strip()
+                            if local_name in {
+                                'title', 'creator', 'subject', 'publisher',
+                                'description', 'language', 'date',
+                            }:
+                                dc_values.setdefault(local_name, []).append(value)
+                            elif local_name == 'meta':
+                                name = element.get('name') or element.get('property')
+                                if name in {
+                                    'calibre:series', 'calibre:series_index',
+                                    'calibre:rating',
+                                }:
+                                    calibre_values[name] = (
+                                        element.get('content', value).strip()
+                                    )
+
+                        def first_value(name):
+                            return next((
+                                value for value in dc_values.get(name, []) if value
+                            ), '')
+
+                        series = calibre_values.get('calibre:series', '')
+                        # Passing --series "" records the intended replacement,
+                        # but calibre 9.11.0 treats it as a no-op and leaves an
+                        # existing calibre:series meta in a real kepubify KEPUB.
+                        # Do not "fix" that by sending KEPUBs through ebook-polish:
+                        # polishing re-segments koboSpans and moves every Kobo
+                        # reader's saved position.
+                        cmd += ['--series', series]
+                        series_index = calibre_values.get('calibre:series_index', '')
+                        if series_index:
+                            cmd += ['--index', series_index]
+                        cmd += [
+                            '--tags', ', '.join(
+                                value for value in dc_values.get('subject', []) if value
+                            ),
+                            '--publisher', first_value('publisher'),
+                            '--comments', first_value('description'),
+                        ]
+                        pubdate = first_value('date')
+                        if pubdate:
+                            cmd += ['--date', pubdate]
+                        languages = ', '.join(
+                            value for value in dc_values.get('language', []) if value
+                        )
+                        if languages:
+                            cmd += ['--language', languages]
+                        authors = ' & '.join(
+                            value for value in dc_values.get('creator', []) if value
+                        )
+                        if authors:
+                            cmd += ['--authors', authors]
+                        title = first_value('title')
+                        if title:
+                            cmd += ['--title', title]
+                        rating = calibre_values.get('calibre:rating', '')
+                        if rating:
+                            cmd += ['--rating', rating]
                     if Path(book.cover_path).exists():
                         cmd += ['--cover', book.cover_path]
                 else:

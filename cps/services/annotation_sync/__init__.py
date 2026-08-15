@@ -207,8 +207,18 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
                 f"{_book_uuid(book)}!!{chapter_filename}", book_uuid=_book_uuid(book)
             )
         except ContentIdError:
-            log.warning("Rejecting annotation %s with invalid content location", annotation_id)
-            return None
+            # content_id is DERIVED, nullable and recomputable; the highlight is
+            # none of those things. For a sideloaded book the device is the only
+            # other copy, so discarding the row here destroys text that exists
+            # nowhere else -- which is exactly what happened between 2026-08-13
+            # and 2026-08-15. Degrade the locator, never the annotation;
+            # ub.backfill_annotation_content_ids repairs the column later.
+            log.warning(
+                "Annotation %s has an unusable content location %r; storing it "
+                "without a content_id rather than discarding the highlight",
+                annotation_id, chapter_filename,
+            )
+            normalized_content_id = None
     ann = (
         session.query(ub.Annotation)
         .filter(

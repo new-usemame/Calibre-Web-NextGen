@@ -123,6 +123,25 @@ def test_clean_package_is_completely_untouched(tmp_path):
 
 
 @pytest.mark.unit
+def test_clean_package_reads_only_container_and_opf(tmp_path, monkeypatch):
+    import cps.services.kepub_package_normalizer as normalizer
+
+    package = tmp_path / "clean.kepub"
+    _write_package(package, opf=CLEAN_OPF, nav_path="OPS/nav.xhtml")
+    read_names = []
+
+    class RecordingZipFile(zipfile.ZipFile):
+        def read(self, name, *args, **kwargs):
+            read_names.append(name.filename if isinstance(name, zipfile.ZipInfo) else name)
+            return super().read(name, *args, **kwargs)
+
+    monkeypatch.setattr(normalizer.zipfile, "ZipFile", RecordingZipFile)
+
+    assert normalizer.normalize_kepub_package(package) is False
+    assert read_names == ["META-INF/container.xml", "OPS/epb.opf"]
+
+
+@pytest.mark.unit
 def test_kobo_span_markup_and_per_file_counts_are_preserved_exactly(tmp_path):
     package = tmp_path / "spans.kepub"
     _write_package(package)

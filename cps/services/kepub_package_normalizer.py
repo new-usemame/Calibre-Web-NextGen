@@ -244,15 +244,16 @@ def normalize_kepub_package(path):
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
             names = [info.filename for info in infos]
+            opf_path = _package_document_path(archive)
+            opf_bytes = archive.read(opf_path)
+            relocations = _plan_relocations(opf_path, opf_bytes, set(names))
+            if not relocations:
+                return False
             if len(names) != len(set(names)):
                 raise ValueError("KEPUB contains duplicate ZIP member names")
             if archive.testzip() is not None:
                 raise ValueError("KEPUB failed its CRC check")
             contents = {info.filename: archive.read(info) for info in infos}
-            opf_path = _package_document_path(archive)
-            relocations = _plan_relocations(opf_path, contents[opf_path], set(names))
-            if not relocations:
-                return False
             entries = _rewritten_entries(infos, contents, relocations)
             expected_span_counts = _span_counts(contents, relocations)
             comment = archive.comment

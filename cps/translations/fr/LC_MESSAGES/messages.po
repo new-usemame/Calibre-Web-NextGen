@@ -3629,6 +3629,10 @@ msgid "Open Table view"
 msgstr "Ouvrir la vue tableau"
 
 #: cps/spa_strings.py
+msgid "Open Tasks"
+msgstr "Ouvrir les tâches"
+
+#: cps/spa_strings.py
 msgid "Open Admin"
 msgstr "Ouvrir l’administration"
 

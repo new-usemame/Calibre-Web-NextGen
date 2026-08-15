@@ -156,6 +156,51 @@ PRESET_GROUPS = (
 
 DEFAULT_PRESET = "kobo_libra_color"
 
+# Kobo's `x-kobo-devicemodel` header, normalised, mapped to the preset that
+# names the same hardware.
+#
+# Deliberately an ALLOW-LIST, not a parse. The header is client-controlled, so
+# an unrecognised value resolves to None and the caller keeps the instance
+# setting -- falling back is always correct, guessing a ratio is not. Only
+# families we ship a name-matched preset for appear here; nothing is inferred
+# from a model name we have not seen.
+#
+# Observed values from real hardware on this instance (2026-08-15):
+#   "Kobo Clara BW"      -> kobo_clara_bw
+#   "Kobo Libra Colour"  -> kobo_libra_color   (note Kobo's British spelling)
+_DEVICE_MODEL_PRESETS = {
+    "koboclarabw":    "kobo_clara_bw",
+    "koboclaracolor": "kobo_clara_color",
+    "koboclara2e":    "kobo_clara_2e",
+    "koboclarahd":    "kobo_clara",
+    "kobolibracolor": "kobo_libra_color",
+    "kobolibra2":     "kobo_libra_2",
+    "kobosage":       "kobo_sage",
+    "koboforma":      "kobo_forma",
+    "koboelipsa2e":   "kobo_elipsa_2e",
+}
+
+# Matches the bound device_registry already applies to the same header, and the
+# width of Device.model. A longer value is a client doing something odd, not a
+# device we know.
+_DEVICE_MODEL_MAX_LEN = 160
+
+
+def preset_for_device_model(model):
+    """Resolve a Kobo device-model string to one of our aspect presets.
+
+    Returns None for anything not positively recognised, including None, a
+    non-string, an over-long value, or a known-shaped name we do not ship a
+    preset for. Callers treat None as "keep the configured aspect".
+    """
+    if not model or not isinstance(model, str):
+        return None
+    if len(model) > _DEVICE_MODEL_MAX_LEN:
+        return None
+    key = "".join(ch for ch in model.lower() if ch.isalnum()).replace("colour", "color")
+    return _DEVICE_MODEL_PRESETS.get(key)
+
+
 # How close the source must be to the target ratio to skip padding entirely.
 _RATIO_EPSILON = 0.005
 

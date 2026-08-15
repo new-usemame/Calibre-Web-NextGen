@@ -16,6 +16,16 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Covers are now shaped for the Kobo that is actually asking.** The server-side
+  cover padding had one aspect setting for the whole instance, so a household with
+  two different Kobos had to pick a winner — the other device got covers padded to
+  someone else's screen. Every authenticated Kobo request already announces its
+  model, and the server already records it, so the padding now follows the device.
+  An unrecognised model keeps the configured setting exactly as before.
+
+
 ## [v4.1.36] - 2026-08-15
 
 ### Added

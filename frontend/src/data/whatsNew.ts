@@ -56,6 +56,27 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.36',
+    date: '2026-08-15',
+    items: [
+      {
+        title: 'Your Kobo keeps the highlights you make on it',
+        body: 'Highlights and notes made on a Kobo could disappear after a sync. Each time you opened a book the device asked us what annotations it should have, and we passed the question to Kobo\u2019s own cloud, which has never heard of a book from your own library \u2014 so it said "none" and the device deleted what it had. We no longer forward that question for books we serve, so the device keeps what it holds.',
+        category: 'Sync',
+      },
+      {
+        title: 'Highlights from a Kobo are never thrown away',
+        body: 'Since v4.1.34 a highlight arriving from a Kobo was discarded outright whenever the chapter location attached to it looked unfamiliar, which on some libraries meant every single one. The highlighted text is now always kept; only the location pointer is set aside if it cannot be read, and it can be worked out again later.',
+        category: 'Sync',
+      },
+      {
+        title: 'The one book that would not keep a highlight',
+        body: 'Some books quietly refused to hold highlights on a Kobo while every other book behaved, because of how the file points at its own table of contents \u2014 the device ended up filing your highlight under one name for a chapter and looking for it under another. Converting a book for Kobo now tidies that up, leaving the text and page positions exactly as they were.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.35',
     date: '2026-08-15',
     items: [

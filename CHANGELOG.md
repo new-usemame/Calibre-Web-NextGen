@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.36] - 2026-08-15
+
 ### Added
 
 - **The book page tells you which shelves the book is on again.** The classic
@@ -36,6 +38,47 @@ is for things you can see or feel when running the app.
   itself, so a library with no language metadata set gets it right too, and a
   right-to-left title above a Latin author renders each correctly. The classic
   book page is fixed as well. Reported by @raphaelbahat.
+
+- **Your Kobo no longer loses its highlights when it syncs.** Highlights and
+  notes made on a Kobo could vanish after a sync — a problem reporters have been
+  chasing upstream since 2022 without a root cause. Every time you open a book
+  the Kobo asks the server what annotations exist for it, and we forwarded that
+  question to Kobo's own cloud, which has never heard of a book you sideloaded.
+  It answered "none", the device believed it, and deleted the highlights it had.
+  For a sideloaded book the Kobo is usually the only copy, so they were gone. We
+  now decline to answer that question for books we serve rather than passing on
+  an answer that isn't true. Measured on real hardware: 88 highlights before a
+  sync, 1 uploaded and 87 deleted after it. This also explains the long-standing
+  workaround of removing a book from its shelf once synced — that stops the
+  sync, so the question is never asked.
+
+- **Highlights made on a Kobo are no longer discarded by the server.** A change
+  in v4.1.34 began validating the chapter location that arrives with each
+  highlight, and threw the whole highlight away when that location looked
+  unfamiliar — losing the text, the note and the colour over a field that is
+  only a pointer and can be recomputed. Some Kobo books legitimately report a
+  location the check didn't recognise, so on an affected library *every* Kobo
+  highlight was dropped. **If you are on v4.1.34 or v4.1.35 and highlight on a
+  Kobo, please update.** Highlights are now always kept; only the pointer is set
+  aside when it can't be understood, and the same is true of a malformed
+  timestamp.
+
+- **Books that silently refused to keep Kobo highlights now work.** Some EPUBs,
+  commonly from free ebook sites, point at their table of contents with a path
+  that steps outside its own folder. A Kobo doesn't tidy that path up, so it
+  ends up with two different names for the same chapter: it saves your highlight
+  under one and looks for it under the other. The highlight stays on the device
+  forever and is simply never drawn, which is why highlighting appears not to
+  work for one particular book while every other book is fine. Conversion to
+  Kobo format now tidies those paths, leaving the book's text and its Kobo page
+  markers untouched. On the library this was found in, 5 books of 216 were
+  affected — and none had ever managed to store a single highlight.
+
+- **Chapter locations containing a redundant `..` are understood rather than
+  rejected.** A Kobo can report a chapter as `OPS/../OPS/chapter-17.xml`, which
+  plainly means `OPS/chapter-17.xml`. That is now normalised, so those
+  highlights land in the right place and appear in the web reader instead of
+  being stored without a location.
 
 ## [v4.1.35] - 2026-08-15
 

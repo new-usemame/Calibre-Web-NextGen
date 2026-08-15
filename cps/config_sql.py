@@ -156,6 +156,8 @@ class _Settings(_Base):
     config_kobo_cover_padding_color = Column(String, default="")
     config_kobo_prefer_kepub = Column(Boolean, default=True)
     config_kobo_kepub_backfill_completed = Column(Boolean, default=False)
+    # Versioned repair gates can advance without accumulating one-off booleans.
+    config_kobo_kepub_package_repair_version = Column(Integer, default=0)
 
     # Fork #225 (@froggybottomboys): admin-set server-wide announcement
     # banner. Empty string = no banner. Layout.html renders the banner

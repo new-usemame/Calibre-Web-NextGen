@@ -279,3 +279,22 @@ def normalize_kepub_package(path):
                 os.unlink(temporary_path)
             except OSError:
                 pass
+
+
+def kepub_package_needs_normalization(path):
+    """Cheap read-only probe: inspect only container.xml and the package document.
+
+    Return ``True`` for an escaping manifest item, ``False`` for a clean package,
+    and ``None`` when the package cannot be inspected. The archive is never
+    materialized, preserving the clean-library fast path introduced in #1639.
+    """
+    path = os.fspath(path)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = {info.filename for info in archive.infolist()}
+            opf_path = _package_document_path(archive)
+            opf_bytes = archive.read(opf_path)
+            return bool(_plan_relocations(opf_path, opf_bytes, names))
+    except Exception as error:
+        log.warning("Could not inspect KEPUB package %s: %s", path, error)
+        return None

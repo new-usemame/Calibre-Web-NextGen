@@ -32,7 +32,7 @@ except ImportError as e:
         OAuthConsumerMixin = BaseException
         oauth_support = False
 from sqlalchemy import create_engine, exc, exists, event, text
-from sqlalchemy import Column, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, UniqueConstraint
 from sqlalchemy import String, Integer, SmallInteger, Boolean, DateTime, Float, JSON, Text
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.sql.expression import func
@@ -775,6 +775,90 @@ class KoboSyncedBooks(Base):
 
     __table_args__ = (
         UniqueConstraint('user_id', 'book_id', name='uq_kobo_synced_books_user_book'),
+    )
+
+
+class NoticeEvent(Base):
+    """Device-agnostic occurrence that may need to be shown to selected users.
+
+    Book ids belong to calibre's separate metadata database, so they deliberately
+    cannot be foreign keys here. ``occurrence_key`` makes recurrence explicit:
+    dismissing one occurrence never suppresses a later event of the same type.
+    """
+    __tablename__ = "notice_event"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    notice_type = Column(String(80), nullable=False)
+    occurrence_key = Column(String(64), nullable=False)
+    scope = Column(String(16), nullable=False)
+    book_id = Column(Integer, nullable=True)
+    book_uuid = Column(String(64), nullable=True)
+    title_snapshot = Column(String, nullable=True)
+    payload_json = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    active = Column(Boolean, nullable=False, default=True)
+
+    deliveries = relationship(
+        "UserNoticeDelivery", back_populates="event",
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("notice_type", "occurrence_key", name="uq_notice_event_occurrence"),
+        CheckConstraint(
+            "(scope = 'global' AND book_id IS NULL) OR "
+            "(scope = 'book' AND book_id IS NOT NULL)",
+            name="ck_notice_event_scope_book",
+        ),
+        Index("ix_notice_event_type_active", "notice_type", "active", "created_at"),
+        Index("ix_notice_event_book", "book_id", "active"),
+    )
+
+
+class UserNoticeDelivery(Base):
+    """Audience membership and permanent per-user dismissal for one event."""
+    __tablename__ = "user_notice_delivery"
+
+    event_id = Column(
+        Integer, ForeignKey("notice_event.id", ondelete="CASCADE"), primary_key=True,
+    )
+    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    first_presented_at = Column(DateTime, nullable=True)
+    dismissed_at = Column(DateTime, nullable=True)
+
+    event = relationship("NoticeEvent", back_populates="deliveries")
+
+    __table_args__ = (
+        Index("ix_user_notice_delivery_inbox", "user_id", "dismissed_at", "event_id"),
+    )
+
+
+class KepubPackageRepair(Base):
+    """Durable cross-database/file state for one detected package repair."""
+    __tablename__ = "kepub_package_repair"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    occurrence_key = Column(String(64), nullable=False, unique=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    book_uuid = Column(String(64), nullable=True)
+    source_sha256 = Column(String(64), nullable=False)
+    repaired_sha256 = Column(String(64), nullable=True)
+    backup_path = Column(String, nullable=True)
+    status = Column(String(24), nullable=False)
+    error_message = Column(String, nullable=True)
+    detected_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    file_repaired_at = Column(DateTime, nullable=True)
+    metadata_bumped_at = Column(DateTime, nullable=True)
+    notice_event_id = Column(Integer, ForeignKey("notice_event.id", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('detected', 'file_repaired', 'metadata_bumped', "
+            "'completed', 'failed', 'unsupported')",
+            name="ck_kepub_package_repair_status",
+        ),
+        Index("ix_kepub_package_repair_book_status", "book_id", "status"),
     )
 
 
@@ -2455,6 +2539,19 @@ def migrate_book_cover_preview_table(engine, _session):
             print(f"[cover-preview-migration] Could not create idx_bcp_user_locked: {e}", flush=True)
 
 
+def migrate_notice_tables(engine, _session):
+    """Create the generic notice inbox and resumable repair journal idempotently."""
+    Base.metadata.create_all(
+        engine,
+        tables=[
+            NoticeEvent.__table__,
+            UserNoticeDelivery.__table__,
+            KepubPackageRepair.__table__,
+        ],
+        checkfirst=True,
+    )
+
+
 def migrate_kobo_annotation_sync_h1_columns(engine, _session):
     """H1 Phase 1: extend ``kobo_annotation_sync`` with position + source
     tracking columns for the Kobo highlight import / view / web-reader
@@ -3146,6 +3243,7 @@ def migrate_Database(_session):
     migrate_multi_device_annotation_safe_slice(engine, _session)
     migrate_device_management_slice(engine, _session)
     migrate_book_cover_preview_table(engine, _session)
+    migrate_notice_tables(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)
 
     # Ensure progress syncing tables in app.db (user-related tables).

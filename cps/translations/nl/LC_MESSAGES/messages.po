@@ -23,6 +23,70 @@ msgstr ""
 "Generated-By: Babel 2.13.1\n"
 "X-Generator: Poedit 3.9\n"
 
+#: cps/spa_strings.py
+msgid "Kobo book compatibility repaired"
+msgstr "Compatibiliteit van Kobo-boek hersteld"
+
+#: cps/spa_strings.py
+msgid "Library notice"
+msgstr "Bibliotheekmelding"
+
+#: cps/spa_strings.py
+msgid "Show affected books"
+msgstr "Betrokken boeken tonen"
+
+#: cps/spa_strings.py
+msgid "Untitled book"
+msgstr "Boek zonder titel"
+
+#: cps/spa_strings.py
+msgid "{count} notices dismissed permanently."
+msgstr "{count} meldingen permanent gesloten."
+
+#: cps/spa_strings.py
+msgid "CWNG repaired {count} books previously sent to your Kobo. Older highlights may still need to be recreated on the device."
+msgstr "CWNG heeft {count} boeken hersteld die eerder naar uw Kobo zijn gestuurd. Mogelijk moet u oudere markeringen opnieuw aanmaken op het apparaat."
+
+#: cps/spa_strings.py
+msgid "CWNG repaired a book previously sent to your Kobo. Older highlights may still need to be recreated on the device."
+msgstr "CWNG heeft een boek hersteld dat eerder naar uw Kobo is gestuurd. Mogelijk moet u oudere markeringen opnieuw aanmaken op het apparaat."
+
+#: cps/spa_strings.py
+msgid "There is new information about your library."
+msgstr "Er is nieuwe informatie over uw bibliotheek."
+
+#: cps/spa_strings.py
+msgid "Dismiss all"
+msgstr "Alles sluiten"
+
+#: cps/spa_strings.py
+msgid "Dismiss all {count} notices permanently"
+msgstr "Alle {count} meldingen permanent sluiten"
+
+#: cps/spa_strings.py
+msgid "This book was repaired after it had already been sent to a Kobo. Download the updated book; highlights created before the repair may remain invisible and may need to be recreated."
+msgstr "Dit boek is hersteld nadat het al naar een Kobo was gestuurd. Download het bijgewerkte boek; markeringen die vóór het herstel zijn gemaakt, kunnen onzichtbaar blijven en moeten mogelijk opnieuw worden aangemaakt."
+
+#: cps/spa_strings.py
+msgid "There is new information about this book."
+msgstr "Er is nieuwe informatie over dit boek."
+
+#: cps/spa_strings.py
+msgid "Notice dismissed permanently."
+msgstr "Melding permanent gesloten."
+
+#: cps/spa_strings.py
+msgid "Dismiss permanently"
+msgstr "Permanent sluiten"
+
+#: cps/spa_strings.py
+msgid "Could not dismiss the notices. Please try again."
+msgstr "De meldingen konden niet worden gesloten. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not dismiss the notice. Please try again."
+msgstr "De melding kon niet worden gesloten. Probeer het opnieuw."
+
 #: cps/about.py cps/spa_strings.py
 msgid "Statistics"
 msgstr "Statistieken"

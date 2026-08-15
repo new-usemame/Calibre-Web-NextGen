@@ -56,6 +56,57 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.35',
+    date: '2026-08-15',
+    items: [
+      {
+        title: 'A stuck conversion no longer holds up everything behind it',
+        body: 'Converting a book, a PDF most often, could start and then sit there forever, with every job queued behind it waiting too. The converter writes to two output streams and we kept reading only one of them while it ran, so as soon as the other filled up it stopped and waited for us while we waited for it. Conversions now run to the end, and a KEPUB conversion that fails finally shows the error text it had been swallowing.',
+        category: 'Library',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'Books you just imported are at the top of Newest',
+        body: 'Drop several books into the ingest folder at once and most of them landed somewhere in the middle of your library, filed under the publication date stored inside the file rather than the day they arrived. Only the last book of each batch was being stamped with the time it was imported; all of them are now. Books already in your library keep the dates they have.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Newest opens on your newest book, and lists stay put',
+        body: 'Books added in the same batch share a date, and with nothing to break the tie the library handed them back in whatever order the database happened to walk — so a group could come out backwards, and paging through could repeat or skip a book. Every sort now has a definite order all the way down, in the new interface, the classic one, the OPDS feeds your e-reader pulls, shelves and the duplicate finder. Sorting by publication date, last modified, series position and downloads was fixed the same way.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Reading on a Kobo now moves KOReader too',
+        body: 'Read a few chapters on a Kobo and KOReader stayed wherever that device last was, even though the book page showed the Kobo\'s progress — so it looked like the sync had worked while nothing ever reached the other device. The Kobo\'s position is now written to the place KOReader reads from. The two sides share a percentage rather than an exact spot, so it lands near where you stopped; it needs the NextGen Progress Sync plugin on the device.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Typing a tag that already exists offers that tag first',
+        body: 'Typing "Romance" pre-selected "Paranormal Romance" and pressing Enter applied it, because suggestions arrived in no particular order and the menu always highlighted its first row. Suggestions are now ordered exact match first, then values starting with what you typed, and nothing is highlighted until you arrow into the list — so Enter adds your text, and ArrowDown then Enter takes a suggestion. This also makes it possible again to add a value that sits inside a longer one, and it applies to tags, authors, series and publishers in both editors.',
+        category: 'Library',
+      },
+      {
+        title: 'Metadata enforcement picks itself back up after a killed run',
+        body: 'The enforcer takes a lock so two copies cannot run over each other, and released it only on a clean exit — so an out-of-memory kill, or a `docker stop` that ran out of patience, left the lock behind and every later run cancelled itself. Edits you made in the web interface kept appearing on screen but stopped being written into the book files, and nothing on screen said so. A run now checks whether the process that left the lock is still alive and takes over if it is not.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'A failed first start no longer locks you out',
+        body: 'If creating the settings database failed on the very first run, startup went on to create an empty one anyway. On the next boot that empty file looked like an existing install, so the step that creates your admin account was skipped — leaving no way in, and no way to retry, because the file now existed. The failure is reported now and the empty file is never created.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Start it the ordinary Python way',
+        body: 'If you install Calibre-Web NextGen as a Python package — packaging it for a distribution, running it under systemd, or just off a checkout — you can now start it with `python -m cps`. Starting it by the path to `cps.py` works exactly as before, so nothing you already have set up needs touching.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.34',
     date: '2026-08-13',
     items: [

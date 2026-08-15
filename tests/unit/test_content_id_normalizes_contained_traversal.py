@@ -26,7 +26,6 @@ UUID = "9e5251ad-d530-4e58-9121-8b8336099fdd"
     ("OPS/../OPS/chapter-017.xml", "OPS/chapter-017.xml"),
     ("OEBPS/../OEBPS/chapter001.html", "OEBPS/chapter001.html"),
     ("./OPS/chapter-006.xml", "OPS/chapter-006.xml"),
-    ("OPS//chapter-006.xml", "OPS/chapter-006.xml"),
     ("OPS/sub/../chapter-006.xml", "OPS/chapter-006.xml"),
     # already clean -> unchanged
     ("OPS/chapter-006.xml", "OPS/chapter-006.xml"),
@@ -42,10 +41,18 @@ def test_contained_traversal_normalizes(raw, expected):
     "OPS\\chapter-006.xml",        # backslash
     "OPS/chapter-006.xml\n",       # control character
     "..",                          # bare traversal
+    "OPS//chapter-006.xml",        # empty segment
 ])
 def test_escaping_or_malformed_still_rejected(raw):
     with pytest.raises(ContentIdError):
         normalize_content_id(f"{UUID}!!{raw}", book_uuid=UUID)
+
+
+def test_url_authority_syntax_still_rejected():
+    with pytest.raises(ContentIdError):
+        normalize_content_id(
+            f"{UUID}!!http://example.test/chapter.xhtml", book_uuid=UUID,
+        )
 
 
 def test_normalization_is_idempotent():

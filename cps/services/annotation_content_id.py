@@ -48,6 +48,11 @@ def _chapter(value: str) -> str:
         raise ContentIdError("content_id chapter path is not relative")
     if any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise ContentIdError("content_id chapter path contains control characters")
+    # Preserve the existing rejection of empty path segments before normpath
+    # can erase them. Besides repeated separators, this rejects URL authority
+    # syntax such as "http://example.test/chapter.xhtml".
+    if "" in value.split("/"):
+        raise ContentIdError("content_id chapter path contains an unsafe segment")
     # Real clients emit CONTAINED traversals. A Kobo whose OPF references a file
     # outside the OPF directory (an EPUB3 nav at the zip root declared
     # href="../nav.xhtml") joins paths without normalizing, so it sends e.g.

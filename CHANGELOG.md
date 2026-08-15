@@ -16,6 +16,16 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Added
+
+- **The book page tells you which shelves the book is on again.** The classic
+  page has always shown a pill for each one; the new UI only knew about shelf
+  membership inside the "Add to shelf" menu, so answering "what shelves is this
+  book on?" meant opening a menu and reading it off the checkmarks. The shelves
+  are now listed on the page itself, next to the publisher and language, and
+  each one links through to that shelf. Adding or removing the book from the
+  menu updates the list straight away. Reported by @lguerard.
+
 ## [v4.1.35] - 2026-08-15
 
 ### Changed

@@ -4,6 +4,7 @@ import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image 
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
+  useBookShelves, useShelves,
 } from '../lib/queries';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
 import { Pill } from '../components/Pill';
@@ -260,6 +261,11 @@ export function BookDetail() {
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reloadMessage, setReloadMessage] = useState('');
+  // Shelf membership for the metadata list (#1254). Both queries are already
+  // in flight for the always-rendered AddToShelf popover below and share its
+  // cache keys, so reading them here costs no extra request.
+  const shelfMembership = useBookShelves(id).data;
+  const visibleShelves = useShelves().data;
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !book) {
@@ -272,6 +278,12 @@ export function BookDetail() {
   }
 
   const primaryReadTarget = getPrimaryReadTarget(book.id, book.formats.map((f) => f.format));
+
+  // The membership endpoint returns ids only, and both it and the shelf list
+  // apply the same server-side visibility filter (own shelves + public ones),
+  // so every id here resolves to a name the caller is allowed to see.
+  const onShelfIds = new Set(shelfMembership?.shelf_ids ?? []);
+  const bookShelves = (visibleShelves?.items ?? []).filter((s) => onShelfIds.has(s.id));
 
   return (
     <main className={styles.container}>
@@ -623,6 +635,22 @@ export function BookDetail() {
                     <span key={p.id}>
                       {i > 0 && ', '}
                       <Link href={`/publishers/${p.id}`} className={styles.metaLink}>{p.name}</Link>
+                    </span>
+                  ))}
+                </dd>
+              </>
+            )}
+            {bookShelves.length > 0 && (
+              <>
+                {/* Always the plural msgid: "Shelf" is translated in no locale
+                    today, so a count-switched label would render English for a
+                    single shelf everywhere. */}
+                <dt className={styles.metaLabel}>{t('Shelves')}</dt>
+                <dd className={styles.metaValue} data-testid="book-shelves">
+                  {bookShelves.map((s, i) => (
+                    <span key={s.id}>
+                      {i > 0 && ', '}
+                      <Link href={`/shelf/${s.id}`} className={styles.metaLink}>{s.name}</Link>
                     </span>
                   ))}
                 </dd>

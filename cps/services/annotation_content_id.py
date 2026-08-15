@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import posixpath
 import re
 import uuid
 from pathlib import PurePosixPath
@@ -47,9 +48,18 @@ def _chapter(value: str) -> str:
         raise ContentIdError("content_id chapter path is not relative")
     if any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise ContentIdError("content_id chapter path contains control characters")
-    if any(part in ("", ".", "..") for part in value.split("/")):
-        raise ContentIdError("content_id chapter path contains an unsafe segment")
-    return value
+    # Real clients emit CONTAINED traversals. A Kobo whose OPF references a file
+    # outside the OPF directory (an EPUB3 nav at the zip root declared
+    # href="../nav.xhtml") joins paths without normalizing, so it sends e.g.
+    # "OPS/../OPS/chapter-017.xml" -- unambiguously "OPS/chapter-017.xml".
+    # This guard exists to stop a path ESCAPING the book container, not to reject
+    # every dot segment; rejecting the contained case cost real annotations their
+    # content_id and left them unresolvable in the web reader.
+    normalized = posixpath.normpath(value)
+    if (normalized.startswith("../") or normalized.startswith("/")
+            or normalized in (".", "..")):
+        raise ContentIdError("content_id chapter path escapes the book container")
+    return normalized
 
 
 def normalize_content_id(value, *, book_uuid=None, allow_legacy_file_uri=False):

@@ -366,6 +366,37 @@ def handle_annotations(entitlement_id):
     PATCH includes content (i.e. annotations come from Kobo).  An always-persist
     path independent of any sync target lands in sub-project (2).
     """
+    if request.method == "GET":
+        book = get_book_by_entitlement_id(entitlement_id)
+        if book is not None:
+            # This entitlement is a book WE delivered. Kobo's cloud has never heard
+            # of it, so it answers the download direction with a success-shaped
+            # "no annotations" -- and Nickel acts on that by DELETING every local
+            # Bookmark row for the book (upstream calibre-web #2610).
+            #
+            # Measured on real hardware 2026-08-15: 88 correctly-anchored highlights
+            # at 11:58; one sync at 12:07 uploaded a single annotation and deleted
+            # the other 87. For a sideloaded book the device is frequently the only
+            # copy, so a 200-empty here is a DESTRUCTIVE operation even though the
+            # verb is GET.
+            #
+            # We deliberately do not answer with our own snapshot either: an
+            # internally-complete server view would tell a second device to drop
+            # annotations it has not uploaded yet. 503 + Retry-After is the one
+            # response that cannot be read as "you have none" -- it is explicitly
+            # non-authoritative, so the device keeps what it holds.
+            log.info(
+                "Not proxying annotation download for locally-owned book %s (%s); "
+                "Kobo's empty answer would delete the device's copy",
+                book.id, entitlement_id,
+            )
+            response = make_response(
+                jsonify({"error": "Annotation download unavailable for sideloaded content"}),
+                503,
+            )
+            response.headers["Retry-After"] = "3600"
+            return response
+
     if request.method == "PATCH":
         try:
             data = request.get_json() or {}

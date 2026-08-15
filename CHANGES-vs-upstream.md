@@ -61,6 +61,16 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **RTL metadata renders right-to-left in both UIs** (fork #1073) — there was no
+  `dir` attribute anywhere in the SPA or the classic templates, so Arabic,
+  Hebrew and Farsi titles, authors, series and descriptions inherited the
+  document's `ltr` direction and rendered from the wrong edge. Each text field
+  now carries `dir="auto"`, resolving direction from that string's own first
+  strong directional character rather than from book-level language metadata,
+  which most libraries leave unset. `BookCard`'s `text-align: left` became
+  `start` so alignment follows the resolved direction instead of overriding it.
+  Reported by @raphaelbahat. SHA TBD, release TBD.
+
 - **Converter pipes are drained together, so a chatty child cannot wedge the
   task queue** (fork #1110) — `_convert_ebook_format` streamed the child's
   stdout in a `while p.poll() is None` loop and read stderr only after the

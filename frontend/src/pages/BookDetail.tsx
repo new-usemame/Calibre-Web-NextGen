@@ -319,9 +319,12 @@ export function BookDetail() {
         {/* RIGHT: info */}
         <div className={styles.infoCol}>
           <div>
-            <h1 className={styles.title}>{book.title}</h1>
+            {/* dir="auto" per field (#1073): direction follows each string's own
+                first strong character, so a Hebrew title and a Latin series name
+                on the same page each render correctly. */}
+            <h1 className={styles.title} dir="auto">{book.title}</h1>
             {book.authors.length > 0 && (
-              <p className={styles.authors}>
+              <p className={styles.authors} dir="auto">
                 {book.authors.map((a, i) => (
                   <span key={a.id}>
                     {i > 0 && AUTHOR_SEPARATOR}
@@ -331,7 +334,7 @@ export function BookDetail() {
               </p>
             )}
             {book.series && (
-              <p className={styles.series}>
+              <p className={styles.series} dir="auto">
                 <Link href={`/series/${book.series.id}`} className={styles.metaLink}>
                   {book.series.name}
                 </Link>
@@ -669,7 +672,7 @@ export function BookDetail() {
             {(book.custom_columns ?? []).map((column) => (
               <Fragment key={`custom-${column.id}`}>
                 <dt className={styles.metaLabel}>{column.name}</dt>
-                <dd className={styles.metaValue}>
+                <dd className={styles.metaValue} dir="auto">
                   {column.datatype === 'comments' && column.values[0]?.value_html ? (
                     <span
                       // value_html is sanitized by the API serializer.
@@ -689,6 +692,7 @@ export function BookDetail() {
           {book.description_html && (
             <div
               className={styles.description}
+              dir="auto"
               // description_html is sanitized server-side in serialize_book_detail
               // (cps/clean_html.clean_string — bleach/nh3 allowlist, same as the
               // legacy templates), so it is safe to render here.

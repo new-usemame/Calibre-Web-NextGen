@@ -26,6 +26,17 @@ is for things you can see or feel when running the app.
   each one links through to that shelf. Adding or removing the book from the
   menu updates the list straight away. Reported by @lguerard.
 
+### Fixed
+
+- **Arabic, Hebrew and Farsi titles now read the right way round.** Book titles,
+  authors, series names, descriptions and custom column values written in a
+  right-to-left script were rendered left-to-right on the book page and on the
+  grid and shelf cards, so the text started from the wrong edge and punctuation
+  landed on the wrong side. Direction is now detected per field from the text
+  itself, so a library with no language metadata set gets it right too, and a
+  right-to-left title above a Latin author renders each correctly. The classic
+  book page is fixed as well. Reported by @raphaelbahat.
+
 ## [v4.1.35] - 2026-08-15
 
 ### Changed

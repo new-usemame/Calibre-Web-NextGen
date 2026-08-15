@@ -118,12 +118,18 @@ export function BookCard({
     </div>
   );
 
+  // dir="auto" per field, not once on the card (#1073, reported by @raphaelbahat).
+  // The browser picks direction from the first strong directional character in
+  // THAT string, so a Hebrew title above an English author renders each the right
+  // way round. A single card-level or book-level flag has to be wrong about one
+  // of them, and keying off the book's language metadata would miss the many
+  // libraries that leave language unset — which is the case in the report.
   const info = (
     <div className={styles.info}>
-      <p className={styles.title}>{book.title}</p>
-      <p className={styles.author}>{authorStr}</p>
+      <p className={styles.title} dir="auto">{book.title}</p>
+      <p className={styles.author} dir="auto">{authorStr}</p>
       {seriesLine && (
-        <p className={styles.series} data-testid="book-card-series">{seriesLine}</p>
+        <p className={styles.series} dir="auto" data-testid="book-card-series">{seriesLine}</p>
       )}
     </div>
   );

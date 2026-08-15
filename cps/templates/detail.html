@@ -829,8 +829,11 @@
                             </div>
                         </div>
 
-                        <h2 id="title">{{ entry.title }}</h2>
-                        <p class="author">
+                        {# dir="auto" per field (#1073): direction resolves from each
+                           string's own first strong character, so RTL titles and authors
+                           render right-to-left without the library needing a language set. #}
+                        <h2 id="title" dir="auto">{{ entry.title }}</h2>
+                        <p class="author" dir="auto">
                             {% for author in entry.ordered_authors %}
                                 <a href="{{ url_for('web.books_list',  data='author', sort_param='stored', book_id=author.id ) }}">{{ author.name.replace('|',',') }}</a>
                                 {% if not loop.last %}
@@ -874,7 +877,7 @@
                             {% endif %}
                         </div>
                         {% if entry.series|length > 0 %}
-                            <p id="book_of">{{ _("Book %(index)s of %(range)s", index=entry.series_index|formatfloat(2), range=(url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id)|escapedlink(entry.series[0].name))|safe) }}</p>
+                            <p id="book_of" dir="auto">{{ _("Book %(index)s of %(range)s", index=entry.series_index|formatfloat(2), range=(url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id)|escapedlink(entry.series[0].name))|safe) }}</p>
                         {% endif %}
 
                         <div class="book-metadata">
@@ -1098,7 +1101,7 @@
                 {% if entry.comments|length > 0 and entry.comments[0].text|length > 0 %}
                     <div class="book-detail-description">
                         <h3 id="decription">{{ _('Description:') }}</h3>
-                        {{ entry.comments[0].text|clean_string|safe }}
+                        <div dir="auto">{{ entry.comments[0].text|clean_string|safe }}</div>
                     </div>
                 {% endif %}
                 <div id="shelf-action-errors" class="pull-left" role="alert"></div>

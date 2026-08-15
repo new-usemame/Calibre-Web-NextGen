@@ -25,7 +25,11 @@
   background: none;
   border: none;
   padding: 0;
-  text-align: left;
+  /* `start`, not `left`: the card's text nodes carry dir="auto" (#1073), so an
+     Arabic or Hebrew title computes as RTL. A hardcoded `left` would win over
+     that and pin the text to the wrong edge, leaving the direction correct but
+     the alignment visibly wrong. `start` resolves per element's own direction. */
+  text-align: start;
   text-decoration: none;
   color: inherit;
   transition: transform var(--dur-base) var(--ease-out);

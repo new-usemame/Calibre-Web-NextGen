@@ -73,7 +73,9 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
   stdout keeps feeding the live progress parser; the `calibredb --as-opf`
   probe, `_convert_kepubify` (which read stdout to EOF and never drained
   stderr at all) and `process_wait` carried the same defect and are fixed with
-  it. SHA `TBD`, release `TBD`.
+  it. The `--as-opf` failure branch also compared bytes against str literals,
+  raising `TypeError` on the line meant to report the failure. SHA `318997de`,
+  release `TBD`.
 
 - **Book lists have a total order, so "Newest" is newest** (fork #1331) — every
   list pages with LIMIT/OFFSET over an ORDER BY that named one non-unique

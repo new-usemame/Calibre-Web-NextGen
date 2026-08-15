@@ -10,7 +10,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
-"PO-Revision-Date: 2026-08-12 11:27+0300\n"
+"PO-Revision-Date: 2026-08-15 16:11+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -707,8 +707,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py
 msgid "Password length has to be between 1 and 40"
@@ -3585,7 +3585,7 @@ msgstr "Перейти к загрузке"
 
 #: cps/spa_strings.py
 msgid "Open Tasks"
-msgstr ""
+msgstr "Текущие задачи"
 
 #: cps/spa_strings.py
 msgid "Open search"
@@ -4259,7 +4259,7 @@ msgstr "Не удалось загрузить читалки."
 
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
-msgstr ""
+msgstr "Не удалось загрузить выделения и заметки."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -4283,7 +4283,7 @@ msgstr "Не удалось открыть это выделение."
 
 #: cps/spa_strings.py
 msgid "Could not open that search result."
-msgstr ""
+msgstr "Не удалось открыть этот результат поиска."
 
 #: cps/spa_strings.py
 msgid "Could not read this comic archive."
@@ -4331,7 +4331,7 @@ msgstr "Не удалось сохранить вашу позицию чтен�
 
 #: cps/spa_strings.py
 msgid "Could not search this book."
-msgstr ""
+msgstr "Не удалось выполнить поиск по этой книге."
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
@@ -4684,7 +4684,7 @@ msgstr "Шифрование"
 
 #: cps/spa_strings.py
 msgid "Enter at least 2 characters"
-msgstr ""
+msgstr "Введите не менее 2 символов"
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -5263,7 +5263,7 @@ msgstr "Пока нет выделений. Выделите текст в кн�
 
 #: cps/spa_strings.py
 msgid "No matches found in this book."
-msgstr ""
+msgstr "В этой книге совпадений не найдено."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5332,6 +5332,8 @@ msgid ""
 "Nothing here yet. Highlight or write a note while reading, or import from a "
 "Kobo device."
 msgstr ""
+"Здесь пока ничего нет. Сделайте выделение или напишите заметку во время "
+"чтения, либо импортируйте их с устройства Kobo."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -5711,15 +5713,15 @@ msgstr "Области доступа (Scopes)"
 
 #: cps/spa_strings.py
 msgid "Search inside book"
-msgstr ""
+msgstr "Искать внутри книги"
 
 #: cps/spa_strings.py
 msgid "Search term"
-msgstr ""
+msgstr "Поисковый запрос"
 
 #: cps/spa_strings.py
 msgid "Search this book"
-msgstr ""
+msgstr "Искать в этой книге"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
@@ -5731,7 +5733,7 @@ msgstr "Поиск по всем источникам…"
 
 #: cps/spa_strings.py
 msgid "Searching this book…"
-msgstr ""
+msgstr "Поиск по этой книге…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5900,7 +5902,7 @@ msgstr "Показать пароль"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing the first {count} matches."
-msgstr ""
+msgstr "Отображаются первые {count} совпадений."
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -5966,7 +5968,7 @@ msgstr "Сведения об источнике"
 
 #: cps/spa_strings.py
 msgid "Start the only OAuth provider automatically"
-msgstr ""
+msgstr "Автоматически запускать единственного провайдера OAuth"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Started reading"
@@ -6238,6 +6240,10 @@ msgid ""
 "local=1 to the login URL to reach the password form, which keeps working as "
 "long as standard password login is left enabled."
 msgstr ""
+"При включённом автоматическом запуске страница авторизации сразу "
+"перенаправляет к провайдеру. Добавьте ?local=1 к URL авторизации, чтобы "
+"перейти к форме ввода пароля, которая продолжает работать, пока включён "
+"стандартный вход по паролю."
 
 #: cps/spa_strings.py
 msgid "Write a note"
@@ -6245,7 +6251,7 @@ msgstr "Написать заметку"
 
 #: cps/spa_strings.py
 msgid "Write a note…"
-msgstr "Написать заметку..."
+msgstr "Написать заметку…"
 
 #: cps/spa_strings.py
 msgid ""
@@ -6364,7 +6370,7 @@ msgstr "{count} файлов отклонено"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} matches"
-msgstr ""
+msgstr "Совпадений: {count}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6399,7 +6405,7 @@ msgstr "Устройство {name} удалено."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name}, {n} highlights and notes"
-msgstr ""
+msgstr "{name}, {n} выделений и заметок"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6419,13 +6425,15 @@ msgstr "{n} найдено"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} highlights and notes"
-msgstr ""
+msgstr "{n} выделений и заметок"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "{n} highlights and notes assigned to this device will become Unknown device."
 msgstr ""
+"{n} выделений и заметок, привязанных к этому устройству, получат статус "
+"«Неизвестное устройство»."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6433,6 +6441,8 @@ msgid ""
 "{n} highlights and notes were made on this device. They are not deleted. "
 "Their origin history is kept."
 msgstr ""
+"На этом устройстве сделано {n} выделений и заметок. Они не удаляются. "
+"История их происхождения сохраняется."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8537,9 +8547,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -8979,7 +8989,7 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Automatically forward to the only OAuth provider"
-msgstr ""
+msgstr "Автоматически перенаправлять к единственному провайдеру OAuth"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8988,6 +8998,11 @@ msgid ""
 "normal login page instead. That page still accepts a username and password "
 "only while the setting above is left off."
 msgstr ""
+"Если включено и активен ровно один провайдер OAuth, при открытии страницы "
+"авторизации он запускается автоматически. Добавьте ?local=1 к URL страницы "
+"авторизации, чтобы вместо этого открыть обычную страницу входа. Она по-"
+"прежнему будет принимать имя пользователя и пароль, только если "
+"вышеуказанная настройка отключена."
 
 #: cps/templates/config_edit.html
 msgid "Enable OAuth Group-Based Admin Role Management"
@@ -9534,9 +9549,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -9559,9 +9574,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -13091,9 +13106,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

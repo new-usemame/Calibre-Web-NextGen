@@ -23,6 +23,7 @@ from xml.etree import ElementTree as ET
 from pathlib import Path
 
 import pytest
+from lxml import etree
 
 from tests.fixtures.kepub_fixture import build_calibre_epub3_series_kepub
 
@@ -276,6 +277,38 @@ def _kobo_span_counts(contents):
     }
 
 
+def _remove_epub3_series(package):
+    metas = package.xpath("//*[local-name()='meta']")
+    collection_ids = {
+        element.get("id")
+        for element in metas
+        if element.get("property") == "belongs-to-collection"
+        and element.get("id")
+    }
+    series_ids = {
+        element.get("refines", "").removeprefix("#")
+        for element in metas
+        if element.get("property") == "collection-type"
+        and "".join(element.itertext()).strip().lower() == "series"
+    } & collection_ids
+
+    changed = False
+    for parent in package.iter():
+        for child in list(parent):
+            property_name = child.get("property") if isinstance(child.tag, str) else None
+            refined_id = child.get("refines", "").removeprefix("#") if property_name else ""
+            if (
+                property_name == "belongs-to-collection"
+                and child.get("id") in series_ids
+            ) or (
+                property_name in {"collection-type", "group-position"}
+                and refined_id in series_ids
+            ):
+                parent.remove(child)
+                changed = True
+    return changed
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("subjects", "expected_tags"),
@@ -427,6 +460,106 @@ def test_clearing_real_kepubify_epub3_series_survives_calibre_comments(
     assert _kobo_span_counts(before) == _kobo_span_counts(after)
     for name in before.keys() - {"OEBPS/content.opf"}:
         assert after[name] == before[name]
+
+
+@pytest.mark.unit
+def test_package_rewrite_clears_series_from_real_kepubify_shape(tmp_path):
+    from cps.services.kepub_package_normalizer import rewrite_package_document
+
+    kepub = build_calibre_epub3_series_kepub(tmp_path / "real-shape.kepub")
+    kepub.chmod(0o640)
+    before = _archive_contents(kepub)
+    before_comment = _archive_comment(kepub)
+    before_mode = stat.S_IMODE(kepub.stat().st_mode)
+
+    assert b'href="../nav.xhtml"' in before["OEBPS/content.opf"]
+    assert "nav.xhtml" in before
+    assert sum(_kobo_span_counts(before).values()) == 3
+    assert rewrite_package_document(kepub, _remove_epub3_series) is True
+
+    after = _archive_contents(kepub)
+    assert _series_metadata(after["OEBPS/content.opf"]) == set()
+    assert b'href="../nav.xhtml"' in after["OEBPS/content.opf"]
+    assert set(after) == set(before)
+    assert len(after) == len(before)
+    assert _kobo_span_counts(after) == _kobo_span_counts(before)
+    for name in before.keys() - {"OEBPS/content.opf"}:
+        assert after[name] == before[name]
+    assert _archive_comment(kepub) == before_comment
+    assert stat.S_IMODE(kepub.stat().st_mode) == before_mode
+
+
+@pytest.mark.unit
+def test_enforcer_strip_clears_series_from_real_kepubify_shape(
+    enforcer_module, tmp_path
+):
+    kepub = build_calibre_epub3_series_kepub(tmp_path / "enforcer-entry.kepub")
+    before = _archive_contents(kepub)
+
+    assert enforcer_module._strip_kepub_series_metadata(kepub) is True
+
+    after = _archive_contents(kepub)
+    assert _series_metadata(after["OEBPS/content.opf"]) == set()
+    assert b'href="../nav.xhtml"' in after["OEBPS/content.opf"]
+    assert set(after) == set(before)
+    assert _kobo_span_counts(after) == _kobo_span_counts(before)
+    for name in before.keys() - {"OEBPS/content.opf"}:
+        assert after[name] == before[name]
+
+
+@pytest.mark.unit
+def test_package_rewrite_rejects_new_escaping_manifest_href(tmp_path):
+    from cps.services.kepub_package_normalizer import rewrite_package_document
+
+    kepub = tmp_path / "introduced-escape.kepub"
+    _write_series_kepub(kepub)
+    with zipfile.ZipFile(kepub, "a") as archive:
+        archive.writestr("introduced.xhtml", b"<html/>")
+    original = kepub.read_bytes()
+
+    def add_escaping_item(package):
+        manifest = package.xpath("//*[local-name()='manifest']")[0]
+        etree.SubElement(
+            manifest,
+            "{http://www.idpf.org/2007/opf}item",
+            id="introduced-escape",
+            href="../introduced.xhtml",
+            attrib={"media-type": "application/xhtml+xml"},
+        )
+        return True
+
+    assert rewrite_package_document(kepub, add_escaping_item) is None
+    assert kepub.read_bytes() == original
+    assert list(tmp_path.glob(".introduced-escape.kepub.*.package-rewrite.tmp")) == []
+
+
+@pytest.mark.unit
+def test_normalizer_rejects_output_that_still_escapes(
+    tmp_path, monkeypatch, caplog
+):
+    from cps.services import kepub_package_normalizer as normalizer
+
+    kepub = build_calibre_epub3_series_kepub(tmp_path / "normalizer-postcondition.kepub")
+    original = kepub.read_bytes()
+    real_rewritten_entries = normalizer._rewritten_entries
+
+    def keep_escaping_package_document(infos, contents, relocations):
+        entries = real_rewritten_entries(infos, contents, relocations)
+        return [
+            (info, contents["OEBPS/content.opf"])
+            if info.filename == "OEBPS/content.opf"
+            else (info, content)
+            for info, content in entries
+        ]
+
+    monkeypatch.setattr(
+        normalizer, "_rewritten_entries", keep_escaping_package_document
+    )
+
+    assert normalizer.normalize_kepub_package(kepub) is None
+    assert kepub.read_bytes() == original
+    assert "rewritten manifest still escapes the OPF directory" in caplog.text
+    assert list(tmp_path.glob(".normalizer-postcondition.kepub.*.normalize.tmp")) == []
 
 
 @pytest.mark.unit

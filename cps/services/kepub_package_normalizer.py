@@ -261,7 +261,25 @@ def _write_archive(path, entries, comment):
             archive.writestr(info, content)
 
 
+def _escaping_manifest_hrefs(opf_path, opf_bytes):
+    opf_directory = posixpath.dirname(opf_path)
+    escaping = set()
+    for item in _manifest_items(opf_bytes):
+        href = item.get("href")
+        if not href:
+            continue
+        split = _split_local_reference(href)
+        if split is None:
+            continue
+        _, href_path = split
+        if not _inside_directory(
+                _resolve_reference(opf_path, href_path), opf_directory):
+            escaping.add(href)
+    return escaping
+
+
 def _validate_rewritten_archive(path, expected_span_counts):
+    """Validate archive-integrity invariants shared by every rewrite."""
     with zipfile.ZipFile(path) as archive:
         infos = archive.infolist()
         _reject_oversized_archive(infos)
@@ -274,22 +292,28 @@ def _validate_rewritten_archive(path, expected_span_counts):
         if archive.testzip() is not None:
             raise ValueError("rewritten KEPUB failed its CRC check")
         opf_path = _package_document_path(archive)
-        opf_directory = posixpath.dirname(opf_path)
         opf_bytes = _read_bounded_member(
             archive, opf_path, MAX_PACKAGE_DOCUMENT_BYTES, "package document")
-        for item in _manifest_items(opf_bytes):
-            href = item.get("href")
-            if not href:
-                continue
-            split = _split_local_reference(href)
-            if split is None:
-                continue
-            _, href_path = split
-            if not _inside_directory(_resolve_reference(opf_path, href_path), opf_directory):
-                raise ValueError("rewritten manifest still escapes the OPF directory")
         contents = {info.filename: archive.read(info) for info in infos}
         if _span_counts(contents) != expected_span_counts:
-            raise ValueError("KoboSpan counts changed while normalizing the package")
+            raise ValueError("KoboSpan counts changed during package rewrite")
+        return opf_path, opf_bytes
+
+
+def _validate_package_document_rewrite(
+        path, expected_span_counts, source_escaping_hrefs):
+    opf_path, opf_bytes = _validate_rewritten_archive(
+        path, expected_span_counts)
+    rewritten_escaping_hrefs = _escaping_manifest_hrefs(opf_path, opf_bytes)
+    if not rewritten_escaping_hrefs.issubset(source_escaping_hrefs):
+        raise ValueError("package rewrite introduced an escaping manifest href")
+
+
+def _validate_normalized_archive(path, expected_span_counts):
+    opf_path, opf_bytes = _validate_rewritten_archive(
+        path, expected_span_counts)
+    if _escaping_manifest_hrefs(opf_path, opf_bytes):
+        raise ValueError("rewritten manifest still escapes the OPF directory")
 
 
 def rewrite_package_document(path, transform):
@@ -301,7 +325,8 @@ def rewrite_package_document(path, transform):
     source archive is untouched and the temporary archive is removed.
 
     The transaction preserves every non-package member's bytes, the archive
-    comment, and the source file's permission bits.
+    comment, and the source file's permission bits. Existing escaping manifest
+    hrefs may remain, but the transform may not introduce another one.
     """
     path = os.fspath(path)
     temporary_path = None
@@ -323,6 +348,8 @@ def rewrite_package_document(path, transform):
                 MAX_PACKAGE_DOCUMENT_BYTES,
                 "package document",
             )
+            source_escaping_hrefs = _escaping_manifest_hrefs(
+                package_path, package_bytes)
             package = etree.fromstring(package_bytes, parser=_XML_PARSER)
             if not transform(package):
                 return False
@@ -344,7 +371,8 @@ def rewrite_package_document(path, transform):
         )
         os.close(descriptor)
         _write_archive(temporary_path, entries, comment)
-        _validate_rewritten_archive(temporary_path, expected_span_counts)
+        _validate_package_document_rewrite(
+            temporary_path, expected_span_counts, source_escaping_hrefs)
 
         with zipfile.ZipFile(temporary_path) as rewritten:
             if rewritten.comment != comment:
@@ -414,7 +442,7 @@ def normalize_kepub_package(path):
         )
         os.close(descriptor)
         _write_archive(temporary_path, entries, comment)
-        _validate_rewritten_archive(temporary_path, expected_span_counts)
+        _validate_normalized_archive(temporary_path, expected_span_counts)
         os.chmod(temporary_path, stat.S_IMODE(original_stat.st_mode))
         os.replace(temporary_path, path)
         temporary_path = None

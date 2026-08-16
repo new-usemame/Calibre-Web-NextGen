@@ -70,6 +70,7 @@ CALIBRE_911_EPUB3_SERIES_OPF = """<?xml version="1.0" encoding="utf-8"?>
     <meta refines="#id-6" property="group-position">9</meta>
   </metadata>
   <manifest>
+    <item id="nav" href="../nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
   <spine><itemref idref="chapter"/></spine>
@@ -187,11 +188,17 @@ def build_minimal_epub(dest: Path) -> Path:
 
 def build_calibre_epub3_series_kepub(dest: Path) -> Path:
     """Build the reduced real Calibre/kepubify shape used by #1372 tests."""
+    nav = """<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Contents</title></head>
+<body><nav><ol><li><a href="OEBPS/chapter.xhtml">Chapter</a></li></ol></nav></body>
+</html>
+"""
     chapter = _kobo_chapter_html([
         ("kobo.1.1", "First sentence."),
         ("kobo.1.2", "Second sentence."),
         ("kobo.1.3", "Third sentence."),
-    ])
+    ]).replace('<span id=', '<span class="koboSpan" id=')
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.comment = b"calibre-9.11-kepubify-4.0.4"
@@ -201,6 +208,7 @@ def build_calibre_epub3_series_kepub(dest: Path) -> Path:
             compress_type=zipfile.ZIP_STORED,
         )
         archive.writestr("META-INF/container.xml", CONTAINER_XML)
+        archive.writestr("nav.xhtml", nav)
         archive.writestr("OEBPS/content.opf", CALIBRE_911_EPUB3_SERIES_OPF)
         archive.writestr("OEBPS/chapter.xhtml", chapter)
     return dest

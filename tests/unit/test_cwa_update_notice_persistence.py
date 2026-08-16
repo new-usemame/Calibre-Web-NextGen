@@ -49,21 +49,22 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts')))
 
 import cps.render_template as rt
+import cps.constants as constants
 
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RENDER_PY = REPO_ROOT / "cps" / "render_template.py"
+CONSTANTS_PY = REPO_ROOT / "cps" / "constants.py"
 
 
 def test_notice_path_is_a_single_module_constant():
     """SSOT: one constant, and no stray hardcoded copies of the filename."""
-    assert hasattr(rt, "CWA_UPDATE_NOTICE_PATH"), (
+    assert hasattr(constants, "CWA_UPDATE_NOTICE_PATH"), (
         "the update-notice path must be a module-level constant so readers and "
         "writers cannot drift apart (cf. LOG_ARCHIVE in cps/cwa_functions.py)"
     )
 
-    source = RENDER_PY.read_text()
+    source = CONSTANTS_PY.read_text()
     # The filename should appear exactly once as a path literal: in the constant.
     literals = re.findall(r"""["'][^"']*cwa_update_notice["']""", source)
     assert len(literals) == 1, (
@@ -79,9 +80,9 @@ def test_notice_lives_on_the_persistent_config_volume_not_app():
     declared VOLUME. Writing the throttle to ``/app`` made it reset on every
     image pull, which is precisely when the update banner matters.
     """
-    path = rt.CWA_UPDATE_NOTICE_PATH
+    path = constants.CWA_UPDATE_NOTICE_PATH
 
-    assert path.startswith("/config/"), (
+    assert path.startswith(constants.CONFIG_DIR), (
         f"update notice must live on the persistent /config volume, got {path!r}"
     )
     assert not path.startswith("/app"), (
@@ -93,7 +94,7 @@ def test_notice_lives_on_the_persistent_config_volume_not_app():
 def test_first_run_returns_sentinel_and_creates_the_file(tmp_path, monkeypatch):
     """No file yet: fire exactly one notification, and record today."""
     notice = tmp_path / "cwa_update_notice"
-    monkeypatch.setattr(rt, "CWA_UPDATE_NOTICE_PATH", str(notice))
+    monkeypatch.setattr(constants, "CWA_UPDATE_NOTICE_PATH", str(notice))
 
     assert not notice.exists()
 
@@ -110,7 +111,7 @@ def test_existing_file_is_read_back_verbatim_and_not_clobbered(tmp_path, monkeyp
     """A stored date is returned as-is; reading must not rewrite the file."""
     notice = tmp_path / "cwa_update_notice"
     notice.write_text("2026-01-15")
-    monkeypatch.setattr(rt, "CWA_UPDATE_NOTICE_PATH", str(notice))
+    monkeypatch.setattr(constants, "CWA_UPDATE_NOTICE_PATH", str(notice))
 
     result = rt.get_cwa_last_notification()
 
@@ -125,7 +126,7 @@ def test_same_day_notification_short_circuits_before_the_version_check(tmp_path,
     """Already notified today: no network round-trip, no second banner."""
     notice = tmp_path / "cwa_update_notice"
     notice.write_text(datetime.now().strftime("%Y-%m-%d"))
-    monkeypatch.setattr(rt, "CWA_UPDATE_NOTICE_PATH", str(notice))
+    monkeypatch.setattr(constants, "CWA_UPDATE_NOTICE_PATH", str(notice))
 
     called = {"update_available": 0, "flash": 0}
 

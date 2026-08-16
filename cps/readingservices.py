@@ -62,7 +62,7 @@ def redact_headers(headers):
     return redacted
 
 
-def proxy_to_kobo_reading_services():
+def proxy_to_kobo_reading_services(data=None):
     """Proxy the request to Kobo's reading services API."""
     try:
         kobo_url = KOBO_READING_SERVICES_URL + request.path
@@ -76,12 +76,15 @@ def proxy_to_kobo_reading_services():
         outgoing_headers.remove("Host")
         # Remove CWA session cookie - Kobo doesn't need it and it causes issues
         outgoing_headers.pop("Cookie", None)
+        if data is not None:
+            # requests must calculate this again for a filtered request body.
+            outgoing_headers.pop("Content-Length", None)
         
         readingservices_response = requests.request(
             method=request.method,
             url=kobo_url,
             headers=outgoing_headers,
-            data=request.get_data(),
+            data=request.get_data() if data is None else data,
             allow_redirects=False,
             timeout=(2, 10)
         )
@@ -129,12 +132,6 @@ def requires_reading_services_auth_and_config(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # The destructive-download guard runs FIRST, ahead of every pass-through
-        # below. Kobo sync being switched off, or a missing/expired session, must
-        # not re-open a path that deletes annotations off the user's device.
-        guarded = _guard_request_if_annotation_download()
-        if guarded is not None:
-            return guarded
         if not config.config_kobo_sync:
             log.debug("Kobo sync disabled, proxying to Kobo")
             return proxy_to_kobo_reading_services()
@@ -185,53 +182,54 @@ def resolve_entitlement_ownership(entitlement_id):
         return OWNERSHIP_UNKNOWN
 
 
-def _annotation_download_guard(entitlement_id):
-    """503 when we must not proxy this book's annotation download, else ``None``.
-
-    Kobo's cloud has never heard of a sideloaded book and answers the download
-    with a success-shaped empty set, which Nickel acts on by DELETING every local
-    Bookmark row for the book (upstream calibre-web #2610; measured 2026-08-15,
-    87 highlights deleted in one sync). For a sideloaded book the device is
-    frequently the only copy, so a 200-empty is destructive even though the verb
-    is GET.
-
-    Fails CLOSED: an entitlement we cannot resolve is refused too, because the
-    fallback here destroys data that exists nowhere else.
-    """
-    owner = resolve_entitlement_ownership(entitlement_id)
-    if owner is None:
-        return None  # definitively not ours -- Kobo's cloud IS authoritative
-    if owner is OWNERSHIP_UNKNOWN:
-        log.warning(
-            "Refusing annotation download for entitlement %s: ownership unknown, "
-            "and proxying on uncertainty can delete the device's only copy",
-            entitlement_id,
-        )
-    else:
-        log.info(
-            "Not proxying annotation download for locally-owned book %s (%s); "
-            "Kobo's empty answer would delete the device's copy",
-            owner.id, entitlement_id,
-        )
-    response = make_response(
-        jsonify({"error": "Annotation download unavailable for sideloaded content"}), 503,
-    )
-    response.headers["Retry-After"] = "3600"
-    return response
-
-
-_ANNOTATION_PATH_RE = re.compile(r"^/api/v3/content/(?P<eid>[^/]+)/annotations/?$")
-
-
-def _guard_request_if_annotation_download():
-    """Apply the download guard from the OUTERMOST layer, before any auth/config
-    pass-through can hand this request to Kobo. Returns a response or ``None``."""
-    if request.method != "GET":
+def _parse_check_for_changes_request(raw_body):
+    """Return a recognized check-for-changes request list, or ``None``."""
+    try:
+        entries = json.loads(raw_body)
+    except (TypeError, ValueError, UnicodeDecodeError):
         return None
-    match = _ANNOTATION_PATH_RE.match(request.path or "")
-    if not match:
+    if not isinstance(entries, list):
         return None
-    return _annotation_download_guard(match.group("eid"))
+    if any(
+        not isinstance(entry, dict)
+        or not isinstance(entry.get("ContentId"), str)
+        for entry in entries
+    ):
+        return None
+    return entries
+
+
+def _check_for_changes_response_content_ids(entries):
+    """Return ids from a recognized Kobo response list, or ``None``."""
+    if not isinstance(entries, list):
+        return None
+    content_ids = []
+    for entry in entries:
+        if isinstance(entry, str):
+            content_ids.append(entry)
+        elif isinstance(entry, dict) and isinstance(entry.get("ContentId"), str):
+            content_ids.append(entry["ContentId"])
+        else:
+            return None
+    return content_ids
+
+
+def _filter_check_for_changes_entries(entries, filtered_content_ids):
+    """Return entries whose string or object ContentId is not filtered."""
+    filtered_content_ids = set(filtered_content_ids)
+    return [
+        entry for entry in entries
+        if (entry if isinstance(entry, str) else entry["ContentId"])
+        not in filtered_content_ids
+    ]
+
+
+def _check_for_changes_ownership_is_filtered(ownership):
+    """Whether an ownership result must be contained at the trigger boundary."""
+    # UNKNOWN is deliberately treated as owned here. A false positive only
+    # misses one Kobo-cloud annotation sync; a false negative can delete the
+    # user's only copy of their highlights.
+    return ownership is not None
 
 
 def get_book_identifiers(book):
@@ -444,14 +442,6 @@ def handle_annotations(entitlement_id):
     PATCH includes content (i.e. annotations come from Kobo).  An always-persist
     path independent of any sync target lands in sub-project (2).
     """
-    if request.method == "GET":
-        # Same guard as the decorator, kept here as defense in depth so the
-        # handler is safe if it is ever reached by another route or called
-        # directly. Single implementation, so the two cannot drift.
-        guarded = _annotation_download_guard(entitlement_id)
-        if guarded is not None:
-            return guarded
-
     if request.method == "PATCH":
         try:
             data = request.get_json(silent=True)
@@ -493,7 +483,9 @@ def handle_annotations(entitlement_id):
                     )
         except Exception:
             log.exception("Error processing PATCH annotations")
-    # Proxy to Kobo reading services for both GET + PATCH.
+    # Proxy both GET + PATCH. Do not refuse GET: hardware testing showed that a
+    # 503 (or a hung request) makes Nickel empty its local annotations. The safe
+    # containment point is checkforchanges, before Nickel decides to GET.
     return proxy_to_kobo_reading_services()
 
 
@@ -501,12 +493,38 @@ def handle_annotations(entitlement_id):
 @readingservices_api_v3.route("/content/checkforchanges", methods=["POST"])
 @requires_reading_services_auth_and_config
 def handle_check_for_changes():
-    """
-    Handle check for changes request.
-    Proxies to Kobo's reading services.
-    """
-    # Proxy to Kobo reading services
-    return proxy_to_kobo_reading_services()
+    """Keep locally-owned content out of Nickel's destructive GET trigger."""
+    entries = _parse_check_for_changes_request(request.get_data())
+    if entries is None:
+        log.warning("Not proxying an unrecognized Kobo checkforchanges request")
+        return jsonify([])
+
+    filtered_ids = {
+        entry["ContentId"] for entry in entries
+        if _check_for_changes_ownership_is_filtered(
+            resolve_entitlement_ownership(entry["ContentId"])
+        )
+    }
+    outbound_entries = _filter_check_for_changes_entries(entries, filtered_ids)
+    if not outbound_entries:
+        return jsonify([])
+
+    upstream = proxy_to_kobo_reading_services(
+        data=json.dumps(outbound_entries, separators=(",", ":")).encode("utf-8")
+    )
+    upstream_entries = upstream.get_json(silent=True)
+    response_ids = _check_for_changes_response_content_ids(upstream_entries)
+    if response_ids is None:
+        log.warning("Discarding an unrecognized Kobo checkforchanges response")
+        return jsonify([])
+
+    filtered_ids.update(
+        content_id for content_id in response_ids
+        if _check_for_changes_ownership_is_filtered(
+            resolve_entitlement_ownership(content_id)
+        )
+    )
+    return jsonify(_filter_check_for_changes_entries(upstream_entries, filtered_ids))
 
 
 @csrf.exempt

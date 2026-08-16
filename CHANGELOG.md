@@ -18,6 +18,14 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Kobo highlights now stay on the device when it syncs — the v4.1.36 fix did
+  not work.** A Kobo first asks which books have changed; if that answer names a
+  book, the reader downloads its annotation list and replaces every local
+  highlight and note with exactly what came back. v4.1.36 refused that download,
+  but the Kobo treats a refusal just like an empty list and still deletes
+  everything. This release keeps books served by NextGen out of the earlier
+  changed-books answer, so the destructive download never starts. New highlights
+  and notes still upload normally.
 - **Basic Configuration now saves when you press Enter in a single-line field,
   and "Convert missing KEPUBs now" works again.** Both did the same thing: that
   page was the one settings screen that refused the save it was trying to make,

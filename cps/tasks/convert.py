@@ -24,7 +24,10 @@ from cps import logger, config
 from cps.subproc_wrapper import process_open, stream_process_output
 from flask_babel import gettext as _
 from cps.file_helper import get_temp_dir
-from cps.services.kepub_package_normalizer import normalize_kepub_package
+from cps.services.kepub_package_normalizer import (
+    count_fragment_anchored_toc_targets,
+    normalize_kepub_package,
+)
 
 from cps.tasks.mail import TaskEmail
 from cps import gdriveutils, helper
@@ -32,6 +35,17 @@ from cps.constants import SUPPORTED_CALIBRE_BINARIES
 from cps.string_helper import strip_whitespaces
 
 log = logger.create()
+
+
+def _log_fragment_anchored_toc(book, path):
+    count = count_fragment_anchored_toc_targets(path)
+    if count:
+        log.warning(
+            "KEPUB for book '%s' (id %d) has %d fragment-anchored TOC targets; "
+            "Kobo highlights in this book may not appear on the device",
+            book.title, book.id, count,
+        )
+    return count
 
 
 def _valid_archive(path, book_format):
@@ -187,6 +201,8 @@ class TaskConvert(CalibreTask):
         if check == 0:
             cur_book = local_db.get_book(book_id)
             if os.path.isfile(file_path + format_new_ext):
+                if self.settings['new_book_format'].upper() == 'KEPUB':
+                    _log_fragment_anchored_toc(cur_book, file_path + format_new_ext)
                 new_format = local_db.session.query(db.Data).filter(db.Data.book == book_id) \
                     .filter(db.Data.format == self.settings['new_book_format'].upper()).one_or_none()
                 if not new_format:

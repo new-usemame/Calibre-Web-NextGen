@@ -141,25 +141,35 @@ for books that already carry highlights, and probably applies to new conversions
 **The 810-highlight recovery is independent of all of this** and stands alone: stripping the
 fragment from `Bookmark.ContentID` re-anchors every one, with no conversion change.
 
-### ⚠️ Open: what deleted the local rows is NOT established
+### ✅ ANSWERED 2026-08-16 — `checkforchanges` triggers an authoritative replacement
 
-After a sync in which the Cause-2 guard fired for The Age of Innocence, that book's **3 local
-`Bookmark` rows were deleted** while 6 rows in 1984 survived with identical row ids. All 3 were
-captured server-side first, with full text, colour and real KoboSpan anchors — so nothing was lost.
+🚨 **CORRECTION:** the open question above is now settled. Nickel did not independently prune the
+unanchored rows. On both book open and book close it emitted, in order:
 
-Two explanations fit equally, and they are **confounded** here because the deleted set and the
-unanchored set are the same three rows:
+```
+PUT   /kobo/<tok>/v1/library/<uuid>/state
+PATCH /api/v3/content/<uuid>/annotations
+POST  /api/v3/content/checkforchanges
+GET   /api/v3/content/<uuid>/annotations?limit=100
+```
 
-1. the guard's refusal did not prevent Nickel deleting the local rows;
-2. Nickel **pruned** them for being unanchored, independent of the download.
+The final GET occurred **only when** the `checkforchanges` response named that `ContentId`. Nickel
+then replaced the content's entire local `Bookmark` set with exactly what the GET produced,
+including destroying rows the response did not mention. Serving one annotation replaced three
+local rows with that one row.
 
-🚨 **The two devices point in opposite directions.** On the Libra the *anchored* rows died (87 of
-88, after repair — see Cause 2) and the unanchored survived; on the Clara the reverse. **No model
-explains both. Do not cite either device as evidence that the Cause-2 guard holds or fails.**
+All of these trigger cases were observed on a Clara BW running firmware 4.45.23792:
 
-**The experiment that separates them, and it is one reading session:** highlight both a
-fragment-TOC book and a clean-TOC book, then sync once. Only the fragmented book losing rows ⇒
-pruning. Both losing rows ⇒ the download path.
+| `checkforchanges` / annotation result | observed device result |
+|---|---|
+| `checkforchanges` returns `[]` | no GET; no local deletion |
+| GET returns 200 with N annotations | local set becomes exactly those N |
+| GET returns 503 | local set becomes empty |
+| GET hangs | local set becomes empty |
+
+The #1636 refusal therefore caused the Clara deletion it was intended to prevent. Filtering
+CWNG-owned ContentIds out of `checkforchanges` was measured across three open/close cycles: the GET
+was never issued, no highlights were deleted, and PATCH uploads continued to return 204.
 
 **Library scan:** 5 of 216 books (2.3%) carry an escaping OPF href, every one `../nav.xhtml`.
 Perfect correlation on the instance: every book with one has **zero** stored annotations ever;
@@ -174,15 +184,20 @@ to `<uuid>!<opf-dir>!<normpath(href)>`, scoped by `VolumeID`. Verify each target
 
 ---
 
-## Cause 2 — highlights are then DELETED: the annotation download returns an authoritative empty set
+## Cause 2 — highlights are then DELETED: `checkforchanges` triggers an authoritative replacement
 
 This is upstream [calibre-web #2610](https://github.com/janeczku/calibre-web/issues/2610), open
 since 2022 and never root-caused because nobody had read the device DB during the event.
 
 CWNG advertises itself as `reading_services_host` whenever Kobo sync is on, then forwards
-`GET /api/v3/content/<uuid>/annotations` to `readingservices.kobo.com`. **Kobo's cloud has never
-heard of a sideloaded book**, so it answers with a success-shaped empty set — and Nickel acts on
-that by deleting every local `Bookmark` row for the book.
+`GET /api/v3/content/<uuid>/annotations` to `readingservices.kobo.com`.
+
+🚨 **CORRECTED 2026-08-16:** the original claim that **Kobo's cloud has never heard of a sideloaded
+book** is false. Kobo's cloud does store annotations for sideloaded books; proxying the GET restored
+two previously deleted highlights verbatim. The destructive mechanism is broader: when
+`checkforchanges` names a ContentId, Nickel issues the GET and replaces its entire local Bookmark
+set with exactly the returned annotations. A 200 containing one row replaced three local rows with
+one, while a 503 and a hung GET both replaced the set with empty.
 
 ```
 11:58   88 highlights present and correctly anchored (after the Cause-1 repair)
@@ -199,10 +214,11 @@ GET**.
 rows were invisible to the sync reconciliation and survived; making them well-formed made them
 eligible for deletion. **Fix the server before repairing a device.**
 
-**Fix (PR #1636):** when the entitlement resolves to a book we own, do not proxy the download
-direction — return **503 + `Retry-After`**, the one response that cannot be read as "you have none".
-Content we do not own still proxies (there Kobo's cloud genuinely is authoritative); PATCH upload is
-untouched.
+🚨 **CORRECTED 2026-08-16 — PR #1636 DID NOT WORK:** returning **503 + `Retry-After`** is not a safe
+refusal. Nickel treats the failure as an empty authoritative set and deletes every local row. The
+proven containment is earlier: strip every CWNG-owned ContentId from the outbound
+`checkforchanges` request and defensively from its response. When no ids remain, answer `[]`
+without contacting Kobo. Nickel then issues no GET at all, while PATCH upload remains untouched.
 
 Deliberately **not** answering with our own snapshot: an internally-complete server view would tell
 a second device to drop annotations it has not uploaded yet, and a regenerated KEPUB shifts KoboSpan

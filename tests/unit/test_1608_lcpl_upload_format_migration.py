@@ -2,7 +2,7 @@
 # Copyright (C) 2024-2026 Calibre-Web-NextGen contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Existing installs must receive LCPL upload support without losing intent."""
+"""Existing ACSM-enabled installs receive LCPL without widening restrictions."""
 
 import inspect
 
@@ -56,42 +56,82 @@ def test_allowlist_already_containing_lcpl_is_untouched_but_marked():
 
 
 def test_running_migration_twice_does_not_append_twice():
-    config, saves = _config("epub,pdf")
+    config, saves = _config("epub,pdf,acsm")
 
     config.reconcile_lcpl_upload_format()
     config.reconcile_lcpl_upload_format()
 
-    assert config.config_upload_formats == "epub,pdf,lcpl"
-    assert saves == [("epub,pdf,lcpl", True)]
+    assert config.config_upload_formats == "epub,pdf,acsm,lcpl"
+    assert saves == [("epub,pdf,acsm,lcpl", True)]
 
 
 def test_user_removal_after_marker_is_never_reversed():
-    config, saves = _config("epub,pdf")
+    config, saves = _config("epub,pdf,acsm")
     config.reconcile_lcpl_upload_format()
-    config.config_upload_formats = "epub,pdf"
+    config.config_upload_formats = "epub,pdf,acsm"
+
+    config.reconcile_lcpl_upload_format()
+
+    assert config.config_upload_formats == "epub,pdf,acsm"
+    assert saves == [("epub,pdf,acsm,lcpl", True)]
+
+
+def test_narrowed_allowlist_without_acsm_is_byte_identical_and_marked():
+    original = " EPUB ,pdf,,PDF "
+    config, saves = _config(original)
+
+    config.reconcile_lcpl_upload_format()
+
+    assert config.config_upload_formats == original
+    assert config.config_upload_formats_lcpl_migrated is True
+    assert saves == [(original, True)]
+
+
+def test_narrowed_epub_pdf_allowlist_is_untouched_and_marked():
+    config, saves = _config("epub,pdf")
 
     config.reconcile_lcpl_upload_format()
 
     assert config.config_upload_formats == "epub,pdf"
-    assert saves == [("epub,pdf,lcpl", True)]
-
-
-def test_deliberately_trimmed_allowlist_loses_nothing():
-    config, saves = _config("epub,pdf")
-
-    config.reconcile_lcpl_upload_format()
-
-    assert config.config_upload_formats.split(',') == ["epub", "pdf", "lcpl"]
-    assert saves == [("epub,pdf,lcpl", True)]
+    assert config.config_upload_formats_lcpl_migrated is True
+    assert saves == [("epub,pdf", True)]
 
 
 def test_append_uses_admin_form_normalization_without_losing_empty_entries():
-    config, saves = _config(" EPUB ,,pdf,EPUB")
+    config, saves = _config(" EPUB ,,pdf,ACSM,EPUB")
 
     config.reconcile_lcpl_upload_format()
 
-    assert config.config_upload_formats == "epub,,pdf,lcpl"
-    assert saves == [("epub,,pdf,lcpl", True)]
+    assert config.config_upload_formats == "epub,,pdf,acsm,lcpl"
+    assert saves == [("epub,,pdf,acsm,lcpl", True)]
+
+
+def test_marker_prevents_second_pass_when_lcpl_was_not_appended():
+    config, saves = _config("epub,pdf")
+    config.reconcile_lcpl_upload_format()
+    config.config_upload_formats = "epub,pdf,acsm"
+
+    config.reconcile_lcpl_upload_format()
+
+    assert config.config_upload_formats == "epub,pdf,acsm"
+    assert saves == [("epub,pdf", True)]
+
+
+def test_pre_upgrade_full_default_containing_acsm_gains_lcpl():
+    from cps import constants
+
+    previous_default = ','.join(
+        upload_format
+        for upload_format in constants.EXTENSIONS_UPLOAD
+        if upload_format != "lcpl"
+    )
+    assert "acsm" in previous_default.split(',')
+    config, saves = _config(previous_default)
+
+    config.reconcile_lcpl_upload_format()
+
+    assert config.config_upload_formats == previous_default + ",lcpl"
+    assert saves == [(previous_default + ",lcpl", True)]
 
 
 def test_empty_allow_all_sentinel_is_marked_without_being_narrowed():
@@ -128,7 +168,7 @@ def test_marker_and_later_user_removal_persist_across_restart(tmp_path):
     session = Session()
     config_sql.load_configuration(session, key)
     stored = session.query(config_sql._Settings).one()
-    stored.config_upload_formats = "mobi,epub,pdf"
+    stored.config_upload_formats = "mobi,epub,pdf,acsm"
     stored.config_upload_formats_lcpl_migrated = False
     session.commit()
 
@@ -136,10 +176,10 @@ def test_marker_and_later_user_removal_persist_across_restart(tmp_path):
     config.init_config(session, key, None)
     session.expire_all()
     stored = session.query(config_sql._Settings).one()
-    assert stored.config_upload_formats == "mobi,epub,pdf,lcpl"
+    assert stored.config_upload_formats == "mobi,epub,pdf,acsm,lcpl"
     assert stored.config_upload_formats_lcpl_migrated is True
 
-    config.config_upload_formats = "mobi,epub,pdf"
+    config.config_upload_formats = "mobi,epub,pdf,acsm"
     config.save()
     session.close()
 
@@ -148,7 +188,7 @@ def test_marker_and_later_user_removal_persist_across_restart(tmp_path):
     restarted.init_config(restarted_session, key, None)
     restarted_session.expire_all()
     final = restarted_session.query(config_sql._Settings).one()
-    assert final.config_upload_formats == "mobi,epub,pdf"
+    assert final.config_upload_formats == "mobi,epub,pdf,acsm"
     assert final.config_upload_formats_lcpl_migrated is True
     restarted_session.close()
     engine.dispose()

@@ -576,7 +576,7 @@ class ConfigSQL(object):
         return self.hardcover_sync_enabled()
 
     def reconcile_lcpl_upload_format(self):
-        """Append the LCPL default once without replacing user choices."""
+        """Inherit LCPL once when an existing allowlist accepts ACSM."""
         if not bool(getattr(
                 self, "config_upload_formats_lcpl_migrated", False)):
             raw_formats = getattr(self, "config_upload_formats", "") or ""
@@ -586,9 +586,12 @@ class ConfigSQL(object):
                 if upload_format not in normalized:
                     normalized.append(upload_format)
 
-            # An empty value means allow every extension; replacing it with
-            # lcpl would narrow access rather than add a newly shipped default.
-            if any(normalized) and "lcpl" not in normalized:
+            # LCPL is Readium's analogue of Adobe's ACSM, so an existing ACSM
+            # entry demonstrates that licence/ticket uploads belong here. If
+            # ACSM was removed or never allowed, preserve the administrator's
+            # list byte-for-byte; LCPL can still be added in Basic Configuration.
+            # The empty allow-all sentinel also remains unchanged.
+            if "acsm" in normalized and "lcpl" not in normalized:
                 normalized.append("lcpl")
                 self.config_upload_formats = ','.join(normalized)
 

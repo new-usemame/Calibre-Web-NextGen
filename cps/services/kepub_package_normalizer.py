@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Make kepubify output safe for Kobo's non-normalizing package resolver."""
 
+from collections import Counter
 import copy
 import os
 import posixpath
@@ -261,10 +262,16 @@ def _write_archive(path, entries, comment):
             archive.writestr(info, content)
 
 
-def _escaping_manifest_hrefs(opf_path, opf_bytes):
+def _escaping_manifest_references(opf_path, opf_bytes):
+    """Count escaping ``manifest/item@href`` references by item identity.
+
+    An item's ``id`` is its stable identity. An item without an ``id`` falls
+    back to its ordinal position among the package's manifest items, so adding,
+    moving, or reassigning an unidentified escaping item fails closed.
+    """
     opf_directory = posixpath.dirname(opf_path)
-    escaping = set()
-    for item in _manifest_items(opf_bytes):
+    escaping = Counter()
+    for position, item in enumerate(_manifest_items(opf_bytes)):
         href = item.get("href")
         if not href:
             continue
@@ -274,7 +281,9 @@ def _escaping_manifest_hrefs(opf_path, opf_bytes):
         _, href_path = split
         if not _inside_directory(
                 _resolve_reference(opf_path, href_path), opf_directory):
-            escaping.add(href)
+            item_id = item.get("id")
+            identity = ("id", item_id) if item_id else ("position", position)
+            escaping[(identity, href)] += 1
     return escaping
 
 
@@ -301,18 +310,19 @@ def _validate_rewritten_archive(path, expected_span_counts):
 
 
 def _validate_package_document_rewrite(
-        path, expected_span_counts, source_escaping_hrefs):
+        path, expected_span_counts, source_escaping_references):
     opf_path, opf_bytes = _validate_rewritten_archive(
         path, expected_span_counts)
-    rewritten_escaping_hrefs = _escaping_manifest_hrefs(opf_path, opf_bytes)
-    if not rewritten_escaping_hrefs.issubset(source_escaping_hrefs):
+    rewritten_escaping_references = _escaping_manifest_references(
+        opf_path, opf_bytes)
+    if rewritten_escaping_references - source_escaping_references:
         raise ValueError("package rewrite introduced an escaping manifest href")
 
 
 def _validate_normalized_archive(path, expected_span_counts):
     opf_path, opf_bytes = _validate_rewritten_archive(
         path, expected_span_counts)
-    if _escaping_manifest_hrefs(opf_path, opf_bytes):
+    if _escaping_manifest_references(opf_path, opf_bytes):
         raise ValueError("rewritten manifest still escapes the OPF directory")
 
 
@@ -326,7 +336,10 @@ def rewrite_package_document(path, transform):
 
     The transaction preserves every non-package member's bytes, the archive
     comment, and the source file's permission bits. Existing escaping manifest
-    hrefs may remain, but the transform may not introduce another one.
+    ``item`` hrefs may remain only with the same raw spelling, item identity,
+    and multiplicity; an item without an ``id`` is identified by its manifest
+    position. This check covers only manifest ``item`` hrefs, not ``guide``
+    references, metadata ``link`` elements, or ``xml:base``.
     """
     path = os.fspath(path)
     temporary_path = None
@@ -348,7 +361,7 @@ def rewrite_package_document(path, transform):
                 MAX_PACKAGE_DOCUMENT_BYTES,
                 "package document",
             )
-            source_escaping_hrefs = _escaping_manifest_hrefs(
+            source_escaping_references = _escaping_manifest_references(
                 package_path, package_bytes)
             package = etree.fromstring(package_bytes, parser=_XML_PARSER)
             if not transform(package):
@@ -357,7 +370,7 @@ def rewrite_package_document(path, transform):
             contents = {info.filename: archive.read(info) for info in infos}
             expected_span_counts = _span_counts(contents)
             contents[package_path] = etree.tostring(
-                package,
+                package.getroottree(),
                 encoding="utf-8",
                 xml_declaration=package_bytes.lstrip().startswith(b"<?xml"),
             )
@@ -372,7 +385,7 @@ def rewrite_package_document(path, transform):
         os.close(descriptor)
         _write_archive(temporary_path, entries, comment)
         _validate_package_document_rewrite(
-            temporary_path, expected_span_counts, source_escaping_hrefs)
+            temporary_path, expected_span_counts, source_escaping_references)
 
         with zipfile.ZipFile(temporary_path) as rewritten:
             if rewritten.comment != comment:

@@ -151,14 +151,14 @@ def _option_value(cmd, option):
     return cmd[cmd.index(option) + 1]
 
 
-def _write_series_kepub(path, include_series=True):
+def _write_series_kepub(path, include_series=True, package_prolog=b""):
     series_metadata = b""
     if include_series:
         series_metadata = b"""    <meta name="calibre:series" content="Residual Series"/>
     <meta name="calibre:series_index" content="4.0"/>
 """
     package = b"""<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf"
+%s<package xmlns="http://www.idpf.org/2007/opf"
          xmlns:dc="http://purl.org/dc/elements/1.1/"
          unique-identifier="book-id" version="3.0">
   <metadata>
@@ -173,7 +173,7 @@ def _write_series_kepub(path, include_series=True):
           media-type="application/xhtml+xml"/>
   </manifest>
   <spine><itemref idref="chapter"/></spine>
-</package>""" % series_metadata
+</package>""" % (package_prolog, series_metadata)
     container = b"""<?xml version="1.0"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"
            version="1.0">
@@ -531,6 +531,80 @@ def test_package_rewrite_rejects_new_escaping_manifest_href(tmp_path):
     assert rewrite_package_document(kepub, add_escaping_item) is None
     assert kepub.read_bytes() == original
     assert list(tmp_path.glob(".introduced-escape.kepub.*.package-rewrite.tmp")) == []
+
+
+@pytest.mark.unit
+def test_package_rewrite_rejects_duplicate_escaping_manifest_href(tmp_path):
+    from cps.services.kepub_package_normalizer import rewrite_package_document
+
+    kepub = build_calibre_epub3_series_kepub(tmp_path / "duplicate-escape.kepub")
+    original = kepub.read_bytes()
+
+    def duplicate_escaping_item(package):
+        manifest = package.xpath("//*[local-name()='manifest']")[0]
+        etree.SubElement(
+            manifest,
+            "{http://www.idpf.org/2007/opf}item",
+            id="duplicate-nav",
+            href="../nav.xhtml",
+            attrib={
+                "media-type": "application/xhtml+xml",
+                "properties": "nav",
+            },
+        )
+        return True
+
+    assert rewrite_package_document(kepub, duplicate_escaping_item) is None
+    assert kepub.read_bytes() == original
+    assert list(tmp_path.glob(".duplicate-escape.kepub.*.package-rewrite.tmp")) == []
+
+
+@pytest.mark.unit
+def test_package_rewrite_rejects_reassigned_escaping_manifest_href(tmp_path):
+    from cps.services.kepub_package_normalizer import rewrite_package_document
+
+    kepub = build_calibre_epub3_series_kepub(tmp_path / "reassigned-escape.kepub")
+    original = kepub.read_bytes()
+
+    def reassign_escaping_item(package):
+        items = {
+            item.get("id"): item
+            for item in package.xpath("//*[local-name()='manifest']/*[local-name()='item']")
+        }
+        items["nav"].set("href", "chapter.xhtml")
+        items["chapter"].set("href", "../nav.xhtml")
+        return True
+
+    assert rewrite_package_document(kepub, reassign_escaping_item) is None
+    assert kepub.read_bytes() == original
+    assert list(tmp_path.glob(".reassigned-escape.kepub.*.package-rewrite.tmp")) == []
+
+
+@pytest.mark.unit
+def test_series_clear_preserves_package_doctype_and_processing_instruction(
+    enforcer_module, tmp_path
+):
+    kepub = tmp_path / "package-prolog.kepub"
+    _write_series_kepub(
+        kepub,
+        package_prolog=(
+            b"<!DOCTYPE package>\n"
+            b"<?calibre-marker preserve-this?>\n"
+        ),
+    )
+    before = _archive_contents(kepub)
+
+    assert b"<!DOCTYPE package>" in before["OEBPS/content.opf"]
+    assert b"<?calibre-marker preserve-this?>" in before["OEBPS/content.opf"]
+    assert enforcer_module._strip_kepub_series_metadata(kepub) is True
+
+    after = _archive_contents(kepub)
+    assert _series_metadata(after["OEBPS/content.opf"]) == set()
+    assert b"<!DOCTYPE package>" in after["OEBPS/content.opf"]
+    assert b"<?calibre-marker preserve-this?>" in after["OEBPS/content.opf"]
+    assert set(after) == set(before)
+    for name in before.keys() - {"OEBPS/content.opf"}:
+        assert after[name] == before[name]
 
 
 @pytest.mark.unit

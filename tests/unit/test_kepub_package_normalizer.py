@@ -131,9 +131,9 @@ def test_clean_package_reads_only_container_and_opf(tmp_path, monkeypatch):
     read_names = []
 
     class RecordingZipFile(zipfile.ZipFile):
-        def read(self, name, *args, **kwargs):
+        def open(self, name, *args, **kwargs):
             read_names.append(name.filename if isinstance(name, zipfile.ZipInfo) else name)
-            return super().read(name, *args, **kwargs)
+            return super().open(name, *args, **kwargs)
 
     monkeypatch.setattr(normalizer.zipfile, "ZipFile", RecordingZipFile)
 
@@ -150,9 +150,9 @@ def test_clean_repair_probe_reads_only_container_and_opf(tmp_path, monkeypatch):
     read_names = []
 
     class RecordingZipFile(zipfile.ZipFile):
-        def read(self, name, *args, **kwargs):
+        def open(self, name, *args, **kwargs):
             read_names.append(name.filename if isinstance(name, zipfile.ZipInfo) else name)
-            return super().read(name, *args, **kwargs)
+            return super().open(name, *args, **kwargs)
 
     monkeypatch.setattr(normalizer.zipfile, "ZipFile", RecordingZipFile)
 
@@ -350,3 +350,73 @@ def test_an_archive_that_decompresses_past_the_bound_is_refused(tmp_path, monkey
     assert result is None
     assert package.read_bytes() == original
     assert any("decompresses to more than" in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("probe", [False, True], ids=["normalizer", "repair-probe"])
+def test_total_size_is_rejected_before_any_member_read_or_crc_scan(
+    tmp_path, monkeypatch, caplog, probe,
+):
+    from cps.services import kepub_package_normalizer as mod
+
+    package = tmp_path / "early-bound.kepub"
+    _write_package(package)
+    reads = []
+    crc_scans = []
+    real_zip = zipfile.ZipFile
+
+    class NoEarlyReadZipFile(real_zip):
+        def read(self, *args, **kwargs):
+            reads.append(args[0] if args else None)
+            raise AssertionError("member read happened before total-size rejection")
+
+        def testzip(self):
+            crc_scans.append(True)
+            raise AssertionError("CRC scan happened before total-size rejection")
+
+    monkeypatch.setattr(mod, "MAX_TOTAL_UNCOMPRESSED_BYTES", 8)
+    monkeypatch.setattr(mod.zipfile, "ZipFile", NoEarlyReadZipFile)
+
+    with caplog.at_level("WARNING"):
+        result = (mod.kepub_package_needs_normalization(package) if probe
+                  else mod.normalize_kepub_package(package))
+
+    assert result is None
+    assert reads == []
+    assert crc_scans == []
+    assert "decompresses to more than" in caplog.text
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "member, limit_name, expected",
+    [
+        ("META-INF/container.xml", "MAX_CONTAINER_XML_BYTES", "container.xml"),
+        ("OPS/epb.opf", "MAX_PACKAGE_DOCUMENT_BYTES", "package document"),
+    ],
+)
+def test_structural_members_have_strict_per_entry_bounds(
+    tmp_path, monkeypatch, caplog, member, limit_name, expected,
+):
+    from cps.services import kepub_package_normalizer as mod
+
+    package = tmp_path / "structural-bound.kepub"
+    _write_package(package)
+    monkeypatch.setattr(mod, limit_name, 8, raising=False)
+
+    with caplog.at_level("WARNING"):
+        assert mod.normalize_kepub_package(package) is None
+    assert expected in caplog.text
+
+
+@pytest.mark.unit
+def test_repair_probe_applies_the_opf_per_entry_bound(tmp_path, monkeypatch, caplog):
+    from cps.services import kepub_package_normalizer as mod
+
+    package = tmp_path / "probe-opf-bound.kepub"
+    _write_package(package)
+    monkeypatch.setattr(mod, "MAX_PACKAGE_DOCUMENT_BYTES", 8, raising=False)
+
+    with caplog.at_level("WARNING"):
+        assert mod.kepub_package_needs_normalization(package) is None
+    assert "package document" in caplog.text

@@ -100,16 +100,10 @@ class TaskKepubBackfill(CalibreTask):
                 except Exception as error:
                     log.error("KEPUB backfill could not close its database session: %s", error)
 
-            # The startup backfill is a bounded migration attempt. Individual
-            # failures remain visible on the task, but must not make every boot
-            # repeat the same bulk conversion against an unwritable library.
-            #
-            # A run that converted nothing at all and failed at least once is a
-            # broken environment (read-only books volume, a mount that arrived
-            # late), not a finished migration. Checking it off would strand the
-            # library with no KEPUBs, no retry and -- because the startup task is
-            # hidden -- no explanation. Leave the flag clear so the next boot
-            # tries again.
+            # The legacy completion flag no longer gates startup: every eligible
+            # boot performs the cheap idempotent scan. Keep writing it for safe
+            # rollback to an older release, but do not mark a wholly failed run
+            # complete for that older reader.
             if self.converted or not self.failed:
                 # Persist first, then flip the in-memory flag: a save() that
                 # raises would otherwise leave this process believing the
@@ -191,9 +185,14 @@ def enqueue_kepub_backfill(user="System", hidden=False):
 
 
 def enqueue_startup_kepub_backfill():
-    if not config.config_kobo_kepub_backfill_completed:
-        return enqueue_kepub_backfill(hidden=True)
-    return False
+    """Queue the cheap idempotent scan whenever KEPUB preference is available.
+
+    KoboSyncedBooks rows are deleted during ordinary reconciliation and SQLite
+    may reuse their INTEGER PRIMARY KEY values, so no max-id watermark can prove
+    the work-set unchanged. The task already skips existing KEPUBs and missing
+    EPUBs before conversion; scanning is the reliable and inexpensive gate.
+    """
+    return enqueue_kepub_backfill(hidden=True)
 
 
 def is_kepub_backfill_pending():

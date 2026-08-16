@@ -114,15 +114,12 @@ def test_valid_content_location_still_normalizes(patched_session):
     assert row.content_id == f"{BOOK_UUID}!!OPS/chapter-006.xml"
 
 
-def test_a_newly_invalid_location_clears_the_stored_one_rather_than_leaving_it_stale(
+def test_a_newly_invalid_location_preserves_the_last_known_valid_locator(
     patched_session,
 ):
-    """"Supplied and unusable" is not "not supplied".
-
-    Only the first should clear a previously-stored locator. Keeping a stale one
-    points the annotation at a chapter the device no longer claims it is in, and
-    lets an equal-clock payload be mistaken for a no-op. The highlight itself
-    still survives either way -- that is the invariant from #1635.
+    """A malformed replacement does not prove the validated stored locator is
+    wrong. Preserve the last-known-valid value; the current backfill normalizes
+    non-NULL locators and cannot reconstruct one that was cleared.
     """
     session, user = patched_session
     book = _book()
@@ -139,8 +136,20 @@ def test_a_newly_invalid_location_clears_the_stored_one_rather_than_leaving_it_s
     dispatch_annotation_sync([moved], book, user)
 
     row = session.query(ub.Annotation).one()
-    assert row.content_id is None, "a known-wrong locator must not be left in place"
+    assert row.content_id == f"{BOOK_UUID}!!OPS/chapter-006.xml"
     assert row.highlighted_text == "same highlight, relocated", "the highlight survives"
+
+
+def test_a_new_annotation_with_an_invalid_location_is_stored_with_null_content_id(
+    patched_session,
+):
+    session, user = patched_session
+
+    dispatch_annotation_sync([_payload("OPS/../../outside.xml")], _book(), user)
+
+    row = session.query(ub.Annotation).one()
+    assert row.content_id is None
+    assert row.highlighted_text == "Be patient, for the world is broad and wide."
 
 
 def test_an_update_with_no_location_at_all_leaves_the_stored_one_alone(patched_session):

@@ -41,11 +41,20 @@ _KOBO_SPAN_RE = re.compile(
 _XML_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, recover=False)
 
 
-#: A KEPUB is a book. Anything past this is either broken or hostile, and
-#: reading it would exhaust the conversion worker -- MemoryError is not an
-#: Exception, so the module's own catch cannot recover from it. Books are
-#: user-uploadable, so this bound is reachable by input we do not control.
-MAX_TOTAL_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB
+#: This implementation temporarily holds the source members, rewritten members,
+#: output ZIP and validation members at the same time. A 2 GiB input therefore
+#: implied several GiB of peak memory -- not a meaningful worker-safety bound.
+#: 256 MiB still accommodates unusually image-heavy books while capping that
+#: multi-copy peak near a scale a normal container can survive. On refusal the
+#: original is untouched and conversion retains its existing delivery fallback.
+MAX_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
+
+#: Structural XML is read before relocation can be planned, so it also needs a
+#: per-entry bound. Real container.xml files are normally under 1 KiB; 1 MiB is
+#: generous. A very large manifest can be legitimate, hence a separate 16 MiB
+#: ceiling, but it must not be able to allocate hundreds of MiB on its own.
+MAX_CONTAINER_XML_BYTES = 1 * 1024 * 1024
+MAX_PACKAGE_DOCUMENT_BYTES = 16 * 1024 * 1024
 
 
 def _reject_oversized_archive(infos):
@@ -59,8 +68,27 @@ def _reject_oversized_archive(infos):
             )
 
 
+def _read_bounded_member(archive, name, limit, description):
+    """Read one structural member without trusting only ZIP metadata."""
+    try:
+        info = archive.getinfo(name)
+    except KeyError as error:
+        raise ValueError("KEPUB is missing {}".format(description)) from error
+    if info.file_size > limit:
+        raise ValueError("{} exceeds {} bytes".format(description, limit))
+    with archive.open(info, "r") as member:
+        content = member.read(limit + 1)
+    if len(content) > limit:
+        raise ValueError("{} exceeds {} bytes".format(description, limit))
+    return content
+
+
 def _package_document_path(archive):
-    container = etree.fromstring(archive.read(_CONTAINER_PATH), parser=_XML_PARSER)
+    container = etree.fromstring(
+        _read_bounded_member(
+            archive, _CONTAINER_PATH, MAX_CONTAINER_XML_BYTES, "container.xml"),
+        parser=_XML_PARSER,
+    )
     rootfiles = container.xpath(
         "//container:rootfile/@full-path", namespaces={"container": _CONTAINER_NS})
     if not rootfiles:
@@ -236,6 +264,7 @@ def _write_archive(path, entries, comment):
 def _validate_rewritten_archive(path, expected_span_counts):
     with zipfile.ZipFile(path) as archive:
         infos = archive.infolist()
+        _reject_oversized_archive(infos)
         if not infos or infos[0].filename != "mimetype":
             raise ValueError("mimetype is not the first EPUB entry")
         if infos[0].compress_type != zipfile.ZIP_STORED:
@@ -246,7 +275,9 @@ def _validate_rewritten_archive(path, expected_span_counts):
             raise ValueError("rewritten KEPUB failed its CRC check")
         opf_path = _package_document_path(archive)
         opf_directory = posixpath.dirname(opf_path)
-        for item in _manifest_items(archive.read(opf_path)):
+        opf_bytes = _read_bounded_member(
+            archive, opf_path, MAX_PACKAGE_DOCUMENT_BYTES, "package document")
+        for item in _manifest_items(opf_bytes):
             href = item.get("href")
             if not href:
                 continue
@@ -274,9 +305,14 @@ def normalize_kepub_package(path):
         original_stat = os.stat(path)
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
+            # This is intentionally the first operation after reading the central
+            # directory: no member read and no full CRC/decompression pass may
+            # happen before the cheap declared-size rejection.
+            _reject_oversized_archive(infos)
             names = [info.filename for info in infos]
             opf_path = _package_document_path(archive)
-            opf_bytes = archive.read(opf_path)
+            opf_bytes = _read_bounded_member(
+                archive, opf_path, MAX_PACKAGE_DOCUMENT_BYTES, "package document")
             relocations = _plan_relocations(opf_path, opf_bytes, set(names))
             if not relocations:
                 return False
@@ -284,7 +320,6 @@ def normalize_kepub_package(path):
                 raise ValueError("KEPUB contains duplicate ZIP member names")
             if archive.testzip() is not None:
                 raise ValueError("KEPUB failed its CRC check")
-            _reject_oversized_archive(infos)
             contents = {info.filename: archive.read(info) for info in infos}
             entries = _rewritten_entries(infos, contents, relocations)
             expected_span_counts = _span_counts(contents, relocations)
@@ -323,9 +358,12 @@ def kepub_package_needs_normalization(path):
     path = os.fspath(path)
     try:
         with zipfile.ZipFile(path) as archive:
-            names = {info.filename for info in archive.infolist()}
+            infos = archive.infolist()
+            _reject_oversized_archive(infos)
+            names = {info.filename for info in infos}
             opf_path = _package_document_path(archive)
-            opf_bytes = archive.read(opf_path)
+            opf_bytes = _read_bounded_member(
+                archive, opf_path, MAX_PACKAGE_DOCUMENT_BYTES, "package document")
             return bool(_plan_relocations(opf_path, opf_bytes, names))
     except Exception as error:
         log.warning("Could not inspect KEPUB package %s: %s", path, error)

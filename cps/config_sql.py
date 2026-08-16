@@ -156,6 +156,10 @@ class _Settings(_Base):
     config_kobo_cover_padding_color = Column(String, default="")
     config_kobo_prefer_kepub = Column(Boolean, default=True)
     config_kobo_kepub_backfill_completed = Column(Boolean, default=False)
+    # Legacy #1647 watermark retained only for schema/rollback compatibility.
+    # It is deliberately not read: SQLite can reuse KoboSyncedBooks INTEGER
+    # PRIMARY KEY values after deletes, so max(id) is not a monotonic work-set.
+    config_kobo_kepub_backfill_watermark = Column(Integer, default=0)
     # Versioned repair gates can advance without accumulating one-off booleans.
     config_kobo_kepub_package_repair_version = Column(Integer, default=0)
 

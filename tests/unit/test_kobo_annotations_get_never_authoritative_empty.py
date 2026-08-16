@@ -96,6 +96,65 @@ def test_patch_upload_direction_still_proxies(app, monkeypatch):
         assert _view()(BOOK_UUID) is sentinel
 
 
+def test_patch_non_object_body_is_validated_locally_and_still_proxies(
+    app, monkeypatch, caplog,
+):
+    """Malformed local-capture input must be explicit, not an AttributeError
+    swallowed by the outer handler; upload pass-through remains unchanged."""
+    from cps.services import annotation_sync
+
+    sentinel = object()
+    dispatched = []
+    monkeypatch.setattr(
+        rs, "get_book_by_entitlement_id",
+        lambda _eid: SimpleNamespace(id=347, title="Flatland", identifiers=[]),
+    )
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    monkeypatch.setattr(
+        rs, "current_user", SimpleNamespace(id=7, name="test-user", is_authenticated=True),
+    )
+    monkeypatch.setattr(
+        annotation_sync, "dispatch_annotation_sync",
+        lambda *args, **kwargs: dispatched.append((args, kwargs)),
+    )
+
+    with app.test_request_context(
+        f"/api/v3/content/{BOOK_UUID}/annotations", method="PATCH", json=["not", "an", "object"],
+    ), caplog.at_level("WARNING"):
+        assert _view()(BOOK_UUID) is sentinel
+
+    assert dispatched == []
+    assert "PATCH body is not a JSON object" in caplog.text
+
+
+def test_patch_non_list_annotation_batch_is_rejected_without_breaking_proxy(
+    app, monkeypatch, caplog,
+):
+    from cps.services import annotation_sync
+
+    sentinel = object()
+    monkeypatch.setattr(
+        rs, "get_book_by_entitlement_id",
+        lambda _eid: SimpleNamespace(id=347, title="Flatland", identifiers=[]),
+    )
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    monkeypatch.setattr(
+        rs, "current_user", SimpleNamespace(id=7, name="test-user", is_authenticated=True),
+    )
+    monkeypatch.setattr(
+        annotation_sync, "dispatch_annotation_sync",
+        lambda *_args, **_kwargs: pytest.fail("non-list batch reached dispatcher"),
+    )
+
+    with app.test_request_context(
+        f"/api/v3/content/{BOOK_UUID}/annotations", method="PATCH",
+        json={"updatedAnnotations": {"id": "not-a-list"}},
+    ), caplog.at_level("WARNING"):
+        assert _view()(BOOK_UUID) is sentinel
+
+    assert "expected a list" in caplog.text
+
+
 # --- fail-closed: uncertainty must never fall through to the destructive path ---
 
 def test_ownership_lookup_error_fails_closed(app, monkeypatch, no_proxy):

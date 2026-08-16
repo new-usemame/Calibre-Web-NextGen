@@ -190,6 +190,39 @@ def test_client_last_modified_missing_malformed_valid(db_session, raw, expected)
         assert row.client_modified_at == datetime(2026, 8, 9, 14, 52, 21)
 
 
+def test_malformed_client_clock_does_not_suppress_an_existing_annotation_edit(db_session):
+    """A rejected clock is not an undated update.
+
+    Once a row has a valid timestamp, collapsing a later malformed timestamp to
+    the ordinary "missing" sentinel makes the stale-update guard discard the
+    user's changed text and note.  Apply the edit by arrival order, but retain
+    the last valid ordering hint.
+    """
+    from cps.services.annotation_sync import _upsert_annotation
+
+    book = SimpleNamespace(id=5, uuid="b3d1b38b-74fd-43b7-a796-996e5a6a8b04")
+    user = SimpleNamespace(id=7)
+    row = _upsert_annotation(db_session, {
+        "id": "bad-clock-existing",
+        "highlightedText": "first",
+        "noteText": "first note",
+        "clientLastModifiedUtc": "2026-08-09T15:00:00Z",
+    }, book, user)
+    db_session.flush()
+
+    updated = _upsert_annotation(db_session, {
+        "id": "bad-clock-existing",
+        "highlightedText": "edited",
+        "noteText": "edited note",
+        "clientLastModifiedUtc": "not-a-clock",
+    }, book, user)
+
+    assert updated is row
+    assert row.highlighted_text == "edited"
+    assert row.note_text == "edited note"
+    assert row.client_modified_at == datetime(2026, 8, 9, 15, 0)
+
+
 def test_kobo_create_records_origin_once_and_update_cannot_replace_it(db_session):
     from cps import ub
     from cps.services.annotation_sync import _upsert_annotation

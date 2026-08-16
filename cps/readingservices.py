@@ -454,7 +454,13 @@ def handle_annotations(entitlement_id):
 
     if request.method == "PATCH":
         try:
-            data = request.get_json() or {}
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                log.warning(
+                    "Ignoring local annotation capture for entitlement %s: "
+                    "PATCH body is not a JSON object", entitlement_id,
+                )
+                data = {}
             log_annotation_data(entitlement_id, "PATCH", data)
             book = get_book_by_entitlement_id(entitlement_id)
             if book is None:
@@ -466,12 +472,22 @@ def handle_annotations(entitlement_id):
                 from cps.services import annotation_sync
                 updated = data.get("updatedAnnotations")
                 deleted = data.get("deletedAnnotationIds")
-                if updated:
+                if updated is not None and not isinstance(updated, list):
+                    log.warning(
+                        "Ignoring updatedAnnotations for entitlement %s: expected a list",
+                        entitlement_id,
+                    )
+                elif updated:
                     annotation_sync.dispatch_annotation_sync(
                         updated, book, current_user,
                         origin_device_id=getattr(g, "annotation_origin_device_id", None),
                     )
-                if deleted:
+                if deleted is not None and not isinstance(deleted, list):
+                    log.warning(
+                        "Ignoring deletedAnnotationIds for entitlement %s: expected a list",
+                        entitlement_id,
+                    )
+                elif deleted:
                     annotation_sync.dispatch_annotation_deletes(
                         deleted, current_user, book_id=book.id,
                     )

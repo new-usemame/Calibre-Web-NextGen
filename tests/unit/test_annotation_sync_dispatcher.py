@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from cps import ub
@@ -177,3 +178,83 @@ def test_tombstone_is_terminal_against_repeat_push(patched_session):
     dispatch_annotation_sync([payload], _book(), user)  # re-push
     st = s.query(ub.AnnotationSyncTarget).one()
     assert st.status == "tombstone"  # NOT resurrected
+
+
+@pytest.mark.parametrize("bad_location", ["not-an-object", [], {"span": "not-an-object"}])
+def test_malformed_location_shape_degrades_without_dropping_the_batch(
+    patched_session, bad_location,
+):
+    """A derived location is optional; its bad shape cannot eat user text or
+    prevent a later well-formed annotation in the same PATCH from landing."""
+    s, user = patched_session
+    malformed = _payload("uuid-bad-location", text_="keep this text")
+    malformed["location"] = bad_location
+
+    dispatch_annotation_sync([
+        _payload("uuid-before", text_="before"),
+        malformed,
+        _payload("uuid-after", text_="after"),
+    ], _book(), user)
+
+    rows = {
+        row.annotation_id: row.highlighted_text
+        for row in s.query(ub.Annotation).order_by(ub.Annotation.id).all()
+    }
+    assert rows == {
+        "uuid-before": "before",
+        "uuid-bad-location": "keep this text",
+        "uuid-after": "after",
+    }
+
+
+def test_non_object_annotation_member_is_skipped_without_dropping_later_members(
+    patched_session,
+):
+    s, user = patched_session
+
+    dispatch_annotation_sync([
+        _payload("uuid-before", text_="before"),
+        "not-an-annotation-object",
+        _payload("uuid-after", text_="after"),
+    ], _book(), user)
+
+    assert [row.annotation_id for row in s.query(ub.Annotation).order_by(ub.Annotation.id)] == [
+        "uuid-before", "uuid-after",
+    ]
+
+
+def test_database_failure_rolls_back_only_that_member_and_later_members_continue(
+    patched_session, monkeypatch,
+):
+    """Successful members are committed independently; a genuine DB failure is
+    explicitly rolled back and cannot poison the scoped session or the rest of
+    the device's batch."""
+    from cps.services import annotation_sync
+
+    s, user = patched_session
+    original = annotation_sync._upsert_annotation
+    rollback_calls = []
+    original_rollback = s.rollback
+
+    def recording_rollback():
+        rollback_calls.append(True)
+        return original_rollback()
+
+    def fail_one(session, payload, book, user, **kwargs):
+        if payload.get("id") == "uuid-db-failure":
+            raise OperationalError("INSERT", {}, RuntimeError("disk unavailable"))
+        return original(session, payload, book, user, **kwargs)
+
+    monkeypatch.setattr(s, "rollback", recording_rollback)
+    monkeypatch.setattr(annotation_sync, "_upsert_annotation", fail_one)
+
+    dispatch_annotation_sync([
+        _payload("uuid-before", text_="before"),
+        _payload("uuid-db-failure", text_="lost only with failed write"),
+        _payload("uuid-after", text_="after"),
+    ], _book(), user)
+
+    assert rollback_calls == [True]
+    assert [row.annotation_id for row in s.query(ub.Annotation).order_by(ub.Annotation.id)] == [
+        "uuid-before", "uuid-after",
+    ]

@@ -149,8 +149,7 @@ def _book_uuid(book):
     return None
 
 
-def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id,
-                              content_location_rejected=False):
+def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
     """True only when applying the payload would leave every stored field unchanged."""
     def supplied(mapping, key, current):
         return mapping.get(key) if key in mapping else current
@@ -171,8 +170,7 @@ def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id,
         supplied(payload, "noteText", annotation.note_text),
         supplied(payload, "highlightColor", annotation.highlight_color),
         chapter_progress if chapter_progress is not None else annotation.chapter_progress,
-        normalized_content_id if normalized_content_id else (
-            None if content_location_rejected else annotation.content_id),
+        normalized_content_id or annotation.content_id,
         supplied(span, "startPath", annotation.start_container_path),
         supplied(span, "endPath", annotation.end_container_path),
         supplied(span, "startChar", annotation.start_offset),
@@ -191,30 +189,50 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
     independent of any registered sync target (Hardcover etc.).
     """
     from cps import ub
+    if not isinstance(payload, dict):
+        log.warning("Skipping non-object annotation payload of type %s", type(payload).__name__)
+        return None
     annotation_id = payload.get("id")
     if not annotation_id:
         return None
     raw_client_time = payload.get("clientLastModifiedUtc", _CLIENT_TIME_MISSING)
     client_time = parse_client_modified_utc(raw_client_time)
+    client_time_rejected = False
     if raw_client_time is not _CLIENT_TIME_MISSING and client_time is None:
-        # Same rule as the content location below: a malformed CLOCK READING is
-        # not a reason to destroy the user's words. Degrade to "no timestamp
-        # supplied" -- an already-handled state -- so the highlight is still
-        # stored and only the ordering hint is lost.
+        # A rejected reading is NOT an absent reading. Existing rows deliberately
+        # ignore undated updates, but applying that policy here would discard the
+        # user's edit over a malformed ordering hint. Apply by arrival order and
+        # retain any last-known-valid stored clock.
         log.warning(
             "Annotation %s has a malformed clientLastModifiedUtc %r; storing it "
             "without a client timestamp rather than discarding the highlight",
             annotation_id, raw_client_time,
         )
         client_time = _CLIENT_TIME_MISSING
-    span = (payload.get("location") or {}).get("span") or {}
+        client_time_rejected = True
+
+    location = payload.get("location")
+    if location is None:
+        span = {}
+    elif not isinstance(location, dict):
+        log.warning(
+            "Annotation %s has a non-object location; preserving the annotation "
+            "without the rejected derived location", annotation_id,
+        )
+        span = {}
+    else:
+        supplied_span = location.get("span")
+        if supplied_span is None:
+            span = {}
+        elif not isinstance(supplied_span, dict):
+            log.warning(
+                "Annotation %s has a non-object location.span; preserving the "
+                "annotation without the rejected derived location", annotation_id,
+            )
+            span = {}
+        else:
+            span = supplied_span
     normalized_content_id = None
-    #: "the client supplied a chapter and it was unusable", which is NOT the same
-    #: as "the client supplied no chapter". Only the former should clear a
-    #: previously-stored locator: keeping a stale one would point the annotation
-    #: at a chapter the device no longer says it is in, and would let an
-    #: equal-clock payload be mistaken for a no-op.
-    content_location_rejected = False
     chapter_filename = span.get("chapterFilename")
     if chapter_filename and _book_uuid(book):
         from cps.services.annotation_content_id import normalize_content_id, ContentIdError
@@ -223,19 +241,17 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
                 f"{_book_uuid(book)}!!{chapter_filename}", book_uuid=_book_uuid(book)
             )
         except ContentIdError:
-            # content_id is DERIVED, nullable and recomputable; the highlight is
-            # none of those things. For a sideloaded book the device is the only
-            # other copy, so discarding the row here destroys text that exists
-            # nowhere else -- which is exactly what happened between 2026-08-13
-            # and 2026-08-15. Degrade the locator, never the annotation;
-            # ub.backfill_annotation_content_ids repairs the column later.
+            # content_id is derived and nullable; the highlight is neither. A
+            # rejected replacement also does not prove an existing validated
+            # locator is wrong, so preserve the last-known-valid value. The
+            # content-id backfill only normalizes non-NULL values and cannot
+            # reconstruct one after it has been cleared.
             log.warning(
                 "Annotation %s has an unusable content location %r; storing it "
-                "without a content_id rather than discarding the highlight",
+                "without discarding the highlight or its last valid content_id",
                 annotation_id, chapter_filename,
             )
             normalized_content_id = None
-            content_location_rejected = True
     ann = (
         session.query(ub.Annotation)
         .filter(
@@ -249,18 +265,18 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
         stored = ann.client_modified_at
         if stored.tzinfo is not None:
             stored = stored.astimezone(timezone.utc).replace(tzinfo=None)
-        if client_time is _CLIENT_TIME_MISSING or client_time < stored:
+        if client_time is _CLIENT_TIME_MISSING and not client_time_rejected:
             log.info("Ignoring stale or undated update for annotation %s", annotation_id)
             return None
-        if client_time == stored:
+        if client_time is not _CLIENT_TIME_MISSING and client_time < stored:
+            log.info("Ignoring stale or undated update for annotation %s", annotation_id)
+            return None
+        if client_time is not _CLIENT_TIME_MISSING and client_time == stored:
             # Kobo clocks have second precision. A byte-equivalent retry is a
             # no-op, but a real edit can share the same second and must not be
             # eaten merely because its clock ties. Equal-clock divergent
             # payloads therefore use arrival order as the deterministic tie.
-            if _kobo_payload_matches_row(
-                ann, payload, span, normalized_content_id,
-                content_location_rejected,
-            ):
+            if _kobo_payload_matches_row(ann, payload, span, normalized_content_id):
                 return None
     if ann is None:
         ann = ub.Annotation(
@@ -286,11 +302,6 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
         ann.chapter_progress = chapter_progress
     if normalized_content_id:
         ann.content_id = normalized_content_id
-    elif content_location_rejected:
-        # Supplied and unusable -> the stored locator is now known-wrong. Clear
-        # it rather than leaving a stale pointer; the highlight itself stays, and
-        # ub.backfill_annotation_content_ids can rebuild the column later.
-        ann.content_id = None
     if "startPath" in span:
         ann.start_container_path = span.get("startPath")
     if "endPath" in span:
@@ -500,24 +511,58 @@ def _mark_pending(session, annotation, user):
 
 
 def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_id=None) -> None:
-    """For each annotation in the PATCH payload, persist locally then push to each enabled handler."""
+    """Persist each valid annotation independently, then fan it out.
+
+    Device batches are a transport convenience, not a transaction boundary: one
+    malformed member or failed write must not roll back already-preserved user
+    data or prevent later members from being attempted.
+    """
     from cps import ub
     if not payload_annotations:
         return
+    if not isinstance(payload_annotations, list):
+        log.warning("Skipping annotation batch because updatedAnnotations is not a list")
+        return
     jobs = []
-    for payload in payload_annotations:
-        ann = _upsert_annotation(
-            ub.session, payload, book, user, origin_device_id=origin_device_id,
-        )
-        if ann is None:
+    for index, payload in enumerate(payload_annotations):
+        if not isinstance(payload, dict):
+            log.warning(
+                "Skipping non-object annotation member at updatedAnnotations[%d]", index,
+            )
             continue
-        if _background_enqueue() is not None:
-            if _mark_pending(ub.session, ann, user):
-                jobs.append({"op": "push", "annotation": ann.id,
-                             "book": book.id, "payload": payload})
+        pending_job = None
+        try:
+            ann = _upsert_annotation(
+                ub.session, payload, book, user, origin_device_id=origin_device_id,
+            )
+            if ann is None:
+                continue
+            if _background_enqueue() is not None:
+                if _mark_pending(ub.session, ann, user):
+                    pending_job = {"op": "push", "annotation": ann.id,
+                                   "book": book.id, "payload": payload}
+            else:
+                push_annotation_to_handlers(ub.session, ann, book, user, payload=payload)
+            committed = ub.session_commit()
+            if committed is False:
+                log.error(
+                    "Annotation %s could not be committed; continuing with the batch",
+                    payload.get("id"),
+                )
+                continue
+        except Exception:
+            # A failed SQLAlchemy transaction poisons the scoped session until an
+            # explicit rollback. Do that here, then continue: prior annotations
+            # were committed independently and later annotations still deserve a
+            # chance to persist.
+            log.exception(
+                "Annotation member updatedAnnotations[%d] failed; rolling back that "
+                "member and continuing", index,
+            )
+            ub.session.rollback()
             continue
-        push_annotation_to_handlers(ub.session, ann, book, user, payload=payload)
-    ub.session_commit()
+        if pending_job is not None:
+            jobs.append(pending_job)
     _enqueue(user, jobs, book=book)
 
 

@@ -102,17 +102,23 @@ class TestCompositeKeysetCursorPinned:
 
     def test_composite_keyset_uses_strictly_greater_or_id_tiebreaker(self):
         src = _function_source(KOBO_PY, "HandleSyncRequest")
+        helper_src = _function_source(KOBO_PY, "books_keyset_after_cursor")
         # The fix's composite is `(lm > cursor_lm) OR (lm == cursor_lm AND id > cursor_id)`.
         # Pin both arms exactly so a future edit can't silently revert one.
-        assert "db.Books.last_modified > cursor_lm" in src, (
+        assert "books_keyset_after_cursor(cursor_lm, cursor_id)" in src, (
             "Composite-keyset filter must include the strict-greater arm "
-            "on last_modified (fork #347)."
+            "and equal-timestamp id-tiebreaker through the shared normalized "
+            "Books.last_modified predicate (fork #347/#1677)."
         )
-        assert "db.Books.last_modified == cursor_lm" in src, (
-            "Composite-keyset filter must include the equal-cursor-lm arm "
-            "so paginated batches can walk through ties (fork #347)."
+        assert "normalized_stored > normalized_cursor" in helper_src, (
+            "The normalized keyset helper must keep the strict-greater "
+            "last_modified arm (fork #347/#1677)."
         )
-        assert "db.Books.id > cursor_id" in src, (
+        assert "normalized_stored == normalized_cursor" in helper_src, (
+            "The normalized keyset helper must keep the equal-timestamp arm "
+            "so the id tiebreaker can walk timestamp ties (fork #347/#1677)."
+        )
+        assert "db.Books.id > cursor_id" in helper_src, (
             "Composite-keyset filter must include the id tiebreaker — "
             "the whole point of fork #347 is that ORDER BY (lm, id) "
             "needs cursor (lm, id) to walk through last_modified ties."

@@ -272,13 +272,34 @@ def pull_annotations(document: str):
         # it is the usual shape of a book that was never checksum-registered.
         log.info(
             "KOReader annotation pull: user=%s document=%s no matching book "
-            "(returning empty set)", user.id, _loggable(document),
+            "(returning empty set, book_known=false)", user.id, _loggable(document),
         )
-        return create_sync_response({"document": document, "annotations": [], "annotation_count": 0})
+        # `book_known` is the discriminator that makes "I don't know this book"
+        # distinguishable from "this book genuinely has no annotations". Without
+        # it the two are identical on the wire, and a client that reconciles
+        # against an empty set would delete highlights that exist nowhere else --
+        # exactly how a Kobo lost 87 of them on 2026-08-15 (see
+        # notes/ANNOTATION-SYNC-PRINCIPLES-DESIGN.md, P1).
+        #
+        # Deliberately ADDITIVE rather than a status-code change: plugins already
+        # in the field parse this shape, and breaking them to fix a hazard none
+        # of them currently trip would trade a latent problem for a real one.
+        # Emitted on BOTH branches so a client can tell a server that knows the
+        # field from one that predates it -- absent means "cannot tell, be
+        # conservative", never "known".
+        return create_sync_response({
+            "document": document,
+            "annotations": [],
+            "annotation_count": 0,
+            "book_known": False,
+        })
 
     payload = build_pull_payload(user.id, book_id, ub.session)
     payload["document"] = document
     payload["calibre_book_id"] = book_id
+    # See the unmatched branch above: present-and-true is what lets a client
+    # trust an empty list here as a real "you have none".
+    payload["book_known"] = True
     log.info(
         "KOReader annotation pull: user=%s book=%s document=%s annotations=%s",
         user.id, book_id, _loggable(document), payload.get("annotation_count", 0),

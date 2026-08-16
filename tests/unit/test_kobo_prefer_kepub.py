@@ -122,6 +122,7 @@ def test_backfill_is_composite_idempotent_preserves_sync_rows_and_skips_gdrive(m
 
     class Query:
         def distinct(self): return self
+        def scalar(self): return 2  # max(KoboSyncedBooks.id) for the watermark
         def all(self): return list(sync_rows)
 
     class AppSession:
@@ -166,6 +167,7 @@ def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
 
     class Query:
         def distinct(self): return self
+        def scalar(self): return 2  # max(KoboSyncedBooks.id) for the watermark
         def all(self): return [(1,), (2,)]
 
     class AppSession:

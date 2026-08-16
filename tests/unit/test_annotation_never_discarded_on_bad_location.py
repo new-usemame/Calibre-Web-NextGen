@@ -112,3 +112,52 @@ def test_valid_content_location_still_normalizes(patched_session):
 
     row = session.query(ub.Annotation).one()
     assert row.content_id == f"{BOOK_UUID}!!OPS/chapter-006.xml"
+
+
+def test_a_newly_invalid_location_clears_the_stored_one_rather_than_leaving_it_stale(
+    patched_session,
+):
+    """"Supplied and unusable" is not "not supplied".
+
+    Only the first should clear a previously-stored locator. Keeping a stale one
+    points the annotation at a chapter the device no longer claims it is in, and
+    lets an equal-clock payload be mistaken for a no-op. The highlight itself
+    still survives either way -- that is the invariant from #1635.
+    """
+    session, user = patched_session
+    book = _book()
+
+    good = _payload("OPS/chapter-006.xml")
+    good["clientLastModifiedUtc"] = "2026-08-15T10:00:00Z"
+    dispatch_annotation_sync([good], book, user)
+    row = session.query(ub.Annotation).one()
+    assert row.content_id == f"{BOOK_UUID}!!OPS/chapter-006.xml"
+
+    moved = _payload("OPS/../../outside.xml")   # escapes the container -> unusable
+    moved["clientLastModifiedUtc"] = "2026-08-15T11:00:00Z"
+    moved["highlightedText"] = "same highlight, relocated"
+    dispatch_annotation_sync([moved], book, user)
+
+    row = session.query(ub.Annotation).one()
+    assert row.content_id is None, "a known-wrong locator must not be left in place"
+    assert row.highlighted_text == "same highlight, relocated", "the highlight survives"
+
+
+def test_an_update_with_no_location_at_all_leaves_the_stored_one_alone(patched_session):
+    """The other half of the distinction: silence is not a retraction."""
+    session, user = patched_session
+    book = _book()
+
+    good = _payload("OPS/chapter-006.xml")
+    good["clientLastModifiedUtc"] = "2026-08-15T10:00:00Z"
+    dispatch_annotation_sync([good], book, user)
+
+    quiet = {
+        "id": good["id"],
+        "highlightedText": "text only, no location block",
+        "clientLastModifiedUtc": "2026-08-15T11:00:00Z",
+    }
+    dispatch_annotation_sync([quiet], book, user)
+
+    row = session.query(ub.Annotation).one()
+    assert row.content_id == f"{BOOK_UUID}!!OPS/chapter-006.xml"

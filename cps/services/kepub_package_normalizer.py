@@ -41,6 +41,24 @@ _KOBO_SPAN_RE = re.compile(
 _XML_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, recover=False)
 
 
+#: A KEPUB is a book. Anything past this is either broken or hostile, and
+#: reading it would exhaust the conversion worker -- MemoryError is not an
+#: Exception, so the module's own catch cannot recover from it. Books are
+#: user-uploadable, so this bound is reachable by input we do not control.
+MAX_TOTAL_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB
+
+
+def _reject_oversized_archive(infos):
+    total = 0
+    for info in infos:
+        total += info.file_size
+        if total > MAX_TOTAL_UNCOMPRESSED_BYTES:
+            raise ValueError(
+                "KEPUB decompresses to more than %d bytes; refusing to load it"
+                % MAX_TOTAL_UNCOMPRESSED_BYTES
+            )
+
+
 def _package_document_path(archive):
     container = etree.fromstring(archive.read(_CONTAINER_PATH), parser=_XML_PARSER)
     rootfiles = container.xpath(
@@ -59,9 +77,22 @@ def _manifest_items(opf_bytes):
 
 
 def _split_local_reference(value):
+    """Split a local reference into (urlsplit parts, decoded path), or None when
+    it points outside the package entirely.
+
+    ``None`` means "not ours to touch" and every caller treats it as skip, so it
+    must mean ONLY that. An absolute local path is not external -- it is a
+    reference we cannot contain -- and silently skipping it would let a manifest
+    href escape the OPF directory while we report the package clean, which is the
+    exact invariant this module exists to guarantee.
+    """
     parts = urlsplit(value)
-    if parts.scheme or parts.netloc or parts.path.startswith("/"):
-        return None
+    if parts.scheme or parts.netloc:
+        return None  # genuinely external (http:, data:, //host/...) -- leave alone
+    if parts.path.startswith("/"):
+        raise ValueError(
+            "EPUB reference is an absolute path and cannot be contained: %r" % value
+        )
     path = unquote(parts.path)
     if "\\" in path:
         raise ValueError("EPUB reference contains a backslash")
@@ -253,6 +284,7 @@ def normalize_kepub_package(path):
                 raise ValueError("KEPUB contains duplicate ZIP member names")
             if archive.testzip() is not None:
                 raise ValueError("KEPUB failed its CRC check")
+            _reject_oversized_archive(infos)
             contents = {info.filename: archive.read(info) for info in infos}
             entries = _rewritten_entries(infos, contents, relocations)
             expected_span_counts = _span_counts(contents, relocations)
@@ -279,3 +311,22 @@ def normalize_kepub_package(path):
                 os.unlink(temporary_path)
             except OSError:
                 pass
+
+
+def kepub_package_needs_normalization(path):
+    """Cheap read-only probe: inspect only container.xml and the package document.
+
+    Return ``True`` for an escaping manifest item, ``False`` for a clean package,
+    and ``None`` when the package cannot be inspected. The archive is never
+    materialized, preserving the clean-library fast path introduced in #1639.
+    """
+    path = os.fspath(path)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = {info.filename for info in archive.infolist()}
+            opf_path = _package_document_path(archive)
+            opf_bytes = archive.read(opf_path)
+            return bool(_plan_relocations(opf_path, opf_bytes, names))
+    except Exception as error:
+        log.warning("Could not inspect KEPUB package %s: %s", path, error)
+        return None

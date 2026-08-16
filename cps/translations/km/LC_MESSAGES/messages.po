@@ -3625,6 +3625,80 @@ msgid "Dismiss help announcement"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Kobo book compatibility repaired"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Library notice"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Show affected books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Untitled book"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} notices dismissed permanently."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"CWNG repaired {count} books previously sent to your Kobo. Older highlights "
+"may still need to be recreated on the device."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"CWNG repaired a book previously sent to your Kobo. Older highlights may "
+"still need to be recreated on the device."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "There is new information about your library."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Dismiss all {count} notices permanently"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Dismiss all"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This book was repaired after it had already been sent to a Kobo. Download "
+"the updated book; highlights created before the repair may remain invisible "
+"and may need to be recreated."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "There is new information about this book."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Notice dismissed permanently."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Dismiss permanently"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not dismiss the notices. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not dismiss the notice. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Open Ko-fi →"
 msgstr ""
 
@@ -6851,6 +6925,19 @@ msgstr ""
 #: cps/tasks/kepub_backfill.py
 #, python-format
 msgid "%(count)d KEPUB conversion(s) failed"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+msgid "Repair existing KEPUB packages"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+msgid "Google Drive KEPUB repair is not supported"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+#, python-format
+msgid "%(count)d KEPUB repair(s) failed"
 msgstr ""
 
 #: cps/tasks/mail.py

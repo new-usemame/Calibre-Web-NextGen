@@ -142,6 +142,25 @@ def test_clean_package_reads_only_container_and_opf(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+def test_clean_repair_probe_reads_only_container_and_opf(tmp_path, monkeypatch):
+    import cps.services.kepub_package_normalizer as normalizer
+
+    package = tmp_path / "clean-probe.kepub"
+    _write_package(package, opf=CLEAN_OPF, nav_path="OPS/nav.xhtml")
+    read_names = []
+
+    class RecordingZipFile(zipfile.ZipFile):
+        def read(self, name, *args, **kwargs):
+            read_names.append(name.filename if isinstance(name, zipfile.ZipInfo) else name)
+            return super().read(name, *args, **kwargs)
+
+    monkeypatch.setattr(normalizer.zipfile, "ZipFile", RecordingZipFile)
+
+    assert normalizer.kepub_package_needs_normalization(package) is False
+    assert read_names == ["META-INF/container.xml", "OPS/epb.opf"]
+
+
+@pytest.mark.unit
 def test_kobo_span_markup_and_per_file_counts_are_preserved_exactly(tmp_path):
     package = tmp_path / "spans.kepub"
     _write_package(package)
@@ -271,3 +290,63 @@ def test_conversion_corrupt_archive_still_does_not_replace_existing_kepub(tmp_pa
     assert check == 1
     assert "invalid kepub archive" in str(error).lower()
     assert destination.read_bytes() == b"existing valid kepub"
+
+
+# --- hardening: gaps found by adversarial review of #1637 ---
+
+ABSOLUTE_HREF_OPF = FLATLAND_OPF.replace(b'href="../nav.xhtml"', b'href="/nav.xhtml"')
+
+
+@pytest.mark.unit
+def test_an_absolute_manifest_href_is_not_silently_treated_as_external(tmp_path, caplog):
+    """`None` from the reference splitter means "not ours to touch", and every
+    caller treats it as skip. An absolute local path is not external -- it is a
+    reference we cannot contain -- so lumping it in with http:/data: would let a
+    manifest href escape the OPF directory while we report the package clean.
+    That is precisely the invariant this module exists to guarantee.
+    """
+    package = tmp_path / "absolute.kepub"
+    _write_package(package, opf=ABSOLUTE_HREF_OPF)
+    original = package.read_bytes()
+
+    with caplog.at_level("WARNING"):
+        result = _normalizer()(package)
+
+    assert result is None, "an uncontainable href must not report success"
+    assert package.read_bytes() == original, "the original must be left untouched"
+    assert any("normalize" in r.getMessage().lower() for r in caplog.records)
+
+
+@pytest.mark.unit
+def test_a_genuinely_external_href_is_still_left_alone(tmp_path):
+    """The fix must not make real external references an error."""
+    external = FLATLAND_OPF.replace(
+        b'href="../nav.xhtml"', b'href="https://example.invalid/nav.xhtml"')
+    package = tmp_path / "external.kepub"
+    _write_package(package, opf=external)
+
+    result = _normalizer()(package)
+
+    # nothing escapes the OPF dir any more, so this is a clean no-op, not a failure
+    assert result is False
+
+
+@pytest.mark.unit
+def test_an_archive_that_decompresses_past_the_bound_is_refused(tmp_path, monkeypatch, caplog):
+    """MemoryError is not an Exception, so the module's own catch cannot recover
+    from exhausting the conversion worker. Books are user-uploadable, so this
+    bound is reachable by input we do not control. Checked BEFORE the read.
+    """
+    from cps.services import kepub_package_normalizer as mod
+
+    package = tmp_path / "big.kepub"
+    _write_package(package)
+    original = package.read_bytes()
+    monkeypatch.setattr(mod, "MAX_TOTAL_UNCOMPRESSED_BYTES", 8)  # smaller than any real book
+
+    with caplog.at_level("WARNING"):
+        result = mod.normalize_kepub_package(package)
+
+    assert result is None
+    assert package.read_bytes() == original
+    assert any("decompresses to more than" in r.getMessage() for r in caplog.records)

@@ -3,6 +3,7 @@ import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { SkipLink } from './SkipLink';
+import { UserNoticeBanner } from './UserNotices';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
@@ -30,6 +31,7 @@ export function AppShell({ userName, instanceName, onLogout, children }: AppShel
       {/* First focusable element on the page (SC 2.4.1). */}
       <SkipLink />
       <TopBar userName={userName} instanceName={instanceName} onLogout={onLogout} onMenu={() => setDrawerOpen(true)} />
+      <UserNoticeBanner />
       <AnnouncementBanner />
       <div className={styles.body}>
         <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} onNavigate={() => setDrawerOpen(false)} />

@@ -149,7 +149,8 @@ def _book_uuid(book):
     return None
 
 
-def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
+def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id,
+                              content_location_rejected=False):
     """True only when applying the payload would leave every stored field unchanged."""
     def supplied(mapping, key, current):
         return mapping.get(key) if key in mapping else current
@@ -170,7 +171,8 @@ def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
         supplied(payload, "noteText", annotation.note_text),
         supplied(payload, "highlightColor", annotation.highlight_color),
         chapter_progress if chapter_progress is not None else annotation.chapter_progress,
-        normalized_content_id or annotation.content_id,
+        normalized_content_id if normalized_content_id else (
+            None if content_location_rejected else annotation.content_id),
         supplied(span, "startPath", annotation.start_container_path),
         supplied(span, "endPath", annotation.end_container_path),
         supplied(span, "startChar", annotation.start_offset),
@@ -207,6 +209,12 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
         client_time = _CLIENT_TIME_MISSING
     span = (payload.get("location") or {}).get("span") or {}
     normalized_content_id = None
+    #: "the client supplied a chapter and it was unusable", which is NOT the same
+    #: as "the client supplied no chapter". Only the former should clear a
+    #: previously-stored locator: keeping a stale one would point the annotation
+    #: at a chapter the device no longer says it is in, and would let an
+    #: equal-clock payload be mistaken for a no-op.
+    content_location_rejected = False
     chapter_filename = span.get("chapterFilename")
     if chapter_filename and _book_uuid(book):
         from cps.services.annotation_content_id import normalize_content_id, ContentIdError
@@ -227,6 +235,7 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
                 annotation_id, chapter_filename,
             )
             normalized_content_id = None
+            content_location_rejected = True
     ann = (
         session.query(ub.Annotation)
         .filter(
@@ -250,6 +259,7 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
             # payloads therefore use arrival order as the deterministic tie.
             if _kobo_payload_matches_row(
                 ann, payload, span, normalized_content_id,
+                content_location_rejected,
             ):
                 return None
     if ann is None:
@@ -276,6 +286,11 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
         ann.chapter_progress = chapter_progress
     if normalized_content_id:
         ann.content_id = normalized_content_id
+    elif content_location_rejected:
+        # Supplied and unusable -> the stored locator is now known-wrong. Clear
+        # it rather than leaving a stale pointer; the highlight itself stays, and
+        # ub.backfill_annotation_content_ids can rebuild the column later.
+        ann.content_id = None
     if "startPath" in span:
         ann.start_container_path = span.get("startPath")
     if "endPath" in span:

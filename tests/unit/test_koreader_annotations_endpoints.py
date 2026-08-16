@@ -279,3 +279,39 @@ def test_wire_preflights_entire_batch_before_persisting(wire):
     assert session.query(ub.Annotation).filter_by(
         annotation_id="must-not-partially-commit"
     ).count() == 0
+
+
+# --- P1: "I don't know this book" must be distinguishable from "you have none" ---
+
+def test_pull_marks_an_unknown_book_as_not_known(wire):
+    """An unmatched digest previously returned an empty set at HTTP 200, which is
+    byte-identical to "this book genuinely has no annotations". A client that
+    reconciles against that would delete highlights existing nowhere else --
+    exactly how a Kobo lost 87 of them (notes/ANNOTATION-SYNC-PRINCIPLES-DESIGN.md,
+    P1). The discriminator is additive so plugins already in the field keep working.
+    """
+    client, _session = wire
+    response = client.get("/kosync/syncs/annotations/digest-that-matches-nothing")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["annotations"] == []
+    assert body["annotation_count"] == 0
+    assert body["book_known"] is False
+
+
+def test_pull_marks_a_known_book_as_known(wire):
+    """Emitted on BOTH branches: absent must mean "server predates the field, be
+    conservative", never "known". A client can only trust an empty list when the
+    server positively says it knows the book."""
+    client, _session = wire
+    response = client.get("/kosync/syncs/annotations/digest-699")
+    assert response.status_code == 200
+    assert response.get_json()["book_known"] is True
+
+
+def test_unknown_book_pull_is_still_backward_compatible(wire):
+    """The legacy keys are untouched, so an existing plugin parses it unchanged."""
+    client, _session = wire
+    body = client.get("/kosync/syncs/annotations/nope").get_json()
+    assert set(["document", "annotations", "annotation_count"]).issubset(body.keys())
+    assert body["document"] == "nope"

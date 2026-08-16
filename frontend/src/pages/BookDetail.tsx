@@ -20,6 +20,7 @@ import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { BookUserNotices } from '../components/UserNotices';
 
 function formatBytes(bytes: number): string {
   const mb = bytes / (1024 * 1024);
@@ -288,6 +289,8 @@ export function BookDetail() {
   return (
     <main className={styles.container}>
       <Link href="/" className={styles.back}>{t('← Library')}</Link>
+
+      <BookUserNotices bookId={book.id} />
 
       <div className={styles.layout}>
         {/* LEFT: cover */}

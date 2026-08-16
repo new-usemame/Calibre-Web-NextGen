@@ -143,5 +143,12 @@ def main():
         from . import logger
         logger.create().error_or_exception(f"Could not queue startup KEPUB backfill: {ex}")
 
+    try:
+        from .tasks.kepub_package_repair import enqueue_startup_kepub_package_repair
+        enqueue_startup_kepub_package_repair()
+    except Exception as ex:
+        from . import logger
+        logger.create().error_or_exception(f"Could not queue startup KEPUB package repair: {ex}")
+
     success = web_server.start()
     sys.exit(0 if success else 1)

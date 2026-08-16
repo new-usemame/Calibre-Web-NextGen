@@ -3827,6 +3827,88 @@ msgid "Dismiss help announcement"
 msgstr "Masquer l’annonce d’aide"
 
 #: cps/spa_strings.py
+msgid "Kobo book compatibility repaired"
+msgstr "Compatibilité du livre Kobo réparée"
+
+#: cps/spa_strings.py
+msgid "Library notice"
+msgstr "Avis de la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Show affected books"
+msgstr "Afficher les livres concernés"
+
+#: cps/spa_strings.py
+msgid "Untitled book"
+msgstr "Livre sans titre"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} notices dismissed permanently."
+msgstr "{count} avis masqués définitivement."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"CWNG repaired {count} books previously sent to your Kobo. Older highlights "
+"may still need to be recreated on the device."
+msgstr ""
+"CWNG a réparé {count} livres précédemment envoyés à votre Kobo. Il faudra "
+"peut-être recréer les anciens surlignages sur l’appareil."
+
+#: cps/spa_strings.py
+msgid ""
+"CWNG repaired a book previously sent to your Kobo. Older highlights may "
+"still need to be recreated on the device."
+msgstr ""
+"CWNG a réparé un livre précédemment envoyé à votre Kobo. Il faudra peut-être "
+"recréer les anciens surlignages sur l’appareil."
+
+#: cps/spa_strings.py
+msgid "There is new information about your library."
+msgstr ""
+"De nouvelles informations concernant votre bibliothèque sont disponibles."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Dismiss all {count} notices permanently"
+msgstr "Masquer définitivement les {count} avis"
+
+#: cps/spa_strings.py
+msgid "Dismiss all"
+msgstr "Tout masquer"
+
+#: cps/spa_strings.py
+msgid ""
+"This book was repaired after it had already been sent to a Kobo. Download "
+"the updated book; highlights created before the repair may remain invisible "
+"and may need to be recreated."
+msgstr ""
+"Ce livre a été réparé après avoir déjà été envoyé à une Kobo. Téléchargez le "
+"livre mis à jour ; les surlignages créés avant la réparation peuvent rester "
+"invisibles et devoir être recréés."
+
+#: cps/spa_strings.py
+msgid "There is new information about this book."
+msgstr "De nouvelles informations concernant ce livre sont disponibles."
+
+#: cps/spa_strings.py
+msgid "Notice dismissed permanently."
+msgstr "Avis masqué définitivement."
+
+#: cps/spa_strings.py
+msgid "Dismiss permanently"
+msgstr "Masquer définitivement"
+
+#: cps/spa_strings.py
+msgid "Could not dismiss the notices. Please try again."
+msgstr "Impossible de masquer les avis. Veuillez réessayer."
+
+#: cps/spa_strings.py
+msgid "Could not dismiss the notice. Please try again."
+msgstr "Impossible de masquer l’avis. Veuillez réessayer."
+
+#: cps/spa_strings.py
 msgid "Open Ko-fi →"
 msgstr "Ouvrir Ko-fi →"
 
@@ -7156,6 +7238,19 @@ msgstr ""
 #: cps/tasks/kepub_backfill.py
 #, python-format
 msgid "%(count)d KEPUB conversion(s) failed"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+msgid "Repair existing KEPUB packages"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+msgid "Google Drive KEPUB repair is not supported"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+#, python-format
+msgid "%(count)d KEPUB repair(s) failed"
 msgstr ""
 
 #: cps/tasks/mail.py

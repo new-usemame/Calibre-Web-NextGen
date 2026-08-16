@@ -156,6 +156,14 @@ class _Settings(_Base):
     config_kobo_cover_padding_color = Column(String, default="")
     config_kobo_prefer_kepub = Column(Boolean, default=True)
     config_kobo_kepub_backfill_completed = Column(Boolean, default=False)
+    # High-water mark over KoboSyncedBooks.id covered by the last successful
+    # backfill. The boolean above cannot express "done for what existed THEN",
+    # and the backfill's work-set is exactly the set that grows when a device
+    # pairs -- so a one-shot latch answers "completed" while the new device's
+    # books have no KEPUB. Monotonic id, so any new sync row re-arms it.
+    config_kobo_kepub_backfill_watermark = Column(Integer, default=0)
+    # Versioned repair gates can advance without accumulating one-off booleans.
+    config_kobo_kepub_package_repair_version = Column(Integer, default=0)
 
     # Fork #225 (@froggybottomboys): admin-set server-wide announcement
     # banner. Empty string = no banner. Layout.html renders the banner

@@ -109,6 +109,20 @@ export interface Book {
   hidden?: boolean;
 }
 
+export interface UserNotice {
+  id: number;
+  type: string;
+  scope: 'global' | 'book';
+  occurred_at: string | null;
+  book: { id: number; uuid: string | null; title: string | null } | null;
+  payload: Record<string, unknown>;
+}
+
+export interface NoticeInbox {
+  notices: UserNotice[];
+  summary: { count: number };
+}
+
 export interface BookFormat {
   format: string;
   size_bytes: number;

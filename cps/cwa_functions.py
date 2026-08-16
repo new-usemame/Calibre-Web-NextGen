@@ -2690,7 +2690,7 @@ def get_status():
 @user_login_required
 def user_profiles_json():
     try:
-        json_path = "/config/user_profiles.json"
+        json_path = constants.USER_PROFILES_JSON
         with open(json_path, "r") as file:
             data = json.load(file)
         return jsonify(data)
@@ -2767,7 +2767,7 @@ def set_profile_picture():
 
         try:
             # Path to the JSON file
-            json_path = "/config/user_profiles.json"
+            json_path = constants.USER_PROFILES_JSON
             log.debug(f"Opening JSON file at: {json_path}")
 
             # Read the existing data from the JSON file and update it

@@ -66,6 +66,23 @@ def enforcer_module():
     return _load_module()
 
 
+@pytest.mark.unit
+def test_cover_enforcer_import_does_not_require_kepub_normalizer(monkeypatch):
+    monkeypatch.setitem(
+        sys.modules, "cps.services.kepub_package_normalizer", None
+    )
+
+    try:
+        module = _load_module()
+    except ModuleNotFoundError as error:
+        pytest.fail(
+            "cover_enforcer import must not require the KEPUB normalizer: "
+            f"{error}"
+        )
+
+    assert module.Enforcer is not None
+
+
 def _capture_kepub_command(
     module,
     monkeypatch,
@@ -373,9 +390,6 @@ def test_series_rewrite_preserves_other_members_comment_and_mode(
 def test_unchanged_series_does_not_stage_or_replace_kepub(
     enforcer_module, tmp_path, monkeypatch
 ):
-    assert getattr(enforcer_module, "rewrite_package_document", None) is not None, (
-        "public package rewriter must exist without changing the unchanged-series path"
-    )
     book_dir = tmp_path / "Author" / "Title (1373)"
     book_dir.mkdir(parents=True)
     kepub = book_dir / "book.kepub"

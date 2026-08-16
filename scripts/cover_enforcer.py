@@ -28,8 +28,6 @@ import app_paths
 
 app_paths.ensure_app_root_on_sys_path()
 
-from cps.services.kepub_package_normalizer import rewrite_package_document
-
 try:
     from cps import constants
     _CHANGE_LOGS_DIR = constants.CWA_METADATA_CHANGE_LOGS_DIR
@@ -112,6 +110,8 @@ def _series_meta_name(element):
 
 def _strip_kepub_series_metadata(path):
     """Remove residual series metadata from one staged KEPUB."""
+    from cps.services.kepub_package_normalizer import rewrite_package_document
+
     def strip_series(package):
         removed = 0
         for parent in package.iter():

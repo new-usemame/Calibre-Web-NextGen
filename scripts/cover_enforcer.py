@@ -28,6 +28,8 @@ import app_paths
 
 app_paths.ensure_app_root_on_sys_path()
 
+from cps.services.kepub_package_normalizer import rewrite_package_document
+
 try:
     from cps import constants
     _CHANGE_LOGS_DIR = constants.CWA_METADATA_CHANGE_LOGS_DIR
@@ -94,6 +96,35 @@ except Exception:
 dirs_json = str(app_paths.dirs_json())
 change_logs_dir = _CHANGE_LOGS_DIR
 metadata_temp_dir = _METADATA_TEMP_DIR
+
+_KEPUB_SERIES_META_NAMES = {"calibre:series", "calibre:series_index"}
+
+
+def _local_name(element):
+    return element.tag.rsplit('}', 1)[-1]
+
+
+def _series_meta_name(element):
+    if _local_name(element) != 'meta':
+        return None
+    return element.get('name') or element.get('property')
+
+
+def _strip_kepub_series_metadata(path):
+    """Remove residual series metadata from one staged KEPUB."""
+    def strip_series(package):
+        removed = 0
+        for parent in package.iter():
+            for child in list(parent):
+                if _series_meta_name(child) in _KEPUB_SERIES_META_NAMES:
+                    parent.remove(child)
+                    removed += 1
+        return bool(removed)
+
+    result = rewrite_package_document(path, strip_series)
+    if result is None:
+        raise ValueError("package-document rewrite failed")
+    return result
 
 
 def _lock_path() -> str:
@@ -709,30 +740,36 @@ class Enforcer:
                 # --calibre so library files are normally ".kepub", but a file
                 # kepubified outside CWNG keeps the default shape.
                 lower_name = os.path.basename(file).lower()
+                clear_kepub_series = False
+                staged_kepub = None
+                write_completed = False
                 if lower_name.endswith(".kepub") or lower_name.endswith(".kepub.epub"):
                     tool = 'ebook-meta'
                     cmd = [tool, file, '--from-opf', book.new_metadata_path]
 
                     try:
                         opf_root = ET.parse(book.new_metadata_path).getroot()
-                    except (ET.ParseError, OSError) as error:
-                        print(
-                            f"[cover-metadata-enforcer] Warning: could not parse "
-                            f"metadata OPF '{book.new_metadata_path}': {error}; "
-                            "using --from-opf without replacement flags",
-                            flush=True,
-                        )
-                    else:
                         metadata = next(
                             (element for element in opf_root.iter()
-                             if element.tag.rsplit('}', 1)[-1] == 'metadata'),
-                            opf_root,
+                             if _local_name(element) == 'metadata'),
+                            None,
                         )
-
+                        if metadata is None:
+                            raise ValueError("metadata element is missing")
+                    except (ET.ParseError, OSError, ValueError) as error:
+                        print(
+                            f"[cover-metadata-enforcer] Warning: could not enforce "
+                            f"metadata for '{book.title_author}' ({book.file_format}); "
+                            f"original file preserved because metadata OPF "
+                            f"'{book.new_metadata_path}' could not be parsed: {error}",
+                            flush=True,
+                        )
+                        cmd = None
+                    else:
                         dc_values = {}
                         calibre_values = {}
                         for element in metadata:
-                            local_name = element.tag.rsplit('}', 1)[-1]
+                            local_name = _local_name(element)
                             value = ''.join(element.itertext()).strip()
                             if local_name in {
                                 'title', 'creator', 'subject', 'publisher',
@@ -748,6 +785,10 @@ class Enforcer:
                                     calibre_values[name] = (
                                         element.get('content', value).strip()
                                     )
+
+                        clear_kepub_series = (
+                            'calibre:series' not in calibre_values
+                        )
 
                         def first_value(name):
                             return next((
@@ -791,7 +832,7 @@ class Enforcer:
                         rating = calibre_values.get('calibre:rating', '')
                         if rating:
                             cmd += ['--rating', rating]
-                    if Path(book.cover_path).exists():
+                    if cmd is not None and Path(book.cover_path).exists():
                         cmd += ['--cover', book.cover_path]
                 else:
                     tool = 'ebook-polish'
@@ -801,24 +842,88 @@ class Enforcer:
                         cmd = [tool, '-o', book.new_metadata_path, '-U', file, file]
 
                 try:
-                    result = subprocess.run(
-                        cmd, capture_output=True, text=True, timeout=120, check=False
-                    )
+                    if cmd is not None and clear_kepub_series:
+                        kepub_suffix = (
+                            ".kepub.epub"
+                            if lower_name.endswith(".kepub.epub")
+                            else ".kepub"
+                        )
+                        descriptor, staged_kepub = tempfile.mkstemp(
+                            dir=os.path.dirname(os.path.abspath(file)),
+                            prefix="." + os.path.basename(file) + ".metadata-",
+                            suffix=kepub_suffix,
+                        )
+                        os.close(descriptor)
+                        shutil.copy2(file, staged_kepub)
+                        cmd[1] = staged_kepub
 
-                    if result.returncode != 0:
-                        print(f"[cover-metadata-enforcer] Warning: {tool} returned {result.returncode} for {file}", flush=True)
-                        if result.stderr:
-                            print(f"[cover-metadata-enforcer] Error output: {result.stderr.strip()}", flush=True)
+                    if cmd is not None:
+                        result = subprocess.run(
+                            cmd, capture_output=True, text=True, timeout=120, check=False
+                        )
+
+                        if result.returncode != 0:
+                            if clear_kepub_series:
+                                print(
+                                    f"[cover-metadata-enforcer] Warning: could not clear "
+                                    f"series for '{book.title_author}' "
+                                    f"({book.file_format}); original file preserved because "
+                                    f"{tool} returned {result.returncode}",
+                                    flush=True,
+                                )
+                            else:
+                                print(f"[cover-metadata-enforcer] Warning: {tool} returned {result.returncode} for {file}", flush=True)
+                            if result.stderr:
+                                print(f"[cover-metadata-enforcer] Error output: {result.stderr.strip()}", flush=True)
+                        elif clear_kepub_series:
+                            try:
+                                _strip_kepub_series_metadata(staged_kepub)
+                            except Exception as error:
+                                print(
+                                    f"[cover-metadata-enforcer] Warning: could not clear "
+                                    f"series for '{book.title_author}' "
+                                    f"({book.file_format}); original file preserved: {error}",
+                                    flush=True,
+                                )
+                            else:
+                                os.replace(staged_kepub, file)
+                                staged_kepub = None
+                                write_completed = True
+                        else:
+                            write_completed = True
                 except subprocess.TimeoutExpired:
-                    print(f"[cover-metadata-enforcer] Error: {tool} timed out for {file}", flush=True)
+                    if clear_kepub_series:
+                        print(
+                            f"[cover-metadata-enforcer] Warning: could not clear series "
+                            f"for '{book.title_author}' ({book.file_format}); original "
+                            f"file preserved because {tool} timed out",
+                            flush=True,
+                        )
+                    else:
+                        print(f"[cover-metadata-enforcer] Error: {tool} timed out for {file}", flush=True)
                 except Exception as e:
-                    print(f"[cover-metadata-enforcer] Error running {tool} for {file}: {e}", flush=True)
+                    if clear_kepub_series:
+                        print(
+                            f"[cover-metadata-enforcer] Warning: could not clear series "
+                            f"for '{book.title_author}' ({book.file_format}); original "
+                            f"file preserved: {e}",
+                            flush=True,
+                        )
+                    else:
+                        print(f"[cover-metadata-enforcer] Error running {tool} for {file}: {e}", flush=True)
+                finally:
+                    if staged_kepub is not None:
+                        try:
+                            os.unlink(staged_kepub)
+                        except OSError:
+                            pass
                 
                 self.empty_metadata_temp()
-                print(f"[cover-metadata-enforcer]: DONE: '{book.title_author}.{book.file_format}': Cover & Metadata updated", flush=True)
+                if write_completed:
+                    print(f"[cover-metadata-enforcer]: DONE: '{book.title_author}.{book.file_format}': Cover & Metadata updated", flush=True)
 
-                # Calculate and store new checksum after modification
-                self._recalculate_checksum_after_modification(book.book_id, book.file_format, file)
+                    # Calculate and store new checksum after modification
+                    self._recalculate_checksum_after_modification(book.book_id, book.file_format, file)
 
                 book_objects.append(book)
 

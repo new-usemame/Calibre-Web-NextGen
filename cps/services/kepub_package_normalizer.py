@@ -292,6 +292,88 @@ def _validate_rewritten_archive(path, expected_span_counts):
             raise ValueError("KoboSpan counts changed while normalizing the package")
 
 
+def rewrite_package_document(path, transform):
+    """Transform a KEPUB package document with an atomic, validated rewrite.
+
+    ``transform`` receives the parsed package element and must return truthy only
+    when it mutated that element. Return ``True`` when the archive was replaced,
+    ``False`` for a byte-identical no-op, and ``None`` on failure. On failure the
+    source archive is untouched and the temporary archive is removed.
+
+    The transaction preserves every non-package member's bytes, the archive
+    comment, and the source file's permission bits.
+    """
+    path = os.fspath(path)
+    temporary_path = None
+    try:
+        original_stat = os.stat(path)
+        with zipfile.ZipFile(path) as archive:
+            infos = archive.infolist()
+            _reject_oversized_archive(infos)
+            names = [info.filename for info in infos]
+            if len(names) != len(set(names)):
+                raise ValueError("KEPUB contains duplicate ZIP member names")
+            if archive.testzip() is not None:
+                raise ValueError("KEPUB failed its CRC check")
+
+            package_path = _package_document_path(archive)
+            package_bytes = _read_bounded_member(
+                archive,
+                package_path,
+                MAX_PACKAGE_DOCUMENT_BYTES,
+                "package document",
+            )
+            package = etree.fromstring(package_bytes, parser=_XML_PARSER)
+            if not transform(package):
+                return False
+
+            contents = {info.filename: archive.read(info) for info in infos}
+            expected_span_counts = _span_counts(contents)
+            contents[package_path] = etree.tostring(
+                package,
+                encoding="utf-8",
+                xml_declaration=package_bytes.lstrip().startswith(b"<?xml"),
+            )
+            entries = [(info, contents[info.filename]) for info in infos]
+            comment = archive.comment
+
+        descriptor, temporary_path = tempfile.mkstemp(
+            dir=os.path.dirname(os.path.abspath(path)),
+            prefix="." + os.path.basename(path) + ".",
+            suffix=".package-rewrite.tmp",
+        )
+        os.close(descriptor)
+        _write_archive(temporary_path, entries, comment)
+        _validate_rewritten_archive(temporary_path, expected_span_counts)
+
+        with zipfile.ZipFile(temporary_path) as rewritten:
+            if rewritten.comment != comment:
+                raise ValueError("archive comment changed during package rewrite")
+            for name, content in contents.items():
+                if name != package_path and rewritten.read(name) != content:
+                    raise ValueError(
+                        "non-package ZIP member changed during package rewrite: " + name
+                    )
+
+        os.chmod(temporary_path, stat.S_IMODE(original_stat.st_mode))
+        os.replace(temporary_path, path)
+        temporary_path = None
+        return True
+    except Exception as error:
+        log.warning(
+            "Could not rewrite KEPUB package document %s; original preserved: %s",
+            path,
+            error,
+        )
+        return None
+    finally:
+        if temporary_path is not None:
+            try:
+                os.unlink(temporary_path)
+            except OSError:
+                pass
+
+
 def normalize_kepub_package(path):
     """Normalize escaping OPF manifest items in ``path`` atomically.
 

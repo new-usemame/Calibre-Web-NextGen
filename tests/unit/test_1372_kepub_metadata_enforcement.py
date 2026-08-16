@@ -183,7 +183,12 @@ def test_kepub_uses_ebook_meta_not_ebook_polish(enforcer_module, tmp_path, monke
     kepub.write_bytes(b"PK\x03\x04stub")
     (book_dir / "cover.jpg").write_bytes(b"\xff\xd8stub")
     opf = tmp_path / "new_metadata.opf"
-    opf.write_text("<package/>", encoding="utf-8")
+    opf.write_text(
+        "<package><metadata>"
+        "<meta name=\"calibre:series\" content=\"Existing Series\"/>"
+        "</metadata></package>",
+        encoding="utf-8",
+    )
 
     calls = _patch_enforce_dependencies(enforcer_module, monkeypatch, book_dir, opf)
 
@@ -383,7 +388,12 @@ def test_default_kepubify_output_takes_the_metadata_only_path(
     target = book_dir / "book.kepub.epub"
     target.write_text("x", encoding="utf-8")
     opf = book_dir / "metadata.opf"
-    opf.write_text("<opf/>", encoding="utf-8")
+    opf.write_text(
+        "<package><metadata>"
+        "<meta name=\"calibre:series\" content=\"Existing Series\"/>"
+        "</metadata></package>",
+        encoding="utf-8",
+    )
 
     calls = _patch_enforce_dependencies(module, monkeypatch, str(book_dir), str(opf))
 

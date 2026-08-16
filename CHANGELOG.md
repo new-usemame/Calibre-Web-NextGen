@@ -52,6 +52,10 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Clearing a series now removes it from Kobo book files (#1372).** Deleting
+  a book's series in the library now removes the old series name and index from
+  its KEPUB too, so a Kobo no longer keeps displaying metadata that was cleared.
+
 - **Deleted tags no longer stay behind in the Kobo copy.** Removing one tag
   from a book updated the EPUB, but the KEPUB merged the shorter list with its
   old tags and kept every deleted value. Tags are now replaced from the library

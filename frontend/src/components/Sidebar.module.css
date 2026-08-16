@@ -163,26 +163,19 @@
   .shelfName,
   .magicShelfName {
     opacity: 0;
-    visibility: hidden;
     white-space: nowrap;
     transition:
       opacity var(--dur-fast) var(--ease),
-      visibility var(--dur-fast) var(--ease);
   }
 
   :is(.shelfItem, .shelfItemActive) {
     opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
     transition:
       opacity var(--dur-fast) var(--ease),
-      visibility var(--dur-fast) var(--ease);
   }
 
   .magicShelfItem {
     opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
   }
 
   .magicShelfIcon {
@@ -198,8 +191,6 @@
   :is(.nav, .navOpen):is(:hover, :focus-within)
     :is(.shelfItem, .shelfItemActive) {
     opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
   }
 
   :is(.nav, .navOpen):is(:hover, :focus-within) .magicShelfIcon {

@@ -128,3 +128,31 @@ def test_normalized_predicate_treats_suffixed_storage_as_cursor_equal(book_sessi
     )
 
     assert stored_equals_cursor.id == 7
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("stored_text", "cursor"), [
+    ("2026-08-15 16:50:40.500", datetime(2026, 8, 15, 16, 50, 40, 500000)),
+    ("2026-08-15 16:50:40.500+00:00", datetime(2026, 8, 15, 16, 50, 40, 500000)),
+    ("2026-08-15 16:50:40.5000000+00:00", datetime(2026, 8, 15, 16, 50, 40, 500000)),
+    ("2026-08-15 16:50:40.5", datetime(2026, 8, 15, 16, 50, 40, 500000)),
+])
+def test_variable_width_fraction_matches_cursor_and_does_not_reemit(
+    book_session, stored_text, cursor
+):
+    _seed_literal(book_session, [(9, stored_text)])
+
+    stored_equals_cursor = (
+        book_session.query(db.Books.id)
+        .filter(
+            normalized_books_last_modified(db.Books.last_modified)
+            == normalized_books_last_modified(cursor)
+        )
+        .one()
+    )
+    first, returned_token = _sync_once(book_session)
+    second, _ = _sync_once(book_session, returned_token)
+
+    assert stored_equals_cursor.id == 9
+    assert [entry["ChangedEntitlement"]["BookId"] for entry in first] == [9]
+    assert second == []

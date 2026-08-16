@@ -72,16 +72,28 @@ def normalized_books_last_modified(value):
     TEXT.  Calibre includes a UTC offset while SQLAlchemy writes a naive value,
     so comparing the raw strings makes the suffix decide the keyset result.
 
-    SQLite's ``strftime('%f')`` stops at milliseconds.  Keep the original six
-    fractional digits (or add six zeroes when absent) so this SQL key has the
-    same microsecond precision as the Python datetime carried by SyncToken.
-    ``strftime`` supplies the UTC-normalized whole-second portion; timezone
-    offsets therefore cannot affect comparison or ordering.
+    SQLite's ``strftime('%f')`` stops at milliseconds.  Extract consecutive
+    fractional digits only, right-pad with zeroes, and truncate to six digits
+    so this SQL key has the same microsecond precision as the Python datetime
+    carried by SyncToken. ``strftime`` supplies the UTC-normalized whole-second
+    portion; timezone offsets therefore cannot affect comparison or ordering.
     """
     raw_value = cast(value, String)
     fraction_start = func.instr(raw_value, ".")
+    fraction_tail = func.substr(raw_value, fraction_start + 1)
+
+    # ltrim removes the leading digit run; the length difference is therefore
+    # exactly the fraction's width up to its first non-digit. Offset digits can
+    # never leak back in after their leading '+' or '-' stops the run.
+    fraction_width = (
+        func.length(fraction_tail)
+        - func.length(func.ltrim(fraction_tail, "0123456789"))
+    )
+    fraction_digits = func.substr(fraction_tail, 1, fraction_width)
+
     microseconds = case(
-        (fraction_start > 0, func.substr(raw_value, fraction_start + 1, 6)),
+        (fraction_start > 0,
+         func.substr(fraction_digits + literal("000000"), 1, 6)),
         else_="000000",
     )
     return (
@@ -102,7 +114,7 @@ def books_keyset_after_cursor(cursor_lm, cursor_id):
 
 
 def books_cursor_datetime(value):
-    """Match the SQL key's UTC basis while retaining all six microseconds."""
+    """Put a dialect-parsed datetime on the cursor's UTC-naive basis."""
     if value.tzinfo is not None:
         return value.astimezone(timezone.utc).replace(tzinfo=None)
     return value

@@ -25,7 +25,11 @@ except ImportError as e:
 
 def get_mimetype(ext):
     # overwrite some mimetypes for proper file detection
-    mimes = {".cbz": "application/zip",
+    # Licence files register semantic vendor types, but libmagic sniffs their
+    # contents as generic JSON/XML; upload validation needs the sniffed types.
+    mimes = {".acsm": "text/xml",
+             ".lcpl": "application/json",
+             ".cbz": "application/zip",
              ".cbr": "application/x-rar",
              ".cbt": "application/x-tar",
              ".kfx": "application/octet-stream",

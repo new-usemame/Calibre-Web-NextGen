@@ -6,8 +6,14 @@
   "refs": [
     "#2610"
   ],
+  "resolution": {
+    "commit": "d7e485d24",
+    "date": "2026-08-16",
+    "note": "Containment shipped in #1679 (d7e485d24) and verified live on the deployed instance.\n\nThe exposure this finding named is closed: an owned-book annotations GET can no longer reach Nickel's destructive replace trigger, because the trigger itself — POST /api/v3/content/checkforchanges — now filters CWNG-owned content ids out of both the outbound request and the response, and a batch that is entirely owned never contacts Kobo at all.\n\nRoot cause, established on hardware (Clara BW 4.45.23792, stock Nickel): nothing was broken in Kobo. checkforchanges -> GET is a replace protocol working as designed — the GET response REPLACES the device's entire local Bookmark set for that book. CWNG lost highlights by sitting in the middle and answering that GET destructively (503) while never authoring the set. The v4.1.36 guard failed for exactly this reason: refusing is one of the destructive answers.\n\nLive verification on the deployed instance (OBSERVED), POST /api/v3/content/checkforchanges with a real session:\n  A  owned content id      -> 200 [] , no upstream call in the log\n  B  id not in the library -> 401 proxied back from Kobo (Cloudflare, WWW-Authenticate: Bearer)\n  C  malformed body        -> 200 [] + 'Not proxying an unrecognized Kobo checkforchanges request'\nB is the control that makes A mean something: without it, 200 [] is indistinguishable from a route that returns [] to everything.\n\nWHAT IS NOT CLOSED, tracked separately by notes/KOBO-TWO-WAY-ANNOTATION-SYNC-DESIGN.md (#1681):\n  - markup/stylus annotations remain unrepresentable. 49 ExtraAnnotationData rows across 6 books on the operator's Libra (35 of them on the two Homer translations). Nothing should author an annotation set for those books; the design gates on ExtraAnnotationData IS NOT NULL, i.e. on the property, not the type.\n  - Two-way sync itself is designed and proven feasible on hardware but not implemented. Staged rollout, both gates default off.\n  - Nothing here retroactively restores anything already deleted.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Kobo annotations GET is proxied to Kobo's cloud — unexamined data-loss exposure (CW #2610)"
 }

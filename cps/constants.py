@@ -179,7 +179,7 @@ EXTENSIONS_CONVERT_TO = ['pdf', 'epub', 'mobi', 'azw3', 'docx', 'rtf', 'fb2',
                          'lit', 'lrf', 'txt', 'htmlz', 'rtf', 'odt']
 EXTENSIONS_UPLOAD = {'txt', 'pdf', 'epub', 'kepub', 'mobi', 'azw', 'azw3', 'cbr', 'cbz', 'cbt', 'cb7', 'djvu', 'djv',
                      'prc', 'doc', 'docx', 'fb2', 'html', 'rtf', 'lit', 'odt', 'mp3', 'mp4', 'ogg',
-                     'opus', 'wav', 'flac', 'm4a', 'm4b', 'acsm', 'kfx', 'kfx-zip'}
+                     'opus', 'wav', 'flac', 'm4a', 'm4b', 'acsm', 'lcpl', 'kfx', 'kfx-zip'}
 
 _extension = ""
 if sys.platform == "win32":

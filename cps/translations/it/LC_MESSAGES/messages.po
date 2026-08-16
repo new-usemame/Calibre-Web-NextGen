@@ -11402,18 +11402,11 @@ msgstr "e dal disco rigido"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Nota importante su Kobo: i libri eliminati rimarranno su qualsiasi "
-"dispositivo Kobo associato."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"I libri devono essere prima archiviati e il dispositivo sincronizzato prima "
-"che un libro possa essere eliminato in sicurezza."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -13124,3 +13117,16 @@ msgstr "Mostra sezione Libri letti e Libri da leggere"
 
 #~ msgid "Separate Book Files from Library"
 #~ msgstr "Separa i file dei libri dalla biblioteca"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Nota importante su Kobo: i libri eliminati rimarranno su qualsiasi "
+#~ "dispositivo Kobo associato."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "I libri devono essere prima archiviati e il dispositivo sincronizzato prima "
+#~ "che un libro possa essere eliminato in sicurezza."

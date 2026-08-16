@@ -18,6 +18,13 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The delete warning no longer tells you the wrong thing about your Kobo.**
+  It said deleted books would stay on any paired Kobo and that you had to
+  archive and sync first. That stopped being true when deletions started sending
+  the device an instruction to archive its copy. The warning now describes what
+  actually happens, including the honest caveat: the device is told on its next
+  sync, and if that instruction cannot be recorded the book may still remain.
+
 - **Covers are now shaped for the Kobo that is actually asking.** The server-side
   cover padding had one aspect setting for the whole instance, so a household with
   two different Kobos had to pick a winner — the other device got covers padded to

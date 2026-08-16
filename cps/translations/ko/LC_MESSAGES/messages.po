@@ -11275,14 +11275,11 @@ msgstr "그리고 디스크에서도 삭제됩니다."
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
-msgstr "Kobo 알림: 삭제된 책은 연결된 Kobo 기기에 남아있습니다."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
+msgstr ""
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr "책을 안전하게 삭제하려면 먼저 보관 처리 후 기기 동기화가 필요합니다."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -12875,3 +12872,12 @@ msgstr "읽음/읽지 않음 표시"
 
 #~ msgid "Separate Book Files from Library"
 #~ msgstr "책 저장 경로 분리"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr "Kobo 알림: 삭제된 책은 연결된 Kobo 기기에 남아있습니다."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr "책을 안전하게 삭제하려면 먼저 보관 처리 후 기기 동기화가 필요합니다."

@@ -11343,18 +11343,11 @@ msgstr "a z hard disku"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Důležitá Kobo poznámka: smazané knihy zůstanou na jakémkoli spárovaném "
-"zařízení Kobo."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"Knihy musí být nejprve archivovány a zařízení musí být synchronizováno, než "
-"bude kniha bezpečně smazána."
 
 #: cps/templates/modal_dialogs.html
 #, fuzzy
@@ -12655,3 +12648,16 @@ msgstr "Zobrazit výběr sérií"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Kliknutím na obal načtěte metadata do formuláře"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Důležitá Kobo poznámka: smazané knihy zůstanou na jakémkoli spárovaném "
+#~ "zařízení Kobo."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "Knihy musí být nejprve archivovány a zařízení musí být synchronizováno, než "
+#~ "bude kniha bezpečně smazána."

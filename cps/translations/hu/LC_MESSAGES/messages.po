@@ -11531,18 +11531,11 @@ msgstr " és a merevlemezről"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Fontos Kobo megjegyzés: a törölt könyvek továbbra is megmaradnak minden "
-"párosított Kobo eszközön."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"A könyvek archiválása és az eszköz szinkronizálása szükséges ahhoz, hogy egy "
-"könyvet biztonságosan törölhessen."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -13199,3 +13192,16 @@ msgstr "Olvasott/olvasatlan mutatása"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Kattints a borítóra a metadatok betöltésére"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Fontos Kobo megjegyzés: a törölt könyvek továbbra is megmaradnak minden "
+#~ "párosított Kobo eszközön."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "A könyvek archiválása és az eszköz szinkronizálása szükséges ahhoz, hogy egy "
+#~ "könyvet biztonságosan törölhessen."

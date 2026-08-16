@@ -11362,18 +11362,11 @@ msgstr "dan harddisk"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Catatan Penting Kobo: buku yang dihapus akan tetap ada di perangkat Kobo "
-"yang telah dipasangkan."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"Buku harus diarsipkan terlebih dahulu dan perangkat disinkronkan sebelum "
-"buku dapat dihapus dengan aman."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -12740,3 +12733,16 @@ msgstr "Tampilkan pilihan baca/belum dibaca"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik sampul untuk memuat metadata ke formulir"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Catatan Penting Kobo: buku yang dihapus akan tetap ada di perangkat Kobo "
+#~ "yang telah dipasangkan."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "Buku harus diarsipkan terlebih dahulu dan perangkat disinkronkan sebelum "
+#~ "buku dapat dihapus dengan aman."

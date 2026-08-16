@@ -167,6 +167,7 @@ class _FakeProcessor:
 
     def backup(self, filepath, backup_type):
         self.backed_up.append((filepath, backup_type))
+        return True
 
     def set_library_permissions(self):
         pass
@@ -631,6 +632,45 @@ class TestNotABookFormatsAreNotRescued:
             )
             assert guidance, f"{fmt} is skipped on failure but explains nothing"
             assert "processed_books/failed" in guidance
+
+    def test_successful_failure_backup_removes_only_the_import_sidecar(
+        self, monkeypatch, tmp_path
+    ):
+        source = tmp_path / "Library Loan.lcpl"
+        source.write_text("licence contents")
+        import_manifest = Path(str(source) + ".cwa.json")
+        import_manifest.write_text('{"action": "import"}')
+        failed_manifest = Path(str(source) + ".cwa.failed.json")
+        failed_manifest.write_text("preserve this")
+        failed_dir = tmp_path / "processed_books" / "failed"
+        monkeypatch.setitem(
+            ingest_processor.backup_destinations, "failed", str(failed_dir)
+        )
+
+        processor = object.__new__(ingest_processor.NewBookProcessor)
+        processor.input_format = "lcpl"
+        processor.filename = source.name
+        ingest_processor._fail_not_a_book_input(processor, str(source))
+
+        assert (failed_dir / source.name).read_text() == "licence contents"
+        assert source.read_text() == "licence contents"
+        assert not import_manifest.exists()
+        assert failed_manifest.read_text() == "preserve this"
+
+    def test_failed_backup_keeps_the_import_sidecar(self, tmp_path):
+        source = tmp_path / "Library Loan.lcpl"
+        source.write_text("licence contents")
+        import_manifest = Path(str(source) + ".cwa.json")
+        import_manifest.write_text('{"action": "import"}')
+
+        processor = object.__new__(ingest_processor.NewBookProcessor)
+        processor.input_format = "lcpl"
+        processor.filename = source.name
+        processor.backup = lambda *_args, **_kwargs: False
+        ingest_processor._fail_not_a_book_input(processor, str(source))
+
+        assert source.read_text() == "licence contents"
+        assert import_manifest.read_text() == '{"action": "import"}'
 
 
 class TestAutoConvertOffDoesNotImportTickets:

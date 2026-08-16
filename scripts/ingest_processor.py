@@ -1053,12 +1053,25 @@ def conversion_failure_guidance(input_format, filename, converter_output=None):
 
 def _fail_not_a_book_input(processor, filepath) -> None:
     """Preserve a ticket/licence and explain why it was not imported."""
-    processor.backup(filepath, backup_type="failed")
+    if processor.backup(filepath, backup_type="failed"):
+        _remove_completed_import_manifest(filepath)
     guidance = conversion_failure_guidance(
         processor.input_format, processor.filename
     )
     if guidance:
         print(f"\n[ingest-processor]: {guidance}\n", flush=True)
+
+
+def _remove_completed_import_manifest(filepath) -> None:
+    """Remove only a successfully handled browser-upload import sidecar."""
+    manifest_path = filepath + ".cwa.json"
+    try:
+        with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
+            manifest = json.load(manifest_file)
+        if isinstance(manifest, dict) and manifest.get("action") == "import":
+            os.remove(manifest_path)
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        pass
 
 
 class NewBookProcessor:
@@ -1359,9 +1372,11 @@ class NewBookProcessor:
             # Name the absolute directory: "moved to failed backup" on its own
             # left users with nowhere to look (#1094).
             print(f"[ingest-processor]: Saved a copy of {os.path.basename(input_file)} to {output_path}", flush=True)
+            return True
         except Exception as e:
             # Never let backups crash ingest; just log the problem
             print(f"[ingest-processor]: ERROR - Failed to backup '{input_file}' to '{output_path}': {e}")
+            return False
 
 
     def convert_book(self, end_format=None) -> tuple[bool, str]:

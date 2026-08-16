@@ -22,9 +22,9 @@ is for things you can see or feel when running the app.
   isn't allowed to be uploaded to this server”.** Existing installations gain
   `lcpl` in their Upload Format Allowlist once, without losing or reordering
   their current choices; removing it afterward is respected. The ingest watcher
-  now dispatches LCPL files for processing. LCPL and ACSM tickets are sent to
-  `processed_books/failed` instead of becoming junk book records, including
-  with Auto-Convert disabled or an add-format manifest.
+  now dispatches LCPL files for processing without leaving upload sidecars
+  behind. With Auto-Convert disabled, ACSM tickets are no longer imported and
+  checksummed as books; they are preserved in `processed_books/failed` instead.
 - **Basic Configuration now saves when you press Enter in a single-line field,
   and "Convert missing KEPUBs now" works again.** Both did the same thing: that
   page was the one settings screen that refused the save it was trying to make,

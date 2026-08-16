@@ -199,6 +199,9 @@ class _Settings(_Base):
     config_calibre = Column(String)
     config_rarfile_location = Column(String, default=None)
     config_upload_formats = Column(String, default=','.join(constants.EXTENSIONS_UPLOAD))
+    # One-time append of the fork #1608 LCPL default to existing rows. A
+    # dedicated marker preserves any later user removal of lcpl.
+    config_upload_formats_lcpl_migrated = Column(Boolean, default=False)
     config_unicode_filename = Column(Boolean, default=False)
     config_embed_metadata = Column(Boolean, default=True)
 
@@ -303,6 +306,7 @@ class ConfigSQL(object):
         self._fernet = Fernet(secret_key)
         self.cli = cli
         self.load()
+        self.reconcile_lcpl_upload_format()
 
         change = False
 
@@ -570,6 +574,27 @@ class ConfigSQL(object):
             self.config_hardcover_sync_migrated = True
             self.save()
         return self.hardcover_sync_enabled()
+
+    def reconcile_lcpl_upload_format(self):
+        """Append the LCPL default once without replacing user choices."""
+        if not bool(getattr(
+                self, "config_upload_formats_lcpl_migrated", False)):
+            raw_formats = getattr(self, "config_upload_formats", "") or ""
+            normalized = []
+            for raw_format in str(raw_formats).split(','):
+                upload_format = raw_format.strip().lower()
+                if upload_format not in normalized:
+                    normalized.append(upload_format)
+
+            # An empty value means allow every extension; replacing it with
+            # lcpl would narrow access rather than add a newly shipped default.
+            if any(normalized) and "lcpl" not in normalized:
+                normalized.append("lcpl")
+                self.config_upload_formats = ','.join(normalized)
+
+            self.config_upload_formats_lcpl_migrated = True
+            self.save()
+        return self.config_upload_formats
 
     def resolved_comicvine_api_key(self):
         """The install's OWN ComicVine API key, or "" when none is set.

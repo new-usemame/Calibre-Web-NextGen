@@ -744,7 +744,7 @@ def set_cwa_settings():
     cwa_settings = cwa_db.cwa_settings
     previous_koreader_enabled = bool(cwa_settings.get('koreader_sync_enabled', 0))
 
-    ignorable_formats = ['acsm', 'azw', 'azw3', 'azw4', 'cbz',
+    ignorable_formats = ['acsm', 'lcpl', 'azw', 'azw3', 'azw4', 'cbz',
                         'cbr', 'cb7', 'cbc', 'chm',
                         'djvu', 'docx', 'epub', 'fb2',
                         'fbz', 'html', 'htmlz', 'kepub', 'lit',

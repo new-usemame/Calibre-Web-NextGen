@@ -11596,18 +11596,11 @@ msgstr "in iz trdega diska"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Pomembno opozorilo Kobo: izbrisane knjige bodo ostale v vsaki povezani "
-"napravi Kobo."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"Preden lahko knjigo varno izbrišete, jo morate najprej arhivirati in "
-"sinhronizirati napravo."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -13210,3 +13203,16 @@ msgstr "Prikaži razdelek Prebrano/neprebrano"
 #~ msgstr ""
 #~ "Označi knjigo kot arhivirano ali ne, da se skrije v Calibre-Web in "
 #~ "izbriše iz Kobo bralnika"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Pomembno opozorilo Kobo: izbrisane knjige bodo ostale v vsaki povezani "
+#~ "napravi Kobo."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "Preden lahko knjigo varno izbrišete, jo morate najprej arhivirati in "
+#~ "sinhronizirati napravo."

@@ -11789,18 +11789,11 @@ msgstr "и жёсткий диск"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Важное примечание для Kobo: удалённые книги останутся на любом подключённом "
-"устройстве Kobo."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"Перед безопасным удалением книги необходимо сначала заархивировать её и "
-"синхронизировать устройство."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -13566,3 +13559,16 @@ msgstr "Показать раздел прочитанного/непрочит�
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Нажмите на обложку, чтобы получить метаданные"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Важное примечание для Kobo: удалённые книги останутся на любом подключённом "
+#~ "устройстве Kobo."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "Перед безопасным удалением книги необходимо сначала заархивировать её и "
+#~ "синхронизировать устройство."

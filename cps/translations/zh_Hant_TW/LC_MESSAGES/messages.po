@@ -11186,14 +11186,11 @@ msgstr "，包括從硬碟中"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
-msgstr "Kobo 重要說明：被刪除的書籍將保留在任何配對的 Kobo 設備上。"
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
+msgstr ""
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr "必須先將書籍存檔並同步設備，然後才能安全地刪除書籍。"
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -12492,3 +12489,12 @@ msgstr "顯示已讀/未讀選擇"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "單擊封面將元數據加載到表單"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr "Kobo 重要說明：被刪除的書籍將保留在任何配對的 Kobo 設備上。"
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr "必須先將書籍存檔並同步設備，然後才能安全地刪除書籍。"

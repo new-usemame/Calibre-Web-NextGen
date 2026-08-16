@@ -11285,14 +11285,11 @@ msgstr "والقرص الصلب"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
-msgstr "ملاحظة Kobo هامة: الكتب المحذوفة ستبقى على أي جهاز Kobo مقترن."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
+msgstr ""
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr "يجب أولاً أرشفة الكتب ومزامنة الجهاز قبل أن يتم حذف الكتاب بأمان."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -12584,3 +12581,12 @@ msgstr "إظهار قسم المقروء/غير المقروء"
 
 #~ msgid "Return to Database config"
 #~ msgstr "العودة إلى تهيئة قاعدة البيانات"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr "ملاحظة Kobo هامة: الكتب المحذوفة ستبقى على أي جهاز Kobo مقترن."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr "يجب أولاً أرشفة الكتب ومزامنة الجهاز قبل أن يتم حذف الكتاب بأمان."

@@ -56,6 +56,7 @@ MAX_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 #: ceiling, but it must not be able to allocate hundreds of MiB on its own.
 MAX_CONTAINER_XML_BYTES = 1 * 1024 * 1024
 MAX_PACKAGE_DOCUMENT_BYTES = 16 * 1024 * 1024
+MAX_TOC_DOCUMENT_BYTES = 16 * 1024 * 1024
 
 
 def _reject_oversized_archive(infos):
@@ -103,6 +104,85 @@ def _package_document_path(archive):
 def _manifest_items(opf_bytes):
     package = etree.fromstring(opf_bytes, parser=_XML_PARSER)
     return package.xpath("//*[local-name()='manifest']/*[local-name()='item']")
+
+
+def _toc_documents(opf_path, opf_bytes):
+    for item in _manifest_items(opf_bytes):
+        media_type = item.get("media-type", "")
+        properties = set(item.get("properties", "").split())
+        if media_type == "application/x-dtbncx+xml":
+            kind = "NCX"
+        elif "nav" in properties:
+            kind = "navigation"
+        else:
+            continue
+        href = item.get("href")
+        if not href:
+            continue
+        split = _split_local_reference(href)
+        if split is None:
+            continue
+        _, href_path = split
+        toc_path = _resolve_reference(opf_path, href_path)
+        if toc_path.startswith("../") or toc_path.startswith("/"):
+            raise ValueError("EPUB TOC path escapes the archive")
+        yield toc_path, kind
+
+
+def _toc_targets(toc_bytes, kind):
+    document = etree.fromstring(toc_bytes, parser=_XML_PARSER)
+    if kind == "NCX":
+        return document.xpath("//*[local-name()='content']/@src")
+
+    targets = []
+    for nav in document.xpath("//*[local-name()='nav']"):
+        epub_types = set()
+        for value in nav.xpath("@*[local-name()='type']"):
+            epub_types.update(value.split())
+        roles = set(nav.get("role", "").split())
+        if "toc" in epub_types or "doc-toc" in roles:
+            targets.extend(nav.xpath(".//*[local-name()='a']/@href"))
+    return targets
+
+
+def count_fragment_anchored_toc_targets(path):
+    """Count distinct fragment-bearing targets in manifest-declared TOCs.
+
+    Return zero when the archive or package document cannot be inspected.
+    Malformed individual TOCs are logged and skipped. This diagnostic never
+    modifies the EPUB and never lets user-file failures escape into conversion.
+    """
+    path = os.fspath(path)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            infos = archive.infolist()
+            _reject_oversized_archive(infos)
+            opf_path = _package_document_path(archive)
+            opf_bytes = _read_bounded_member(
+                archive, opf_path, MAX_PACKAGE_DOCUMENT_BYTES, "package document")
+            toc_documents = list(_toc_documents(opf_path, opf_bytes))
+            fragment_targets = set()
+            for toc_path, kind in toc_documents:
+                try:
+                    toc_bytes = _read_bounded_member(
+                        archive, toc_path, MAX_TOC_DOCUMENT_BYTES,
+                        "{} TOC document".format(kind))
+                    for target in _toc_targets(toc_bytes, kind):
+                        try:
+                            split = _split_local_reference(target)
+                        except (TypeError, ValueError):
+                            continue
+                        if split is not None and split[0].fragment:
+                            _, target_path = split
+                            resolved_path = _resolve_reference(toc_path, target_path)
+                            fragment_targets.add((resolved_path, split[0].fragment))
+                except Exception as error:
+                    log.warning("Could not inspect %s TOC document in %s: %s",
+                                kind, path, error)
+            return len(fragment_targets)
+    except Exception as error:
+        log.warning("Could not inspect EPUB TOC fragments in %s: %s", path, error)
+        return 0
 
 
 def _split_local_reference(value):

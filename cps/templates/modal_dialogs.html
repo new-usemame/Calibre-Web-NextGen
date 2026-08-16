@@ -53,8 +53,7 @@
 		  </p>
           {% if config.config_kobo_sync %}
           <p>
-            <span>{{_('Important Kobo Note: deleted books will remain on any paired Kobo device.')}}</span>
-            <span>{{_('Books must first be archived and the device synced before a book can safely be deleted.')}}</span>
+            <span>{{_('Deleting this book also tries to archive its copy on paired Kobo devices the next time they sync. If that update cannot be recorded, the book may remain on a device.')}}</span>
           </p>
           {% endif %}
         </div>

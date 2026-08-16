@@ -11338,18 +11338,11 @@ msgstr "a pevný disk"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Dôležitá poznámka pre Kobo: zmazané knihy zostanú na každom spárovanom Kobo "
-"zariadení."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"Kniha musí byť najskôr archivovaná a zariadenie synchronizované pred tým než "
-"môže byť kniha bezpečne zmazaná."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -12706,3 +12699,16 @@ msgstr "Zobraziť sekciu Prečítané/Neprečítané"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Kliknite na oblálku aby ste načítali metadáta do formulára"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Dôležitá poznámka pre Kobo: zmazané knihy zostanú na každom spárovanom Kobo "
+#~ "zariadení."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "Kniha musí byť najskôr archivovaná a zariadenie synchronizované pred tým než "
+#~ "môže byť kniha bezpečne zmazaná."

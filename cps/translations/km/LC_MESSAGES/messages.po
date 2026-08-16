@@ -11271,14 +11271,11 @@ msgstr "និងពីថាសរឹង"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
 
 #: cps/templates/modal_dialogs.html
 #, fuzzy
@@ -12466,3 +12463,12 @@ msgstr "បង្ហាញជម្រើសស៊េរី"
 #, fuzzy
 #~ msgid "CWA Discord Server"
 #~ msgstr "ស្រាវជ្រាវ"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""

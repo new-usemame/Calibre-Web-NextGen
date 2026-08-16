@@ -11364,18 +11364,11 @@ msgstr "och från hårddisken"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Viktigt Kobo-notering: borttagna böcker kommer att finnas kvar på alla "
-"kopplade Kobo-enheter."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"Böcker måste först arkiveras och enheten synkroniseras innan en bok säkert "
-"kan tas bort."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -12699,3 +12692,16 @@ msgstr "Visa läst/oläst val"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klicka på omslaget för att läsa in metadata till formuläret"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Viktigt Kobo-notering: borttagna böcker kommer att finnas kvar på alla "
+#~ "kopplade Kobo-enheter."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "Böcker måste först arkiveras och enheten synkroniseras innan en bok säkert "
+#~ "kan tas bort."

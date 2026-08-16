@@ -11410,18 +11410,11 @@ msgstr "και σκληρός δίσκος"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Σημαντική Σημείωση Kobo: τα διαγραμμένα βιβλία θα παραμείνουν σε οποιαδήποτε "
-"συνδεδεμένη συσκευή Kobo."
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"Τα βιβλία πρέπει πρώτα να αρχειοθετηθούν και να συγχρονιστεί η συσκευή πριν "
-"μπορέσει να διαγραφεί με ασφάλεια το βιβλίο."
 
 #: cps/templates/modal_dialogs.html
 #, fuzzy
@@ -12729,3 +12722,16 @@ msgstr "Προβολή επιλογών σειράς"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Κάνε κλικ στο εξώφυλλο για φόρτωση μεταδεδομένων στη φόρμα"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Σημαντική Σημείωση Kobo: τα διαγραμμένα βιβλία θα παραμείνουν σε οποιαδήποτε "
+#~ "συνδεδεμένη συσκευή Kobo."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "Τα βιβλία πρέπει πρώτα να αρχειοθετηθούν και να συγχρονιστεί η συσκευή πριν "
+#~ "μπορέσει να διαγραφεί με ασφάλεια το βιβλίο."

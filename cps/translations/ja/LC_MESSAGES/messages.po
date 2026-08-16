@@ -11493,20 +11493,11 @@ msgstr "ローカルから完全に削除されます"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the"
+" next time they sync. If that update cannot be recorded, the book may remain"
+" on a device."
 msgstr ""
-"Koboに関する重要な注意：削除された書籍はペアリングされたKoboデバイスに残りま"
-"す。Koboに関する重要な注意: 削除された本はどの連携されたKobo端末にも残りま"
-"す。"
 
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"書籍を安全に削除するには、まず書籍をアーカイブしてデバイスを同期する必要があ"
-"ります。本を安全に削除するためには、初めに本をアーカイブした上で端末と同期す"
-"る必要があります"
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -13163,3 +13154,18 @@ msgstr "既読/未読セクションを表示"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "カバー画像をクリックしてメタデータをフォームに読み込んでください"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Koboに関する重要な注意：削除された書籍はペアリングされたKoboデバイスに残りま"
+#~ "す。Koboに関する重要な注意: 削除された本はどの連携されたKobo端末にも残りま"
+#~ "す。"
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can safely "
+#~ "be deleted."
+#~ msgstr ""
+#~ "書籍を安全に削除するには、まず書籍をアーカイブしてデバイスを同期する必要があ"
+#~ "ります。本を安全に削除するためには、初めに本をアーカイブした上で端末と同期す"
+#~ "る必要があります"

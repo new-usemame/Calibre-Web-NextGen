@@ -18,6 +18,15 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The log now warns when a book cannot show highlights on a Kobo.** Some books
+  have a table of contents that points partway into a chapter file rather than at
+  the file itself. On a Kobo, every highlight made in such a book is stored
+  correctly and drawn nowhere — there is no error and nothing looks wrong, the
+  marks simply never appear. On one real library this affects 42% of books. After
+  a KEPUB is produced, the log now names the book and how many of its navigation
+  targets are affected, so the problem is at least visible. This does not fix the
+  rendering; that needs a conversion change with a migration story for highlights
+  people already hold.
 - **The delete warning no longer tells you the wrong thing about your Kobo.**
   It said deleted books would stay on any paired Kobo and that you had to
   archive and sync first. That stopped being true when deletions started sending

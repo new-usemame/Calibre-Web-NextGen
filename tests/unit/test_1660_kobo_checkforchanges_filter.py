@@ -8,7 +8,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from flask import Flask, jsonify
+from flask import Flask, jsonify, make_response
 
 import cps.readingservices as rs
 
@@ -68,6 +68,11 @@ def test_response_filter_handles_bare_ids_and_content_id_objects():
     ]
 
 
+def test_filter_requires_prevalidated_entries():
+    with pytest.raises(KeyError):
+        rs._filter_check_for_changes_entries([{"unexpected": OWNED}], {OWNED})
+
+
 def test_ownership_unknown_is_treated_as_owned():
     assert rs._check_for_changes_ownership_is_filtered(rs.OWNERSHIP_UNKNOWN) is True
     assert rs._check_for_changes_ownership_is_filtered(None) is False
@@ -88,6 +93,110 @@ def test_all_owned_batch_short_circuits_without_outbound_call(app, monkeypatch):
         response = _view(rs.handle_check_for_changes)()
 
     assert response.status_code == 200
+    assert response.get_json() == []
+
+
+def test_duplicate_foreign_ids_are_preserved_in_outbound_batch(app, monkeypatch):
+    outbound = []
+
+    def _proxy(*, data):
+        outbound.extend(json.loads(data))
+        return jsonify([])
+
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: None)
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", _proxy)
+    entries = _request_entries(FOREIGN, FOREIGN)
+    with app.test_request_context(
+        "/api/v3/content/checkforchanges", method="POST", json=entries,
+    ):
+        response = _view(rs.handle_check_for_changes)()
+
+    assert outbound == entries
+    assert response.status_code == 200
+    assert response.get_json() == []
+
+
+def test_null_content_id_short_circuits_full_handler(app, monkeypatch):
+    monkeypatch.setattr(
+        rs, "resolve_entitlement_ownership",
+        lambda _content_id: pytest.fail("null ContentId must not reach ownership lookup"),
+    )
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: pytest.fail("null ContentId must not contact Kobo"),
+    )
+    with app.test_request_context(
+        "/api/v3/content/checkforchanges", method="POST",
+        json=[{"ContentId": None, "etag": "etag-null"}],
+    ):
+        response = _view(rs.handle_check_for_changes)()
+
+    assert response.status_code == 200
+    assert response.get_json() == []
+
+
+def test_case_variant_owned_uuid_is_normalized_only_for_lookup(app, monkeypatch):
+    looked_up = []
+    original = f"  {{{OWNED.upper()}}}  "
+
+    def _get_book_by_uuid(content_id):
+        looked_up.append(content_id)
+        return SimpleNamespace(id=347) if content_id == OWNED else None
+
+    monkeypatch.setattr(rs.calibre_db, "get_book_by_uuid", _get_book_by_uuid)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: pytest.fail("normalized owned UUID must not contact Kobo"),
+    )
+    with app.test_request_context(
+        "/api/v3/content/checkforchanges", method="POST", json=_request_entries(original),
+    ):
+        response = _view(rs.handle_check_for_changes)()
+
+    assert looked_up == [OWNED]
+    assert response.status_code == 200
+    assert response.get_json() == []
+
+
+def test_foreign_content_id_is_forwarded_in_its_original_representation(app, monkeypatch):
+    outbound = []
+    original = "  {KOBO-Store-Content}  "
+
+    monkeypatch.setattr(rs.calibre_db, "get_book_by_uuid", lambda _content_id: None)
+
+    def _proxy(*, data):
+        outbound.extend(json.loads(data))
+        return jsonify([])
+
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", _proxy)
+    entries = _request_entries(original)
+    with app.test_request_context(
+        "/api/v3/content/checkforchanges", method="POST", json=entries,
+    ):
+        response = _view(rs.handle_check_for_changes)()
+
+    assert outbound == entries
+    assert response.get_json() == []
+
+
+def test_case_variant_owned_uuid_is_filtered_from_upstream_response(app, monkeypatch):
+    variant = f"{{{OWNED.upper()}}}"
+    looked_up = []
+
+    def _get_book_by_uuid(content_id):
+        looked_up.append(content_id)
+        return SimpleNamespace(id=347) if content_id == OWNED else None
+
+    monkeypatch.setattr(rs.calibre_db, "get_book_by_uuid", _get_book_by_uuid)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services", lambda **_kwargs: jsonify([variant]),
+    )
+    with app.test_request_context(
+        "/api/v3/content/checkforchanges", method="POST", json=_request_entries(FOREIGN),
+    ):
+        response = _view(rs.handle_check_for_changes)()
+
+    assert looked_up == [FOREIGN, OWNED]
     assert response.get_json() == []
 
 
@@ -144,6 +253,22 @@ def test_unrecognized_upstream_response_becomes_safe_empty_array(app, monkeypatc
     assert response.get_json() == []
 
 
+@pytest.mark.parametrize("status", [401, 403])
+def test_upstream_auth_failure_with_json_list_is_propagated(app, monkeypatch, status):
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: None)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: make_response(jsonify([OWNED]), status),
+    )
+    with app.test_request_context(
+        "/api/v3/content/checkforchanges", method="POST", json=_request_entries(FOREIGN),
+    ):
+        response = _view(rs.handle_check_for_changes)()
+
+    assert response.status_code == status
+    assert response.get_json() == [OWNED]
+
+
 def test_annotation_get_proxies_even_for_owned_content(app, monkeypatch):
     sentinel = object()
     monkeypatch.setattr(
@@ -177,14 +302,64 @@ def test_unauthenticated_annotation_get_does_not_resolve_ownership(app, monkeypa
         assert decorated() is sentinel
 
 
-def test_patch_upload_direction_still_proxies(app, monkeypatch):
+def test_empty_patch_for_unowned_content_still_proxies(app, monkeypatch):
     sentinel = object()
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: None)
+    monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations", method="PATCH",
         json={"updatedAnnotations": []},
     ):
         assert _view(rs.handle_annotations)(OWNED) is sentinel
+
+
+def test_patch_captures_updated_annotations_before_proxying(app, monkeypatch):
+    from cps.services import annotation_sync
+
+    sentinel = object()
+    book = SimpleNamespace(id=347, title="Flatland", identifiers=[])
+    user = SimpleNamespace(id=7, name="test-user", is_authenticated=True)
+    dispatched = []
+    annotation = {"id": "annotation-1", "type": "highlight"}
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(rs, "current_user", user)
+    monkeypatch.setattr(
+        annotation_sync, "dispatch_annotation_sync",
+        lambda *args, **kwargs: dispatched.append((args, kwargs)),
+    )
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations", method="PATCH",
+        json={"updatedAnnotations": [annotation]},
+    ):
+        assert _view(rs.handle_annotations)(OWNED) is sentinel
+
+    assert dispatched == [(([annotation], book, user), {"origin_device_id": None})]
+
+
+def test_patch_ownership_unknown_is_visible_and_not_proxied(app, monkeypatch, caplog):
+    monkeypatch.setattr(
+        rs, "resolve_entitlement_ownership", lambda _content_id: rs.OWNERSHIP_UNKNOWN,
+    )
+    monkeypatch.setattr(
+        rs, "log_annotation_data",
+        lambda *_args, **_kwargs: pytest.fail("unknown ownership must stop capture"),
+    )
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("uncaptured PATCH must not be acknowledged to Kobo"),
+    )
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations", method="PATCH",
+        json={"updatedAnnotations": [{"id": "annotation-1"}]},
+    ), caplog.at_level("ERROR"):
+        response = _view(rs.handle_annotations)(OWNED)
+
+    assert response.status_code == 503
+    assert response.get_json() == {"error": "Annotation capture temporarily unavailable"}
+    assert OWNED in caplog.text
 
 
 def test_patch_non_object_body_is_rejected_locally_and_still_proxies(
@@ -195,9 +370,10 @@ def test_patch_non_object_body_is_rejected_locally_and_still_proxies(
     sentinel = object()
     dispatched = []
     monkeypatch.setattr(
-        rs, "get_book_by_entitlement_id",
+        rs, "resolve_entitlement_ownership",
         lambda _content_id: SimpleNamespace(id=347, title="Flatland", identifiers=[]),
     )
+    monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
     monkeypatch.setattr(
         rs, "current_user", SimpleNamespace(id=7, name="test-user", is_authenticated=True),
@@ -223,9 +399,10 @@ def test_patch_non_list_annotation_batch_is_rejected_without_breaking_proxy(
 
     sentinel = object()
     monkeypatch.setattr(
-        rs, "get_book_by_entitlement_id",
+        rs, "resolve_entitlement_ownership",
         lambda _content_id: SimpleNamespace(id=347, title="Flatland", identifiers=[]),
     )
+    monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
     monkeypatch.setattr(
         rs, "current_user", SimpleNamespace(id=7, name="test-user", is_authenticated=True),

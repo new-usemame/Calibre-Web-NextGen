@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixtures.kepub_fixture import build_calibre_epub3_series_kepub
+
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "cover_enforcer.py"
 
@@ -222,12 +224,48 @@ def _write_exported_opf_without_series(path):
 
 
 def _series_metadata(package):
-    return {
-        element.get("name") or element.get("property")
+    metas = [
+        element
         for element in ET.fromstring(package).iter()
-        if element.tag.rsplit("}", 1)[-1] == "meta"
-        and (element.get("name") or element.get("property"))
-        in {"calibre:series", "calibre:series_index"}
+        if isinstance(element.tag, str)
+        and element.tag.rsplit("}", 1)[-1] == "meta"
+    ]
+    found = {
+        element.get("name")
+        for element in metas
+        if element.get("name") in {"calibre:series", "calibre:series_index"}
+    }
+    collections = {
+        element.get("id"): element
+        for element in metas
+        if element.get("property") == "belongs-to-collection"
+        and element.get("id")
+    }
+    series_ids = {
+        element.get("refines", "").removeprefix("#")
+        for element in metas
+        if element.get("property") == "collection-type"
+        and "".join(element.itertext()).strip().lower() == "series"
+    } & collections.keys()
+    for element in metas:
+        property_name = element.get("property")
+        refined_id = element.get("refines", "").removeprefix("#")
+        if element.get("id") in series_ids and property_name == "belongs-to-collection":
+            found.add(property_name)
+        elif refined_id in series_ids and property_name in {
+            "collection-type", "group-position"
+        }:
+            found.add(property_name)
+    return found
+
+
+def _metadata_properties(package):
+    return {
+        element.get("property")
+        for element in ET.fromstring(package).iter()
+        if isinstance(element.tag, str)
+        and element.tag.rsplit("}", 1)[-1] == "meta"
+        and element.get("property")
     }
 
 
@@ -355,6 +393,40 @@ def test_clearing_series_removes_residual_kepub_package_metadata(
     assert _series_metadata(after["OEBPS/content.opf"]) == set()
     assert _kobo_span_counts(before) == _kobo_span_counts(after)
     assert _kobo_span_counts(after)["OEBPS/chapter.xhtml"] == 3
+
+
+@pytest.mark.unit
+def test_clearing_real_kepubify_epub3_series_survives_calibre_comments(
+    enforcer_module, tmp_path, monkeypatch
+):
+    book_dir = tmp_path / "Author" / "Real kepubify shape (1372)"
+    book_dir.mkdir(parents=True)
+    kepub = build_calibre_epub3_series_kepub(book_dir / "book.kepub")
+    exported_opf = tmp_path / "library.opf"
+    _write_exported_opf_without_series(exported_opf)
+    before = _archive_contents(kepub)
+
+    _capture_kepub_command(
+        enforcer_module, monkeypatch, book_dir, exported_opf
+    )
+
+    after = _archive_contents(kepub)
+    assert before["OEBPS/content.opf"].count(b"<!--") == 2
+    assert _series_metadata(before["OEBPS/content.opf"]) == {
+        "belongs-to-collection",
+        "collection-type",
+        "group-position",
+    }
+    assert _series_metadata(after["OEBPS/content.opf"]) == set()
+    assert after["OEBPS/content.opf"].count(b"<!--") == 2
+    assert {"title-type", "file-as", "role"} <= _metadata_properties(
+        after["OEBPS/content.opf"]
+    )
+    assert b'id="id-6"' in after["OEBPS/content.opf"]
+    assert b'refines="#id-6"' in after["OEBPS/content.opf"]
+    assert _kobo_span_counts(before) == _kobo_span_counts(after)
+    for name in before.keys() - {"OEBPS/content.opf"}:
+        assert after[name] == before[name]
 
 
 @pytest.mark.unit

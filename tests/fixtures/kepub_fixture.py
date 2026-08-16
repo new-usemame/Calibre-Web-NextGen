@@ -46,6 +46,37 @@ OPF_TEMPLATE = """<?xml version="1.0" encoding="utf-8"?>
 """
 
 
+# Reduced from a real Calibre 9.11.0 EPUB package after `ebook-meta --series`
+# followed by kepubify 4.0.4. Calibre emits the comments and EPUB3 collection
+# refinements shown here; unrelated refinement types deliberately remain beside
+# the series so removal tests can detect an over-broad transform.
+CALIBRE_911_EPUB3_SERIES_OPF = """<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">issue-1372-real-shape</dc:identifier>
+    <dc:title id="title">Fixture Title</dc:title>
+    <dc:creator id="creator">Fixture Author</dc:creator>
+    <dc:language>eng</dc:language>
+    <!--Image: 671 x 1000 size=63885 q=50-->
+    <meta property="belongs-to-collection" id="id-5">Verify Series</meta>
+    <meta refines="#id-5" property="collection-type">series</meta>
+    <!--Chunk: size=22609 Split on div.chapter-->
+    <meta refines="#id-5" property="group-position">3</meta>
+    <meta refines="#title" property="title-type">main</meta>
+    <meta refines="#creator" property="file-as">Author, Fixture</meta>
+    <meta refines="#creator" property="role">aut</meta>
+    <meta property="belongs-to-collection" id="id-6">Fixture Set</meta>
+    <meta refines="#id-6" property="collection-type">set</meta>
+    <meta refines="#id-6" property="group-position">9</meta>
+  </metadata>
+  <manifest>
+    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="chapter"/></spine>
+</package>
+"""
+
+
 def _kobo_chapter_html(spans: list[tuple[str, str]]) -> str:
     """Build a kepub-style chapter where each tuple is
     ``(kobo_id, text)`` — emits ``<span id="kobo.<id>">text</span>``."""
@@ -151,4 +182,25 @@ def build_minimal_epub(dest: Path) -> Path:
         zf.writestr("OEBPS/content.opf", opf)
         for name, html in chapters.items():
             zf.writestr(f"OEBPS/{name}", html)
+    return dest
+
+
+def build_calibre_epub3_series_kepub(dest: Path) -> Path:
+    """Build the reduced real Calibre/kepubify shape used by #1372 tests."""
+    chapter = _kobo_chapter_html([
+        ("kobo.1.1", "First sentence."),
+        ("kobo.1.2", "Second sentence."),
+        ("kobo.1.3", "Third sentence."),
+    ])
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.comment = b"calibre-9.11-kepubify-4.0.4"
+        archive.writestr(
+            "mimetype",
+            b"application/epub+zip",
+            compress_type=zipfile.ZIP_STORED,
+        )
+        archive.writestr("META-INF/container.xml", CONTAINER_XML)
+        archive.writestr("OEBPS/content.opf", CALIBRE_911_EPUB3_SERIES_OPF)
+        archive.writestr("OEBPS/chapter.xhtml", chapter)
     return dest

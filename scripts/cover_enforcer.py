@@ -96,10 +96,14 @@ change_logs_dir = _CHANGE_LOGS_DIR
 metadata_temp_dir = _METADATA_TEMP_DIR
 
 _KEPUB_SERIES_META_NAMES = {"calibre:series", "calibre:series_index"}
+_KEPUB_SERIES_REFINEMENT_PROPERTIES = {"collection-type", "group-position"}
 
 
 def _local_name(element):
-    return element.tag.rsplit('}', 1)[-1]
+    tag = element.tag
+    if not isinstance(tag, str):
+        return None
+    return tag.rsplit('}', 1)[-1]
 
 
 def _series_meta_name(element):
@@ -113,10 +117,42 @@ def _strip_kepub_series_metadata(path):
     from cps.services.kepub_package_normalizer import rewrite_package_document
 
     def strip_series(package):
+        metas = [
+            element for element in package.iter()
+            if _local_name(element) == 'meta'
+        ]
+        collection_ids = {
+            element.get('id')
+            for element in metas
+            if element.get('property') == 'belongs-to-collection'
+            and element.get('id')
+        }
+        series_collection_ids = {
+            element.get('refines', '').removeprefix('#')
+            for element in metas
+            if element.get('property') == 'collection-type'
+            and ''.join(element.itertext()).strip().lower() == 'series'
+            and element.get('refines', '').startswith('#')
+        } & collection_ids
+
         removed = 0
         for parent in package.iter():
             for child in list(parent):
-                if _series_meta_name(child) in _KEPUB_SERIES_META_NAMES:
+                property_name = child.get('property') if _local_name(child) == 'meta' else None
+                refined_id = child.get('refines', '').removeprefix('#') if property_name else ''
+                remove_epub3_collection = (
+                    property_name == 'belongs-to-collection'
+                    and child.get('id') in series_collection_ids
+                )
+                remove_epub3_refinement = (
+                    property_name in _KEPUB_SERIES_REFINEMENT_PROPERTIES
+                    and refined_id in series_collection_ids
+                )
+                if (
+                    _series_meta_name(child) in _KEPUB_SERIES_META_NAMES
+                    or remove_epub3_collection
+                    or remove_epub3_refinement
+                ):
                     parent.remove(child)
                     removed += 1
         return bool(removed)

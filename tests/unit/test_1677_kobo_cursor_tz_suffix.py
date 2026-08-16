@@ -114,6 +114,42 @@ def test_mixed_timestamp_shapes_deliver_once_and_terminate(book_session):
 
 
 @pytest.mark.unit
+def test_suffixed_row_that_is_not_the_maximum_drains_forward(book_session):
+    """A suffixed row the cursor comes to REST on must not trap the walk.
+
+    The tip case is the one users report, but it is not the only way this
+    predicate fails.  Measured on a real library: the sync drains forward past
+    intermediate suffixed rows because a later row pushes the cursor beyond
+    them, so their broken equality arm is never consulted -- and only the row
+    holding the maximum, with nothing after it to rescue it, loops.  A future
+    change that breaks forward-draining would reintroduce re-downloads on a
+    different set of books, and a suite that only asserts the tip would stay
+    green.  ``limit=1`` forces the cursor to rest exactly on the suffixed
+    middle row, which is the state the aggregate mixed-shapes test only reaches
+    incidentally.
+    """
+    _seed_literal(book_session, [
+        (1, "2026-05-03 14:40:55.000001"),
+        (2, "2026-07-08 03:34:24.752033+00:00"),   # suffixed, NOT the maximum
+        (3, "2026-08-15 16:50:40.995056"),
+    ])
+
+    delivered, token = [], None
+    for _ in range(8):
+        entries, token = _sync_once(book_session, token, limit=1)
+        if not entries:
+            break
+        delivered.extend(entry["ChangedEntitlement"]["BookId"] for entry in entries)
+    else:
+        pytest.fail(
+            "walk did not terminate: the cursor is trapped on the suffixed "
+            "middle row instead of draining forward past it"
+        )
+
+    assert delivered == [1, 2, 3]
+
+
+@pytest.mark.unit
 def test_normalized_predicate_treats_suffixed_storage_as_cursor_equal(book_session):
     _seed_literal(book_session, [(7, "2026-08-15 16:50:40.995056+00:00")])
     cursor = datetime(2026, 8, 15, 16, 50, 40, 995056)

@@ -18,13 +18,23 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Kobo highlights now stay on the device when it syncs — the v4.1.36 fix did
+  not work.** A Kobo first asks which books have changed; if that answer names a
+  book, the reader downloads its annotation list and replaces every local
+  highlight and note with exactly what came back. v4.1.36 refused that download,
+  but the Kobo treats a refusal just like an empty list and still deletes
+  everything. This release keeps books served by NextGen out of the earlier
+  changed-books answer, so the destructive download never starts. New highlights
+  and notes still upload normally.
 - **Uploading a Readium `.lcpl` licence file no longer fails with “File type
-  isn't allowed to be uploaded to this server”.** Existing installations gain
-  `lcpl` in their Upload Format Allowlist once, without losing or reordering
-  their current choices; removing it afterward is respected. The ingest watcher
-  now dispatches LCPL files for processing without leaving upload sidecars
-  behind. With Auto-Convert disabled, ACSM tickets are no longer imported and
-  checksummed as books; they are preserved in `processed_books/failed` instead.
+  isn't allowed to be uploaded to this server”.** Installations that already
+  accept Adobe `.acsm` tickets inherit `lcpl` in their Upload Format Allowlist
+  once, without losing or reordering their current choices; an allowlist that
+  does not accept `.acsm` is left exactly as the administrator set it, and
+  removing `lcpl` afterward is respected. The ingest watcher now dispatches LCPL
+  files for processing without leaving upload sidecars behind. With Auto-Convert
+  disabled, ACSM tickets are no longer imported and checksummed as books; they
+  are preserved in `processed_books/failed` instead.
 - **Basic Configuration now saves when you press Enter in a single-line field,
   and "Convert missing KEPUBs now" works again.** Both did the same thing: that
   page was the one settings screen that refused the save it was trying to make,

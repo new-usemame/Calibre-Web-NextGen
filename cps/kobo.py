@@ -1114,6 +1114,9 @@ def _normalize_cover_uuid(image_id):
     return normalize_cover_uuid(image_id)
 
 
+_REQUESTING_DEVICE_ASPECT_G_KEY = "_kobo_requesting_device_aspect"
+
+
 def _requesting_device_aspect():
     """Aspect preset for the Kobo making *this* request, or None.
 
@@ -1128,46 +1131,59 @@ def _requesting_device_aspect():
       1. the `x-kobo-devicemodel` header on this request -- the device speaking
          for itself, and the only source that is certainly about *this* device;
       2. the model recorded for this user's Kobo, when the header is absent and
-         the answer is unambiguous (exactly one registered Kobo).
+         the answer is unambiguous (exactly one preset is implied).
 
     Returns None whenever the answer is not certain -- unknown model, no
     request context, no user, or more than one candidate device with no header
     to disambiguate. None means "keep the configured aspect", i.e. exactly
     today's behaviour, so this can only make covers more correct, never less.
     """
+    if not has_request_context():
+        return None
+
+    resolved = None
     try:
-        if not has_request_context():
-            return None
+        if hasattr(g, _REQUESTING_DEVICE_ASPECT_G_KEY):
+            return getattr(g, _REQUESTING_DEVICE_ASPECT_G_KEY)
 
         header_model = request.headers.get("x-kobo-devicemodel")
         preset = cover_preview.preset_for_device_model(header_model)
         if preset:
-            return preset
-
-        # No usable header. Fall back to what this user's Kobo told us
-        # earlier, but only when there is exactly one candidate -- with two
-        # Kobos on one account and no header, any pick is a coin toss and the
-        # configured value is the more honest answer.
-        user_id = getattr(current_user, "id", None)
-        if not user_id:
-            return None
-        models = [
-            row[0]
-            for row in ub.session.query(ub.Device.model)
-            .filter(ub.Device.user_id == user_id,
-                    ub.Device.kind == "kobo",
-                    ub.Device.active.is_(True))
-            .all()
-        ]
-        candidates = {cover_preview.preset_for_device_model(m) for m in models}
-        candidates.discard(None)
-        if len(candidates) == 1:
-            return candidates.pop()
-        return None
+            resolved = preset
+        else:
+            # No usable header. Fall back to what this user's Kobos told us
+            # earlier, but only when their mapped models imply one preset.
+            # Different presets with no header are ambiguous; the configured
+            # value is the more honest answer.
+            user_id = getattr(current_user, "id", None)
+            if user_id:
+                models = [
+                    row[0]
+                    for row in ub.session.query(ub.Device.model)
+                    .filter(ub.Device.user_id == user_id,
+                            ub.Device.kind == "kobo",
+                            ub.Device.active.is_(True))
+                    .all()
+                ]
+                candidates = {cover_preview.preset_for_device_model(m) for m in models}
+                candidates.discard(None)
+                if len(candidates) == 1:
+                    resolved = candidates.pop()
     except Exception as exc:
         # Cover shaping must never be the reason a sync or a cover fetch fails.
         log.debug("Kobo Sync: could not resolve a per-device cover aspect: %s", exc)
-        return None
+        resolved = None
+
+    # This function runs once per book on sync-metadata construction. Cache
+    # both a preset and the fail-safe None for this request so an absent or
+    # unrecognised header cannot turn into one Device query per book.
+    try:
+        setattr(g, _REQUESTING_DEVICE_ASPECT_G_KEY, resolved)
+    except Exception as exc:
+        # A cache failure must not make cover shaping fail. Resolution remains
+        # usable for this call; the next call will simply resolve again.
+        log.debug("Kobo Sync: could not cache the per-device cover aspect: %s", exc)
+    return resolved
 
 
 def _current_padding_settings():

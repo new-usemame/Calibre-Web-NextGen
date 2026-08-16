@@ -18,6 +18,22 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A book you are reading no longer un-downloads itself from your Kobo over and
+  over.** Whichever book in your synced set was modified most recently could be
+  re-sent to the reader as "changed" on every single sync, so the Kobo threw away
+  the copy it had and downloaded it again — indefinitely, and usually to the book
+  you were in the middle of. One household reader fetched the same title six times
+  in three days while every other book on the same shelf was fetched once. The
+  cause was a comparison between the sync cursor and Calibre's own
+  `last_modified` column: Calibre stores that value as text with a `+00:00`
+  timezone suffix, the cursor was compared without one, and SQLite compares text
+  character by character — so the newest book always looked newer than the marker
+  meant to say "already sent". Books whose timestamp had no fractional seconds hit
+  the same bug in reverse and could be skipped instead. A book joined the affected
+  set whenever metadata or cover enforcement rewrote it, so this got more likely
+  the more you used the library. Both comparisons and the ordering they depend on
+  are now normalised, so the timestamp's stored format can no longer decide what
+  your reader receives.
 - **Basic Configuration now saves when you press Enter in a single-line field,
   and "Convert missing KEPUBs now" works again.** Both did the same thing: that
   page was the one settings screen that refused the save it was trying to make,

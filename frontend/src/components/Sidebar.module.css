@@ -148,15 +148,18 @@
 
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
   :is(.nav, .navOpen) {
-    margin-right: -156px;
+    width: 64px;
+    overflow: hidden;
     z-index: var(--z-overlay);
     box-sizing: border-box;
-    clip-path: inset(0 156px 0 0);
-    transition: clip-path var(--dur-base) var(--ease-out);
+    transition:
+      width var(--dur-base) var(--ease-out),
+      margin-right var(--dur-base) var(--ease-out);
   }
 
   :is(.nav, .navOpen):is(:hover, :focus-within) {
-    clip-path: inset(0);
+    width: 220px;
+    margin-right: -156px;
   }
 
   :is(.item, .itemActive, .sectionTitle, .sectionTitleActive, .customizeBtn) > span,
@@ -164,14 +167,13 @@
   .magicShelfName {
     opacity: 0;
     white-space: nowrap;
-    transition:
-      opacity var(--dur-fast) var(--ease),
+    transition: opacity var(--dur-fast) var(--ease);
   }
 
   :is(.shelfItem, .shelfItemActive) {
     opacity: 0;
-    transition:
-      opacity var(--dur-fast) var(--ease),
+    visibility: hidden;
+    transition: opacity var(--dur-fast) var(--ease);
   }
 
   .magicShelfItem {
@@ -191,6 +193,7 @@
   :is(.nav, .navOpen):is(:hover, :focus-within)
     :is(.shelfItem, .shelfItemActive) {
     opacity: 1;
+    visibility: visible;
   }
 
   :is(.nav, .navOpen):is(:hover, :focus-within) .magicShelfIcon {

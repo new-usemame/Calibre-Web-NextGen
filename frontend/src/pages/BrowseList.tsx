@@ -91,8 +91,8 @@ function TagRow({ id, name, count, href }: { id: number | string; name: string; 
           {conflict && (
             <div className={styles.rowConfirm} role="alert">
               <span>{conflict.count === 1
-                ? t('“{name}” already exists on {count} book. Merge this tag into it?', { name: conflict.name, count: conflict.count })
-                : t('“{name}” already exists on {count} books. Merge this tag into it?', { name: conflict.name, count: conflict.count })}</span>
+                ? t('"{{name}}" already exists on {count} book. Merge this tag into it?', { name: conflict.name, count: conflict.count })
+                : t('"{{name}}" already exists on {count} books. Merge this tag into it?', { name: conflict.name, count: conflict.count })}</span>
               <button type="button" className={styles.rowAction} disabled={rename.isPending}
                 onClick={() => submit(conflict.name, true)}
                 aria-label={t('Merge into {name}', { name: conflict.name })}>
@@ -113,8 +113,8 @@ function TagRow({ id, name, count, href }: { id: number | string; name: string; 
       <li className={styles.rowEditing}>
         <div className={styles.rowConfirm} role="alert">
           <span>{count === 1
-            ? t('Delete “{name}”? It is removed from {count} book, which is kept.', { name, count })
-            : t('Delete “{name}”? It is removed from {count} books, which are kept.', { name, count })}</span>
+            ? t('Delete "{name}"? It is removed from {count} book, which is kept.', { name, count })
+            : t('Delete "{name}"? It is removed from {count} books, which are kept.', { name, count })}</span>
           <button type="button" className={styles.rowDanger} disabled={remove.isPending}
             aria-label={t('Confirm delete tag {name}', { name })}
             onClick={() => remove.mutate(undefined, {
@@ -175,7 +175,13 @@ export function BrowseList({ plural, title }: BrowseListProps) {
   // #1396 — the per-row rename/delete buttons (#973) only render for an editor,
   // and they are what crowds the name out of the track, so the wider track is
   // scoped to the same condition rather than applied to every browse list.
-  const gridClass = canEditTags ? `${styles.grid} ${styles.gridWithActions}` : styles.grid;
+  // For non-editor tag views we apply gridTags (same 300px floor) so the grid
+  // stays at ~4 columns instead of the dense ~6-column default.
+  const gridClass = canEditTags
+    ? `${styles.grid} ${styles.gridWithActions}`
+    : plural === 'tags'
+    ? `${styles.grid} ${styles.gridTags}`
+    : styles.grid;
 
   const items = useMemo(() => {
     const all = data?.items ?? [];

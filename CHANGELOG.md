@@ -42,8 +42,10 @@ is for things you can see or feel when running the app.
   scan finish so it does not return on the next restart. The book itself is
   still not repaired — this does not widen what the server rewrites — and a
   genuine read error, including a flaky network share, is still retried rather
-  than permanently skipping a temporarily unreadable book. Reported by
-  @iroQuai in #1696, whose workaround was deleting every `.kepub`.
+  than permanently skipping a temporarily unreadable book. If the server cannot
+  save the completion marker, the task now reports that failure instead of
+  silently claiming success before the scan runs again. Reported by @iroQuai in
+  #1696, whose workaround was deleting every `.kepub`.
 
 ## [v4.1.37] - 2026-08-17
 

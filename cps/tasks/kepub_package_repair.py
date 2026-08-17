@@ -375,7 +375,13 @@ class TaskKepubPackageRepair(CalibreTask):
                 except Exception:
                     config.config_kobo_kepub_package_repair_version = previous_version
                     raise
-                self._handleSuccess()
+                if config.config_kobo_kepub_package_repair_version != REPAIR_VERSION:
+                    self._handleError(N_(
+                        u"KEPUB repair finished, but the completion marker could not "
+                        u"be saved; the scan will run again"
+                    ))
+                else:
+                    self._handleSuccess()
         finally:
             _clear_pending(self)
 

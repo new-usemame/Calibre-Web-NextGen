@@ -356,6 +356,34 @@ def test_retryable_probe_failure_still_blocks_version_bump(
 
 
 @pytest.mark.unit
+def test_completion_marker_save_failure_does_not_report_success(
+    app_session, tmp_path, monkeypatch
+):
+    _package, queued = _install_task_harness(
+        monkeypatch,
+        tmp_path,
+        app_session,
+        repair_task.kepub_package_needs_normalization,
+    )
+
+    def swallow_failed_save():
+        # ConfigSQL.save() reloads the persisted value after swallowing an
+        # OperationalError, so the in-memory attribute returns to its old value.
+        repair_task.config.config_kobo_kepub_package_repair_version = 0
+
+    monkeypatch.setattr(repair_task.config, "save", swallow_failed_save)
+
+    assert repair_task.enqueue_startup_kepub_package_repair() is True
+    task = queued[-1]
+    task.run(None)
+
+    assert task.stat == STAT_FAIL
+    assert "completion marker could not be saved" in str(task.error)
+    assert repair_task.config.config_kobo_kepub_package_repair_version == 0
+    assert repair_task.enqueue_startup_kepub_package_repair() is True
+
+
+@pytest.mark.unit
 def test_unsupported_identity_columns_migrate_existing_app_db_idempotently():
     engine = create_engine("sqlite:///:memory:", future=True)
     with engine.begin() as connection:

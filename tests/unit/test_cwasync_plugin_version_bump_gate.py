@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""A changed KOReader plugin must declare a version ahead of the last release.
+"""A KOReader plugin publish owed by a release must declare that release's version.
 
 ``scripts/publish-cwasync-plugin.sh`` already refuses to publish a plugin whose
 declared version does not equal the tag it is publishing for. That check is
@@ -22,13 +22,31 @@ to the bump the publish depends on.
 **The invariant, and why it is shaped this way.** A bump is *not* owed on every
 release. The plugin deliberately holds its version while it is unchanged, so
 Updates Manager does not report a phantom update on app tags that never touched
-it (that regression is why ``plugin-release-asset.yml`` was deleted). So the rule
-keys off the source, not the calendar:
+it (that regression is why ``plugin-release-asset.yml`` was deleted). The gate
+therefore asks two independent questions:
 
-* plugin identical to what the newest release tag shipped -> no bump owed, and
-  the declared version must not have run ahead of that tag either.
-* plugin differs -> the next tag owes a publish, so the declared version must
-  already be greater than the newest released version.
+* plugin substance differs from the newest release tag -> a publish is owed, so
+  the declared version must equal the version being cut.
+* plugin substance is unchanged -> no source-driven bump is owed. Keep every
+  declaration the old gate accepted (at or behind the newest tag), and allow
+  exactly one new value: equality with the version being cut.
+
+The version being cut comes from the newest dated ``CHANGELOG.md`` section, not
+from git tags. The changelog is the branch-local, independent artifact rolled by
+the pre-tag bookkeeping commit, so it exists before the tag and pins the exact
+version this commit will ship. A tag-anchored upper bound rejects a legitimate
+pre-tag bump as a phantom update because the tag necessarily still names the
+previous release.
+
+More importantly, the tag baseline can drift from the publisher's real baseline:
+``publish-cwasync-plugin.sh`` compares against the dedicated plugin repository,
+not against this repository's newest tag. Once that repository falls behind, a
+publish is owed even when our plugin is identical to our newest tag. The old gate
+missed that state, the post-release publish rejected the stale declaration, and
+that rejection prevented the dedicated repository from advancing -- making the
+drift self-perpetuating rather than self-healing. Unit tests cannot query that
+repository, so allowing an unchanged plugin to catch up to (but never pass) the
+version being cut is the hermetic pre-tag rule that admits the required repair.
 
 "Differs" deliberately ignores the two ``version = "..."`` lines themselves.
 Those lines live inside the directory being compared, so a naive whole-directory
@@ -45,6 +63,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -54,9 +73,14 @@ pytestmark = pytest.mark.unit
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_RELPATH = "koreader/plugins/cwasync.koplugin"
 PLUGIN = REPO_ROOT / PLUGIN_RELPATH
+CHANGELOG = REPO_ROOT / "CHANGELOG.md"
 
 VERSION_RE = re.compile(r'version\s*=\s*"([0-9]+(?:\.[0-9]+)*)"')
 RELEASE_TAG_RE = re.compile(r"^v([0-9]+)\.([0-9]+)\.([0-9]+)$")
+RELEASE_HEADING_RE = re.compile(
+    r"^## \[v(\d+\.\d+\.\d+)\]\s+[-–]\s+\d{4}-\d{2}-\d{2}\s*$",
+    re.MULTILINE,
+)
 
 
 def _git(*args: str) -> subprocess.CompletedProcess:
@@ -144,6 +168,16 @@ def _newest_release_tag() -> str:
     return max(tags, key=lambda tag: _version_key(tag[1:]))
 
 
+def _version_being_cut() -> str:
+    """Read the pre-tag release version from the newest dated changelog section."""
+    versions = RELEASE_HEADING_RE.findall(CHANGELOG.read_text(encoding="utf-8"))
+    assert versions, (
+        "CHANGELOG.md has no dated vX.Y.Z release section, so the plugin "
+        "version gate cannot determine which release is being cut"
+    )
+    return versions[0]
+
+
 def test_meta_and_main_declare_the_same_version() -> None:
     """The publish script reads both files and requires them to agree."""
     meta = _declared_version("_meta.lua")
@@ -154,33 +188,87 @@ def test_meta_and_main_declare_the_same_version() -> None:
     )
 
 
-def test_changed_plugin_declares_a_version_ahead_of_the_last_release() -> None:
-    """A plugin that moved since the last tag must already be bumped past it.
+def test_plugin_declaration_matches_version_being_cut() -> None:
+    """The declaration must fit the source delta and the release being cut.
 
     Red before the #1427 bump: the plugin differed from v4.1.31 while declaring
     4.1.25, so the next tag would have reached the publish workflow's hard error
     with the tag already immovable.
     """
     newest_tag = _newest_release_tag()
-    newest_version = newest_tag[1:]
+    release_version = _version_being_cut()
     declared = _declared_version("_meta.lua")
 
     # Working tree vs the tag, so an uncommitted plugin edit counts as a change.
     if _plugin_substance_changed_since(newest_tag):
-        assert _version_key(declared) > _version_key(newest_version), (
+        assert declared == release_version, (
             f"The plugin has changed since {newest_tag}, so the next release "
             f"owes the dedicated repository a publish -- but it still declares "
-            f"{declared}. publish-cwasync-plugin.sh will hard-fail on a version "
-            f"that is not the tag, and it runs after the tag is published, "
-            f"which cannot be undone. Bump the version line in both "
+            f"{declared} while the release being cut is {release_version}. "
+            f"publish-cwasync-plugin.sh will hard-fail on a version that is not "
+            f"the tag, and it runs after the tag is published, which cannot be "
+            f"undone. Set the version line in both "
             f"{PLUGIN_RELPATH}/_meta.lua and {PLUGIN_RELPATH}/main.lua to the "
-            f"next release tag before cutting it."
+            f"version being cut before tagging it."
         )
     else:
-        assert _version_key(declared) <= _version_key(newest_version), (
-            f"The plugin is identical to the one {newest_tag} shipped, yet it "
-            f"declares {declared} -- ahead of the newest release. Updates "
-            f"Manager compares installed against latest, so a version that ran "
-            f"ahead of its own source offers devices an update that does not "
-            f"exist."
+        newest_version = newest_tag[1:]
+        assert (
+            _version_key(declared) <= _version_key(newest_version)
+            or declared == release_version
+        ), (
+            f"The plugin is identical in substance to the one {newest_tag} "
+            f"shipped, yet it declares {declared}, which is neither at or "
+            f"behind {newest_version} nor equal to the {release_version} "
+            f"release being cut. Updates Manager compares installed against "
+            f"latest, so a version no release will ship offers devices an "
+            f"update that does not exist."
         )
+
+
+def test_pretag_bump_to_version_being_cut_is_allowed(monkeypatch) -> None:
+    """A legitimate pre-tag bump must not be rejected as a phantom update."""
+    module = sys.modules[__name__]
+    monkeypatch.setattr(module, "_newest_release_tag", lambda: "v4.1.36")
+    monkeypatch.setattr(module, "_declared_version", lambda _filename: "4.1.37")
+    monkeypatch.setattr(
+        module, "_plugin_substance_changed_since", lambda _tag: False
+    )
+    monkeypatch.setattr(
+        module, "_version_being_cut", lambda: "4.1.37", raising=False
+    )
+
+    test_plugin_declaration_matches_version_being_cut()
+
+
+def test_changed_plugin_without_a_bump_is_rejected(monkeypatch) -> None:
+    """Keep the original #1427 failure mode pinned as an executed predicate."""
+    module = sys.modules[__name__]
+    monkeypatch.setattr(module, "_newest_release_tag", lambda: "v4.1.31")
+    monkeypatch.setattr(module, "_version_being_cut", lambda: "4.1.32")
+    monkeypatch.setattr(module, "_declared_version", lambda _filename: "4.1.25")
+    monkeypatch.setattr(
+        module, "_plugin_substance_changed_since", lambda _tag: True
+    )
+
+    with pytest.raises(AssertionError, match="still declares 4.1.25"):
+        test_plugin_declaration_matches_version_being_cut()
+
+
+@pytest.mark.parametrize("wrong_version", ["4.1.36.1", "4.1.38"])
+def test_plugin_cannot_declare_a_version_no_release_will_ship(
+    monkeypatch, wrong_version: str
+) -> None:
+    """Intermediate and future declarations both remain forbidden."""
+    module = sys.modules[__name__]
+    monkeypatch.setattr(module, "_newest_release_tag", lambda: "v4.1.36")
+    monkeypatch.setattr(module, "_version_being_cut", lambda: "4.1.37")
+    monkeypatch.setattr(
+        module, "_declared_version", lambda _filename: wrong_version
+    )
+    monkeypatch.setattr(
+        module, "_plugin_substance_changed_since", lambda _tag: False
+    )
+
+    with pytest.raises(AssertionError, match="no release will ship"):
+        test_plugin_declaration_matches_version_being_cut()

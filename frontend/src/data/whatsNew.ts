@@ -56,6 +56,90 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.37',
+    date: '2026-08-17',
+    items: [
+      {
+        title: 'Older Kobo books are repaired, and you are told which ones',
+        body: 'Books converted before the recent KEPUB packaging fix could still be unable to hold highlights. The library now repairs those existing files itself and shows a notice naming every affected book, including the honest warning that highlights already made against the broken structure cannot be recovered.',
+        category: 'Library',
+      },
+      {
+        title: 'Clear books left behind by older deletions',
+        body: 'Books deleted before Kobo archival tracking existed could remain on a reader through every sync and full resync. An administrator can now upload that device\'s KoboReader.sqlite file, review only the library-absent books CWNG can identify, and choose each one to archive on the next sync; samples are excluded and nothing starts selected.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo highlights stay put when the device syncs',
+        body: 'The v4.1.36 safeguard still let a Kobo begin a download that replaced its local highlights and notes with an empty answer. Books served by NextGen are now kept out of the earlier changed-books response, so that destructive download never starts while new annotations continue to upload normally.',
+        category: 'Sync',
+      },
+      {
+        title: 'Upload Readium licence files directly',
+        body: 'A Readium .lcpl licence used to be rejected as a forbidden file type or left stranded in the ingest folder. Servers that already accept Adobe .acsm tickets now accept LCPL once as well without disturbing a deliberately restricted allowlist; with Auto-Convert off, ACSM tickets are kept with failed ingests instead of being imported as books.',
+        category: 'Library',
+        link: { to: '/upload', label: 'Upload a book' },
+      },
+      {
+        title: 'The book you are reading stops downloading again and again',
+        body: 'The most recently changed book on a Kobo could be marked as new on every sync, making the device discard and fetch it repeatedly. Sync cursors now compare Calibre timestamps consistently, so stored timezone and fractional-second formats cannot trap or skip a book.',
+        category: 'Sync',
+      },
+      {
+        title: 'Basic Configuration saves instead of opening a 405 error',
+        body: 'Pressing Enter in a setting or choosing Convert missing KEPUBs now could discard the page and lead to a Method Not Allowed error. Both actions now use the normal save path, keep you on Settings, and show the usual confirmation.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open administration' },
+      },
+      {
+        title: 'The log identifies books whose Kobo highlights will be invisible',
+        body: 'Some tables of contents point into the middle of a chapter, so a Kobo stores each highlight but never draws it and gives no error. After conversion, the log now names the affected book and counts its problematic navigation targets so you can see the issue; this diagnoses the file but does not rewrite existing highlight locations.',
+        category: 'Sync',
+      },
+      {
+        title: 'The delete warning now matches what your Kobo will do',
+        body: 'The dialog still said a deleted book would stay on a paired Kobo and had to be archived first, even after automatic archival was added. It now explains that the reader is told on its next sync and that a failure to record the instruction can still leave the copy behind.',
+        category: 'Library',
+      },
+      {
+        title: 'Each Kobo gets covers shaped for its own screen',
+        body: 'A household with different Kobo models previously had one cover-padding shape for every device, so at least one reader received covers sized for somebody else\'s screen. Each authenticated request now uses the model that made it, while an unrecognised model keeps the administrator\'s configured fallback.',
+        category: 'Sync',
+      },
+      {
+        title: 'Full-library sync counts books once',
+        body: 'Libraries that keep both EPUB and KEPUB formats reported roughly twice as many changed entries and sent only about half a page of books per request. Sync now counts distinct books, which restores accurate logs and avoids the extra round trips without changing what is delivered.',
+        category: 'Sync',
+      },
+      {
+        title: 'Large Kobo libraries finish their first full sync',
+        body: 'With more than about 100 books pending, a Kobo could receive the first page repeatedly until thousands of duplicate entitlements made the server fail. Each completed page now advances the saved cursor, so the remaining library drains normally.',
+        category: 'Sync',
+      },
+      {
+        title: 'A newly paired Kobo gets the converted books it needs',
+        body: 'Background KEPUB conversion could remain marked complete after pairing added a new device\'s books, leaving most of them as plain EPUBs that could not reliably hold highlights. The progress marker now grows with the work set, so those new books are converted while the device waits.',
+        category: 'Sync',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'Removing a series removes it from the Kobo copy too',
+        body: 'Clearing a book\'s series updated its EPUB but left the old series visible in the KEPUB on a Kobo. The KEPUB metadata is now cleared safely without recutting the internal position markers that hold the reader\'s saved place.',
+        category: 'Library',
+      },
+      {
+        title: 'Highlight edits survive a malformed device timestamp',
+        body: 'When a Kobo sent an unreadable clock value, an edit to an existing highlight could silently lose its changed text, note, colour and location. An unreadable timestamp is now handled separately from a missing one, so the edit is applied.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOReader clients can distinguish an unknown book from an empty one',
+        body: 'The sync API returned the same empty list for a book the server did not know and for a known book with no highlights, leaving other clients unable to tell whether empty was authoritative. Those states now have distinct responses; the bundled plugin was already safe.',
+        category: 'Sync',
+      },
+    ],
+  },
+  {
     version: 'v4.1.36',
     date: '2026-08-15',
     items: [

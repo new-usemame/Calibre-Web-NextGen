@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.37] - 2026-08-17
+
 ### Added
 
 - **Your library now tells you when it has repaired a book, and which books were

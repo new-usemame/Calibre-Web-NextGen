@@ -16,6 +16,13 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Returning to the browser tab no longer refreshes every cached part of the
+  app.** Window focus no longer triggers an app-wide burst of server requests,
+  reducing unnecessary traffic for low-bandwidth connections while leaving
+  live polling, such as the task queue, running normally.
+
 ## [v4.1.38] - 2026-08-17
 
 ### Added

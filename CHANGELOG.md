@@ -28,6 +28,23 @@ is for things you can see or feel when running the app.
   The setting explains the same thing where it appears, so a new checkbox in your
   settings is not a feature you have missed.
 
+### Fixed
+
+- **A KEPUB the server cannot repair no longer makes every restart scan the
+  whole library again.** After upgrading to v4.1.37, a library containing an
+  older kepubify file with a missing `kobo.js`, or a book too large for the
+  repair safety limit, could leave the server at high CPU with `database is
+  locked` errors and a container that kept crashing. The repair pass treated
+  “I cannot repair this book” as “the whole job failed”, never recorded that it
+  had finished, and started the complete scan again on every restart, forever.
+  It now records a book it explicitly refuses once, reports it as
+  “unsupported” in the task list rather than as a failed repair, and lets the
+  scan finish so it does not return on the next restart. The book itself is
+  still not repaired — this does not widen what the server rewrites — and a
+  genuine read error, including a flaky network share, is still retried rather
+  than permanently skipping a temporarily unreadable book. Reported by
+  @iroQuai in #1696, whose workaround was deleting every `.kepub`.
+
 ## [v4.1.37] - 2026-08-17
 
 ### Added

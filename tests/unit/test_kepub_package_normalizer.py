@@ -156,7 +156,8 @@ def test_clean_repair_probe_reads_only_container_and_opf(tmp_path, monkeypatch):
 
     monkeypatch.setattr(normalizer.zipfile, "ZipFile", RecordingZipFile)
 
-    assert normalizer.kepub_package_needs_normalization(package) is False
+    inspection = normalizer.kepub_package_needs_normalization(package)
+    assert inspection.status == normalizer.PROBE_CLEAN
     assert read_names == ["META-INF/container.xml", "OPS/epb.opf"]
 
 
@@ -381,7 +382,10 @@ def test_total_size_is_rejected_before_any_member_read_or_crc_scan(
         result = (mod.kepub_package_needs_normalization(package) if probe
                   else mod.normalize_kepub_package(package))
 
-    assert result is None
+    if probe:
+        assert result.status == mod.PROBE_UNSUPPORTED
+    else:
+        assert result is None
     assert reads == []
     assert crc_scans == []
     assert "decompresses to more than" in caplog.text
@@ -418,5 +422,24 @@ def test_repair_probe_applies_the_opf_per_entry_bound(tmp_path, monkeypatch, cap
     monkeypatch.setattr(mod, "MAX_PACKAGE_DOCUMENT_BYTES", 8, raising=False)
 
     with caplog.at_level("WARNING"):
-        assert mod.kepub_package_needs_normalization(package) is None
+        inspection = mod.kepub_package_needs_normalization(package)
+        assert inspection.status == mod.PROBE_UNSUPPORTED
     assert "package document" in caplog.text
+
+
+@pytest.mark.unit
+def test_repair_probe_classifies_io_failure_as_retryable(tmp_path, monkeypatch):
+    from cps.services import kepub_package_normalizer as mod
+
+    package = tmp_path / "temporarily-unreadable.kepub"
+    package.write_bytes(b"placeholder")
+
+    def unavailable(_path):
+        raise PermissionError("network share is temporarily unavailable")
+
+    monkeypatch.setattr(mod.zipfile, "ZipFile", unavailable)
+
+    inspection = mod.kepub_package_needs_normalization(package)
+
+    assert inspection.status == mod.PROBE_RETRYABLE
+    assert "temporarily unavailable" in inspection.error_message

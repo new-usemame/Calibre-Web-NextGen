@@ -859,6 +859,10 @@ class KepubPackageRepair(Base):
     book_id = Column(Integer, nullable=False, index=True)
     book_uuid = Column(String(64), nullable=True)
     source_sha256 = Column(String(64), nullable=False)
+    source_size = Column(Integer, nullable=True)
+    source_mtime_ns = Column(Integer, nullable=True)
+    source_ctime_ns = Column(Integer, nullable=True)
+    repair_version = Column(Integer, nullable=True)
     repaired_sha256 = Column(String(64), nullable=True)
     backup_path = Column(String, nullable=True)
     status = Column(String(24), nullable=False)
@@ -2894,6 +2898,40 @@ def migrate_notice_tables(engine, _session):
     )
 
 
+def migrate_kepub_package_repair_disposition(engine, _session):
+    """Add nullable cheap-identity/version fields for terminal dispositions."""
+    with engine.begin() as conn:
+        table = conn.execute(text(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='kepub_package_repair'"
+        )).fetchone()
+        if table is None:
+            return
+        existing = {
+            row[1] for row in conn.execute(
+                text("PRAGMA table_info(kepub_package_repair)"))
+        }
+
+    columns = {
+        "source_size": "INTEGER",
+        "source_mtime_ns": "INTEGER",
+        "source_ctime_ns": "INTEGER",
+        "repair_version": "INTEGER",
+    }
+    for column, column_type in columns.items():
+        if column in existing:
+            continue
+        try:
+            _run_ddl_with_retry(
+                engine,
+                "ALTER TABLE kepub_package_repair ADD COLUMN {} {}".format(
+                    column, column_type),
+            )
+        except exc.OperationalError as error:
+            if "duplicate column" not in str(error).lower():
+                raise
+
+
 def migrate_kobo_annotation_sync_h1_columns(engine, _session):
     """H1 Phase 1: extend ``kobo_annotation_sync`` with position + source
     tracking columns for the Kobo highlight import / view / web-reader
@@ -3901,6 +3939,7 @@ def migrate_Database(_session):
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_book_cover_preview_table(engine, _session)
     migrate_notice_tables(engine, _session)
+    migrate_kepub_package_repair_disposition(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)
 
     # Ensure progress syncing tables in app.db (user-related tables).

@@ -4,6 +4,7 @@
 
 from collections import Counter
 import copy
+from dataclasses import dataclass
 import os
 import posixpath
 import re
@@ -18,6 +19,25 @@ from .. import logger
 
 
 log = logger.create()
+
+
+class UnsupportedKepubPackage(ValueError):
+    """An explicit package-content or declared-size refusal by the normalizer."""
+
+
+PROBE_CLEAN = "clean"
+PROBE_NEEDS_NORMALIZATION = "needs_normalization"
+PROBE_UNSUPPORTED = "unsupported"
+PROBE_RETRYABLE = "retryable"
+
+
+@dataclass(frozen=True)
+class KepubPackageInspection:
+    """Typed repair-probe outcome; failures are never inferred from log text."""
+
+    status: str
+    error_message: str | None = None
+
 
 _CONTAINER_PATH = "META-INF/container.xml"
 _CONTAINER_NS = "urn:oasis:names:tc:opendocument:xmlns:container"
@@ -64,7 +84,7 @@ def _reject_oversized_archive(infos):
     for info in infos:
         total += info.file_size
         if total > MAX_TOTAL_UNCOMPRESSED_BYTES:
-            raise ValueError(
+            raise UnsupportedKepubPackage(
                 "KEPUB decompresses to more than %d bytes; refusing to load it"
                 % MAX_TOTAL_UNCOMPRESSED_BYTES
             )
@@ -75,13 +95,16 @@ def _read_bounded_member(archive, name, limit, description):
     try:
         info = archive.getinfo(name)
     except KeyError as error:
-        raise ValueError("KEPUB is missing {}".format(description)) from error
+        raise UnsupportedKepubPackage(
+            "KEPUB is missing {}".format(description)) from error
     if info.file_size > limit:
-        raise ValueError("{} exceeds {} bytes".format(description, limit))
+        raise UnsupportedKepubPackage(
+            "{} exceeds {} bytes".format(description, limit))
     with archive.open(info, "r") as member:
         content = member.read(limit + 1)
     if len(content) > limit:
-        raise ValueError("{} exceeds {} bytes".format(description, limit))
+        raise UnsupportedKepubPackage(
+            "{} exceeds {} bytes".format(description, limit))
     return content
 
 
@@ -94,10 +117,12 @@ def _package_document_path(archive):
     rootfiles = container.xpath(
         "//container:rootfile/@full-path", namespaces={"container": _CONTAINER_NS})
     if not rootfiles:
-        raise ValueError("EPUB container does not name a package document")
+        raise UnsupportedKepubPackage(
+            "EPUB container does not name a package document")
     package_path = posixpath.normpath(rootfiles[0])
     if package_path.startswith("../") or package_path.startswith("/"):
-        raise ValueError("EPUB package document path escapes the archive")
+        raise UnsupportedKepubPackage(
+            "EPUB package document path escapes the archive")
     return package_path
 
 
@@ -125,7 +150,7 @@ def _toc_documents(opf_path, opf_bytes):
         _, href_path = split
         toc_path = _resolve_reference(opf_path, href_path)
         if toc_path.startswith("../") or toc_path.startswith("/"):
-            raise ValueError("EPUB TOC path escapes the archive")
+            raise UnsupportedKepubPackage("EPUB TOC path escapes the archive")
         yield toc_path, kind
 
 
@@ -199,12 +224,12 @@ def _split_local_reference(value):
     if parts.scheme or parts.netloc:
         return None  # genuinely external (http:, data:, //host/...) -- leave alone
     if parts.path.startswith("/"):
-        raise ValueError(
+        raise UnsupportedKepubPackage(
             "EPUB reference is an absolute path and cannot be contained: %r" % value
         )
     path = unquote(parts.path)
     if "\\" in path:
-        raise ValueError("EPUB reference contains a backslash")
+        raise UnsupportedKepubPackage("EPUB reference contains a backslash")
     return parts, path
 
 
@@ -246,7 +271,8 @@ def _plan_relocations(opf_path, opf_bytes, archive_names):
         if _inside_directory(source, opf_directory):
             continue
         if source not in archive_names:
-            raise ValueError("escaping manifest item is missing: {}".format(source))
+            raise UnsupportedKepubPackage(
+                "escaping manifest item is missing: {}".format(source))
         if source not in relocations:
             destination = _collision_safe_destination(source, opf_directory, occupied)
             relocations[source] = destination
@@ -554,20 +580,35 @@ def normalize_kepub_package(path):
 def kepub_package_needs_normalization(path):
     """Cheap read-only probe: inspect only container.xml and the package document.
 
-    Return ``True`` for an escaping manifest item, ``False`` for a clean package,
-    and ``None`` when the package cannot be inspected. The archive is never
-    materialized, preserving the clean-library fast path introduced in #1639.
+    Only this normalizer's explicit ``UnsupportedKepubPackage`` refusals are
+    terminal. ZIP, parser, decoding, EOF, I/O, and unexpected failures are
+    retryable because a short network-share read can surface as any of them.
+
+    The repair task may cache an explicit unsupported result using stat fields.
+    That cache is deliberately best-effort, not proof of content identity: an
+    undetected stat collision can defer one book until a future repair-version
+    bump. This is preferred to hashing a package we may not safely read.
+    The archive is never materialized, preserving the clean-library fast path.
     """
     path = os.fspath(path)
     try:
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
             _reject_oversized_archive(infos)
-            names = {info.filename for info in infos}
+            names = [info.filename for info in infos]
+            if len(names) != len(set(names)):
+                raise UnsupportedKepubPackage(
+                    "KEPUB contains duplicate ZIP member names")
             opf_path = _package_document_path(archive)
             opf_bytes = _read_bounded_member(
                 archive, opf_path, MAX_PACKAGE_DOCUMENT_BYTES, "package document")
-            return bool(_plan_relocations(opf_path, opf_bytes, names))
+            needs_normalization = bool(
+                _plan_relocations(opf_path, opf_bytes, set(names)))
+            return KepubPackageInspection(
+                PROBE_NEEDS_NORMALIZATION if needs_normalization else PROBE_CLEAN)
+    except UnsupportedKepubPackage as error:
+        log.warning("KEPUB package %s is unsupported by the normalizer: %s", path, error)
+        return KepubPackageInspection(PROBE_UNSUPPORTED, str(error))
     except Exception as error:
-        log.warning("Could not inspect KEPUB package %s: %s", path, error)
-        return None
+        log.warning("Could not inspect KEPUB package %s; will retry: %s", path, error)
+        return KepubPackageInspection(PROBE_RETRYABLE, str(error))

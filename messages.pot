@@ -6897,6 +6897,13 @@ msgstr ""
 
 #: cps/tasks/kepub_package_repair.py
 #, python-format
+msgid ""
+"%(clean)d clean, %(repaired)d repaired, %(unsupported)d unsupported, "
+"%(failed)d failed"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+#, python-format
 msgid "%(count)d KEPUB repair(s) failed"
 msgstr ""
 

@@ -33,6 +33,15 @@ is for things you can see or feel when running the app.
   after its response; it now sends `Connection: close` so HTTP/1.1 clients do
   not return that closing socket to their pool and try to reuse it.
 
+- **A comic dropped into the ingest folder now keeps the title, series, issue
+  number, author and language its `ComicInfo.xml` already carries.** Auto-ingest
+  ran a bare `calibredb add` for comic files, which does not read that embedded
+  metadata, so a `.cbz`/`.cbr` tagged by ComicTagger, Kapowarr, Mylar3 or a
+  well-tagged scene release landed as `<filename>` by `Unknown` — the same
+  guesswork an untagged file gets. Uploading the identical file by hand through
+  the web UI already read it correctly; ingest now does too. A comic with no
+  embedded tags is unaffected.
+
 ## [v4.1.39] - 2026-08-21
 
 ### Fixed

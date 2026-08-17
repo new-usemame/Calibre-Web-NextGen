@@ -5428,6 +5428,10 @@ msgid "Open Account"
 msgstr "Account openen"
 
 #: cps/spa_strings.py
+msgid "Open administration"
+msgstr "Beheer openen"
+
+#: cps/spa_strings.py
 msgid "Open classic reader"
 msgstr "Klassieke lezer openen"
 
@@ -6214,6 +6218,10 @@ msgstr "Bijwerken mislukt."
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Upload as cover"
 msgstr "Uploaden als omslag"
+
+#: cps/spa_strings.py
+msgid "Upload a book"
+msgstr "Een boek uploaden"
 
 #: cps/spa_strings.py
 msgid "Upload books"

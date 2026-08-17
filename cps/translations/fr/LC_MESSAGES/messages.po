@@ -5554,6 +5554,10 @@ msgid "Open Account"
 msgstr "Ouvrir le compte"
 
 #: cps/spa_strings.py
+msgid "Open administration"
+msgstr "Ouvrir l’administration"
+
+#: cps/spa_strings.py
 msgid "Open classic reader"
 msgstr "Ouvrir le lecteur classique"
 
@@ -6341,6 +6345,10 @@ msgstr "Échec de la mise à jour."
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Upload as cover"
 msgstr "Téléverser comme couverture"
+
+#: cps/spa_strings.py
+msgid "Upload a book"
+msgstr "Téléverser un livre"
 
 #: cps/spa_strings.py
 msgid "Upload books"

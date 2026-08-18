@@ -30,11 +30,16 @@ is for things you can see or feel when running the app.
   the highlights page, and the Markdown, CSV and JSON exports all show and
   name them correctly, including the pink and grey a Kobo can make but the web
   reader's own palette does not offer. Existing highlights are read correctly
-  as they are — nothing in your library is rewritten. A highlight whose colour
-  the app cannot work out is no longer labelled and drawn as yellow: it is
-  shown in a neutral shade and described as unknown, so a highlight you really
-  did make yellow is no longer indistinguishable from one whose colour was
-  lost. Adding a note to an imported highlight also works again — saving one on
+  as they are — nothing in your library is rewritten. One visible change comes
+  with that: the classic EPUB reader used to paint a highlight synced from a
+  device in the Kobo's own pale ink, because that raw value reached it
+  untouched while every other screen showed it yellow. It now paints the shade
+  this app uses for that colour everywhere else, so the same highlight looks
+  the same wherever you open it. A highlight whose colour the app cannot work
+  out is no longer labelled and drawn as yellow: it is shown in a neutral shade
+  and, on the highlights page, named as unknown — so a highlight you really did
+  make yellow is no longer indistinguishable from one whose colour was lost.
+  Adding a note to an imported highlight also works again — saving one on
   a pink or grey highlight used to fail silently, because the note editor sent
   the highlight's colour back with it and the server does not accept those as a
   choice.

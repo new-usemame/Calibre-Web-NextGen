@@ -98,3 +98,27 @@ def test_docker_marker_paths_remain_byte_identical(
         "/config/cwa_ingest_batch_dirty",
         "/config/cwa_ingest_batch_active",
     )
+
+
+def test_active_ingest_suppresses_manual_full_scan_nag(
+    ingest_processor, monkeypatch, tmp_path
+):
+    active_file = tmp_path / "custom_ingest_batch_active"
+    monkeypatch.setenv("CWA_INGEST_BATCH_ACTIVE_FILE", str(active_file))
+    monkeypatch.setattr(
+        duplicate_index,
+        "CWA_DB",
+        lambda: type(
+            "CacheDB",
+            (),
+            {"get_duplicate_cache": lambda self: {"last_scanned_book_id": 0}},
+        )(),
+    )
+    monkeypatch.setattr(duplicate_index, "_current_library_book_ids", lambda: {1})
+
+    assert duplicate_index.duplicate_index_needs_manual_full_scan({}) is True
+
+    ingest_processor.mark_ingest_batch_active()
+
+    assert active_file.is_file()
+    assert duplicate_index.duplicate_index_needs_manual_full_scan({}) is False

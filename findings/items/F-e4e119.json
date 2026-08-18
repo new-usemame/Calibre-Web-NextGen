@@ -4,8 +4,14 @@
   "created": "2026-08-18",
   "id": "F-e4e119",
   "refs": [],
+  "resolution": {
+    "commit": "08a44a980",
+    "date": "2026-08-18",
+    "note": "Fixed in #1731: ingest_bookmarks now routes through this module's own _commit_required, so a commit that returns False takes the same path as one that raises. Red/green: the rolled-back import reported 3 rows imported before the change.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "The KoboReader.sqlite import reports rows imported after a rolled-back commit"
 }

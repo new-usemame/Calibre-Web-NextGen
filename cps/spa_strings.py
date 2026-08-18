@@ -1081,6 +1081,7 @@ _("{n} highlights and notes were made on this device. They are not deleted. Thei
 _("{ok} of {total} assigned to {name}.")
 _("{ok} of {total} sources answered")
 _("…or paste an image URL")
+_("← Back")
 _("← Back to book")
 _("← Back to sign in")
 _("← Library")

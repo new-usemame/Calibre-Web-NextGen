@@ -21,6 +21,7 @@ import { getPrimaryReadTarget } from '../lib/readerTarget';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { BookUserNotices } from '../components/UserNotices';
+import { backTarget } from '../lib/backLink';
 
 /* `fetchpriority` is a plain DOM attribute. react-dom 18.3 has no knowledge of
    it, so the camelCase `fetchPriority` that @types/react declares would trip its
@@ -265,6 +266,7 @@ export function BookDetail() {
   const reloadMetadata = useReloadMetadata(id);
   const [, navigate] = useLocation();
   const me = useMe().data;
+  const bookBackTarget = backTarget();
   // The send-to-e-reader button only renders when mail is configured + the user
   // can download, so defer the account fetch (which carries the saved e-reader
   // address used to prefill the recipient field, #715) until that's possible.
@@ -284,7 +286,9 @@ export function BookDetail() {
   if (error || !book) {
     return (
       <main className={styles.container}>
-        <Link href="/" className={styles.back}>{t('← Library')}</Link>
+        <Link href={bookBackTarget.href} className={styles.back}>
+          {t(bookBackTarget.isOrigin ? '← Back' : '← Library')}
+        </Link>
         <EmptyState message={error instanceof Error ? error.message : t('Book not found.')} />
       </main>
     );
@@ -300,7 +304,9 @@ export function BookDetail() {
 
   return (
     <main className={styles.container}>
-      <Link href="/" className={styles.back}>{t('← Library')}</Link>
+      <Link href={bookBackTarget.href} className={styles.back}>
+        {t(bookBackTarget.isOrigin ? '← Back' : '← Library')}
+      </Link>
 
       <BookUserNotices bookId={book.id} />
 

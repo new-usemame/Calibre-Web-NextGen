@@ -20,8 +20,9 @@
         red:    "rgba(217, 83, 79, 0.40)",
         green:  "rgba(92, 184, 92, 0.40)",
         blue:   "rgba(91, 192, 222, 0.40)",
-        // The Kobo palette also has pink and grey (F-5769c9); without them
-        // every greyscale-device highlight falls through to yellow.
+        // The Kobo palette also has pink and grey (F-5769c9). Without entries
+        // for them, every highlight from a greyscale device would miss this
+        // table and take the fallback below.
         pink:   "rgba(232, 175, 207, 0.40)",
         grey:   "rgba(160, 160, 160, 0.40)"
     };

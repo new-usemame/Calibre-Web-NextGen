@@ -274,7 +274,12 @@
     // --- Phase 1: create / edit / delete -----------------------------------
 
     var appliedCfi = {};          // annotation_id -> the cfi actually drawn (for removal on edit/delete)
-    var CREATE_COLORS = ["yellow", "red", "green", "blue"];  // the set a Kobo round-trips
+    // The colours this reader OFFERS when creating a highlight. NOT "the set a
+    // Kobo round-trips" — that claim was wrong: a Kobo round-trips
+    // yellow/pink/blue/green/grey and has no red at all (F-5769c9). It must
+    // match cps.services.annotation_colors.WEBREADER_COLOR_NAMES, which is what
+    // the server accepts on create and edit.
+    var CREATE_COLORS = ["yellow", "red", "green", "blue"];
 
     function csrfToken() {
         var el = document.querySelector("input[name='csrf_token']");

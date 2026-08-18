@@ -4,8 +4,14 @@
   "created": "2026-08-18",
   "id": "F-5769c9",
   "refs": [],
+  "resolution": {
+    "commit": "a751f648cf423a5bcefc104407bede7c1b021a31",
+    "date": "2026-08-18",
+    "note": "Fixed by #1737 (squashed as a751f648c). cps/services/annotation_colors.py is now the one hex<->name table, measured on the operator's Clara BW: Bookmark.Color 0-4 -> #F6F3B3 yellow / #E8AFCF pink / #B2E1E8 blue / #C6E09E green / #A0A0A0 grey. The column stores the canonical wire hex and every read path normalises to a display name; an unrecognised code resolves to NULL rather than an invented yellow, and no migration ships because the normaliser tolerates all three legacy vocabularies on read. RED/GREEN: the author's suite went 86 failed -> 213 passed with the fix stashed and restored, and the same A/B was re-observed on a live container - main answered /annotations/11/data.json with the raw hex and 'yellow' for a NULL column, this branch answers yellow/pink/blue/green/grey and null, on identical rows and the identical request. VERIFIED IN A BROWSER, by computed style, on all six render surfaces (SPA highlights page, SPA reader marks and drawer, classic annotations_view.html, legacy epub/PDF/comic renderers): each wire hex renders as its intended colour, a NULL renders as the #d0cbc2 neutral (var(--border) on the highlights page) and is never repainted yellow, and the 4 legacy webreader 'red' rows still read back red. Driven through the real /annotations/import upload for Color 0,1,2,3,4,7,NULL - stored as the five hexes plus two NULLs, displayed as the five names plus two nulls. Note-save on an imported grey highlight now PATCHes 200 with no colour in the body, where the payload main's client built for the same row (highlight_color 'a0a0a0') still 400s bad_color. Deferred, unchanged: F-0eb843 (the KOReader cwasync Lua provider still holds the wrong table). New: F-8efa11 (safeColorToken can strip an unknown token into a palette name).",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "The KoboReader.sqlite import assigns the wrong highlight colour, and every Clara BW highlight imports as yellow"
 }

@@ -1003,31 +1003,44 @@ jobs:
           echo "Is frontend PR:    $IS_FRONTEND_PR"
           echo "Is main push:      $IS_MAIN_PUSH"
 
-          # A required summary must positively prove that every hard-gated
-          # main-push lane completed. Reject skipped/cancelled as well as
-          # failure; otherwise a later broken job condition silently turns
-          # coverage off while this required check stays green.
+          # A required summary must positively prove that every hard-gated lane
+          # completed. Reject skipped/cancelled as well as failure; otherwise a
+          # later broken job condition silently turns coverage off while this
+          # required check stays green.
+          #
+          # `fast-tests` and `frontend-build` carry no `if:`, so they run on
+          # EVERY trigger of this workflow. Any result other than success means
+          # the lane vouched for nothing, and neither can this summary.
+          #
+          # `cancelled` is the state that actually bites, and it is not
+          # hypothetical: a job killed by its own `timeout-minutes` is reported
+          # as **cancelled**, never as `failure`. OBSERVED 2026-08-18 on #1725 —
+          # the `Install system dependencies` apt step stalled for 24m46s, the
+          # job's 25-minute cap fired, `Fast Tests` came back `cancelled`, and
+          # this summary exited 0 having executed no tests at all. This
+          # strictness already existed but was scoped to IS_MAIN_PUSH, so it
+          # never covered the pull-request path — which is where every merge is
+          # gated. Scoping a gate to the rarer event is how it goes unnoticed.
+          if [[ "${{ needs.fast-tests.result }}" != "success" ]]; then
+            echo "❌ Fast tests did not succeed"
+            echo "   Actual result: ${{ needs.fast-tests.result }}"
+            exit 1
+          fi
+
+          # The SPA bundle is a hard gate: a broken TypeScript/Vite build ships
+          # an empty/broken frontend, so it blocks the merge like fast-tests.
+          if [[ "${{ needs.frontend-build.result }}" != "success" ]]; then
+            echo "❌ Frontend build did not succeed"
+            echo "   Actual result: ${{ needs.frontend-build.result }}"
+            exit 1
+          fi
+
           if [[ "$IS_MAIN_PUSH" == "true" ]]; then
-            if [[ "${{ needs.fast-tests.result }}" != "success" ]]; then
-              echo "❌ Fast tests did not succeed on a push to main"
-              echo "   Actual result: ${{ needs.fast-tests.result }}"
-              exit 1
-            fi
-            if [[ "${{ needs.frontend-build.result }}" != "success" ]]; then
-              echo "❌ Frontend build did not succeed on a push to main"
-              echo "   Actual result: ${{ needs.frontend-build.result }}"
-              exit 1
-            fi
             if [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
               echo "❌ SPA e2e suite did not succeed on a push to main"
               echo "   Actual result: ${{ needs.e2e-tests.result }}"
               exit 1
             fi
-          fi
-
-          if [[ "${{ needs.fast-tests.result }}" == "failure" ]]; then
-            echo "❌ Fast tests failed"
-            exit 1
           fi
 
           # Both path-derived gates read changed_paths outputs: IS_BUILD_PR
@@ -1038,17 +1051,11 @@ jobs:
           # #1130 is about, one level up. Fail loudly instead of inferring
           # "nothing changed" from "we could not tell what changed".
           if [[ "${{ github.event_name }}" == "pull_request" \
-                && "${{ needs.changed_paths.result }}" == "failure" ]]; then
-            echo "❌ Detect changed paths failed — the build and SPA e2e gates"
-            echo "   are both derived from its outputs, so neither can be"
-            echo "   trusted on this run."
-            exit 1
-          fi
-
-          # The SPA bundle is a hard gate: a broken TypeScript/Vite build ships
-          # an empty/broken frontend, so it blocks the merge like fast-tests.
-          if [[ "${{ needs.frontend-build.result }}" == "failure" ]]; then
-            echo "❌ Frontend build failed"
+                && "${{ needs.changed_paths.result }}" != "success" ]]; then
+            echo "❌ Detect changed paths did not succeed — the build and SPA"
+            echo "   e2e gates are both derived from its outputs, so neither"
+            echo "   can be trusted on this run."
+            echo "   Actual result: ${{ needs.changed_paths.result }}"
             exit 1
           fi
 

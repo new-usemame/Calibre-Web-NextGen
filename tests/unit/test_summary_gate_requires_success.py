@@ -119,6 +119,58 @@ def test_integration_stays_advisory_on_main():
     assert rc == 0
 
 
+@pytest.mark.parametrize("result", ["failure", "skipped", "cancelled"])
+def test_pull_request_requires_fast_tests_success(result):
+    """The PR path must reject every non-success fast-tests result, not just
+    `failure`.
+
+    `cancelled` is not a hypothetical. A job killed by its own
+    `timeout-minutes` is reported as **cancelled**, never as failure. OBSERVED
+    2026-08-18 on #1725: the `Install system dependencies` apt step stalled for
+    24m46s, the job's 25-minute cap fired, `Fast Tests` came back `cancelled`,
+    and this summary — the single required check branch protection reads —
+    exited 0 having run no tests at all.
+
+    The strictness already existed for pushes to main and was never extended to
+    pull requests, which is where essentially every merge is gated.
+    """
+    rc, out = _run(event="pull_request", ref="refs/heads/topic",
+                   fast=result, build="success", integration="skipped",
+                   e2e="skipped")
+    assert rc == 1, (
+        f"pull request with fast-tests={result} must fail the summary; got rc=0\n{out}"
+    )
+    assert result in out, "the summary should name the actual result it rejected"
+
+
+@pytest.mark.parametrize("result", ["failure", "skipped", "cancelled"])
+def test_pull_request_requires_frontend_build_success(result):
+    """Same reasoning for the SPA bundle: it has no `if:`, so it runs on every
+    PR, and any result other than success means it did not vouch for anything.
+    """
+    rc, out = _run(event="pull_request", ref="refs/heads/topic",
+                   fast="success", build=result, integration="skipped",
+                   e2e="skipped")
+    assert rc == 1, (
+        f"pull request with frontend-build={result} must fail the summary; got rc=0\n{out}"
+    )
+
+
+@pytest.mark.parametrize("result", ["skipped", "cancelled"])
+def test_pull_request_requires_changed_paths_success(result):
+    """`changed_paths` feeds BOTH path-derived gates. The workflow already
+    rejects its `failure`; a cancelled or skipped run leaves its outputs just as
+    empty, so both gates silently read "not applicable" and this summary would
+    vouch for a run that gated nothing.
+    """
+    rc, out = _run(event="pull_request", ref="refs/heads/topic",
+                   fast="success", build="success", integration="skipped",
+                   e2e="skipped", changed_paths=result)
+    assert rc == 1, (
+        f"pull request with changed_paths={result} must fail the summary; got rc=0\n{out}"
+    )
+
+
 def test_non_frontend_pr_still_passes_with_e2e_skipped():
     """The PR path is deliberately path-gated: a backend-only PR skips the SPA
     suite by design and must not be blocked by this change."""

@@ -403,7 +403,21 @@ def _apply_result(st, result):
 
 def _upsert_sync_target(session, annotation, target_name, result):
     """Find-or-create the (annotation_id, target) row, race-safe under
-    concurrent INSERT via IntegrityError recovery."""
+    concurrent INSERT via IntegrityError recovery.
+
+    The INSERT is isolated behind a SAVEPOINT, and that is load-bearing rather
+    than tidiness. This runs BEFORE ``ub.session_commit()`` and in the same
+    transaction as the annotation ``_upsert_annotation`` has just flushed but
+    not committed, so recovering from the race with a bare
+    ``session.rollback()`` discarded the user's annotation along with the
+    losing target row — after which the caller committed, logged no failure,
+    and the device was told its upload succeeded. Since the device only ever
+    uploads a delta, that content had nothing left to recover it from.
+
+    A SAVEPOINT contains only what is flushed after it, which is exactly the
+    precondition ``cps/kobo.py`` documents for #1318: the annotation is already
+    flushed, so it survives the savepoint being rolled back.
+    """
     from cps import ub
     st = (
         session.query(ub.AnnotationSyncTarget)
@@ -425,12 +439,14 @@ def _upsert_sync_target(session, annotation, target_name, result):
             created_at=_now(),
             updated_at=_now(),
         )
-        session.add(st)
         try:
-            session.flush()
+            with session.begin_nested():
+                session.add(st)
+                session.flush()
         except IntegrityError:
-            # Concurrent INSERT — recover by re-reading + applying result.
-            session.rollback()
+            # Concurrent INSERT — the savepoint (and only the savepoint) is
+            # rolled back, so the flushed annotation is still staged. Recover
+            # by re-reading + applying result.
             st = (
                 session.query(ub.AnnotationSyncTarget)
                 .filter(

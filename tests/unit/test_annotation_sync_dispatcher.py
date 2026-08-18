@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from cps import ub
@@ -258,3 +258,103 @@ def test_database_failure_rolls_back_only_that_member_and_later_members_continue
     assert [row.annotation_id for row in s.query(ub.Annotation).order_by(ub.Annotation.id)] == [
         "uuid-before", "uuid-after",
     ]
+
+
+def test_sync_target_insert_race_does_not_discard_the_annotation(
+    patched_session, monkeypatch,
+):
+    """A losing race on the (annotation_id, target) INSERT must not take the
+    user's annotation with it.
+
+    ``_upsert_sync_target`` runs BEFORE ``ub.session_commit()`` and in the same
+    transaction as the annotation ``_upsert_annotation`` has flushed but not
+    committed. Recovering from the concurrent INSERT with a bare
+    ``session.rollback()`` therefore discards the annotation as well — and the
+    dispatcher then commits, reports no failure, and the device is told its
+    upload succeeded. The content is gone with nothing to recover it from,
+    because the device only ever uploads a delta.
+
+    Same precondition ``cps/kobo.py`` already documents for #1318: a SAVEPOINT
+    contains only what is flushed after it, so isolating just the target INSERT
+    leaves the annotation intact.
+    """
+    s, user = patched_session
+    register_handler(StubHandler())
+    original_flush = s.flush
+    raced = {"done": False}
+
+    def flush_losing_the_target_race(*args, **kwargs):
+        if not raced["done"] and any(
+            isinstance(obj, ub.AnnotationSyncTarget) for obj in s.new
+        ):
+            raced["done"] = True
+            raise IntegrityError(
+                "INSERT INTO annotation_sync_target", {},
+                RuntimeError("UNIQUE constraint failed"),
+            )
+        return original_flush(*args, **kwargs)
+
+    monkeypatch.setattr(s, "flush", flush_losing_the_target_race)
+
+    dispatch_annotation_sync(
+        [_payload("uuid-race", text_="must survive the target race")], _book(), user,
+    )
+
+    assert raced["done"], "the test did not actually exercise the INSERT race"
+    rows = s.query(ub.Annotation).all()
+    assert [r.annotation_id for r in rows] == ["uuid-race"], (
+        "the annotation was discarded by the sync-target race recovery"
+    )
+    assert rows[0].highlighted_text == "must survive the target race"
+
+
+def test_sync_target_insert_race_still_applies_the_result_to_the_winning_row(
+    patched_session, monkeypatch,
+):
+    """Positive control for the savepoint. Isolating the INSERT must not cost
+    the recovery: when a genuine competing row exists, the loser still has to
+    find it and apply its result. Without this, a change that simply stopped
+    inserting would satisfy the loss test above and quietly break the race
+    handling it exists to preserve.
+    """
+    s, user = patched_session
+    register_handler(StubHandler())
+
+    # Give the competing INSERT a valid annotation to reference, then clear the
+    # target row so the next dispatch takes the create path again.
+    dispatch_annotation_sync([_payload("uuid-a", text_="v1")], _book(), user)
+    annotation_id = s.query(ub.Annotation).one().id
+    s.query(ub.AnnotationSyncTarget).delete()
+    s.commit()
+
+    original_begin_nested = s.begin_nested
+    injected = {"done": False}
+
+    def begin_nested_after_a_competitor_commits(*args, **kwargs):
+        # Land the competing row in the OUTER transaction, i.e. before the
+        # savepoint opens — which is where another session's committed INSERT
+        # would already be by the time we lose to it.
+        if not injected["done"]:
+            injected["done"] = True
+            now = datetime.now(timezone.utc)
+            s.execute(
+                text(
+                    "INSERT INTO annotation_sync_target "
+                    "(annotation_id, target, status, created_at, updated_at) "
+                    "VALUES (:a, 'stub', 'pending', :t, :t)"
+                ),
+                {"a": annotation_id, "t": now},
+            )
+        return original_begin_nested(*args, **kwargs)
+
+    monkeypatch.setattr(s, "begin_nested", begin_nested_after_a_competitor_commits)
+
+    dispatch_annotation_sync([_payload("uuid-a", text_="v2")], _book(), user)
+
+    assert injected["done"], "the test did not actually exercise the INSERT race"
+    targets = s.query(ub.AnnotationSyncTarget).all()
+    assert len(targets) == 1, "the race must converge on exactly one target row"
+    assert targets[0].status == "synced", (
+        "the loser must apply its result to the winning row"
+    )
+    assert s.query(ub.Annotation).one().highlighted_text == "v2"

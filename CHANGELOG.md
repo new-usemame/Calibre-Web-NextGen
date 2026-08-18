@@ -18,6 +18,23 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Highlights imported from a Kobo are the colour you actually made them.**
+  Every highlight pulled in from a `KoboReader.sqlite` upload arrived yellow on
+  a black-and-white reader such as a Clara BW, and on a colour reader the
+  greens came in blue and the blues came in green. The device records a
+  highlight's colour as a number, and the number-to-colour table this app was
+  using did not match what the hardware actually writes: it had no entry at all
+  for the shade every greyscale reader uses, so those all fell through to
+  yellow, and two of the four it did know were swapped. Highlights now import
+  as yellow, pink, blue, green or grey to match the device, and the reader,
+  the highlights page, and the Markdown, CSV and JSON exports all show and
+  name them correctly, including the pink and grey a Kobo can make but the web
+  reader's own palette does not offer. Existing highlights are read correctly
+  as they are — nothing in your library is rewritten — and a colour the app
+  cannot identify is now left blank instead of being shown as yellow, so a
+  highlight you really did make yellow is no longer indistinguishable from one
+  whose colour was lost.
+
 - **Active imports no longer incorrectly ask for a manual duplicate scan on
   bare-metal installs or when ingest marker paths are customized.** Both the
   importer and the duplicate index now look for the batch markers in the same

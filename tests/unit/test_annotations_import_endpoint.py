@@ -120,14 +120,14 @@ class TestIngestCounts:
             book_lookup=book_lookup, commit=session.commit,
         )
 
-        # bm-002 has all the bells: multi-span, typed note, red color.
+        # bm-002 has all the bells: multi-span, typed note, Color=1 (pink).
         row = session.query(ub.Annotation).filter_by(
             annotation_id="bm-002"
         ).one()
         assert row.user_id == 7
         assert row.book_id == 348
         assert row.highlighted_text == "Four legs good, two legs bad."
-        assert row.highlight_color == "red"
+        assert row.highlight_color == "#E8AFCF"   # Color=1 is pink (F-5769c9)
         assert row.note_text == "my favorite line"
         assert row.start_container_path == "span#kobo\\.1\\.2"
         assert row.end_container_path == "span#kobo\\.1\\.3"
@@ -137,8 +137,19 @@ class TestIngestCounts:
         assert row.chapter_progress == 0.024
 
     def test_color_round_trips(self, memory_db, synthetic_db):
+        """Device integer -> what lands in the column -> what the reader is told.
+
+        This asserted ``bm-002 == "red"`` and ``bm-003 == "green"``, which was
+        the importer's own lookup table restated back at itself — nothing round
+        tripped and the name was aspirational. Both values were wrong against
+        the hardware (finding F-5769c9): Color=1 is pink, Color=2 is blue, and
+        Kobo has no red at all. Colour 4, the one a greyscale device writes for
+        every highlight, is covered in
+        tests/unit/test_kobo_highlight_colour_vocabulary.py because the
+        canonical fixture does not carry it.
+        """
         from cps import ub
-        from cps.annotations import ingest_bookmarks
+        from cps.annotations import _data_json_row, ingest_bookmarks
 
         session, _, _ = memory_db
         book_lookup = _make_book_lookup({
@@ -150,9 +161,19 @@ class TestIngestCounts:
         )
         rows = {r.annotation_id: r for r in
                 session.query(ub.Annotation).filter_by(user_id=7).all()}
-        assert rows["bm-001"].highlight_color == "yellow"
-        assert rows["bm-002"].highlight_color == "red"
-        assert rows["bm-003"].highlight_color == "green"
+
+        # Stored: the canonical wire hex the device itself uses.
+        assert rows["bm-001"].highlight_color == "#F6F3B3"   # Color=0
+        assert rows["bm-002"].highlight_color == "#E8AFCF"   # Color=1
+        assert rows["bm-003"].highlight_color == "#B2E1E8"   # Color=2
+
+        # Displayed: the name the reader renders. This is the half that was
+        # missing — the old assertions never left the storage layer.
+        displayed = {k: _data_json_row(v, None, None)["highlight_color"]
+                     for k, v in rows.items()}
+        assert displayed["bm-001"] == "yellow"
+        assert displayed["bm-002"] == "pink"
+        assert displayed["bm-003"] == "blue"
 
 
 # ---------------------------------------------------------------------------

@@ -298,13 +298,16 @@ class TestDataJsonRow:
         # cfi_range is still carried (sidebar jump fallback / export parity).
         assert d["cfi_range"].startswith("epubcfi(")
 
-    def test_hex_color_passed_through_verbatim(self):
+    def test_wire_hex_is_normalised_to_a_display_name(self):
         from cps.annotations import _data_json_row
 
-        # Real Kobo stores a hex color; the JS layer maps it to rgba. The
-        # server must not mangle it into a CSS class or a name.
+        # A Kobo stores the wire hex and that is what the column holds. The
+        # reader keys its palette on names, so the projection normalises here
+        # (finding F-5769c9) — this test used to require the opposite, and
+        # under it every hex row fell through the client palettes' fallback
+        # and rendered yellow whatever colour the user had chosen.
         d = _data_json_row(self._row(), None, None)
-        assert d["highlight_color"] == "#F6F3B3"
+        assert d["highlight_color"] == "yellow"
 
     def test_adds_public_device_ids_without_changing_existing_keys(self):
         from cps.annotations import _data_json_row
@@ -355,6 +358,9 @@ class TestDataJsonRow:
         d = _data_json_row(row, None, None)
         assert d["start_kobospan"] is None
         assert d["end_kobospan"] is None
-        # color falls back to a safe default when absent.
+        # An absent colour reads as absent. It used to project "yellow",
+        # which made a standalone note and a failed colour lookup look like a
+        # real yellow highlight (F-5769c9); the client palettes carry their own
+        # visual fallback, so the server no longer asserts one.
         row.highlight_color = None
-        assert _data_json_row(row, None, None)["highlight_color"] == "yellow"
+        assert _data_json_row(row, None, None)["highlight_color"] is None

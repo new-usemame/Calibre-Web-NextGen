@@ -3385,6 +3385,18 @@ msgstr "Afbeelding uploaden"
 msgid "Uploading…"
 msgstr "Uploaden…"
 
+#: cps/spa_strings.py
+msgid "Grey"
+msgstr "Grijs"
+
+#: cps/spa_strings.py
+msgid "Pink"
+msgstr "Roze"
+
+#: cps/spa_strings.py
+msgid "Unknown color"
+msgstr "Onbekende kleur"
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Yellow"
 msgstr "Geel"

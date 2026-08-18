@@ -111,7 +111,7 @@ def test_full_position_fields_captured(session):
     ann = s.query(ub.Annotation).one()
     assert ann.highlighted_text == "There is no such thing as a moral or an immoral book."
     assert ann.note_text == "Iconic opening line."
-    assert ann.highlight_color == "yellow"
+    assert ann.highlight_color == "#F6F3B3"   # normalised to the wire hex
     assert ann.chapter_progress == 0.05
     # The new sub-project (2) bits — position fields:
     assert ann.content_id == "f5bf555e-ab63-4649-8430-38449747cace!!OEBPS/chapter-01.html"
@@ -129,7 +129,7 @@ def test_partial_payload_doesnt_overwrite_existing_fields(session):
     update = {"id": "kobo-1", "highlightColor": "red"}
     dispatch_annotation_sync([update], _book(), user)
     ann = s.query(ub.Annotation).one()
-    assert ann.highlight_color == "red"
+    assert ann.highlight_color == "#D9534F"   # web-reader red has no Kobo hex
     assert ann.content_id == "f5bf555e-ab63-4649-8430-38449747cace!!OEBPS/chapter-01.html"
     assert ann.start_offset == 0  # preserved
 

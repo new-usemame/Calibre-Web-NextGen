@@ -52,7 +52,8 @@ def build_synthetic_kobo_db(
 
     * 3 highlights on a UUID-tagged book (matches CW library)
     * 1 highlight with a typed note (Annotation populated)
-    * 1 highlight in red color (color != 0)
+    * highlights spanning three distinct ``Bookmark.Color`` codes
+      (0 = yellow, 1 = pink, 2 = blue — the measured mapping, F-5769c9)
     * 1 highlight on a sideloaded book (``file://`` URI) — must be skipped
     * 1 hidden highlight (Hidden=1) — must be skipped
     * 1 highlight on an unrelated UUID (no CW book) — must be skipped
@@ -105,6 +106,45 @@ def build_synthetic_kobo_db(
          "2026-01-06T10:00:00Z", "2026-01-06T10:00:00Z", 0),
     ]
 
+    conn.executemany(
+        "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
+    conn.commit()
+    conn.close()
+    return path
+
+
+def build_kobo_db_with_colors(
+    path: Path,
+    colors,
+    book_uuid: str = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04",
+) -> Path:
+    """Write a KoboReader.sqlite holding one highlight per entry in
+    ``colors``, all on ``book_uuid``.
+
+    ``colors`` is an iterable of raw ``Bookmark.Color`` values — ints, but
+    deliberately also ``None`` and out-of-range codes, because those are the
+    cases the colour lookup has to answer "unknown" to rather than inventing a
+    colour. Bookmark ids are ``clr-<index>`` so a test can address each row
+    without depending on the canonical fixture's counts.
+    """
+    if not isinstance(path, Path):
+        path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path.unlink()
+    conn = sqlite3.connect(path)
+    conn.executescript(BOOKMARK_DDL)
+    rows = []
+    for index, color in enumerate(colors):
+        rows.append((
+            f"clr-{index}", book_uuid, f"{book_uuid}!!chapter1.html",
+            "span#kobo\\.1\\.{}".format(index), -99, 0,
+            "span#kobo\\.1\\.{}".format(index), -99, 10,
+            f"passage {index}", None, color, None, 0.1,
+            "2026-01-01T10:00:00Z", "2026-01-01T10:00:00Z", 0,
+        ))
     conn.executemany(
         "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         rows,

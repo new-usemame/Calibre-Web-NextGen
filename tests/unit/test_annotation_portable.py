@@ -138,7 +138,9 @@ def test_apply_updates_existing(session):
         user_id=9, book=_book(), session=session, commit=session.commit,
     )
     assert action == "updated"
-    assert row.highlight_color == "red"
+    # The portable wire speaks names; the column stores the canonical hex
+    # (F-5769c9). Red is the web reader's own colour — Kobo has none.
+    assert row.highlight_color == "#D9534F"
     assert row.note_text == "v2"
     assert session.query(ub.Annotation).filter_by(user_id=9, annotation_id="dev-d").count() == 1
 

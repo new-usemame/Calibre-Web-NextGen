@@ -3246,6 +3246,18 @@ msgstr ""
 msgid "Uploading…"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Grey"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pink"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unknown color"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Yellow"
 msgstr ""

@@ -39,11 +39,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Optional
 
+from .annotation_colors import hex_for_bookmark_color
+
 log = logging.getLogger(__name__)
 
-# Kobo's Bookmark.Color encoding — empirically observed on real devices.
-# See notes/KOBO-PROTOCOL-REFERENCE.md §10.1 finding 5.
-_COLOR_MAP = {0: "yellow", 1: "red", 2: "green", 3: "blue"}
+# Kobo's Bookmark.Color encoding lives in cps/services/annotation_colors.py —
+# one table, measured on real hardware (finding F-5769c9), shared with every
+# other path that touches a highlight colour.
 
 # SQLite database file magic — first 16 bytes of any valid SQLite 3.x file.
 _SQLITE_MAGIC = b"SQLite format 3\x00"
@@ -82,7 +84,9 @@ class ParsedBookmark:
     annotation: Optional[str]      # Bookmark.Annotation (user's typed note)
     context_string: Optional[str]
     chapter_progress: Optional[float]
-    color: str                     # COLOR_MAP-normalized: 'yellow'/'red'/'green'/'blue'
+    color: Optional[str]           # canonical wire hex (e.g. '#A0A0A0'), or
+                                   # None when Bookmark.Color is absent or is
+                                   # an index the measured table doesn't cover
     hidden: bool
     date_created: Optional[str]    # ISO-8601 strings as stored by Kobo
     date_modified: Optional[str]
@@ -330,7 +334,10 @@ def parse_kobo_bookmarks(sqlite_path: Path) -> Iterator[ParsedBookmark]:
             annotation=annotation,
             context_string=ctx,
             chapter_progress=chapter_progress,
-            color=_COLOR_MAP.get(color or 0, "yellow"),
+            # An unrecognised Color yields None — "unknown" — never a
+            # specific colour. A default here is what made every greyscale
+            # device's highlights indistinguishable from real yellow ones.
+            color=hex_for_bookmark_color(color),
             hidden=bool(hidden),
             date_created=dcreated,
             date_modified=dmod,

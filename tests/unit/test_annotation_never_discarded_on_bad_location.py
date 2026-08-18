@@ -98,7 +98,7 @@ def test_bad_content_location_never_discards_the_annotation(
     row = rows[0]
     assert row.highlighted_text == "Be patient, for the world is broad and wide."
     assert row.note_text == "irreplaceable user note"
-    assert row.highlight_color == "yellow"
+    assert row.highlight_color == "#F6F3B3"   # stored as the wire hex
     # The span anchors survive too -- they are what re-render the highlight.
     assert row.start_container_path == "span#kobo\\.5\\.1"
     assert row.end_container_path == "span#kobo\\.5\\.3"

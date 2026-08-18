@@ -69,7 +69,7 @@ class TestEditAnnotation:
             commit=memory_db.commit, color="green", note="my note",
         )
         assert row is not None
-        assert row.highlight_color == "green"
+        assert row.highlight_color == "#C6E09E"   # 'green' stored as wire hex
         assert row.note_text == "my note"
 
     def test_edit_does_not_touch_position(self, memory_db):
@@ -86,12 +86,12 @@ class TestEditAnnotation:
 
     def test_edit_only_note_leaves_color(self, memory_db):
         from cps import annotations as ann_mod
-        _seed(memory_db, color="blue")
+        _seed(memory_db, color="#B2E1E8")   # blue, as the column stores it
         row = ann_mod.edit_annotation(
             "cwn-web-abc", user_id=7, book_id=1, session=memory_db,
             commit=memory_db.commit, note="just a note",
         )
-        assert row.highlight_color == "blue"   # unchanged
+        assert row.highlight_color == "#B2E1E8"   # unchanged ('blue' as hex)
         assert row.note_text == "just a note"
 
     def test_edit_invalid_color_rejected(self, memory_db):

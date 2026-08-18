@@ -15,7 +15,10 @@
         yellow: "#f0c419",
         red:    "#d9534f",
         green:  "#5cb85c",
-        blue:   "#5bc0de"
+        blue:   "#5bc0de",
+        // The Kobo palette also has pink and grey (F-5769c9).
+        pink:   "#e8afcf",
+        grey:   "#a0a0a0"
     };
 
     // Annotations cache, keyed by comic_page (1-indexed).

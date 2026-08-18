@@ -50,6 +50,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from . import calibre_db, logger, ub
 from .cw_login import current_user
 from .render_template import render_title_template
+from .services.annotation_colors import (
+    WEBREADER_COLOR_NAMES,
+    to_display_name,
+    to_storage_color,
+)
 from .services.kobo_import import (
     KoboUploadError,
     MAX_KOBO_DATABASE_UPLOAD_BYTES,
@@ -513,7 +518,11 @@ def _row_to_dict(row) -> dict:
         "annotation_id": row.annotation_id,
         "book_id": row.book_id,
         "highlighted_text": row.highlighted_text,
-        "highlight_color": row.highlight_color,
+        # Stored as the canonical wire hex; exports speak the display
+        # vocabulary so a Markdown/CSV/JSON dump reads as "grey", not
+        # "#A0A0A0". A colour we can't name stays whatever it is, and an
+        # absent one stays absent.
+        "highlight_color": to_display_name(row.highlight_color),
         "note_text": row.note_text,
         "content_id": row.content_id,
         "chapter_progress": row.chapter_progress,
@@ -536,8 +545,9 @@ def render_markdown(book_title: str, rows) -> str:
         quoted = "\n".join("> " + line for line in text.splitlines() or [""])
         out.append(quoted)
         meta_bits = []
-        if r.highlight_color:
-            meta_bits.append(f"color: **{r.highlight_color}**")
+        color = to_display_name(r.highlight_color)
+        if color:
+            meta_bits.append(f"color: **{color}**")
         if r.note_text:
             note_oneline = r.note_text.replace("\n", " ").strip()
             meta_bits.append(f"note: {note_oneline}")
@@ -746,7 +756,13 @@ def _data_json_row(r, cfi, pdf_quad, device_public_ids=None, anchor_status=None)
         "end_kobospan": _extract_kobospan_id(r.end_container_path or ""),
         "end_offset": r.end_offset,
         "highlighted_text": r.highlighted_text,
-        "highlight_color": r.highlight_color or "yellow",
+        # The display token, or null. It used to say "yellow" whenever the
+        # column was NULL, which handed the reader a real-looking colour for a
+        # row that has none (a standalone note) and for one whose colour we
+        # failed to resolve. The client palettes already carry their own
+        # fallback for null, so the server no longer asserts a colour it does
+        # not have.
+        "highlight_color": to_display_name(r.highlight_color),
         "note_text": r.note_text,
         "chapter_progress": r.chapter_progress,
         "source": r.source,
@@ -876,9 +892,15 @@ def annotations_export_json(book_id):
 # can recognize a row it should materialize on a device.
 WEBREADER_ID_PREFIX = "cwn-web-"
 
-# The colors the web reader offers — the set a Kobo round-trips (Color 0..3).
-# Anything else is rejected so we never store a color a device can't represent.
-WEBREADER_COLORS = ("yellow", "red", "green", "blue")
+# The colors the web reader's palette offers. Defined once in
+# ``services/annotation_colors`` and re-exported here for the callers that have
+# always imported it from this module.
+#
+# NOT "the set a Kobo round-trips" — that claim was wrong. A Kobo round-trips
+# yellow/pink/blue/green/grey and has no red at all (finding F-5769c9); red is
+# a CWNG web-reader colour with its own canonical hex. Widening what the reader
+# offers is a product decision, so this stays the four it has always accepted.
+WEBREADER_COLORS = WEBREADER_COLOR_NAMES
 
 
 def create_annotation(payload, *, user_id, book, session, commit,
@@ -900,9 +922,12 @@ def create_annotation(payload, *, user_id, book, session, commit,
     request context — mirrors :func:`ingest_bookmarks`. Raises ``ValueError``
     on a payload with no usable anchor.
     """
-    color = (payload.get("highlight_color") or "yellow").strip().lower()
-    if color not in WEBREADER_COLORS:
-        color = "yellow"
+    # The reader sends a palette NAME; the column speaks canonical hex. Accept
+    # the name (unchanged UI contract), store the hex.
+    color_name = (payload.get("highlight_color") or "yellow").strip().lower()
+    if color_name not in WEBREADER_COLORS:
+        color_name = "yellow"
+    color = to_storage_color(color_name)
 
     # content_id is "<book_uuid>!!<chapter_file>". The reader knows the chapter
     # href but not the book uuid, so when it sends a bare chapter_filename we
@@ -1077,7 +1102,8 @@ def edit_annotation(annotation_id, *, user_id, book_id, session, commit,
         normalized = (color or "").strip().lower()
         if normalized not in WEBREADER_COLORS:
             raise ValueError(f"edit_annotation: unsupported color {color!r}")
-        row.highlight_color = normalized
+        # Validate the name the reader sent, store the canonical hex.
+        row.highlight_color = to_storage_color(normalized)
     if note is not _UNSET:
         row.note_text = note
     row.last_synced = datetime.now(timezone.utc)

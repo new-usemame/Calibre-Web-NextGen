@@ -3495,6 +3495,18 @@ msgstr "Téléverser une image"
 msgid "Uploading…"
 msgstr "Téléversement…"
 
+#: cps/spa_strings.py
+msgid "Grey"
+msgstr "Gris"
+
+#: cps/spa_strings.py
+msgid "Pink"
+msgstr "Rose"
+
+#: cps/spa_strings.py
+msgid "Unknown color"
+msgstr "Couleur inconnue"
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Yellow"
 msgstr "Jaune"

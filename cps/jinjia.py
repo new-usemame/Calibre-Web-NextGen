@@ -149,6 +149,17 @@ def clean_string_filter(val):
     return clean_string(val)
 
 
+# An annotation's highlight colour is STORED as the canonical wire hex
+# (finding F-5769c9) and RENDERED as a display name, because the classic
+# annotations view builds a CSS class out of it and `cwa-annotation-#F6F3B3`
+# is not a valid selector. Answers None when there is no colour, so the
+# template can tell "no colour" apart from a real one.
+@jinjia.app_template_filter('annotation_color')
+def annotation_color_filter(val):
+    from .services.annotation_colors import to_display_name
+    return to_display_name(val)
+
+
 @jinjia.app_template_filter('uuidfilter')
 def uuidfilter(var):
     return uuid4()

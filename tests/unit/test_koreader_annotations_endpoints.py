@@ -137,7 +137,9 @@ def test_push_creates_updates_deletes(env):
     assert row.device_origin_id == "bm-new1"
     # The updated row changed color.
     upd = s.query(ub.Annotation).filter_by(annotation_id="existing").one()
-    assert upd.highlight_color == "red"
+    # KOReader pushes a colour NAME; the column stores the canonical hex
+    # (F-5769c9). Red has no Kobo equivalent and keeps the web reader's own.
+    assert upd.highlight_color == "#D9534F"
 
 
 def test_push_fans_out_to_enabled_target(env):

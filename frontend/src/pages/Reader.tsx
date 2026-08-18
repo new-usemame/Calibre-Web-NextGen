@@ -28,9 +28,13 @@ import styles from './Reader.module.css';
 const HILITE_ORDER = ['yellow', 'green', 'blue', 'red'] as const;
 type HiliteColor = (typeof HILITE_ORDER)[number];
 
-// Highlight colors (match the legacy/Kobo set). Rendered semi-transparent.
+// Fill for a highlight the reader RENDERS. Wider than HILITE_ORDER on purpose:
+// the palette the reader OFFERS is four colours, but a Kobo can hand us pink or
+// grey (F-5769c9) and those have to paint as themselves rather than fall
+// through to yellow. Rendered semi-transparent.
 const HILITE_FILL: Record<string, string> = {
   yellow: '#e6c34a', red: '#d9534f', green: '#5cb85c', blue: '#5b9bd5',
+  pink: '#e8afcf', grey: '#a0a0a0',
 };
 
 type ReaderTheme = 'light' | 'sepia' | 'dark' | 'black';

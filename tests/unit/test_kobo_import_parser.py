@@ -10,7 +10,7 @@ Coverage:
 1. ``looks_like_sqlite`` accepts a real sqlite, rejects garbage.
 2. Parser yields one ``ParsedBookmark`` per valid Bookmark row.
 3. Hidden rows + empty-text rows + empty-BookmarkID rows are filtered.
-4. Color integers map to the expected color names.
+4. Color integers map to the MEASURED wire hex (finding F-5769c9).
 5. Multi-span highlight preserves both start + end fields.
 6. Note (Annotation) field round-trips.
 7. ``ContextString`` field round-trips for re-anchoring downstream.
@@ -84,10 +84,14 @@ class TestParseKoboBookmarks:
 
         p = build_synthetic_kobo_db(tmp_path / "k.sqlite")
         rows = {r.bookmark_id: r for r in parse_kobo_bookmarks(p)}
-        assert rows["bm-001"].color == "yellow"  # Color=0
-        assert rows["bm-002"].color == "red"     # Color=1
-        assert rows["bm-003"].color == "green"   # Color=2
-        assert rows["bm-006"].color == "blue"    # Color=3
+        # The MEASURED mapping (Kobo Clara BW 4.45.23792, finding F-5769c9):
+        # 0 yellow / 1 pink / 2 blue / 3 green / 4 grey. The parser stores the
+        # wire hex the device itself sends and accepts; names are a read-time
+        # projection, so this asserts what actually lands in the column.
+        assert rows["bm-001"].color == "#F6F3B3"  # Color=0 -> yellow
+        assert rows["bm-002"].color == "#E8AFCF"  # Color=1 -> pink, NOT red
+        assert rows["bm-003"].color == "#B2E1E8"  # Color=2 -> blue, NOT green
+        assert rows["bm-006"].color == "#C6E09E"  # Color=3 -> green, NOT blue
 
     def test_typed_note_round_trips(self, tmp_path):
         from cps.services.kobo_import import parse_kobo_bookmarks

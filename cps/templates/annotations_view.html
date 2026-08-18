@@ -17,15 +17,16 @@
 
     <ol class="cwa-annotation-list">
       {% for ann in annotations %}
-        <li id="ann-{{ ann.annotation_id }}" class="cwa-annotation cwa-annotation-{{ ann.highlight_color or 'yellow' }}">
+        {% set ann_color = ann.highlight_color|annotation_color %}
+        <li id="ann-{{ ann.annotation_id }}" class="cwa-annotation cwa-annotation-{{ ann_color or 'yellow' }}">
           <blockquote>{{ ann.highlighted_text or '' }}</blockquote>
           {% if ann.note_text %}
             <p class="cwa-annotation-note">{{ _('Note:') }} {{ ann.note_text }}</p>
           {% endif %}
           <p class="text-muted small">
-            {% if ann.highlight_color %}
-              <span class="cwa-annotation-swatch cwa-annotation-swatch-{{ ann.highlight_color }}" aria-label="{{ ann.highlight_color }}"></span>
-              {{ ann.highlight_color }}
+            {% if ann_color %}
+              <span class="cwa-annotation-swatch cwa-annotation-swatch-{{ ann_color }}" aria-label="{{ ann_color }}"></span>
+              {{ ann_color }}
             {% endif %}
             {% if ann.chapter_progress is not none %}
               · {{ _('Chapter progress: %(pct)d%%', pct=(ann.chapter_progress * 100)|int) }}

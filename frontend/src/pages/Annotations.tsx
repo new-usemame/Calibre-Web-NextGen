@@ -28,7 +28,15 @@ interface ActiveDevice extends DeviceSummary { public_id: string; active: boolea
 interface Payload { annotations: Annotation[]; annotation_count: number; devices: Record<string, DeviceSummary> }
 type Entry = { kind: 'annotation'; annotation: Annotation } | { kind: 'group'; id: string | null; label: string; count: number };
 
-const COLOR_HEX: Record<string, string> = { yellow: '#e6c34a', red: '#d9534f', green: '#5cb85c', blue: '#5b9bd5' };
+/* The API normalises the stored wire hex to a display name (F-5769c9), so this
+ * keys on names and must cover the WHOLE Kobo palette — pink and grey included.
+ * Every organic highlight from a greyscale device (Clara BW) is grey; without a
+ * grey entry they all fall through to yellow, which is the bug this page was
+ * showing. `red` has no Kobo equivalent and is web-reader only. */
+const COLOR_HEX: Record<string, string> = {
+  yellow: '#e6c34a', red: '#d9534f', green: '#5cb85c', blue: '#5b9bd5',
+  pink: '#e8afcf', grey: '#a0a0a0',
+};
 const CHUNK_SIZE = 500;
 
 function chunks<T>(items: T[], size: number): T[][] {
@@ -165,7 +173,14 @@ export function Annotations({ id }: { id: string }) {
   };
 
   if (isLoading) return <SpinnerCentered size={40} />;
-  const colorName = (color: string | null) => ({ yellow: t('Yellow'), red: t('Red'), green: t('Green'), blue: t('Blue') })[color || 'yellow'] || t('Yellow');
+  /* A colour we cannot name is announced as unknown, never as a specific one:
+   * the API now answers null for a row whose colour is absent or unresolvable,
+   * and telling a screen-reader user "Yellow" for it is the same category error
+   * as painting it yellow. */
+  const colorName = (color: string | null) => (color
+    ? ({ yellow: t('Yellow'), red: t('Red'), green: t('Green'), blue: t('Blue'),
+         pink: t('Pink'), grey: t('Grey') } as Record<string, string>)[color] || t('Unknown color')
+    : t('Unknown color'));
   const sourceLabel = (source: string | null) => source === 'kobo' ? t('Kobo') : source === 'koreader' ? t('KOReader') : source === 'webreader' ? t('Web reader') : t('Unknown source');
   const toggle = (annotationId: string) => setSelected((current) => {
     const next = new Set(current); if (next.has(annotationId)) next.delete(annotationId); else next.add(annotationId); return next;
@@ -247,11 +262,10 @@ export function Annotations({ id }: { id: string }) {
           ) : (() => {
             const row = entry.annotation; const current = assignmentOf(row);
             /* A standalone note has no passage and no colour. The API projects a default
-             * colour for it (`r.highlight_color or "yellow"`, a legacy fallback for old
-             * rows), so drawing the swatch and the blockquote unconditionally shows a
-             * swatch announced as "Yellow" beside an EMPTY quote — a highlight that looks
-             * like it lost its text. Draw the row as what it is. Credit: the rule and the
-             * reasoning come from #1544 on main; this keeps them through the merge. */
+             * colour for it, so drawing the swatch and the blockquote unconditionally
+             * shows a swatch beside an EMPTY quote — a highlight that looks like it lost
+             * its text. Draw the row as what it is. Credit: the rule and the reasoning
+             * come from #1544 on main; this keeps them through the merge. */
             const unanchored = row.position_type === 'unanchored';
             const quoteName = (unanchored ? row.note_text || '' : row.highlighted_text).slice(0, 60);
             /* Announcing a note as "Select highlight" is the same category error in the

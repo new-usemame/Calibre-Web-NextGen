@@ -23,6 +23,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.exc import IntegrityError
 
+from ..annotation_colors import to_display_name, to_storage_color
 from .base import AnnotationSyncTargetHandler, SyncResult
 
 log = logging.getLogger(__name__)
@@ -159,7 +160,8 @@ def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
     if "contextString" in span or "context" in span:
         next_context = span.get("contextString") or span.get("context")
     current = (
-        annotation.highlighted_text, annotation.note_text, annotation.highlight_color,
+        annotation.highlighted_text, annotation.note_text,
+        to_storage_color(annotation.highlight_color),
         annotation.chapter_progress, annotation.content_id,
         annotation.start_container_path, annotation.end_container_path,
         annotation.start_offset, annotation.end_offset,
@@ -168,7 +170,11 @@ def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
     incoming = (
         supplied(payload, "highlightedText", annotation.highlighted_text),
         supplied(payload, "noteText", annotation.note_text),
-        supplied(payload, "highlightColor", annotation.highlight_color),
+        # Both sides through the same normaliser: the device's hex and a
+        # legacy row's colour NAME are the same colour, and a PATCH that
+        # changes nothing must not be counted as a change just because the
+        # stored spelling is older than the wire one.
+        to_storage_color(supplied(payload, "highlightColor", annotation.highlight_color)),
         chapter_progress if chapter_progress is not None else annotation.chapter_progress,
         normalized_content_id or annotation.content_id,
         supplied(span, "startPath", annotation.start_container_path),
@@ -300,7 +306,9 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
     if "noteText" in payload:
         ann.note_text = payload.get("noteText")
     if "highlightColor" in payload:
-        ann.highlight_color = payload.get("highlightColor")
+        # The device already sends the canonical wire hex; normalising is a
+        # no-op for it and repairs a legacy name from any other client.
+        ann.highlight_color = to_storage_color(payload.get("highlightColor"))
     if "type" in payload:
         native_type = payload.get("type")
         if isinstance(native_type, str) and len(native_type) <= 32:

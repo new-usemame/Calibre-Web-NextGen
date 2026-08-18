@@ -38,9 +38,11 @@
 (function () {
     "use strict";
 
-    // Named highlight colors the web-reader create path emits. Real Kobo
-    // devices store a hex color instead (e.g. "#F6F3B3"); colorToRgba
-    // handles both. RGB triples here, alpha applied uniformly below.
+    // Named highlight colors data.json emits. The server normalises the stored
+    // wire hex to a name (F-5769c9), so the whole Kobo palette can arrive here
+    // -- grey especially, which is every organic highlight from a greyscale
+    // device. colorToRgba still accepts a raw "#F6F3B3" for anything that
+    // reaches it unnormalised. RGB triples here, alpha applied uniformly below.
     var NAMED_RGB = {
         yellow: [240, 196, 25],
         red:    [217, 83, 79],
@@ -48,7 +50,9 @@
         blue:   [91, 192, 222],
         pink:   [233, 30, 99],
         purple: [156, 39, 176],
-        orange: [255, 152, 0]
+        orange: [255, 152, 0],
+        grey:   [160, 160, 160],
+        gray:   [160, 160, 160]
     };
     var HIGHLIGHT_ALPHA = 0.4;
 

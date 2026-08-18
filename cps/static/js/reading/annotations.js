@@ -48,7 +48,11 @@
         red:    [217, 83, 79],
         green:  [92, 184, 92],
         blue:   [91, 192, 222],
-        pink:   [233, 30, 99],
+        // Kobo's own pink (#E8AFCF). It was a hot pink here, which no path
+        // could reach while the server sent raw hex; now that a name arrives
+        // it would render a Kobo pink highlight in a completely different
+        // colour from the same row on the SPA highlights page.
+        pink:   [232, 175, 207],
         purple: [156, 39, 176],
         orange: [255, 152, 0],
         grey:   [160, 160, 160],

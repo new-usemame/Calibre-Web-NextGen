@@ -449,3 +449,38 @@ class TestLiveKoboPatchPathNormalises:
         payload = {"highlightColor": "#F6F3B3"}
         span = {}
         assert _kobo_payload_matches_row(annotation, payload, span, None) is True
+
+
+class TestClassicViewTemplateWiring:
+    """The classic per-book view renders the colour through a Jinja filter, and
+    a filter that is defined but never registered fails at RENDER time — a 500
+    on the page, which no direct call to the function would catch."""
+
+    def test_the_filter_is_registered_and_reachable_from_a_template(self):
+        import flask
+        from cps.jinjia import jinjia
+
+        app = flask.Flask(__name__)
+        app.register_blueprint(jinjia)
+        with app.app_context():
+            rendered = app.jinja_env.from_string(
+                "{{ value|annotation_color }}"
+            ).render(value="#A0A0A0")
+        assert rendered == "grey"
+
+    def test_the_template_pipes_the_colour_through_the_filter(self):
+        """Source-pin the wiring itself.
+
+        The template builds a CSS class out of this value. Dropping the filter
+        would put `cwa-annotation-#F6F3B3` in a class attribute, which is not a
+        valid selector and cannot be styled — and nothing else in the suite
+        renders this template.
+        """
+        from pathlib import Path
+
+        here = Path(__file__).resolve().parents[2]
+        source = (here / "cps" / "templates" / "annotations_view.html").read_text()
+        assert "ann.highlight_color|annotation_color" in source
+        # Nothing may reach the class attribute or the label unfiltered.
+        assert "cwa-annotation-{{ ann.highlight_color" not in source
+        assert "swatch-{{ ann.highlight_color" not in source

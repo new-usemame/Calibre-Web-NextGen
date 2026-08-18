@@ -406,9 +406,16 @@ class TestEveryReadPathNormalises:
         assert annotation_color_filter("#A0A0A0") == "grey"
         assert annotation_color_filter(None) is None
 
-    def test_no_read_path_can_emit_a_raw_hex(self):
+    def test_no_read_path_emits_a_known_kobo_wire_hex(self):
         """One sweep over every projection, so a new one added beside these
-        cannot quietly skip the normaliser."""
+        cannot quietly skip the normaliser.
+
+        Scoped to the five MEASURED hexes on purpose. An UNKNOWN hex is
+        deliberately passed through by these projections (see
+        ``TestUnknownTokensArePreservedButNeverKeyAPalette``) — preserving a
+        colour we cannot name is the point, and asserting "no hex ever" here
+        would contradict it.
+        """
         import json
         from cps.annotations import _data_json_row, render_csv, render_json, render_markdown
         from cps.services.annotation_portable import to_portable
@@ -484,3 +491,175 @@ class TestClassicViewTemplateWiring:
         # Nothing may reach the class attribute or the label unfiltered.
         assert "cwa-annotation-{{ ann.highlight_color" not in source
         assert "swatch-{{ ann.highlight_color" not in source
+
+
+class TestUnknownTokensArePreservedButNeverKeyAPalette:
+    """Preservation and validation are different jobs, and one function cannot
+    do both.
+
+    ``to_display_name`` preserves a token this app cannot name, because an
+    export and a backup want the honest stored value. But a CSS class, a
+    human-facing tag and any fixed palette need a token they can actually key
+    on — handing those a raw ``#123456`` recreates the broken-selector problem
+    the normaliser was introduced to prevent. ``to_known_display_name`` is the
+    validating half.
+    """
+
+    @pytest.mark.parametrize("stored", ["#123456", "olive", "chartreuse", "  Olive "])
+    def test_display_preserves_what_known_display_rejects(self, stored):
+        from cps.services.annotation_colors import to_display_name, to_known_display_name
+
+        assert to_display_name(stored) is not None
+        assert to_known_display_name(stored) is None
+
+    @pytest.mark.parametrize("stored,expected", [
+        ("#A0A0A0", "grey"), ("#a0a0a0", "grey"), ("gray", "grey"),
+        ("red", "red"), ("#D9534F", "red"), ("yellow", "yellow"),
+        (None, None), ("", None),
+    ])
+    def test_known_display_answers_for_everything_it_can_name(self, stored, expected):
+        from cps.services.annotation_colors import to_known_display_name
+
+        assert to_known_display_name(stored) == expected
+
+    def test_the_hardcover_tag_is_a_colour_we_can_name_or_nothing(self):
+        """Hardcover renders this as free text on the user's journal entry."""
+        from cps.services.annotation_colors import to_known_display_name
+
+        assert to_known_display_name("#A0A0A0") == "grey"
+        assert to_known_display_name("#123456") is None
+
+
+class TestClassicViewNeverEmitsABrokenOrInventedClass:
+    """The classic view styles a row by ``cwa-annotation-<colour>``."""
+
+    def _render(self, stored):
+        import flask
+        from cps.jinjia import jinjia
+
+        app = flask.Flask(__name__)
+        app.register_blueprint(jinjia)
+        with app.app_context():
+            return app.jinja_env.from_string(
+                "{% set c = v|annotation_palette_class %}"
+                "cwa-annotation{% if c %} cwa-annotation-{{ c }}{% endif %}"
+            ).render(v=stored)
+
+    def test_a_known_colour_gets_its_modifier(self):
+        assert self._render("#A0A0A0") == "cwa-annotation cwa-annotation-grey"
+
+    def test_no_colour_gets_no_modifier_rather_than_yellow(self):
+        """The template used to append ``or 'yellow'``, which painted the row's
+        border yellow for a row that has no colour at all."""
+        assert self._render(None) == "cwa-annotation"
+        assert self._render("") == "cwa-annotation"
+
+    def test_an_unnameable_colour_gets_no_modifier_rather_than_a_broken_one(self):
+        assert self._render("#123456") == "cwa-annotation"
+        assert self._render("olive") == "cwa-annotation"
+
+    def test_the_template_uses_the_palette_filter_for_every_class(self):
+        """Source-pin, because nothing in the suite renders this template and a
+        raw colour interpolated into a class is silently broken, not an error."""
+        from pathlib import Path
+
+        here = Path(__file__).resolve().parents[2]
+        source = (here / "cps" / "templates" / "annotations_view.html").read_text()
+        assert "ann.highlight_color|annotation_palette_class" in source
+        assert "cwa-annotation-{{ ann_color" not in source
+        assert "swatch-{{ ann_color" not in source
+        assert "or 'yellow'" not in source
+
+    def test_every_display_name_this_app_can_produce_has_a_style(self):
+        """A name with no CSS rule renders the default neutral border while the
+        label beside it says "pink" — which is how pink and grey shipped
+        half-supported in the first place."""
+        from pathlib import Path
+        from cps.services.annotation_colors import to_display_name, KOBO_BOOKMARK_COLOR_HEX
+
+        here = Path(__file__).resolve().parents[2]
+        source = (here / "cps" / "templates" / "annotations_view.html").read_text()
+        names = {to_display_name(h) for h in KOBO_BOOKMARK_COLOR_HEX.values()} | {"red"}
+        for name in names:
+            assert f".cwa-annotation-{name} " in source or f".cwa-annotation-{name}  " in source, name
+            assert f".cwa-annotation-swatch-{name} " in source, name
+
+
+class TestLegacyReaderDoesNotResendAnUneditableColour:
+    """Adding a NOTE to an imported highlight must not fail on its colour.
+
+    The legacy reader's edit popup sent ``highlight_color`` on every save,
+    seeded from the row. The server accepts only the four colours its palette
+    offers, so once imported rows arrive as `pink`/`grey` — and before that, as
+    a raw hex mangled into a token like `f6f3b3` — saving a note on one was
+    rejected outright and the note was lost.
+    """
+
+    def _source(self):
+        from pathlib import Path
+
+        here = Path(__file__).resolve().parents[2]
+        return (here / "cps" / "static" / "js" / "reading" / "annotations.js").read_text()
+
+    def test_the_colour_is_sent_only_when_the_user_picked_a_swatch(self):
+        source = self._source()
+        assert "if (chosen.picked) { patch.highlight_color = chosen.color; }" in source
+        assert "{ highlight_color: chosen.color, note_text: note.value || null }" not in source
+
+    def test_a_colour_the_edit_endpoint_would_reject_is_still_rejected(self, memory_db):
+        """The client-side fix is the right one precisely because the server
+        contract is unchanged: pink is a colour to RENDER, not one to choose."""
+        from cps.annotations import create_annotation, edit_annotation
+
+        row = create_annotation(
+            {"highlight_color": "yellow", "highlighted_text": "a passage",
+             "cfi_range": "epubcfi(/6/4!/4/2,/1:0,/1:9)"},
+            user_id=7, book=SimpleNamespace(id=BOOK_ID, uuid=BOOK_UUID),
+            session=memory_db, commit=memory_db.commit,
+        )
+        with pytest.raises(ValueError):
+            edit_annotation(row.annotation_id, user_id=7, book_id=BOOK_ID,
+                            session=memory_db, commit=memory_db.commit, color="grey")
+        # …and a note-only edit on that same row is untouched by the colour rule.
+        edited = edit_annotation(row.annotation_id, user_id=7, book_id=BOOK_ID,
+                                 session=memory_db, commit=memory_db.commit,
+                                 note="a note")
+        assert edited.note_text == "a note"
+        assert edited.highlight_color == "#F6F3B3"
+
+
+class TestNoClientPaintsAnUnknownColourYellow:
+    """The server stopped inventing a colour; a client that then paints yellow
+    for null puts the same lie back one layer down."""
+
+    def _read(self, *parts):
+        from pathlib import Path
+
+        here = Path(__file__).resolve().parents[2]
+        return here.joinpath(*parts).read_text()
+
+    def test_legacy_epub_reader(self):
+        source = self._read("cps", "static", "js", "reading", "annotations.js")
+        assert "if (!rgb) { rgb = UNKNOWN_RGB; }" in source
+        assert "rgb = NAMED_RGB.yellow" not in source
+
+    def test_legacy_pdf_reader(self):
+        source = self._read("cps", "static", "js", "reading", "annotations_pdf.js")
+        assert "|| UNKNOWN_RGBA" in source
+        assert "|| COLOR_RGBA.yellow" not in source
+
+    def test_legacy_comic_reader(self):
+        source = self._read("cps", "static", "js", "reading", "annotations_comic.js")
+        assert "|| UNKNOWN_BG" in source
+        assert "|| COLOR_BG.yellow" not in source
+
+    def test_spa_reader(self):
+        source = self._read("frontend", "src", "pages", "Reader.tsx")
+        assert "UNKNOWN_FILL" in source
+        assert "|| HILITE_FILL.yellow" not in source
+        assert "highlight_color || 'yellow'" not in source
+
+    def test_spa_highlights_page(self):
+        source = self._read("frontend", "src", "pages", "Annotations.tsx")
+        assert "COLOR_HEX[row.highlight_color || 'yellow']" not in source
+        assert "'var(--border)'" in source

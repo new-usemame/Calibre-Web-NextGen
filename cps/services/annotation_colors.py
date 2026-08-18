@@ -55,9 +55,18 @@ TWO RULES THIS MODULE KEEPS
    ``.get(color or 0, "yellow")`` default is what made a failed lookup
    indistinguishable from a real yellow highlight downstream.
 2. **Never destroy a colour.** A token this table does not know (a KOReader
-   palette name, a hex from a future firmware) passes through both directions
-   unchanged rather than being nulled, so no third-party vocabulary is lost by
-   being routed through here.
+   palette name, a hex from a future firmware) survives both directions rather
+   than being nulled, so no third-party vocabulary is lost by being routed
+   through here. "Survives" means the token itself is preserved after
+   whitespace trimming, case folding, and known-alias folding — not that the
+   string comes back byte-identical.
+
+PRESERVATION IS NOT VALIDATION, and the two have separate functions here.
+:func:`to_display_name` preserves an unknown token because an export and a
+backup want the honest stored value. A consumer that needs a token it can *key
+a palette on* — a CSS class, a tag, a protocol enum — must use
+:func:`to_known_display_name`, which answers ``None`` rather than handing back
+something no palette has an entry for.
 """
 
 from __future__ import annotations
@@ -143,9 +152,10 @@ def to_storage_color(value) -> Optional[str]:
     * a display name this table knows -> its canonical upper-case hex;
     * a hex this table knows, in any case -> the canonical upper-case hex;
     * ``None`` / blank / a non-string -> ``None``;
-    * anything else -> the token, lower-cased, **unchanged**. A vocabulary
-      this module has not been taught (a KOReader palette name, a hex from a
-      newer device) is preserved rather than discarded.
+    * anything else -> the token, **preserved** after trimming, lower-casing
+      and known-alias folding. A vocabulary this module has not been taught (a
+      KOReader palette name, a hex from a newer device) is kept rather than
+      discarded, so routing a value through here never loses it.
     """
     token = _token(value)
     if token is None:
@@ -159,14 +169,21 @@ def to_storage_color(value) -> Optional[str]:
 
 
 def to_display_name(value) -> Optional[str]:
-    """Normalise a stored colour to the display token the UI palettes key on.
+    """Normalise a stored colour to what should be SHOWN for it.
 
     * a canonical hex -> its name (``#A0A0A0`` -> ``grey``);
     * a legacy name still in the column -> that name (``red`` -> ``red``),
       which is why no migration is needed;
     * ``None`` / blank / a non-string -> ``None``, so "no colour" and
       "unknown colour" stay distinguishable from a real one;
-    * anything else -> the token, lower-cased, unchanged.
+    * anything else -> the token, preserved after trimming, lower-casing and
+      known-alias folding.
+
+    ⚠️ The last case means the result is **not guaranteed to be a name any
+    palette knows** — it can be a raw hex or a foreign vocabulary's word. That
+    is deliberate for exports and backups, which want the honest stored value.
+    Anything that keys a palette, builds a CSS class, or fills a protocol enum
+    must use :func:`to_known_display_name` instead.
     """
     token = _token(value)
     if token is None:
@@ -175,3 +192,16 @@ def to_display_name(value) -> Optional[str]:
     if token in _HEX_TO_NAME:
         return _HEX_TO_NAME[token]
     return token
+
+
+def to_known_display_name(value) -> Optional[str]:
+    """Like :func:`to_display_name`, but answers ``None`` for anything this
+    module cannot name.
+
+    For consumers where an unrecognised token is worse than nothing: a CSS
+    class (``cwa-annotation-#123456`` is not a selector), a human-facing tag,
+    or any surface that indexes a fixed palette. "I don't know" is a state
+    those can render; a token with no palette entry is not.
+    """
+    name = to_display_name(value)
+    return name if name in _NAME_TO_HEX else None

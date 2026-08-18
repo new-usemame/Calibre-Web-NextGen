@@ -70,9 +70,13 @@ def to_portable(row) -> dict:
         "annotation_id": row.annotation_id,
         "highlighted_text": row.highlighted_text,
         "note_text": row.note_text,
-        # The portable wire speaks display NAMES (the KOReader plugin's own
-        # provider builds and consumes names); the column speaks canonical
-        # hex. Normalise on the way out so a device never sees "#A0A0A0".
+        # The portable wire speaks display names (the KOReader plugin's own
+        # provider builds and consumes names); the column speaks canonical hex.
+        # Normalise on the way out so a device never sees "#A0A0A0". A colour
+        # this app cannot name is passed through as the stored token rather
+        # than dropped — the receiving provider is then the one deciding what
+        # to do with a word it does not know, which is better than us deleting
+        # the user's colour on its behalf.
         "color": to_display_name(row.highlight_color),
         "content_id": row.content_id,
         "start_kobospan": _extract_kobospan_id(row.start_container_path or ""),

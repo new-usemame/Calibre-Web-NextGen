@@ -60,9 +60,16 @@
     };
     var HIGHLIGHT_ALPHA = 0.4;
 
+    // What an unknown or absent colour paints as. Deliberately NOT a palette
+    // entry: a highlight still has to be visible, but painting it yellow would
+    // make a colour we failed to resolve indistinguishable from one the reader
+    // really did choose (F-5769c9).
+    var UNKNOWN_RGB = [208, 203, 194];
+
     // Map a color (named or "#rrggbb"/"#rgb") to an rgba() fill string.
-    // Falls back to yellow for anything unrecognized so a highlight is
-    // never silently dropped just because the color is odd.
+    // Falls back to the neutral for anything unrecognized so a highlight is
+    // never silently dropped just because the color is odd — and never
+    // silently claims a palette colour it does not have.
     function colorToRgba(color) {
         var c = (color == null ? "" : String(color)).trim().toLowerCase();
         var rgb = null;
@@ -77,7 +84,7 @@
         } else if (NAMED_RGB.hasOwnProperty(c)) {
             rgb = NAMED_RGB[c];
         }
-        if (!rgb) { rgb = NAMED_RGB.yellow; }
+        if (!rgb) { rgb = UNKNOWN_RGB; }
         return "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + HIGHLIGHT_ALPHA + ")";
     }
 
@@ -87,9 +94,12 @@
 
     // CSS-safe class token from a color (strips "#", spaces, etc.) so the
     // sidebar entry can be color-targeted without an invalid selector.
+    // "unknown" rather than "yellow" for an absent colour: the token reaches a
+    // class name, and naming the row yellow is the invented-colour bug this
+    // whole change removed (F-5769c9).
     function safeColorToken(color) {
         var c = (color == null ? "" : String(color)).trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
-        return c || "yellow";
+        return c || "unknown";
     }
 
     // Resolve a character offset within a KoboSpan to a (text node, offset)
@@ -435,8 +445,16 @@
         var popup = document.createElement("div");
         popup.id = "cwa-ann-popup";
         popup.className = "cwa-ann-popup";
-        var chosen = { color: safeColorToken(row.highlight_color) };
-        popup.appendChild(makeSwatchRow(chosen.color, function (c) { chosen.color = c; }));
+        // Only the four colours the server accepts for an EDIT can be resent.
+        // A Kobo highlight arrives as pink, grey or a colour we cannot name;
+        // resending that is rejected outright, so merely adding a NOTE to an
+        // imported highlight used to fail with the whole PATCH. Track whether
+        // the user actually picked a swatch and send the colour only then.
+        var chosen = { color: safeColorToken(row.highlight_color), picked: false };
+        popup.appendChild(makeSwatchRow(chosen.color, function (c) {
+            chosen.color = c;
+            chosen.picked = true;
+        }));
         var note = document.createElement("textarea");
         note.className = "cwa-ann-note";
         note.placeholder = t("note", "Note");
@@ -448,8 +466,9 @@
         save.type = "button"; save.className = "cwa-ann-save"; save.textContent = t("save", "Save");
         save.addEventListener("click", function () {
             save.disabled = true;
-            apiFetch("PATCH", apiBase() + "/" + encodeURIComponent(row.annotation_id),
-                     { highlight_color: chosen.color, note_text: note.value || null })
+            var patch = { note_text: note.value || null };
+            if (chosen.picked) { patch.highlight_color = chosen.color; }
+            apiFetch("PATCH", apiBase() + "/" + encodeURIComponent(row.annotation_id), patch)
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
             .then(function (updated) { repaintAnnotation(row.annotation_id, updated); removePopup(); })
             .catch(function (err) { save.disabled = false; if (window.console) { console.warn("annotation edit failed:", err); } });

@@ -20,6 +20,8 @@
         pink:   "#e8afcf",
         grey:   "#a0a0a0"
     };
+    // Unknown or absent — see annotations_pdf.js.
+    var UNKNOWN_BG = "#d0cbc2";
 
     // Annotations cache, keyed by comic_page (1-indexed).
     var byPage = {};
@@ -100,7 +102,7 @@
             return;
         }
         // Use the first annotation's color for the badge background.
-        var color = COLOR_BG[(rows[0] && rows[0].highlight_color) || "yellow"] || COLOR_BG.yellow;
+        var color = COLOR_BG[(rows[0] && rows[0].highlight_color) || ""] || UNKNOWN_BG;
         badge.style.backgroundColor = color;
         badge.textContent = rows.length === 1
             ? "1 note"

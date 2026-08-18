@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Callable, Optional
 
-from ..annotation_colors import to_display_name
+from ..annotation_colors import to_known_display_name
 from .base import AnnotationSyncTargetHandler, SyncResult
 
 log = logging.getLogger(__name__)
@@ -148,9 +148,11 @@ class HardcoverHandler(AnnotationSyncTargetHandler):
                     progress_percent=progress_percent,
                     progress_page=None,
                     highlighted_text=annotation.highlighted_text,
-                    # Hardcover turns this into a free-text tag, so it gets the
-                    # display name — "#A0A0A0" is not a tag anyone wants.
-                    highlight_color=to_display_name(annotation.highlight_color),
+                    # Hardcover turns this into a free-text tag, so it gets a
+                    # colour we can NAME or nothing at all — neither "#A0A0A0"
+                    # nor a foreign vocabulary's word is a tag anyone wants,
+                    # and the caller skips the tag on a falsy value.
+                    highlight_color=to_known_display_name(annotation.highlight_color),
                 )
         except Exception as exc:
             log.warning("HardcoverHandler.push raised: %s", exc)

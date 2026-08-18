@@ -173,10 +173,13 @@ export function Annotations({ id }: { id: string }) {
   };
 
   if (isLoading) return <SpinnerCentered size={40} />;
-  /* A colour we cannot name is announced as unknown, never as a specific one:
-   * the API now answers null for a row whose colour is absent or unresolvable,
-   * and telling a screen-reader user "Yellow" for it is the same category error
-   * as painting it yellow. */
+  /* A colour we cannot name is announced as unknown, never as a specific one.
+   * Two shapes reach here: null (the column is empty, or the device's colour
+   * code was one we cannot resolve) and a non-null token this palette has no
+   * entry for (a foreign vocabulary's name, a hex from a newer device, which
+   * the API preserves rather than discards). Both are "unknown" to a reader;
+   * telling a screen-reader user "Yellow" for either is the same category
+   * error as painting it yellow. */
   const colorName = (color: string | null) => (color
     ? ({ yellow: t('Yellow'), red: t('Red'), green: t('Green'), blue: t('Blue'),
          pink: t('Pink'), grey: t('Grey') } as Record<string, string>)[color] || t('Unknown color')
@@ -261,11 +264,14 @@ export function Annotations({ id }: { id: string }) {
             </div>
           ) : (() => {
             const row = entry.annotation; const current = assignmentOf(row);
-            /* A standalone note has no passage and no colour. The API projects a default
-             * colour for it, so drawing the swatch and the blockquote unconditionally
-             * shows a swatch beside an EMPTY quote — a highlight that looks like it lost
-             * its text. Draw the row as what it is. Credit: the rule and the reasoning
-             * come from #1544 on main; this keeps them through the merge. */
+            /* A standalone note has no passage and no colour. Drawing the swatch and
+             * the blockquote unconditionally puts a swatch beside an EMPTY quote — a
+             * highlight that looks like it lost its text. Draw the row as what it is.
+             * Credit: the rule and the reasoning come from #1544 on main; this keeps
+             * them through the merge. (It used to be worse: the API projected a
+             * default colour onto these rows, so the swatch was announced "Yellow".
+             * It no longer does — see F-5769c9 — but the row still must not draw a
+             * highlight's furniture.) */
             const unanchored = row.position_type === 'unanchored';
             const quoteName = (unanchored ? row.note_text || '' : row.highlighted_text).slice(0, 60);
             /* Announcing a note as "Select highlight" is the same category error in the

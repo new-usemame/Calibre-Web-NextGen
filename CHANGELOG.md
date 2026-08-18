@@ -30,10 +30,14 @@ is for things you can see or feel when running the app.
   the highlights page, and the Markdown, CSV and JSON exports all show and
   name them correctly, including the pink and grey a Kobo can make but the web
   reader's own palette does not offer. Existing highlights are read correctly
-  as they are — nothing in your library is rewritten — and a colour the app
-  cannot identify is now left blank instead of being shown as yellow, so a
-  highlight you really did make yellow is no longer indistinguishable from one
-  whose colour was lost.
+  as they are — nothing in your library is rewritten. A highlight whose colour
+  the app cannot work out is no longer labelled and drawn as yellow: it is
+  shown in a neutral shade and described as unknown, so a highlight you really
+  did make yellow is no longer indistinguishable from one whose colour was
+  lost. Adding a note to an imported highlight also works again — saving one on
+  a pink or grey highlight used to fail silently, because the note editor sent
+  the highlight's colour back with it and the server does not accept those as a
+  choice.
 
 - **Active imports no longer incorrectly ask for a manual duplicate scan on
   bare-metal installs or when ingest marker paths are customized.** Both the

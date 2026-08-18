@@ -37,6 +37,12 @@ const HILITE_FILL: Record<string, string> = {
   pink: '#e8afcf', grey: '#a0a0a0',
 };
 
+// What an unknown or absent colour paints as. Deliberately NOT a palette entry:
+// a highlight still has to be visible, but falling back to yellow would make a
+// colour we could not resolve indistinguishable from one the reader really did
+// choose — the invented-colour bug this file's server side stopped doing.
+const UNKNOWN_FILL = '#d0cbc2';
+
 type ReaderTheme = 'light' | 'sepia' | 'dark' | 'black';
 
 interface TocItem {
@@ -323,7 +329,10 @@ export function Reader({ id }: { id: string }) {
     cfiRange: string;
     text: string;
     annotationId?: string;
-    color: HiliteColor;
+    // A string, not HiliteColor: 'create' and 'standalone' seed it from the
+    // four the palette offers, but 'edit' carries whatever the existing
+    // highlight already is, which for an imported one can be pink or grey.
+    color: string;
     note: string;
   } | null>(null);
 
@@ -500,7 +509,7 @@ export function Reader({ id }: { id: string }) {
   const paintHighlight = useCallback((
     cfiRange: string, color: string, annotationId: string, hasNote = false,
   ) => {
-    const fill = HILITE_FILL[color] || HILITE_FILL.yellow;
+    const fill = HILITE_FILL[color] || UNKNOWN_FILL;
     try {
       renditionRef.current?.annotations?.highlight(
         cfiRange,
@@ -604,8 +613,12 @@ export function Reader({ id }: { id: string }) {
     setActiveHl(null);
     setComposer({
       mode: 'edit', cfiRange: hl.cfiRange, text: '', annotationId: hl.id,
-      color: (HILITE_ORDER as readonly string[]).includes(hl.color)
-        ? hl.color as HiliteColor : 'yellow',
+      // Carry the highlight's own colour through verbatim, even when it is one
+      // the create palette does not offer (a Kobo pink or grey). Coercing it to
+      // yellow here repainted an imported highlight yellow the moment its owner
+      // opened the note composer. No swatch shows as pressed for such a colour,
+      // which is correct — it is not one of the four on offer.
+      color: hl.color,
       note: hl.note,
     });
   }, [activeHl]);
@@ -1086,7 +1099,7 @@ export function Reader({ id }: { id: string }) {
               const note = (a.note_text || '').trim();
               if (note && a.annotation_id) notesRef.current.set(a.annotation_id, note);
               if (a.cfi_range) {
-                paintHighlight(a.cfi_range, a.highlight_color || 'yellow', a.annotation_id, !!note);
+                paintHighlight(a.cfi_range, a.highlight_color ?? '', a.annotation_id, !!note);
               }
             });
           })
@@ -1361,7 +1374,7 @@ export function Reader({ id }: { id: string }) {
             ) : (
               <ul role="list">
                 {annList.map((row) => {
-                  const colour = HILITE_FILL[row.highlight_color || 'yellow'] || HILITE_FILL.yellow;
+                  const colour = HILITE_FILL[row.highlight_color ?? ''] ?? UNKNOWN_FILL;
                   /*
                    * A standalone note is a note ABOUT the book, with no passage
                    * attached — a deliberate state, not a broken highlight.

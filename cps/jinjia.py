@@ -150,14 +150,32 @@ def clean_string_filter(val):
 
 
 # An annotation's highlight colour is STORED as the canonical wire hex
-# (finding F-5769c9) and RENDERED as a display name, because the classic
-# annotations view builds a CSS class out of it and `cwa-annotation-#F6F3B3`
-# is not a valid selector. Answers None when there is no colour, so the
-# template can tell "no colour" apart from a real one.
+# (finding F-5769c9). These two filters are the read side of that, and they are
+# deliberately different:
+#
+# `annotation_color` is what to SHOW. It preserves a token this app cannot name
+# (a KOReader colour, a hex from a newer device) because printing the honest
+# stored value beats printing nothing.
+#
+# `annotation_palette_class` is what may be INTERPOLATED INTO A CLASS NAME. The
+# classic view styles a row by `cwa-annotation-<colour>`, and neither
+# `cwa-annotation-#F6F3B3` nor `cwa-annotation-olive` is a rule that exists —
+# the first is not even a valid selector. It answers None unless the colour is
+# one this app has a palette entry for, so the template can omit the modifier
+# rather than emit a broken one.
+#
+# Both answer None when there is no colour at all, so the template can tell
+# "no colour" apart from a real one.
 @jinjia.app_template_filter('annotation_color')
 def annotation_color_filter(val):
     from .services.annotation_colors import to_display_name
     return to_display_name(val)
+
+
+@jinjia.app_template_filter('annotation_palette_class')
+def annotation_palette_class_filter(val):
+    from .services.annotation_colors import to_known_display_name
+    return to_known_display_name(val)
 
 
 @jinjia.app_template_filter('uuidfilter')

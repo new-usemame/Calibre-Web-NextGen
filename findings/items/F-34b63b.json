@@ -1,0 +1,11 @@
+{
+  "area": "web-reader",
+  "body": "`frontend/src/pages/Reader.tsx`: the note composer renders the four highlight\nswatches and `setComposer((s) => (s ? { ...s, color: c } : s))` updates its local\nstate when one is clicked. In `edit` mode `commitNote` then PATCHes **only**\n`note_text` and calls `repaintHighlight(c.cfiRange, c.color, ...)`.\n\nSo clicking a swatch while writing a note visibly recolours the highlight and\nthe change is never sent. It survives until the next reload, then reverts.\n\nPre-existing; unrelated to the colour-vocabulary work in F-5769c9 (found by an\nadversarial review pass over that diff, not caused by it). Two candidate fixes:\neither include `highlight_color` in the edit PATCH when the composer's colour\ndiffers from the row's, or do not offer the swatches in `edit` mode at all —\nthe dedicated recolour popover already exists and does persist\n(`recolorHighlight`).\n\nThe second is probably right: two surfaces that both look like they set the\ncolour, where only one does, is the confusion underneath the bug.\n\nNOT verified in a browser — read from the source.",
+  "created": "2026-08-18",
+  "id": "F-34b63b",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "The SPA reader's note composer repaints a recolour it never persists"
+}

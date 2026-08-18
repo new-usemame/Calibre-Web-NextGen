@@ -282,7 +282,11 @@ export function Annotations({ id }: { id: string }) {
                 if (selecting) toggle(row.annotation_id);
               }}>
               {selecting && <label className={styles.rowSelect} onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected.has(row.annotation_id)} onChange={() => toggle(row.annotation_id)} aria-label={selectLabel} /><span className={styles.srOnly}>{selectLabel}</span></label>}
-              {!unanchored && <span className={styles.bar} role="img" aria-label={colorName(row.highlight_color)} style={{ background: COLOR_HEX[row.highlight_color || 'yellow'] || COLOR_HEX.yellow }} />}
+              {/* A colour we cannot name gets the neutral, not yellow: this swatch is
+                  LABELLED, so painting yellow under an "Unknown color" label would tell a
+                  sighted user one thing and a screen-reader user another. */}
+              {!unanchored && <span className={styles.bar} role="img" aria-label={colorName(row.highlight_color)}
+                style={{ background: (row.highlight_color && COLOR_HEX[row.highlight_color]) || 'var(--border)' }} />}
               <div className={styles.body}>
                 {!unanchored && <blockquote className={styles.quote}>{row.highlighted_text}</blockquote>}{row.note_text && <p className={styles.note}>{row.note_text}</p>}
                 <div className={styles.meta}><span>{sourceLabel(row.source)}</span><span aria-hidden="true">·</span>

@@ -281,3 +281,73 @@ class TestCommitFailure:
         # what would have been imported if the commit had succeeded.
         assert result["skipped_orphan"] == 2
         assert result["skipped_hidden"] == 1
+
+
+@pytest.mark.unit
+class TestImportHonestyAndIdentity:
+    """Two ways the import misreports what it actually did."""
+
+    def test_commit_returning_false_reports_imported_zero(self, memory_db, synthetic_db):
+        """The production commit signals failure by RETURNING False, not by raising.
+
+        ``ub.session_commit`` catches OperationalError/InvalidRequestError,
+        rolls back, and returns False — the sibling test above only covers a
+        commit that raises, which is the path production does not take. With
+        only that coverage the endpoint answers HTTP 200 and ``imported: N``
+        after writing nothing at all.
+        """
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        book_lookup = _make_book_lookup({
+            "b3d1b38b-74fd-43b7-a796-996e5a6a8b04": 348,
+        })
+
+        result = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=book_lookup, commit=lambda: False,
+        )
+
+        assert result["imported"] == 0, (
+            "a rolled-back import must not report rows as imported"
+        )
+        assert session.query(ub.Annotation).filter_by(user_id=7).count() == 0
+        # The other counts stay honest, as with a raising commit.
+        assert result["skipped_orphan"] == 2
+        assert result["skipped_hidden"] == 1
+
+    def test_same_annotation_id_against_a_different_book_is_not_skipped(
+        self, memory_db, synthetic_db,
+    ):
+        """Dedup must use the canonical key, which includes the book.
+
+        ``uq_annotation_user_book_annotation`` is on
+        ``(user_id, book_id, annotation_id)`` and the live PATCH dispatcher
+        upserts on that triple. The import checked only
+        ``(user_id, annotation_id)``, so one book's row suppressed a row the
+        schema explicitly permits in another book.
+        """
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        uuid = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+
+        first = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=_make_book_lookup({uuid: 348}), commit=session.commit,
+        )
+        assert first["imported"] == 3
+
+        # Same bookmark ids, resolved to a DIFFERENT book.
+        second = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=_make_book_lookup({uuid: 349}), commit=session.commit,
+        )
+
+        assert second["imported"] == 3, (
+            "rows for a different book were suppressed by the wrong dedup key"
+        )
+        assert session.query(ub.Annotation).filter_by(user_id=7, book_id=348).count() == 3
+        assert session.query(ub.Annotation).filter_by(user_id=7, book_id=349).count() == 3

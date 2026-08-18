@@ -348,8 +348,14 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
     are explicit so this function is unit-testable without a Flask app.
 
     The annotation-backup hook fires automatically on commit so the
-    user already has a recoverable snapshot before the next import
-    overwrites anything.
+    user already has a recoverable snapshot.
+
+    NOTE: this import is INSERT-ONLY. An annotation the server already holds
+    for that (user, book) is skipped without comparing DateModified, text,
+    note, colour, position or hidden state, so re-importing a newer device
+    database cannot apply an edit or a device-side deletion. The previous
+    wording here described an "overwrite" the code has never performed
+    (findings F-e628c6).
 
     Returns a counts dict the JSON endpoint hands back to the browser.
     """
@@ -387,10 +393,14 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
             skipped_orphan += 1
             continue
 
-        # Dedup: (user_id, annotation_id) is already indexed; one
-        # SELECT covers the existence check.
+        # Dedup on the CANONICAL key. `uq_annotation_user_book_annotation` is
+        # (user_id, book_id, annotation_id) and the live PATCH dispatcher
+        # upserts on that same triple; checking only (user_id, annotation_id)
+        # made one book's row suppress a row the schema explicitly permits in
+        # another book. `ix_annotation_user_book` covers this lookup.
         existing = session.query(ub.Annotation.id).filter(
             ub.Annotation.user_id == user_id,
+            ub.Annotation.book_id == book_id,
             ub.Annotation.annotation_id == bm.bookmark_id,
         ).first()
         if existing is not None:
@@ -430,7 +440,12 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
         imported += 1
 
     try:
-        commit()
+        # `_commit_required` is this module's own guard for exactly this: CWNG's
+        # commit wrapper signals a rolled-back write by RETURNING False, not by
+        # raising, so a bare `commit()` reported rows as imported after writing
+        # nothing. Routing through the helper makes both failure shapes take
+        # the same path.
+        _commit_required(commit)
     except Exception as e:
         log.error("annotations: import commit failed: %s", e)
         session.rollback()

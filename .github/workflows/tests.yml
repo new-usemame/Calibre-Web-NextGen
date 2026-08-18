@@ -36,12 +36,17 @@ jobs:
   # ============================================================================
   # JOB 1: Fast Tests (Smoke + Unit)
   # Runs on: Every push, every PR
-  # Duration: ~2 minutes
+  # Duration: a few minutes (~4 on a healthy runner, plus the npm install)
   # Purpose: Catch basic errors immediately
   # ============================================================================
   fast-tests:
     name: Fast Tests (Smoke + Unit)
     runs-on: ubuntu-latest
+    # Bounds hangs in the SETUP steps, which the test step's own
+    # timeout-minutes cannot reach. This job runs two networked installs (apt
+    # and npm) before pytest starts; without a job-level cap a stall in either
+    # runs to GitHub's 6-hour default. Twice observed stalling in the apt step.
+    timeout-minutes: 25
     env:
       PYTHONDONTWRITEBYTECODE: '1'
     
@@ -74,6 +79,12 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies (npm ci)
+        working-directory: frontend
+        run: npm ci
 
       - name: Install system dependencies
         run: |

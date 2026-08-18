@@ -6,6 +6,7 @@ import {
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
+import { createEntityListQueryOptions } from './entityListQueryOptions';
 import type { MetadataProvider, MetaSearchResponse } from './api';
 import type {
   Me, Book, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
@@ -256,11 +257,10 @@ export function useBooks(q: BooksQuery) {
 /** Fetch an entity-browse list (authors/series/tags/publishers/languages).
  *  `plural` is the endpoint segment (e.g. "authors"). */
 export function useEntityList(plural: string) {
-  return useQuery<EntityList>({
-    queryKey: ['entities', plural],
-    queryFn: () => apiGet<EntityList>(`/api/v1/${plural}`),
-    staleTime: 60000,
-  });
+  return useQuery<EntityList>(createEntityListQueryOptions(
+    plural,
+    () => apiGet<EntityList>(`/api/v1/${plural}`),
+  ));
 }
 
 /** The tag a rename collided with, carried on the 409 so the caller can offer

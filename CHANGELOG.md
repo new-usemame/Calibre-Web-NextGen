@@ -22,6 +22,13 @@ is for things you can see or feel when running the app.
   app.** Window focus no longer triggers an app-wide burst of server requests,
   reducing unnecessary traffic for low-bandwidth connections while leaving
   live polling, such as the task queue, running normally.
+- **Opening the main library no longer downloads a page-sized response it
+  cannot use.** The unfiltered catalog asked the API for an entity list it had
+  not been given a name for, which the server answered with the full HTML
+  library page (~58KB). The app could not parse that as data, so it failed and
+  retried. Nothing on screen depended on it. That was unnecessary traffic
+  whenever the unfiltered library view loaded, and it is the second half of the
+  same bandwidth complaint as the focus-refetch fix above.
 
 ## [v4.1.38] - 2026-08-17
 

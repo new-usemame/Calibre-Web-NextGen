@@ -18,6 +18,10 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Active imports no longer incorrectly ask for a manual duplicate scan on
+  bare-metal installs or when ingest marker paths are customized.** Both the
+  importer and the duplicate index now look for the batch markers in the same
+  configured location.
 - **Returning to the browser tab no longer refreshes every cached part of the
   app.** Window focus no longer triggers an app-wide burst of server requests,
   reducing unnecessary traffic for low-bandwidth connections while leaving

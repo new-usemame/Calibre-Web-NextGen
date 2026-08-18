@@ -26,10 +26,13 @@ is for things you can see or feel when running the app.
   returns with its `?q=` query intact. Advanced search is an honest exception:
   `/search` returns to the search page with an empty form, not the previous
   criteria or results, because that page keeps its criteria in component state
-  and puts nothing in the URL. The remembered list lasts for the current
-  browsing session only and is deliberately dropped on a full page reload or a
-  deep link; in those cases the back link falls back to the library root as
-  before. Reported by @Arjan61 in #666.
+  and puts nothing in the URL. The destination survives a reload of the book
+  page, but the list's loaded pages and scroll position do not, so it returns at
+  the top; a book opened from a deep link with no recorded origin still falls
+  back to the library root as before. Opening a book from somewhere that is not
+  a list — a notice banner on another page, for example — or going straight
+  from one book to another shows “← Library”, because there is no list behind
+  it. Reported by @Arjan61 in #666.
 - **The new UI no longer checks with the server for every book cover as you
   scroll, and the book page no longer fetches a 280KB cover to show it at
   postcard size.** Every cover was sent with instructions never to reuse it, so

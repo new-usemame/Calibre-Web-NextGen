@@ -264,9 +264,9 @@ export function BookDetail() {
   const sendToEreader = useSendToEreader(id);
   const deleteBook = useDeleteBook(id);
   const reloadMetadata = useReloadMetadata(id);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const me = useMe().data;
-  const bookBackTarget = backTarget();
+  const bookBackTarget = backTarget(location);
   // The send-to-e-reader button only renders when mail is configured + the user
   // can download, so defer the account fetch (which carries the saved e-reader
   // address used to prefill the recipient field, #715) until that's possible.

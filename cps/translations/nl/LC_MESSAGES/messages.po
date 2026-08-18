@@ -6545,6 +6545,10 @@ msgid "…or paste an image URL"
 msgstr "…of plak een afbeelding-URL"
 
 #: cps/spa_strings.py
+msgid "← Back"
+msgstr "← Terug"
+
+#: cps/spa_strings.py
 msgid "← Back to book"
 msgstr "← Terug naar boek"
 

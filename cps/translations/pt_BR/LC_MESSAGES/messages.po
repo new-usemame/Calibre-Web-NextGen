@@ -6450,6 +6450,10 @@ msgid "…or paste an image URL"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "← Back"
+msgstr "← Voltar"
+
+#: cps/spa_strings.py
 msgid "← Back to book"
 msgstr "← Voltar para o livro"
 

@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "VERIFIED against the code.\n\n`requires_reading_services_auth_and_config` (cps/readingservices.py) proxies the\nrequest untouched in two cases:\n\n    if not config.config_kobo_sync:            -> proxy_to_kobo_reading_services()\n    ...\n    if current_user.is_authenticated: ...      -> otherwise proxy\n\n`handle_check_for_changes` is therefore never entered, so the ownership filter\nthat keeps an owned book out of Nickel's destructive annotations GET does not\nrun. Measured device behaviour: if checkforchanges names a ContentId, Nickel\nGETs that book's annotations and REPLACES its entire local set with the result.\n\nReachable windows: the device keeps CWNG configured as its reading-services host\nwhile its Flask session expires (upstream Kobo credentials still valid), and the\ninterval after an admin disables Kobo sync but before the device refreshes its\nservice configuration.\n\nThe containment is only as strong as the weakest way of reaching the route, and\nthe decorator is currently the weakest.\n\nUNVERIFIED, same family, recorded so it is not lost: only the exact path\n`/api/v3/content/checkforchanges` is intercepted. A trailing slash would fall to\nthe `/<path:subpath>` catch-all proxy. I reasoned this from the route table but\ndid NOT execute it against the real url_map, and no device has been observed\nsending the slash form.",
+  "created": "2026-08-18",
+  "id": "F-30d264",
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "checkforchanges containment is bypassed when Kobo sync is off or the session is unauthenticated"
+}

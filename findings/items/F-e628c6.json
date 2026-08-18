@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "VERIFIED against the code. Two defects in the same six lines.\n\n1. WRONG IDENTITY. The existence check is:\n\n       ub.Annotation.user_id == user_id,\n       ub.Annotation.annotation_id == bm.bookmark_id,\n\n   but the canonical uniqueness is `uq_annotation_user_book_annotation` on\n   `(user_id, book_id, annotation_id)`, and the live PATCH dispatcher upserts on\n   that triple. So an import drops a row the schema explicitly permits whenever\n   the same BookmarkID appears against two books — reachable with a repaired or\n   merged KoboReader.sqlite.\n\n2. INSERT-ONLY. When the row exists the import does `skipped_existing += 1;\n   continue` — no comparison of DateModified, text, note, colour, position or\n   hidden state. So re-importing a NEWER device database can never apply an edit,\n   and a device-side deletion is invisible twice over (hidden rows are skipped\n   earlier).\n\nThe load-bearing comment above it describes a behaviour the code does not have —\nit talks about a backup taken before \"the next import overwrites anything\", when\nthe import overwrites nothing. Someone trusting that comment would import an\nedited database expecting their new note and silently get the old one.\n\nFix direction: dedup on the same triple as the schema, and make the existing-row\nbranch a real merge decided by DateModified. Until then the docstring should say\nplainly that the import is insert-only.",
+  "created": "2026-08-18",
+  "id": "F-e628c6",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "The KoboReader.sqlite import is insert-only and dedups on the wrong key"
+}

@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "VERIFIED against the code AND against a real device.\n\n`cps/services/kobo_import.py` selects bookmarks with:\n\n    FROM Bookmark WHERE Text IS NOT NULL AND Text != ''\n\nA Kobo dogear is a `Bookmark` row with EMPTY `Text` (measured on a Clara BW,\nfirmware 4.45.23792: 13 dogear rows, all `Text=''`). So every dogear is filtered\nout in SQL — it is not skipped-with-a-reason, it never reaches\n`ingest_bookmarks` and is not even included in `total_seen`, so the import\nsummary shown to the user cannot mention it.\n\nThat contradicts the live path, which DOES store them: the deployed server holds\nrows with `annotation_type='dogear'` captured from the same device via PATCH.\nSo the two ingest routes disagree about what an annotation is.\n\nThis matters more than it looks because the SQLite import is the ONLY recovery\npath for annotations the live delta never carried (see the device-only finding).\nThe recovery tool silently drops a class of the very thing it exists to recover.\n\nThe same filter also excludes a bookmark whose user content lives only in\n`Annotation` (a note with no highlighted text).",
+  "created": "2026-08-18",
+  "id": "F-b1004e",
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "The KoboReader.sqlite import drops every dogear and note-only bookmark before it is counted"
+}

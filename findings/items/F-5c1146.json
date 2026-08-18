@@ -1,0 +1,13 @@
+{
+  "area": "kobo",
+  "body": "VERIFIED against the code (not merely reported).\n\n`cps/readingservices.py` `handle_annotations` wraps the whole capture block in\n`except Exception: log.exception(...)` and then, unconditionally, `return\nproxy_to_kobo_reading_services()`. Inside, `dispatch_annotation_sync` does check\nthe commit — `committed = ub.session_commit(); if committed is False: log.error(...);\ncontinue` — but that failure never reaches the response.\n\nSo a member that did not persist still produces an upstream-success PATCH answer.\n\nWhy that is terminal rather than merely wrong:\n- the Kobo uploads a DELTA, so it never re-offers the annotation;\n- `checkforchanges` containment deliberately keeps an owned book out of the\n  Kobo-cloud download that could otherwise have healed it.\n\nNote the route already has the right instinct one branch up: when ownership\nlookup fails it returns 503 *specifically* so \"the device does not treat an\nuncaptured upload as successful\". The same reasoning is not applied to a\ncapture that was attempted and lost.\n\nThe route docstring also claims the path \"persists annotations whenever the\nPATCH includes content\", which is false for this branch.\n\nOPEN QUESTION before fixing — do not guess: what a Kobo does with a non-success\nPATCH is UNOBSERVED. Measured hardware behaviour exists for a 503 on the\nannotations *GET* (it empties the device's local set), and that must not be\nassumed to transfer to PATCH. Needs a device experiment before a fix ships,\notherwise the cure could be worse than the disease.",
+  "created": "2026-08-18",
+  "id": "F-5c1146",
+  "refs": [
+    "#1728"
+  ],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "The annotations PATCH is answered success even when a member failed to commit"
+}

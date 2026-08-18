@@ -237,7 +237,15 @@ def kobo_put(monkeypatch):
 
     kobo_ub = MagicMock(session=_SessionProxy())
     kobo_ub.session_flush = lambda *a, **k: session.flush()
-    kobo_ub.session_commit = lambda *a, **k: session.commit()
+    def _session_commit(*_a, **_k):
+        # Mirror the real ``ub.session_commit`` contract: True when the write
+        # landed. The old stub returned ``session.commit()``, i.e. None — so
+        # any caller that correctly checked the result would have looked broken
+        # here, which is part of why the unchecked commit survived.
+        session.commit()
+        return True
+
+    kobo_ub.session_commit = _session_commit
     kobo_ub.ReadBook = SimpleNamespace(STATUS_UNREAD=0, STATUS_IN_PROGRESS=1, STATUS_FINISHED=2)
 
     monkeypatch.setattr(kobo_module, "ub", kobo_ub)
@@ -375,3 +383,39 @@ def test_settles_pending_writes_before_opening_the_savepoint():
     src = inspect.getsource(share_kobo_progress_with_koreader)
     assert "session_flush()" in src
     assert src.index("session_flush()") < src.index("begin_nested()")
+
+
+@pytest.mark.unit
+def test_state_put_does_not_report_success_when_the_commit_rolled_back(
+    kobo_put, monkeypatch,
+):
+    """A rolled-back reading state must not be answered ``Success``.
+
+    ``ub.session_commit()`` returns ``False`` when it caught an
+    ``OperationalError``/``InvalidRequestError`` and rolled back, and its own
+    docstring says callers whose answer to the user depends on the write
+    landing MUST check it — citing #1318, which is precisely "a rolled-back
+    bookmark was still answered 201".
+
+    This handler ignored the result and returned ``RequestResult: Success``
+    unconditionally, so a device whose progress was NOT stored was told it was,
+    cleared its queue, and the server kept the older position.
+    """
+    kobo_module, app, _session = kobo_put
+    monkeypatch.setattr(kobo_module.ub, "session_commit", lambda *a, **k: False)
+
+    with app.test_request_context(json=_state_put_payload(63.5), method="PUT"):
+        response = _handler(kobo_module)("uuid-under-test")
+
+    if isinstance(response, tuple):
+        body, status = response[0], response[1]
+        body = body if isinstance(body, str) else body.get_data(as_text=True)
+    else:
+        body, status = response.get_data(as_text=True), response.status_code
+
+    assert status >= 500, (
+        f"a rolled-back state write must not be answered {status}"
+    )
+    assert "Success" not in body, (
+        "the device must not be told the write landed when it was rolled back"
+    )

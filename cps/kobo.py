@@ -1782,7 +1782,14 @@ def HandleStateRequest(book_uuid):
                 current_user.id, book.id, request_bookmark["ProgressPercent"])
 
         ub.session.merge(kobo_reading_state)
-        ub.session_commit()
+        # #1318 again, on the reading-state path: ``session_commit()`` returns
+        # False when it caught an OperationalError/InvalidRequestError and
+        # rolled back, and its docstring is explicit that callers whose answer
+        # depends on the write landing MUST check it. Answering "Success" for a
+        # rolled-back write makes the device clear its queue and keeps the
+        # server on the older position, with nothing anywhere reporting it.
+        if not ub.session_commit():
+            return "", 500
         return jsonify({
             "RequestResult": "Success",
             "UpdateResults": [update_results_response],

@@ -34,6 +34,34 @@ _MISSING_MANIFEST_ITEM_OPF = b"""<?xml version="1.0" encoding="UTF-8"?>
 </package>
 """
 
+_SPLITTABLE_OPF = b"""<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="chapter"/></spine>
+</package>
+"""
+
+_SPLITTABLE_NCX = b"""<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap>
+  <navPoint id="one"><navLabel><text>One</text></navLabel>
+    <content src="chapter.xhtml#one"/></navPoint>
+  <navPoint id="two"><navLabel><text>Two</text></navLabel>
+    <content src="chapter.xhtml#two"/></navPoint>
+</navMap></ncx>
+"""
+
+_SPLITTABLE_CHAPTER = b"""<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><body>
+  <div id="book-columns"><div id="book-inner">
+    <section id="one"><span class="koboSpan" id="kobo.1.1">one</span></section>
+    <section id="two"><span class="koboSpan" id="kobo.2.1">two</span></section>
+  </div></div>
+</body></html>
+"""
+
 
 def _write_permanently_unsupported_package(path):
     """Write a readable package whose escaping manifest target does not exist."""
@@ -42,6 +70,16 @@ def _write_permanently_unsupported_package(path):
         archive.writestr("META-INF/container.xml", _CONTAINER_XML)
         archive.writestr("OPS/content.opf", _MISSING_MANIFEST_ITEM_OPF)
         archive.comment = b"a"
+
+
+def _write_splittable_package(path):
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "mimetype", b"application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        archive.writestr("META-INF/container.xml", _CONTAINER_XML)
+        archive.writestr("OPS/content.opf", _SPLITTABLE_OPF)
+        archive.writestr("OPS/toc.ncx", _SPLITTABLE_NCX)
+        archive.writestr("OPS/chapter.xhtml", _SPLITTABLE_CHAPTER)
 
 
 @pytest.fixture
@@ -243,6 +281,61 @@ def test_repair_version_two_rescans_install_completed_at_version_one(monkeypatch
     assert repair_task.REPAIR_VERSION == 2
     assert repair_task.enqueue_startup_kepub_package_repair() is True
     assert calls == [True]
+
+
+@pytest.mark.unit
+def test_existing_book_repair_does_not_split_multichapter_document(
+    app_session, tmp_path, monkeypatch
+):
+    book_dir = tmp_path / "Author" / "Existing (1)"
+    book_dir.mkdir(parents=True)
+    package = book_dir / "book.kepub"
+    _write_splittable_package(package)
+    before = package.read_bytes()
+    book = SimpleNamespace(
+        id=31,
+        uuid="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        title="Existing synced book",
+        path="Author/Existing (1)",
+        last_modified=None,
+    )
+    data = SimpleNamespace(
+        id=41,
+        book=31,
+        name="book",
+        format="KEPUB",
+        uncompressed_size=package.stat().st_size,
+    )
+    metadata_session = _FakeMetadataSession(data, book)
+
+    monkeypatch.setattr(
+        repair_task.db,
+        "CalibreDB",
+        lambda *args, **kwargs: SimpleNamespace(session=metadata_session),
+    )
+    monkeypatch.setattr(repair_task.ub, "get_new_session_instance", lambda: app_session)
+    monkeypatch.setattr(repair_task.config, "config_use_google_drive", False, raising=False)
+    monkeypatch.setattr(
+        repair_task.config,
+        "config_kobo_kepub_package_repair_version",
+        0,
+        raising=False,
+    )
+    monkeypatch.setattr(repair_task.config, "get_book_path", lambda: str(tmp_path))
+    monkeypatch.setattr(repair_task.config, "save", lambda: None)
+    monkeypatch.setattr(
+        repair_task,
+        "kepub_package_needs_normalization",
+        lambda _path: True,
+    )
+    monkeypatch.setattr(repair_task, "_backup_original", lambda *_args: "backup.kepub")
+    monkeypatch.setattr(repair_task.helper, "mark_book_modified", lambda *_args, **_kwargs: None)
+
+    task = repair_task.TaskKepubPackageRepair()
+    task.run(None)
+
+    assert package.read_bytes() == before
+    assert repair_task.REPAIR_VERSION == 2
 
 
 @pytest.mark.unit

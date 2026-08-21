@@ -39,6 +39,14 @@ function BookLinks({ notices }: { notices: UserNotice[] }) {
   );
 }
 
+/*
+ * #1748 final invariant: the repair instructions below are the operator-chosen
+ * copy. They lead with sync, retain the remove-and-download fallback, and
+ * deliberately omit the superseded pre-repair-highlight warning.
+ * The squash message records intermediate drafts; these exact literals are the
+ * final decision and are pinned by the unit and end-to-end tests.
+ */
+
 export function UserNoticeBanner() {
   const t = useT();
   const announce = useAnnouncer();
@@ -72,8 +80,8 @@ export function UserNoticeBanner() {
         <strong id="user-notice-title">{noticeTitle(first, t)}</strong>
         {first.type === 'kepub-package-repair' ? (
           <p>{affectedBookCount === 1
-            ? t('CWNG repaired a book previously sent to your Kobo. Older highlights may still need to be recreated on the device.')
-            : t('CWNG repaired {count} books previously sent to your Kobo. Older highlights may still need to be recreated on the device.', { count: affectedBookCount })}</p>
+            ? t('We repaired this book for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove the book from your Kobo and let it download again.')
+            : t('We repaired {count} books for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove them from your Kobo and let them download again.', { count: affectedBookCount })}</p>
         ) : (
           <p>{typeof first.payload.message === 'string' ? first.payload.message : t('There is new information about your library.')}</p>
         )}
@@ -107,7 +115,7 @@ export function BookUserNotices({ bookId }: { bookId: number }) {
           <div>
             <strong id={`book-notice-${notice.id}`}>{noticeTitle(notice, t)}</strong>
             <p>{notice.type === 'kepub-package-repair'
-              ? t('This book was repaired after it had already been sent to a Kobo. Download the updated book; highlights created before the repair may remain invisible and may need to be recreated.')
+              ? t('We repaired this book for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove the book from your Kobo and let it download again. If you read it some other way, download it again to get the repaired copy.')
               : (typeof notice.payload.message === 'string'
                 ? notice.payload.message : t('There is new information about this book.'))}</p>
           </div>

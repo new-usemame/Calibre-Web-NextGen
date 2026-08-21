@@ -2009,6 +2009,61 @@ def edit_hardcover_blacklist(book_id, to_save):
 
 
 # returns False if an error occurs or no book is uploaded, in all other cases the ebook metadata to change is returned
+def _book_has_annotations(book_id):
+    """True when any user holds a highlight or note against this book.
+
+    Used to decide whether a newly uploaded KEPUB may be split into one document
+    per chapter. Splitting renames spine documents, and every stored annotation
+    -- Kobo `ContentID`, web-reader `cfi_range`, KOReader position -- is
+    anchored to the document it was made in, so renaming strands them. A book
+    nobody has annotated has nothing to strand.
+
+    Deliberately across ALL users, not just the uploader: an admin replacing a
+    format must not silently break another account's highlights.
+
+    Fails CLOSED. If the annotation store cannot be read, this returns True and
+    the upload is merely normalized rather than split -- the outcome users had
+    before splitting existed, which is the safe side of the trade.
+    """
+    try:
+        return ub.session.query(ub.Annotation).filter(
+            ub.Annotation.book_id == book_id).first() is not None
+    except Exception:
+        log.exception(
+            "Could not check annotations for book %s; not splitting its KEPUB", book_id)
+        return True
+
+
+def _package_was_split_by_us(path):
+    """Thin indirection so tests can drive the decision without a real archive."""
+    from .services.kepub_spine_splitter import package_was_split_by_us
+
+    return package_was_split_by_us(path)
+
+
+def _may_split_replacement(book_id, replacing_a_split_package):
+    """Whether a replacement KEPUB for this book may be split.
+
+    A book with no annotations is always safe to split — there is nothing to
+    strand. When it HAS annotations the answer turns on what is already stored,
+    because piece naming is deterministic (F-bbd10e):
+
+      * stored package ALREADY SPLIT -> split. A replacement from the same source
+        re-splits to the same names, so splitting preserves an annotation
+        anchored to `X-split-2.xhtml`, while withholding it deletes the file that
+        anchor names. A replacement from a different edition breaks those anchors
+        either way, so splitting is never worse here.
+      * stored package NOT split -> do not split. Splitting would rename the
+        documents its existing annotations are anchored to.
+
+    An earlier version of this guard withheld the split whenever annotations
+    existed, which is right for the second case and causes the first case's harm.
+    """
+    if not _book_has_annotations(book_id):
+        return True
+    return bool(replacing_a_split_package)
+
+
 def upload_book_formats(requested_files, book, book_id, no_cover=True):
     # Check and handle Uploaded file
     to_save = dict()
@@ -2051,6 +2106,12 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
                           category="error")
                     error = True
                     continue
+            # Asked BEFORE the save, because the save overwrites the evidence.
+            # See _may_split_replacement for why the answer decides the split.
+            replacing_a_split_package = (
+                file_ext == "kepub" and os.path.exists(saved_filename)
+                and _package_was_split_by_us(saved_filename))
+
             try:
                 requested_file.save(saved_filename)
             except OSError:
@@ -2064,11 +2125,27 @@ def upload_book_formats(requested_files, book, book_id, no_cover=True):
                 # would keep its fragment-anchored TOC targets forever and a
                 # Kobo would file every highlight in those chapters under an id
                 # no spine row carries (#1715, same defect as #1657).
+                #
                 # normalize_kepub_package logs and returns None on any failure,
                 # leaving the archive untouched -- storing an un-normalized
                 # KEPUB is strictly better than refusing the upload, which is
                 # the same trade-off convert.py makes.
-                normalize_kepub_package(saved_filename)
+                #
+                # Splitting is withheld for an annotated book unless the stored
+                # KEPUB was already split by us; _may_split_replacement explains
+                # why re-splitting is then the anchor-preserving choice. This
+                # route is reached from EDIT BOOK, so
+                # `book_id` can be a book that has been in the library for
+                # years: a split renames its spine documents, and a Kobo matches
+                # its stored Bookmark rows by ContentID, so it would keep the
+                # rows, rewrite each ContentID to the bare old filename, render
+                # nothing, and report "no annotations" for a book the reader had
+                # highlighted. Normalization alone never renames a document,
+                # which is why it stays unconditional and this does not.
+                normalize_kepub_package(
+                    saved_filename,
+                    split_chapters=_may_split_replacement(
+                        book_id, replacing_a_split_package))
 
             # AFTER normalization: it rewrites the archive, so measuring first
             # would record a stale size in the Calibre data row.

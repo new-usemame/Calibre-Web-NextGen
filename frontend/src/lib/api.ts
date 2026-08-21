@@ -124,6 +124,8 @@ export interface Book {
   date_added?: string | null;
   last_modified?: string | null;
   read?: boolean;
+  /** Sync-driven tri-state marker for library cards; absent on older servers. */
+  in_progress?: boolean;
   archived?: boolean;
   /** Personal-library declutter state. Present on list items from current servers. */
   hidden?: boolean;

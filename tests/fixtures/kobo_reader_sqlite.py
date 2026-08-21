@@ -40,6 +40,11 @@ CREATE TABLE Bookmark (
 )
 """
 
+BOOKMARK_DDL_WITH_TYPE = BOOKMARK_DDL.replace(
+    "Hidden INTEGER DEFAULT 0\n)",
+    "Hidden INTEGER DEFAULT 0,\n    Type TEXT\n)",
+)
+
 
 def build_synthetic_kobo_db(
     path: Path,
@@ -169,4 +174,97 @@ def build_empty_sqlite_no_bookmark_table(path: Path) -> Path:
 def build_not_sqlite(path: Path) -> Path:
     """Not a SQLite file at all — exercises the magic-bytes rejection."""
     path.write_bytes(b"This is not a sqlite file. " * 100)
+    return path
+
+
+def build_kobo_db_with_bookmark_type(
+    path: Path,
+    book_uuid: str = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04",
+) -> Path:
+    """A Bookmark table that carries the ``Type`` column, as current firmware does.
+
+    ``build_synthetic_kobo_db`` above deliberately omits ``Type`` — it models an
+    older schema, and the importer must keep working there. This one models the
+    schema a current device actually has, so the two together cover both sides of
+    the capability check in ``parse_kobo_bookmarks``.
+
+    ``dogear`` rows carry no ``Text`` on a real device and so cannot reach the
+    importer, whose SELECT filters them out. One is included anyway, with text,
+    precisely so a test can prove the importer stores whatever word the device
+    used rather than assuming everything it sees is a highlight.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(path)
+    conn.executescript(BOOKMARK_DDL_WITH_TYPE)
+    chapter1 = "{}!!chapter1.html".format(book_uuid)
+    chapter2 = "{}!!chapter2.html".format(book_uuid)
+    rows = [
+        ("bt-001", book_uuid, chapter1, "span#kobo\\.1\\.1", -99, 0,
+         "span#kobo\\.1\\.2", -99, 5, "a highlight", None, 0, "ctx", 0.1,
+         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "highlight"),
+        ("bt-002", book_uuid, chapter1, "span#kobo\\.2\\.1", -99, 0,
+         "span#kobo\\.2\\.2", -99, 5, "with a note", "my note", 1, "ctx", 0.2,
+         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "highlight"),
+        ("bt-003", book_uuid, chapter2, "span#kobo\\.3\\.1", -99, 0,
+         "span#kobo\\.3\\.2", -99, 5, "a dogear with text", None, 4, "ctx", 0.3,
+         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "dogear"),
+        ("bt-004", book_uuid, chapter2, "span#kobo\\.4\\.1", -99, 0,
+         "span#kobo\\.4\\.2", -99, 5, "type is empty", None, 0, "ctx", 0.4,
+         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, ""),
+    ]
+    conn.executemany(
+        "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
+    conn.commit()
+    conn.close()
+    return path
+
+
+def build_kobo_db_with_recovery_rows(
+    path: Path,
+    book_uuid: str = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04",
+) -> Path:
+    """Current-device shapes that the old ``Text`` SQL gate made invisible.
+
+    A dogear has empty ``Text`` and identifies itself through ``Type``. A Kobo
+    highlight with only a typed note keeps ``Type='highlight'`` and puts the
+    user's writing in ``Annotation``. The final fully-empty row is a vacuity
+    guard: widening the old gate must not turn a row with no annotation evidence
+    into an imported annotation, but it must still be counted with a reason.
+    """
+    if not isinstance(path, Path):
+        path = Path(path)
+    if path.exists():
+        path.unlink()
+    conn = sqlite3.connect(path)
+    conn.executescript(BOOKMARK_DDL_WITH_TYPE)
+    chapter = f"{book_uuid}!!chapter1.html"
+    rows = [
+        (
+            "recover-dogear", book_uuid, chapter,
+            "span#kobo\\.7\\.1", -99, 0, "span#kobo\\.7\\.1", -99, 0,
+            "", None, None, None, 0.7,
+            "2026-08-18T12:00:00Z", "2026-08-18T12:00:00Z", 0, "dogear",
+        ),
+        (
+            "recover-note-only", book_uuid, chapter,
+            "span#kobo\\.8\\.1", -99, 3, "span#kobo\\.8\\.1", -99, 3,
+            "", "remember this", 4, "near the end", 0.8,
+            "2026-08-18T12:01:00Z", "2026-08-18T12:02:00Z", 0, "highlight",
+        ),
+        (
+            "recover-empty", book_uuid, chapter,
+            None, None, None, None, None, None,
+            "", None, None, None, None,
+            "2026-08-18T12:03:00Z", "2026-08-18T12:03:00Z", 0, None,
+        ),
+    ]
+    conn.executemany(
+        "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
+    conn.commit()
+    conn.close()
     return path

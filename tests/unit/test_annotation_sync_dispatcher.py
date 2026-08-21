@@ -169,6 +169,20 @@ def test_dispatch_delete_skips_tombstoned(patched_session):
     assert h.calls == []  # handler.delete NOT called twice
 
 
+def test_malformed_delete_member_cannot_block_a_later_valid_delete(patched_session):
+    """One unaddressable member must not turn the rest of the delta into a no-op."""
+    s, user = patched_session
+    dispatch_annotation_sync([_payload("uuid-keep"), _payload("uuid-delete")], _book(), user)
+
+    dispatch_annotation_deletes([{"not": "an id"}, "uuid-delete"], user, book_id=7)
+
+    rows = {
+        row.annotation_id: row.hidden
+        for row in s.query(ub.Annotation).order_by(ub.Annotation.id).all()
+    }
+    assert rows == {"uuid-keep": False, "uuid-delete": True}
+
+
 def test_tombstone_is_terminal_against_repeat_push(patched_session):
     s, user = patched_session
     register_handler(StubHandler())

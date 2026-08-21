@@ -7,6 +7,18 @@
 [![Open issues](https://img.shields.io/github/issues/new-usemame/Calibre-Web-NextGen)](https://github.com/new-usemame/Calibre-Web-NextGen/issues)
 [![Sponsor](https://img.shields.io/badge/Sponsor-nothing%20paywalled-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/new-usemame)
 
+> ### 🤖 Most of the code in this fork is written by AI
+>
+> Not a footnote: the majority of this fork's own fixes, their regression tests, the changelog and
+> most issue replies are produced by an AI assistant working from a written brief. Merges are gated
+> on CI and on a regression test that is verified to fail without the fix, and anything adding a
+> dependency, changing a licence or introducing an external URL is merged by a person — but a human
+> does not read every line. The shipped application itself contains no AI: no model dependency, no
+> inference call, no telemetry, and your library is not sent anywhere.
+>
+> Decide for yourself whether that is a project you want running your library.
+> **[Read the full disclosure →](docs/AI-USAGE.md)**
+
 ---
 
 ## Switch from upstream CWA
@@ -29,7 +41,6 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - **New here?** See [Quick start](#quick-start) below.
 - **Want to back the work?** [**Sponsor on GitHub**](https://github.com/sponsors/new-usemame) — no rewards, no paywalled features, one-time or monthly. [Here's what it actually pays for.](#supporting-the-project)
 - **Setting up with an AI assistant** (Claude, ChatGPT, etc.)? Point it at [`AI_README.md`](AI_README.md) — a setup guide written for the assistant to follow, verify, and hand back to you working.
-- **Wondering how AI is used here?** [`docs/AI-USAGE.md`](docs/AI-USAGE.md) — used heavily to develop this fork, not at all in the software you run, and what gates it.
 
 ---
 
@@ -679,34 +690,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `███████████████████░` 97% | 2717/2807 | 0 |
-| Spanish (`es`) | `███████████████████░` 94% | 2639/2807 | 0 |
-| Polish (`pl`) | `███████████████████░` 93% | 2603/2807 | 0 |
-| French (`fr`) | `████████████████░░░░` 82% | 2313/2807 | 127 |
-| German (`de`) | `███████████████░░░░░` 74% | 2069/2807 | 62 |
-| Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1857/2807 | 292 |
-| Hungarian (`hu`) | `████████████░░░░░░░░` 59% | 1644/2807 | 121 |
-| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 50% | 1406/2807 | 310 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████░░░░░░░░░░` 49% | 1381/2807 | 182 |
-| Japanese (`ja`) | `█████████░░░░░░░░░░░` 47% | 1318/2807 | 247 |
-| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 43% | 1212/2807 | 318 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████░░░░░░░░░░░░` 42% | 1174/2807 | 348 |
-| Italian (`it`) | `███████░░░░░░░░░░░░░` 34% | 955/2807 | 269 |
-| Korean (`ko`) | `███████░░░░░░░░░░░░░` 34% | 946/2807 | 269 |
-| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 28% | 788/2807 | 286 |
-| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 27% | 747/2807 | 313 |
-| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 25% | 699/2807 | 360 |
-| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 24% | 676/2807 | 362 |
-| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 24% | 675/2807 | 361 |
-| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 21% | 582/2807 | 388 |
-| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 504/2807 | 399 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 475/2807 | 408 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2807 | 372 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 15% | 431/2807 | 435 |
-| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2807 | 357 |
-| Finnish (`fi`) | `███░░░░░░░░░░░░░░░░░` 13% | 354/2807 | 388 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 10% | 289/2807 | 385 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 207/2807 | 343 |
+| Russian (`ru`) | `███████████████████░` 96% | 2715/2814 | 0 |
+| Spanish (`es`) | `███████████████████░` 94% | 2637/2814 | 0 |
+| Polish (`pl`) | `██████████████████░░` 92% | 2601/2814 | 0 |
+| French (`fr`) | `████████████████░░░░` 82% | 2313/2814 | 127 |
+| German (`de`) | `███████████████░░░░░` 74% | 2069/2814 | 62 |
+| Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1857/2814 | 292 |
+| Hungarian (`hu`) | `████████████░░░░░░░░` 58% | 1644/2814 | 121 |
+| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 50% | 1406/2814 | 310 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████░░░░░░░░░░` 49% | 1381/2814 | 182 |
+| Japanese (`ja`) | `█████████░░░░░░░░░░░` 47% | 1318/2814 | 247 |
+| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 43% | 1212/2814 | 318 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████░░░░░░░░░░░░` 42% | 1174/2814 | 348 |
+| Italian (`it`) | `███████░░░░░░░░░░░░░` 34% | 955/2814 | 269 |
+| Korean (`ko`) | `███████░░░░░░░░░░░░░` 34% | 946/2814 | 269 |
+| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 28% | 788/2814 | 286 |
+| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 26% | 747/2814 | 313 |
+| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 25% | 699/2814 | 360 |
+| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 24% | 675/2814 | 361 |
+| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 24% | 676/2814 | 362 |
+| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 21% | 582/2814 | 388 |
+| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 504/2814 | 399 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 475/2814 | 408 |
+| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2814 | 372 |
+| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 15% | 431/2814 | 435 |
+| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2814 | 357 |
+| Finnish (`fi`) | `███░░░░░░░░░░░░░░░░░` 13% | 354/2814 | 388 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 10% | 289/2814 | 385 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 207/2814 | 343 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

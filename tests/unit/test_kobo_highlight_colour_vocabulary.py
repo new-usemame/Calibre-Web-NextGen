@@ -370,6 +370,9 @@ class TestEveryReadPathNormalises:
             origin_device_id=None, assigned_device_id=None,
             start_xpointer=None, end_xpointer=None, hidden=False,
             device_origin_id=None,
+            # to_portable exports this since F-9de049; a real Annotation row
+            # always carries it, and the stub models a real row.
+            annotation_type=None,
         )
 
     def test_markdown_export(self):

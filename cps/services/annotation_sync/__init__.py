@@ -24,6 +24,7 @@ from typing import Dict, List, Optional
 from sqlalchemy.exc import IntegrityError
 
 from ..annotation_colors import to_display_name, to_storage_color
+from ..annotation_types import to_storage_type
 from .base import AnnotationSyncTargetHandler, SyncResult
 
 log = logging.getLogger(__name__)
@@ -43,11 +44,11 @@ def parse_client_modified_utc(value):
         raw = raw[:-1] + "+00:00"
     try:
         parsed = datetime.fromisoformat(raw)
-    except ValueError:
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    except (ValueError, OverflowError):
         return None
-    if parsed.tzinfo is None:
-        return None
-    return parsed.astimezone(timezone.utc).replace(tzinfo=None)
 
 # Background dispatch seam (#920)
 # ------------------------------
@@ -292,6 +293,13 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
             book_id=book.id,
             source="kobo",
             origin_device_id=origin_device_id,
+            # Set at construction, not only in the conditional update below.
+            # That branch runs `if "type" in payload`, so a PATCH that omits the
+            # key used to create a row with NULL — the conditional half of
+            # F-9de049. `to_storage_type` still answers None when the payload
+            # says nothing, so this records what the device sent and never
+            # invents a type it did not.
+            annotation_type=to_storage_type(payload.get("type")),
         )
         session.add(ann)
     elif getattr(ann, "content_revision", None) is None:
@@ -310,8 +318,13 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
         # no-op for it and repairs a legacy name from any other client.
         ann.highlight_color = to_storage_color(payload.get("highlightColor"))
     if "type" in payload:
-        native_type = payload.get("type")
-        if isinstance(native_type, str) and len(native_type) <= 32:
+        # Routed through the vocabulary owner (F-9de049) rather than stored raw:
+        # it folds spelling and case so the device's word and the importer's land
+        # on one token, and it preserves a word it does not know instead of
+        # dropping it. The length guard stays — the column is VARCHAR(32) and a
+        # hostile payload should not make the write fail.
+        native_type = to_storage_type(payload.get("type"))
+        if native_type is not None and len(native_type) <= 32:
             ann.annotation_type = native_type
     # Position fields — pulled from Kobo's location.span block.
     chapter_progress = span.get("chapterProgress")
@@ -704,6 +717,13 @@ def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
         return
     jobs = []
     for annotation_id in deleted_ids:
+        if not isinstance(annotation_id, str) or not annotation_id:
+            # A malformed member has no addressable annotation identity. Skip
+            # only that member: letting it reach SQL can poison the session and
+            # prevent later, valid deletions in the same device delta from
+            # being applied before the outer route proxies success.
+            log.warning("Skipping malformed deletedAnnotationIds member %r", annotation_id)
+            continue
         query = ub.session.query(ub.Annotation).filter(
             ub.Annotation.user_id == user.id,
             ub.Annotation.annotation_id == annotation_id,

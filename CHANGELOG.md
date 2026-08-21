@@ -16,8 +16,60 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.39] - 2026-08-21
+
 ### Fixed
 
+- **A highlight made on a Kobo or in the web reader no longer disappears after
+  a KOReader sync.** A KOReader sync could previously either take ownership of
+  an existing highlight or mark it deleted directly, so a later sync — or that
+  same request — could remove a highlight it did not create. Every KOReader
+  delete path now respects where the highlight came from: KOReader can update
+  the contents of Kobo and web-reader highlights, but can delete only
+  highlights created in KOReader.
+
+- **The New UI shows a "Reading" badge on books you have started, the way the
+  classic UI always did.** The green "Read" pill was there, but a book you were
+  part-way through looked identical to one you had never opened, so the only way
+  to tell was to open its detail page. Every list the New UI serves — the
+  library grid, shelves, magic shelves (including the built-in Currently
+  Reading shelf), and search results — now carries the same amber "Reading"
+  marker the old cover badge used, driven by the same sync state your Kobo and
+  KOReader already write. Reported by @magdalar and @JamesHACS (#1702).
+
+- **Highlights now work in the chapters of a book that keeps many chapters in
+  one file — the shape almost every Project Gutenberg book has.** A Kobo
+  recognises a chapter by the file it lives in, not by a link into the middle of
+  a file, so in these books only the first chapter of each file could hold a
+  highlight. Everything you highlighted in the rest of the file was saved on the
+  device and simply never shown, with the Annotations panel reporting nothing
+  there. Books converted, uploaded, or auto-ingested from now on are stored with
+  one file per chapter, so highlights attach where you make them. Measured on a
+  41-book library, counting the chapters a Kobo could actually attach a highlight
+  to: 13 of 1653 before any of this work, 1192 once the existing repair had run,
+  and 1584 with chapter splitting on top — so this change is worth about 392 more
+  chapters, and 96% of chapters in that library can now hold a highlight. **A book you have already
+  highlighted is deliberately left alone** — changing its chapter files would
+  stop those highlights showing on your device — unless it was already stored
+  chapter-by-chapter, in which case re-uploading or re-converting it keeps the
+  same chapter files and your highlights keep working.
+- **The notice you get after CWNG repairs a Kobo book now tells you what to do
+  about it, in a way that works whichever way your device behaves.** It used to say the app had "repaired a book previously sent to your
+  Kobo" and that "older highlights may still need to be recreated" — accurate, but
+  it never said the thing that actually helps: sync, then try highlighting again.
+  It now leads with that, and adds the fallback for the case where syncing alone
+  is not enough — remove the book from the Kobo and let it download again — so the
+  advice holds whether or not your device re-downloads a repaired book on its own.
+  The version shown on a book's own page also tells you to download the book again
+  if you read it somewhere other than a Kobo.
+- **Highlight colours synced through the KOReader plugin were wrong, and on a
+  black-and-white Kobo every highlight came back yellow.** The plugin used a
+  colour table that had blue and green the wrong way round, called Kobo's pink
+  "red" (a Kobo cannot store red at all), and had no entry for grey — which is
+  the colour a greyscale reader like the Clara BW records for *every* highlight
+  you make, so all of them arrived as yellow. The table now matches what the
+  device actually stores, measured on hardware, and the server and plugin are
+  checked against each other so they cannot drift apart again.
 - **Asking your system to reduce motion now stops every spinning icon in the new
   UI, not just some of them.** The app has seven loading spinners; four stopped
   when you turned on "reduce motion" and three kept spinning — including the

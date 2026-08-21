@@ -960,6 +960,10 @@ msgid "Uploaded file is not a SQLite database."
 msgstr "Загруженный файл не является базой данных SQLite."
 
 #: cps/annotations.py
+msgid "Uploaded database has no readable Kobo Bookmark table."
+msgstr ""
+
+#: cps/annotations.py
 #, python-format
 msgid "File exceeds %(max)d MB."
 msgstr "Размер файла превышает %(max)d МБ."
@@ -3260,6 +3264,10 @@ msgstr "Издатели (через запятую)"
 msgid "Read"
 msgstr "Прочитано"
 
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Reading"
+msgstr "В процессе чтения"
+
 #: cps/spa_strings.py
 msgid "Reading progress"
 msgstr "Прогресс чтения"
@@ -3519,10 +3527,6 @@ msgid ""
 msgstr ""
 "Интерфейс переведен на ваш язык; эти примечания к обновлению написаны на "
 "английском."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Reading"
-msgstr "В процессе чтения"
 
 #: cps/spa_strings.py
 msgid "Grid view"
@@ -6362,6 +6366,29 @@ msgid "Warning: this highlight can’t be shown in the book"
 msgstr "Предупреждение: это выделение не может быть показано в книге"
 
 #: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again. If you read it some other way, "
+"download it again to get the repaired copy."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"We repaired {count} books for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove them "
+"from your Kobo and let them download again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Web reader"
 msgstr "Веб-читалка"
 
@@ -7691,20 +7718,44 @@ msgid "Import summary"
 msgstr "Сводка импорта"
 
 #: cps/templates/annotations_import.html
-msgid "new highlights imported"
-msgstr "импортированы новые выделения"
+msgid "new annotations imported"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "existing annotations updated from a newer device copy"
+msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "already imported (skipped)"
 msgstr "уже импортировано (пропущено)"
 
 #: cps/templates/annotations_import.html
+msgid "different or undated device entries older than server state (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
 msgid "for books not in this library (skipped)"
 msgstr "для книг, отсутствующих в этой библиотеке (пропущено)"
 
 #: cps/templates/annotations_import.html
-msgid "hidden on device (skipped)"
-msgstr "скрыто на устройстве (пропущено)"
+msgid "hidden on device (reported, not applied)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "empty bookmark rows with no annotation content (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "invalid bookmark rows (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries with invalid book positions (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries not saved because the import transaction failed"
+msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "total entries seen"
@@ -13235,6 +13286,12 @@ msgstr "Показывать выбранные полки в OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Показать раздел прочитанного/непрочитанного"
+
+#~ msgid "new highlights imported"
+#~ msgstr "импортированы новые выделения"
+
+#~ msgid "hidden on device (skipped)"
+#~ msgstr "скрыто на устройстве (пропущено)"
 
 #~ msgid "Could not load highlights."
 #~ msgstr "Не удалось загрузить выделения."

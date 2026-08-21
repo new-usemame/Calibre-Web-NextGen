@@ -14,6 +14,7 @@ collaborators, so they exercise the actual code path rather than pinning source.
 """
 import os
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -37,14 +38,27 @@ CHAPTER = ('<?xml version="1.0" encoding="UTF-8"?>'
            '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>c</title></head>'
            '<body><div id="top">x</div></body></html>')
 
+SPLIT_NCX = ('<?xml version="1.0" encoding="UTF-8"?>'
+             '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>'
+             '<navPoint id="n1"><navLabel><text>One</text></navLabel>'
+             '<content src="chapter.xhtml#one"/></navPoint>'
+             '<navPoint id="n2"><navLabel><text>Two</text></navLabel>'
+             '<content src="chapter.xhtml#two"/></navPoint></navMap></ncx>')
+SPLIT_CHAPTER = ('<?xml version="1.0" encoding="UTF-8"?>'
+                 '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+                 '<div id="book-columns"><div id="book-inner">'
+                 '<section id="one"><span class="koboSpan" id="kobo.1.1">one</span></section>'
+                 '<section id="two"><span class="koboSpan" id="kobo.2.1">two</span></section>'
+                 '</div></div></body></html>')
 
-def _make_kepub(path):
+
+def _make_kepub(path, *, splittable=False):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("mimetype", "application/epub+zip")
         archive.writestr("META-INF/container.xml", CONTAINER)
         archive.writestr("OEBPS/content.opf", OPF)
-        archive.writestr("OEBPS/toc.ncx", NCX)
-        archive.writestr("OEBPS/chapter.xhtml", CHAPTER)
+        archive.writestr("OEBPS/toc.ncx", SPLIT_NCX if splittable else NCX)
+        archive.writestr("OEBPS/chapter.xhtml", SPLIT_CHAPTER if splittable else CHAPTER)
     return path
 
 
@@ -66,13 +80,14 @@ class _Upload:
             dst.write(src.read())
 
 
-def _drive_upload(monkeypatch, tmp_path, filename):
+def _drive_upload(monkeypatch, tmp_path, filename, *, splittable=False,
+                  annotations=0, pre_existing=False):
     """Run the real upload_book_formats with fake collaborators."""
     from cps import editbooks
 
     library = tmp_path / "library"
     (library / "Author" / "Book (1)").mkdir(parents=True)
-    source = _make_kepub(str(tmp_path / "incoming.kepub"))
+    source = _make_kepub(str(tmp_path / "incoming.kepub"), splittable=splittable)
 
     recorded = {}
 
@@ -126,6 +141,30 @@ def _drive_upload(monkeypatch, tmp_path, filename):
     monkeypatch.setattr(editbooks.uploader, "process", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(editbooks, "merge_metadata", lambda *a, **k: None, raising=False)
 
+    # `_book_has_annotations` decides whether this upload may be split. It fails
+    # CLOSED, so without a working annotation store every upload would silently
+    # take the no-split path and the split assertions below would pass for the
+    # wrong reason.
+    class _AnnotationQuery:
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def first(self):
+            return object() if annotations else None
+
+    class _UbSession:
+        def query(self, _model):
+            return _AnnotationQuery()
+
+    monkeypatch.setattr(editbooks.ub, "session", _UbSession(), raising=False)
+
+    if pre_existing:
+        # The replacement case needs something already stored, or the
+        # "was it already split" question is never even asked.
+        stored_dir = library / "Author" / "Book (1)"
+        stored_dir.mkdir(parents=True, exist_ok=True)
+        (stored_dir / ("Book (1)." + filename.rsplit('.', 1)[-1])).write_bytes(b"old")
+
     editbooks.upload_book_formats([_Upload(source, filename)], _Book(), 1)
 
     stored = library / "Author" / "Book (1)" / ("Book (1)." + filename.rsplit(".", 1)[-1])
@@ -139,6 +178,35 @@ def test_uploaded_kepub_has_its_redundant_toc_fragment_stripped(monkeypatch, tmp
     assert _ncx_sources(str(stored)) == ["chapter.xhtml"], (
         "the redundant #top fragment must be gone, or a Kobo files highlights in "
         "this chapter under an id no spine row carries")
+
+
+def test_uploaded_kepub_is_born_with_split_chapter_documents(monkeypatch, tmp_path):
+    stored, _recorded = _drive_upload(
+        monkeypatch, tmp_path, "incoming.kepub", splittable=True)
+
+    assert _ncx_sources(str(stored)) == [
+        "chapter-split-1.xhtml",
+        "chapter-split-2.xhtml",
+    ]
+
+
+def test_upload_continues_when_opted_in_split_returns_failure(monkeypatch, tmp_path):
+    from cps import editbooks
+
+    monkeypatch.setattr(
+        editbooks,
+        "normalize_kepub_package",
+        lambda _path, **_kwargs: None,
+    )
+
+    stored, _recorded = _drive_upload(
+        monkeypatch, tmp_path, "incoming.kepub", splittable=True)
+
+    assert stored.exists()
+    assert _ncx_sources(str(stored)) == [
+        "chapter.xhtml#one",
+        "chapter.xhtml#two",
+    ]
 
 
 def test_recorded_size_matches_the_normalized_file(monkeypatch, tmp_path):
@@ -157,3 +225,152 @@ def test_non_kepub_upload_is_untouched(monkeypatch, tmp_path):
     assert stored.exists()
     assert _ncx_sources(str(stored)) == ["chapter.xhtml#top"], (
         "a non-KEPUB upload must be stored byte-for-byte as supplied")
+
+
+def test_an_uploaded_kepub_is_not_split_when_the_book_already_has_annotations(
+        monkeypatch, tmp_path):
+    """This route is reached from EDIT BOOK, so the book can be years old.
+
+    Splitting renames spine documents. A Kobo matches its stored Bookmark rows
+    by ContentID, so it keeps the rows, rewrites each ContentID to the bare old
+    filename, renders nothing, and reports "no annotations" for a book the
+    reader had highlighted. Normalization alone never renames a document, so it
+    still runs -- only the split is withheld.
+    """
+    stored, _recorded = _drive_upload(
+        monkeypatch, tmp_path, "incoming.kepub", splittable=True, annotations=1)
+
+    assert stored.exists(), "the upload must still be stored"
+    assert _ncx_sources(str(stored)) == ["chapter.xhtml#one", "chapter.xhtml#two"], (
+        "an annotated book's KEPUB was split; every existing highlight in it "
+        "would stop rendering on the device")
+
+
+def test_the_annotation_check_fails_closed(monkeypatch, tmp_path):
+    """If the annotation store cannot be read, do not split.
+
+    The unsafe direction is splitting a book that turns out to have highlights,
+    so an unreadable store must produce the pre-split behaviour, not the
+    optimistic one.
+    """
+    from cps import editbooks
+
+    class _ExplodingSession:
+        def query(self, _model):
+            raise RuntimeError("annotation store unavailable")
+
+    monkeypatch.setattr(editbooks.ub, "session", _ExplodingSession(), raising=False)
+    assert editbooks._book_has_annotations(1) is True
+
+
+def test_the_annotation_check_looks_past_the_uploading_user(monkeypatch):
+    """An admin replacing a format must not silently break someone else's highlights.
+
+    Executed rather than pinned to source text: capture the criteria the query is
+    actually filtered by and read them, so the test fails if a `user_id` filter
+    is added no matter how it is spelled.
+    """
+    from cps import editbooks, ub
+
+    captured = []
+
+    class _Query:
+        def filter(self, *criteria):
+            captured.extend(criteria)
+            return self
+
+        def first(self):
+            return None
+
+    class _Session:
+        def query(self, model):
+            assert model is ub.Annotation, model
+            return _Query()
+
+    monkeypatch.setattr(editbooks.ub, "session", _Session(), raising=False)
+    assert editbooks._book_has_annotations(7) is False
+
+    rendered = " ".join(str(criterion) for criterion in captured)
+    assert captured, "the check ran no filter at all; it would report every book annotated"
+    assert "annotation.book_id" in rendered, rendered
+    assert "user_id" not in rendered, (
+        "the annotation check is filtered by user; an admin replacing a format "
+        "would then split a book another account has highlighted: " + rendered
+    )
+
+
+def test_an_annotated_book_that_was_ALREADY_split_is_split_again(monkeypatch, tmp_path):
+    """F-bbd10e: withholding the split is the wrong answer for a book born split.
+
+    Piece naming is deterministic, so re-splitting a replacement built from the
+    same source reproduces the exact member names its annotations are anchored
+    to. Withholding the split instead DELETES those files. The earlier guard —
+    "never split an annotated book" — got this case backwards.
+    """
+    from cps import editbooks
+
+    # Pretend the package already on disk carries our split pieces in its spine.
+    monkeypatch.setattr(editbooks, "_package_was_split_by_us", lambda _p: True,
+                        raising=False)
+
+    stored, _recorded = _drive_upload(
+        monkeypatch, tmp_path, "incoming.kepub", splittable=True, annotations=1,
+        pre_existing=True)
+
+    assert _ncx_sources(str(stored)) == [
+        "chapter-split-1.xhtml",
+        "chapter-split-2.xhtml",
+    ], "an already-split annotated book was left unsplit, stranding its anchors"
+
+
+def test_an_annotated_book_that_was_NOT_split_is_still_left_alone(monkeypatch, tmp_path):
+    """The original case, which must not regress while fixing the inversion."""
+    from cps import editbooks
+
+    monkeypatch.setattr(editbooks, "_package_was_split_by_us", lambda _p: False,
+                        raising=False)
+
+    stored, _recorded = _drive_upload(
+        monkeypatch, tmp_path, "incoming.kepub", splittable=True, annotations=1,
+        pre_existing=True)
+
+    assert _ncx_sources(str(stored)) == ["chapter.xhtml#one", "chapter.xhtml#two"], (
+        "a book that was never split had its spine renamed underneath its "
+        "existing highlights"
+    )
+
+
+def test_the_decision_rule_itself(monkeypatch):
+    """Both inputs, all four combinations, without driving an upload."""
+    from cps import editbooks
+
+    monkeypatch.setattr(editbooks, "_book_has_annotations", lambda _b: False,
+                        raising=False)
+    assert editbooks._may_split_replacement(1, False) is True
+    assert editbooks._may_split_replacement(1, True) is True
+
+    monkeypatch.setattr(editbooks, "_book_has_annotations", lambda _b: True,
+                        raising=False)
+    assert editbooks._may_split_replacement(1, False) is False
+    assert editbooks._may_split_replacement(1, True) is True
+
+
+def test_upload_comment_describes_the_annotated_replacement_exception():
+    """The call-site prose must not contradict the decision directly below it.
+
+    The stale wording said splitting happened only without annotations, hiding
+    the already-split exception this suite exists to protect. Pin both the
+    removal and the corrected rule because a wrong comment disables review of
+    the real branch even while behavioural tests remain green.
+    """
+    from cps import editbooks
+
+    source = Path(editbooks.__file__).read_text(encoding="utf-8")
+    stale = "Splitting is opted into only when the book carries no"
+    corrected = (
+        "Splitting is withheld for an annotated book unless the stored\n"
+        "                # KEPUB was already split by us"
+    )
+
+    assert stale not in source
+    assert corrected in source

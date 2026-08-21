@@ -3,7 +3,13 @@
 Asked for in [#1631](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1631). It's a fair
 question and it deserves a permanent answer rather than a reply buried in a thread.
 
-**Short version: AI is used heavily to develop this fork, and not at all in the software you run.**
+**Short version: most of the code you run was written by AI; none of it calls one at runtime.**
+
+Those are two different questions and it is worth keeping them apart, because answering only the
+second one is misleading. *Authorship*: the majority of this fork's own code, tests and prose are
+AI-written. *Runtime*: the shipped application has no model dependency, makes no inference call, and
+sends your library nowhere. If AI-authored code is the thing you are worried about, the runtime
+answer is not a reassurance and is not offered as one.
 
 ## In the software you run: none
 

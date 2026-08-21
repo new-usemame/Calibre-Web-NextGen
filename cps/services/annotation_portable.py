@@ -10,7 +10,8 @@ device-native fields (KoboReader.sqlite Bookmark columns, etc.).
     (pull: server → device).
   - :func:`apply_portable` — upsert an Annotation from a pushed wire dict
     (push: device → server), recording ``device_origin_id`` for feedback-loop
-    suppression and soft-deleting on ``hidden``.
+    suppression and soft-deleting on ``hidden`` only when the calling protocol
+    authorizes the stored provenance.
 
 Kept dependency-light + explicit so it's unit-testable without a Flask
 request context (mirrors cps/annotations.py's pure helpers).
@@ -21,12 +22,15 @@ See notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md §4.1.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Collection, Optional, Tuple
 
 from sqlalchemy import exc
 
+from .. import logger
 from .annotation_colors import to_display_name, to_storage_color
 from .annotation_types import to_storage_type
+
+log = logger.create()
 
 _VALID_SOURCES = {"kobo", "webreader", "koreader"}
 
@@ -103,13 +107,17 @@ def to_portable(row) -> dict:
 
 
 def apply_portable(payload, *, user_id, book, session, commit,
-                   origin_device_id=None) -> Tuple[Optional[object], str]:
+                   origin_device_id=None,
+                   deletable_sources: Collection[str] = (),
+                   ) -> Tuple[Optional[object], str]:
     """Upsert an Annotation from a device-pushed portable dict.
 
     Find-or-create keyed on ``(user_id, book_id, annotation_id)``. New rows take
     a recognized payload ``source`` and default a missing source to ``koreader``;
-    existing rows retain their stored provenance. Position fields are built
-    from the KoboSpan anchors like the web-reader create path.
+    existing rows retain their stored provenance. ``deletable_sources`` is the
+    calling protocol's authority for soft-deleting an existing row; the helper
+    defaults to allowing none. Position fields are built from the KoboSpan
+    anchors like the web-reader create path.
     ``device_origin_id`` is recorded so the next pull won't echo the row back to
     the device. ``hidden: true`` soft-deletes.
 
@@ -149,17 +157,39 @@ def apply_portable(payload, *, user_id, book, session, commit,
         )
         session.add(row)
         created = True
-    elif row.hidden and not payload.get("hidden"):
-        # A complete-list retry has no mutation clock, so it cannot prove an
-        # intentional recreation. Preserve the tombstone and every stored field.
-        return row, "skipped"
+    else:
+        if "source" in payload and payload.get("source") != row.source:
+            # Keep the 200 response for compatibility, but never let a refused
+            # authority claim disappear without the details needed to diagnose
+            # why the device's requested change did not land.
+            log.warning(
+                "Portable annotation push ignored source change: user=%s book=%s "
+                "annotation_id=%r stored_source=%r claimed_source=%r",
+                user_id, getattr(book, "id", "?"), annotation_id,
+                row.source, payload.get("source"),
+            )
+        if row.hidden and not payload.get("hidden"):
+            # A complete-list retry has no mutation clock, so it cannot prove an
+            # intentional recreation. Preserve the tombstone and every stored field.
+            return row, "skipped"
     # ``source`` is provenance, not editable content. Every legitimate origin
-    # is assigned at creation by its ingest route (Kobo PATCH, web reader, or
-    # this KOReader bridge). No ordinary annotation push carries authority to
-    # migrate an existing row between those origins; such a migration would
-    # need its own operator-gated operation. In particular, accepting a claimed
-    # ``koreader`` source here would let the next named-delete push bypass
-    # _DELETABLE_SOURCES and erase a Kobo/web-reader row (F-1927e0).
+    # is assigned at creation by its ingest route (Kobo PATCH, web reader, the
+    # KoboReader.sqlite import, or this KOReader bridge). No ordinary annotation
+    # push carries authority to migrate an existing row between those origins;
+    # such a migration would need its own operator-gated operation. In
+    # particular, accepting a claimed ``koreader`` source here would let the
+    # next named-delete push bypass _DELETABLE_SOURCES and erase a Kobo/web-
+    # reader row (F-1927e0).
+
+    hidden_requested = bool(payload.get("hidden"))
+    hidden_permitted = created or row.source in deletable_sources
+    if hidden_requested and not hidden_permitted and not bool(row.hidden):
+        log.warning(
+            "Portable annotation push refused hidden: user=%s book=%s "
+            "annotation_id=%r stored_source=%r deletable_sources=%s",
+            user_id, getattr(book, "id", "?"), annotation_id, row.source,
+            sorted(deletable_sources),
+        )
 
     before = None if created else (
         row.source, row.highlighted_text, row.note_text, row.highlight_color,
@@ -213,9 +243,14 @@ def apply_portable(payload, *, user_id, book, session, commit,
     if payload.get("device_origin_id"):
         row.device_origin_id = payload.get("device_origin_id")
 
-    if payload.get("hidden"):
+    if hidden_requested and hidden_permitted:
         row.hidden = True
         action = "deleted"
+    elif hidden_requested:
+        # Preserve the stored state. If no permitted content field changed,
+        # the before/after check below reports this as ``skipped`` and the
+        # protocol performs no fan-out of any kind.
+        action = "updated"
     else:
         row.hidden = False
         action = "created" if created else "updated"
@@ -251,5 +286,6 @@ def apply_portable(payload, *, user_id, book, session, commit,
         return apply_portable(
             payload, user_id=user_id, book=book, session=session, commit=commit,
             origin_device_id=origin_device_id,
+            deletable_sources=deletable_sources,
         )
     return row, action

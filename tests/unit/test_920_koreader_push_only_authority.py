@@ -32,6 +32,7 @@ These tests pin the authority contract:
 from __future__ import annotations
 
 import importlib
+import logging
 
 import pytest
 from flask import Flask
@@ -52,11 +53,13 @@ class StubHandler(AnnotationSyncTargetHandler):
 
     def __init__(self):
         self.deletes = []
+        self.pushes = []
 
     def is_enabled(self, user):
         return True
 
     def push(self, annotation, book, user, payload=None):
+        self.pushes.append(annotation.annotation_id)
         return SyncResult(status="synced", target_record_id="r1")
 
     def delete(self, sync_target, user):
@@ -301,20 +304,23 @@ def test_push_cannot_rehome_foreign_row_then_delete_it(wire, original_source):
 
 
 @pytest.mark.parametrize("claimed_source", ["kobo", "webreader"])
-def test_foreign_source_claim_cannot_rehome_koreader_row(wire, claimed_source):
+def test_foreign_source_claim_cannot_rehome_koreader_row(
+    wire, claimed_source, caplog,
+):
     """The provenance boundary is symmetric; no ordinary push may re-home."""
     client, session, user = wire
     _seed(session, user.id, "kr-owned", source="koreader")
 
-    response = client.put("/kosync/syncs/annotations", json={
-        "document": "digest-920",
-        "annotations": [{
-            "annotation_id": "kr-owned",
-            "source": claimed_source,
-            "highlighted_text": "edited without acquiring foreign provenance",
-            "color": "yellow",
-        }],
-    })
+    with caplog.at_level(logging.WARNING):
+        response = client.put("/kosync/syncs/annotations", json={
+            "document": "digest-920",
+            "annotations": [{
+                "annotation_id": "kr-owned",
+                "source": claimed_source,
+                "highlighted_text": "edited without acquiring foreign provenance",
+                "color": "yellow",
+            }],
+        })
 
     row = session.query(ub.Annotation).filter_by(
         user_id=user.id, book_id=7, annotation_id="kr-owned",
@@ -322,6 +328,84 @@ def test_foreign_source_claim_cannot_rehome_koreader_row(wire, claimed_source):
     assert response.status_code == 200
     assert row.source == "koreader"
     assert row.highlighted_text == "edited without acquiring foreign provenance"
+    refusals = [
+        record.getMessage() for record in caplog.records
+        if "ignored source change" in record.getMessage()
+    ]
+    assert len(refusals) == 1
+    assert "annotation_id='kr-owned'" in refusals[0]
+    assert "stored_source='koreader'" in refusals[0]
+    assert f"claimed_source={claimed_source!r}" in refusals[0]
+
+
+@pytest.mark.parametrize("original_source", ["kobo", "webreader"])
+def test_hidden_push_cannot_delete_foreign_row(
+    wire, original_source, caplog,
+):
+    """F-1927e0: inline ``hidden`` obeys the same source boundary as a
+    named delete and cannot trigger delete fan-out for another origin."""
+    client, session, user = wire
+    handler = StubHandler()
+    register_handler(handler)
+    _seed(session, user.id, "foreign-hidden", source=original_source)
+    row = session.query(ub.Annotation).filter_by(
+        user_id=user.id, book_id=7, annotation_id="foreign-hidden",
+    ).one()
+    session.add(ub.AnnotationSyncTarget(
+        annotation_id=row.id, target="stub", target_record_id="r-hidden",
+        status="synced",
+    ))
+    session.commit()
+
+    with caplog.at_level(logging.WARNING):
+        response = client.put("/kosync/syncs/annotations", json={
+            "document": "digest-920",
+            "annotations": [{
+                "annotation_id": "foreign-hidden",
+                "hidden": True,
+            }],
+        })
+
+    row = session.query(ub.Annotation).filter_by(
+        user_id=user.id, book_id=7, annotation_id="foreign-hidden",
+    ).one()
+    assert response.status_code == 200
+    assert response.get_json()["deleted"] == 0
+    assert response.get_json()["skipped"] == 1
+    assert row.source == original_source
+    assert row.hidden is False
+    assert _live_ids(session, user.id) == {"foreign-hidden"}
+    assert handler.deletes == []
+    assert handler.pushes == []
+    refusals = [
+        record.getMessage() for record in caplog.records
+        if "refused hidden" in record.getMessage()
+    ]
+    assert len(refusals) == 1
+    assert "annotation_id='foreign-hidden'" in refusals[0]
+    assert f"stored_source={original_source!r}" in refusals[0]
+
+
+def test_new_hidden_push_still_creates_a_tombstone(wire):
+    """The source boundary restricts deletes of existing rows, not creation."""
+    client, session, user = wire
+
+    response = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-920",
+        "annotations": [{
+            "annotation_id": "new-hidden",
+            "source": "kobo",
+            "hidden": True,
+        }],
+    })
+
+    row = session.query(ub.Annotation).filter_by(
+        user_id=user.id, book_id=7, annotation_id="new-hidden",
+    ).one()
+    assert response.status_code == 200
+    assert response.get_json()["deleted"] == 1
+    assert row.source == "kobo"
+    assert row.hidden is True
 
 
 def test_reported_delete_never_crosses_user_or_book(env):

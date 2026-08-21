@@ -100,6 +100,8 @@ def apply_push(annotations, *, user, book, session, commit,
     the user has since deleted; they are soft-deleted (see
     :func:`_apply_deletes`). Omission from ``annotations`` means nothing on its
     own — see the module docstring for why the server never infers a delete.
+    Inline ``hidden`` uses the same ``_DELETABLE_SOURCES`` authority as those
+    named deletes.
     """
     from ...services.annotation_portable import apply_portable
     from ...services import annotation_sync
@@ -111,6 +113,10 @@ def apply_push(annotations, *, user, book, session, commit,
         row, action = apply_portable(
             payload, user_id=user.id, book=book, session=session, commit=commit,
             origin_device_id=origin_device_id,
+            # This protocol owns the single authority decision. The portable
+            # helper receives the decision; it does not grow a second source
+            # list that could drift from named-delete enforcement.
+            deletable_sources=_DELETABLE_SOURCES,
         )
         summary[action] = summary.get(action, 0) + 1
         if row is None or action == "skipped":

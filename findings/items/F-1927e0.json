@@ -6,8 +6,14 @@
   "refs": [
     "#1781"
   ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-21",
+    "note": "Fixed on this branch. A push may no longer reassign source on an EXISTING row; existing rows retain their stored provenance. The create path is unchanged: a new row still takes a recognised payload source and still defaults a missing one to koreader.\n\nRed/green verified independently by the reviewer, after rebasing onto the merged #1781: 44 passed with the fix; restoring the re-home assignment as a degrade mutation gives 4 failed, including both mirror-direction cases (a kobo or webreader claim cannot re-home a koreader row either).\n\nThe bug was PROVEN executable before it was fixed, through the real Flask route:\n    STEP1 push {annotation_id:'kobo-1', source:'koreader'}  -> 200, row.source becomes 'koreader'\n    STEP2 push {annotations:[], deleted:['kobo-1']}         -> 200, deleted=1\n    SURVIVING: set()\n\nNote for whoever reads this later: test_reported_delete_never_crosses_source already existed, passed, and carried the exact invariant in its docstring. It only exercised the DIRECT delete, so the flip-then-delete was outside its reach. The new tests sit next to it deliberately.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "A KOReader push can flip an existing annotation's source and then delete it, defeating the delete boundary the code claims to enforce"
 }

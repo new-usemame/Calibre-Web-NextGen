@@ -137,11 +137,34 @@ class TestCssSpinnerContract:
 @pytest.mark.unit
 class TestNoGifSpinners:
     """No template should reference loading-icon.gif or loader.gif anymore.
-    All spinners are now pure-CSS .css-spinner elements."""
+    All spinners are now pure-CSS .css-spinner elements.
+
+    Each test below scans ``TEMPLATES.rglob("*.html")`` and asserts the offender
+    list is empty. That shape passes for two very different reasons -- no
+    template references the gif, or no template was scanned at all -- and only
+    one of them is the thing being claimed. If ``cps/templates`` is ever moved or
+    renamed, ``rglob`` returns nothing, every offender list is empty, and three
+    tests go green over a directory that is not there. ``_templates`` is the
+    guard: it fails loudly rather than letting the scan evaporate.
+    """
+
+    @staticmethod
+    def _templates():
+        assert TEMPLATES.is_dir(), (
+            "%s is not a directory — the template scans below would pass "
+            "vacuously over an empty glob" % TEMPLATES
+        )
+        found = sorted(TEMPLATES.rglob("*.html"))
+        assert len(found) > 20, (
+            "only %d template(s) found under %s; this suite scans the whole "
+            "template tree, so a population that small means the scan is not "
+            "seeing what it claims to" % (len(found), TEMPLATES)
+        )
+        return found
 
     def test_no_templates_reference_loading_icon_gif(self):
         offenders = []
-        for tpl in TEMPLATES.rglob("*.html"):
+        for tpl in self._templates():
             body = tpl.read_text(encoding="utf-8", errors="ignore")
             if "loading-icon.gif" in body:
                 offenders.append(str(tpl.relative_to(REPO_ROOT)))
@@ -152,7 +175,7 @@ class TestNoGifSpinners:
 
     def test_no_templates_reference_loader_gif(self):
         offenders = []
-        for tpl in TEMPLATES.rglob("*.html"):
+        for tpl in self._templates():
             body = tpl.read_text(encoding="utf-8", errors="ignore")
             if re.search(r'src=["\'][^"\']*loader\.gif', body):
                 offenders.append(str(tpl.relative_to(REPO_ROOT)))
@@ -165,7 +188,7 @@ class TestNoGifSpinners:
         """The old #img-spinner / #img-spinner2 ids were on <img> elements
         and are now gone; any reappearance is a regression."""
         offenders = []
-        for tpl in TEMPLATES.rglob("*.html"):
+        for tpl in self._templates():
             body = tpl.read_text(encoding="utf-8", errors="ignore")
             if 'id="img-spinner"' in body or 'id="img-spinner2"' in body:
                 offenders.append(str(tpl.relative_to(REPO_ROOT)))

@@ -39,6 +39,18 @@ async function json(route: Route, body: unknown) {
   });
 }
 
+test('shows the complete singular repair instruction for one affected book', async ({ page }) => {
+  await serveCurrentSpaBuild(page);
+  const repaired = [notice(100, 1, 'One repaired book')];
+  await page.route(/\/api\/v1\/notices(?:\/[^?]*)?(?:\?.*)?$/, async (route) => json(route, {
+    notices: repaired,
+    summary: { count: repaired.length },
+  }));
+
+  await page.goto('/app');
+  await expect(page.getByText('We repaired this book for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove the book from your Kobo and let it download again.', { exact: true })).toBeVisible();
+});
+
 test('aggregates repaired books and permanently bulk-dismisses explicit occurrences', async ({ page }) => {
   await serveCurrentSpaBuild(page);
   const repaired = [notice(101, 1, 'First repaired book'), notice(102, 2, 'Second repaired book')];
@@ -59,7 +71,7 @@ test('aggregates repaired books and permanently bulk-dismisses explicit occurren
   });
 
   await page.goto('/app');
-  await expect(page.getByText('CWNG repaired 2 books previously sent to your Kobo.')).toBeVisible();
+  await expect(page.getByText('We repaired 2 books for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove them from your Kobo and let them download again.', { exact: true })).toBeVisible();
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations.filter(
     (violation) => violation.impact === 'critical' || violation.impact === 'serious',
@@ -99,9 +111,9 @@ test('book detail presents and independently dismisses its book-scoped occurrenc
   });
 
   await page.goto(`/app/book/${book!.id}`);
-  await expect(page.getByText('This book was repaired after it had already been sent to a Kobo.')).toBeVisible();
+  await expect(page.getByText('We repaired this book for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove the book from your Kobo and let it download again. If you read it some other way, download it again to get the repaired copy.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Dismiss permanently' }).click();
 
-  await expect(page.getByText('This book was repaired after it had already been sent to a Kobo.')).toHaveCount(0);
+  await expect(page.getByText('We repaired this book for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove the book from your Kobo and let it download again. If you read it some other way, download it again to get the repaired copy.', { exact: true })).toHaveCount(0);
   expect(dismissedId).toBe(201);
 });

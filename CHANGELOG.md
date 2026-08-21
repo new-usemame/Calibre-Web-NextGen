@@ -18,6 +18,56 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Highlights now work in the chapters of a book that keeps many chapters in
+  one file — the shape almost every Project Gutenberg book has.** A Kobo
+  recognises a chapter by the file it lives in, not by a link into the middle of
+  a file, so in these books only the first chapter of each file could hold a
+  highlight. Everything you highlighted in the rest of the file was saved on the
+  device and simply never shown, with the Annotations panel reporting nothing
+  there. Books converted, uploaded, or auto-ingested from now on are stored with
+  one file per chapter, so highlights attach where you make them. Measured on a
+  41-book library, counting the chapters a Kobo could actually attach a highlight
+  to: 13 of 1653 before any of this work, 1192 once the existing repair had run,
+  and 1584 with chapter splitting on top — so this change is worth about 392 more
+  chapters, and 96% of chapters in that library can now hold a highlight. **A book you have already
+  highlighted is deliberately left alone** — changing its chapter files would
+  stop those highlights showing on your device — unless it was already stored
+  chapter-by-chapter, in which case re-uploading or re-converting it keeps the
+  same chapter files and your highlights keep working.
+- **The notice you get after CWNG repairs a Kobo book now tells you what to do
+  about it, in a way that works whichever way your device behaves.** It used to say the app had "repaired a book previously sent to your
+  Kobo" and that "older highlights may still need to be recreated" — accurate, but
+  it never said the thing that actually helps: sync, then try highlighting again.
+  It now leads with that, and adds the fallback for the case where syncing alone
+  is not enough — remove the book from the Kobo and let it download again — so the
+  advice holds whether or not your device re-downloads a repaired book on its own.
+  The version shown on a book's own page also tells you to download the book again
+  if you read it somewhere other than a Kobo.
+- **Highlight colours synced through the KOReader plugin were wrong, and on a
+  black-and-white Kobo every highlight came back yellow.** The plugin used a
+  colour table that had blue and green the wrong way round, called Kobo's pink
+  "red" (a Kobo cannot store red at all), and had no entry for grey — which is
+  the colour a greyscale reader like the Clara BW records for *every* highlight
+  you make, so all of them arrived as yellow. The table now matches what the
+  device actually stores, measured on hardware, and the server and plugin are
+  checked against each other so they cannot drift apart again.
+- **Asking your system to reduce motion now stops every spinning icon in the new
+  UI, not just some of them.** The app has seven loading spinners; four stopped
+  when you turned on "reduce motion" and three kept spinning — including the
+  shared one used on more screens than any other, so the same page could show a
+  still spinner in one place and a spinning one in another. All seven now follow
+  the same rule. Nothing changes if you have not asked for reduced motion.
+- **Container updates and restarts no longer spend the entire shutdown grace
+  period frozen before being killed.** The ingest watcher installed a graceful
+  shutdown handler but then blocked in a foreground polling or filesystem-watch
+  pipeline, which prevents Bash from running that handler. This affected both
+  network-share installations and the default native-Linux watcher: every stop
+  waited for Docker's final forced kill, severing any requests still in flight.
+  The watcher now runs as a managed background process group, so the service can
+  receive the signal immediately, stop its watcher and cleanup helpers, and let
+  the rest of the application finish shutting down normally. Signals arriving
+  during the instant a background process is started are held until its process
+  group ID has been recorded, so that startup edge cannot leave a watcher behind.
 - **A book now takes you back to the list you opened it from instead of
   dropping you at the library root.** The back link returns to the same author,
   series, tag, publisher, language, rating, format, shelf, magic shelf, or

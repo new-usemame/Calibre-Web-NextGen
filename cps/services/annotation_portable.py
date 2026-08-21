@@ -26,6 +26,7 @@ from typing import Optional, Tuple
 from sqlalchemy import exc
 
 from .annotation_colors import to_display_name, to_storage_color
+from .annotation_types import to_storage_type
 
 _VALID_SOURCES = {"kobo", "webreader", "koreader"}
 
@@ -88,6 +89,10 @@ def to_portable(row) -> dict:
         "position_type": row.position_type,
         "start_xpointer": row.start_xpointer,
         "end_xpointer": row.end_xpointer,
+        # Additive since F-9de049: without it a KOReader export -> import round
+        # trip silently dropped the type, because neither side ever mentioned it.
+        # A receiver that does not understand the key ignores it.
+        "type": row.annotation_type,
         "source": row.source,
         "hidden": bool(row.hidden),
         "device_origin_id": row.device_origin_id,
@@ -131,6 +136,9 @@ def apply_portable(payload, *, user_id, book, session, commit,
         row = ub.Annotation(
             user_id=user_id, annotation_id=annotation_id,
             book_id=book.id, source=source, origin_device_id=origin_device_id,
+            # Preserved, never chosen: a sender that omits it leaves NULL rather
+            # than being assigned a type this side invented (F-9de049).
+            annotation_type=to_storage_type(payload.get("type")),
         )
         session.add(row)
         created = True

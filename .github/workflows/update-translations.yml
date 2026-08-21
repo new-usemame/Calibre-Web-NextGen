@@ -24,7 +24,6 @@ concurrency:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   update-translations:
@@ -90,7 +89,6 @@ jobs:
           git add -f messages.pot cps/translations/*/LC_MESSAGES/messages.po README.md
           if git diff --cached --quiet; then
             echo "No translation changes to commit"
-            echo "TRANSLATION_COMMITTED=0" >> $GITHUB_ENV
           else
             git commit -m "Update translations"
             # The autopilot pushes docs commits to main minutes after each
@@ -116,38 +114,37 @@ jobs:
               echo "::error::translation push failed after 3 attempts"
               exit 1
             fi
-            echo "TRANSLATION_COMMITTED=1" >> $GITHUB_ENV
-            echo "TRANSLATION_COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           fi
 
-      - name: Select dev build SHA
-        run: |
-          if [ "${{ env.TRANSLATION_COMMITTED }}" = "1" ]; then
-            echo "DEV_BUILD_SHA=${{ env.TRANSLATION_COMMIT_SHA }}" >> $GITHUB_ENV
-          else
-            echo "DEV_BUILD_SHA=${{ github.sha }}" >> $GITHUB_ENV
-          fi
-
-      - name: Trigger dev build for main
-        # A workflow_dispatch HTTP API call returns 204 on success and 422 on
-        # bad inputs (e.g. undeclared `inputs.*`). curl without --fail returns 0
-        # on 422, which previously masked silent dispatch failures — the step
-        # went green while no dev build actually ran. Use --fail-with-body so
-        # any non-2xx surfaces here, and assert 204 explicitly.
-        run: |
-          set -euo pipefail
-          http_code=$(curl -sS -L -X POST \
-            -o /tmp/dispatch.out -w "%{http_code}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/docker-image-build-dev.yml/dispatches \
-            -d "{\"ref\":\"main\",\"inputs\":{\"ref\":\"${DEV_BUILD_SHA}\",\"branch\":\"main\"}}")
-          echo "dispatch HTTP ${http_code}"
-          if [ "${http_code}" != "204" ]; then
-            echo "::error::dev-build dispatch failed (HTTP ${http_code})"
-            cat /tmp/dispatch.out
-            exit 1
-          fi
+      # There is deliberately no "trigger a dev build" step here.
+      # 218f2bc11 (2026-01-30) added one — and simultaneously excluded main
+      # from the dev workflow's push trigger — because the translation
+      # commit was pushed with GITHUB_TOKEN, which GitHub deliberately does
+      # not run workflows for; the dispatch was the only way main ever got
+      # a :dev image. Both premises are gone. The push has ridden GH_PAT
+      # since d7e22c6fc (2026-05-02), and a PAT push triggers workflows on
+      # its own, so the translation commit has built itself since then. And
+      # 4ce64df8e (2026-06-06) restored push: branches: [main] on
+      # docker-image-build-dev.yml, so every merge touching image-relevant
+      # paths builds itself too. From then on the dispatch could only ever
+      # build a SHA the push trigger had already built — or one it had
+      # deliberately skipped: workflow_dispatch has no paths-ignore, so on
+      # a merge confined to the ignored paths (docs, tests, .github —
+      # editing this workflow is the live example) the dispatch force-built
+      # an image the push trigger correctly declines to build. Those merges
+      # now get ZERO dev builds, which is the intended behaviour, not a
+      # gap: the ignore list exists because such changes cannot alter image
+      # contents (the Dockerfile is not under .github/). Each redundant or
+      # unwanted build pushed a new :dev image that the operator's
+      # household server auto-deploys via watchtower; measured 2026-08-18
+      # at 2–3 builds per merge, i.e. duplicate user-visible restarts. The
+      # GITHUB_TOKEN the dispatch ran under also needed actions: write,
+      # which left with it.
+      # tests/unit/test_dev_image_build_once_when_image_relevant_never_when_ignored.py
+      # pins the policy: exactly one build per image-relevant merge, zero
+      # per ignored one. If the push above ever falls back to GITHUB_TOKEN,
+      # that file's premise test goes red and a trigger belongs back here —
+      # that is the only shape in which one does.
 
       # The per-language translation-status table lives in the repo README
       # (single source of truth) — see the "Translations" section of the

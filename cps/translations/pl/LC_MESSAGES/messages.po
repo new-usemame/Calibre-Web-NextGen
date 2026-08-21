@@ -3825,19 +3825,6 @@ msgid "{count} notices dismissed permanently."
 msgstr ""
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"CWNG repaired {count} books previously sent to your Kobo. Older highlights "
-"may still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"CWNG repaired a book previously sent to your Kobo. Older highlights may "
-"still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "There is new information about your library."
 msgstr ""
 
@@ -3848,13 +3835,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This book was repaired after it had already been sent to a Kobo. Download "
-"the updated book; highlights created before the repair may remain invisible "
-"and may need to be recreated."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6343,6 +6323,29 @@ msgstr "Oczekiwanie na autoryzację…"
 
 #: cps/spa_strings.py
 msgid "Warning: this highlight can’t be shown in the book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again. If you read it some other way, "
+"download it again to get the repaired copy."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"We repaired {count} books for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove them "
+"from your Kobo and let them download again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -10205,8 +10208,8 @@ msgid ""
 "Add these two services to your docker-compose file and run \"docker compose "
 "up -d\". After that you stay up to date automatically — no button to press."
 msgstr ""
-"Dodaj te dwie usługi do pliku docker-compose i uruchom \"docker compose up -"
-"d\". Od tej pory aktualizacje odbywają się automatycznie — bez klikania "
+"Dodaj te dwie usługi do pliku docker-compose i uruchom \"docker compose up "
+"-d\". Od tej pory aktualizacje odbywają się automatycznie — bez klikania "
 "żadnego przycisku."
 
 #: cps/templates/cwa_settings.html cps/templates/update_now_modal.html

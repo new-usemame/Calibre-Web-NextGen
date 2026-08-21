@@ -739,8 +739,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py
 msgid "Password length has to be between 1 and 40"
@@ -3816,19 +3816,6 @@ msgid "{count} notices dismissed permanently."
 msgstr ""
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"CWNG repaired {count} books previously sent to your Kobo. Older highlights "
-"may still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"CWNG repaired a book previously sent to your Kobo. Older highlights may "
-"still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "There is new information about your library."
 msgstr ""
 
@@ -3839,13 +3826,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This book was repaired after it had already been sent to a Kobo. Download "
-"the updated book; highlights created before the repair may remain invisible "
-"and may need to be recreated."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6349,6 +6329,29 @@ msgid "Warning: this highlight can’t be shown in the book"
 msgstr "Предупреждение: это выделение не может быть показано в книге"
 
 #: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again. If you read it some other way, "
+"download it again to get the repaired copy."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"We repaired {count} books for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove them "
+"from your Kobo and let them download again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Web reader"
 msgstr "Веб-читалка"
 
@@ -8712,9 +8715,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -9709,9 +9712,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -9734,9 +9737,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -13420,9 +13423,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

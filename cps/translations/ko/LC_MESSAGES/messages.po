@@ -3670,19 +3670,6 @@ msgid "{count} notices dismissed permanently."
 msgstr ""
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"CWNG repaired {count} books previously sent to your Kobo. Older highlights "
-"may still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"CWNG repaired a book previously sent to your Kobo. Older highlights may "
-"still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "There is new information about your library."
 msgstr ""
 
@@ -3693,13 +3680,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This book was repaired after it had already been sent to a Kobo. Download "
-"the updated book; highlights created before the repair may remain invisible "
-"and may need to be recreated."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6143,6 +6123,29 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Warning: this highlight can’t be shown in the book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again. If you read it some other way, "
+"download it again to get the repaired copy."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"We repaired {count} books for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove them "
+"from your Kobo and let them download again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -12811,8 +12814,8 @@ msgstr "읽음/읽지 않음 표시"
 #~ msgstr ""
 #~ "이 경로들은 CWA 내부에서만 사용됩니다. 콜론 왼쪽 경로는 자유롭게 변경가능"
 #~ "하나,\n"
-#~ "        오른쪽 경로는 변경할 이유가 없습니다.<br><br>만약 <code>metadata."
-#~ "db<code> 파일을 나머지 서재와 다른 위치에 두고 싶다면, \n"
+#~ "        오른쪽 경로는 변경할 이유가 없습니다.<br><br>만약 "
+#~ "<code>metadata.db<code> 파일을 나머지 서재와 다른 위치에 두고 싶다면, \n"
 #~ "<b>아래의 ‘책 파일을 서재와 분리하기’ 옵션을 사용하고, 거기에 라이브러리"
 #~ "의 나머지 경로를 입력하십시오.</b>"
 

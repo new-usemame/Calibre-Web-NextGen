@@ -156,3 +156,95 @@ class TestParserEdgeCases:
         from cps.services.kobo_import import parse_kobo_bookmarks
 
         assert list(parse_kobo_bookmarks(tmp_path / "nope.sqlite")) == []
+
+
+@pytest.mark.unit
+class TestBookmarkTypeIsRecovered:
+    """F-7e418c: the importer never recorded what the device said a row WAS.
+
+    `cps/services/annotation_sync/__init__.py` stores `payload["type"]` for an
+    annotation arriving over the wire, so the same highlight recovered from
+    KoboReader.sqlite used to land with `annotation_type` NULL while its live
+    twin carried a value. Two writers to one column, disagreeing.
+
+    The value is taken from `Bookmark.Type` verbatim rather than derived. That is
+    not a guess about the device's vocabulary: the KOReader plugin both writes
+    `Type = "highlight"` and selects `WHERE Type = 'highlight'`
+    (koreader/plugins/cwasync.koplugin/kobo_sqlite_provider.lua), and the wire
+    payload uses the same word. Deriving one instead would have invented a third
+    vocabulary for this column — exactly what cps/services/annotation_colors.py
+    exists to undo for highlight_color.
+    """
+
+    def test_the_device_word_is_stored_verbatim(self, tmp_path):
+        from cps.services.kobo_import import parse_kobo_bookmarks
+        from tests.fixtures.kobo_reader_sqlite import build_kobo_db_with_bookmark_type
+
+        p = build_kobo_db_with_bookmark_type(tmp_path / "typed.sqlite")
+        by_id = {r.bookmark_id: r for r in parse_kobo_bookmarks(p)}
+
+        assert by_id["bt-001"].annotation_type == "highlight"
+        assert by_id["bt-002"].annotation_type == "highlight"
+
+    def test_a_word_that_is_not_highlight_is_not_rewritten_to_one(self, tmp_path):
+        """Preserve, don't classify.
+
+        A row whose Type is "dogear" must arrive as "dogear". Normalising it to
+        "highlight" would be the same class of mistake as the colour table that
+        answered "yellow" for every code it did not know.
+        """
+        from cps.services.kobo_import import parse_kobo_bookmarks
+        from tests.fixtures.kobo_reader_sqlite import build_kobo_db_with_bookmark_type
+
+        p = build_kobo_db_with_bookmark_type(tmp_path / "typed.sqlite")
+        by_id = {r.bookmark_id: r for r in parse_kobo_bookmarks(p)}
+        assert by_id["bt-003"].annotation_type == "dogear"
+
+    def test_an_empty_type_becomes_none_not_an_empty_string(self, tmp_path):
+        """"" and NULL both mean "the device did not say"."""
+        from cps.services.kobo_import import parse_kobo_bookmarks
+        from tests.fixtures.kobo_reader_sqlite import build_kobo_db_with_bookmark_type
+
+        p = build_kobo_db_with_bookmark_type(tmp_path / "typed.sqlite")
+        by_id = {r.bookmark_id: r for r in parse_kobo_bookmarks(p)}
+        assert by_id["bt-004"].annotation_type is None
+
+    def test_a_schema_without_the_type_column_still_imports_everything(self, tmp_path):
+        """The capability check is the point.
+
+        Naming a column an older firmware lacks would fail the whole query and
+        lose EVERY annotation on that device — far worse than importing them
+        untyped. The long-standing synthetic fixture has no Type column, so it is
+        the older-schema case; assert both that it still yields its rows and that
+        their type is None rather than a fabricated default.
+        """
+        from cps.services.kobo_import import parse_kobo_bookmarks
+        from tests.fixtures.kobo_reader_sqlite import build_synthetic_kobo_db
+
+        p = build_synthetic_kobo_db(tmp_path / "old.sqlite")
+        rows = list(parse_kobo_bookmarks(p))
+        assert len(rows) >= 6, "the older-schema import lost rows"
+        assert {r.annotation_type for r in rows} == {None}
+
+    def test_the_two_fixtures_really_differ(self, tmp_path):
+        """Vacuity guard.
+
+        If both fixtures lacked the Type column, every assertion above would pass
+        while testing one branch twice.
+        """
+        import sqlite3
+
+        from tests.fixtures.kobo_reader_sqlite import (
+            build_kobo_db_with_bookmark_type,
+            build_synthetic_kobo_db,
+        )
+
+        def columns(path):
+            conn = sqlite3.connect(path)
+            try:
+                return {row[1] for row in conn.execute("PRAGMA table_info(Bookmark)")}
+            finally:
+                conn.close()
+
+        assert "Type" in columns(build_kobo_db_with_bookmark_type(tmp_path / "new.sqlite"))
+        assert "Type" not in columns(build_synthetic_kobo_db(tmp_path / "old.sqlite"))

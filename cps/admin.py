@@ -1442,10 +1442,37 @@ def ajax_kobo_resend(userid, bookid):
 
 def do_kobo_resend(userid, bookid):
     # Force re-delivery of one book to one user's Kobo on the next sync.
-    # Clears the (user_id, book_id) row from kobo_synced_books so the
-    # sync emits NewEntitlement, and bumps Books.last_modified so the
-    # sync filter (Books.last_modified > sync_token.books_last_modified)
-    # picks the book up regardless of where the device's cursor is.
+    #
+    # Two writes, and only the second does what it says on its own:
+    #
+    #   * bump Books.last_modified, so the sync filter
+    #     (Books.last_modified > sync_token.books_last_modified) picks the book
+    #     up regardless of where the device's cursor sits;
+    #   * clear the (user_id, book_id) row from kobo_synced_books.
+    #
+    # ⚠️ This comment used to say the deletion is what makes the sync emit
+    # NewEntitlement. It is not, and believing so is what made the only
+    # regression test for this helper assert a causal chain the code cannot
+    # perform (F-cc5efb). get_kobo_created_ts (cps/kobo.py) derives the
+    # NewEntitlement / ChangedEntitlement choice from Books.timestamp and the
+    # joined date_added ONLY — it never reads kobo_synced_books, and the sync
+    # query deliberately does not filter on that table either because it is
+    # user-keyed and doing so would break multi-device sync (cps/kobo.py, see
+    # the comments around the changed-book query).
+    #
+    # The deletion still matters, by a different route: HandleSyncRequest resets
+    # the WHOLE sync token — books_last_created included — to datetime.min when
+    # the user has no kobo_synced_books rows left at all (cps/kobo.py, "if no
+    # books synced don't respect sync_token"). So removing the user's LAST row
+    # does produce NewEntitlement, which is the single-book case anyone would
+    # test by hand and is presumably how the wrong explanation survived. With
+    # any other synced row remaining, this emits ChangedEntitlement.
+    #
+    # 🚨 Whether a Kobo re-downloads the file on a ChangedEntitlement is
+    # UNOBSERVED (F-3e383a). The success message below tells the admin the
+    # device "will re-receive the book"; that claim is only established for the
+    # empty-table case above. Do not strengthen it without measuring on
+    # hardware.
     book = calibre_db.session.query(db.Books).filter(db.Books.id == bookid).first()
     if book is None:
         message = _("Book {} not found").format(bookid)

@@ -90,6 +90,10 @@ class ParsedBookmark:
     hidden: bool
     date_created: Optional[str]    # ISO-8601 strings as stored by Kobo
     date_modified: Optional[str]
+    annotation_type: Optional[str] = None
+    # Bookmark.Type verbatim — the device's own word, normally "highlight".
+    # None when the column is absent (older firmware) so a missing value is
+    # never confused with a device that said something.
 
 
 @dataclass(frozen=True)
@@ -295,16 +299,26 @@ def parse_kobo_bookmarks(sqlite_path: Path) -> Iterator[ParsedBookmark]:
             log.info("kobo_import: %s has no Bookmark table — skipping", sqlite_path)
             return
 
+        # Bookmark.Type is the device's own word for what a row is
+        # ("highlight"; a Kobo also uses "dogear", which cannot reach us because
+        # of the Text filter below). Selected conditionally: naming a column an
+        # older firmware lacks would fail the whole query and lose every
+        # annotation on the device, which is a far worse outcome than importing
+        # them untyped.
+        has_type = any(
+            row[1] == "Type"
+            for row in conn.execute("PRAGMA table_info(Bookmark)").fetchall()
+        )
         rows = conn.execute("""
             SELECT
                 BookmarkID, VolumeID, ContentID,
                 StartContainerPath, StartContainerChildIndex, StartOffset,
                 EndContainerPath, EndContainerChildIndex, EndOffset,
                 Text, Annotation, Color, ContextString,
-                ChapterProgress, DateCreated, DateModified, Hidden
+                ChapterProgress, DateCreated, DateModified, Hidden, {type_column}
             FROM Bookmark
             WHERE Text IS NOT NULL AND Text != ''
-        """).fetchall()
+        """.format(type_column="Type" if has_type else "NULL")).fetchall()
     except sqlite3.DatabaseError as e:
         log.warning("kobo_import: SQL error on %s: %s", sqlite_path, e)
         return
@@ -315,7 +329,7 @@ def parse_kobo_bookmarks(sqlite_path: Path) -> Iterator[ParsedBookmark]:
         (bm_id, volume_id, content_id,
          sp, sci, so, ep, eci, eo,
          text, annotation, color, ctx,
-         chapter_progress, dcreated, dmod, hidden) = r
+         chapter_progress, dcreated, dmod, hidden, bm_type) = r
         if not bm_id or not volume_id:
             # Malformed row — Kobo doesn't normally emit these. Skip
             # rather than abort the whole import.
@@ -338,6 +352,14 @@ def parse_kobo_bookmarks(sqlite_path: Path) -> Iterator[ParsedBookmark]:
             # specific colour. A default here is what made every greyscale
             # device's highlights indistinguishable from real yellow ones.
             color=hex_for_bookmark_color(color),
+            # Stored verbatim, not derived. The device's vocabulary and the
+            # live PATCH path's `payload["type"]` are the same word — the
+            # KOReader plugin both writes `Type = "highlight"` and selects
+            # `WHERE Type = 'highlight'` — so preserving it keeps the two
+            # writers to this column speaking one language instead of
+            # inventing a third (the mistake annotation_colors.py exists to
+            # undo for highlight_color).
+            annotation_type=(bm_type if isinstance(bm_type, str) and bm_type else None),
             hidden=bool(hidden),
             date_created=dcreated,
             date_modified=dmod,

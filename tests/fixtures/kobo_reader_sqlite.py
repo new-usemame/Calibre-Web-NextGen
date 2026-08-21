@@ -170,3 +170,69 @@ def build_not_sqlite(path: Path) -> Path:
     """Not a SQLite file at all — exercises the magic-bytes rejection."""
     path.write_bytes(b"This is not a sqlite file. " * 100)
     return path
+
+
+def build_kobo_db_with_bookmark_type(
+    path: Path,
+    book_uuid: str = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04",
+) -> Path:
+    """A Bookmark table that carries the ``Type`` column, as current firmware does.
+
+    ``build_synthetic_kobo_db`` above deliberately omits ``Type`` — it models an
+    older schema, and the importer must keep working there. This one models the
+    schema a current device actually has, so the two together cover both sides of
+    the capability check in ``parse_kobo_bookmarks``.
+
+    ``dogear`` rows carry no ``Text`` on a real device and so cannot reach the
+    importer, whose SELECT filters them out. One is included anyway, with text,
+    precisely so a test can prove the importer stores whatever word the device
+    used rather than assuming everything it sees is a highlight.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(path)
+    conn.execute("""
+        CREATE TABLE Bookmark (
+            BookmarkID TEXT PRIMARY KEY,
+            VolumeID TEXT,
+            ContentID TEXT,
+            StartContainerPath TEXT,
+            StartContainerChildIndex INTEGER,
+            StartOffset INTEGER,
+            EndContainerPath TEXT,
+            EndContainerChildIndex INTEGER,
+            EndOffset INTEGER,
+            Text TEXT,
+            Annotation TEXT,
+            Color INTEGER,
+            ContextString TEXT,
+            ChapterProgress REAL,
+            DateCreated TEXT,
+            DateModified TEXT,
+            Hidden INTEGER DEFAULT 0,
+            Type TEXT
+        )
+    """)
+    chapter1 = "{}!!chapter1.html".format(book_uuid)
+    chapter2 = "{}!!chapter2.html".format(book_uuid)
+    rows = [
+        ("bt-001", book_uuid, chapter1, "span#kobo\\.1\\.1", -99, 0,
+         "span#kobo\\.1\\.2", -99, 5, "a highlight", None, 0, "ctx", 0.1,
+         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "highlight"),
+        ("bt-002", book_uuid, chapter1, "span#kobo\\.2\\.1", -99, 0,
+         "span#kobo\\.2\\.2", -99, 5, "with a note", "my note", 1, "ctx", 0.2,
+         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "highlight"),
+        ("bt-003", book_uuid, chapter2, "span#kobo\\.3\\.1", -99, 0,
+         "span#kobo\\.3\\.2", -99, 5, "a dogear with text", None, 4, "ctx", 0.3,
+         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "dogear"),
+        ("bt-004", book_uuid, chapter2, "span#kobo\\.4\\.1", -99, 0,
+         "span#kobo\\.4\\.2", -99, 5, "type is empty", None, 0, "ctx", 0.4,
+         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, ""),
+    ]
+    conn.executemany(
+        "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
+    conn.commit()
+    conn.close()
+    return path

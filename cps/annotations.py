@@ -50,6 +50,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from . import calibre_db, logger, ub
 from .cw_login import current_user
 from .render_template import render_title_template
+from .services.annotation_types import (
+    to_storage_type,
+    type_for_webreader_annotation,
+)
 from .services.annotation_colors import (
     WEBREADER_COLOR_NAMES,
     to_display_name,
@@ -437,6 +441,12 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
             end_offset=bm.end_offset,
             context_string=bm.context_string,
             chapter_progress=bm.chapter_progress,
+            # The device's own word for what this row is, carried through
+            # unchanged (F-7e418c). The live PATCH path stores the same
+            # vocabulary from `payload["type"]`, so a row recovered from
+            # KoboReader.sqlite and the same annotation arriving over the wire
+            # now agree instead of one of them being NULL.
+            annotation_type=to_storage_type(getattr(bm, "annotation_type", None)),
             source="kobo",
             origin_device_id=origin_device_id,
             hidden=False,
@@ -977,6 +987,10 @@ def create_annotation(payload, *, user_id, book, session, commit,
             annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
             book_id=book.id,
             source="webreader",
+            # No anchor: the reader's unanchored note, an object no Kobo can
+            # represent. `note` is declared web-reader-only in annotation_types
+            # for the same reason WEBREADER_RED_HEX is declared there.
+            annotation_type=type_for_webreader_annotation(has_anchor=False),
             note_text=note,
             # A standalone note is made on a device like any other annotation;
             # it just cannot be placed in the book. Attribution is orthogonal to
@@ -1010,6 +1024,10 @@ def create_annotation(payload, *, user_id, book, session, commit,
             annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
             book_id=book.id,
             source="webreader",
+            # An anchored passage is a `highlight` — the DEVICE's own word for
+            # the same object, so this is not a vocabulary we invented. Note
+            # text attached to it does not make it a note.
+            annotation_type=type_for_webreader_annotation(has_anchor=True),
             origin_device_id=origin_device_id,
             highlighted_text=payload.get("highlighted_text"),
             highlight_color=color,
@@ -1037,6 +1055,10 @@ def create_annotation(payload, *, user_id, book, session, commit,
         annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
         book_id=book.id,
         source="webreader",
+        # An anchored passage is a `highlight` — the DEVICE's own word for
+        # the same object, so this is not a vocabulary we invented. Note
+        # text attached to it does not make it a note.
+        annotation_type=type_for_webreader_annotation(has_anchor=True),
         origin_device_id=origin_device_id,
         highlighted_text=payload.get("highlighted_text"),
         highlight_color=color,

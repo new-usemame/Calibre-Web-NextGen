@@ -3687,19 +3687,6 @@ msgid "{count} notices dismissed permanently."
 msgstr ""
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"CWNG repaired {count} books previously sent to your Kobo. Older highlights "
-"may still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"CWNG repaired a book previously sent to your Kobo. Older highlights may "
-"still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "There is new information about your library."
 msgstr ""
 
@@ -3710,13 +3697,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This book was repaired after it had already been sent to a Kobo. Download "
-"the updated book; highlights created before the repair may remain invisible "
-"and may need to be recreated."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6160,6 +6140,29 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Warning: this highlight can’t be shown in the book"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again. If you read it some other way, "
+"download it again to get the repaired copy."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"We repaired {count} books for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove them "
+"from your Kobo and let them download again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9393,8 +9396,8 @@ msgid ""
 "innocenat\">innocenat</a>."
 msgstr ""
 "此工具改编自 <a href=\"https://github.com/innocenat\">innocenat</a> 制作的 "
-"<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-fix.netlify."
-"app</a> 工具。"
+"<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-"
+"fix.netlify.app</a> 工具。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -9413,8 +9416,8 @@ msgid ""
 "temporarily lock metadata.db. To stop a running backfill, restart the "
 "container after disabling."
 msgstr ""
-"注意：启用此功能会在启动时启动校验和回填服务，该服务可能会暂时锁定 metadata."
-"db。要停止正在运行的回填，请在禁用后重新启动容器。"
+"注意：启用此功能会在启动时启动校验和回填服务，该服务可能会暂时锁定 "
+"metadata.db。要停止正在运行的回填，请在禁用后重新启动容器。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -10269,8 +10272,8 @@ msgid ""
 "users with edit rights will see a badge on the Duplicates sidebar button and "
 "a notification popup when they login."
 msgstr ""
-"检测到未解决的重复项时显示弹出通知。管理员和具有编辑权限的用户在登录时，将"
-"在“重复项”侧边栏按钮上看到一个徽章，并会看到一个弹出通知。"
+"检测到未解决的重复项时显示弹出通知。管理员和具有编辑权限的用户在登录时，将在"
+"“重复项”侧边栏按钮上看到一个徽章，并会看到一个弹出通知。"
 
 #: cps/templates/cwa_settings.html
 #, fuzzy

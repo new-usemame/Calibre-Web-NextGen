@@ -8,8 +8,12 @@ realistic-length text fields. Verifies:
   - SHA-256 preservation of every preserved column
   - row counts match expected post-migration distribution
 
-Marked @pytest.mark.slow so it doesn't run on every CI invocation; runs
-on the integration job.
+Runs in the fast gate. It used to declare the `slow` lane with the note "runs on
+the integration job" -- but the Integration job selects by PATH
+(``pytest tests/docker/ tests/integration/``), never by marker, so a slow-marked
+file sitting under tests/unit/ ran in NEITHER job. Measured 2026-08-19: the whole
+file is 0.50s serial and passes under ``-n 4``, so the premise was wrong twice.
+tests/unit/test_ci_test_lanes.py now fails if any opt-out is unreachable again.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ import pytest
 from sqlalchemy import create_engine, text
 
 
-pytestmark = pytest.mark.slow
+pytestmark = pytest.mark.unit
 
 
 PRE_MIGRATION_DDL = """

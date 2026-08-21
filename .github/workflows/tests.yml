@@ -145,6 +145,26 @@ jobs:
             --cov=cps \
             --cov-report=xml \
             --cov-report=term-missing
+
+      # Tests that live under tests/unit/ but declare a non-fast lane. The
+      # marker expression above deselects them, and the Integration job selects
+      # by PATH (tests/docker/ tests/integration/), so before this step they ran
+      # in NEITHER job -- see tests/unit/test_ci_test_lanes.py, which fails if
+      # any opt-out becomes unreachable again.
+      #
+      # Deliberately NO -n: the one file here is marked `integration` precisely
+      # to stay out of the xdist pool, because cps.progress_syncing.models
+      # imports cps.db and cps.ub at module level and hangs in a worker
+      # subprocess (notes/xdist-worker-ipc-hang-followup-2026-05-21.md). Running
+      # it with -n would reintroduce the hang this classification exists to
+      # avoid. It is sub-second, so a serial step costs nothing.
+      - name: Run non-xdist unit tests (lane opt-outs)
+        run: |
+          pytest tests/unit -m "integration" \
+            -v \
+            --tb=short \
+            --timeout=120 \
+            --timeout-method=thread
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7

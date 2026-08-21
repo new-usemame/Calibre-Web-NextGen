@@ -14,17 +14,12 @@ from .serializers import serialize_book_list_item, serialize_book_detail
 from .. import calibre_db, config, db, ub, isoLanguages, logger
 from ..cw_login import current_user
 from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
-    get_convert_options, get_kosync_progress_display
+    get_convert_options, get_kosync_progress_display, \
+    SQLITE_IN_CHUNK_SIZE as _SQLITE_IN_CHUNK
 from ..sort_orders import BOOK_SORT_ORDERS
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
-
-# SQLite builds vary in their host-parameter ceiling. Stay below even the
-# conservative historical limit when filtering app.db-derived download ids
-# against the separate calibre metadata database.
-_SQLITE_IN_CHUNK = 900
-
 
 def _visible_ids_for_chunk(book_ids):
     query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
@@ -37,7 +32,8 @@ def _visible_hot_book_ids(book_ids):
     """Return visible ids in hotness order without an unbounded SQL ``IN``."""
     visible = set()
     for start in range(0, len(book_ids), _SQLITE_IN_CHUNK):
-        visible.update(_visible_ids_for_chunk(book_ids[start:start + _SQLITE_IN_CHUNK]))
+        visible.update(_visible_ids_for_chunk(
+            book_ids[start:start + _SQLITE_IN_CHUNK]))
     return [book_id for book_id in book_ids if book_id in visible]
 
 

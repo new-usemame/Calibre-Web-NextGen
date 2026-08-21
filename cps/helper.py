@@ -619,6 +619,11 @@ def get_sorted_author(value):
     return value2
 
 
+# SQLite builds vary in their host-parameter ceiling. Keep IN clauses below the
+# conservative historical limit while leaving ordinary list pages as one query.
+SQLITE_IN_CHUNK_SIZE = 900
+
+
 def book_in_progress_ids(book_read_statuses, read_column_configured, user):
     """Return the sync-driven "currently reading" ids from a batch of books.
 
@@ -637,10 +642,11 @@ def book_in_progress_ids(book_read_statuses, read_column_configured, user):
     writes only to ``ub.ReadBook``, so with a custom read column configured the
     flag must be read from ``ub.ReadBook`` regardless of which column is linked.
 
-    The custom-column query is deliberately batch-shaped: one query resolves a
-    whole SPA list page (and the single-book helper below delegates to the same
-    derivation). A truthy custom value is finished and is filtered out even if
-    an old IN_PROGRESS ``ReadBook`` row remains underneath it.
+    The custom-column query is deliberately batch-shaped: one query resolves an
+    ordinary SPA list page, while oversized caller-controlled pages are split
+    into bounded IN clauses. The single-book helper below delegates to the same
+    derivation. A truthy custom value is finished and is filtered out even if an
+    old IN_PROGRESS ``ReadBook`` row remains underneath it.
     """
     statuses = {int(book_id): value for book_id, value in book_read_statuses}
     if not statuses:
@@ -657,14 +663,19 @@ def book_in_progress_ids(book_read_statuses, read_column_configured, user):
     if read_column_configured:
         # A finished custom-column value is unambiguous — never in-progress,
         # including when a stale sync row still says otherwise.
-        eligible_ids = {book_id for book_id, value in statuses.items() if not value}
+        eligible_ids = sorted(
+            book_id for book_id, value in statuses.items() if not value)
         if not eligible_ids:
             return set()
-        rows = ub.session.query(ub.ReadBook.book_id).filter(
-            ub.ReadBook.user_id == int(user.id),
-            ub.ReadBook.book_id.in_(eligible_ids),
-            ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).all()
-        return {int(row[0]) for row in rows if int(row[0]) in eligible_ids}
+        in_progress_ids = set()
+        for start in range(0, len(eligible_ids), SQLITE_IN_CHUNK_SIZE):
+            chunk = eligible_ids[start:start + SQLITE_IN_CHUNK_SIZE]
+            rows = ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == int(user.id),
+                ub.ReadBook.book_id.in_(chunk),
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).all()
+            in_progress_ids.update(int(row[0]) for row in rows)
+        return in_progress_ids
     return {
         book_id for book_id, value in statuses.items()
         if value == ub.ReadBook.STATUS_IN_PROGRESS

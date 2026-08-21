@@ -175,6 +175,41 @@ def test_anonymous_list_never_queries_or_exposes_in_progress(readbook_db):
     assert statements == []
 
 
+def test_custom_read_column_chunks_oversized_in_progress_lookup(readbook_db):
+    """An uncapped page must stay below SQLite's conservative bind ceiling."""
+    ub, engine, session = readbook_db
+    user = SimpleNamespace(id=9, is_authenticated=True, is_anonymous=False)
+    # 901 eligible ids crosses the production 900-id chunk boundary. Only the
+    # first and last are reading so the result also proves chunks are combined.
+    statuses = [(book_id, False) for book_id in range(1, 902)]
+    session.add_all([
+        ub.ReadBook(user_id=9, book_id=1, read_status=ub.ReadBook.STATUS_IN_PROGRESS),
+        ub.ReadBook(user_id=9, book_id=901, read_status=ub.ReadBook.STATUS_IN_PROGRESS),
+    ])
+    session.commit()
+    statements = []
+    parameter_counts = []
+
+    def capture_statement(*args):
+        statements.append(args[2])
+        parameter_counts.append(len(args[3]))
+
+    event.listen(engine, "before_cursor_execute", capture_statement)
+    try:
+        from cps.helper import book_in_progress_ids
+
+        with patch.object(ub, "session", session):
+            result = book_in_progress_ids(statuses, True, user)
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_statement)
+
+    assert result == {1, 901}
+    assert len(statements) == 2, "901 ids must execute as 900 + 1, not one oversized IN"
+    # Two scalar predicates (user/status) accompany each IN list.
+    assert sorted(parameter_counts) == [3, 902]
+    assert all("book_id IN" in statement for statement in statements)
+
+
 def test_currently_reading_magic_shelf_items_expose_in_progress():
     """The built-in Currently Reading shelf must not lose its own state badge."""
     from cps import ub
@@ -223,6 +258,91 @@ def test_currently_reading_magic_shelf_items_expose_in_progress():
             return_value=([row], None, Pagination(1, 60, 1)),
         ):
             response = inspect.unwrap(magic_mod.magic_shelf_books)(17)
+
+    body = json.loads(response.get_data(as_text=True))
+    assert body["items"][0]["in_progress"] is True
+    assert body["items"][0]["read"] is False
+
+
+def test_shelf_detail_items_expose_in_progress():
+    """Ordinary shelf cards carry the same tri-state as the library grid."""
+    from cps import ub
+    from cps.api import books as books_mod
+    from cps.api import shelves as shelves_mod
+    from cps.pagination import Pagination
+
+    user = SimpleNamespace(id=9, is_authenticated=True, is_anonymous=False)
+    shelf = SimpleNamespace(
+        id=23, name="To read next", user_id=9, is_public=False, kobo_sync=False
+    )
+    row = SimpleNamespace(
+        Books=_book(2),
+        is_archived=False,
+        read_status=ub.ReadBook.STATUS_IN_PROGRESS,
+    )
+    app_session = MagicMock()
+    app_session.query.return_value.filter.return_value.first.return_value = shelf
+
+    app = flask.Flask(__name__)
+    with app.test_request_context("/api/v1/shelves/23"):
+        with patch.object(shelves_mod.ub, "session", app_session), patch.object(
+            shelves_mod, "current_user", user
+        ), patch.object(
+            books_mod, "current_user", user
+        ), patch.object(
+            shelves_mod.config, "config_books_per_page", 60, create=True
+        ), patch.object(
+            shelves_mod.config, "config_read_column", 0, create=True
+        ), patch.object(
+            shelves_mod, "check_shelf_view_permissions", return_value=True
+        ), patch.object(
+            shelves_mod, "check_shelf_edit_permissions", return_value=True
+        ), patch.object(
+            shelves_mod.calibre_db,
+            "fill_indexpage",
+            return_value=([row], None, Pagination(1, 60, 1)),
+        ):
+            response = inspect.unwrap(shelves_mod.shelf_detail)(23)
+
+    body = json.loads(response.get_data(as_text=True))
+    assert body["items"][0]["in_progress"] is True
+    assert body["items"][0]["read"] is False
+
+
+def test_advanced_search_items_expose_in_progress():
+    """Advanced-search cards carry the same tri-state as the library grid."""
+    from cps import ub
+    from cps.api import books as books_mod
+    from cps.api import search as search_mod
+
+    user = SimpleNamespace(id=9, is_authenticated=True, is_anonymous=False)
+    row = SimpleNamespace(
+        Books=_book(3),
+        is_archived=False,
+        read_status=ub.ReadBook.STATUS_IN_PROGRESS,
+    )
+    query = MagicMock()
+    query.distinct.return_value = query
+    query.order_by.return_value = query
+    query.count.return_value = 1
+    query.offset.return_value = query
+    query.limit.return_value = query
+    query.all.return_value = [row]
+
+    app = flask.Flask(__name__)
+    with app.test_request_context(
+        "/api/v1/search/advanced", method="POST", json={"title": "Book"}
+    ):
+        with patch.object(search_mod, "current_user", user), patch.object(
+            books_mod, "current_user", user
+        ), patch.object(
+            search_mod.config, "config_books_per_page", 60, create=True
+        ), patch.object(
+            search_mod.config, "config_read_column", 0, create=True
+        ), patch.object(
+            search_mod, "build_adv_search_query", return_value=(query, "")
+        ):
+            response = inspect.unwrap(search_mod.advanced_search)()
 
     body = json.loads(response.get_data(as_text=True))
     assert body["items"][0]["in_progress"] is True

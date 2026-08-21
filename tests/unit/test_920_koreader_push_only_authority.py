@@ -268,6 +268,62 @@ def test_reported_delete_never_crosses_source(wire):
     assert _live_ids(session, user.id) == {"web-1", "kobo-1"}
 
 
+@pytest.mark.parametrize("original_source", ["kobo", "webreader"])
+def test_push_cannot_rehome_foreign_row_then_delete_it(wire, original_source):
+    """F-1927e0: provenance cannot be rewritten to bypass delete scoping."""
+    client, session, user = wire
+    _seed(session, user.id, "foreign-1", source=original_source)
+
+    update = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-920",
+        "annotations": [{
+            "annotation_id": "foreign-1",
+            "source": "koreader",
+            "highlighted_text": "content may update without changing provenance",
+            "color": "yellow",
+        }],
+    })
+    delete = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-920",
+        "annotations": [],
+        "deleted": ["foreign-1"],
+    })
+
+    row = session.query(ub.Annotation).filter_by(
+        user_id=user.id, book_id=7, annotation_id="foreign-1",
+    ).one()
+    assert update.status_code == 200
+    assert delete.status_code == 200
+    assert delete.get_json()["deleted"] == 0
+    assert row.source == original_source
+    assert row.highlighted_text == "content may update without changing provenance"
+    assert row.hidden is False
+
+
+@pytest.mark.parametrize("claimed_source", ["kobo", "webreader"])
+def test_foreign_source_claim_cannot_rehome_koreader_row(wire, claimed_source):
+    """The provenance boundary is symmetric; no ordinary push may re-home."""
+    client, session, user = wire
+    _seed(session, user.id, "kr-owned", source="koreader")
+
+    response = client.put("/kosync/syncs/annotations", json={
+        "document": "digest-920",
+        "annotations": [{
+            "annotation_id": "kr-owned",
+            "source": claimed_source,
+            "highlighted_text": "edited without acquiring foreign provenance",
+            "color": "yellow",
+        }],
+    })
+
+    row = session.query(ub.Annotation).filter_by(
+        user_id=user.id, book_id=7, annotation_id="kr-owned",
+    ).one()
+    assert response.status_code == 200
+    assert row.source == "koreader"
+    assert row.highlighted_text == "edited without acquiring foreign provenance"
+
+
 def test_reported_delete_never_crosses_user_or_book(env):
     session, user, other = env
     _seed(session, other.id, "kr-other-user")

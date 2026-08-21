@@ -56,6 +56,94 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.39',
+    date: '2026-08-21',
+    items: [
+      {
+        title: 'A KOReader sync cannot delete highlights made elsewhere',
+        body: 'KOReader could take ownership of a highlight made on a Kobo or in the web reader and later remove it. It can still update those highlights, but now deletes only highlights that originated in KOReader.',
+        category: 'Sync',
+      },
+      {
+        title: 'See which books you have started in every New UI list',
+        body: 'Books in progress now carry an amber Reading badge across the library, shelves, magic shelves and search results. It uses the same reading state already shared with Kobo and KOReader.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Highlights work in more chapters of newly processed books',
+        body: 'Books that pack many chapters into one file, including most Project Gutenberg editions, are now stored one file per chapter when uploaded, converted or auto-ingested. Books you have already highlighted are left unchanged unless they already use that safe chapter-by-chapter structure.',
+        category: 'Reading',
+        link: { to: '/upload', label: 'Upload a book' },
+      },
+      {
+        title: 'Kobo repair notices tell you what to do next',
+        body: 'After CWNG repairs a Kobo book, the notice now asks you to sync and try highlighting again, then explains when to remove and redownload the book. The book page also covers readers other than Kobo.',
+        category: 'Sync',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'KOReader highlight colours match the device',
+        body: 'Blue and green no longer arrive swapped, Kobo pink is named correctly, and greyscale-reader highlights no longer fall back to yellow. The plugin and server now share the same device-measured colour mapping.',
+        category: 'Sync',
+      },
+      {
+        title: 'Reduce Motion now stops every loading spinner',
+        body: 'All seven loading indicators in the New UI now respect your system Reduce Motion setting. Nothing changes when reduced motion is not enabled.',
+        category: 'Account',
+      },
+      {
+        title: 'Container updates and restarts shut down cleanly',
+        body: 'The ingest watcher no longer blocks the service until Docker forcibly kills it at the end of the shutdown grace period. It now stops its watcher and cleanup helpers promptly so in-flight requests can finish normally.',
+        category: 'Admin',
+      },
+      {
+        title: 'Book covers load with less repeated network traffic',
+        body: 'The New UI now reuses versioned covers while scrolling and requests a book-page image sized for the screen instead of the full original. Existing open pages keep their current cover until refreshed, and servers without resized-cover support retain the previous fallback.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'A replacement cover reaches every place that uses it',
+        body: 'Replacing a cover in the New UI or through automatic metadata now records the book as changed. Other pages refresh correctly, Kobo is told to sync it, and a background job is requested to write it into the downloadable book file.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Imported Kobo highlights keep their real colours',
+        body: 'Highlights from a KoboReader.sqlite upload now appear as yellow, pink, blue, green or grey across the reader, Highlights page and exports. Unknown colours stay visibly unknown, and notes can again be saved on imported pink or grey highlights.',
+        category: 'Sync',
+      },
+      {
+        title: 'Active imports no longer trigger a false duplicate warning',
+        body: 'Bare-metal installs and servers with customized ingest marker paths could ask for a manual duplicate scan while an import was still running. The importer and duplicate index now use the same configured marker location.',
+        category: 'Library',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'Returning to the tab no longer refreshes the whole app',
+        body: 'Focusing the browser tab no longer launches a burst of requests for every cached part of the New UI. Live polling such as the task queue continues normally.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Opening the library avoids a useless page download',
+        body: 'The unfiltered library no longer requests an unnamed entity list that the server answered with a full HTML page the app could not use. That removes a failed request and retry each time the main library loads.',
+        category: 'Under the hood',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Kobo highlights return in books with anchored chapter links',
+        body: 'CWNG now repairs table-of-contents links that point to an unnecessary anchor at the top of a chapter, including safe repairs to existing converted books after upgrade. Sync and open the repaired book on your Kobo to download it and make existing highlights appear again.',
+        category: 'Sync',
+      },
+      {
+        title: 'Highlight compatibility warnings report a real chapter count',
+        body: 'The Kobo compatibility warning no longer counts page-number anchors as broken chapters. Logs now count only table-of-contents entries that actually determine where a Kobo can show highlights.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
     version: 'v4.1.38',
     date: '2026-08-17',
     items: [

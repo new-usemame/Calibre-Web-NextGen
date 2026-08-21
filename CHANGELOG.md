@@ -16,6 +16,8 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.39] - 2026-08-21
+
 ### Fixed
 
 - **A highlight made on a Kobo or in the web reader no longer disappears after

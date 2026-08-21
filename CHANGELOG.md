@@ -16,6 +16,17 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **People who had permission to manage someone else's public smart shelf could
+  not do so in the new UI.** Its Edit, Duplicate, and Delete controls were all
+  hidden unless you owned the shelf, even though the server allows admins to
+  edit it, shelf editors to delete it, and any signed-in viewer to duplicate it.
+  Each control now follows its own server-provided permission, matching ordinary
+  shelves; Kobo sync remains available only to the shelf owner. Reported by
+  [@iroQuai](https://github.com/iroQuai) ([#1734](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1734),
+  umbrella [#867](https://github.com/new-usemame/Calibre-Web-NextGen/issues/867)).
+
 ## [v4.1.39] - 2026-08-21
 
 ### Fixed

@@ -18,6 +18,15 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The New UI shows a "Reading" badge on books you have started, the way the
+  classic UI always did.** The green "Read" pill was there, but a book you were
+  part-way through looked identical to one you had never opened, so the only way
+  to tell was to open its detail page. Every list the New UI serves — the
+  library grid, shelves, magic shelves (including the built-in Currently
+  Reading shelf), and search results — now carries the same amber "Reading"
+  marker the old cover badge used, driven by the same sync state your Kobo and
+  KOReader already write. Reported by @magdalar and @JamesHACS (#1702).
+
 - **Highlights now work in the chapters of a book that keeps many chapters in
   one file — the shape almost every Project Gutenberg book has.** A Kobo
   recognises a chapter by the file it lives in, not by a link into the middle of

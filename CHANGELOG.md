@@ -18,6 +18,12 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A highlight made on a Kobo or in the web reader no longer disappears after
+  a KOReader sync.** A KOReader sync could previously take ownership of an
+  existing highlight, so a later sync could delete it as if it had been made
+  in KOReader. Highlights now keep the source they were created in, so KOReader
+  can update their contents without gaining permission to delete them.
+
 - **The New UI shows a "Reading" badge on books you have started, the way the
   classic UI always did.** The green "Read" pill was there, but a book you were
   part-way through looked identical to one you had never opened, so the only way

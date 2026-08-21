@@ -117,7 +117,7 @@ def _row_read_status(e):
     return getattr(e, "read_status", None)
 
 
-def _row_to_item(e, hidden_ids=None, in_progress_ids=None):
+def _row_to_item(e, in_progress_ids, hidden_ids=None):
     """Unwrap a SQLAlchemy Row (Books, is_archived, read_status) or plain Books object."""
     book = getattr(e, "Books", e)
     read_status = _row_read_status(e)
@@ -148,7 +148,7 @@ def _rows_to_items(entries, hidden_ids=None):
     ]
     in_progress_ids = book_in_progress_ids(
         statuses, config.config_read_column, current_user)
-    return [_row_to_item(entry, hidden_ids, in_progress_ids) for entry in entries]
+    return [_row_to_item(entry, in_progress_ids, hidden_ids) for entry in entries]
 
 
 def _build_entity_filter(author, series, tag, publisher, language, rating=None, book_format=None):

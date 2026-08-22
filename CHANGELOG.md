@@ -18,10 +18,10 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
-- **Smart shelves and other library activity now keep recording statistics in
-  every deployment layout.** Installations launched outside the application
-  directory could not find the CWA settings database module, which filled the
-  log with `No module named 'scripts'` errors and silently dropped activity
+- **Smart shelves and other library activity now keep recording statistics when
+  source-tree and container installs launch outside the application directory.**
+  Those launches could not find the CWA settings database module, which filled
+  the log with `No module named 'scripts'` errors and silently dropped activity
   records for smart shelves, searches, shelves, OPDS, Kobo sync, and related
   actions. Reported in
   [#1755](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1755).

@@ -61,3 +61,33 @@ def test_cwa_db_loader_repairs_a_sys_path_without_the_app_root(monkeypatch):
     assert Path(module.__file__).resolve() == SCRIPTS_DIR / "cwa_db.py"
     assert sys.path.count(str(REPO_ROOT)) == 1
     assert sys.path.count(str(SCRIPTS_DIR)) == 1
+
+
+@pytest.mark.unit
+def test_loader_aliases_scripts_name_after_top_level_import(monkeypatch):
+    """Importing cwa_db first must not permit a second module execution."""
+    loader = importlib.import_module("cps.cwa_db_loader")
+    for module_name in ("cwa_db", "scripts.cwa_db", "scripts"):
+        monkeypatch.delitem(sys.modules, module_name, raising=False)
+
+    first = importlib.import_module("cwa_db")
+    loaded = loader.load_cwa_db()
+    second = importlib.import_module("scripts.cwa_db")
+
+    assert loaded is first is second
+    assert first.CWA_DB is second.CWA_DB
+
+
+@pytest.mark.unit
+def test_loader_aliases_top_level_name_after_scripts_import(monkeypatch):
+    """Importing scripts.cwa_db first must not permit a second execution."""
+    loader = importlib.import_module("cps.cwa_db_loader")
+    for module_name in ("cwa_db", "scripts.cwa_db", "scripts"):
+        monkeypatch.delitem(sys.modules, module_name, raising=False)
+
+    first = importlib.import_module("scripts.cwa_db")
+    loaded = loader.load_cwa_db()
+    second = importlib.import_module("cwa_db")
+
+    assert loaded is first is second
+    assert first.CWA_DB is second.CWA_DB

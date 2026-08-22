@@ -170,8 +170,5 @@ version = {file = ["VERSION"]}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cps", "cps.*", "scripts"]
+include = ["cps", "cps.*"]
 exclude = ["tests", "tests.*"]
-
-[tool.setuptools.package-data]
-scripts = ["cwa_schema.sql"]

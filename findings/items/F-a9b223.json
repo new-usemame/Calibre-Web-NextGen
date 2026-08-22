@@ -1,0 +1,15 @@
+{
+  "area": "kobo",
+  "body": "The per-(user, book) annotation backup is the safety net that the recoverability\nargument for every destructive annotation path leans on. Two properties limit\nwhat it can actually recover, and they compound.\n\n1. RETENTION IS COUNT-BASED, AND A LOSS EVENT SPENDS ITS OWN SLOTS\n`RETENTION_COUNT = 3` (cps/services/annotation_backup.py:57). `_apply_retention`\n(:331) keeps the newest three by `created_at DESC` and UNLINKS the file for each\nolder one. Backups are content-hash deduped (:222), so only content-CHANGING\nevents consume a slot — but a destructive push is exactly such an event. Three\ncontent-changing writes after a loss and the last snapshot that still held the\nlost annotation is deleted from disk permanently. The window is three events,\nnot three days, and the event that caused the loss is the first to spend one.\n\n2. THERE IS NO RESTORE PATH\nThe schema-version comment at :51 says a restore endpoint is a \"(future PR)\".\nGrepping the tree confirms none exists: `restore_annotation_device`\n(cps/annotations.py:181) restores DEVICE ASSIGNMENT ROUTING, not annotation\ncontent, and the admin restore at cps/admin.py:3568 is the Calibre-database last\nresort that explicitly ERASES all per-book data. So today the gzip snapshots are\nwritten, retained and evicted, and cannot be loaded back through any application\npath.\n\nWHAT IS AND IS NOT AFFECTED\n- Soft-deleted rows are still IN the backup: `_run_one` selects all rows for the\n  pair with no `hidden` filter (:204), so a `hidden=True` row keeps its content.\n  Those rows are also still in the live DB, so the backup is not the only copy.\n- A HARD delete is the real exposure. F-a7b6b2 (duplicate-book merge) removes the\n  row from the DB entirely, so a pre-merge snapshot is the ONLY copy — and it is\n  subject to both limits above.\n\nSEVERITY FRAMING (stated honestly)\nThe missing restore endpoint is deferred deliberately, not an accident, so this\nis not filed as a defect in itself. What is actionable NOW, independent of that\nendpoint, is limit 1: eviction is blind to what a snapshot contains. A snapshot\nholding annotations that no longer exist in the live DB is precisely the one\nworth keeping, and it is currently the first to be unlinked.\n\nSUGGESTED DIRECTION (not a spec)\nMake retention content-aware rather than purely count-based — e.g. never evict\nthe most recent snapshot whose annotation set is not a subset of the live set,\nso the last pre-loss state survives until a restore path exists to use it.",
+  "created": "2026-08-22",
+  "id": "F-a9b223",
+  "refs": [
+    "cps/services/annotation_backup.py:57",
+    "cps/services/annotation_backup.py:331",
+    "F-a7b6b2"
+  ],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "Annotation backup retention is count-based and evicts the pre-loss snapshot, and no restore path exists to use one"
+}

@@ -125,6 +125,7 @@ def apply_push(annotations, *, user, book, session, commit,
             if action == "deleted":
                 annotation_sync.dispatch_annotation_deletes(
                     [row.annotation_id], user, book_id=book.id,
+                    deletable_sources=_DELETABLE_SOURCES,
                 )
             else:
                 annotation_sync.dispatch_existing_annotation_sync(row, book, user)
@@ -189,6 +190,7 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
         try:
             annotation_sync.dispatch_annotation_deletes(
                 [row.annotation_id], user, book_id=book.id,
+                deletable_sources=_DELETABLE_SOURCES,
             )
         except Exception:  # pragma: no cover - fan-out must never fail the push
             log.exception("koreader annotation delete fan-out failed for %s", row.annotation_id)

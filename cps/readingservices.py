@@ -533,8 +533,12 @@ def handle_annotations(entitlement_id):
                         entitlement_id,
                     )
                 elif deleted:
+                    # Nickel can only name annotations Kobo created: CWNG has
+                    # no annotation writeback to Kobo. If F-3b565b implements
+                    # writeback, this provenance authority must be revisited.
                     annotation_sync.dispatch_annotation_deletes(
                         deleted, current_user, book_id=book.id,
+                        deletable_sources={"kobo"},
                     )
         except Exception:
             log.exception("Error processing PATCH annotations")

@@ -27,6 +27,12 @@ is for things you can see or feel when running the app.
   [@iroQuai](https://github.com/iroQuai) ([#1734](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1734),
   umbrella [#867](https://github.com/new-usemame/Calibre-Web-NextGen/issues/867)).
 
+- **Pages and API requests no longer fail sporadically with a dropped
+  connection or `socket hang up` behind a reverse proxy or in a client that
+  pools connections.** The server deliberately closes every HTTP connection
+  after its response; it now sends `Connection: close` so HTTP/1.1 clients do
+  not return that closing socket to their pool and try to reuse it.
+
 ## [v4.1.39] - 2026-08-21
 
 ### Fixed

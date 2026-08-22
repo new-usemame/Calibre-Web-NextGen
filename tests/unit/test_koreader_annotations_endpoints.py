@@ -169,7 +169,9 @@ def test_delete_fanout_is_scoped_to_book(env):
     s, user = env
     _seed(s, user, "shared", book_id=7)
     _seed(s, user, "shared", book_id=8)
-    dispatch_annotation_deletes(["shared"], user, book_id=8)
+    dispatch_annotation_deletes(
+        ["shared"], user, book_id=8, deletable_sources={"kobo"},
+    )
     assert s.query(ub.Annotation).filter_by(book_id=7, annotation_id="shared").one().hidden is False
     assert s.query(ub.Annotation).filter_by(book_id=8, annotation_id="shared").one().hidden is True
 

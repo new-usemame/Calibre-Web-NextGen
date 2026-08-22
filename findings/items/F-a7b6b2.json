@@ -1,0 +1,20 @@
+{
+  "area": "kobo",
+  "body": "`migrate_user_book_data` (cps/user_book_data.py:67) merges per-user data when a\nduplicate book is collapsed into a kept copy. For annotations it resolves an\n`(user_id, annotation_id)` clash by always dropping the row on the FROM book:\n\n    clash = session.query(ub.Annotation).filter(...book_id == to_book_id).first()\n    if clash is not None:\n        ...\n        session.delete(ann)          # the from_book row, unconditionally\n    else:\n        ann.book_id = to_book_id\n\nThere is no recency comparison, so whichever copy happens to be the merge target\nwins regardless of which row the user actually edited more recently.\n\nTHE SAME FILE ALREADY KNOWS BETTER\nImmediately below, the KoboReadingState merge picks the newer of the two with\n`_newer(state.last_modified, existing.last_modified)` (:112), and ReadBook does\nthe same at :139. Annotations are the one per-user record merged arbitrarily.\nThe Annotation model carries `server_modified_at`, `client_modified_at` and\n`content_revision` (cps/ub.py:1124-1140), so the comparison is available and\nsimply is not made.\n\nIT IS A HARD DELETE, NOT A SOFT ONE\nEvery other annotation-loss path in this subsystem sets `hidden=True`, leaving a\ntombstone a later push can un-hide. This one calls `session.delete(ann)` and\nexplicitly deletes the AnnotationSyncTarget children first. There is no\ntombstone and no recovery through any application path — strictly worse than\nthe F-1927e0 / F-a54711 / #1790 soft-delete class.\n\nOBSERVED PROOF (in-memory ub schema, migrate_user_book_data called directly)\n    BEFORE:\n      book=1 rev=9 mod=2026-07-20 text='NEWER EDIT - the user latest text' note='note written last week'\n      book=2 rev=1 mod=2026-01-01 text='stale original' note=None\n    AFTER:\n      book=2 rev=1 mod=2026-01-01 text='stale original' note=None\n    SURVIVOR IS THE STALE ROW\n    NEWER EDIT LOST: True\n\nThe surviving row also loses a note the user wrote that the kept copy never had,\nso this is not only a stale-text problem: content present on exactly one side is\ndestroyed rather than merged.\n\nSUGGESTED DIRECTION (not a spec)\nMatch the sibling records: compare recency and keep the newer row, re-pointing it\nto `to_book_id` and dropping the older. Field-level merge (keep a note that\nexists on only one side) is a further question worth deciding deliberately.",
+  "created": "2026-08-22",
+  "id": "F-a7b6b2",
+  "refs": [
+    "cps/user_book_data.py:67",
+    "cps/user_book_data.py:112"
+  ],
+  "resolution": {
+    "commit": "f8cac66d1",
+    "date": "2026-08-22",
+    "note": "Fixed and merged as #1794. migrate_user_book_data now keeps the newer coherent annotation row on an (user_id, annotation_id) clash: newest non-null of server_modified_at/client_modified_at, a present clock outranking a null one, content_revision breaking clock ties, and the destination row retained on a total tie. Verified on merged main: my original proof inverts - the rev=9 row with the note survives and is re-pointed to to_book_id, where before the stale rev=1 row won. Degrading the recency check to constant-false (the old arbitrary winner) fails 3 tests. Field-level merge was deliberately NOT done: combining content, anchors and lifecycle metadata could produce a version no client authored. Checked and cleared during review: _delete_annotation removes only AnnotationSyncTarget children, but KoboAnnotationMaterialization cascades via the ORM (cascade all,delete-orphan with no passive_deletes), so no orphan holding verbatim text survives against a recyclable id.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Duplicate-book merge hard-deletes the newer annotation with no recency check, while reading state in the same file keeps the newer"
+}

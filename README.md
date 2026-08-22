@@ -690,7 +690,7 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `███████████████████░` 96% | 2715/2814 | 0 |
+| Russian (`ru`) | `████████████████████` 100% | 2802/2814 | 0 |
 | Spanish (`es`) | `███████████████████░` 94% | 2637/2814 | 0 |
 | Polish (`pl`) | `██████████████████░░` 92% | 2601/2814 | 0 |
 | French (`fr`) | `████████████████░░░░` 82% | 2313/2814 | 127 |

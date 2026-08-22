@@ -63,8 +63,11 @@ test('Hide persists across reload; Show hidden reveals a marked book and provide
   await expect(hide).toHaveRole('button');
   const hideName = await hide.getAttribute('aria-label');
   expect(hideName).toBeTruthy();
-  const adjacent = await hide.evaluate((node) => node.nextElementSibling?.getAttribute('aria-label'));
-  expect(adjacent).toBeTruthy();
+  const actionControls = page.getByTestId('book-actions').locator('a, button');
+  expect(await actionControls.count()).toBeGreaterThan(0);
+  for (const control of await actionControls.all()) {
+    await expect(control).toHaveAccessibleName(/\S/);
+  }
 
   try {
     const before = await page.request.get('/api/v1/books?per_page=60').then((r) => r.json());

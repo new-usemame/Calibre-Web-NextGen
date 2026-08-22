@@ -452,7 +452,7 @@
 
 .dangerZoneTitle {
   margin: 0;
-  color: var(--danger);
+  color: var(--text);
   font-family: var(--font-display);
   font-size: var(--fs-lg);
 }

@@ -102,11 +102,20 @@ class TestMigrate:
         assert moved.highlighted_text == "hl"
         assert session.query(ub.AnnotationSyncTarget).count() == 1
 
-    def test_annotation_clash_keeps_winner_row(self, session):
+    def test_annotation_clash_keeps_newer_destination_row(self, session):
         from cps import ub
         from cps.user_book_data import migrate_user_book_data
-        keep = _annotation(ub, WINNER, text="winner-copy")
-        lose = _annotation(ub, LOSER, text="loser-copy")
+        keep = _annotation(
+            ub, WINNER, text="newer-destination-copy", note_text="keep me",
+            server_modified_at=datetime(2026, 7, 20), content_revision=9,
+        )
+        lose = _annotation(
+            ub, LOSER, text="stale-source-copy",
+            server_modified_at=datetime(2026, 1, 1), content_revision=1,
+        )
+        keep.sync_targets.append(
+            ub.AnnotationSyncTarget(target="readwise", status="synced")
+        )
         lose.sync_targets.append(ub.AnnotationSyncTarget(target="hardcover", status="pending"))
         session.add_all([keep, lose])
         session.commit()
@@ -115,9 +124,106 @@ class TestMigrate:
         session.commit()
 
         rows = session.query(ub.Annotation).all()
-        assert len(rows) == 1 and rows[0].highlighted_text == "winner-copy"
-        # the dropped loser row's sync-target child went with it
-        assert session.query(ub.AnnotationSyncTarget).count() == 0
+        assert len(rows) == 1
+        assert rows[0].book_id == WINNER
+        assert rows[0].highlighted_text == "newer-destination-copy"
+        assert rows[0].note_text == "keep me"
+        # Only the dropped source row's sync-target child is removed.
+        targets = session.query(ub.AnnotationSyncTarget).all()
+        assert len(targets) == 1
+        assert targets[0].annotation_id == rows[0].id
+        assert targets[0].target == "readwise"
+
+    def test_annotation_clash_moves_newer_source_row_and_drops_destination_children(
+        self, session,
+    ):
+        from cps import ub
+        from cps.user_book_data import migrate_user_book_data
+        keep = _annotation(
+            ub, WINNER, text="stale-destination-copy", note_text=None,
+            server_modified_at=datetime(2026, 1, 1), content_revision=1,
+        )
+        lose = _annotation(
+            ub, LOSER, text="newer-source-copy", note_text="recent note",
+            server_modified_at=datetime(2026, 7, 20), content_revision=9,
+        )
+        keep.sync_targets.append(
+            ub.AnnotationSyncTarget(target="hardcover", status="synced")
+        )
+        lose.sync_targets.append(
+            ub.AnnotationSyncTarget(target="readwise", status="pending")
+        )
+        session.add_all([keep, lose])
+        session.commit()
+        source_id = lose.id
+
+        migrate_user_book_data(LOSER, WINNER, session=session)
+        session.commit()
+
+        row = session.query(ub.Annotation).one()
+        assert row.id == source_id
+        assert row.book_id == WINNER
+        assert row.highlighted_text == "newer-source-copy"
+        assert row.note_text == "recent note"
+        assert row.content_revision == 9
+        targets = session.query(ub.AnnotationSyncTarget).all()
+        assert len(targets) == 1
+        assert targets[0].annotation_id == row.id
+        assert targets[0].target == "readwise"
+
+    def test_annotation_clash_uses_client_clock_when_server_clocks_are_null(
+        self, session,
+    ):
+        from cps import ub
+        from cps.user_book_data import migrate_user_book_data
+        session.add_all([
+            _annotation(
+                ub, WINNER, text="stale-destination-copy",
+                client_modified_at=datetime(2026, 1, 1), content_revision=9,
+            ),
+            _annotation(
+                ub, LOSER, text="newer-source-copy",
+                client_modified_at=datetime(2026, 7, 20), content_revision=1,
+            ),
+        ])
+        session.commit()
+
+        migrate_user_book_data(LOSER, WINNER, session=session)
+        session.commit()
+
+        row = session.query(ub.Annotation).one()
+        assert row.book_id == WINNER
+        assert row.highlighted_text == "newer-source-copy"
+
+    def test_annotation_clash_null_clocks_use_revision_then_destination_tie_break(
+        self, session,
+    ):
+        from cps import ub
+        from cps.user_book_data import migrate_user_book_data
+        session.add_all([
+            _annotation(ub, WINNER, annotation_id="revision", text="revision-2",
+                        content_revision=2),
+            _annotation(ub, LOSER, annotation_id="revision", text="revision-7",
+                        content_revision=7),
+            _annotation(ub, WINNER, annotation_id="tie", text="destination-tie",
+                        content_revision=4),
+            _annotation(ub, LOSER, annotation_id="tie", text="source-tie",
+                        content_revision=4),
+        ])
+        session.commit()
+
+        migrate_user_book_data(LOSER, WINNER, session=session)
+        session.commit()
+
+        rows = {
+            row.annotation_id: row
+            for row in session.query(ub.Annotation).order_by(ub.Annotation.annotation_id)
+        }
+        assert set(rows) == {"revision", "tie"}
+        assert rows["revision"].book_id == WINNER
+        assert rows["revision"].highlighted_text == "revision-7"
+        assert rows["tie"].book_id == WINNER
+        assert rows["tie"].highlighted_text == "destination-tie"
 
     def test_kobo_reading_state_newer_loser_wins(self, session):
         from cps import ub

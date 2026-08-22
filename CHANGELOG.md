@@ -16,6 +16,41 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A Kobo can no longer erase a book's local highlights when its Calibre-Web
+  session expires or an admin has just disabled Kobo sync.** Those transition
+  windows, plus alternate spellings of Kobo's `checkforchanges` request, could
+  bypass the owned-book filter and tell the device to replace its complete
+  local highlight set from the cloud response. Every equivalent request now
+  reaches the same ownership containment; owned books receive an empty change
+  list, while Kobo-store content continues to proxy normally.
+
+- **Two people could not find how to delete a book in the new UI and switched
+  back to the classic view over it.** Deletion worked, but the edit page had no
+  whole-book delete control and the book page buried Delete at the end of a
+  wrapping row of ordinary actions. The edit page now puts Delete book beside
+  Edit metadata, and the book page gives it its own clearly labelled
+  destructive section — the two places people actually look. Both remain
+  permission-gated and confirm before deleting. Reported through anonymous
+  feedback ([#1046](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1046),
+  duplicate [#1037](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1037)).
+
+- **People who had permission to manage someone else's public smart shelf could
+  not do so in the new UI.** Its Edit, Duplicate, and Delete controls were all
+  hidden unless you owned the shelf, even though the server allows admins to
+  edit it, shelf editors to delete it, and any signed-in viewer to duplicate it.
+  Each control now follows its own server-provided permission, matching ordinary
+  shelves; Kobo sync remains available only to the shelf owner. Reported by
+  [@iroQuai](https://github.com/iroQuai) ([#1734](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1734),
+  umbrella [#867](https://github.com/new-usemame/Calibre-Web-NextGen/issues/867)).
+
+- **Pages and API requests no longer fail sporadically with a dropped
+  connection or `socket hang up` behind a reverse proxy or in a client that
+  pools connections.** The server deliberately closes every HTTP connection
+  after its response; it now sends `Connection: close` so HTTP/1.1 clients do
+  not return that closing socket to their pool and try to reuse it.
+
 - **The dependency list on the Statistics page now tells you when something is
   actually missing.** The list is built from the packages Calibre-Web NextGen
   declares it needs, but a few of those only apply to certain systems — one is

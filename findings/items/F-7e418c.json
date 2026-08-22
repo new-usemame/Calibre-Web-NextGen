@@ -7,8 +7,14 @@
     "#1731",
     "F-724452"
   ],
+  "resolution": {
+    "commit": "d8fa66267",
+    "date": "2026-08-22",
+    "note": "Fixed in #1774: ingest_bookmarks now sets annotation_type=to_storage_type(bm.annotation_type) (cps/annotations.py:427), so the importer and the live PATCH path agree. The ordering hazard this finding named is also discharged -- F-b1004e landed in the same PR, so dogears arrive typed rather than TYPE-NULL. Held by tests/unit/test_annotation_type_vocabulary.py::test_no_annotation_constructor_leaves_the_type_unset. Mutation re-verified independently 2026-08-22: blanking the annotation_type keyword in annotation_portable.py fails exactly that test (1 failed, 20 passed).",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "The KoboReader.sqlite importer never sets annotation_type, so every recovered row is typed NULL"
 }

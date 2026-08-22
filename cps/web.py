@@ -1600,7 +1600,7 @@ def edit_magic_shelf(shelf_id):
     opds_expose_checked = ub.is_opds_magic_shelf_exposed_for_user(current_user.id, shelf.id)
     
     # Check if user can edit this shelf (owner or admin only)
-    if shelf.user_id != current_user.id and not current_user.role_admin():
+    if not magic_shelf.can_edit_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to edit magic shelf {shelf_id} without permission")
         abort(403)
 
@@ -1703,7 +1703,7 @@ def duplicate_magic_shelf(shelf_id):
         return jsonify({"success": False, "message": _("Shelf not found")}), 404
     
     # Users can duplicate their own shelves or any public shelf
-    if shelf.user_id != current_user.id and not shelf.is_public:
+    if not magic_shelf.can_duplicate_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to duplicate private shelf {shelf_id} owned by {shelf.user_id}")
         return jsonify({"success": False, "message": _("Permission denied")}), 403
     
@@ -1753,22 +1753,14 @@ def delete_magic_shelf(shelf_id):
         log.warning(f"Magic shelf {shelf_id} not found for deletion")
         abort(404)
     
-    # Check if user can delete this shelf
-    can_delete = False
-    if shelf.user_id == current_user.id:
-        can_delete = True
-    elif shelf.is_public == 1 and current_user.role_edit_shelfs():
-        can_delete = True
-    
-    if not can_delete:
+    if not magic_shelf.has_magic_shelf_delete_authority(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to delete magic shelf {shelf_id} without permission")
         abort(403)
-    
-    # Prevent deletion of system shelves
-    if shelf.is_system:
+
+    if not magic_shelf.can_delete_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to delete system shelf {shelf_id}")
         return jsonify({
-            "success": False, 
+            "success": False,
             "message": _("System shelves cannot be deleted. You can hide them in your user profile settings.")
         }), 400
     

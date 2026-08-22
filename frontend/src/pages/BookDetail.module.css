@@ -436,7 +436,27 @@
   background: var(--surface-2);
 }
 
-/* Destructive whole-book delete (fork #803). Same shape as .downloadBtn, danger-tinted. */
+/* Whole-book deletion is a separate, labelled region instead of one more chip
+   in the wrapping ordinary-actions row (#1046). */
+.dangerZone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding: var(--sp-4);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-lg);
+  background: var(--danger-soft);
+}
+
+.dangerZoneTitle {
+  margin: 0;
+  color: var(--danger);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+}
+
 .actionDanger {
   display: inline-flex;
   align-items: center;
@@ -447,7 +467,7 @@
   padding: var(--sp-2) var(--sp-3);
   height: 38px;
   border-radius: var(--r-md);
-  background: transparent;
+  background: var(--surface-1);
   border: 1px solid var(--danger);
   color: var(--danger);
   cursor: pointer;
@@ -465,9 +485,10 @@
 }
 
 .deleteErr {
+  flex-basis: 100%;
   color: var(--danger);
   font-size: var(--fs-sm);
-  margin-top: var(--sp-2);
+  margin: 0;
 }
 
 /* Tags row */

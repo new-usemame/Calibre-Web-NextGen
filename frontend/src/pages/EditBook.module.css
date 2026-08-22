@@ -16,12 +16,23 @@
 
 .back:hover { color: var(--accent); }
 
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-5);
+}
+
 .title {
   font-family: var(--font-display);
   font-size: var(--fs-xl);
   color: var(--text);
-  margin-bottom: var(--sp-5);
+  margin: 0;
 }
+
+.deleteErr { color: var(--danger); font-size: var(--fs-sm); margin: 0 0 var(--sp-4); }
 
 .form {
   background: var(--surface-1);

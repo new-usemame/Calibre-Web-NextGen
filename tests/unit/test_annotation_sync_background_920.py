@@ -194,7 +194,9 @@ def test_delete_hides_locally_immediately_and_queues_the_remote(patched_session,
     queue.clear()
     handler.calls.clear()
 
-    dispatch_annotation_deletes(["uuid-a"], user, book_id=book.id)
+    dispatch_annotation_deletes(
+        ["uuid-a"], user, book_id=book.id, deletable_sources={"kobo"},
+    )
 
     ann = s.query(ub.Annotation).one()
     assert ann.hidden is True, "local soft-delete must not wait on the remote"
@@ -214,7 +216,9 @@ def test_tombstoned_target_is_never_requeued(patched_session, queue):
     book = _book()
     dispatch_annotation_sync([_payload("uuid-a")], book, user)
     _run(s, user, queue, book)
-    dispatch_annotation_deletes(["uuid-a"], user, book_id=book.id)
+    dispatch_annotation_deletes(
+        ["uuid-a"], user, book_id=book.id, deletable_sources={"kobo"},
+    )
     _run(s, user, queue, book)
     queue.clear()
 

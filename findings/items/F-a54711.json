@@ -1,0 +1,21 @@
+{
+  "area": "kobo",
+  "body": "`dispatch_annotation_deletes` (cps/services/annotation_sync/__init__.py:705) is the\nKobo PATCH `deletedAnnotationIds` handler. It selects the row to soft-delete on\n`user_id` + `annotation_id` only:\n\n    query = ub.session.query(ub.Annotation).filter(\n        ub.Annotation.user_id == user.id,\n        ub.Annotation.annotation_id == annotation_id,\n    )\n\nThere is no provenance check. A Kobo device can therefore soft-delete a\n`webreader` or `koreader` row in a single push.\n\nThis is the same class as F-1927e0 / #1790 (a delete path with no source\nauthority), in the one spelling of delete that was never re-checked when those\nlanded. It is strictly easier to reach than F-1927e0, which needed two pushes\nand a provenance flip; this needs one push naming the id.\n\nWHY THE DEVICE CANNOT HONESTLY KNOW THE ID\nAnnotation writeback to the device is not implemented: `serveable` on\n`KoboAnnotationMaterialization` is hardcoded `False` at both write sites\n(annotation_sync/__init__.py:374, :389) and is never set true anywhere in the\ntree. No annotation is ever served back to a Kobo device, so a Kobo device\nprovably never held a `webreader`/`koreader` row, and naming one in\n`deletedAnnotationIds` is not reachable by honest use.\n\nASYMMETRY WITH THE KOREADER BRIDGE\nThe KOReader bridge does the same operation gated by\n`_DELETABLE_SOURCES = {\"koreader\"}`\n(progress_syncing/protocols/koreader_annotations.py:67, :390). Both bridges\nreceive all sources on pull; only one may delete across sources. One of the two\nis wrong, and the unrestricted one is the Kobo path.\n\nRECOVERABILITY\nThe docstring claims \"Recovery is symmetric: a subsequent create/update PATCH\nfor the same annotation_id un-hides it.\" That recovery is available only to a\nKobo device. A web-reader row hidden this way has no un-hide affordance in the\nweb UI, so for the user it is unrecoverable through any application path — the\nsame severity note that set #1790's rating.\n\nOBSERVED PROOF (in-memory ub schema, dispatch_annotation_deletes called directly)\n    BEFORE: kobo-1(kobo,False)  web-1(webreader,False)  kor-1(koreader,False)\n    AFTER : kobo-1(kobo,True)   web-1(webreader,True)   kor-1(koreader,True)\n    FOREIGN ROWS DESTROYED BY A KOBO DELETE: ['web-1', 'kor-1']\n\nWHY THE FIX IS SAFE\nThe Kobo PATCH create path only ever assigns `source=\"kobo\"`\n(annotation_sync/__init__.py:294), and the KoboReader.sqlite importer also\nwrites `source=\"kobo\"`. Restricting this path's delete authority to `{\"kobo\"}`\ntherefore cannot affect any honest Kobo delete.\n\nFORWARD NOTE\nIf annotation writeback (F-3b565b, design-only) is ever implemented, the\ndevice would legitimately hold foreign rows and this authority model must be\nrevisited deliberately rather than by default.",
+  "created": "2026-08-22",
+  "id": "F-a54711",
+  "refs": [
+    "cps/services/annotation_sync/__init__.py:705",
+    "F-1927e0",
+    "#1790"
+  ],
+  "resolution": {
+    "commit": "39da46bf5",
+    "date": "2026-08-22",
+    "note": "Fixed and merged as #1793. dispatch_annotation_deletes now takes a REQUIRED keyword-only deletable_sources; Kobo PATCH passes {'kobo'}, KOReader passes _DELETABLE_SOURCES, the authenticated web-reader delete passes None (user authority across provenance). Verified on merged main: the original proof now shows both foreign rows surviving while the honest kobo delete still lands, refusals logged with provenance. Degrading the guard to constant-true (exactly the pre-fix behaviour) fails test_kobo_delete_authority_refuses_foreign_sources_and_fans_out_owned. /security-review returned no findings at confidence >=8 and independently confirmed the None sentinel is unreachable from any device path and that no other writer bypasses the gate.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Kobo PATCH deletedAnnotationIds has no provenance authority: one push soft-deletes webreader and koreader rows"
+}

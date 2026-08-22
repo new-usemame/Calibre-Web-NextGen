@@ -23,6 +23,26 @@ class MyWSGIHandler(WSGIHandler):
         self.close_connection = True
         return is_valid
 
+    def start_response(self, status, headers, exc_info=None):
+        # ``read_request`` deliberately closes every connection, but gevent only
+        # adds the matching response header for HTTP/1.0. Make the same policy
+        # explicit to HTTP/1.1 clients, and replace any misleading app-provided
+        # value without emitting a duplicate header.
+        response_headers = []
+        connection_added = False
+        for name, value in headers:
+            if isinstance(name, str) and name.lower() == 'connection':
+                if connection_added:
+                    continue
+                value = 'close'
+                connection_added = True
+            response_headers.append((name, value))
+
+        if not connection_added:
+            response_headers.append(('Connection', 'close'))
+
+        return super().start_response(status, response_headers, exc_info)
+
     def get_environ(self):
         env = super().get_environ()
         path, __ = self.path.split('?', 1) if '?' in self.path else (self.path, '')
@@ -55,4 +75,3 @@ class MyWSGIHandler(WSGIHandler):
             (self._orig_status or self.status or '000').split()[0],
             length,
             delta)
-

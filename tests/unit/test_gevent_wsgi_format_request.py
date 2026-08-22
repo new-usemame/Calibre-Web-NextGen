@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-"""Regression tests for ``cps.gevent_wsgi.MyWSGIHandler.format_request``.
+"""Regression tests for ``cps.gevent_wsgi.MyWSGIHandler``.
 
 Issue new-usemame/Calibre-Web-NextGen#147: gevent calls ``format_request``
 from its access-log path even for requests that never parsed as HTTP
@@ -21,6 +21,9 @@ from types import SimpleNamespace
 import pytest
 
 pytest.importorskip("gevent")
+
+from gevent import socket  # noqa: E402
+from gevent.pywsgi import WSGIServer  # noqa: E402
 
 from cps.gevent_wsgi import MyWSGIHandler  # noqa: E402
 
@@ -113,3 +116,69 @@ def test_read_request_forces_connection_close():
         "so stale reverse-proxy keepalive sockets don't accumulate against "
         "the gevent process. See fork issue #193 + CWA #1335."
     )
+
+
+def _request_real_server(request_version, app_connection=None):
+    """Return one response from a real MyWSGIHandler-backed TCP server."""
+    body = b"ok"
+
+    def application(_environ, start_response):
+        headers = [
+            ("Content-Type", "text/plain"),
+            ("Content-Length", str(len(body))),
+        ]
+        if app_connection is not None:
+            headers.append(("Connection", app_connection))
+        start_response("200 OK", headers)
+        return [body]
+
+    server = WSGIServer(
+        ("127.0.0.1", 0),
+        application,
+        handler_class=MyWSGIHandler,
+        log=None,
+    )
+    server.start()
+    client = socket.create_connection(server.address, timeout=2)
+    try:
+        request = (
+            f"GET / {request_version}\r\n"
+            "Host: localhost\r\n"
+            "\r\n"
+        ).encode("ascii")
+        client.sendall(request)
+
+        response = bytearray()
+        while chunk := client.recv(4096):
+            response.extend(chunk)
+    finally:
+        client.close()
+        server.stop(timeout=1)
+
+    head, separator, _response_body = bytes(response).partition(b"\r\n\r\n")
+    assert separator, response
+    return head.split(b"\r\n")[1:]
+
+
+def _connection_values(response_headers):
+    return [
+        value.strip().lower()
+        for name, separator, value in (header.partition(b":") for header in response_headers)
+        if separator and name.strip().lower() == b"connection"
+    ]
+
+
+def test_http_1_1_response_advertises_connection_close():
+    headers = _request_real_server("HTTP/1.1")
+    assert _connection_values(headers) == [b"close"]
+
+
+def test_http_1_0_response_advertises_connection_close_once():
+    headers = _request_real_server("HTTP/1.0")
+    assert _connection_values(headers) == [b"close"]
+
+
+@pytest.mark.parametrize("app_connection", ["close", "keep-alive"])
+def test_app_connection_header_is_normalized_to_one_close_header(app_connection):
+    headers = _request_real_server("HTTP/1.1", app_connection=app_connection)
+    assert _connection_values(headers) == [b"close"]

@@ -5,6 +5,7 @@ import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as Upl
 import {
   useBookMetadata, useUpdateMetadata, useBook, useMe, useDeleteFormat, useConvertFormat,
   useSetCover, useMetadataSearch, useMetadataProviders, useSetMetadataProviderActive, useAddFormat,
+  useDeleteBook,
 } from '../lib/queries';
 import { Button } from '../components/Button';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
@@ -98,11 +99,14 @@ export function EditBook({ id }: { id: string }) {
   const { data: meta, isLoading, error } = useBookMetadata(id);
   const update = useUpdateMetadata(id);
   const setCover = useSetCover(id);
+  const me = useMe().data;
+  const deleteBook = useDeleteBook(id);
   const [, navigate] = useLocation();
 
   const [form, setForm] = useState<FormState | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!meta) return;
@@ -222,12 +226,35 @@ export function EditBook({ id }: { id: string }) {
     });
   };
 
+  const onDeleteBook = () => {
+    if (deleteBook.isPending) return;
+    if (!window.confirm(
+      t('Delete "{title}"? This permanently removes the book and all its files from your library. This cannot be undone.', { title: form.title })
+    )) return;
+    setDeleteError(null);
+    deleteBook.mutate(undefined, {
+      onSuccess: () => navigate('/'),
+      onError: (err) =>
+        setDeleteError(err instanceof ApiError ? err.message : t('Could not delete this book.')),
+    });
+  };
+
   return (
     <main className={styles.container}>
       <Link href={`/book/${id}`} className={styles.back}>
         <ChevronLeft size={16} /> {t('Back to book')}
       </Link>
-      <h1 className={styles.title}>{t('Edit metadata')}</h1>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.title}>{t('Edit metadata')}</h1>
+        {me?.role?.delete_books && (
+          <Button type="button" variant="danger" data-testid="edit-book-delete"
+            aria-label={t('Delete book')} disabled={deleteBook.isPending} onClick={onDeleteBook}>
+            <Trash2 size={16} aria-hidden="true" focusable={false} />
+            {deleteBook.isPending ? t('Deleting…') : t('Delete book')}
+          </Button>
+        )}
+      </div>
+      {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
 
       <CoverManager id={id} />
 

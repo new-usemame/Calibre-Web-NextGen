@@ -4,8 +4,14 @@
   "created": "2026-08-19",
   "id": "F-9de049",
   "refs": [],
+  "resolution": {
+    "commit": "9e06f0fa7",
+    "date": "2026-08-22",
+    "note": "Fixed in #1760 (+#1777): cps/services/annotation_types.py is now the declared owner, and all six ub.Annotation constructors route through it -- importer and portable import and live PATCH via to_storage_type, the three web-reader paths via type_for_webreader_annotation. The vocabulary question this finding said had to be answered first IS answered in that module's docstring: highlight/dogear are the device's own words, note is declared web-reader-only, unknown words survive rather than being nulled or defaulted. Guarded by a source-scanning enumeration test plus a vacuity control (test_the_scan_finds_the_constructors_it_claims_to). Mutation re-verified 2026-08-22.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "annotation_type has five writers, no owner, and no agreed vocabulary"
 }

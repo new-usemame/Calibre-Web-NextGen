@@ -19,9 +19,22 @@ class MyWSGIHandler(WSGIHandler):
         # the proxy renegotiating fresh sockets so recovery is bounded.
         # Backport of CWA #1335 by @I-Would-Like-To-Report-A-Bug-Please;
         # addresses fork issue #193.
+        # If a 101/upgrade route is ever added, exempt it from this forced-close
+        # policy instead of emitting a contradictory Switching Protocols response.
         is_valid = super().read_request(raw_requestline)
         self.close_connection = True
         return is_valid
+
+    def finalize_headers(self):
+        # Let gevent validate and encode application headers, and make all of its
+        # Content-Length/chunking decisions, before enforcing the close policy.
+        super().finalize_headers()
+        self.response_headers = [
+            (name, value)
+            for name, value in self.response_headers
+            if name.lower() != b'connection'
+        ]
+        self.response_headers.append((b'Connection', b'close'))
 
     def get_environ(self):
         env = super().get_environ()
@@ -55,4 +68,3 @@ class MyWSGIHandler(WSGIHandler):
             (self._orig_status or self.status or '000').split()[0],
             length,
             delta)
-

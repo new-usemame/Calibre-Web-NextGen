@@ -339,6 +339,34 @@ def test_patch_captures_updated_annotations_before_proxying(app, monkeypatch):
     assert dispatched == [(([annotation], book, user), {"origin_device_id": None})]
 
 
+def test_patch_declares_kobo_delete_authority_before_proxying(app, monkeypatch):
+    from cps.services import annotation_sync
+
+    sentinel = object()
+    book = SimpleNamespace(id=347, title="Flatland", identifiers=[])
+    user = SimpleNamespace(id=7, name="test-user", is_authenticated=True)
+    dispatched = []
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(rs, "current_user", user)
+    monkeypatch.setattr(
+        annotation_sync, "dispatch_annotation_deletes",
+        lambda *args, **kwargs: dispatched.append((args, kwargs)),
+    )
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations", method="PATCH",
+        json={"deletedAnnotationIds": ["annotation-1"]},
+    ):
+        assert _view(rs.handle_annotations)(OWNED) is sentinel
+
+    assert dispatched == [(
+        (["annotation-1"], user),
+        {"book_id": book.id, "deletable_sources": {"kobo"}},
+    )]
+
+
 def test_patch_ownership_unknown_is_visible_and_not_proxied(app, monkeypatch, caplog):
     monkeypatch.setattr(
         rs, "resolve_entitlement_ownership", lambda _content_id: rs.OWNERSHIP_UNKNOWN,

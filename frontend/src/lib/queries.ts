@@ -181,6 +181,7 @@ export function useDiscover(count: number, nonce: number) {
     queryKey: ['discover-strip', count, nonce],
     queryFn: () => apiGet<BooksPage>(`/api/v1/books?filter=discover&per_page=${count}`),
     staleTime: 0,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 }

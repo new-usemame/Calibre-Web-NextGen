@@ -10,15 +10,14 @@ import re
 import unicodedata
 from difflib import SequenceMatcher
 
-from cps import constants, logger, db
+from cps import logger, db
 from cps.metadata_constants import (
     DEFAULT_METADATA_PROVIDER_HIERARCHY,
     DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON,
 )
 from cps.search_metadata import cl as metadata_providers
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 log = logger.create()
 

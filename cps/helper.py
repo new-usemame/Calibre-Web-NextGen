@@ -58,9 +58,8 @@ from .services import parallel
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS
 from .tasks.mail import TaskEmail
 from .tasks.thumbnail import TaskClearCoverThumbnailCache, TaskGenerateCoverThumbnails

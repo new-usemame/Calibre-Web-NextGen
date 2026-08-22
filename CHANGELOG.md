@@ -18,6 +18,14 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Smart shelves and other library activity now keep recording statistics in
+  every deployment layout.** Installations launched outside the application
+  directory could not find the CWA settings database module, which filled the
+  log with `No module named 'scripts'` errors and silently dropped activity
+  records for smart shelves, searches, shelves, OPDS, Kobo sync, and related
+  actions. Reported in
+  [#1755](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1755).
+
 - **A Kobo can no longer erase a book's local highlights when its Calibre-Web
   session expires or an admin has just disabled Kobo sync.** Those transition
   windows, plus alternate spellings of Kobo's `checkforchanges` request, could

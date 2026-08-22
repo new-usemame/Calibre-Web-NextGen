@@ -619,34 +619,73 @@ def get_sorted_author(value):
     return value2
 
 
-def book_is_in_progress(book_id, read_status_value, read_column_configured, user):
-    """Return True when a book is sync-driven "currently reading".
+# SQLite builds vary in their host-parameter ceiling. Keep IN clauses below the
+# conservative historical limit while leaving ordinary list pages as one query.
+SQLITE_IN_CHUNK_SIZE = 900
+
+
+def book_in_progress_ids(book_read_statuses, read_column_configured, user):
+    """Return the sync-driven "currently reading" ids from a batch of books.
 
     The single source of truth for the tri-state in-progress marker shown on the
-    book detail page (fork #509/#634). Mirrors ``web.show_book``'s
+    classic detail page and in the SPA (fork #509/#634/#1702). Mirrors
+    ``web.show_book``'s
     ``read_status_raw == STATUS_IN_PROGRESS`` derivation so the classic detail
-    page and the new-UI (SPA) book page never disagree — the exact class of
-    read-state drift that fork #579/#637 fixed for the "read" badge.
+    page, SPA detail and SPA list never disagree — the exact class of read-state
+    drift that fork #579/#637 fixed for the "read" badge.
 
+    ``book_read_statuses`` is an iterable of ``(book_id, read_status_value)``.
     ``read_status_value`` is the third column returned by
     ``calibre_db.get_book_read_archived`` — the built-in ``ub.ReadBook.read_status``
     (0/1/2/None) when no custom read column is configured, or the custom column's
     boolean-ish value when one is. In-progress is a tri-state KOReader/Kobo sync
     writes only to ``ub.ReadBook``, so with a custom read column configured the
     flag must be read from ``ub.ReadBook`` regardless of which column is linked.
+
+    The custom-column query is deliberately batch-shaped: one query resolves an
+    ordinary SPA list page, while oversized caller-controlled pages are split
+    into bounded IN clauses. The single-book helper below delegates to the same
+    derivation. A truthy custom value is finished and is filtered out even if an
+    old IN_PROGRESS ``ReadBook`` row remains underneath it.
     """
-    if user is None or not user.is_authenticated or getattr(user, "is_anonymous", False):
-        return False
+    statuses = {int(book_id): value for book_id, value in book_read_statuses}
+    if not statuses:
+        return set()
+    try:
+        authenticated = (user is not None and user.is_authenticated
+                         and not getattr(user, "is_anonymous", False))
+    except (AttributeError, RuntimeError):
+        # Bare Flask unit contexts and startup/reconnect windows may leave the
+        # LocalProxy unresolved. They have no authenticated per-user state.
+        authenticated = False
+    if not authenticated:
+        return set()
     if read_column_configured:
-        # A finished custom-column value is unambiguous — never in-progress.
-        if read_status_value:
-            return False
-        row = ub.session.query(ub.ReadBook).filter(
-            ub.ReadBook.user_id == int(user.id),
-            ub.ReadBook.book_id == book_id,
-            ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
-        return row is not None
-    return read_status_value == ub.ReadBook.STATUS_IN_PROGRESS
+        # A finished custom-column value is unambiguous — never in-progress,
+        # including when a stale sync row still says otherwise.
+        eligible_ids = sorted(
+            book_id for book_id, value in statuses.items() if not value)
+        if not eligible_ids:
+            return set()
+        in_progress_ids = set()
+        for start in range(0, len(eligible_ids), SQLITE_IN_CHUNK_SIZE):
+            chunk = eligible_ids[start:start + SQLITE_IN_CHUNK_SIZE]
+            rows = ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == int(user.id),
+                ub.ReadBook.book_id.in_(chunk),
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).all()
+            in_progress_ids.update(int(row[0]) for row in rows)
+        return in_progress_ids
+    return {
+        book_id for book_id, value in statuses.items()
+        if value == ub.ReadBook.STATUS_IN_PROGRESS
+    }
+
+
+def book_is_in_progress(book_id, read_status_value, read_column_configured, user):
+    """Return True for one book using the shared batch read-state derivation."""
+    return int(book_id) in book_in_progress_ids(
+        ((book_id, read_status_value),), read_column_configured, user)
 
 
 def reset_reading_position(session, user_id, book_id):

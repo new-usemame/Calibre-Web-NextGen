@@ -6,7 +6,7 @@ Public API:
   - register_handler(handler): plug in a new target
   - available_targets(): list registered target names
   - dispatch_annotation_sync(payload_annotations, book, user): push every annotation
-  - dispatch_annotation_deletes(deleted_ids, user, book_id): delete scoped annotations
+  - dispatch_annotation_deletes(..., deletable_sources=...): delete scoped annotations
 
 The dispatcher owns all DB persistence — Annotation rows + AnnotationSyncTarget
 rows + the status state machine. Handlers are stateless: they make remote
@@ -24,6 +24,7 @@ from typing import Dict, List, Optional
 from sqlalchemy.exc import IntegrityError
 
 from ..annotation_colors import to_display_name, to_storage_color
+from ..annotation_types import to_storage_type
 from .base import AnnotationSyncTargetHandler, SyncResult
 
 log = logging.getLogger(__name__)
@@ -43,11 +44,11 @@ def parse_client_modified_utc(value):
         raw = raw[:-1] + "+00:00"
     try:
         parsed = datetime.fromisoformat(raw)
-    except ValueError:
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    except (ValueError, OverflowError):
         return None
-    if parsed.tzinfo is None:
-        return None
-    return parsed.astimezone(timezone.utc).replace(tzinfo=None)
 
 # Background dispatch seam (#920)
 # ------------------------------
@@ -292,6 +293,13 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
             book_id=book.id,
             source="kobo",
             origin_device_id=origin_device_id,
+            # Set at construction, not only in the conditional update below.
+            # That branch runs `if "type" in payload`, so a PATCH that omits the
+            # key used to create a row with NULL — the conditional half of
+            # F-9de049. `to_storage_type` still answers None when the payload
+            # says nothing, so this records what the device sent and never
+            # invents a type it did not.
+            annotation_type=to_storage_type(payload.get("type")),
         )
         session.add(ann)
     elif getattr(ann, "content_revision", None) is None:
@@ -310,8 +318,13 @@ def _upsert_annotation(session, payload, book, user, *, origin_device_id=None):
         # no-op for it and repairs a legacy name from any other client.
         ann.highlight_color = to_storage_color(payload.get("highlightColor"))
     if "type" in payload:
-        native_type = payload.get("type")
-        if isinstance(native_type, str) and len(native_type) <= 32:
+        # Routed through the vocabulary owner (F-9de049) rather than stored raw:
+        # it folds spelling and case so the device's word and the importer's land
+        # on one token, and it preserves a word it does not know instead of
+        # dropping it. The length guard stays — the column is VARCHAR(32) and a
+        # hostile payload should not make the write fail.
+        native_type = to_storage_type(payload.get("type"))
+        if native_type is not None and len(native_type) <= 32:
             ann.annotation_type = native_type
     # Position fields — pulled from Kobo's location.span block.
     chapter_progress = span.get("chapterProgress")
@@ -689,21 +702,35 @@ def dispatch_existing_annotation_sync(annotation, book, user) -> None:
     _enqueue(user, jobs, book=book)
 
 
-def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
+def dispatch_annotation_deletes(
+    deleted_ids, user, book_id=None, *, deletable_sources,
+) -> None:
     """For each annotation_id, transition non-tombstone sync_targets via
     handler.delete AND soft-delete the local Annotation row by setting
     ``hidden=True``.
 
-    Sub-project (2): local soft-delete happens unconditionally — independent
-    of any enabled sync target. Recovery is symmetric: a subsequent
-    create/update PATCH for the same annotation_id un-hides it via
-    ``_upsert_annotation``.
+    ``deletable_sources`` is the caller's provenance authority. Device bridges
+    pass the sources that device can honestly name; a direct user action passes
+    ``None`` to declare authority across sources. Requiring the keyword makes a
+    new bridge choose an authority model instead of inheriting an unsafe
+    default.
+
+    Once authorised, local soft-delete happens independently of any enabled
+    sync target. Recovery is symmetric: a subsequent create/update PATCH for
+    the same annotation_id un-hides it via ``_upsert_annotation``.
     """
     from cps import ub
     if not deleted_ids:
         return
     jobs = []
     for annotation_id in deleted_ids:
+        if not isinstance(annotation_id, str) or not annotation_id:
+            # A malformed member has no addressable annotation identity. Skip
+            # only that member: letting it reach SQL can poison the session and
+            # prevent later, valid deletions in the same device delta from
+            # being applied before the outer route proxies success.
+            log.warning("Skipping malformed deletedAnnotationIds member %r", annotation_id)
+            continue
         query = ub.session.query(ub.Annotation).filter(
             ub.Annotation.user_id == user.id,
             ub.Annotation.annotation_id == annotation_id,
@@ -712,6 +739,20 @@ def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
             query = query.filter(ub.Annotation.book_id == book_id)
         ann = query.first()
         if ann is None:
+            continue
+        delete_authorized = (
+            deletable_sources is None or ann.source in deletable_sources
+        )
+        if not delete_authorized:
+            # Keep device transports successful for compatibility, but never
+            # let a refused destructive request disappear without provenance
+            # details that identify the authority mismatch.
+            log.warning(
+                "Annotation delete refused: user=%s book=%s annotation_id=%r "
+                "stored_source=%r deletable_sources=%s",
+                user.id, ann.book_id, annotation_id, ann.source,
+                sorted(deletable_sources),
+            )
             continue
         # Push delete through any non-tombstone sync targets.
         for st in list(ann.sync_targets):

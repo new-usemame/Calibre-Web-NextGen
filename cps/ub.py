@@ -3498,11 +3498,97 @@ def _ensure_kobo_opaque_present_guards(engine):
     _run_ddl_with_retry(engine, statements)
 
 
+def backfill_legacy_annotation_types(engine):
+    """Fill only NULL types derivable from a recorded web-reader branch.
+
+    The scan and its complete counts are logged before a write transaction is
+    opened. Existing values, including future vocabulary this version does not
+    know, always win: the candidate scan ignores them and the UPDATE repeats an
+    ``annotation_type IS NULL`` guard in case a concurrent writer supplies a
+    value after the scan. Rows without a recorded web-reader branch discriminator
+    remain NULL, where NULL deliberately means unknown.
+
+    Re-running is safe: after a derived value is stored it is no longer a
+    candidate, and no non-NULL value is ever overwritten.
+    """
+    from .services.annotation_types import derive_legacy_annotation_type
+
+    counts = {
+        "total": 0,
+        "already_typed": 0,
+        "null": 0,
+        "derived_note": 0,
+        "derived_highlight": 0,
+        "unknown": 0,
+        "would_update": 0,
+        "updated": 0,
+    }
+    required_columns = {"id", "position_type", "annotation_type"}
+    annotation_columns = _table_columns(engine, "annotation")
+    if annotation_columns is None or not required_columns.issubset(annotation_columns):
+        log.info(
+            "[annotation-type-backfill] scan total=0 already_typed=0 null=0 "
+            "derived_note=0 derived_highlight=0 unknown=0 would_update=0; "
+            "annotation schema is not eligible"
+        )
+        return counts
+
+    candidates = []
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT id, position_type, annotation_type "
+            "FROM annotation ORDER BY id"
+        )).fetchall()
+
+    counts["total"] = len(rows)
+    for row_id, position_type, annotation_type in rows:
+        if annotation_type is not None:
+            counts["already_typed"] += 1
+            continue
+        counts["null"] += 1
+        derived = derive_legacy_annotation_type(
+            position_type=position_type,
+        )
+        if derived is None:
+            counts["unknown"] += 1
+            continue
+        counts[f"derived_{derived}"] += 1
+        candidates.append({"row_id": row_id, "annotation_type": derived})
+
+    counts["would_update"] = len(candidates)
+    log.info(
+        "[annotation-type-backfill] scan total=%d already_typed=%d null=%d "
+        "derived_note=%d derived_highlight=%d unknown=%d would_update=%d",
+        counts["total"],
+        counts["already_typed"],
+        counts["null"],
+        counts["derived_note"],
+        counts["derived_highlight"],
+        counts["unknown"],
+        counts["would_update"],
+    )
+
+    if candidates:
+        with engine.begin() as conn:
+            for candidate in candidates:
+                result = conn.execute(text(
+                    "UPDATE annotation SET annotation_type=:annotation_type "
+                    "WHERE id=:row_id AND annotation_type IS NULL"
+                ), candidate)
+                counts["updated"] += result.rowcount
+    log.info(
+        "[annotation-type-backfill] applied=%d planned=%d",
+        counts["updated"], counts["would_update"],
+    )
+    return counts
+
+
 def migrate_kobo_two_way_annotation_sync(engine, _session):
     """Stage 0 additive schema and conservative legacy-state backfill.
 
-    This migration never updates a pre-existing annotation column.  The only
-    annotation backfills target newly-added columns, and every legacy book is
+    Existing annotation values are preserved. The only legacy type values
+    filled are NULLs whose recorded web-reader branch reproduces today's exact
+    writer decision; all other types remain unknown. Every legacy book is
     represented as unseeded/unknown rather than being promoted to authority.
     """
     # Capture existing Stage 0-scoped violations so a repeated or partially
@@ -3534,6 +3620,8 @@ def migrate_kobo_two_way_annotation_sync(engine, _session):
         )
         for column_name, ddl in additions:
             _add_column_if_missing(engine, "annotation", column_name, ddl)
+
+        backfill_legacy_annotation_types(engine)
 
         with engine.begin() as conn:
             row_count_before = conn.execute(text("SELECT COUNT(*) FROM annotation")).scalar_one()

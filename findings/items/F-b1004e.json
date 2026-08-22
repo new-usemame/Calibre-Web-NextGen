@@ -4,8 +4,14 @@
   "created": "2026-08-18",
   "id": "F-b1004e",
   "refs": [],
+  "resolution": {
+    "commit": "d8fa66267",
+    "date": "2026-08-21",
+    "note": "Fixed in #1774. The lossy 'WHERE Text IS NOT NULL AND Text != \"\"' predicate is gone; every Bookmark row is selected and classified explicitly across Text, Annotation and Type, and every row takes exactly one accounted-for path -- tests assert the buckets sum to total_seen. Dogears and note-only rows now import with the correct annotation_type and appear in the user-visible summary. Mutation re-verified independently: reducing the content predicate to the historical bool(Text) gate fails exactly test_dogear_and_note_only_row_import_and_every_row_is_accounted.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "The KoboReader.sqlite import drops every dogear and note-only bookmark before it is counted"
 }

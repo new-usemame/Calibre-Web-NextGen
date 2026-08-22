@@ -33,6 +33,34 @@ FLATLAND_OPF = b"""<?xml version="1.0" encoding="UTF-8"?>
 
 CLEAN_OPF = FLATLAND_OPF.replace(b'href="../nav.xhtml"', b'href="nav.xhtml"')
 
+SPLIT_OPF = b"""<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="chapter"/></spine>
+</package>
+"""
+
+SPLIT_NCX = b"""<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap>
+  <navPoint id="one"><navLabel><text>One</text></navLabel>
+    <content src="chapter.xhtml#one"/></navPoint>
+  <navPoint id="two"><navLabel><text>Two</text></navLabel>
+    <content src="chapter.xhtml#two"/></navPoint>
+</navMap></ncx>
+"""
+
+SPLIT_CHAPTER = b"""<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><body>
+  <div id="book-columns"><div id="book-inner">
+    <section id="one"><span class="koboSpan" id="kobo.1.1">one</span></section>
+    <section id="two"><span class="koboSpan" id="kobo.2.1">two</span></section>
+  </div></div>
+</body></html>
+"""
+
 NAV_XHTML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml"><body><nav>
   <a href="OPS/chapter-001.xml#start">Chapter one</a>
@@ -63,6 +91,22 @@ def _write_package(
     with zipfile.ZipFile(path, "w") as archive:
         for name, content, compression in entries:
             archive.writestr(name, content, compress_type=compression)
+
+
+def _write_splittable_package(path):
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "mimetype", b"application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        archive.writestr("META-INF/container.xml", CONTAINER_XML)
+        archive.writestr("OPS/epb.opf", SPLIT_OPF)
+        archive.writestr("OPS/toc.ncx", SPLIT_NCX)
+        archive.writestr("OPS/chapter.xhtml", SPLIT_CHAPTER)
+
+
+def _ncx_sources(path):
+    with zipfile.ZipFile(path) as archive:
+        document = etree.fromstring(archive.read("OPS/toc.ncx"))
+    return document.xpath("//*[local-name()='navMap']//*[local-name()='content']/@src")
 
 
 def _normalizer():
@@ -306,13 +350,160 @@ def test_conversion_continues_when_normalization_cannot_process_the_package(tmp_
     monkeypatch.setattr(convert.config, "config_kepubifypath", "/bin/kepubify", raising=False)
     monkeypatch.setattr(convert, "process_open", lambda *_args, **_kwargs: process)
     monkeypatch.setattr(convert, "stream_process_output", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(convert, "normalize_kepub_package", lambda _path: None)
+    monkeypatch.setattr(
+        convert, "normalize_kepub_package", lambda _path, **_kwargs: None)
     task = convert.TaskConvert(str(book_path), 1, "convert", {}, None)
 
     check, error = task._convert_kepubify(str(book_path), ".epub", ".kepub")
 
     assert check == 0, f"conversion should still succeed, got error: {error}"
     assert destination.exists(), "the un-normalized KEPUB must still be delivered"
+
+
+def _patch_annotation_store(monkeypatch, convert, *, annotations):
+    """Give the conversion task a readable annotation store.
+
+    `_book_has_annotations` fails CLOSED, so without this every conversion test
+    would silently take the no-split path and the split assertions would pass for
+    the wrong reason.
+    """
+    class _Query:
+        def filter(self, *_criteria):
+            return self
+
+        def first(self):
+            return object() if annotations else None
+
+    class _Session:
+        def query(self, _model):
+            return _Query()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(convert.ub, "init_db_thread", lambda: _Session(), raising=False)
+
+
+@pytest.mark.unit
+def test_kepubify_conversion_is_born_with_split_chapter_documents(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import cps.helper  # noqa: F401 - establish the application's normal import order
+    from cps.tasks import convert
+
+    book_path = tmp_path / "book"
+    (tmp_path / "book.epub").write_bytes(b"source")
+    _write_splittable_package(tmp_path / "book.kepub.epub")
+    destination = tmp_path / "book.kepub"
+    process = SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(convert.config, "config_embed_metadata", False, raising=False)
+    monkeypatch.setattr(convert.config, "config_binariesdir", "", raising=False)
+    monkeypatch.setattr(convert.config, "config_kepubifypath", "/bin/kepubify", raising=False)
+    monkeypatch.setattr(convert, "process_open", lambda *_args, **_kwargs: process)
+    monkeypatch.setattr(convert, "stream_process_output", lambda *_args, **_kwargs: [])
+    _patch_annotation_store(monkeypatch, convert, annotations=0)
+    task = convert.TaskConvert(str(book_path), 1, "convert", {}, None)
+
+    check, error = task._convert_kepubify(str(book_path), ".epub", ".kepub")
+
+    assert check == 0, error
+    assert _ncx_sources(destination) == [
+        "chapter-split-1.xhtml",
+        "chapter-split-2.xhtml",
+    ]
+
+
+@pytest.mark.unit
+def test_kepubify_conversion_does_not_split_a_book_that_has_annotations(
+        tmp_path, monkeypatch):
+    """Conversion regenerates the KEPUB of a book already in the library.
+
+    A book that has been read and highlighted can be re-converted at any time.
+    Splitting renames its spine documents, and a Kobo matches its stored Bookmark
+    rows by ContentID -- it would keep the rows, rewrite each to the bare old
+    filename, render nothing, and report no annotations. Normalization still runs
+    (it never renames anything); only the split is withheld.
+    """
+    from types import SimpleNamespace
+
+    import cps.helper  # noqa: F401 - establish the application's normal import order
+    from cps.tasks import convert
+
+    book_path = tmp_path / "book"
+    (tmp_path / "book.epub").write_bytes(b"source")
+    _write_splittable_package(tmp_path / "book.kepub.epub")
+    destination = tmp_path / "book.kepub"
+    process = SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(convert.config, "config_embed_metadata", False, raising=False)
+    monkeypatch.setattr(convert.config, "config_binariesdir", "", raising=False)
+    monkeypatch.setattr(convert.config, "config_kepubifypath", "/bin/kepubify", raising=False)
+    monkeypatch.setattr(convert, "process_open", lambda *_args, **_kwargs: process)
+    monkeypatch.setattr(convert, "stream_process_output", lambda *_args, **_kwargs: [])
+    _patch_annotation_store(monkeypatch, convert, annotations=1)
+    task = convert.TaskConvert(str(book_path), 1, "convert", {}, None)
+
+    check, error = task._convert_kepubify(str(book_path), ".epub", ".kepub")
+
+    assert check == 0, error
+    assert _ncx_sources(destination) == ["chapter.xhtml#one", "chapter.xhtml#two"], (
+        "an annotated book's KEPUB was split; its existing highlights would "
+        "stop rendering on the device")
+
+
+@pytest.mark.unit
+def test_the_conversion_annotation_check_fails_closed(monkeypatch):
+    """An unreadable annotation store must produce the pre-split behaviour."""
+    import cps.helper  # noqa: F401
+    from cps.tasks import convert
+
+    def _explode():
+        raise RuntimeError("annotation store unavailable")
+
+    monkeypatch.setattr(convert.ub, "init_db_thread", _explode, raising=False)
+    task = convert.TaskConvert("/nowhere", 1, "convert", {}, None)
+    assert task._book_has_annotations() is True
+
+
+@pytest.mark.unit
+def test_the_conversion_annotation_check_uses_a_worker_session(monkeypatch):
+    """Background tasks must not touch the global web-request ub.session.
+
+    Executed rather than pinned to source: fail the global session outright and
+    require the check to still work, which it can only do through
+    ub.init_db_thread().
+    """
+    import cps.helper  # noqa: F401
+    from cps.tasks import convert
+
+    class _Forbidden:
+        def query(self, *_args, **_kwargs):
+            raise AssertionError(
+                "the conversion task used the global web-request ub.session")
+
+    opened = []
+
+    class _WorkerQuery:
+        def filter(self, *_criteria):
+            return self
+
+        def first(self):
+            return None
+
+    class _WorkerSession:
+        def query(self, _model):
+            return _WorkerQuery()
+
+        def close(self):
+            opened.append("closed")
+
+    monkeypatch.setattr(convert.ub, "session", _Forbidden(), raising=False)
+    monkeypatch.setattr(convert.ub, "init_db_thread", lambda: _WorkerSession(), raising=False)
+
+    task = convert.TaskConvert("/nowhere", 1, "convert", {}, None)
+    assert task._book_has_annotations() is False
+    assert opened == ["closed"], "the worker session was not closed"
 
 
 @pytest.mark.unit
@@ -334,7 +525,8 @@ def test_conversion_corrupt_archive_still_does_not_replace_existing_kepub(tmp_pa
     monkeypatch.setattr(convert.config, "config_kepubifypath", "/bin/kepubify", raising=False)
     monkeypatch.setattr(convert, "process_open", lambda *_args, **_kwargs: process)
     monkeypatch.setattr(convert, "stream_process_output", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(convert, "normalize_kepub_package", lambda _path: None)
+    monkeypatch.setattr(
+        convert, "normalize_kepub_package", lambda _path, **_kwargs: None)
     task = convert.TaskConvert(str(book_path), 1, "convert", {}, None)
 
     check, error = task._convert_kepubify(str(book_path), ".epub", ".kepub")
@@ -494,3 +686,129 @@ def test_repair_probe_classifies_io_failure_as_retryable(tmp_path, monkeypatch):
 
     assert inspection.status == mod.PROBE_RETRYABLE
     assert "temporarily unavailable" in inspection.error_message
+
+
+@pytest.mark.unit
+def test_kepubify_conversion_RE_splits_an_annotated_book_that_was_already_split(
+        tmp_path, monkeypatch):
+    """The guard's second clause, which the convert path had no test for.
+
+    "Never split an annotated book" is the wrong rule when the STORED package is
+    already one of ours. Piece naming is deterministic, so re-splitting the same
+    source reproduces the exact member names the existing annotations are
+    anchored to -- while withholding the split deletes the very files those
+    anchors name. Splitting preserves them; not splitting strands them.
+
+    The upload path has covered this since F-bbd10e
+    (test_1715_uploaded_kepub_is_normalized.py ::
+    test_an_annotated_book_that_was_ALREADY_split_is_split_again). The
+    conversion path carries the identical clause at cps/tasks/convert.py and had
+    only the plain "annotated => do not split" case, so simplifying the
+    expression to `may_split = not self._book_has_annotations()` -- the obvious
+    reading -- left every conversion test green while silently stranding the
+    anchors of every annotated, already-split book.
+
+    The stored package here is a REAL splitter output, not a mock: the assertion
+    exercises `package_was_split_by_us` itself rather than a stand-in for it.
+    """
+    from types import SimpleNamespace
+
+    import cps.helper  # noqa: F401 - establish the application's normal import order
+    from cps.tasks import convert
+
+    book_path = tmp_path / "book"
+    (tmp_path / "book.epub").write_bytes(b"source")
+    _write_splittable_package(tmp_path / "book.kepub.epub")
+
+    # The already-stored package: genuinely produced by our own splitter, so
+    # `package_was_split_by_us` answers True on its real spine check.
+    destination = tmp_path / "book.kepub"
+    _write_splittable_package(destination)
+    _normalizer()(str(destination), split_chapters=True)
+
+    from cps.services.kepub_spine_splitter import package_was_split_by_us
+    assert package_was_split_by_us(str(destination)), (
+        "fixture is wrong: the stored package is not one the splitter produced, "
+        "so this test could not tell the two branches apart")
+
+    process = SimpleNamespace(returncode=0)
+    monkeypatch.setattr(convert.config, "config_embed_metadata", False, raising=False)
+    monkeypatch.setattr(convert.config, "config_binariesdir", "", raising=False)
+    monkeypatch.setattr(convert.config, "config_kepubifypath", "/bin/kepubify", raising=False)
+    monkeypatch.setattr(convert, "process_open", lambda *_args, **_kwargs: process)
+    monkeypatch.setattr(convert, "stream_process_output", lambda *_args, **_kwargs: [])
+    _patch_annotation_store(monkeypatch, convert, annotations=1)
+    task = convert.TaskConvert(str(book_path), 1, "convert", {}, None)
+
+    check, error = task._convert_kepubify(str(book_path), ".epub", ".kepub")
+
+    assert check == 0, error
+    assert _ncx_sources(destination) == [
+        "chapter-split-1.xhtml",
+        "chapter-split-2.xhtml",
+    ], ("an annotated book whose stored KEPUB was already split came back "
+        "unsplit; the chapter files its highlights are anchored to no longer "
+        "exist, so they would stop rendering on the device")
+
+
+@pytest.mark.unit
+def test_kepubify_conversion_keeps_an_existing_UNSPLIT_annotated_book_unsplit(
+        tmp_path, monkeypatch):
+    """The convert boundary must use the detector's False result, not existence.
+
+    The positive partner above proves a real splitter output is accepted. This
+    case supplies the missing other half: the destination exists, but its spine
+    is ordinary and unsplit. Merely checking ``os.path.exists(destination)`` --
+    or replacing ``package_was_split_by_us`` with an always-True predicate --
+    would split the replacement and strand annotations anchored to
+    ``chapter.xhtml``.
+
+    Wrap the real detector and record its argument so the assertion proves the
+    decision was made at the conversion boundary, against the stored package.
+    """
+    from types import SimpleNamespace
+
+    import cps.helper  # noqa: F401 - establish the application's normal import order
+    from cps.services import kepub_spine_splitter
+    from cps.tasks import convert
+
+    book_path = tmp_path / "book"
+    (tmp_path / "book.epub").write_bytes(b"source")
+    _write_splittable_package(tmp_path / "book.kepub.epub")
+
+    destination = tmp_path / "book.kepub"
+    _write_splittable_package(destination)
+    assert _ncx_sources(destination) == [
+        "chapter.xhtml#one",
+        "chapter.xhtml#two",
+    ], "fixture is wrong: the stored package is not an ordinary unsplit KEPUB"
+
+    real_detector = kepub_spine_splitter.package_was_split_by_us
+    detector_calls = []
+
+    def record_detector_call(path):
+        detector_calls.append(path)
+        return real_detector(path)
+
+    monkeypatch.setattr(
+        kepub_spine_splitter, "package_was_split_by_us", record_detector_call)
+
+    process = SimpleNamespace(returncode=0)
+    monkeypatch.setattr(convert.config, "config_embed_metadata", False, raising=False)
+    monkeypatch.setattr(convert.config, "config_binariesdir", "", raising=False)
+    monkeypatch.setattr(convert.config, "config_kepubifypath", "/bin/kepubify", raising=False)
+    monkeypatch.setattr(convert, "process_open", lambda *_args, **_kwargs: process)
+    monkeypatch.setattr(convert, "stream_process_output", lambda *_args, **_kwargs: [])
+    _patch_annotation_store(monkeypatch, convert, annotations=1)
+    task = convert.TaskConvert(str(book_path), 1, "convert", {}, None)
+
+    check, error = task._convert_kepubify(str(book_path), ".epub", ".kepub")
+
+    assert check == 0, error
+    assert detector_calls == [str(destination)], (
+        "conversion did not ask the real detector about the stored package")
+    assert _ncx_sources(destination) == [
+        "chapter.xhtml#one",
+        "chapter.xhtml#two",
+    ], ("an annotated book whose stored KEPUB was unsplit came back split; "
+        "its highlights were anchored to the chapter.xhtml spine document")

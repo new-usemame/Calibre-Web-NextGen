@@ -958,6 +958,10 @@ msgid "Uploaded file is not a SQLite database."
 msgstr "Przesłany plik nie jest bazą danych SQLite."
 
 #: cps/annotations.py
+msgid "Uploaded database has no readable Kobo Bookmark table."
+msgstr ""
+
+#: cps/annotations.py
 #, python-format
 msgid "File exceeds %(max)d MB."
 msgstr "Plik przekracza %(max)d MB."
@@ -3264,6 +3268,10 @@ msgstr "Wydawcy (oddzieleni przecinkami)"
 msgid "Read"
 msgstr "Przeczytane"
 
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Reading"
+msgstr "Czytanie"
+
 #: cps/spa_strings.py
 msgid "Reading progress"
 msgstr "Postęp czytania"
@@ -3524,10 +3532,6 @@ msgid ""
 msgstr ""
 "Interfejs jest przetłumaczony na Twój język; te informacje o aktualizacji są "
 "napisane w języku angielskim."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Reading"
-msgstr "Czytanie"
 
 #: cps/spa_strings.py
 msgid "Grid view"
@@ -3825,19 +3829,6 @@ msgid "{count} notices dismissed permanently."
 msgstr ""
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"CWNG repaired {count} books previously sent to your Kobo. Older highlights "
-"may still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"CWNG repaired a book previously sent to your Kobo. Older highlights may "
-"still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "There is new information about your library."
 msgstr ""
 
@@ -3848,13 +3839,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This book was repaired after it had already been sent to a Kobo. Download "
-"the updated book; highlights created before the repair may remain invisible "
-"and may need to be recreated."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6346,6 +6330,29 @@ msgid "Warning: this highlight can’t be shown in the book"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again. If you read it some other way, "
+"download it again to get the repaired copy."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"We repaired {count} books for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove them "
+"from your Kobo and let them download again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Web reader"
 msgstr ""
 
@@ -7661,20 +7668,44 @@ msgid "Import summary"
 msgstr "Podsumowanie importu"
 
 #: cps/templates/annotations_import.html
-msgid "new highlights imported"
-msgstr "zaimportowano nowych zakreśleń"
+msgid "new annotations imported"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "existing annotations updated from a newer device copy"
+msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "already imported (skipped)"
 msgstr "już zaimportowane (pominięto)"
 
 #: cps/templates/annotations_import.html
+msgid "different or undated device entries older than server state (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
 msgid "for books not in this library (skipped)"
 msgstr "dla książek spoza tej biblioteki (pominięto)"
 
 #: cps/templates/annotations_import.html
-msgid "hidden on device (skipped)"
-msgstr "ukryte na urządzeniu (pominięto)"
+msgid "hidden on device (reported, not applied)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "empty bookmark rows with no annotation content (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "invalid bookmark rows (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries with invalid book positions (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries not saved because the import transaction failed"
+msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "total entries seen"
@@ -13141,6 +13172,12 @@ msgstr "Udostępniaj wybrane półki przez OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Pokaż sekcję przeczytane/nieprzeczytane"
+
+#~ msgid "new highlights imported"
+#~ msgstr "zaimportowano nowych zakreśleń"
+
+#~ msgid "hidden on device (skipped)"
+#~ msgstr "ukryte na urządzeniu (pominięto)"
 
 #~ msgid "Could not load highlights."
 #~ msgstr "Nie udało się wczytać zakreśleń."

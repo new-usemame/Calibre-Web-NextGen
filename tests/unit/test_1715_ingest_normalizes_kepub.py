@@ -50,14 +50,27 @@ CHAPTER = ('<?xml version="1.0" encoding="UTF-8"?>'
            '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>c</title></head>'
            '<body><div id="top">x</div></body></html>')
 
+SPLIT_NCX = ('<?xml version="1.0" encoding="UTF-8"?>'
+             '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>'
+             '<navPoint id="n1"><navLabel><text>One</text></navLabel>'
+             '<content src="chapter.xhtml#one"/></navPoint>'
+             '<navPoint id="n2"><navLabel><text>Two</text></navLabel>'
+             '<content src="chapter.xhtml#two"/></navPoint></navMap></ncx>')
+SPLIT_CHAPTER = ('<?xml version="1.0" encoding="UTF-8"?>'
+                 '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+                 '<div id="book-columns"><div id="book-inner">'
+                 '<section id="one"><span class="koboSpan" id="kobo.1.1">one</span></section>'
+                 '<section id="two"><span class="koboSpan" id="kobo.2.1">two</span></section>'
+                 '</div></div></body></html>')
 
-def _make_kepub(path):
+
+def _make_kepub(path, *, splittable=False):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("mimetype", "application/epub+zip")
         archive.writestr("META-INF/container.xml", CONTAINER)
         archive.writestr("OEBPS/content.opf", OPF)
-        archive.writestr("OEBPS/toc.ncx", NCX)
-        archive.writestr("OEBPS/chapter.xhtml", CHAPTER)
+        archive.writestr("OEBPS/toc.ncx", SPLIT_NCX if splittable else NCX)
+        archive.writestr("OEBPS/chapter.xhtml", SPLIT_CHAPTER if splittable else CHAPTER)
     return str(path)
 
 
@@ -93,6 +106,31 @@ def test_ingested_kepub_has_its_redundant_fragment_stripped(tmp_path):
     assert _ncx_sources(book) == ["chapter.xhtml"], (
         "an ingested KEPUB must be normalized, or a Kobo files highlights in "
         "this chapter under an id no spine row carries")
+
+
+def test_ingested_kepub_is_born_with_split_chapter_documents(tmp_path):
+    book = _make_kepub(tmp_path / "incoming.kepub", splittable=True)
+
+    _run_add(book)
+
+    assert _ncx_sources(book) == [
+        "chapter-split-1.xhtml",
+        "chapter-split-2.xhtml",
+    ]
+
+
+def test_ingest_continues_when_opted_in_split_returns_failure(tmp_path, monkeypatch):
+    book = _make_kepub(tmp_path / "incoming.kepub", splittable=True)
+    before = Path(book).read_bytes()
+    monkeypatch.setattr(
+        ingest_processor,
+        "_normalize_kepub_package",
+        lambda _path, **_kwargs: None,
+    )
+
+    _run_add(book)
+
+    assert Path(book).read_bytes() == before
 
 
 def test_ingested_epub_is_left_alone(tmp_path):

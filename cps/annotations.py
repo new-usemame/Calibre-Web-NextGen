@@ -50,6 +50,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from . import calibre_db, logger, ub
 from .cw_login import current_user
 from .render_template import render_title_template
+from .services.annotation_types import (
+    to_storage_type,
+    type_for_webreader_annotation,
+)
 from .services.annotation_colors import (
     WEBREADER_COLOR_NAMES,
     to_display_name,
@@ -291,12 +295,11 @@ def annotations_import_form():
 @user_login_required
 def annotations_import_submit():
     """Accept an uploaded ``KoboReader.sqlite``, parse the Bookmark
-    table, and INSERT each highlight into ``kobo_annotation_sync``
+    table, and merge each recoverable annotation into ``kobo_annotation_sync``
     for the current user.
 
-    Returns a JSON summary: ``{imported, skipped_existing, skipped_orphan,
-    skipped_hidden, total_seen}`` — the upload form swaps to a result
-    pane without a page reload.
+    Returns a JSON summary with new/updated and reasoned skip counts; the
+    upload form swaps to a result pane without a page reload.
     """
     try:
         with temporary_kobo_database(
@@ -306,6 +309,7 @@ def annotations_import_submit():
         messages = {
             "no_file": _("No file uploaded."),
             "not_sqlite": _("Uploaded file is not a SQLite database."),
+            "not_kobo": _("Uploaded database has no readable Kobo Bookmark table."),
             "too_large": _(
                 "File exceeds %(max)d MB.",
                 max=MAX_UPLOAD_BYTES // (1024 * 1024),
@@ -346,29 +350,163 @@ def _ingest_bookmarks(sqlite_path: str) -> dict:
     )
 
 
+def _bookmark_has_recoverable_content(text, note, annotation_type) -> bool:
+    """Whether a device row carries evidence of an annotation.
+
+    Kobo stores highlights in ``Text``, attached/note-only writing in
+    ``Annotation``, and dogears (whose text is empty) in ``Type``. Keep all
+    three inputs explicit: reducing this to the historical ``bool(Text)`` gate
+    makes dogears and note-only rows disappear again.
+    """
+    return any(
+        isinstance(value, str) and bool(value.strip())
+        for value in (text, note, annotation_type)
+    )
+
+
+def _parse_kobo_datetime(value):
+    """Parse a Kobo ISO-8601 clock into the DB's naive-UTC convention."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    raw = value.strip()
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw)
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _naive_utc(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _device_edit_is_newer(device_modified_at, existing) -> bool:
+    """Return whether an imported device edit may replace ``existing``.
+
+    The device must supply a valid clock later than *every* clock recording an
+    accepted state on the server. Comparing only to ``client_modified_at``
+    would let an older snapshot overwrite a later server/web edit; comparing
+    only to server receipt time would ignore the device's edit ordering. The
+    maximum is deliberately conservative because recovery must prefer a
+    reported conflict over silent loss of newer server state.
+    """
+    if device_modified_at is None:
+        return False
+    accepted_clocks = [
+        _naive_utc(getattr(existing, name, None))
+        for name in (
+            "client_modified_at", "server_modified_at", "last_synced", "created_at",
+        )
+    ]
+    watermark = max((clock for clock in accepted_clocks if clock is not None), default=None)
+    return watermark is None or device_modified_at > watermark
+
+
+def _bookmark_values(bm, content_id):
+    return (
+        bm.text,
+        bm.annotation,
+        bm.color,
+        content_id,
+        bm.start_container_path,
+        bm.start_container_child_index,
+        bm.start_offset,
+        bm.end_container_path,
+        bm.end_container_child_index,
+        bm.end_offset,
+        bm.context_string,
+        bm.chapter_progress,
+        to_storage_type(bm.annotation_type),
+    )
+
+
+def _annotation_values(row):
+    return (
+        row.highlighted_text,
+        row.note_text,
+        to_storage_color(row.highlight_color),
+        row.content_id,
+        row.start_container_path,
+        row.start_container_child_index,
+        row.start_offset,
+        row.end_container_path,
+        row.end_container_child_index,
+        row.end_offset,
+        row.context_string,
+        row.chapter_progress,
+        to_storage_type(row.annotation_type),
+    )
+
+
+def _bookmark_matches_annotation(bm, content_id, row) -> bool:
+    return not bool(row.hidden) and _bookmark_values(bm, content_id) == _annotation_values(row)
+
+
+def _apply_imported_bookmark(row, bm, content_id, *, device_modified_at,
+                             origin_device_id):
+    """Apply the content half of an already-authorised newer device edit."""
+    (
+        row.highlighted_text,
+        row.note_text,
+        row.highlight_color,
+        row.content_id,
+        row.start_container_path,
+        row.start_container_child_index,
+        row.start_offset,
+        row.end_container_path,
+        row.end_container_child_index,
+        row.end_offset,
+        row.context_string,
+        row.chapter_progress,
+        row.annotation_type,
+    ) = _bookmark_values(bm, content_id)
+    row.client_modified_at = device_modified_at
+    row.server_modified_at = datetime.now(timezone.utc)
+    row.last_synced = datetime.now(timezone.utc)
+    row.last_editor_device_id = origin_device_id
+    row.content_revision = (row.content_revision or 1) + 1
+    # Deliberately do not assign ``hidden``. Device-side deletion is not an
+    # import authority, and a recovery upload must never hide a server row.
+
+
 def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
                      origin_device_id=None) -> dict:
     """Walk the parsed bookmarks, resolve VolumeIDs via ``book_lookup``,
-    INSERT new highlights into ``kobo_annotation_sync``. Dependencies
+    merge annotations into ``kobo_annotation_sync``. Dependencies
     are explicit so this function is unit-testable without a Flask app.
 
     The annotation-backup hook fires automatically on commit so the
     user already has a recoverable snapshot.
 
-    NOTE: this import is INSERT-ONLY. An annotation the server already holds
-    for that (user, book) is skipped without comparing DateModified, text,
-    note, colour, position or hidden state, so re-importing a newer device
-    database cannot apply an edit or a device-side deletion. The previous
-    wording here described an "overwrite" the code has never performed
-    (findings F-e628c6).
+    Existing rows are updated only when the device's valid ``DateModified`` is
+    later than every accepted server/client modification clock on the row.
+    This deliberately favours the server on missing, malformed, equal, or
+    older device clocks: an import is a recovery operation and must not silently
+    overwrite state that may have been edited after the device snapshot.
+
+    Hidden device rows are counted but never applied. Importing device-side
+    deletion is intentionally outside this recovery path's authority.
 
     Returns a counts dict the JSON endpoint hands back to the browser.
     """
     imported = 0
+    updated = 0
     skipped_existing = 0
     skipped_orphan = 0
     skipped_hidden = 0
+    skipped_empty = 0
+    skipped_invalid = 0
+    skipped_newer_server = 0
     skipped_invalid_content_id = 0
+    failed = 0
     total_seen = 0
 
     # Cache: VolumeID -> CW book_id (or None for not-in-library).
@@ -379,6 +517,17 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
         total_seen += 1
         if bm.hidden:
             skipped_hidden += 1
+            continue
+        if not _bookmark_has_recoverable_content(
+                bm.text, bm.annotation, bm.annotation_type):
+            skipped_empty += 1
+            continue
+        if not bm.bookmark_id or not bm.volume_id:
+            skipped_invalid += 1
+            continue
+        normalized_type = to_storage_type(bm.annotation_type)
+        if normalized_type is not None and len(normalized_type) > 32:
+            skipped_invalid += 1
             continue
 
         # Resolve VolumeID -> CW book.id. Kobo writes either a UUID or
@@ -403,15 +552,11 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
         # upserts on that same triple; checking only (user_id, annotation_id)
         # made one book's row suppress a row the schema explicitly permits in
         # another book. `ix_annotation_user_book` covers this lookup.
-        existing = session.query(ub.Annotation.id).filter(
+        existing = session.query(ub.Annotation).filter(
             ub.Annotation.user_id == user_id,
             ub.Annotation.book_id == book_id,
             ub.Annotation.annotation_id == bm.bookmark_id,
         ).first()
-        if existing is not None:
-            skipped_existing += 1
-            continue
-
         from .services.annotation_content_id import normalize_content_id, ContentIdError
         try:
             content_id = normalize_content_id(
@@ -419,6 +564,22 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
             )
         except ContentIdError:
             skipped_invalid_content_id += 1
+            continue
+
+        device_modified_at = _parse_kobo_datetime(bm.date_modified)
+        if existing is not None:
+            if not _device_edit_is_newer(device_modified_at, existing):
+                if _bookmark_matches_annotation(bm, content_id, existing):
+                    skipped_existing += 1
+                else:
+                    skipped_newer_server += 1
+                continue
+            _apply_imported_bookmark(
+                existing, bm, content_id,
+                device_modified_at=device_modified_at,
+                origin_device_id=origin_device_id,
+            )
+            updated += 1
             continue
 
         row = ub.Annotation(
@@ -437,9 +598,17 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
             end_offset=bm.end_offset,
             context_string=bm.context_string,
             chapter_progress=bm.chapter_progress,
+            # The device's own word for what this row is, carried through
+            # unchanged (F-7e418c). The live PATCH path stores the same
+            # vocabulary from `payload["type"]`, so a row recovered from
+            # KoboReader.sqlite and the same annotation arriving over the wire
+            # now agree instead of one of them being NULL.
+            annotation_type=to_storage_type(getattr(bm, "annotation_type", None)),
             source="kobo",
             origin_device_id=origin_device_id,
             hidden=False,
+            client_modified_at=device_modified_at,
+            server_modified_at=datetime.now(timezone.utc),
         )
         session.add(row)
         imported += 1
@@ -454,14 +623,21 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
     except Exception as e:
         log.error("annotations: import commit failed: %s", e)
         session.rollback()
+        failed = imported + updated
         imported = 0
+        updated = 0
 
     return {
         "imported": imported,
+        "updated": updated,
         "skipped_existing": skipped_existing,
         "skipped_orphan": skipped_orphan,
         "skipped_hidden": skipped_hidden,
+        "skipped_empty": skipped_empty,
+        "skipped_invalid": skipped_invalid,
+        "skipped_newer_server": skipped_newer_server,
         "skipped_invalid_content_id": skipped_invalid_content_id,
+        "failed": failed,
         "total_seen": total_seen,
     }
 
@@ -977,6 +1153,10 @@ def create_annotation(payload, *, user_id, book, session, commit,
             annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
             book_id=book.id,
             source="webreader",
+            # No anchor: the reader's unanchored note, an object no Kobo can
+            # represent. `note` is declared web-reader-only in annotation_types
+            # for the same reason WEBREADER_RED_HEX is declared there.
+            annotation_type=type_for_webreader_annotation(has_anchor=False),
             note_text=note,
             # A standalone note is made on a device like any other annotation;
             # it just cannot be placed in the book. Attribution is orthogonal to
@@ -1010,6 +1190,10 @@ def create_annotation(payload, *, user_id, book, session, commit,
             annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
             book_id=book.id,
             source="webreader",
+            # An anchored passage is a `highlight` — the DEVICE's own word for
+            # the same object, so this is not a vocabulary we invented. Note
+            # text attached to it does not make it a note.
+            annotation_type=type_for_webreader_annotation(has_anchor=True),
             origin_device_id=origin_device_id,
             highlighted_text=payload.get("highlighted_text"),
             highlight_color=color,
@@ -1037,6 +1221,10 @@ def create_annotation(payload, *, user_id, book, session, commit,
         annotation_id=WEBREADER_ID_PREFIX + uuid.uuid4().hex,
         book_id=book.id,
         source="webreader",
+        # An anchored passage is a `highlight` — the DEVICE's own word for
+        # the same object, so this is not a vocabulary we invented. Note
+        # text attached to it does not make it a note.
+        annotation_type=type_for_webreader_annotation(has_anchor=True),
         origin_device_id=origin_device_id,
         highlighted_text=payload.get("highlighted_text"),
         highlight_color=color,
@@ -1345,6 +1533,9 @@ def annotations_delete(book_id, annotation_id):
         from .services import annotation_sync
         annotation_sync.dispatch_annotation_deletes(
             [annotation_id], current_user, book_id=book_id,
+            # This is an authenticated user's explicit delete, so it is
+            # authoritative across provenance rather than device-scoped.
+            deletable_sources=None,
         )
     except Exception as e:  # pragma: no cover - defensive
         log.warning("annotations: delete fan-out failed: %s", e)

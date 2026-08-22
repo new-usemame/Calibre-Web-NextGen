@@ -154,8 +154,59 @@ def test_dispatch_delete_transitions_to_tombstone(patched_session):
     register_handler(StubHandler())
     dispatch_annotation_sync([_payload("uuid-x")], _book(), user)
     assert s.query(ub.AnnotationSyncTarget).one().status == "synced"
-    dispatch_annotation_deletes(["uuid-x"], user)
+    dispatch_annotation_deletes(["uuid-x"], user, deletable_sources={"kobo"})
     assert s.query(ub.AnnotationSyncTarget).one().status == "tombstone"
+
+
+def test_kobo_delete_authority_refuses_foreign_sources_and_fans_out_owned(
+    patched_session, caplog,
+):
+    """A Kobo delete may affect only rows a Kobo device could have held."""
+    s, user = patched_session
+    handler = StubHandler()
+    register_handler(handler)
+    dispatch_annotation_sync([_payload("kobo-owned")], _book(), user)
+
+    for annotation_id, source in (
+        ("webreader-foreign", "webreader"),
+        ("koreader-foreign", "koreader"),
+    ):
+        row = ub.Annotation(
+            user_id=user.id,
+            annotation_id=annotation_id,
+            book_id=7,
+            source=source,
+            hidden=False,
+        )
+        row.sync_targets.append(ub.AnnotationSyncTarget(
+            target="stub",
+            target_record_id=f"{source}-remote",
+            status="synced",
+        ))
+        s.add(row)
+    s.commit()
+    handler.calls.clear()
+    caplog.set_level("WARNING", logger="cps.services.annotation_sync")
+
+    dispatch_annotation_deletes(
+        ["kobo-owned", "webreader-foreign", "koreader-foreign"],
+        user,
+        book_id=7,
+        deletable_sources={"kobo"},
+    )
+
+    rows = {
+        row.annotation_id: bool(row.hidden)
+        for row in s.query(ub.Annotation).order_by(ub.Annotation.id)
+    }
+    assert rows == {
+        "kobo-owned": True,
+        "webreader-foreign": False,
+        "koreader-foreign": False,
+    }
+    assert handler.calls == [("delete", "r1")]
+    assert "annotation_id='webreader-foreign' stored_source='webreader'" in caplog.text
+    assert "annotation_id='koreader-foreign' stored_source='koreader'" in caplog.text
 
 
 def test_dispatch_delete_skips_tombstoned(patched_session):
@@ -163,10 +214,29 @@ def test_dispatch_delete_skips_tombstoned(patched_session):
     h = StubHandler()
     register_handler(h)
     dispatch_annotation_sync([_payload("uuid-x")], _book(), user)
-    dispatch_annotation_deletes(["uuid-x"], user)
+    dispatch_annotation_deletes(["uuid-x"], user, deletable_sources={"kobo"})
     h.calls.clear()
-    dispatch_annotation_deletes(["uuid-x"], user)  # second delete attempt
+    dispatch_annotation_deletes(
+        ["uuid-x"], user, deletable_sources={"kobo"},
+    )  # second delete attempt
     assert h.calls == []  # handler.delete NOT called twice
+
+
+def test_malformed_delete_member_cannot_block_a_later_valid_delete(patched_session):
+    """One unaddressable member must not turn the rest of the delta into a no-op."""
+    s, user = patched_session
+    dispatch_annotation_sync([_payload("uuid-keep"), _payload("uuid-delete")], _book(), user)
+
+    dispatch_annotation_deletes(
+        [{"not": "an id"}, "uuid-delete"], user, book_id=7,
+        deletable_sources={"kobo"},
+    )
+
+    rows = {
+        row.annotation_id: row.hidden
+        for row in s.query(ub.Annotation).order_by(ub.Annotation.id).all()
+    }
+    assert rows == {"uuid-keep": False, "uuid-delete": True}
 
 
 def test_tombstone_is_terminal_against_repeat_push(patched_session):
@@ -174,7 +244,7 @@ def test_tombstone_is_terminal_against_repeat_push(patched_session):
     register_handler(StubHandler())
     payload = _payload("uuid-x")
     dispatch_annotation_sync([payload], _book(), user)
-    dispatch_annotation_deletes(["uuid-x"], user)
+    dispatch_annotation_deletes(["uuid-x"], user, deletable_sources={"kobo"})
     dispatch_annotation_sync([payload], _book(), user)  # re-push
     st = s.query(ub.AnnotationSyncTarget).one()
     assert st.status == "tombstone"  # NOT resurrected

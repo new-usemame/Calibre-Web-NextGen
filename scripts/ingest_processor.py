@@ -1591,6 +1591,8 @@ class NewBookProcessor:
         # entry verbatim, fragment included, and file every highlight made there
         # under an id no spine row carries. The repair task cannot cover for this:
         # it is one-shot per REPAIR_VERSION.
+        # This is a new-book boundary, so it explicitly opts into spine
+        # splitting. Existing-library repair keeps the default disabled.
         # Non-fatal by design: normalize_kepub_package logs and returns None with
         # the archive untouched, and importing an un-normalized KEPUB beats
         # refusing the ingest.
@@ -1599,7 +1601,7 @@ class NewBookProcessor:
                 _load_optional_cps_modules()
             if _normalize_kepub_package is not None:
                 try:
-                    _normalize_kepub_package(book_path)
+                    _normalize_kepub_package(book_path, split_chapters=True)
                 except Exception as e:
                     print(f"[ingest-processor] WARN: could not normalize KEPUB "
                           f"{book_path}: {e}", flush=True)

@@ -41,7 +41,7 @@ def test_read_badge_custom_column_truthy_is_read():
     with patch.object(books_mod.config, "config_read_column", 5, create=True):
         # generate_linked_query aliases the custom column as `.value`
         row = SimpleNamespace(Books=_inner(), is_archived=False, value=1)
-        item = books_mod._row_to_item(row)
+        item = books_mod._row_to_item(row, set())
     assert item["read"] is True
 
 
@@ -49,7 +49,7 @@ def test_read_badge_custom_column_falsy_is_unread():
     from cps.api import books as books_mod
     with patch.object(books_mod.config, "config_read_column", 5, create=True):
         row = SimpleNamespace(Books=_inner(), is_archived=False, value=None)
-        item = books_mod._row_to_item(row)
+        item = books_mod._row_to_item(row, set())
     assert item["read"] is False
 
 
@@ -61,7 +61,7 @@ def test_read_badge_custom_column_ignores_stale_read_status_attr():
     with patch.object(books_mod.config, "config_read_column", 5, create=True):
         row = SimpleNamespace(Books=_inner(), is_archived=False, value=0,
                               read_status=ub.ReadBook.STATUS_FINISHED)
-        item = books_mod._row_to_item(row)
+        item = books_mod._row_to_item(row, set())
     assert item["read"] is False
 
 
@@ -72,9 +72,9 @@ def test_read_badge_builtin_column_still_works():
     with patch.object(books_mod.config, "config_read_column", 0, create=True):
         row = SimpleNamespace(Books=_inner(), is_archived=False,
                               read_status=ub.ReadBook.STATUS_FINISHED)
-        assert books_mod._row_to_item(row)["read"] is True
+        assert books_mod._row_to_item(row, set())["read"] is True
         row2 = SimpleNamespace(Books=_inner(), is_archived=False, read_status=None)
-        assert books_mod._row_to_item(row2)["read"] is False
+        assert books_mod._row_to_item(row2, set())["read"] is False
 
 
 # ── read/unread filter honors the custom column (source-pin) ──────────────────

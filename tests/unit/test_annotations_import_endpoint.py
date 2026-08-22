@@ -27,14 +27,25 @@ Coverage:
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from tests.fixtures.kobo_reader_sqlite import build_synthetic_kobo_db
+from tests.fixtures.kobo_reader_sqlite import (
+    build_kobo_db_with_recovery_rows,
+    build_synthetic_kobo_db,
+)
+
+
+OVERFLOWING_KOBO_CLOCKS = (
+    pytest.param("9999-12-31T23:59:59-23:59", id="above-maxyear"),
+    pytest.param("0001-01-01T00:00:00+23:59", id="below-minyear"),
+)
 
 
 @pytest.fixture
@@ -73,6 +84,14 @@ def _make_book_lookup(uuid_to_book_id: dict[str, int]):
     return lookup
 
 
+def _accounted(summary):
+    return sum(summary[key] for key in (
+        "imported", "updated", "skipped_existing", "skipped_orphan",
+        "skipped_hidden", "skipped_empty", "skipped_invalid",
+        "skipped_newer_server", "skipped_invalid_content_id", "failed",
+    ))
+
+
 @pytest.fixture
 def synthetic_db(tmp_path):
     return build_synthetic_kobo_db(tmp_path / "kr.sqlite")
@@ -103,9 +122,10 @@ class TestIngestCounts:
         assert result["skipped_hidden"] == 1, result
         assert result["skipped_orphan"] == 2, result    # bm-004 sideloaded + bm-006 unknown UUID
         assert result["skipped_existing"] == 0, result
-        # total_seen excludes empty BookmarkID + empty Text rows
-        # (filtered at the parser SQL level).
-        assert result["total_seen"] == 6, result
+        assert result["skipped_invalid"] == 1, result
+        assert result["skipped_empty"] == 1, result
+        assert result["total_seen"] == 8, result
+        assert _accounted(result) == result["total_seen"]
 
     def test_inserted_rows_carry_full_h1_payload(self, memory_db, synthetic_db):
         from cps import ub
@@ -174,6 +194,233 @@ class TestIngestCounts:
         assert displayed["bm-001"] == "yellow"
         assert displayed["bm-002"] == "pink"
         assert displayed["bm-003"] == "blue"
+
+
+@pytest.mark.unit
+class TestPreviouslyInvisibleDeviceRows:
+    def test_dogear_and_note_only_row_import_and_every_row_is_accounted(
+        self, memory_db, tmp_path,
+    ):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        book_uuid = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+        device_db = build_kobo_db_with_recovery_rows(tmp_path / "recovery.sqlite")
+
+        result = ingest_bookmarks(
+            device_db, user_id=7, session=session,
+            book_lookup=_make_book_lookup({book_uuid: 348}), commit=session.commit,
+        )
+        rows = {
+            row.annotation_id: row
+            for row in session.query(ub.Annotation).filter_by(user_id=7).all()
+        }
+
+        assert result["imported"] == 2, result
+        assert result["skipped_empty"] == 1, result
+        assert result["total_seen"] == 3, result
+        assert _accounted(result) == result["total_seen"]
+        assert set(rows) == {"recover-dogear", "recover-note-only"}
+        assert rows["recover-dogear"].highlighted_text == ""
+        assert rows["recover-dogear"].annotation_type == "dogear"
+        assert rows["recover-note-only"].highlighted_text == ""
+        assert rows["recover-note-only"].note_text == "remember this"
+        assert rows["recover-note-only"].annotation_type == "highlight"
+
+    def test_every_returned_count_is_presented_in_the_user_summary(self):
+        template = (
+            Path(__file__).parents[2] / "cps" / "templates" / "annotations_import.html"
+        ).read_text(encoding="utf-8")
+        for key in (
+            "imported", "updated", "skipped_existing", "skipped_orphan",
+            "skipped_hidden", "skipped_empty", "skipped_invalid",
+            "skipped_newer_server", "skipped_invalid_content_id", "failed",
+            "total_seen",
+        ):
+            assert f"res.body.{key}" in template
+
+    def test_hidden_device_row_is_reported_without_hiding_server_state(
+        self, memory_db, synthetic_db,
+    ):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        book_uuid = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+        session.add(ub.Annotation(
+            user_id=7, book_id=348, annotation_id="bm-005",
+            highlighted_text="server copy stays visible", hidden=False,
+            source="kobo", server_modified_at=datetime(2099, 1, 1),
+        ))
+        session.commit()
+
+        result = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=_make_book_lookup({book_uuid: 348}), commit=session.commit,
+        )
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-005").one()
+
+        assert result["skipped_hidden"] == 1, result
+        assert row.hidden is False
+        assert row.highlighted_text == "server copy stays visible"
+
+
+@pytest.mark.unit
+class TestOutOfRangeDeviceClock:
+    @pytest.mark.parametrize("clock", OVERFLOWING_KOBO_CLOCKS)
+    def test_parser_rejects_both_utc_overflows(self, clock):
+        from cps.annotations import _parse_kobo_datetime
+
+        assert _parse_kobo_datetime(clock) is None
+
+    @pytest.mark.parametrize("clock", OVERFLOWING_KOBO_CLOCKS)
+    def test_row_with_overflowing_clock_is_imported_and_accounted(
+        self, memory_db, synthetic_db, clock,
+    ):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        connection = sqlite3.connect(synthetic_db)
+        try:
+            connection.execute(
+                "UPDATE Bookmark SET DateModified = ? WHERE BookmarkID = 'bm-001'",
+                (clock,),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        session, _, _ = memory_db
+        result = ingest_bookmarks(
+            synthetic_db,
+            user_id=7,
+            session=session,
+            book_lookup=_make_book_lookup({
+                "b3d1b38b-74fd-43b7-a796-996e5a6a8b04": 348,
+            }),
+            commit=session.commit,
+        )
+
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-001").one()
+        assert result["imported"] == 3, result
+        assert result["total_seen"] == 8, result
+        assert _accounted(result) == result["total_seen"]
+        assert row.client_modified_at is None
+
+    def test_valid_clock_keeps_its_existing_naive_utc_value(self):
+        from cps.annotations import _parse_kobo_datetime
+
+        assert _parse_kobo_datetime(
+            "2026-08-20T15:30:45.123456+02:30"
+        ) == datetime(2026, 8, 20, 13, 0, 45, 123456)
+
+
+@pytest.mark.unit
+class TestNewerDeviceMerge:
+    BOOK_UUID = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+
+    @staticmethod
+    def _edit_fixture(path, *, modified, text, note, color=3):
+        connection = sqlite3.connect(path)
+        try:
+            connection.execute(
+                """
+                UPDATE Bookmark
+                SET Text = ?, Annotation = ?, Color = ?,
+                    ContentID = ?,
+                    StartContainerPath = ?, StartContainerChildIndex = ?, StartOffset = ?,
+                    EndContainerPath = ?, EndContainerChildIndex = ?, EndOffset = ?,
+                    ContextString = ?, ChapterProgress = ?, DateModified = ?
+                WHERE BookmarkID = 'bm-002'
+                """,
+                (
+                    text, note, color, f"{TestNewerDeviceMerge.BOOK_UUID}!!chapter9.html",
+                    "span#kobo\\.9\\.1", -99, 4,
+                    "span#kobo\\.9\\.2", -99, 17,
+                    "replacement context", 0.91, modified,
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_reimport_applies_every_field_from_a_newer_device_database(
+        self, memory_db, synthetic_db,
+    ):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        lookup = _make_book_lookup({self.BOOK_UUID: 348})
+        ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=lookup, commit=session.commit,
+        )
+        before = session.query(ub.Annotation).filter_by(annotation_id="bm-002").one()
+        before_revision = before.content_revision
+        self._edit_fixture(
+            synthetic_db, modified="2099-01-01T00:00:00Z",
+            text="edited passage", note="edited note", color=3,
+        )
+
+        result = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=lookup, commit=session.commit,
+        )
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-002").one()
+
+        assert result["updated"] == 1, result
+        assert result["skipped_existing"] == 2, result
+        assert _accounted(result) == result["total_seen"]
+        assert row.highlighted_text == "edited passage"
+        assert row.note_text == "edited note"
+        assert row.highlight_color == "#C6E09E"
+        assert row.content_id == f"{self.BOOK_UUID}!!chapter9.html"
+        assert row.start_container_path == "span#kobo\\.9\\.1"
+        assert row.start_container_child_index == -99
+        assert row.start_offset == 4
+        assert row.end_container_path == "span#kobo\\.9\\.2"
+        assert row.end_container_child_index == -99
+        assert row.end_offset == 17
+        assert row.context_string == "replacement context"
+        assert row.chapter_progress == 0.91
+        assert row.client_modified_at == datetime(2099, 1, 1)
+        assert row.content_revision == before_revision + 1
+
+    def test_older_device_copy_reports_conflict_without_overwriting_server(
+        self, memory_db, synthetic_db,
+    ):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        lookup = _make_book_lookup({self.BOOK_UUID: 348})
+        ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=lookup, commit=session.commit,
+        )
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-002").one()
+        row.note_text = "newer server note"
+        row.server_modified_at = datetime(2098, 1, 1)
+        session.commit()
+        self._edit_fixture(
+            synthetic_db, modified="2097-01-01T00:00:00Z",
+            text="stale device passage", note="stale device note",
+        )
+
+        result = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=lookup, commit=session.commit,
+        )
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-002").one()
+
+        assert result["updated"] == 0, result
+        assert result["skipped_newer_server"] == 1, result
+        assert _accounted(result) == result["total_seen"]
+        assert row.highlighted_text == "Four legs good, two legs bad."
+        assert row.note_text == "newer server note"
+        assert row.highlight_color == "#E8AFCF"
 
 
 # ---------------------------------------------------------------------------

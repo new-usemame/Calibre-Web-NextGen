@@ -86,13 +86,19 @@ export function BookCard({
             the WCAG pass: it announces the badge once, rather than letting the
             icon and the adjacent text be read as two separate things. Keep it
             even now that the label is visible. */}
-        {book.read && (
+        {book.in_progress ? (
+          <span className={styles.readingBadge} role="img" aria-label={t('Reading')}
+            data-testid="reading-badge">
+            <BookOpen size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
+            {t('Reading')}
+          </span>
+        ) : book.read ? (
           <span className={styles.readBadge} role="img" aria-label={t('Read')}
             data-testid="read-badge">
             <Check size={13} strokeWidth={3} aria-hidden="true" focusable={false} />
             {t('Read')}
           </span>
-        )}
+        ) : null}
         {book.hidden && (
           <span className={styles.hiddenBadge} role="img" aria-label={t('Hidden')}
             data-testid="hidden-book-badge">

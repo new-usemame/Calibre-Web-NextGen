@@ -18,6 +18,93 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A Kobo can no longer erase a book's local highlights when its Calibre-Web
+  session expires or an admin has just disabled Kobo sync.** Those transition
+  windows, plus alternate spellings of Kobo's `checkforchanges` request, could
+  bypass the owned-book filter and tell the device to replace its complete
+  local highlight set from the cloud response. Every equivalent request now
+  reaches the same ownership containment; owned books receive an empty change
+  list, while Kobo-store content continues to proxy normally.
+
+- **Two people could not find how to delete a book in the new UI and switched
+  back to the classic view over it.** Deletion worked, but the edit page had no
+  whole-book delete control and the book page buried Delete at the end of a
+  wrapping row of ordinary actions. The edit page now puts Delete book beside
+  Edit metadata, and the book page gives it its own clearly labelled
+  destructive section — the two places people actually look. Both remain
+  permission-gated and confirm before deleting. Reported through anonymous
+  feedback ([#1046](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1046),
+  duplicate [#1037](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1037)).
+
+- **People who had permission to manage someone else's public smart shelf could
+  not do so in the new UI.** Its Edit, Duplicate, and Delete controls were all
+  hidden unless you owned the shelf, even though the server allows admins to
+  edit it, shelf editors to delete it, and any signed-in viewer to duplicate it.
+  Each control now follows its own server-provided permission, matching ordinary
+  shelves; Kobo sync remains available only to the shelf owner. Reported by
+  [@iroQuai](https://github.com/iroQuai) ([#1734](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1734),
+  umbrella [#867](https://github.com/new-usemame/Calibre-Web-NextGen/issues/867)).
+
+- **Pages and API requests no longer fail sporadically with a dropped
+  connection or `socket hang up` behind a reverse proxy or in a client that
+  pools connections.** The server deliberately closes every HTTP connection
+  after its response; it now sends `Connection: close` so HTTP/1.1 clients do
+  not return that closing socket to their pool and try to reuse it.
+
+## [v4.1.39] - 2026-08-21
+
+### Fixed
+
+- **A highlight made on a Kobo or in the web reader no longer disappears after
+  a KOReader sync.** A KOReader sync could previously either take ownership of
+  an existing highlight or mark it deleted directly, so a later sync — or that
+  same request — could remove a highlight it did not create. Every KOReader
+  delete path now respects where the highlight came from: KOReader can update
+  the contents of Kobo and web-reader highlights, but can delete only
+  highlights created in KOReader.
+
+- **The New UI shows a "Reading" badge on books you have started, the way the
+  classic UI always did.** The green "Read" pill was there, but a book you were
+  part-way through looked identical to one you had never opened, so the only way
+  to tell was to open its detail page. Every list the New UI serves — the
+  library grid, shelves, magic shelves (including the built-in Currently
+  Reading shelf), and search results — now carries the same amber "Reading"
+  marker the old cover badge used, driven by the same sync state your Kobo and
+  KOReader already write. Reported by @magdalar and @JamesHACS (#1702).
+
+- **Highlights now work in the chapters of a book that keeps many chapters in
+  one file — the shape almost every Project Gutenberg book has.** A Kobo
+  recognises a chapter by the file it lives in, not by a link into the middle of
+  a file, so in these books only the first chapter of each file could hold a
+  highlight. Everything you highlighted in the rest of the file was saved on the
+  device and simply never shown, with the Annotations panel reporting nothing
+  there. Books converted, uploaded, or auto-ingested from now on are stored with
+  one file per chapter, so highlights attach where you make them. Measured on a
+  41-book library, counting the chapters a Kobo could actually attach a highlight
+  to: 13 of 1653 before any of this work, 1192 once the existing repair had run,
+  and 1584 with chapter splitting on top — so this change is worth about 392 more
+  chapters, and 96% of chapters in that library can now hold a highlight. **A book you have already
+  highlighted is deliberately left alone** — changing its chapter files would
+  stop those highlights showing on your device — unless it was already stored
+  chapter-by-chapter, in which case re-uploading or re-converting it keeps the
+  same chapter files and your highlights keep working.
+- **The notice you get after CWNG repairs a Kobo book now tells you what to do
+  about it, in a way that works whichever way your device behaves.** It used to say the app had "repaired a book previously sent to your
+  Kobo" and that "older highlights may still need to be recreated" — accurate, but
+  it never said the thing that actually helps: sync, then try highlighting again.
+  It now leads with that, and adds the fallback for the case where syncing alone
+  is not enough — remove the book from the Kobo and let it download again — so the
+  advice holds whether or not your device re-downloads a repaired book on its own.
+  The version shown on a book's own page also tells you to download the book again
+  if you read it somewhere other than a Kobo.
+- **Highlight colours synced through the KOReader plugin were wrong, and on a
+  black-and-white Kobo every highlight came back yellow.** The plugin used a
+  colour table that had blue and green the wrong way round, called Kobo's pink
+  "red" (a Kobo cannot store red at all), and had no entry for grey — which is
+  the colour a greyscale reader like the Clara BW records for *every* highlight
+  you make, so all of them arrived as yellow. The table now matches what the
+  device actually stores, measured on hardware, and the server and plugin are
+  checked against each other so they cannot drift apart again.
 - **Asking your system to reduce motion now stops every spinning icon in the new
   UI, not just some of them.** The app has seven loading spinners; four stopped
   when you turned on "reduce motion" and three kept spinning — including the

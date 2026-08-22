@@ -6,6 +6,7 @@
 plugin maps it to device-native fields). `apply_portable(payload, ...)` is the
 push-side upsert: find-or-create by (user_id, annotation_id), populate from the
 portable dict, record device_origin_id, and soft-delete on hidden=True.
+The caller supplies the protocol's authority for deleting an existing row.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from types import SimpleNamespace
 
 from cps import ub
+from cps.progress_syncing.protocols.koreader_annotations import _DELETABLE_SOURCES
 from cps.services.annotation_portable import to_portable, apply_portable
 
 pytestmark = pytest.mark.unit
@@ -94,13 +96,23 @@ def test_apply_passthrough_source_kobo(session):
     assert row.source == "kobo"
 
 
-def test_apply_invalid_source_coerced(session):
-    row, _ = apply_portable(
+def test_apply_invalid_source_is_rejected_instead_of_inventing_koreader(session):
+    row, action = apply_portable(
         {"annotation_id": "dev-c", "source": "bogus", "start_kobospan": "kobo.1.1",
          "start_offset": 0, "end_kobospan": "kobo.1.1", "end_offset": 3},
         user_id=9, book=_book(), session=session, commit=session.commit,
     )
-    assert row.source == "koreader"
+    assert row is None
+    assert action == "skipped"
+    assert session.query(ub.Annotation).count() == 0
+
+
+def test_portable_boundary_rejects_an_unrecognised_source():
+    from cps.services.annotation_portable import validate_portable_payload
+
+    error = validate_portable_payload({"annotation_id": "dev-c", "source": "bogus"})
+
+    assert error == "source must be one of: kobo, koreader, webreader"
 
 
 def test_apply_portable_sets_origin_only_when_creating(session):
@@ -154,6 +166,7 @@ def test_apply_hidden_soft_deletes(session):
     row, action = apply_portable(
         {"annotation_id": "dev-e", "hidden": True},
         user_id=9, book=_book(), session=session, commit=session.commit,
+        deletable_sources=_DELETABLE_SOURCES,
     )
     assert action == "deleted"
     assert row.hidden is True

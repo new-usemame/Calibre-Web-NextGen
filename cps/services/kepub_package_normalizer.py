@@ -860,7 +860,7 @@ def rewrite_package_document(path, transform):
                 pass
 
 
-def normalize_kepub_package(path):
+def _normalize_kepub_package_only(path):
     """Normalize unsafe package paths and redundant TOC fragments atomically.
 
     Return ``True`` when the archive changed, ``False`` for a clean byte-identical
@@ -933,6 +933,33 @@ def normalize_kepub_package(path):
                 os.unlink(temporary_path)
             except OSError:
                 pass
+
+
+def normalize_kepub_package(path, *, split_chapters=False):
+    """Normalize one KEPUB and optionally split multi-chapter spine documents.
+
+    Chapter splitting is deliberately opt-in. The default is used by the
+    versioned existing-library repair task, where changing spine filenames can
+    orphan annotations already stored on a Kobo. New-book entry points pass
+    ``split_chapters=True`` before a device has received the package.
+
+    Return ``True`` when either stage changed the archive, ``False`` for a
+    byte-identical no-op, and ``None`` when either requested stage failed. Each
+    stage is atomic, and its own failure leaves the archive passed to that stage
+    untouched.
+    """
+    normalized = _normalize_kepub_package_only(path)
+    if normalized is None or not split_chapters:
+        return normalized
+
+    # Lazy import avoids a module cycle: the lexical splitter reuses the
+    # normalizer's bounded package/reference primitives.
+    from .kepub_spine_splitter import split_multichapter_documents
+
+    split = split_multichapter_documents(path)
+    if split is None:
+        return None
+    return bool(normalized or split)
 
 
 def kepub_package_needs_normalization(path):

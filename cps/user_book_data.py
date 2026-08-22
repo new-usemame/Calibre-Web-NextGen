@@ -45,6 +45,40 @@ def _newer(a, b):
         b = b.replace(tzinfo=None)
     return a > b
 
+
+def _annotation_is_newer(candidate, current):
+    """Whether ``candidate`` is the newer coherent annotation version.
+
+    Server and client clocks both record accepted edits, so the newest
+    available clock on each row is authoritative.  Revisions break equal or
+    absent-clock ties.  A complete tie returns False, deterministically
+    retaining ``current`` (the row already attached to the destination book).
+    """
+    candidate_modified = None
+    current_modified = None
+    for timestamp in (candidate.server_modified_at,
+                      candidate.client_modified_at):
+        if _newer(timestamp, candidate_modified):
+            candidate_modified = timestamp
+    for timestamp in (current.server_modified_at,
+                      current.client_modified_at):
+        if _newer(timestamp, current_modified):
+            current_modified = timestamp
+
+    if _newer(candidate_modified, current_modified):
+        return True
+    if _newer(current_modified, candidate_modified):
+        return False
+    return (candidate.content_revision or 0) > (current.content_revision or 0)
+
+
+def _delete_annotation(session, annotation):
+    """Delete an annotation and children SQLite will not cascade itself."""
+    session.query(ub.AnnotationSyncTarget).filter(
+        ub.AnnotationSyncTarget.annotation_id == annotation.id,
+    ).delete(synchronize_session=False)
+    session.delete(annotation)
+
 # Models keyed (user_id, book_id) handled by this module, with merge
 # semantics for migrate. BookShelf has no user_id (shelf-scoped) and
 # KoboBookmark/KoboStatistics/AnnotationSyncTarget are children reached
@@ -78,9 +112,9 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
         return
 
     # Annotations: re-point, but a user may already have the same
-    # annotation_id on the kept book (e.g. the device synced both copies) —
-    # there only the loser row is dropped (ORM delete so sync-target
-    # children go with it).
+    # annotation_id on the kept book (e.g. the device synced both copies).
+    # Keep the newer coherent row; field-level synthesis could combine content,
+    # anchors and lifecycle metadata into a version no client ever authored.
     for ann in session.query(ub.Annotation).filter(
             ub.Annotation.book_id == from_book_id).all():
         clash = session.query(ub.Annotation).filter(
@@ -88,13 +122,12 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
             ub.Annotation.annotation_id == ann.annotation_id,
             ub.Annotation.book_id == to_book_id).first()
         if clash is not None:
-            # sync_targets declares passive_deletes=True (expects DB-level
-            # ON DELETE CASCADE), but SQLite FK enforcement is off — delete
-            # the children explicitly.
-            session.query(ub.AnnotationSyncTarget).filter(
-                ub.AnnotationSyncTarget.annotation_id == ann.id).delete(
-                synchronize_session=False)
-            session.delete(ann)
+            if _annotation_is_newer(ann, clash):
+                _delete_annotation(session, clash)
+                session.flush()  # clear the UNIQUE slot before re-pointing
+                ann.book_id = to_book_id
+            else:
+                _delete_annotation(session, ann)
         else:
             ann.book_id = to_book_id
     session.flush()

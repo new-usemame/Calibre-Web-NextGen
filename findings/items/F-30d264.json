@@ -4,8 +4,14 @@
   "created": "2026-08-18",
   "id": "F-30d264",
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-22",
+    "note": "Fixed on fix/30d264-checkforchanges-containment. The auth/config decorator now admits semantic checkforchanges requests into ownership containment even for an expired Flask session or disabled Kobo sync, and the API-v3 catch-all delegates trailing-slash, case, doubled-slash, and WSGI-decoded encoded-slash spellings to the same handler. Owned-only requests receive 200 [] without contacting Kobo; foreign ids remain unchanged through the upstream request/response. Regression tests were red on origin/main (6 failed, 2 passed), green after the fix (12 passed), and independent pre-fix mutations failed 2 auth/config parameters and 4 catch-all-spelling parameters.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "checkforchanges containment is bypassed when Kobo sync is off or the session is unauthenticated"
 }

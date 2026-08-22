@@ -5,6 +5,7 @@
 
 """Regression coverage for #1755's deployment-dependent CWA_DB import."""
 
+import ast
 import importlib
 import os
 import sys
@@ -91,3 +92,29 @@ def test_loader_aliases_top_level_name_after_scripts_import(monkeypatch):
 
     assert loaded is first is second
     assert first.CWA_DB is second.CWA_DB
+
+
+@pytest.mark.unit
+def test_cps_modules_use_only_the_canonical_cwa_db_loader():
+    """Keep direct CWA DB imports from returning outside the loader."""
+    cps_dir = REPO_ROOT / "cps"
+    loader_path = cps_dir / "cwa_db_loader.py"
+    forbidden_modules = {"cwa_db", "scripts.cwa_db"}
+    offenders = []
+
+    for source_path in sorted(cps_dir.rglob("*.py")):
+        if source_path == loader_path:
+            continue
+        tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module in forbidden_modules:
+                offenders.append(f"{source_path.relative_to(REPO_ROOT)}:{node.lineno}")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name in forbidden_modules:
+                        offenders.append(f"{source_path.relative_to(REPO_ROOT)}:{node.lineno}")
+
+    assert offenders == [], (
+        "CWA DB must be imported through cps.cwa_db_loader; direct imports found at: "
+        + ", ".join(offenders)
+    )

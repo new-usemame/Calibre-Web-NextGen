@@ -22,17 +22,8 @@ from cps.duplicate_index import (
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
 from cps.ub import init_db_thread
 
-try:
-    from cps.cwa_db_loader import load_cwa_db
-except ModuleNotFoundError as error:
-    # Focused isolation tests execute this file beneath a non-package ``cps``
-    # stub and supply cwa_db directly. Production must use the loader above.
-    import sys
-    if error.name != "cps.cwa_db_loader" or hasattr(sys.modules.get("cps"), "__path__"):
-        raise
-    CWA_DB = sys.modules["cwa_db"].CWA_DB
-else:
-    CWA_DB = load_cwa_db().CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 
 def _cooldown_remaining_minutes(cur, cooldown_minutes, now=None):

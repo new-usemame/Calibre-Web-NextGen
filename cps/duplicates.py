@@ -28,18 +28,8 @@ from .render_template import render_title_template
 from .duplicate_notice import duplicate_setup_notice_file
 from .cw_login import current_user
 
-try:
-    from cps.cwa_db_loader import load_cwa_db
-except ModuleNotFoundError as error:
-    # Some focused tests execute this file beneath a minimal, non-package
-    # ``cps`` stub and provide their own cwa_db module. Real application loads
-    # always have a package path and must use the canonical loader.
-    import sys
-    if error.name != "cps.cwa_db_loader" or hasattr(sys.modules.get("cps"), "__path__"):
-        raise
-    CWA_DB = sys.modules["cwa_db"].CWA_DB
-else:
-    CWA_DB = load_cwa_db().CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 duplicates = Blueprint('duplicates', __name__)
 log = logger.create()

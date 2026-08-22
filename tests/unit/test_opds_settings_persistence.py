@@ -182,7 +182,10 @@ def test_create_magic_shelf_persists_opds_expose(monkeypatch):
 
 def test_edit_magic_shelf_updates_opds_expose(monkeypatch):
     shelf = types.SimpleNamespace(id=12, user_id=4, name="Magic", rules={"rules": [1]}, icon="🪄", kobo_sync=False, is_public=0, is_system=False)
-    current_user = types.SimpleNamespace(id=4, role_admin=lambda: False, role_edit_shelfs=lambda: True, opds_only_shelves_sync=1)
+    current_user = types.SimpleNamespace(id=4, is_authenticated=True,
+                                         role_admin=lambda: False,
+                                         role_edit_shelfs=lambda: True,
+                                         opds_only_shelves_sync=1)
     calls = []
 
     class SessionStub(DummySession):
@@ -220,7 +223,8 @@ def test_edit_system_magic_shelf_preserves_canonical_name(monkeypatch):
     shelf = types.SimpleNamespace(id=12, user_id=4, name="Currently Reading",
                                   rules={"rules": [1]}, icon="📖", kobo_sync=False,
                                   is_public=0, is_system=True)
-    current_user = types.SimpleNamespace(id=4, role_admin=lambda: False,
+    current_user = types.SimpleNamespace(id=4, is_authenticated=True,
+                                         role_admin=lambda: False,
                                          role_edit_shelfs=lambda: True,
                                          opds_only_shelves_sync=0)
 

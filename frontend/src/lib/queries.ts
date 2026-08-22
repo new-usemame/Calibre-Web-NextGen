@@ -1157,7 +1157,19 @@ export function useToggleMagicShelfKoboSync(id: string | number) {
   });
 }
 
-export interface MagicShelfItem { id: number; name: string; icon: string; is_public: boolean; is_owner: boolean; is_system: boolean; kobo_sync?: boolean }
+export interface MagicShelfItem {
+  id: number;
+  name: string;
+  icon: string;
+  is_public: boolean;
+  is_owner: boolean;
+  is_system: boolean;
+  kobo_sync?: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_duplicate: boolean;
+  can_kobo_sync: boolean;
+}
 
 export function useMagicShelves() {
   return useQuery<{ items: MagicShelfItem[] }>({
@@ -1168,8 +1180,7 @@ export function useMagicShelves() {
 }
 
 export function useMagicShelfBooks(id: string | number, page = 1) {
-  return useQuery<{ id: number; name: string; icon: string; is_owner: boolean; is_system: boolean;
-    kobo_sync?: boolean } & BooksPage>({
+  return useQuery<MagicShelfItem & BooksPage>({
     queryKey: ['magicshelf', String(id), page],
     queryFn: () => apiGet(`/api/v1/magicshelf/${id}?page=${page}`),
     enabled: String(id).length > 0,

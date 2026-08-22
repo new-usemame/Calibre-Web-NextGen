@@ -118,7 +118,7 @@ def test_read_request_forces_connection_close():
     )
 
 
-def _request_real_server(request_version, app_connection=None):
+def _request_real_server(request_version, app_connection_headers=None):
     """Return one response from a real MyWSGIHandler-backed TCP server."""
     body = b"ok"
 
@@ -127,8 +127,8 @@ def _request_real_server(request_version, app_connection=None):
             ("Content-Type", "text/plain"),
             ("Content-Length", str(len(body))),
         ]
-        if app_connection is not None:
-            headers.append(("Connection", app_connection))
+        if app_connection_headers is not None:
+            headers.extend(app_connection_headers)
         start_response("200 OK", headers)
         return [body]
 
@@ -155,9 +155,10 @@ def _request_real_server(request_version, app_connection=None):
         client.close()
         server.stop(timeout=1)
 
-    head, separator, _response_body = bytes(response).partition(b"\r\n\r\n")
+    head, separator, response_body = bytes(response).partition(b"\r\n\r\n")
     assert separator, response
-    return head.split(b"\r\n")[1:]
+    response_lines = head.split(b"\r\n")
+    return response_lines[0], response_lines[1:], response_body
 
 
 def _connection_values(response_headers):
@@ -169,16 +170,42 @@ def _connection_values(response_headers):
 
 
 def test_http_1_1_response_advertises_connection_close():
-    headers = _request_real_server("HTTP/1.1")
+    _status, headers, _body = _request_real_server("HTTP/1.1")
     assert _connection_values(headers) == [b"close"]
 
 
 def test_http_1_0_response_advertises_connection_close_once():
-    headers = _request_real_server("HTTP/1.0")
+    _status, headers, _body = _request_real_server("HTTP/1.0")
     assert _connection_values(headers) == [b"close"]
 
 
 @pytest.mark.parametrize("app_connection", ["close", "keep-alive"])
 def test_app_connection_header_is_normalized_to_one_close_header(app_connection):
-    headers = _request_real_server("HTTP/1.1", app_connection=app_connection)
+    _status, headers, _body = _request_real_server(
+        "HTTP/1.1",
+        app_connection_headers=[("Connection", app_connection)],
+    )
+    assert _connection_values(headers) == [b"close"]
+
+
+def test_mixed_case_duplicate_connection_headers_are_normalized_to_one_close():
+    _status, headers, _body = _request_real_server(
+        "HTTP/1.1",
+        app_connection_headers=[
+            ("connection", "keep-alive"),
+            ("CoNnEcTiOn", "close"),
+            ("CONNECTION", "upgrade"),
+        ],
+    )
+    assert _connection_values(headers) == [b"close"]
+
+
+def test_bytes_connection_value_is_rejected_by_gevent():
+    status, headers, body = _request_real_server(
+        "HTTP/1.1",
+        app_connection_headers=[("Connection", b"keep-alive")],
+    )
+
+    assert status == b"HTTP/1.1 500 Internal Server Error"
+    assert body == b"Internal Server Error"
     assert _connection_values(headers) == [b"close"]

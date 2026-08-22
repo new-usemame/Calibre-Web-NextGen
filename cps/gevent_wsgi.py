@@ -19,29 +19,22 @@ class MyWSGIHandler(WSGIHandler):
         # the proxy renegotiating fresh sockets so recovery is bounded.
         # Backport of CWA #1335 by @I-Would-Like-To-Report-A-Bug-Please;
         # addresses fork issue #193.
+        # If a 101/upgrade route is ever added, exempt it from this forced-close
+        # policy instead of emitting a contradictory Switching Protocols response.
         is_valid = super().read_request(raw_requestline)
         self.close_connection = True
         return is_valid
 
-    def start_response(self, status, headers, exc_info=None):
-        # ``read_request`` deliberately closes every connection, but gevent only
-        # adds the matching response header for HTTP/1.0. Make the same policy
-        # explicit to HTTP/1.1 clients, and replace any misleading app-provided
-        # value without emitting a duplicate header.
-        response_headers = []
-        connection_added = False
-        for name, value in headers:
-            if isinstance(name, str) and name.lower() == 'connection':
-                if connection_added:
-                    continue
-                value = 'close'
-                connection_added = True
-            response_headers.append((name, value))
-
-        if not connection_added:
-            response_headers.append(('Connection', 'close'))
-
-        return super().start_response(status, response_headers, exc_info)
+    def finalize_headers(self):
+        # Let gevent validate and encode application headers, and make all of its
+        # Content-Length/chunking decisions, before enforcing the close policy.
+        super().finalize_headers()
+        self.response_headers = [
+            (name, value)
+            for name, value in self.response_headers
+            if name.lower() != b'connection'
+        ]
+        self.response_headers.append((b'Connection', b'close'))
 
     def get_environ(self):
         env = super().get_environ()

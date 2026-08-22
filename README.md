@@ -729,9 +729,9 @@ Governance: [`GOVERNANCE.md`](GOVERNANCE.md). Contributing details: [`CONTRIBUTI
 Since May 2026: **188 releases, 673 merged pull requests, 262 issues closed, and 155 contributors credited by name.**
 <!-- funding-stats:end -->
 
-This build exists to ship community bug fixes on a fast, regular release cadence — real fixes,
-written by real people, packaged so they reach users quickly. It complements the upstream
-projects it builds on, and their maintainers have our respect and our credits below.
+This build exists because the project it's based on stopped cutting releases in February with a
+queue of community pull requests still sitting in it — real bug fixes, written by real people,
+that weren't going to reach anybody. Shipping them turned out to be a full-time habit.
 
 **Nothing here is paywalled and nothing ever will be.** No sponsor-only features, no private
 Discord, no early access, no "pro" tier. Every line is GPL-3.0 and free whether you contribute

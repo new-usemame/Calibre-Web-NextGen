@@ -18,6 +18,16 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Two people could not find how to delete a book in the new UI and switched
+  back to the classic view over it.** Deletion worked, but the edit page had no
+  whole-book delete control and the book page buried Delete at the end of a
+  wrapping row of ordinary actions. The edit page now puts Delete book beside
+  Edit metadata, and the book page gives it its own clearly labelled
+  destructive section — the two places people actually look. Both remain
+  permission-gated and confirm before deleting. Reported through anonymous
+  feedback ([#1046](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1046),
+  duplicate [#1037](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1037)).
+
 - **People who had permission to manage someone else's public smart shelf could
   not do so in the new UI.** Its Edit, Duplicate, and Delete controls were all
   hidden unless you owned the shelf, even though the server allows admins to

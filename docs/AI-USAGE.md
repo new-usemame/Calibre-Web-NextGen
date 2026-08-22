@@ -3,11 +3,13 @@
 Asked for in [#1631](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1631). It's a fair
 question and it deserves a permanent answer rather than a reply buried in a thread.
 
-**Short version: most of the code you run was written by AI; none of it calls one at runtime.**
+**Short version: the codebase is the human-written Calibre-Web / CWA lineage; this fork's own
+changes on top of it are largely AI-written; none of it calls an AI at runtime.**
 
-Those are two different questions and it is worth keeping them apart, because answering only the
-second one is misleading. *Authorship*: the majority of this fork's own code, tests and prose are
-AI-written. *Runtime*: the shipped application has no model dependency, makes no inference call, and
+Those are different questions and it is worth keeping them apart, because answering only the
+last one is misleading. *Authorship*: the underlying application was written over many years by
+the Calibre-Web and Calibre-Web-Automated communities. The majority of this fork's own diffs —
+its fixes, tests and prose — are AI-written. *Runtime*: the shipped application has no model dependency, makes no inference call, and
 sends your library nowhere. If AI-authored code is the thing you are worried about, the runtime
 answer is not a reassurance and is not offered as one.
 

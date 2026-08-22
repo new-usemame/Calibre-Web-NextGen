@@ -7,18 +7,6 @@
 [![Open issues](https://img.shields.io/github/issues/new-usemame/Calibre-Web-NextGen)](https://github.com/new-usemame/Calibre-Web-NextGen/issues)
 [![Sponsor](https://img.shields.io/badge/Sponsor-nothing%20paywalled-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/new-usemame)
 
-> ### 🤖 Most of the code in this fork is written by AI
->
-> Not a footnote: the majority of this fork's own fixes, their regression tests, the changelog and
-> most issue replies are produced by an AI assistant working from a written brief. Merges are gated
-> on CI and on a regression test that is verified to fail without the fix, and anything adding a
-> dependency, changing a licence or introducing an external URL is merged by a person — but a human
-> does not read every line. The shipped application itself contains no AI: no model dependency, no
-> inference call, no telemetry, and your library is not sent anywhere.
->
-> Decide for yourself whether that is a project you want running your library.
-> **[Read the full disclosure →](docs/AI-USAGE.md)**
-
 ---
 
 ## Switch from upstream CWA
@@ -41,6 +29,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - **New here?** See [Quick start](#quick-start) below.
 - **Want to back the work?** [**Sponsor on GitHub**](https://github.com/sponsors/new-usemame) — no rewards, no paywalled features, one-time or monthly. [Here's what it actually pays for.](#supporting-the-project)
 - **Setting up with an AI assistant** (Claude, ChatGPT, etc.)? Point it at [`AI_README.md`](AI_README.md) — a setup guide written for the assistant to follow, verify, and hand back to you working.
+- **Wondering how AI is used here?** [How AI is used](#how-ai-is-used) — used heavily to develop this fork, not at all in the software you run, and what gates it.
 
 ---
 
@@ -70,6 +59,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - [Differences from upstream](#differences-from-upstream)
 - [Contributing](#contributing)
 - [Supporting the project](#supporting-the-project)
+- [How AI is used](#how-ai-is-used)
 - [Credits](#credits)
 
 ---
@@ -754,6 +744,22 @@ If it hasn't, that's completely fine — it stays free either way.
 - **[Ko-fi](https://ko-fi.com/calibrewebnextgen)** — the same thing, if you already have an account there.
 
 The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md) when something breaks. That helps more than a few dollars does.
+
+---
+
+## How AI is used
+
+The codebase itself is Calibre-Web and Calibre-Web-Automated — written over many years by their
+human maintainers and contributors, who are credited in [Credits](#credits). What this fork adds
+on top — its own fixes, their regression tests, the changelog and most issue replies — is largely
+produced by an AI assistant working from a written brief, with human review gates: merges require
+CI plus a regression test verified to fail without the fix, and anything adding a dependency,
+changing a licence or introducing an external URL is decided by a person.
+
+**The shipped application itself contains no AI:** no model dependency, no inference call, no
+telemetry, and your library is not sent anywhere.
+
+[**Read the full disclosure →**](docs/AI-USAGE.md)
 
 ---
 

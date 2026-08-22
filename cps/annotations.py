@@ -1533,6 +1533,9 @@ def annotations_delete(book_id, annotation_id):
         from .services import annotation_sync
         annotation_sync.dispatch_annotation_deletes(
             [annotation_id], current_user, book_id=book_id,
+            # This is an authenticated user's explicit delete, so it is
+            # authoritative across provenance rather than device-scoped.
+            deletable_sources=None,
         )
     except Exception as e:  # pragma: no cover - defensive
         log.warning("annotations: delete fan-out failed: %s", e)

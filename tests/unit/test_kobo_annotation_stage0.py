@@ -516,7 +516,9 @@ def test_dispatch_persists_raw_sidecar_without_rewriting_parsed_location(monkeyp
     assert materialization.provenance == "kobo_patch"
     assert materialization.attachments_state == "empty"
     assert materialization.serveable is False
-    annotation_sync.dispatch_annotation_deletes(["ann-1"], user, book_id=348)
+    annotation_sync.dispatch_annotation_deletes(
+        ["ann-1"], user, book_id=348, deletable_sources={"kobo"},
+    )
     session.refresh(ann)
     assert ann.hidden is True
     assert ann.content_revision == 2

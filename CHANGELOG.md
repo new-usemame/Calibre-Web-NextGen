@@ -51,6 +51,20 @@ is for things you can see or feel when running the app.
   after its response; it now sends `Connection: close` so HTTP/1.1 clients do
   not return that closing socket to their pool and try to reuse it.
 
+- **The dependency list on the Statistics page now tells you when something is
+  actually missing.** The list is built from the packages Calibre-Web NextGen
+  declares it needs, but a few of those only apply to certain systems — one is
+  Windows-only, another is for older Python versions. On everything else they
+  were reported as "not installed", so the page hid every "not installed" row to
+  keep them out of sight, and a dependency that was genuinely absent got hidden
+  along with them. That only matters if you run from source rather than the
+  Docker image, where it is possible to end up short a package after an upgrade:
+  the page showed nothing wrong and the app failed later with an import error
+  instead. Entries that do not apply to your system are now left out at the
+  source, and anything genuinely missing is listed again. Docker users see the
+  same list as before, minus two rows that never applied. Packaging work by
+  @chloeroform (#1442).
+
 - **A comic dropped into the ingest folder now keeps the title, series, issue
   number, author and language its `ComicInfo.xml` already carries.** Auto-ingest
   ran a bare `calibredb add` for comic files, which does not read that embedded

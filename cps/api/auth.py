@@ -138,14 +138,6 @@ def _server_features():
     }
 
 
-# Written by cps.cwa_functions.set_profile_picture (the profile_pictures
-# blueprint): a {username: "data:image/…;base64,…"} map. The classic UI reads
-# the whole map via /profile_pictures/user_profiles.json and looks the name up
-# client-side; the SPA gets only the current user's picture on /me instead, so
-# it never downloads every user's avatar. Path is kept in sync with that writer.
-_USER_PROFILES_JSON = "/config/user_profiles.json"
-
-
 def _user_avatar(name):
     """Return the profile-picture data-URI set for ``name`` in the classic
     profile-pictures panel, or None. A missing file, malformed JSON, absent
@@ -153,7 +145,7 @@ def _user_avatar(name):
     back to a neutral glyph. The ``data:image/`` guard keeps a corrupted entry
     from becoming an arbitrary URL the frontend would render."""
     try:
-        with open(_USER_PROFILES_JSON, "r") as fh:
+        with open(constants.USER_PROFILES_JSON, "r") as fh:
             data = json.load(fh)
     except (OSError, ValueError):
         return None

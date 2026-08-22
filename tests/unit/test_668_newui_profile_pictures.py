@@ -18,6 +18,7 @@ import pytest
 from unittest.mock import patch
 
 import cps.api.auth as auth_mod
+import cps.constants as constants
 
 
 DATA_URI = "data:image/png;base64,iVBORw0KGgo="
@@ -37,7 +38,7 @@ def _app():
 def _write(tmp_path, monkeypatch, obj_or_text):
     p = tmp_path / "user_profiles.json"
     p.write_text(obj_or_text if isinstance(obj_or_text, str) else json.dumps(obj_or_text))
-    monkeypatch.setattr(auth_mod, "_USER_PROFILES_JSON", str(p))
+    monkeypatch.setattr(constants, "USER_PROFILES_JSON", str(p))
     return p
 
 
@@ -57,7 +58,7 @@ def test_avatar_absent_user_returns_none(tmp_path, monkeypatch):
 
 @pytest.mark.unit
 def test_avatar_missing_file_returns_none(tmp_path, monkeypatch):
-    monkeypatch.setattr(auth_mod, "_USER_PROFILES_JSON", str(tmp_path / "nope.json"))
+    monkeypatch.setattr(constants, "USER_PROFILES_JSON", str(tmp_path / "nope.json"))
     assert auth_mod._user_avatar("alice") is None
 
 

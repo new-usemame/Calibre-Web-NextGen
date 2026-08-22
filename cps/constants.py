@@ -75,6 +75,24 @@ CWA_METADATA_TEMP_DIR = os.environ.get(
 # Folder where the log files are stored
 LOG_ARCHIVE = os.path.join(CONFIG_DIR, "log_archive")
 
+# Where the "update available" banner remembers the date it last fired, so it
+# can hold itself to once per calendar day.
+#
+# This has to live under /config. That is the declared VOLUME; /app is part of
+# the image and its writable layer is thrown away whenever the container is
+# recreated, which is precisely what a user does when they pull a new image.
+# Keeping the throttle there reset it at the one moment the banner had most
+# likely already been shown (#1333, @chloeroform). Siblings on the same volume:
+# cwa_ingest_status, cwa_ingest_retry_queue, and the logs.
+CWA_UPDATE_NOTICE_PATH = os.path.join(CONFIG_DIR, "cwa_update_notice")
+
+# Written by cps.cwa_functions.set_profile_picture (the profile_pictures
+# blueprint): a {username: "data:image/…;base64,…"} map. The classic UI reads
+# the whole map via /profile_pictures/user_profiles.json and looks the name up
+# client-side; the SPA gets only the current user's picture on /me instead, so
+# it never downloads every user's avatar. Path is kept in sync with that writer.
+USER_PROFILES_JSON = os.path.join(CONFIG_DIR, "user_profiles.json")
+
 DEFAULT_SETTINGS_FILE = "app.db"
 DEFAULT_GDRIVE_FILE = "gdrive.db"
 

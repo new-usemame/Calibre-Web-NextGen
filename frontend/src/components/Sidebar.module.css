@@ -149,7 +149,9 @@
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
   :is(.nav, .navOpen) {
     width: 64px;
-    overflow: hidden;
+    padding-right: var(--sp-2);
+    overflow-x: hidden;
+    overflow-y: auto;
     z-index: var(--z-overlay);
     box-sizing: border-box;
     transition:
@@ -302,6 +304,7 @@
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
+.customizeBtn > svg { flex-shrink: 0; }
 .customizeBtn:hover { background: var(--surface-2); color: var(--text); }
 
 /* ── #585 v3: liquid-glass Customize capsule + inline edit list ──────────── */

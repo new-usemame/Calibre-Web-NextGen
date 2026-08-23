@@ -16,6 +16,17 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cover thumbnails load faster, and the gap widens the bigger your library
+  gets.** Every cover request searched the whole thumbnail table instead of
+  going straight to the row it wanted, and the book grid asked for each cover
+  twice — once for the WebP version and once for the JPEG. Both are fixed, so a
+  page of covers now costs a fraction of the database work it used to. Reported
+  by @ericsilberberg on Discord, who was running NextGen and stock Calibre-Web
+  side by side and noticed pages populating more slowly here
+  ([#1571](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1571)).
+
 ## [v4.1.40] - 2026-08-23
 
 ### Added

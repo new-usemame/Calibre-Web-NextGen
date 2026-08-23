@@ -152,16 +152,14 @@
     overflow: hidden;
     z-index: var(--z-overlay);
     box-sizing: border-box;
-    transition: width var(--dur-base) var(--ease-out);
+    transition:
+      width var(--dur-base) var(--ease-out),
+      margin-right var(--dur-base) var(--ease-out);
   }
 
   :is(.nav, .navOpen):is(:hover, :focus-within) {
     width: 220px;
-    /* Keep expansion in the flex layout. Cancelling the extra width with a
-       negative margin made the rail cover the first 156px of every page: after
-       using a sidebar link, the pointer remained inside that overlay and could
-       not reach a control underneath it. Reflow preserves expand-on-hover and
-       leaves both pointer and keyboard targets unobscured. */
+    margin-right: -156px;
   }
 
   :is(.item, .itemActive, .sectionTitle, .sectionTitleActive, .customizeBtn) > span,

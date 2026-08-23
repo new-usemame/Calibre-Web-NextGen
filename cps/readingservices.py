@@ -57,6 +57,16 @@ def _is_check_for_changes_path(path):
     return normalized_parts == ["api", "v3", "content", "checkforchanges"]
 
 
+def _is_annotation_path(path):
+    """Recognize the one reading-services route whose PATCH carries user data."""
+    normalized_parts = [part.casefold() for part in path.split("/") if part]
+    return (
+        len(normalized_parts) == 5
+        and normalized_parts[:3] == ["api", "v3", "content"]
+        and normalized_parts[-1] == "annotations"
+    )
+
+
 def redact_headers(headers):
     """Redact sensitive headers from the headers dictionary.
     
@@ -143,9 +153,10 @@ def requires_reading_services_auth_and_config(f):
 
     Authentication uses the existing Flask session, whether it came from a
     Kobo-sync handshake or a browser login. If Kobo sync is off OR the user
-    isn't logged in, we normally proxy through to Kobo untouched. The
-    checkforchanges trigger is the exception: its ownership containment must
-    run even during those two transition windows.
+    isn't logged in, we normally proxy through to Kobo untouched. Two routes
+    are exceptions: checkforchanges must still run ownership containment, and
+    an annotation PATCH must fail authentication instead of forwarding a
+    success that would make Nickel forget an upload CWNG did not capture.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -165,6 +176,11 @@ def requires_reading_services_auth_and_config(f):
             return f(*args, **kwargs)
         if contains_check_for_changes:
             return f(*args, **kwargs)
+        if request.method == "PATCH" and _is_annotation_path(request.path):
+            log.warning(
+                "Refusing unauthenticated annotation PATCH so the device can retry"
+            )
+            return make_response(jsonify({"error": "Authentication required"}), 401)
         log.debug("Reading services request without auth, proxying to Kobo")
         return proxy_to_kobo_reading_services()
     return decorated_function
@@ -537,9 +553,19 @@ def handle_annotations(entitlement_id):
                             raw_materializations=raw_materializations,
                             trace_id=trace_id,
                         )
-                    annotation_sync.dispatch_annotation_sync(
+                    persisted = annotation_sync.dispatch_annotation_sync(
                         updated, book, current_user, **dispatch_kwargs,
                     )
+                    if persisted is False:
+                        log.error(
+                            "Kobo annotation PATCH was not fully persisted for "
+                            "user_id=%s book_id=%s; refusing to acknowledge it upstream",
+                            getattr(current_user, "id", None), book.id,
+                        )
+                        return make_response(
+                            jsonify({"error": "Annotation capture temporarily unavailable"}),
+                            503,
+                        )
                 if deleted is not None and not isinstance(deleted, list):
                     log.warning(
                         "Ignoring deletedAnnotationIds for entitlement %s: expected a list",
@@ -555,6 +581,9 @@ def handle_annotations(entitlement_id):
                     )
         except Exception:
             log.exception("Error processing PATCH annotations")
+            return make_response(
+                jsonify({"error": "Annotation capture temporarily unavailable"}), 503,
+            )
     # Proxy both GET + PATCH. Do not refuse GET: hardware testing showed that a
     # 503 (or a hung request) makes Nickel empty its local annotations. The safe
     # containment point is checkforchanges, before Nickel decides to GET.

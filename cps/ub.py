@@ -1781,6 +1781,9 @@ def filename(context):
 
 class Thumbnail(Base):
     __tablename__ = 'thumbnail'
+    __table_args__ = (
+        Index('ix_thumbnail_cover_lookup', 'type', 'entity_id', 'resolution', 'format'),
+    )
 
     id = Column(Integer, primary_key=True)
     entity_id = Column(Integer)
@@ -3995,9 +3998,45 @@ def migrate_bookmark_format_lowercase(engine, _session):
             log.info("[bookmark-format-migration] merged %d rows; lowercased %d rows", merged, updated)
 
 
+def migrate_thumbnail_lookup_index(engine, _session):
+    """Add the composite index used by cover-thumbnail lookups."""
+    marker_path = os.path.join(
+        constants.CONFIG_DIR,
+        ".cwa_migrations",
+        "thumbnail_lookup_index_v1",
+    )
+    if os.path.isfile(marker_path):
+        return
+
+    try:
+        _run_ddl_with_retry(
+            engine,
+            "CREATE INDEX IF NOT EXISTS ix_thumbnail_cover_lookup "
+            "ON thumbnail(type, entity_id, resolution, format)",
+        )
+    except Exception as error:
+        log.warning(
+            "[thumbnail-lookup-index-migration] index creation failed: %s",
+            error,
+        )
+        return
+
+    try:
+        os.makedirs(os.path.dirname(marker_path), exist_ok=True)
+        with open(marker_path, "w", encoding="utf-8") as marker:
+            marker.write(datetime.now(timezone.utc).isoformat())
+    except OSError as error:
+        log.warning(
+            "[thumbnail-lookup-index-migration] could not write marker %s: %s",
+            marker_path,
+            error,
+        )
+
+
 def migrate_Database(_session):
     engine = _session.bind
     add_missing_tables(engine, _session)
+    migrate_thumbnail_lookup_index(engine, _session)
     migrate_registration_table(engine, _session)
     migrate_user_session_table(engine, _session)
     migrate_user_table(engine, _session)

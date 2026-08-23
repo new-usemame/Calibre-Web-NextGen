@@ -139,10 +139,10 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   // ── normal-mode ordered region (browse/discovery + Shelves block, in order) ─
   const renderShelvesBlock = () => (
     <Fragment key="shelves-block">
-      <div className={styles.sectionHeader}>
+      <div>
         <Link
           href="/shelves"
-          className={isActive(location, '/shelves', true) ? styles.sectionTitleActive : styles.sectionTitle}
+          className={isActive(location, '/shelves', true) ? styles.itemActive : styles.item}
           onClick={onNavigate}
         >
           <BookCopy size={16} className={styles.icon} aria-hidden="true" focusable={false} />

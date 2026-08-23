@@ -3999,15 +3999,12 @@ def migrate_bookmark_format_lowercase(engine, _session):
 
 
 def migrate_thumbnail_lookup_index(engine, _session):
-    """Add the composite index used by cover-thumbnail lookups."""
-    marker_path = os.path.join(
-        constants.CONFIG_DIR,
-        ".cwa_migrations",
-        "thumbnail_lookup_index_v1",
-    )
-    if os.path.isfile(marker_path):
-        return
+    """Ensure the current app.db has the cover-thumbnail lookup index.
 
+    Do not gate this on a CONFIG_DIR marker: callers can select or restore a
+    different app.db while keeping the same config directory. The database-
+    scoped ``IF NOT EXISTS`` is the idempotency guard.
+    """
     try:
         _run_ddl_with_retry(
             engine,
@@ -4017,18 +4014,6 @@ def migrate_thumbnail_lookup_index(engine, _session):
     except Exception as error:
         log.warning(
             "[thumbnail-lookup-index-migration] index creation failed: %s",
-            error,
-        )
-        return
-
-    try:
-        os.makedirs(os.path.dirname(marker_path), exist_ok=True)
-        with open(marker_path, "w", encoding="utf-8") as marker:
-            marker.write(datetime.now(timezone.utc).isoformat())
-    except OSError as error:
-        log.warning(
-            "[thumbnail-lookup-index-migration] could not write marker %s: %s",
-            marker_path,
             error,
         )
 

@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 from flask import Flask
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 pytestmark = pytest.mark.unit
@@ -53,26 +53,33 @@ def _legacy_app_db(tmp_path, monkeypatch):
     return engine, db_session
 
 
-def _thumbnail_query_plan(engine):
+def _actual_thumbnail_query_plan(engine, db_session, monkeypatch):
+    """EXPLAIN the statement and parameters emitted by the production helper."""
+    from cps import helper, ub
+
+    captured = []
+
+    def capture_thumbnail_select(
+        conn, cursor, statement, parameters, context, executemany
+    ):
+        if statement.lstrip().upper().startswith("SELECT") and "FROM thumbnail" in statement:
+            captured.append((statement, parameters))
+
+    event.listen(engine, "before_cursor_execute", capture_thumbnail_select)
+    monkeypatch.setattr(ub, "session", db_session)
+    try:
+        helper.get_book_cover_thumbnails_by_formats(
+            SimpleNamespace(id=123, has_cover=True), 2, ("webp", "jpg")
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_thumbnail_select)
+
+    assert len(captured) == 1, captured
+    statement, parameters = captured[0]
     with engine.connect() as connection:
-        rows = connection.execute(
-            text(
-                "EXPLAIN QUERY PLAN "
-                "SELECT * FROM thumbnail "
-                "WHERE type = :type AND entity_id = :entity_id "
-                "AND resolution = :resolution "
-                "AND format IN (:webp, :jpg) "
-                "AND (expiration IS NULL OR expiration > :now) "
-                "ORDER BY format ASC, id ASC"
-            ),
-            {
-                "type": 1,
-                "entity_id": 123,
-                "resolution": 2,
-                "webp": "webp",
-                "jpg": "jpg",
-                "now": datetime.now(timezone.utc),
-            },
+        rows = connection.exec_driver_sql(
+            "EXPLAIN QUERY PLAN " + statement,
+            parameters,
         ).fetchall()
     return " | ".join(str(row[3]) for row in rows)
 
@@ -80,8 +87,11 @@ def _thumbnail_query_plan(engine):
 def test_existing_app_db_migration_adds_thumbnail_lookup_index(tmp_path, monkeypatch):
     engine, db_session = _legacy_app_db(tmp_path, monkeypatch)
     try:
-        plan = _thumbnail_query_plan(engine)
-        assert f"USING INDEX {INDEX_NAME}" in plan, plan
+        plan = _actual_thumbnail_query_plan(engine, db_session, monkeypatch)
+        assert (
+            f"USING INDEX {INDEX_NAME} "
+            "(type=? AND entity_id=? AND resolution=? AND format=?)"
+        ) in plan, plan
         assert "SCAN thumbnail" not in plan, plan
     finally:
         db_session.close()
@@ -93,26 +103,45 @@ def test_thumbnail_lookup_index_migration_is_idempotent(tmp_path, monkeypatch):
 
     engine, db_session = _legacy_app_db(tmp_path, monkeypatch)
     try:
-        marker = tmp_path / ".cwa_migrations" / "thumbnail_lookup_index_v1"
-        assert marker.is_file()
-
-        monkeypatch.setattr(
-            ub,
-            "_run_ddl_with_retry",
-            lambda *args, **kwargs: pytest.fail("second migration run issued DDL"),
-        )
         ub.migrate_thumbnail_lookup_index(engine, db_session)
+        ub.migrate_thumbnail_lookup_index(engine, db_session)
+        indexes = [
+            item["name"]
+            for item in inspect(engine).get_indexes("thumbnail")
+            if item["name"] == INDEX_NAME
+        ]
+        assert indexes == [INDEX_NAME]
     finally:
         db_session.close()
         engine.dispose()
 
 
-def test_thumbnail_lookup_index_failure_does_not_break_startup(
-    tmp_path, monkeypatch, caplog
+def test_existing_marker_cannot_skip_index_for_a_different_database(
+    tmp_path, monkeypatch
 ):
     from cps import constants, ub
 
     monkeypatch.setattr(constants, "CONFIG_DIR", str(tmp_path), raising=False)
+    marker = tmp_path / ".cwa_migrations" / "thumbnail_lookup_index_v1"
+    marker.parent.mkdir()
+    marker.write_text("marker from another app.db")
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'restored-app.db'}", future=True)
+    ub.Thumbnail.__table__.create(engine)
+    with engine.begin() as connection:
+        connection.execute(text(f"DROP INDEX {INDEX_NAME}"))
+
+    try:
+        ub.migrate_thumbnail_lookup_index(engine, None)
+        names = {item["name"] for item in inspect(engine).get_indexes("thumbnail")}
+        assert INDEX_NAME in names
+    finally:
+        engine.dispose()
+
+
+def test_thumbnail_lookup_index_failure_does_not_break_startup(monkeypatch, caplog):
+    from cps import ub
+
     monkeypatch.setattr(
         ub,
         "_run_ddl_with_retry",
@@ -122,9 +151,6 @@ def test_thumbnail_lookup_index_failure_does_not_break_startup(
     ub.migrate_thumbnail_lookup_index(None, None)
 
     assert "index creation failed: read only" in caplog.text
-    assert not (
-        tmp_path / ".cwa_migrations" / "thumbnail_lookup_index_v1"
-    ).exists()
 
 
 def _thumbnail_session():

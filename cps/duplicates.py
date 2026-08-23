@@ -20,7 +20,7 @@ import threading
 import time
 from shutil import copyfile
 
-from . import db, calibre_db, constants, logger, ub, csrf, config, helper, user_book_data
+from . import db, calibre_db, logger, ub, csrf, config, helper, user_book_data
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 from .admin import admin_required  
 from .usermanagement import login_required_if_no_ano
@@ -28,9 +28,8 @@ from .render_template import render_title_template
 from .duplicate_notice import duplicate_setup_notice_file
 from .cw_login import current_user
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 duplicates = Blueprint('duplicates', __name__)
 log = logger.create()

@@ -47,7 +47,7 @@
   color: var(--text);
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
   .menuBtn {
     display: inline-flex;
   }

@@ -8,8 +8,8 @@
 Coverage:
 
 1. ``looks_like_sqlite`` accepts a real sqlite, rejects garbage.
-2. Parser yields one ``ParsedBookmark`` per valid Bookmark row.
-3. Hidden rows + empty-text rows + empty-BookmarkID rows are filtered.
+2. Parser yields one ``ParsedBookmark`` per Bookmark row so the ingest summary
+   can account for malformed, hidden, and empty rows itself.
 4. Color integers map to the MEASURED wire hex (finding F-5769c9).
 5. Multi-span highlight preserves both start + end fields.
 6. Note (Annotation) field round-trips.
@@ -20,6 +20,7 @@ Coverage:
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import pytest
@@ -60,24 +61,30 @@ class TestLooksLikeSqlite:
 
 @pytest.mark.unit
 class TestParseKoboBookmarks:
-    def test_yields_one_per_valid_row(self, tmp_path):
+    def test_parser_keeps_both_read_only_sqlite_guards(self):
+        from cps.services.kobo_import import parse_kobo_bookmarks
+
+        source = inspect.getsource(parse_kobo_bookmarks)
+        assert "mode=ro&immutable=1" in source
+        assert 'conn.execute("PRAGMA query_only = ON")' in source
+
+    def test_yields_every_row_for_downstream_accounting(self, tmp_path):
         from cps.services.kobo_import import parse_kobo_bookmarks
 
         p = build_synthetic_kobo_db(tmp_path / "k.sqlite")
         rows = list(parse_kobo_bookmarks(p))
-        # Fixture has 6 valid-text rows (bm-001..006); bm-007 has empty
-        # BookmarkID + bm-008 has empty Text — both filtered.
+        # The parser classifies nothing: all eight SQL rows reach the caller,
+        # including the malformed id and empty-content row.
         bm_ids = {r.bookmark_id for r in rows}
+        assert len(rows) == 8
         assert "bm-001" in bm_ids
         assert "bm-002" in bm_ids
         assert "bm-003" in bm_ids
         assert "bm-004" in bm_ids  # sideloaded — yielded; caller decides
         assert "bm-005" in bm_ids  # hidden — yielded with hidden=True; caller filters
         assert "bm-006" in bm_ids
-        # malformed (empty BookmarkID) — filtered
-        assert "" not in bm_ids
-        # empty-Text — filtered at SQL level
-        assert "bm-008" not in bm_ids
+        assert "" in bm_ids
+        assert "bm-008" in bm_ids
 
     def test_color_map_normalized(self, tmp_path):
         from cps.services.kobo_import import parse_kobo_bookmarks
@@ -140,11 +147,15 @@ class TestParseKoboBookmarks:
 
 @pytest.mark.unit
 class TestParserEdgeCases:
-    def test_no_bookmark_table_yields_empty(self, tmp_path):
-        from cps.services.kobo_import import parse_kobo_bookmarks
+    def test_no_bookmark_table_is_not_reported_as_an_empty_success(self, tmp_path):
+        from cps.services.kobo_import import (
+            KoboBookmarkDatabaseError,
+            parse_kobo_bookmarks,
+        )
 
         p = build_empty_sqlite_no_bookmark_table(tmp_path / "empty.sqlite")
-        assert list(parse_kobo_bookmarks(p)) == []
+        with pytest.raises(KoboBookmarkDatabaseError, match="Bookmark table"):
+            list(parse_kobo_bookmarks(p))
 
     def test_not_sqlite_yields_empty(self, tmp_path):
         from cps.services.kobo_import import parse_kobo_bookmarks

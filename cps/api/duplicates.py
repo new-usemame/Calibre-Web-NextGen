@@ -43,7 +43,8 @@ def list_duplicates():
     needs_scan = False
     groups = []
     try:
-        from scripts.cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         from ..duplicate_index import (
             get_duplicate_groups_from_index,
             duplicate_index_needs_manual_full_scan,

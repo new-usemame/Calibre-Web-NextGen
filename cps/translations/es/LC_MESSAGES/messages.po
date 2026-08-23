@@ -972,6 +972,10 @@ msgid "Uploaded file is not a SQLite database."
 msgstr "El archivo subido no es una base de datos SQLite."
 
 #: cps/annotations.py
+msgid "Uploaded database has no readable Kobo Bookmark table."
+msgstr ""
+
+#: cps/annotations.py
 #, python-format
 msgid "File exceeds %(max)d MB."
 msgstr "El archivo supera los %(max)d MB."
@@ -3288,6 +3292,10 @@ msgstr "Editoriales (separadas por comas)"
 msgid "Read"
 msgstr "Leído"
 
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Reading"
+msgstr "Lectura"
+
 #: cps/spa_strings.py
 msgid "Reading progress"
 msgstr "Progreso de lectura"
@@ -3550,10 +3558,6 @@ msgid ""
 msgstr ""
 "La interfaz está traducida a tu idioma; estas notas de actualización están "
 "escritas en inglés."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Reading"
-msgstr "Lectura"
 
 #: cps/spa_strings.py
 msgid "Grid view"
@@ -7702,20 +7706,44 @@ msgid "Import summary"
 msgstr "Resumen de la importación"
 
 #: cps/templates/annotations_import.html
-msgid "new highlights imported"
-msgstr "subrayados nuevos importados"
+msgid "new annotations imported"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "existing annotations updated from a newer device copy"
+msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "already imported (skipped)"
 msgstr "ya importados (omitidos)"
 
 #: cps/templates/annotations_import.html
+msgid "different or undated device entries older than server state (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
 msgid "for books not in this library (skipped)"
 msgstr "para libros que no están en esta biblioteca (omitidos)"
 
 #: cps/templates/annotations_import.html
-msgid "hidden on device (skipped)"
-msgstr "ocultos en el dispositivo (omitidos)"
+msgid "hidden on device (reported, not applied)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "empty bookmark rows with no annotation content (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "invalid bookmark rows (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries with invalid book positions (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries not saved because the import transaction failed"
+msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "total entries seen"
@@ -13239,6 +13267,12 @@ msgstr "Exponer las estanterías seleccionadas en OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostrar Selección Leidos/No Leidos"
+
+#~ msgid "new highlights imported"
+#~ msgstr "subrayados nuevos importados"
+
+#~ msgid "hidden on device (skipped)"
+#~ msgstr "ocultos en el dispositivo (omitidos)"
 
 #~ msgid "Could not load highlights."
 #~ msgstr "No se pudieron cargar los subrayados."

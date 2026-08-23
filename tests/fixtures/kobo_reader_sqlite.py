@@ -40,6 +40,11 @@ CREATE TABLE Bookmark (
 )
 """
 
+BOOKMARK_DDL_WITH_TYPE = BOOKMARK_DDL.replace(
+    "Hidden INTEGER DEFAULT 0\n)",
+    "Hidden INTEGER DEFAULT 0,\n    Type TEXT\n)",
+)
+
 
 def build_synthetic_kobo_db(
     path: Path,
@@ -191,28 +196,7 @@ def build_kobo_db_with_bookmark_type(
     import sqlite3
 
     conn = sqlite3.connect(path)
-    conn.execute("""
-        CREATE TABLE Bookmark (
-            BookmarkID TEXT PRIMARY KEY,
-            VolumeID TEXT,
-            ContentID TEXT,
-            StartContainerPath TEXT,
-            StartContainerChildIndex INTEGER,
-            StartOffset INTEGER,
-            EndContainerPath TEXT,
-            EndContainerChildIndex INTEGER,
-            EndOffset INTEGER,
-            Text TEXT,
-            Annotation TEXT,
-            Color INTEGER,
-            ContextString TEXT,
-            ChapterProgress REAL,
-            DateCreated TEXT,
-            DateModified TEXT,
-            Hidden INTEGER DEFAULT 0,
-            Type TEXT
-        )
-    """)
+    conn.executescript(BOOKMARK_DDL_WITH_TYPE)
     chapter1 = "{}!!chapter1.html".format(book_uuid)
     chapter2 = "{}!!chapter2.html".format(book_uuid)
     rows = [
@@ -228,6 +212,54 @@ def build_kobo_db_with_bookmark_type(
         ("bt-004", book_uuid, chapter2, "span#kobo\\.4\\.1", -99, 0,
          "span#kobo\\.4\\.2", -99, 5, "type is empty", None, 0, "ctx", 0.4,
          "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, ""),
+    ]
+    conn.executemany(
+        "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
+    conn.commit()
+    conn.close()
+    return path
+
+
+def build_kobo_db_with_recovery_rows(
+    path: Path,
+    book_uuid: str = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04",
+) -> Path:
+    """Current-device shapes that the old ``Text`` SQL gate made invisible.
+
+    A dogear has empty ``Text`` and identifies itself through ``Type``. A Kobo
+    highlight with only a typed note keeps ``Type='highlight'`` and puts the
+    user's writing in ``Annotation``. The final fully-empty row is a vacuity
+    guard: widening the old gate must not turn a row with no annotation evidence
+    into an imported annotation, but it must still be counted with a reason.
+    """
+    if not isinstance(path, Path):
+        path = Path(path)
+    if path.exists():
+        path.unlink()
+    conn = sqlite3.connect(path)
+    conn.executescript(BOOKMARK_DDL_WITH_TYPE)
+    chapter = f"{book_uuid}!!chapter1.html"
+    rows = [
+        (
+            "recover-dogear", book_uuid, chapter,
+            "span#kobo\\.7\\.1", -99, 0, "span#kobo\\.7\\.1", -99, 0,
+            "", None, None, None, 0.7,
+            "2026-08-18T12:00:00Z", "2026-08-18T12:00:00Z", 0, "dogear",
+        ),
+        (
+            "recover-note-only", book_uuid, chapter,
+            "span#kobo\\.8\\.1", -99, 3, "span#kobo\\.8\\.1", -99, 3,
+            "", "remember this", 4, "near the end", 0.8,
+            "2026-08-18T12:01:00Z", "2026-08-18T12:02:00Z", 0, "highlight",
+        ),
+        (
+            "recover-empty", book_uuid, chapter,
+            None, None, None, None, None, None,
+            "", None, None, None, None,
+            "2026-08-18T12:03:00Z", "2026-08-18T12:03:00Z", 0, None,
+        ),
     ]
     conn.executemany(
         "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

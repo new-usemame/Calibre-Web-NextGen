@@ -66,6 +66,10 @@ log = logger.create()
 # highlight.
 _DELETABLE_SOURCES = {"koreader"}
 
+# Keep ``annotation_id IN (...)`` below SQLite's historical 999-variable
+# ceiling after the user/book/source predicates take their own bind slots.
+_DELETE_ID_CHUNK_SIZE = 900
+
 
 def _now():
     return datetime.now(timezone.utc)
@@ -100,6 +104,8 @@ def apply_push(annotations, *, user, book, session, commit,
     the user has since deleted; they are soft-deleted (see
     :func:`_apply_deletes`). Omission from ``annotations`` means nothing on its
     own — see the module docstring for why the server never infers a delete.
+    Inline ``hidden`` uses the same ``_DELETABLE_SOURCES`` authority as those
+    named deletes.
     """
     from ...services.annotation_portable import apply_portable
     from ...services import annotation_sync
@@ -111,6 +117,10 @@ def apply_push(annotations, *, user, book, session, commit,
         row, action = apply_portable(
             payload, user_id=user.id, book=book, session=session, commit=commit,
             origin_device_id=origin_device_id,
+            # This protocol owns the single authority decision. The portable
+            # helper receives the decision; it does not grow a second source
+            # list that could drift from named-delete enforcement.
+            deletable_sources=_DELETABLE_SOURCES,
         )
         summary[action] = summary.get(action, 0) + 1
         if row is None or action == "skipped":
@@ -119,6 +129,7 @@ def apply_push(annotations, *, user, book, session, commit,
             if action == "deleted":
                 annotation_sync.dispatch_annotation_deletes(
                     [row.annotation_id], user, book_id=book.id,
+                    deletable_sources=_DELETABLE_SOURCES,
                 )
             else:
                 annotation_sync.dispatch_existing_annotation_sync(row, book, user)
@@ -160,17 +171,21 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
     if not wanted:
         return 0
 
-    stale = [
-        row for row in session.query(ub.Annotation).filter(
-            ub.Annotation.user_id == user.id,
-            ub.Annotation.book_id == book.id,
-            ub.Annotation.source == source,
-        ).filter(
-            (ub.Annotation.hidden.is_(None))
-            | (ub.Annotation.hidden == False)  # noqa: E712 — SQLA needs ==
-        ).all()
-        if row.annotation_id in wanted
-    ]
+    base_query = session.query(ub.Annotation).filter(
+        ub.Annotation.user_id == user.id,
+        ub.Annotation.book_id == book.id,
+        ub.Annotation.source == source,
+    ).filter(
+        (ub.Annotation.hidden.is_(None))
+        | (ub.Annotation.hidden == False)  # noqa: E712 — SQLA needs ==
+    )
+    wanted_ids = sorted(wanted)
+    stale = []
+    for start in range(0, len(wanted_ids), _DELETE_ID_CHUNK_SIZE):
+        chunk = wanted_ids[start:start + _DELETE_ID_CHUNK_SIZE]
+        stale.extend(
+            base_query.filter(ub.Annotation.annotation_id.in_(chunk)).all()
+        )
     if not stale:
         return 0
 
@@ -183,6 +198,7 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
         try:
             annotation_sync.dispatch_annotation_deletes(
                 [row.annotation_id], user, book_id=book.id,
+                deletable_sources=_DELETABLE_SOURCES,
             )
         except Exception:  # pragma: no cover - fan-out must never fail the push
             log.exception("koreader annotation delete fan-out failed for %s", row.annotation_id)

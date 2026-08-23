@@ -144,7 +144,7 @@ def cover_url_for(book, resolution):
     return f"{url}?{COVER_VERSION_ARG}={version}" if version else url
 
 
-def serialize_book_list_item(book, read=False, archived=False, hidden=False):
+def serialize_book_list_item(book, read=False, archived=False, hidden=False, in_progress=False):
     series = book.series[0].name if getattr(book, "series", None) else None
     return {
         "id": book.id,
@@ -165,6 +165,7 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False):
         "date_added": _iso_datetime(getattr(book, "timestamp", None)),
         "last_modified": _iso_datetime(getattr(book, "last_modified", None)),
         "read": bool(read),
+        "in_progress": bool(in_progress),
         "archived": bool(archived),
         "hidden": bool(hidden),
     }

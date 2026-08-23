@@ -214,7 +214,7 @@ def test_real_kepub_shape_preserves_every_kobo_span_lexeme_byte_exact(tmp_path):
 
 
 @pytest.mark.unit
-def test_shared_cut_element_keeps_anchors_together_without_aborting_other_splits(tmp_path):
+def test_shared_wrapper_is_refined_without_renaming_later_first_pass_piece(tmp_path):
     chapter = (
         b'<html xmlns="http://www.w3.org/1999/xhtml"><body class="calibre">'
         b'<div id="book-columns"><div id="book-inner">'
@@ -239,17 +239,71 @@ def test_shared_cut_element_keeps_anchors_together_without_aborting_other_splits
     assert _split(book) is True
 
     contents, _manifest, spine, targets = _package_state(book)
-    assert spine == ["chapter", "chapter-split"]
+    assert spine == ["chapter", "chapter-split", "chapter-split-1"]
     assert targets == [
         "chapter-split-1.xhtml",
-        "chapter-split-1.xhtml",
+        "chapter-split-3.xhtml",
         "chapter-split-2.xhtml",
     ]
     first = contents["OPS/chapter-split-1.xhtml"]
     second = contents["OPS/chapter-split-2.xhtml"]
-    assert b'id="ch1"' in first and b'id="ch1b"' in first
+    third = contents["OPS/chapter-split-3.xhtml"]
+    assert b'id="ch1"' in first and b'id="ch1b"' not in first
+    assert b'id="ch1b"' in third
     assert b'id="ch2"' not in first
     assert b'id="ch2"' in second
+
+
+@pytest.mark.unit
+def test_mixed_top_level_and_nested_groups_refine_in_place(tmp_path):
+    chapter = (
+        b'<html xmlns="http://www.w3.org/1999/xhtml"><body><div id="book-columns">'
+        b'<div id="book-inner">'
+        b'<h1 id="front"><i id="ch2"></i>'
+        b'<span class="koboSpan" id="kobo.1.1">front</span></h1>'
+        b'<div class="header-wrapper">'
+        b'<h2 id="nested-1"><span class="koboSpan" id="kobo.2.1">one</span></h2>'
+        b'<h2 id="nested-2"><span class="koboSpan" id="kobo.3.1">two</span></h2>'
+        b'<h2 id="nested-3"><span class="koboSpan" id="kobo.4.1">three</span></h2>'
+        b'<h2 id="nested-4"><span class="koboSpan" id="kobo.5.1">four</span></h2>'
+        b'</div>'
+        b'<p><span class="koboSpan" id="kobo.5.2">trailing wrapper content</span></p>'
+        b'<h1 id="later"><span class="koboSpan" id="kobo.6.1">later</span></h1>'
+        b'</div></div></body></html>')
+    book = _book(
+        tmp_path,
+        targets=(
+            "chapter.xhtml#front",
+            "chapter.xhtml#nested-1",
+            "chapter.xhtml#nested-2",
+            "chapter.xhtml#nested-3",
+            "chapter.xhtml#nested-4",
+            "chapter.xhtml#later",
+        ),
+        chapter=chapter,
+    )
+
+    assert _split(book) is True
+
+    contents, _manifest, spine, targets = _package_state(book)
+    assert len(spine) == 6
+    assert targets == [
+        "chapter-split-1.xhtml",
+        "chapter-split-2.xhtml",
+        "chapter-split-4.xhtml",
+        "chapter-split-5.xhtml",
+        "chapter-split-6.xhtml",
+        "chapter-split-3.xhtml",
+    ]
+    # The already-correct later first-pass chapter keeps split-3; only the
+    # newly separated nested chapters consume names from the numeric tail.
+    assert b'id="later"' in contents["OPS/chapter-split-3.xhtml"]
+    assert b'id="nested-2"' in contents["OPS/chapter-split-4.xhtml"]
+    assert sum(
+        content.count(b'id="kobo.5.2"')
+        for name, content in contents.items() if "chapter-split-" in name
+    ) == 1
+    assert b'id="kobo.5.2"' in contents["OPS/chapter-split-6.xhtml"]
 
 
 @pytest.mark.unit
@@ -379,21 +433,25 @@ def test_meaningful_content_outside_descent_container_is_not_duplicated(tmp_path
     )
     _add_spine_document(book, "nested.xhtml", "nested", nested)
 
-    # The ordinary chapter proves planning and writing actually proceed; the
-    # unsafe nested candidate must remain byte-exact instead of being copied
-    # around each descended piece.
+    # The sibling paragraph belongs only to the first descended piece; later
+    # pieces receive lexical ancestor tags, not a copy of surrounding content.
     assert _split(book) is True
 
     contents, _manifest, spine, targets = _package_state(book)
-    assert spine == ["chapter", "chapter-split", "nested"]
-    assert contents["OPS/nested.xhtml"] == nested
-    assert contents["OPS/nested.xhtml"].count(b"Meaningful sibling content") == 1
+    assert spine == [
+        "chapter", "chapter-split", "nested", "nested-split", "nested-split-1"]
+    nested_pieces = [
+        contents["OPS/nested-split-{}.xhtml".format(index)]
+        for index in range(1, 4)
+    ]
+    assert sum(piece.count(b"Meaningful sibling content") for piece in nested_pieces) == 1
+    assert b"Meaningful sibling content" in nested_pieces[0]
     assert targets == [
         "chapter-split-1.xhtml",
         "chapter-split-2.xhtml",
-        "nested.xhtml#outer",
-        "nested.xhtml#nested-1",
-        "nested.xhtml#nested-2",
+        "nested-split-1.xhtml",
+        "nested-split-2.xhtml",
+        "nested-split-3.xhtml",
     ]
 
 
@@ -573,7 +631,7 @@ def test_unsupported_reference_attribute_causes_a_byte_identical_noop(tmp_path):
 
 
 @pytest.mark.unit
-def test_nested_boundary_that_cannot_form_valid_documents_is_left_untouched(tmp_path):
+def test_outer_anchor_and_one_inner_anchor_form_two_valid_documents(tmp_path):
     chapter = (
         b'<html xmlns="http://www.w3.org/1999/xhtml"><body><div id="ch1">'
         b'<span class="koboSpan" id="kobo.1.1">one</span>'
@@ -581,10 +639,38 @@ def test_nested_boundary_that_cannot_form_valid_documents_is_left_untouched(tmp_
         b'</section></div></body></html>'
     )
     book = _book(tmp_path, chapter=chapter)
-    before = book.read_bytes()
+    assert _split(book) is True
 
-    assert _split(book) is False
-    assert book.read_bytes() == before
+    contents, _manifest, spine, targets = _package_state(book)
+    assert spine == ["chapter", "chapter-split"]
+    assert targets == ["chapter-split-1.xhtml", "chapter-split-2.xhtml"]
+    assert b'id="ch1"' in contents["OPS/chapter-split-1.xhtml"]
+    assert b'id="ch2"' not in contents["OPS/chapter-split-1.xhtml"]
+    assert b'id="ch1"' in contents["OPS/chapter-split-2.xhtml"]
+    assert b'id="ch2"' in contents["OPS/chapter-split-2.xhtml"]
+
+
+@pytest.mark.unit
+def test_ncx_page_list_anchor_is_rebased_but_never_becomes_a_cut(tmp_path):
+    chapter = _chapter().replace(
+        b'<p><span class="koboSpan" id="kobo.1.1">First</span>',
+        b'<p id="page-1"><span class="koboSpan" id="kobo.1.1">First</span>',
+    )
+    ncx = _ncx(("chapter.xhtml#ch1", "chapter.xhtml#ch2")).replace(
+        b"</ncx>",
+        b'<pageList><pageTarget id="page"><navLabel><text>1</text></navLabel>'
+        b'<content src="chapter.xhtml#page-1"/></pageTarget></pageList></ncx>',
+    )
+    book = _book(tmp_path, chapter=chapter, ncx=ncx)
+
+    assert _split(book) is True
+
+    contents, _manifest, spine, targets = _package_state(book)
+    assert spine == ["chapter", "chapter-split"]
+    assert targets == ["chapter-split-1.xhtml", "chapter-split-2.xhtml"]
+    toc = etree.fromstring(contents["OPS/toc.ncx"])
+    assert toc.xpath("string(//*[local-name()='pageTarget']/*[local-name()='content']/@src)") == (
+        "chapter-split-1.xhtml#page-1")
 
 
 @pytest.mark.unit

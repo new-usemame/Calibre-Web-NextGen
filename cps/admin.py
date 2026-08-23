@@ -268,10 +268,8 @@ def trigger_hardcover_auto_fetch():
             return json.dumps(show_text), 400
         
         # Get settings
-        import sys as _sys
-        if constants.SCRIPTS_DIR not in _sys.path:
-            _sys.path.insert(1, constants.SCRIPTS_DIR)
-        from cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
         from cps.services.worker import WorkerThread
         

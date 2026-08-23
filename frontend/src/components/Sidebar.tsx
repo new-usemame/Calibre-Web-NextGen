@@ -287,12 +287,14 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   <li key={`ms-${ms.id}`}>
                     <Link
                       href={href}
-                      className={active ? styles.shelfItemActive : styles.shelfItem}
+                      className={`${active ? styles.shelfItemActive : styles.shelfItem} ${styles.magicShelfItem}`}
                       aria-current={active ? 'page' : undefined}
+                      aria-label={ms.name}
                       onClick={onNavigate}
                       title={ms.name}
                     >
-                      <span className={styles.shelfName}>{ms.icon} {ms.name}</span>
+                      <span className={styles.magicShelfIcon} aria-hidden="true">{ms.icon}</span>
+                      <span className={styles.magicShelfName}>{ms.name}</span>
                     </Link>
                   </li>
                 );

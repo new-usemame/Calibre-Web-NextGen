@@ -7,7 +7,6 @@
 import hashlib
 import json
 import os
-import sys
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -25,8 +24,8 @@ from .duplicates import (
     normalize_text_for_duplicates,
 )
 
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 
 log = logger.create()

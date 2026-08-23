@@ -69,9 +69,8 @@ import sqlite3
 import subprocess
 import time
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 feature_support = {
     'ldap': bool(services.ldap),
@@ -1210,7 +1209,8 @@ def render_magic_shelf(shelf_id, sort_param, page):
 
         # Log activity
         try:
-            from scripts.cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
             cwa_db = CWA_DB()
             cwa_db.log_activity(
                 user_id=current_user.id,
@@ -1600,7 +1600,7 @@ def edit_magic_shelf(shelf_id):
     opds_expose_checked = ub.is_opds_magic_shelf_exposed_for_user(current_user.id, shelf.id)
     
     # Check if user can edit this shelf (owner or admin only)
-    if shelf.user_id != current_user.id and not current_user.role_admin():
+    if not magic_shelf.can_edit_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to edit magic shelf {shelf_id} without permission")
         abort(403)
 
@@ -1703,7 +1703,7 @@ def duplicate_magic_shelf(shelf_id):
         return jsonify({"success": False, "message": _("Shelf not found")}), 404
     
     # Users can duplicate their own shelves or any public shelf
-    if shelf.user_id != current_user.id and not shelf.is_public:
+    if not magic_shelf.can_duplicate_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to duplicate private shelf {shelf_id} owned by {shelf.user_id}")
         return jsonify({"success": False, "message": _("Permission denied")}), 403
     
@@ -1753,22 +1753,14 @@ def delete_magic_shelf(shelf_id):
         log.warning(f"Magic shelf {shelf_id} not found for deletion")
         abort(404)
     
-    # Check if user can delete this shelf
-    can_delete = False
-    if shelf.user_id == current_user.id:
-        can_delete = True
-    elif shelf.is_public == 1 and current_user.role_edit_shelfs():
-        can_delete = True
-    
-    if not can_delete:
+    if not magic_shelf.has_magic_shelf_delete_authority(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to delete magic shelf {shelf_id} without permission")
         abort(403)
-    
-    # Prevent deletion of system shelves
-    if shelf.is_system:
+
+    if not magic_shelf.can_delete_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to delete system shelf {shelf_id}")
         return jsonify({
-            "success": False, 
+            "success": False,
             "message": _("System shelves cannot be deleted. You can hide them in your user profile settings.")
         }), 400
     
@@ -2441,7 +2433,8 @@ def send_to_ereader(book_id, book_format, convert):
         ub.update_download(book_id, int(current_user.id))
         # Track email/send activity
         try:
-            from scripts.cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
             book = calibre_db.get_book(book_id)
             cwa_db = CWA_DB()
             cwa_db.log_activity(
@@ -2519,7 +2512,8 @@ def send_to_selected_ereaders(book_id):
             ub.update_download(book_id, int(current_user.id))
         # Track email/send activity
         try:
-            from scripts.cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
             book = calibre_db.get_book(book_id)
             cwa_db = CWA_DB()
             cwa_db.log_activity(
@@ -2628,7 +2622,8 @@ def handle_login_user(user, remember, message, category):
     
     # Track login activity
     try:
-        from scripts.cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         cwa_db = CWA_DB()
         cwa_db.log_activity(
             user_id=int(user.id),
@@ -2841,7 +2836,8 @@ def login_post():
                 
                 # Track failed login attempt
                 try:
-                    from scripts.cwa_db import CWA_DB
+                    from cps.cwa_db_loader import load_cwa_db
+                    CWA_DB = load_cwa_db().CWA_DB
                     cwa_db = CWA_DB()
                     cwa_db.log_activity(
                         user_id=None,
@@ -2884,7 +2880,8 @@ def login_post():
                 
                 # Track failed login attempt
                 try:
-                    from scripts.cwa_db import CWA_DB
+                    from cps.cwa_db_loader import load_cwa_db
+                    CWA_DB = load_cwa_db().CWA_DB
                     cwa_db = CWA_DB()
                     cwa_db.log_activity(
                         user_id=None,
@@ -3448,7 +3445,8 @@ def read_book(book_id, book_format):
     # Track read activity
     if current_user.is_authenticated:
         try:
-            from scripts.cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
 
             # Detect source of book discovery
             source = request.args.get('from', 'direct')

@@ -18,6 +18,82 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Smart shelves and other library activity now keep recording statistics when
+  source-tree and container installs launch outside the application directory.**
+  Those launches could not find the CWA settings database module, which filled
+  the log with `No module named 'scripts'` errors and silently dropped activity
+  records for smart shelves, searches, shelves, OPDS, Kobo sync, and related
+  actions. Reported in
+  [#1755](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1755).
+
+- **A Kobo can no longer erase a book's local highlights when its Calibre-Web
+  session expires or an admin has just disabled Kobo sync.** Those transition
+  windows, plus alternate spellings of Kobo's `checkforchanges` request, could
+  bypass the owned-book filter and tell the device to replace its complete
+  local highlight set from the cloud response. Every equivalent request now
+  reaches the same ownership containment; owned books receive an empty change
+  list, while Kobo-store content continues to proxy normally.
+
+- **Two people could not find how to delete a book in the new UI and switched
+  back to the classic view over it.** Deletion worked, but the edit page had no
+  whole-book delete control and the book page buried Delete at the end of a
+  wrapping row of ordinary actions. The edit page now puts Delete book beside
+  Edit metadata, and the book page gives it its own clearly labelled
+  destructive section — the two places people actually look. Both remain
+  permission-gated and confirm before deleting. Reported through anonymous
+  feedback ([#1046](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1046),
+  duplicate [#1037](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1037)).
+
+- **People who had permission to manage someone else's public smart shelf could
+  not do so in the new UI.** Its Edit, Duplicate, and Delete controls were all
+  hidden unless you owned the shelf, even though the server allows admins to
+  edit it, shelf editors to delete it, and any signed-in viewer to duplicate it.
+  Each control now follows its own server-provided permission, matching ordinary
+  shelves; Kobo sync remains available only to the shelf owner. Reported by
+  [@iroQuai](https://github.com/iroQuai) ([#1734](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1734),
+  umbrella [#867](https://github.com/new-usemame/Calibre-Web-NextGen/issues/867)).
+
+- **Pages and API requests no longer fail sporadically with a dropped
+  connection or `socket hang up` behind a reverse proxy or in a client that
+  pools connections.** The server deliberately closes every HTTP connection
+  after its response; it now sends `Connection: close` so HTTP/1.1 clients do
+  not return that closing socket to their pool and try to reuse it.
+
+- **The dependency list on the Statistics page now tells you when something is
+  actually missing.** The list is built from the packages Calibre-Web NextGen
+  declares it needs, but a few of those only apply to certain systems — one is
+  Windows-only, another is for older Python versions. On everything else they
+  were reported as "not installed", so the page hid every "not installed" row to
+  keep them out of sight, and a dependency that was genuinely absent got hidden
+  along with them. That only matters if you run from source rather than the
+  Docker image, where it is possible to end up short a package after an upgrade:
+  the page showed nothing wrong and the app failed later with an import error
+  instead. Entries that do not apply to your system are now left out at the
+  source, and anything genuinely missing is listed again. Docker users see the
+  same list as before, minus two rows that never applied. Packaging work by
+  @chloeroform (#1442).
+
+## [v4.1.39] - 2026-08-21
+
+### Fixed
+
+- **A highlight made on a Kobo or in the web reader no longer disappears after
+  a KOReader sync.** A KOReader sync could previously either take ownership of
+  an existing highlight or mark it deleted directly, so a later sync — or that
+  same request — could remove a highlight it did not create. Every KOReader
+  delete path now respects where the highlight came from: KOReader can update
+  the contents of Kobo and web-reader highlights, but can delete only
+  highlights created in KOReader.
+
+- **The New UI shows a "Reading" badge on books you have started, the way the
+  classic UI always did.** The green "Read" pill was there, but a book you were
+  part-way through looked identical to one you had never opened, so the only way
+  to tell was to open its detail page. Every list the New UI serves — the
+  library grid, shelves, magic shelves (including the built-in Currently
+  Reading shelf), and search results — now carries the same amber "Reading"
+  marker the old cover badge used, driven by the same sync state your Kobo and
+  KOReader already write. Reported by @magdalar and @JamesHACS (#1702).
+
 - **Highlights now work in the chapters of a book that keeps many chapters in
   one file — the shape almost every Project Gutenberg book has.** A Kobo
   recognises a chapter by the file it lives in, not by a link into the middle of

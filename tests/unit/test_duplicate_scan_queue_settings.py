@@ -114,7 +114,8 @@ def _load_cwa_functions(monkeypatch, request):
     _install_stub("cps.tasks.database", {"TaskReconnectDatabase": object})
     _install_stub("cps.tasks.auto_send", {"TaskAutoSend": object})
     _install_stub("cps.tasks.ops", {"TaskConvertLibraryRun": object, "TaskEpubFixerRun": object})
-    _install_stub("cwa_db", {"CWA_DB": _SettingsCwaDB})
+    cwa_db = _install_stub("cwa_db", {"CWA_DB": _SettingsCwaDB})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db})
     _install_stub(
         "flask",
         {

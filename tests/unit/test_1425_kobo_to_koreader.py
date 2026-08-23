@@ -321,6 +321,48 @@ def test_bookmark_only_put_still_records_the_devices_own_state(kobo_put):
     assert bookmark.location_value == "kobo.6.1", "the KoboSpan the device seeks to is still stored"
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize("clock", [
+    "not-a-clock",
+    "9999-12-31T23:59:59-23:59",
+    "0001-01-01T00:00:00+23:59",
+])
+def test_state_put_preserves_stored_clocks_when_device_clock_is_rejected(kobo_put, clock):
+    """A rejected device observation must not be replaced with server ``now``."""
+    from datetime import datetime, timezone
+
+    kobo_module, app, _session = kobo_put
+    reading_state = kobo_module.get_or_create_reading_state(BOOK_ID)
+    old_bookmark_clock = datetime(2020, 1, 2, tzinfo=timezone.utc)
+    reading_state.current_bookmark.last_modified = old_bookmark_clock
+    payload = _state_put_payload(64.5)
+    payload["ReadingStates"][0]["LastModified"] = clock
+
+    with app.test_request_context(json=payload, method="PUT"):
+        response = _handler(kobo_module)("uuid-under-test")
+
+    assert response.get_json()["RequestResult"] == "Success"
+    assert reading_state.current_bookmark.progress_percent == 64.5
+    assert reading_state.current_bookmark.last_modified == old_bookmark_clock
+
+
+@pytest.mark.unit
+def test_state_put_still_applies_a_valid_device_clock(kobo_put):
+    """The rejected-clock branch must not change valid-input behaviour."""
+    from datetime import datetime, timezone
+
+    kobo_module, app, _session = kobo_put
+    reading_state = kobo_module.get_or_create_reading_state(BOOK_ID)
+
+    with app.test_request_context(json=_state_put_payload(65.5), method="PUT"):
+        response = _handler(kobo_module)("uuid-under-test")
+
+    assert response.get_json()["RequestResult"] == "Success"
+    assert reading_state.current_bookmark.last_modified == datetime(
+        2026, 8, 14, 6, 0, tzinfo=timezone.utc,
+    )
+
+
 # ── the call site, because the bug was a call that was never made ────────────
 
 @pytest.mark.unit

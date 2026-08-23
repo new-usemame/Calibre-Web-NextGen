@@ -408,7 +408,7 @@ export function BookDetail() {
           </div>
 
           {/* Actions */}
-          <div className={styles.actions}>
+          <div className={styles.actions} data-testid="book-actions">
             {primaryReadTarget ? (
               <Link href={primaryReadTarget} className={styles.actionPrimary}>
                 {t('Read now')}
@@ -548,10 +548,18 @@ export function BookDetail() {
               </button>
             )}
 
-            {/* Delete the whole book — DB + files (fork #803). Hidden entirely for
-                users without the delete role; the server re-checks and returns 403,
-                so this is a UX gate, not the security boundary. */}
-            {me?.role?.delete_books && (
+          </div>
+          <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
+
+          {/* Whole-book deletion is intentionally separated from the wrapping row
+              of ordinary action chips (#1046). The server still re-checks the role;
+              this gate and grouping are the discoverability/UX layer. */}
+          {me?.role?.delete_books && (
+            <section className={styles.dangerZone} data-testid="book-destructive-actions"
+              aria-labelledby={`delete-book-heading-${book.id}`}>
+              <h2 id={`delete-book-heading-${book.id}`} className={styles.dangerZoneTitle}>
+                {t('Delete book')}
+              </h2>
               <button
                 type="button"
                 className={styles.actionDanger}
@@ -573,12 +581,8 @@ export function BookDetail() {
                 <Trash2 size={14} aria-hidden="true" focusable={false} />
                 {deleteBook.isPending ? t('Deleting…') : t('Delete')}
               </button>
-            )}
-          </div>
-          <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
-
-          {deleteError && (
-            <p className={styles.deleteErr} role="alert">{deleteError}</p>
+              {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
+            </section>
           )}
 
           {/* Send-to-e-reader panel */}

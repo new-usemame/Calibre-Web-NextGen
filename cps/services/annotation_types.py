@@ -20,10 +20,10 @@ payload happened to carry a ``type`` key (finding ``F-9de049``):
 
 That is the same shape ``annotation_colors`` was created to undo for
 ``highlight_color``, where three vocabularies accumulated in one column and had
-to be reconciled after the fact. Doing it here now is cheap precisely because
-nothing user-visible reads the column yet — only a field list in
-``cps/services/kobo_annotation_stage0.py``. After two-way sync ships it is a
-migration.
+to be reconciled after the fact. The column now crosses the portable annotation
+boundary in ``cps/services/annotation_portable.py`` and is also named by the
+field list in ``cps/services/kobo_annotation_stage0.py``; no frontend code reads
+it directly.
 
 THE VOCABULARY, AND WHERE EACH WORD COMES FROM
 ----------------------------------------------
@@ -138,3 +138,33 @@ def type_for_webreader_annotation(*, has_anchor: bool) -> str:
     reclassify it the moment someone typed into it.
     """
     return "highlight" if has_anchor else "note"
+
+
+def _is_derivable_legacy_position_type(position_type) -> bool:
+    """Whether a legacy row retains a complete web-reader branch decision.
+
+    Only the direct web-reader constructors assign either token. Portable
+    updates may later rewrite ``source``, but they cannot create these position
+    types, so provenance is deliberately not part of this predicate.
+    """
+    return position_type in ("unanchored", "cfi")
+
+
+def derive_legacy_annotation_type(*, position_type) -> Optional[str]:
+    """Reproduce today's type only from a legacy row's recorded writer input.
+
+    The direct web-reader constructors persist the exact discriminator passed
+    to :func:`type_for_webreader_annotation`: ``unanchored`` means no anchor,
+    while ``cfi`` means an anchor. Those two cases are derivations, not
+    classifications inferred from content. ``source`` is not consulted because
+    portable updates can rewrite it without changing ``position_type``.
+
+    Every other shape remains unknown. In particular, a legacy KoboSpan row
+    has no ``position_type`` value, and the same stored selector shape can
+    arrive through portable import. Inspecting its text or selector would
+    therefore guess which writer and input produced it, violating the rule
+    that an unrecognised type resolves to ``None``.
+    """
+    if not _is_derivable_legacy_position_type(position_type):
+        return None
+    return type_for_webreader_annotation(has_anchor=position_type == "cfi")

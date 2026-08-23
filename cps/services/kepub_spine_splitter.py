@@ -281,13 +281,19 @@ def _project_anchor(anchor, container):
     return cut
 
 
-def _descended_cut_plan(source, container, bounds, anchors, elements, ranges):
+def _has_nested_cut(nested_cuts):
+    """True when an outer TOC anchor can own a piece before an inner cut."""
+    return bool(nested_cuts)
+
+
+def _descended_cut_plan(source, container, anchors, elements, ranges):
     """Prove and plan the single supported nested-anchor descent.
 
     The ordinary NCA projection may collapse every target onto one child.  We
-    descend into that child only when it is itself exactly one TOC target and
-    the original container contains no content outside it.  The outer target
-    then owns the bytes before the first nested boundary.
+    descend into that child only when it is itself exactly one TOC target.  The
+    outer target owns the bytes before the first nested boundary; surrounding
+    sibling content is assigned to the natural edge pieces by the nested
+    partitioner rather than copied into every piece.
     """
     children = {
         _project_anchor(anchor, container) for anchor in anchors.values()
@@ -308,15 +314,8 @@ def _descended_cut_plan(source, container, bounds, anchors, elements, ranges):
 
     descended_bounds = _container_bounds(
         source, descended_container, elements, ranges)
-    _container_start, container_inner_start, container_inner_end, _container_end = bounds
-    descended_start, descended_inner_start, _descended_inner_end, descended_end = (
+    _descended_start, descended_inner_start, _descended_inner_end, _descended_end = (
         descended_bounds)
-    # Prefix/suffix slicing repeats everything outside the selected container.
-    # Permit that only for whitespace inside the original NCA; elements,
-    # comments, text, and other meaningful bytes make descent unsafe.
-    if (source[container_inner_start:descended_start].strip()
-            or source[descended_end:container_inner_end].strip()):
-        return None
 
     nested_cuts = {
         ranges[elements.index(_project_anchor(anchor, descended_container))][0]
@@ -325,7 +324,7 @@ def _descended_cut_plan(source, container, bounds, anchors, elements, ranges):
     # This is deliberately one level only.  If the nested targets still
     # collapse into one child, arbitrary recursive shell construction would be
     # required and the document remains in its current graceful grouping.
-    if len(nested_cuts) < 2 or min(nested_cuts) <= descended_inner_start:
+    if not _has_nested_cut(nested_cuts) or min(nested_cuts) <= descended_inner_start:
         return None
     boundaries = [descended_inner_start, *sorted(nested_cuts)]
     return descended_bounds, boundaries
@@ -351,6 +350,7 @@ def _anchor_cut_plan(source, document, fragments, elements, ranges):
     if container is not body and body not in container.iterancestors():
         raise _UnsafeSplit("TOC anchor common ancestor is outside the content body")
     bounds = _container_bounds(source, container, elements, ranges)
+    nested_partition = False
     anchor_positions = {}
     cut_positions = {}
     for fragment, anchor in anchors.items():
@@ -360,10 +360,11 @@ def _anchor_cut_plan(source, document, fragments, elements, ranges):
     boundaries = sorted(set(cut_positions.values()))
     if len(boundaries) == 1:
         descended = _descended_cut_plan(
-            source, container, bounds, anchors, elements, ranges)
+            source, container, anchors, elements, ranges)
         if descended is not None:
             bounds, boundaries = descended
-    return bounds, boundaries, anchor_positions
+            nested_partition = True
+    return bounds, boundaries, anchor_positions, nested_partition
 
 
 def _partition_document(source, boundaries, container_bounds):
@@ -402,6 +403,72 @@ def _partition_document(source, boundaries, container_bounds):
     return pieces
 
 
+def _partition_nested_document(
+        source, boundaries, container_bounds, container, elements, ranges):
+    """Partition a nested group without copying its surrounding content.
+
+    The ordinary partition duplicates a full prefix and suffix.  During a
+    second pass those shells can contain sibling prose or KoboSpans inherited
+    from the first-pass piece.  Keep that content on the natural edge piece and
+    build middle shells only from exact lexical ancestor tags.
+    """
+    body = _body_element(container.getroottree().getroot())
+    body_bounds = _container_bounds(source, body, elements, ranges)
+    _body_start, body_inner_start, body_inner_end, _body_end = body_bounds
+    chain = []
+    current = container
+    while current is not body:
+        chain.append(current)
+        current = current.getparent()
+        if current is None:
+            raise _UnsafeSplit("nested split container is outside the content body")
+    chain.reverse()
+
+    element_bounds = {
+        element: _container_bounds(source, element, elements, ranges)
+        for element in chain
+    }
+    minimal_prefix = source[:body_inner_start] + b"".join(
+        source[element_bounds[element][0]:element_bounds[element][1]]
+        for element in chain
+    )
+    minimal_suffix = b"".join(
+        source[element_bounds[element][2]:element_bounds[element][3]]
+        for element in reversed(chain)
+    ) + source[body_inner_end:]
+
+    _container_start, container_inner_start, container_inner_end, _container_end = (
+        container_bounds)
+    full_prefix = source[:container_inner_start]
+    full_suffix = source[container_inner_end:]
+    starts = [container_inner_start] + boundaries[1:]
+    ends = boundaries[1:] + [container_inner_end]
+    projected = sum(
+        (len(full_prefix) if index == 0 else len(minimal_prefix))
+        + (end - start)
+        + (len(full_suffix) if index == len(starts) - 1 else len(minimal_suffix))
+        for index, (start, end) in enumerate(zip(starts, ends))
+    )
+    if len(starts) > MAX_SPLIT_PIECES or projected > MAX_SPLIT_PEAK_BYTES:
+        raise _UnsafeSplit(
+            "nested split would allocate {} bytes across {} pieces, over the "
+            "{}-byte / {}-piece budget".format(
+                projected, len(starts), MAX_SPLIT_PEAK_BYTES, MAX_SPLIT_PIECES))
+
+    pieces = []
+    for index, (start, end) in enumerate(zip(starts, ends)):
+        prefix = full_prefix if index == 0 else minimal_prefix
+        suffix = full_suffix if index == len(starts) - 1 else minimal_suffix
+        piece = prefix + source[start:end] + suffix
+        try:
+            etree.fromstring(piece, parser=_XML_PARSER)
+        except etree.XMLSyntaxError as error:
+            raise _UnsafeSplit(
+                "nested chapter boundary would create malformed XML") from error
+        pieces.append(piece)
+    return pieces
+
+
 def _piece_for_position(boundaries, position):
     return max(0, bisect_right(boundaries, position) - 1)
 
@@ -431,6 +498,85 @@ def _fragment_piece_map(
     # piece one and cannot be overwritten by a repeated shell id.
     return _prefer_explicit_anchor_pieces(
         mapping, anchor_positions, boundaries, piece_names)
+
+
+def _should_refine_nested_piece(fragments):
+    """True when one first-pass piece still owns multiple TOC chapters."""
+    return len(fragments) >= 2
+
+
+def _refine_nested_pieces(pieces, fragments, fragment_indexes):
+    """Split chapter groups left together by the first lexical partition.
+
+    The first NCA partition remains authoritative for piece order.  A resulting
+    piece that still owns multiple explicit TOC fragments gets one more lexical
+    planning pass against its own well-formed XML.  This handles a nested group
+    beside ordinary top-level chapters without mixing cut containers or
+    synthesizing ancestor tags.
+    """
+    refinements = {}
+    for piece_index, piece in enumerate(pieces):
+        owned = {
+            fragment for fragment in fragments
+            if fragment_indexes[fragment] == piece_index
+        }
+        if not _should_refine_nested_piece(owned):
+            continue
+        document = etree.fromstring(piece, parser=_XML_PARSER)
+        elements, ranges = _element_positions(piece, document)
+        container_bounds, boundaries, anchor_positions, _nested_partition = _anchor_cut_plan(
+            piece, document, owned, elements, ranges)
+        if len(boundaries) < 2:
+            continue
+        container_start = container_bounds[0]
+        container = next(
+            (element for element, (start, _end) in zip(elements, ranges)
+             if start == container_start), None)
+        if container is None:
+            raise _UnsafeSplit("nested split container has no lexical element")
+        refined = _partition_nested_document(
+            piece, boundaries, container_bounds, container, elements, ranges)
+        local_indexes = _fragment_piece_map(
+            document, elements, ranges, boundaries,
+            list(range(len(refined))), anchor_positions)
+        refinements[piece_index] = refined, local_indexes
+
+    if not refinements:
+        return pieces, fragment_indexes, list(range(len(pieces)))
+
+    flattened = []
+    name_slots = []
+    first_indexes = {}
+    next_extra_slot = len(pieces)
+    for piece_index, piece in enumerate(pieces):
+        first_indexes[piece_index] = len(flattened)
+        refinement = refinements.get(piece_index)
+        if refinement is None:
+            flattened.append(piece)
+            name_slots.append(piece_index)
+            continue
+        flattened.extend(refinement[0])
+        # The first refined child retains the name this first-pass piece had.
+        # Extra children use names after every first-pass name, so refining an
+        # early group cannot rename later chapters that already split safely.
+        name_slots.append(piece_index)
+        extra_count = len(refinement[0]) - 1
+        name_slots.extend(range(next_extra_slot, next_extra_slot + extra_count))
+        next_extra_slot += extra_count
+    if (len(flattened) > MAX_SPLIT_PIECES
+            or sum(map(len, flattened)) > MAX_SPLIT_PEAK_BYTES):
+        raise _UnsafeSplit(
+            "nested split exceeds the {}-byte / {}-piece budget".format(
+                MAX_SPLIT_PEAK_BYTES, MAX_SPLIT_PIECES))
+
+    final_indexes = {}
+    for fragment, piece_index in fragment_indexes.items():
+        destination = first_indexes[piece_index]
+        refinement = refinements.get(piece_index)
+        if refinement is not None:
+            destination += refinement[1].get(fragment, 0)
+        final_indexes[fragment] = destination
+    return flattened, final_indexes, name_slots
 
 
 def _replacement_for_reference(value, document_path, split_plans):
@@ -650,18 +796,37 @@ def _plan_splits(archive, opf_path, opf_bytes, candidates, archive_names):
         if document.xpath("//*[local-name()='base'][@href]"):
             raise _UnsafeSplit("HTML base href prevents reference-safe splitting")
         elements, ranges = _element_positions(source, document)
-        container_bounds, boundaries, anchor_positions = _anchor_cut_plan(
+        container_bounds, boundaries, anchor_positions, nested_partition = _anchor_cut_plan(
             source, document, fragments, elements, ranges)
         # Several TOC anchors may live in one direct child of the common
-        # ancestor. They are inseparable by lexical slicing, but every other
-        # distinct child remains a safe split boundary.
+        # ancestor. Preserve every distinct first-pass boundary, then refine
+        # any still-collapsed piece with its own lexical container below.
         if len(boundaries) < 2:
             continue
         ordered_fragments = sorted(fragments, key=anchor_positions.__getitem__)
-        piece_names = _unique_piece_names(document_path, len(boundaries), occupied_names)
-        pieces = _partition_document(source, boundaries, container_bounds)
-        fragment_pieces = _fragment_piece_map(
-            document, elements, ranges, boundaries, piece_names, anchor_positions)
+        if nested_partition:
+            container_start = container_bounds[0]
+            container = next(
+                (element for element, (start, _end) in zip(elements, ranges)
+                 if start == container_start), None)
+            if container is None:
+                raise _UnsafeSplit("nested split container has no lexical element")
+            pieces = _partition_nested_document(
+                source, boundaries, container_bounds, container, elements, ranges)
+        else:
+            pieces = _partition_document(source, boundaries, container_bounds)
+        fragment_indexes = _fragment_piece_map(
+            document, elements, ranges, boundaries,
+            list(range(len(pieces))), anchor_positions)
+        pieces, fragment_indexes, name_slots = _refine_nested_pieces(
+            pieces, fragments, fragment_indexes)
+        allocated_names = _unique_piece_names(
+            document_path, len(pieces), occupied_names)
+        piece_names = [allocated_names[slot] for slot in name_slots]
+        fragment_pieces = {
+            fragment: piece_names[index]
+            for fragment, index in fragment_indexes.items()
+        }
         plans[document_path] = {
             "source": source,
             "manifest_id": item_id,

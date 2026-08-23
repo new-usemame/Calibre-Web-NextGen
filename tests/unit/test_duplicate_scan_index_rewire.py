@@ -167,7 +167,8 @@ def _load_duplicate_scan_module(monkeypatch, calls):
     _install_stub("cps.ub", {"init_db_thread": lambda: None})
     _install_stub("flask_babel", {"lazy_gettext": lambda text, **kwargs: text % kwargs if kwargs else text})
     _install_stub("sqlalchemy", {"func": SimpleNamespace(max=lambda value: value)})
-    _install_stub("cwa_db", {"CWA_DB": _TaskCwaDB})
+    cwa_db = _install_stub("cwa_db", {"CWA_DB": _TaskCwaDB})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db})
 
     task_path = pathlib.Path(__file__).resolve().parents[2] / "cps" / "tasks" / "duplicate_scan.py"
     spec = importlib.util.spec_from_file_location("cps.tasks.duplicate_scan", task_path)
@@ -588,7 +589,8 @@ def _load_duplicates_route_module(
     _install_stub("sqlalchemy.sql")
     _install_stub("sqlalchemy.sql.expression", {"true": True, "false": False})
     _install_stub("sqlalchemy.orm", {"joinedload": lambda *args, **kwargs: None})
-    _install_stub("cwa_db", {"CWA_DB": _RouteCwaDB})
+    cwa_db = _install_stub("cwa_db", {"CWA_DB": _RouteCwaDB})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db})
 
     def _rebuild(settings):
         calls.append(("rebuild", settings))

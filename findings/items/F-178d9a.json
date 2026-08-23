@@ -4,8 +4,14 @@
   "created": "2026-08-19",
   "id": "F-178d9a",
   "refs": [],
+  "resolution": {
+    "commit": "b0fb9749e",
+    "date": "2026-08-21",
+    "note": "Fixed in #1773. Bounded two-stage refinement: the NCA partition runs first, then any resulting piece still owning >=2 chapter-TOC targets gets exactly one refinement pass. Also covers a sub-shape this finding did not name -- an outer anchor plus exactly ONE inner anchor, which a two-inner-cut-point predicate excluded. Measured on the 41-book library: 1584 -> 1610 of 1653 anchorable, no book regressed, all 41 source KEPUBs SHA-256 unchanged. Residue then read at the source: 35 licence footers, 5 title pages, 1 Contents, 1 part divider whose chapter is reachable anyway, and exactly ONE real chapter (Pride and Prejudice, CHAPTER LXI).",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Spine splitter cannot separate chapters whose TOC anchors nest inside one another"
 }

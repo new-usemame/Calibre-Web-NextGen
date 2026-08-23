@@ -6,7 +6,7 @@ Public API:
   - register_handler(handler): plug in a new target
   - available_targets(): list registered target names
   - dispatch_annotation_sync(payload_annotations, book, user): push every annotation
-  - dispatch_annotation_deletes(deleted_ids, user, book_id): delete scoped annotations
+  - dispatch_annotation_deletes(..., deletable_sources=...): delete scoped annotations
 
 The dispatcher owns all DB persistence — Annotation rows + AnnotationSyncTarget
 rows + the status state machine. Handlers are stateless: they make remote
@@ -44,11 +44,11 @@ def parse_client_modified_utc(value):
         raw = raw[:-1] + "+00:00"
     try:
         parsed = datetime.fromisoformat(raw)
-    except ValueError:
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    except (ValueError, OverflowError):
         return None
-    if parsed.tzinfo is None:
-        return None
-    return parsed.astimezone(timezone.utc).replace(tzinfo=None)
 
 # Background dispatch seam (#920)
 # ------------------------------
@@ -702,21 +702,35 @@ def dispatch_existing_annotation_sync(annotation, book, user) -> None:
     _enqueue(user, jobs, book=book)
 
 
-def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
+def dispatch_annotation_deletes(
+    deleted_ids, user, book_id=None, *, deletable_sources,
+) -> None:
     """For each annotation_id, transition non-tombstone sync_targets via
     handler.delete AND soft-delete the local Annotation row by setting
     ``hidden=True``.
 
-    Sub-project (2): local soft-delete happens unconditionally — independent
-    of any enabled sync target. Recovery is symmetric: a subsequent
-    create/update PATCH for the same annotation_id un-hides it via
-    ``_upsert_annotation``.
+    ``deletable_sources`` is the caller's provenance authority. Device bridges
+    pass the sources that device can honestly name; a direct user action passes
+    ``None`` to declare authority across sources. Requiring the keyword makes a
+    new bridge choose an authority model instead of inheriting an unsafe
+    default.
+
+    Once authorised, local soft-delete happens independently of any enabled
+    sync target. Recovery is symmetric: a subsequent create/update PATCH for
+    the same annotation_id un-hides it via ``_upsert_annotation``.
     """
     from cps import ub
     if not deleted_ids:
         return
     jobs = []
     for annotation_id in deleted_ids:
+        if not isinstance(annotation_id, str) or not annotation_id:
+            # A malformed member has no addressable annotation identity. Skip
+            # only that member: letting it reach SQL can poison the session and
+            # prevent later, valid deletions in the same device delta from
+            # being applied before the outer route proxies success.
+            log.warning("Skipping malformed deletedAnnotationIds member %r", annotation_id)
+            continue
         query = ub.session.query(ub.Annotation).filter(
             ub.Annotation.user_id == user.id,
             ub.Annotation.annotation_id == annotation_id,
@@ -725,6 +739,20 @@ def dispatch_annotation_deletes(deleted_ids, user, book_id=None) -> None:
             query = query.filter(ub.Annotation.book_id == book_id)
         ann = query.first()
         if ann is None:
+            continue
+        delete_authorized = (
+            deletable_sources is None or ann.source in deletable_sources
+        )
+        if not delete_authorized:
+            # Keep device transports successful for compatibility, but never
+            # let a refused destructive request disappear without provenance
+            # details that identify the authority mismatch.
+            log.warning(
+                "Annotation delete refused: user=%s book=%s annotation_id=%r "
+                "stored_source=%r deletable_sources=%s",
+                user.id, ann.book_id, annotation_id, ann.source,
+                sorted(deletable_sources),
+            )
             continue
         # Push delete through any non-tombstone sync targets.
         for st in list(ann.sync_targets):

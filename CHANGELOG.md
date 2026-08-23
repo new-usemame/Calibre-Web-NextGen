@@ -18,6 +18,13 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **After opening a sidebar destination, the expanded desktop navigation could
+  stay over the new page and block its left-side controls simply because the
+  pointer was still resting over the item that was clicked.** The rail now
+  stays collapsed while the pointer travels out toward the page; deliberately
+  returning to the rail or focusing it with the keyboard still expands it
+  without shifting the page content.
+
 - **Smart shelves and other library activity now keep recording statistics when
   source-tree and container installs launch outside the application directory.**
   Those launches could not find the CWA settings database module, which filled

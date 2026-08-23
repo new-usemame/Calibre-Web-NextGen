@@ -157,7 +157,7 @@
       margin-right var(--dur-base) var(--ease-out);
   }
 
-  :is(.nav, .navOpen):is(:hover, :focus-within) {
+  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) {
     width: 220px;
     margin-right: -156px;
   }
@@ -187,14 +187,14 @@
     padding-left: calc(18px + var(--sp-2));
   }
 
-  :is(.nav, .navOpen):is(:hover, :focus-within)
+  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
     :is(.item > span, .itemActive > span, .sectionTitle > span, .sectionTitleActive > span, .customizeBtn > span, .shelfName, .magicShelfName),
-  :is(.nav, .navOpen):is(:hover, :focus-within)
+  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
     :is(.shelfItem, .shelfItemActive) {
     opacity: 1;
   }
 
-  :is(.nav, .navOpen):is(:hover, :focus-within) .magicShelfIcon {
+  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .magicShelfIcon {
     left: calc(var(--sp-3) + 18px + var(--sp-3));
   }
 }

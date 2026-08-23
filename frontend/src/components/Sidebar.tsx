@@ -41,6 +41,8 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const announce = useAnnouncer();
   const navRef = useRef<HTMLElement>(null);
   const update = useUpdateSidebar();
+  const [hoverSuppressed, setHoverSuppressed] = useState(false);
+  const hoverExitObserved = useRef(false);
 
   // #585 v3: inline sidebar edit mode (toggled by the Customize capsule).
   const [editMode, setEditMode] = useState(false);
@@ -65,6 +67,30 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     if (isMobile && !open) node.setAttribute('inert', '');
     else node.removeAttribute('inert');
   }, [isMobile, open]);
+
+  useEffect(() => {
+    if (!hoverSuppressed) return;
+
+    // A route click can leave the pointer either inside the 64px rail or over
+    // the overlay strip that is about to disappear. Keep stale hover suppressed
+    // for the pointer's whole journey out; only a later return to the nav is
+    // fresh hover intent. A layout-induced pointerleave is deliberately ignored.
+    const trackPointerJourney = (event: PointerEvent) => {
+      const node = navRef.current;
+      if (!node) return;
+      const pointerInsideNav = event.composedPath().includes(node);
+
+      if (!hoverExitObserved.current) {
+        if (!pointerInsideNav) hoverExitObserved.current = true;
+        return;
+      }
+
+      if (pointerInsideNav) setHoverSuppressed(false);
+    };
+
+    window.addEventListener('pointermove', trackPointerJourney, true);
+    return () => window.removeEventListener('pointermove', trackPointerJourney, true);
+  }, [hoverSuppressed]);
 
   useFocusTrap(navRef, { onClose, active: isMobile && open });
   const { data: shelvesData } = useShelves();
@@ -193,9 +219,15 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
       {open && <div className={styles.scrim} onClick={onClose} aria-hidden="true" />}
       <nav
         ref={navRef}
-        className={open ? styles.navOpen : styles.nav}
+        className={`${open ? styles.navOpen : styles.nav}${hoverSuppressed ? ` ${styles.hoverSuppressed}` : ''}`}
         aria-label={t('Browse')}
         tabIndex={-1}
+        onClickCapture={(event) => {
+          if (event.target instanceof Element && event.target.closest('a[href]')) {
+            hoverExitObserved.current = false;
+            setHoverSuppressed(true);
+          }
+        }}
       >
         {/* Mobile-only close affordance (labelled); hidden on the desktop rail. */}
         <button type="button" className={styles.drawerClose} onClick={onClose} aria-label={t('Close menu')}>

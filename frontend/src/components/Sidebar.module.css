@@ -85,7 +85,10 @@
   border-radius: var(--r-sm);
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    padding-left var(--dur-base) var(--ease-out);
 }
 
 .shelfItem:hover { color: var(--text); background: var(--surface-2); }
@@ -165,20 +168,17 @@
   }
 
   :is(.item, .itemActive, .sectionTitle, .sectionTitleActive, .customizeBtn) > span,
-  .shelfName,
   .magicShelfName {
     opacity: 0;
     white-space: nowrap;
     transition: opacity var(--dur-fast) var(--ease);
   }
 
-  :is(.shelfItem, .shelfItemActive) {
-    opacity: 0;
-    transition: opacity var(--dur-fast) var(--ease);
+  .shelfList :is(.shelfItem, .shelfItemActive) {
+    padding-left: var(--sp-3);
   }
-
-  .magicShelfItem {
-    opacity: 1;
+  .shelfList .shelfCount {
+    display: none;
   }
 
   .magicShelfIcon {
@@ -190,10 +190,17 @@
   }
 
   :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
-    :is(.item > span, .itemActive > span, .sectionTitle > span, .sectionTitleActive > span, .customizeBtn > span, .shelfName, .magicShelfName),
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
-    :is(.shelfItem, .shelfItemActive) {
+    :is(.item > span, .itemActive > span, .sectionTitle > span, .sectionTitleActive > span, .customizeBtn > span, .magicShelfName) {
     opacity: 1;
+  }
+
+  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
+    .shelfList :is(.shelfItem, .shelfItemActive) {
+    padding-left: calc(var(--sp-3) + 18px + var(--sp-3));
+  }
+
+  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .shelfList .shelfCount {
+    display: inline;
   }
 
   :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .magicShelfIcon {
@@ -202,7 +209,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .magicShelfIcon {
+  .magicShelfIcon,
+  :is(.shelfItem, .shelfItemActive) {
     transition: none;
   }
 }

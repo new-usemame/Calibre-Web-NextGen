@@ -6,6 +6,7 @@ import inspect
 import json
 import flask
 import pytest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
@@ -108,6 +109,28 @@ def test_delete_book_requires_delete_role():
         with patch.object(mod, "current_user", _editor(role_delete=False)):
             resp = inspect.unwrap(mod.delete_book)(5)
     assert resp[1] == 403
+
+
+@pytest.mark.unit
+def test_delete_book_requires_edit_role_as_well_as_delete_role():
+    from cps.api import edit as mod
+    with _ctx("/api/v1/books/5/delete"):
+        with patch.object(mod, "current_user", _editor(role_edit=False, role_delete=True)), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(id=5)), \
+             patch.object(mod, "delete_book_from_table") as core:
+            resp = inspect.unwrap(mod.delete_book)(5)
+    assert resp[1] == 403
+    core.assert_not_called()
+
+
+@pytest.mark.unit
+def test_spa_whole_book_delete_controls_require_both_roles():
+    root = Path(__file__).parents[2]
+    detail = (root / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
+    bulk = (root / "frontend" / "src" / "components" / "BulkBar.tsx").read_text()
+    assert "me?.role?.delete_books && me?.role?.edit" in detail
+    assert "!!me?.role?.delete_books && !!me?.role?.edit" in bulk
+    assert "same delete-and-edit policy as the server" in detail
 
 
 @pytest.mark.unit

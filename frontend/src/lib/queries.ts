@@ -770,8 +770,8 @@ export function useUpdateMetadata(id: string | number) {
 }
 
 /** Delete a whole book — DB rows + files on disk (fork #803). Reuses the
- *  data-safe POST /api/v1/books/<id>/delete (role_delete_books re-checked
- *  server-side → 403 if the user lacks the delete role). Evicts the book from
+ *  data-safe POST /api/v1/books/<id>/delete (delete_books + edit re-checked
+ *  server-side → 403 unless the user has both roles). Evicts the book from
  *  every cached catalog snapshot so a later scroll-restore can't resurrect it
  *  as a ghost card (#578), then refreshes the library + shelves. Callers redirect
  *  away from the now-deleted book's detail page on success. */

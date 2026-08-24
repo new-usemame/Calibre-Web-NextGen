@@ -59,7 +59,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
     };
   }, [shelfOpen]);
 
-  const canDelete = !!me?.role?.delete_books;
+  const canDelete = !!me?.role?.delete_books && !!me?.role?.edit;
   const canEditPublic = !!me?.role?.edit_shelfs;
   const editableShelves = (shelvesData?.items ?? []).filter(
     (s) => s.is_owner || (s.is_public && canEditPublic),

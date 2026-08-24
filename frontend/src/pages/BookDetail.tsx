@@ -552,9 +552,9 @@ export function BookDetail() {
           <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
 
           {/* Whole-book deletion is intentionally separated from the wrapping row
-              of ordinary action chips (#1046). The server still re-checks the role;
+              of ordinary action chips (#1046). This uses the same delete-and-edit policy as the server;
               this gate and grouping are the discoverability/UX layer. */}
-          {me?.role?.delete_books && (
+          {me?.role?.delete_books && me?.role?.edit && (
             <section className={styles.dangerZone} data-testid="book-destructive-actions"
               aria-labelledby={`delete-book-heading-${book.id}`}>
               <h2 id={`delete-book-heading-${book.id}`} className={styles.dangerZoneTitle}>

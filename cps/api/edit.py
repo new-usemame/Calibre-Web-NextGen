@@ -411,7 +411,7 @@ def update_metadata(book_id):
 def delete_book(book_id):
     if not current_user.is_authenticated or current_user.is_anonymous:
         return _err("unauthorized", "You must be signed in", 401)
-    if not current_user.role_delete_books():
+    if not current_user.role_delete_books() or not current_user.role_edit():
         return _err("forbidden", "You are not allowed to delete books", 403)
     # Authorize against the caller's VISIBLE library, not the raw table: a user
     # with the (global) delete role but a language/tag/custom-column visibility

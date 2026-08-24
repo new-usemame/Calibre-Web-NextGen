@@ -633,3 +633,16 @@
 .sendOk { color: var(--success); font-size: var(--fs-sm); }
 .sendErr { color: var(--danger); font-size: var(--fs-sm); }
 .sendHint { color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* Stage 0 Kobo two-way sync state chip (read-only; managed on Account) */
+.twoWayChip {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+  font-size: var(--fs-sm); color: var(--text-muted);
+  padding: var(--sp-2) var(--sp-3); min-height: 38px;
+  text-decoration: none; white-space: nowrap;
+}
+.twoWayBlocked {
+  font-size: var(--fs-xs); color: var(--text);
+  background: var(--danger-soft); border: 1px solid var(--danger-border);
+  border-radius: var(--r-full); padding: 2px var(--sp-2);
+}

@@ -66,6 +66,10 @@ export interface ServerFeatures {
    *  toggle when it can actually do something. Absent on older servers →
    *  treat as off. */
   kobo_sync_magic_shelves?: boolean;
+  /** Stage 0 Kobo two-way annotation sync — the admin's instance switch.
+   *  Absent on older servers → treat as off, so the SPA does not call a
+   *  preference endpoint that would 404. */
+  kobo_two_way_annotations?: boolean;
   /** #1288 — the admin's "Enable Uploads" switch. Classic gates its navbar
    *  upload button on this; the SPA offered Upload regardless. Absent on older
    *  servers → treat as ON, matching the server's column default (the other
@@ -334,6 +338,42 @@ export interface ProfileUpdate {
   theme?: string;
   ui_font_body?: string;
   ui_font_display?: string;
+}
+
+/** Stage 0 Kobo two-way annotation sync — per-book observed state. The feature
+ *  is deliberately inert; this is preference + evidence display only. */
+export interface KoboTwoWayBookState {
+  book_id: number;
+  /** null when the book left the library or the title lookup failed. */
+  title: string | null;
+  authority_status: 'unseeded' | 'seeding' | 'authoritative' | 'quarantined' | 'disabled';
+  opaque_content_status: 'unknown' | 'absent' | 'present';
+  quarantine_reason: string | null;
+  seeded_at: string | null;
+  /** false ⇔ authority_status 'disabled' (the user's per-book opt-out). */
+  enabled: boolean;
+  /** false for pipeline states ('seeding'/'authoritative'/'quarantined') —
+   *  those are sync evidence, and the toggle must not silently erase them. */
+  can_toggle: boolean;
+}
+
+export interface KoboTwoWaySettings {
+  /** Admin-owned instance kill switch (read-only here). */
+  instance_enabled: boolean;
+  /** Server env override — can only ever force the feature off. */
+  emergency_disabled: boolean;
+  /** Whether Kobo sync is configured at all (classic setup prerequisite). */
+  kobo_available: boolean;
+  /** The user's own opt-in. */
+  enabled: boolean;
+  /** 'all': every book syncs as it becomes ready. 'selected': user picks. */
+  scope: 'all' | 'selected';
+  books: KoboTwoWayBookState[];
+}
+
+export interface KoboTwoWayUpdate {
+  enabled?: boolean;
+  scope?: 'all' | 'selected';
 }
 
 export interface BookMetadata {

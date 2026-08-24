@@ -275,6 +275,40 @@ def looks_like_sqlite(blob_or_path) -> bool:
         return False
 
 
+def kobo_hidden_flag(value) -> bool:
+    """Whether a ``Bookmark.Hidden`` value means the device deleted the row.
+
+    Kobo declares the column ``Hidden BOOL NOT NULL DEFAULT 0`` and then writes
+    the **strings** ``'true'``/``'false'`` into it. SQLite's ``BOOL`` carries
+    NUMERIC affinity, but neither string converts to a number, so both are
+    stored as TEXT. The declared type therefore reads like an integer while the
+    stored value is a word — measured on firmware 4.45.23792, where
+    ``typeof(Hidden)`` is ``text`` for all 31 rows.
+
+    ``bool("false")`` is ``True``, so coercing the raw value marks **every** row
+    on a real device as hidden and the recovery import skips all of them while
+    still answering 200 with a success summary.
+
+    Unrecognised values are treated as **not** hidden. An import is a recovery
+    operation: restoring a row the user had deleted is a visible annoyance they
+    can undo, whereas dropping one is the silent loss this function exists to
+    prevent.
+    """
+    if isinstance(value, str):
+        word = value.strip().casefold()
+        if word in ("true", "1"):
+            return True
+        if word in ("false", "0", ""):
+            return False
+        log.warning(
+            "kobo_import: unrecognised Bookmark.Hidden value %r; "
+            "treating the row as visible so a recovery cannot silently drop it",
+            value,
+        )
+        return False
+    return bool(value)
+
+
 def parse_kobo_bookmarks(sqlite_path: Path) -> Iterator[ParsedBookmark]:
     """Open ``sqlite_path`` read-only and yield every ``Bookmark`` row.
 
@@ -365,7 +399,7 @@ def parse_kobo_bookmarks(sqlite_path: Path) -> Iterator[ParsedBookmark]:
             # inventing a third (the mistake annotation_colors.py exists to
             # undo for highlight_color).
             annotation_type=(bm_type if isinstance(bm_type, str) and bm_type else None),
-            hidden=bool(hidden),
+            hidden=kobo_hidden_flag(hidden),
             date_created=dcreated,
             date_modified=dmod,
         )

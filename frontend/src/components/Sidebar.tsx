@@ -139,10 +139,10 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   // ── normal-mode ordered region (browse/discovery + Shelves block, in order) ─
   const renderShelvesBlock = () => (
     <Fragment key="shelves-block">
-      <div className={styles.sectionHeader}>
+      <div>
         <Link
           href="/shelves"
-          className={isActive(location, '/shelves', true) ? styles.sectionTitleActive : styles.sectionTitle}
+          className={isActive(location, '/shelves', true) ? styles.itemActive : styles.item}
           onClick={onNavigate}
         >
           <BookCopy size={16} className={styles.icon} aria-hidden="true" focusable={false} />
@@ -288,19 +288,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
 
             {/* Smart shelves + power features (pinned). */}
             <ul className={styles.list} role="list">
-              {showList && (
-                <li>
-                  <Link
-                    href="/table"
-                    className={isActive(location, '/table', true) ? styles.itemActive : styles.item}
-                    aria-current={isActive(location, '/table', true) ? 'page' : undefined}
-                    onClick={onNavigate}
-                  >
-                    <Table2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                    <span>{t('Table view')}</span>
-                  </Link>
-                </li>
-              )}
               <li>
                 <Link
                   href="/magic"
@@ -331,6 +318,19 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   </li>
                 );
               })}
+              {showList && (
+                <li>
+                  <Link
+                    href="/table"
+                    className={isActive(location, '/table', true) ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/table', true) ? 'page' : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Table2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Table view')}</span>
+                  </Link>
+                </li>
+              )}
               {(canUpload || isAdmin) && showDuplicates && (
                 <li>
                   <Link

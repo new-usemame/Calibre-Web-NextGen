@@ -1,0 +1,11 @@
+{
+  "area": "spa",
+  "body": "OBSERVED, confirmed independently (Opus) after an adversarial audit pass (Sol refuter).\n\nClassic gates the per-format delete buttons on the book having MORE THAN ONE format:\n`cps/templates/book_edit.html:55` — `{% if book.data|length > 1 %}`.\n\nThe SPA has no equivalent guard. `frontend/src/pages/EditBook.tsx:835-850` maps every\nentry of `book.formats` and gates only on `canDelete`, so the sole remaining format\ngets a delete button. The API does not backstop it either: `cps/api/edit.py:432-442`\n(`delete_format`) checks auth, role and visibility, then calls\n`delete_book_from_table(book_id, fmt.upper(), True)` with no format-count check.\n\nResult: through the default UI a user can reduce a book to zero formats — a state\nclassic's UI is explicitly written to prevent. The book row survives with no file.\n\nFix shape: enforce the invariant in the API (the UI guard alone repeats classic's\nmistake of a client-side-only rule), and mirror it in EditBook so the control is\ndisabled-with-reason rather than absent.",
+  "created": "2026-08-23",
+  "id": "F-3db089",
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "New UI can delete a book's last remaining format; classic deliberately prevents it"
+}

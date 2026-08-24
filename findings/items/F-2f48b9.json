@@ -1,0 +1,11 @@
+{
+  "area": "spa",
+  "body": "OBSERVED, confirmed independently (Opus).\n\nAuthorization for Duplicates is admin-OR-edit on both the classic route\n(`cps/duplicates.py:548-551`, `admin_or_edit_required`) and the SPA's own API\n(`cps/api/duplicates.py:28-41`). Classic's sidebar matches it:\n`cps/render_template.py:202` — `if current_user.role_admin() or current_user.role_edit()`.\n\nThe SPA sidebar instead gates on upload-or-admin:\n`frontend/src/components/Sidebar.tsx:334` — `(canUpload || isAdmin) && showDuplicates`.\n\n`upload` and `edit` are distinct bits, so this is wrong in both directions:\n- an EDIT-only user is authorized by the API but never shown the link;\n- an UPLOAD-only user is shown a link whose API answers 403.\n\nFix: gate the sidebar entry on admin-or-edit to match the route and the API, and add\nedit-only and upload-only cases to the role matrix the risk register calls for\n(R13) — this finding is the concrete instance proving that matrix is not optional.",
+  "created": "2026-08-23",
+  "id": "F-2f48b9",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Duplicates sidebar link is gated on the wrong role bit, failing in both directions"
+}

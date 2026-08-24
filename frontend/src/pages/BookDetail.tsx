@@ -268,7 +268,9 @@ export function BookDetail() {
   const [location, navigate] = useLocation();
   const me = useMe().data;
   /* Stage 0 two-way sync state chip (read-only; manage it on Account). */
-  const twoWay = useKoboTwoWayAnnotations({ enabled: !!me && !me.role?.anonymous });
+  const twoWay = useKoboTwoWayAnnotations({
+    enabled: !!me && !me.role?.anonymous && !!me.features?.kobo_two_way_annotations,
+  });
   const bookBackTarget = backTarget(location);
   // The send-to-e-reader button only renders when mail is configured + the user
   // can download, so defer the account fetch (which carries the saved e-reader

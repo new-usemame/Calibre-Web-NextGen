@@ -451,3 +451,43 @@ def test_api_never_wires_the_sync_path():
     # Serving states may never appear as written values in this module.
     assert "authoritative" not in constants
     assert "seeding" not in constants
+
+
+# ── instance capability flag ─────────────────────────────────────────────────
+#
+# Regression for a defect the SPA e2e suite caught and the unit suite could
+# not: every book page fetched the two-way preference endpoint unconditionally,
+# so any server without it (an older backend, or the e2e harness which overlays
+# only the SPA onto a :dev image) answered 404 and the book page raised a
+# console error on EVERY view. The SPA now gates the fetch on this flag, so the
+# flag has to exist and has to track the admin's switch.
+
+@pytest.mark.unit
+def test_server_features_exposes_kobo_two_way_setting():
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from cps.api import auth as mod
+
+    cfg = SimpleNamespace(config_user_hide_enabled=False, config_public_reg=False,
+                          config_anonbrowse=False, config_kobo_sync=True,
+                          config_kobo_sync_magic_shelves=False,
+                          config_kobo_two_way_annotation_sync=True,
+                          get_mail_server_configured=lambda: False)
+    with patch.object(mod, "config", cfg):
+        assert mod._server_features()["kobo_two_way_annotations"] is True
+
+    cfg.config_kobo_two_way_annotation_sync = False
+    with patch.object(mod, "config", cfg):
+        assert mod._server_features()["kobo_two_way_annotations"] is False
+
+
+@pytest.mark.unit
+def test_server_features_kobo_two_way_defaults_off_when_absent():
+    """An older/minimal config must read as off, never fault /me."""
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from cps.api import auth as mod
+
+    with patch.object(mod, "config",
+                      SimpleNamespace(get_mail_server_configured=lambda: False)):
+        assert mod._server_features()["kobo_two_way_annotations"] is False

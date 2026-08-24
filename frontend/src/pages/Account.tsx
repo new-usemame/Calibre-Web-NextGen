@@ -37,7 +37,8 @@ const STATE_TONE_CLASS: Record<string, string> = {
 export function Account() {
   const t = useT();
   const { data: account, isLoading, error } = useAccount();
-  const avatar = useMe().data?.avatar;
+  const me = useMe().data;
+  const avatar = me?.avatar;
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
   const createAppPw = useCreateAppPassword();
@@ -48,7 +49,9 @@ export function Account() {
 
   // Kobo two-way annotation sync (Stage 0 — a preference surface over a
   // feature that is still inert; nothing here makes a book sync).
-  const twoWay = useKoboTwoWayAnnotations();
+  const twoWay = useKoboTwoWayAnnotations({
+    enabled: !!me && !me.role?.anonymous && !!me.features?.kobo_two_way_annotations,
+  });
   const updateTwoWay = useUpdateKoboTwoWayAnnotations();
   const setTwoWayBook = useSetKoboTwoWayBook();
   const [twoWayMsg, setTwoWayMsg] = useState<{ ok: boolean; text: string } | null>(null);

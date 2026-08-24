@@ -53,7 +53,9 @@ export function Annotations({ id }: { id: string }) {
   const me = useMe().data;
   /* Stage 0 two-way sync state chip — read-only here; changes happen on the
    * Account page. Guests skip the query entirely (it would only 401). */
-  const twoWay = useKoboTwoWayAnnotations({ enabled: !!me && !me.role?.anonymous });
+  const twoWay = useKoboTwoWayAnnotations({
+    enabled: !!me && !me.role?.anonymous && !!me.features?.kobo_two_way_annotations,
+  });
   const twoWayBook = selectKoboTwoWayBook(twoWay.data, Number(id));
   const { data, isLoading, error } = useQuery<Payload>({
     queryKey: ['annotations', id], queryFn: () => apiGet(`/annotations/${id}/data.json`),

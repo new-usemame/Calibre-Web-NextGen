@@ -66,6 +66,10 @@ export interface ServerFeatures {
    *  toggle when it can actually do something. Absent on older servers →
    *  treat as off. */
   kobo_sync_magic_shelves?: boolean;
+  /** Stage 0 Kobo two-way annotation sync — the admin's instance switch.
+   *  Absent on older servers → treat as off, so the SPA does not call a
+   *  preference endpoint that would 404. */
+  kobo_two_way_annotations?: boolean;
   /** #1288 — the admin's "Enable Uploads" switch. Classic gates its navbar
    *  upload button on this; the SPA offered Upload regardless. Absent on older
    *  servers → treat as ON, matching the server's column default (the other

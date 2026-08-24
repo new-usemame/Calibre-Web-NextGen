@@ -18,6 +18,11 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **Pull requests opened before a release no longer fail their changelog CI
+  check after that release is tagged.** The guard now considers only releases
+  contained in the branch under test, while retaining the committed release
+  ledger as a strict fallback when Git tag reachability is unavailable.
+
 - **Cover thumbnails load faster, and the gap widens the bigger your library
   gets.** Every cover request searched the whole thumbnail table instead of
   going straight to the row it wanted, and the book grid asked for each cover

@@ -13,7 +13,7 @@ import type {
   Me, Book, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
   SearchOptions, AdvancedSearchParams, AdvSearchResult, Account, ProfileUpdate,
   BookMetadata, MetadataUpdate, UploadResult, AdminUser, AboutInfo, TaskItem, AuthConfig,
-  NoticeInbox,
+  NoticeInbox, KoboTwoWaySettings, KoboTwoWayBookState, KoboTwoWayUpdate,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
@@ -1032,6 +1032,50 @@ export function useRevokeAppPassword() {
   return useMutation({
     mutationFn: (id: number) => apiPost(`/api/v1/account/app-passwords/${id}/delete`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['account'] }),
+  });
+}
+
+// ── Kobo two-way annotation sync (Stage 0 — preferences over a dead switch) ──
+
+const KOBO_TWO_WAY_KEY = ['kobo-two-way-annotations'] as const;
+
+export function useKoboTwoWayAnnotations(options?: { enabled?: boolean }) {
+  return useQuery<KoboTwoWaySettings>({
+    queryKey: KOBO_TWO_WAY_KEY,
+    queryFn: () => apiGet<KoboTwoWaySettings>('/api/v1/account/kobo-two-way-annotations'),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/** Find one book's state inside the settings payload (book pages' chip). */
+export function selectKoboTwoWayBook(
+  data: KoboTwoWaySettings | undefined,
+  bookId: number,
+): KoboTwoWayBookState | undefined {
+  return data?.books.find((b) => b.book_id === bookId);
+}
+
+export function useUpdateKoboTwoWayAnnotations() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: KoboTwoWayUpdate) =>
+      apiPost<KoboTwoWaySettings>('/api/v1/account/kobo-two-way-annotations', vars),
+    onSuccess: (data) => qc.setQueryData(KOBO_TWO_WAY_KEY, data),
+  });
+}
+
+export function useSetKoboTwoWayBook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { book_id: number; enabled: boolean }) =>
+      apiPost<{ book: KoboTwoWayBookState }>('/api/v1/account/kobo-two-way-annotations/books', vars),
+    onSuccess: (data) => {
+      qc.setQueryData<KoboTwoWaySettings>(KOBO_TWO_WAY_KEY, (old) =>
+        old
+          ? { ...old, books: old.books.map((b) => (b.book_id === data.book.book_id ? data.book : b)) }
+          : old,
+      );
+    },
   });
 }
 

@@ -8,7 +8,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CHANGELOG = ROOT / "CHANGELOG.md"
-WHATS_NEW = ROOT / "frontend" / "src" / "data" / "whatsNew.ts"
 CANONICAL_CHANGELOG_FIRST_RELEASE = "v4.0.147"
 
 VERSION = re.compile(r"v\d+\.\d+\.\d+")
@@ -35,24 +34,25 @@ def _missing_sections(published: set[str], headings: set[str]) -> list[str]:
     return sorted(covered_tags - headings, key=_version_tuple)
 
 
-def _published_versions() -> tuple[set[str], str]:
-    """Use local tags, or the committed public-release ledger offline."""
+def _published_versions(root: Path = ROOT) -> tuple[set[str], str]:
+    """Use tags reachable from this checkout, or its committed release ledger."""
     result = subprocess.run(
-        ["git", "tag", "--list", "v*"],
-        cwd=ROOT,
+        ["git", "tag", "--list", "v*", "--merged", "HEAD"],
+        cwd=root,
         check=False,
         capture_output=True,
         text=True,
     )
     tags = {tag for tag in result.stdout.splitlines() if VERSION.fullmatch(tag)}
-    if tags:
-        return tags, "local git tags"
+    if result.returncode == 0 and tags:
+        return tags, "git tags reachable from HEAD"
 
-    assert WHATS_NEW.is_file(), (
+    whats_new = root / "frontend" / "src" / "data" / "whatsNew.ts"
+    assert whats_new.is_file(), (
         "cannot determine published releases: no semver git tags are available "
-        f"and the committed ledger is missing at {WHATS_NEW}"
+        f"and the committed ledger is missing at {whats_new}"
     )
-    versions = set(WHATS_NEW_VERSION.findall(WHATS_NEW.read_text(encoding="utf-8")))
+    versions = set(WHATS_NEW_VERSION.findall(whats_new.read_text(encoding="utf-8")))
     assert versions, (
         "cannot determine published releases: no semver git tags are available "
         "and the committed What's New ledger contains no release versions"
@@ -79,15 +79,87 @@ def test_detector_rejects_the_real_missing_tag_section_shape():
     assert _missing_sections({"v4.1.27"}, headings_after_revert) == ["v4.1.27"]
 
 
+def test_reachability_filter_keeps_ancestor_tags_and_excludes_later_tags(tmp_path):
+    """Non-vacuity: filtering out a future tag must retain the branch's own tag."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args):
+        return subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    git("init", "--quiet")
+    marker = repo / "marker"
+    marker.write_text("reachable\n", encoding="utf-8")
+    git("add", "marker")
+    git(
+        "-c",
+        "user.name=changelog-test",
+        "-c",
+        "user.email=changelog-test@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "reachable release",
+    )
+    reachable_commit = git("rev-parse", "HEAD").stdout.strip()
+    git("tag", "v4.1.38")
+
+    marker.write_text("future\n", encoding="utf-8")
+    git("add", "marker")
+    git(
+        "-c",
+        "user.name=changelog-test",
+        "-c",
+        "user.email=changelog-test@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "future release",
+    )
+    git("tag", "v4.1.40")
+    git("switch", "--quiet", "--detach", reachable_commit)
+
+    assert set(git("tag", "--list", "v*").stdout.splitlines()) == {
+        "v4.1.38",
+        "v4.1.40",
+    }
+    versions, source = _published_versions(root=repo)
+    assert versions == {"v4.1.38"}
+    assert source == "git tags reachable from HEAD"
+    assert _missing_sections(versions, set()) == ["v4.1.38"]
+
+
 def test_tagless_checkout_uses_committed_release_ledger(monkeypatch):
     """A source archive or offline shallow clone remains strict, never skips."""
+
     class NoTags:
+        returncode = 0
         stdout = ""
 
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: NoTags())
     versions, source = _published_versions()
     assert "v4.1.27" in versions
     assert source == "committed What's New ledger (git tags unavailable)"
+
+
+def test_failed_reachability_query_uses_committed_release_ledger(monkeypatch):
+    """A failed Git query also stays strict through the branch-local ledger."""
+
+    class FailedQuery:
+        returncode = 128
+        stdout = "v4.1.40\n"
+
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: FailedQuery())
+    versions, source = _published_versions()
+    assert "v4.1.27" in versions
+    assert source == "committed What's New ledger (git tags unavailable)"
+
 
 def test_at_most_one_version_section_is_untagged():
     """A release is sectioned first, then tagged. Only the in-flight one may lack a tag.

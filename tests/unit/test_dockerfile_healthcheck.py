@@ -36,6 +36,17 @@ DOCKERFILE = REPO_ROOT / "Dockerfile"
 HEALTHCHECK_HELPER = REPO_ROOT / "root" / "usr" / "local" / "bin" / "cwa-healthcheck"
 
 
+def _release_notes_text() -> str:
+    """Read release notes before or after changelog fragments are assembled."""
+    fragments = sorted(
+        path
+        for path in (REPO_ROOT / "changelog.d").glob("*.md")
+        if path.name != "README.md"
+    )
+    sources = [REPO_ROOT / "CHANGELOG.md", *fragments]
+    return "\n".join(path.read_text() for path in sources)
+
+
 @pytest.fixture(scope="module")
 def healthcheck_sources() -> str:
     """Concatenate the Dockerfile HEALTHCHECK CMD line + (if present) the
@@ -159,12 +170,12 @@ def test_healthcheck_https_sqlite_preflight_has_a_real_wall_clock_bound(tmp_path
 
 
 def test_health_release_notes_state_lock_and_unknown_limits_honestly() -> None:
-    changelog = (REPO_ROOT / "CHANGELOG.md").read_text()
+    release_notes = _release_notes_text()
     divergence = (REPO_ROOT / "CHANGES-vs-upstream.md").read_text()
 
-    assert "corruption behind a qualifying lock" in changelog
+    assert "corruption behind a qualifying lock" in release_notes
     assert "corruption behind a qualifying lock" in divergence
-    assert "only detected once the lock clears" in changelog
-    assert "contents remain unknown" in changelog
-    assert "explicitly reported `down`" in changelog
-    assert "genuinely down services still report degraded/503" not in changelog
+    assert "only detected once the lock clears" in release_notes
+    assert "contents remain unknown" in release_notes
+    assert "explicitly reported `down`" in release_notes
+    assert "genuinely down services still report degraded/503" not in release_notes

@@ -1,6 +1,13 @@
 # Kobo two-way annotation sync — authoritative-set design
 
-**Status:** design only; no production implementation is authorized by this document
+**Status:** the **authority** on Kobo two-way annotation sync. Stage 0 (§10) is merged —
+schema, preference API and SPA controls, with both gates default-off so nothing syncs.
+**Stages 1–5 are not authorized by this document** and each remains hardware-gated.
+
+**Supersedes:** `notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md` on the
+Edge 4 question only. That document states server → stock Nickel is "permanently out
+(protocol)"; it predates any hardware measurement and is wrong. Its Phase 1 and Phase 2
+content is unaffected.
 
 **Date:** 2026-08-16
 

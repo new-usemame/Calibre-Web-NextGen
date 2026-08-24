@@ -129,6 +129,12 @@ def _server_features():
         # per-shelf toggle that would otherwise store inert intent (#870).
         "kobo_sync_magic_shelves": bool(
             getattr(config, "config_kobo_sync_magic_shelves", False)),
+        # Stage 0 two-way annotation sync, instance-gated and default off.
+        # Surfaced so the SPA never calls the preference endpoint on a server
+        # that does not have it: an older backend answers 404, which the book
+        # page would otherwise raise as a console error on every single view.
+        "kobo_two_way_annotations": bool(
+            getattr(config, "config_kobo_two_way_annotation_sync", False)),
         # The admin's "Enable Uploads" switch. Classic gates its navbar upload
         # button on this (layout.html: role_upload() and g.allow_upload); the
         # SPA had no way to see it and offered Upload regardless (#1288).

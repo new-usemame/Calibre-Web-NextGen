@@ -43,31 +43,6 @@
   flex-shrink: 0;
 }
 
-/* Shelves section */
-.sectionHeader {
-  margin-top: var(--sp-4);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border);
-}
-
-.sectionTitle,
-.sectionTitleActive {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md);
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semi);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.sectionTitle:hover { color: var(--text); background: var(--surface-2); }
-.sectionTitleActive { color: var(--accent-text); background: var(--accent-soft); }
-
 .shelfList {
   display: flex;
   flex-direction: column;
@@ -85,7 +60,10 @@
   border-radius: var(--r-sm);
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    padding-left var(--dur-base) var(--ease-out);
 }
 
 .shelfItem:hover { color: var(--text); background: var(--surface-2); }
@@ -149,7 +127,10 @@
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
   :is(.nav, .navOpen) {
     width: 64px;
-    overflow: hidden;
+    padding-right: var(--sp-2);
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
     z-index: var(--z-overlay);
     box-sizing: border-box;
     transition:
@@ -157,26 +138,33 @@
       margin-right var(--dur-base) var(--ease-out);
   }
 
+  /* `scrollbar-width: none` above is what every current engine reads. The
+     legacy pseudo-element stays behind the same feature guard as the one in
+     styles/global.css: an engine that honours `::-webkit-scrollbar` but lacks
+     the standard properties gets the fallback, and nothing else does (#1089). */
+  @supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
+    :is(.nav, .navOpen)::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
   :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) {
     width: 220px;
     margin-right: -156px;
   }
 
-  :is(.item, .itemActive, .sectionTitle, .sectionTitleActive, .customizeBtn) > span,
-  .shelfName,
+  :is(.item, .itemActive, .customizeBtn) > span,
   .magicShelfName {
     opacity: 0;
     white-space: nowrap;
     transition: opacity var(--dur-fast) var(--ease);
   }
 
-  :is(.shelfItem, .shelfItemActive) {
-    opacity: 0;
-    transition: opacity var(--dur-fast) var(--ease);
+  .shelfList :is(.shelfItem, .shelfItemActive) {
+    padding-left: var(--sp-3);
   }
-
-  .magicShelfItem {
-    opacity: 1;
+  .shelfList .shelfCount {
+    display: none;
   }
 
   .magicShelfIcon {
@@ -188,10 +176,17 @@
   }
 
   :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
-    :is(.item > span, .itemActive > span, .sectionTitle > span, .sectionTitleActive > span, .customizeBtn > span, .shelfName, .magicShelfName),
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
-    :is(.shelfItem, .shelfItemActive) {
+    :is(.item > span, .itemActive > span, .customizeBtn > span, .magicShelfName) {
     opacity: 1;
+  }
+
+  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
+    .shelfList :is(.shelfItem, .shelfItemActive) {
+    padding-left: calc(var(--sp-3) + 18px + var(--sp-3));
+  }
+
+  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .shelfList .shelfCount {
+    display: inline;
   }
 
   :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .magicShelfIcon {
@@ -200,7 +195,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .magicShelfIcon {
+  .magicShelfIcon,
+  :is(.shelfItem, .shelfItemActive) {
     transition: none;
   }
 }
@@ -302,6 +298,7 @@
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
+.customizeBtn > svg { flex-shrink: 0; }
 .customizeBtn:hover { background: var(--surface-2); color: var(--text); }
 
 /* ── #585 v3: liquid-glass Customize capsule + inline edit list ──────────── */

@@ -1,6 +1,17 @@
 # Annotation two-way sync — Phase 1 (web-reader create) + Phase 2 (KOReader bridge)
 
-Status: design — awaiting operator approval before implementation
+> **⚠️ SUPERSEDED on the Edge 4 question (2026-08-23).** This document states below that
+> Edge 4 — server → stock Nickel — is impossible and "permanently out (protocol)". That
+> claim is **wrong** and was written before anyone measured the protocol on hardware.
+> `notes/KOBO-TWO-WAY-ANNOTATION-SYNC-DESIGN.md` (2026-08-16, Clara BW firmware
+> 4.45.23792) is the **authority** on Edge 4 and supersedes every statement here about
+> it. Stage 0 of that design is merged.
+>
+> Everything else in this document — the Phase 1 web-reader create path and the Phase 2
+> KOReader bridge — still stands and is unaffected.
+
+
+Status: design — Phase 1/2 stand; **Edge 4 claims superseded, see the banner above**
 Author: new-usemame
 Date: 2026-05-25
 Parents:
@@ -23,9 +34,15 @@ Two edges of the 5-edge matrix are still open:
 | 1 | Web reader → Server (create) | ❌ render-only, no create endpoint | **Phase 1** |
 | 5 | Server ↔ KOReader-on-Kobo (→ Nickel) | ❌ plugin is progress-only | **Phase 2** |
 
-Edge 4 (Server → stock Nickel directly) stays out of scope — Kobo's closed
-protocol blocks it; Phase 2's KoboReader.sqlite bridge is the sanctioned path
-to get a server/web highlight onto a Kobo.
+~~Edge 4 (Server → stock Nickel directly) stays out of scope — Kobo's closed
+protocol blocks it~~ — **superseded, and it was never measured.** Firmware
+4.45.23792 fetches `GET /api/v3/content/<uuid>/annotations` after
+`checkforchanges` names the content ID, and treats that response as an
+**authoritative replacement set**: a row added to it is created on-device.
+That is Edge 4, and it is the mechanism
+`notes/KOBO-TWO-WAY-ANNOTATION-SYNC-DESIGN.md` builds on. Phase 2's
+`KoboReader.sqlite` bridge remains a valid path for KOReader users; it is no
+longer the *only* one.
 
 This is two independent sub-projects sharing one data model. They can ship in
 either order. Phase 1 is self-contained and lower-risk; Phase 2 touches a
@@ -351,7 +368,7 @@ checklist), plus the one nullable column + its migration.
 Out of scope (later, behind the seams built here): KOReader-native `.sdr`
 provider (cross-engine xpointer mapping); device-side deletes of Nickel rows;
 async background sync worker; sharing annotations between users; Readwise/Notion
-targets. Edge 4 (direct server→Nickel) remains permanently out (protocol).
+targets. ~~Edge 4 (direct server→Nickel) remains permanently out (protocol).~~ **Wrong — see the banner at the top.** Edge 4 is reachable on firmware 4.45.23792 and is designed in `notes/KOBO-TWO-WAY-ANNOTATION-SYNC-DESIGN.md`.
 
 ## 7. Acceptance criteria
 

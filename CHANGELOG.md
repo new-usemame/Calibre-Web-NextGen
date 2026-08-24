@@ -18,11 +18,6 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
-- **Deleting books in the new interface now follows the same permissions as
-  classic Calibre-Web.** Whole-book deletion now requires both “Delete books”
-  and “Edit books”. Accounts that have delete permission without edit
-  permission will no longer see or be able to use the new interface's single
-  or bulk delete controls.
 - **Pull requests opened before a release no longer fail their changelog CI
   check after that release is tagged.** The guard now considers only releases
   contained in the branch under test, while retaining the committed release

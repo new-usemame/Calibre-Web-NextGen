@@ -13,6 +13,7 @@ import sys
 # This guard cares about heading identity, not date typography.
 RELEASE_HEADING = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]", re.MULTILINE)
 ENTRY_LEAD = re.compile(r"^- \*\*", re.MULTILINE)
+FRAGMENT_PATH = re.compile(r"^changelog\.d/[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
 
 
 def _distinct_entries(text: str) -> set[str]:
@@ -77,6 +78,22 @@ def pull_request_regressions(
     return structural_regressions(target, proposed)
 
 
+def changelog_requirement_errors(changed_paths: list[str]) -> list[str]:
+    """Require the canonical changelog or one real fragment in every PR."""
+    if "CHANGELOG.md" in changed_paths:
+        return []
+    if any(
+        FRAGMENT_PATH.fullmatch(path) and path != "changelog.d/README.md"
+        for path in changed_paths
+    ):
+        return []
+    return [
+        "This PR changes neither CHANGELOG.md nor "
+        "changelog.d/<pr-or-slug>.md. Add a categorized changelog fragment; "
+        "changelog.d/README.md documents the format."
+    ]
+
+
 def _file_at(ref: str) -> str:
     result = subprocess.run(
         ["git", "show", f"{ref}:CHANGELOG.md"],
@@ -105,6 +122,24 @@ def _merge_base(base_ref: str, head_ref: str) -> str:
     return result.stdout.strip()
 
 
+def _changed_paths(branch_point: str, head_ref: str) -> list[str]:
+    result = subprocess.run(
+        ["git", "diff", "--name-only", "-z", branch_point, head_ref],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode:
+        detail = result.stderr.decode(errors="replace").strip() or "git diff failed"
+        raise RuntimeError(
+            f"cannot list PR paths between {branch_point} and {head_ref}: {detail}"
+        )
+    return [
+        raw.decode("utf-8", errors="surrogateescape")
+        for raw in result.stdout.split(b"\0")
+        if raw
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Reject structural CHANGELOG.md loss between two git refs."
@@ -115,10 +150,15 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         branch_point = _merge_base(args.base_ref, args.head_ref)
-        errors = pull_request_regressions(
-            _file_at(args.base_ref),
-            _file_at(branch_point),
-            _file_at(args.head_ref),
+        errors = changelog_requirement_errors(
+            _changed_paths(branch_point, args.head_ref)
+        )
+        errors.extend(
+            pull_request_regressions(
+                _file_at(args.base_ref),
+                _file_at(branch_point),
+                _file_at(args.head_ref),
+            )
         )
     except RuntimeError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -132,7 +172,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         "CHANGELOG integrity guard passed: "
-        "no PR-authored release structure was lost."
+        "a canonical entry or fragment is present and no PR-authored release "
+        "structure was lost."
     )
     return 0
 

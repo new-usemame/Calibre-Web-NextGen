@@ -21,6 +21,10 @@ is for things you can see or feel when running the app.
 - **The Duplicates sidebar link now appears for the people who can actually use
   it.** Editors can discover the page, while upload-only accounts no longer see
   a link that leads to a permission error. Administrators remain unchanged.
+- **Pull requests opened before a release no longer fail their changelog CI
+  check after that release is tagged.** The guard now considers only releases
+  contained in the branch under test, while retaining the committed release
+  ledger as a strict fallback when Git tag reachability is unavailable.
 
 - **Cover thumbnails load faster, and the gap widens the bigger your library
   gets.** Every cover request searched the whole thumbnail table instead of

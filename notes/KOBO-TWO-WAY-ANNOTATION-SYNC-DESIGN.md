@@ -610,8 +610,17 @@ annotation text exists only inside mode-0600 gzip records under the mode-0700 pr
 `<config>/.cwng-private-observability/kobo-reading-services/`. The directory is not part of the
 annotation backup format or the support debug bundle. Retention is bounded to 256 records, 64 MiB
 compressed, seven days, and 16 MiB for any one body. Capture finalization is an after-response
-observer, storage exceptions are swallowed, and executed route tests prove identical status,
-headers, and body with the gate off, on, and throwing.
+observer, storage runs off the gevent hub with a 100 ms request deadline, storage exceptions are
+swallowed, and executed route tests prove identical status, headers, and body with the gate off,
+on, and throwing.
+
+**[OBSERVED — IMPLEMENTED 2026-08-24]** An annotation PATCH refused before authentication can be
+captured only while the same explicit private-data gate is enabled. The schema-version-2 record is
+marked `authentication='unauthenticated'` with `user_id=null`; CWNG does not infer an owner. These
+records never enter the always-on recovery spool. They use a separate mode-0700 directory and
+independent locks capped at 32 records, 8 MiB compressed, 24 hours, and 1 MiB per body. A missing or
+out-of-bound `Content-Length` is not read. Thus unauthenticated traffic cannot consume the
+non-evictable recovery budget or evict authenticated exchange diagnostics.
 
 **[OBSERVED — IMPLEMENTED 2026-08-23]** Annotation PATCH has a separate always-on recovery spool.
 The exact raw request body is atomically written and fsynced before JSON parsing, ownership

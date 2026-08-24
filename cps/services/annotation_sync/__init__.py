@@ -624,11 +624,11 @@ def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_i
     deltas and may never offer an acknowledged member again.
     """
     from cps import ub
-    if not payload_annotations:
-        return True
     if not isinstance(payload_annotations, list):
         log.warning("Skipping annotation batch because updatedAnnotations is not a list")
         return False
+    if not payload_annotations:
+        return True
     jobs = []
     all_persisted = True
     for index, payload in enumerate(payload_annotations):

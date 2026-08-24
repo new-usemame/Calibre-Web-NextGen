@@ -61,6 +61,20 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Kobo annotation PATCH parse failures now preserve the device retry instead
+  of acknowledging an upload CWNG could not address** (fork #1827) — a
+  non-empty non-object body and any present non-list `updatedAnnotations`
+  value now receive the same 503 refusal as a local persistence failure.
+  Empty/whitespace bodies, empty objects, empty annotation/delete lists, and
+  confirmed-unowned content preserve the proxy contract. The route now sends
+  every present `updatedAnnotations` value through the dispatcher, and the
+  dispatcher's non-list defense runs before its empty-batch shortcut. The
+  unauthenticated 401 can record its exact request only under the explicit
+  private-data diagnostic gate, with `authentication=unauthenticated` and no
+  user ID. Those records use a separate 32-file/8-MiB/24-hour budget, never the
+  non-evictable recovery spool, and storage runs off the gevent hub. | SHA
+  `TBD` | release `TBD`.
+
 - **Durable pre-dispatch Kobo PATCH recovery spool (finding F-5c1146 addendum
   point 2)** — the Stage-0 sidecar is attached only after an Annotation row
   exists, so a parser or dispatcher exception could lose the device's delta

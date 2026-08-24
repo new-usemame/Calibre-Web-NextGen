@@ -26,8 +26,10 @@ a repository, issue attachment, or other shared artifact. External backup jobs
 that archive all of `/config` should explicitly exclude
 `.cwng-private-observability/`.
 
-Each schema-version-1 record contains:
+Each schema-version-2 record contains:
 
+- explicit request provenance (`authenticated`, `unauthenticated`, or
+  `not_recorded`) and a local user ID only when one was authenticated;
 - the device request body and redacted headers;
 - `checkforchanges` decisions in original array order, including ownership,
   observed authority state, and whether each ID was suppressed or proxied;
@@ -42,9 +44,32 @@ replaced with `***REDACTED***` in every leg.
 
 Retention is automatic and cross-process locked: at most 256 records, 64 MiB
 compressed total, seven days, and 16 MiB for any individual body. An exchange
-above the body limit is skipped whole rather than saved partially. Any observer
-or storage failure is logged only with structural metadata and cannot replace,
-delay with retries, or change the response being observed.
+above the body limit is skipped whole rather than saved partially. Blocking
+capture storage runs outside the gevent hub with a 100 ms request deadline.
+Any observer or storage failure is logged only with structural metadata and
+cannot replace, retry, or change the response being observed.
+
+### Unauthenticated annotation PATCH refusals
+
+When the private-data gate is enabled, an annotation PATCH refused with 401 is
+captured before the refusal. Its record is explicitly marked
+`authentication: unauthenticated` and `user_id: null`; the route does not guess
+an owner from entitlement IDs, device headers, cookies, or request metadata.
+The request is never admitted to the recovery spool because there is no safe
+replay principal and unresolved spool records are intentionally non-evictable.
+
+This unauthenticated diagnostic has a separate directory and retention budget:
+
+```text
+<config>/.cwng-private-observability/kobo-reading-services-unauthenticated/
+```
+
+It is capped at 32 records, 8 MiB compressed total, 24 hours, and 1 MiB for an
+individual body. Requests without a bounded `Content-Length` or beyond 1 MiB
+are refused normally but not read or captured. The diagnostic remains off by
+default; when it is off, the auth gate does not consume the request body.
+Unauthenticated churn therefore cannot evict authenticated exchange captures
+or any always-on recovery record.
 
 ## Annotation PATCH recovery spool
 

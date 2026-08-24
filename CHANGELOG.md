@@ -18,10 +18,6 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
-- **Bulk actions now report partial failures truthfully.** Delete, read/unread,
-  add-to-shelf, and metadata updates count each request separately; failed books
-  are reported instead of being included in a false success total, and only
-  confirmed deletions are removed from the library cache.
 - **Pull requests opened before a release no longer fail their changelog CI
   check after that release is tagged.** The guard now considers only releases
   contained in the branch under test, while retaining the committed release

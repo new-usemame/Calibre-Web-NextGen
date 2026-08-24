@@ -336,6 +336,42 @@ export interface ProfileUpdate {
   ui_font_display?: string;
 }
 
+/** Stage 0 Kobo two-way annotation sync — per-book observed state. The feature
+ *  is deliberately inert; this is preference + evidence display only. */
+export interface KoboTwoWayBookState {
+  book_id: number;
+  /** null when the book left the library or the title lookup failed. */
+  title: string | null;
+  authority_status: 'unseeded' | 'seeding' | 'authoritative' | 'quarantined' | 'disabled';
+  opaque_content_status: 'unknown' | 'absent' | 'present';
+  quarantine_reason: string | null;
+  seeded_at: string | null;
+  /** false ⇔ authority_status 'disabled' (the user's per-book opt-out). */
+  enabled: boolean;
+  /** false for pipeline states ('seeding'/'authoritative'/'quarantined') —
+   *  those are sync evidence, and the toggle must not silently erase them. */
+  can_toggle: boolean;
+}
+
+export interface KoboTwoWaySettings {
+  /** Admin-owned instance kill switch (read-only here). */
+  instance_enabled: boolean;
+  /** Server env override — can only ever force the feature off. */
+  emergency_disabled: boolean;
+  /** Whether Kobo sync is configured at all (classic setup prerequisite). */
+  kobo_available: boolean;
+  /** The user's own opt-in. */
+  enabled: boolean;
+  /** 'all': every book syncs as it becomes ready. 'selected': user picks. */
+  scope: 'all' | 'selected';
+  books: KoboTwoWayBookState[];
+}
+
+export interface KoboTwoWayUpdate {
+  enabled?: boolean;
+  scope?: 'all' | 'selected';
+}
+
 export interface BookMetadata {
   id: number;
   title: string;

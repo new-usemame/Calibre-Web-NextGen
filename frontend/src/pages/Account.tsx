@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Mail, Globe, KeyRound, Check, Smartphone, Trash2, Copy } from 'lucide-react';
+import { Mail, Globe, KeyRound, Check, CheckCheck, Smartphone, Trash2, Copy, PenLine } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import {
   useAccount, useMe, useUpdateProfile, useChangePassword,
   useCreateAppPassword, useRevokeAppPassword,
+  useKoboTwoWayAnnotations, useUpdateKoboTwoWayAnnotations, useSetKoboTwoWayBook,
 } from '../lib/queries';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
@@ -15,12 +16,22 @@ import { apiGet } from '../lib/api';
 import { UI_BODY_FONTS, UI_DISPLAY_FONTS } from '../lib/fonts';
 import { THEMES, resolveTheme } from '../lib/themes';
 import { useT } from '../lib/i18n';
+import { authorityLabel, authorityTone, opaqueLabel } from '../lib/koboTwoWay';
 import styles from './Account.module.css';
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin', upload: 'Upload', edit: 'Edit metadata', download: 'Download',
   delete_books: 'Delete books', edit_shelfs: 'Edit public shelves', viewer: 'Viewer',
   passwd: 'Change password',
+};
+
+/* Static tone → class map (CSS-module friendly; a computed key would defeat
+ * grep-ability and dead-class checks). */
+const STATE_TONE_CLASS: Record<string, string> = {
+  muted: styles.stateMuted,
+  info: styles.stateInfo,
+  ok: styles.stateOk,
+  warn: styles.stateWarn,
 };
 
 export function Account() {
@@ -34,6 +45,14 @@ export function Account() {
   const devices = useQuery<{ devices: { public_id: string; label: string; annotation_count: number }[] }>({
     queryKey: ['annotation-devices'], queryFn: () => apiGet('/api/annotations/devices?active=true'),
   });
+
+  // Kobo two-way annotation sync (Stage 0 — a preference surface over a
+  // feature that is still inert; nothing here makes a book sync).
+  const twoWay = useKoboTwoWayAnnotations();
+  const updateTwoWay = useUpdateKoboTwoWayAnnotations();
+  const setTwoWayBook = useSetKoboTwoWayBook();
+  const [twoWayMsg, setTwoWayMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [twoWayBookMsg, setTwoWayBookMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Profile form
   const [email, setEmail] = useState('');
@@ -163,6 +182,26 @@ export function Account() {
   const activeRoles = Object.entries(account.role).filter(([, v]) => v);
   const selectedTheme = THEMES.find((o) => o.slug === theme);
 
+  /* Non-optimistic on purpose: this preference guards a feature that can
+   * destroy device-side annotations once it goes live, so the control shows
+   * the SERVER state and snaps back on failure rather than pretending. */
+  const onTwoWaySave = (patch: { enabled?: boolean; scope?: 'all' | 'selected' }) => {
+    setTwoWayMsg(null);
+    updateTwoWay.mutate(patch, {
+      onSuccess: () => setTwoWayMsg({ ok: true, text: t('Two-way sync preference saved.') }),
+      onError: (err) =>
+        setTwoWayMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') }),
+    });
+  };
+
+  const onTwoWayBookToggle = (bookId: number, enabled: boolean) => {
+    setTwoWayBookMsg(null);
+    setTwoWayBook.mutate({ book_id: bookId, enabled }, {
+      onError: (err) =>
+        setTwoWayBookMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not save.') }),
+    });
+  };
+
   return (
     <main className={styles.container}>
       <h1 className={styles.title}>{t('Account')}</h1>
@@ -176,6 +215,135 @@ export function Account() {
         ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
         <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
       </section>
+
+      {/* Kobo two-way annotation sync — Stage 0 (BETA). Both server gates stay
+          off; this card reads/writes the user's preference and shows observed
+          per-book state. It never starts a sync. */}
+      {twoWay.data && (
+        <section className={styles.card} aria-labelledby="kobo-two-way-title">
+          <h2 id="kobo-two-way-title" className={styles.cardTitle}>
+            <PenLine size={16} aria-hidden="true" focusable={false} /> {t('Kobo two-way annotation sync')}
+            <span className={styles.betaPill}>{t('Beta')}</span>
+          </h2>
+
+          {!twoWay.data.kobo_available ? (
+            <p className={styles.hint}>
+              {t('Set up Kobo sync first — then this preference becomes available.')}
+            </p>
+          ) : (
+            <>
+              <label className={styles.toggle}>
+                <input
+                  type="checkbox"
+                  checked={twoWay.data.enabled}
+                  disabled={updateTwoWay.isPending}
+                  onChange={(e) => onTwoWaySave({ enabled: e.target.checked })}
+                />
+                {t('Opt in to Kobo two-way annotation sync')}
+              </label>
+              <p className={styles.hint}>
+                {t('Off by default. While in beta, opting in only records your preference and recovery evidence — it does not change what your Kobo receives yet.')}
+              </p>
+              {!twoWay.data.instance_enabled && (
+                <p className={styles.hint}>
+                  {t('The server-wide option is also off, so nothing can sync yet. An administrator can enable it in the classic server settings.')}
+                </p>
+              )}
+              {twoWay.data.emergency_disabled && (
+                <p className={styles.hint}>
+                  {t('This feature is currently disabled at server level.')}
+                </p>
+              )}
+
+              <fieldset className={styles.scopeGroup}>
+                <legend className={styles.label}>{t('Which books sync?')}</legend>
+                {/* The two options must be distinguishable by SYMBOL, not by
+                    wording alone: multi-check = every book, single check =
+                    picked books. */}
+                <label className={styles.scopeOption}>
+                  <input
+                    type="radio"
+                    name="kobo-two-way-scope"
+                    checked={twoWay.data.scope === 'all'}
+                    disabled={updateTwoWay.isPending}
+                    onChange={() => onTwoWaySave({ scope: 'all' })}
+                  />
+                  <CheckCheck size={18} aria-hidden="true" focusable={false} className={styles.scopeIcon} />
+                  <span className={styles.scopeText}>
+                    <strong>{t('All books')}</strong>
+                    <small>{t('Every book syncs as it becomes ready. You can exclude individual books below.')}</small>
+                  </span>
+                </label>
+                <label className={styles.scopeOption}>
+                  <input
+                    type="radio"
+                    name="kobo-two-way-scope"
+                    checked={twoWay.data.scope === 'selected'}
+                    disabled={updateTwoWay.isPending}
+                    onChange={() => onTwoWaySave({ scope: 'selected' })}
+                  />
+                  <Check size={18} aria-hidden="true" focusable={false} className={styles.scopeIcon} />
+                  <span className={styles.scopeText}>
+                    <strong>{t('Selected books')}</strong>
+                    <small>{t('Only the books you pick below sync. Switching here starts from none picked — you choose each book yourself.')}</small>
+                  </span>
+                </label>
+              </fieldset>
+              <span
+                className={twoWayMsg ? (twoWayMsg.ok ? styles.msgOk : styles.msgErr) : undefined}
+                role="status"
+              >
+                {twoWayMsg?.text}
+              </span>
+
+              <p className={styles.hint}>
+                {t('Opting in does not sync a book straight away. Each book is set up and checked first — its real state is shown here.')}
+              </p>
+              {twoWay.data.books.length > 0 ? (
+                <ul className={styles.twoWayBooks} role="list">
+                  {twoWay.data.books.map((b) => (
+                    <li key={b.book_id} className={styles.twoWayBook}>
+                      <div className={styles.twoWayBookMain}>
+                        <Link href={`/book/${b.book_id}/annotations`} className={styles.twoWayBookTitle}>
+                          {b.title ?? t('Book {id}', { id: b.book_id })}
+                        </Link>
+                        <span className={STATE_TONE_CLASS[authorityTone(b)]}>
+                          {authorityLabel(t, b, twoWay.data.scope)}
+                        </span>
+                        {opaqueLabel(t, b) && (
+                          <span className={styles.stateWarn}>{opaqueLabel(t, b)}</span>
+                        )}
+                        {b.authority_status === 'quarantined' && b.quarantine_reason && (
+                          <span className={styles.twoWayReason}>{b.quarantine_reason}</span>
+                        )}
+                      </div>
+                      {b.can_toggle && (
+                        <label className={styles.toggle}>
+                          <input
+                            type="checkbox"
+                            checked={b.enabled}
+                            disabled={setTwoWayBook.isPending}
+                            onChange={(e) => onTwoWayBookToggle(b.book_id, e.target.checked)}
+                          />
+                          {twoWay.data.scope === 'selected' ? t('Picked') : t('Included')}
+                        </label>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={styles.muted}>{t('No books are ready yet — they appear here as they become ready.')}</p>
+              )}
+              <span
+                className={twoWayBookMsg ? (twoWayBookMsg.ok ? styles.msgOk : styles.msgErr) : undefined}
+                role="status"
+              >
+                {twoWayBookMsg?.text}
+              </span>
+            </>
+          )}
+        </section>
+      )}
 
       {/* Identity */}
       <section className={styles.card}>

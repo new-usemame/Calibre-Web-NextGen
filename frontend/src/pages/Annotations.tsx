@@ -3,8 +3,9 @@ import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ChevronLeft, Download, Highlighter, MoreHorizontal, Upload as UploadIcon } from 'lucide-react';
 import { apiGet, apiPatch, apiPost, apiUrl } from '../lib/api';
-import { useBook } from '../lib/queries';
+import { useBook, useMe, useKoboTwoWayAnnotations, selectKoboTwoWayBook } from '../lib/queries';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { BulkSelectionBar } from '../components/BulkBar';
@@ -49,6 +50,11 @@ export function Annotations({ id }: { id: string }) {
   const t = useT();
   const announce = useAnnouncer();
   const book = useBook(id).data;
+  const me = useMe().data;
+  /* Stage 0 two-way sync state chip — read-only here; changes happen on the
+   * Account page. Guests skip the query entirely (it would only 401). */
+  const twoWay = useKoboTwoWayAnnotations({ enabled: !!me && !me.role?.anonymous });
+  const twoWayBook = selectKoboTwoWayBook(twoWay.data, Number(id));
   const { data, isLoading, error } = useQuery<Payload>({
     queryKey: ['annotations', id], queryFn: () => apiGet(`/annotations/${id}/data.json`),
   });
@@ -208,6 +214,17 @@ export function Annotations({ id }: { id: string }) {
     <main className={styles.container}>
       <Link href={`/book/${id}`} className={styles.back}><ChevronLeft size={16} aria-hidden="true" /> {t('Back to book')}</Link>
       <div className={styles.header}><Highlighter size={22} aria-hidden="true" /><h1>{t('Highlights and notes')}{book ? ` — ${book.title}` : ''}</h1><span>{annotations.length}</span></div>
+      {/* Stage 0 per-book two-way state, surfaced honestly (a toggle alone
+          would look broken: opted-in ≠ synced). Only shown when the user has
+          opted in and this book has pipeline state. */}
+      {twoWay.data?.enabled && twoWayBook && (
+        <p className={styles.twoWayChip}>
+          <Link href="/account">
+            {t('Kobo two-way sync: {state}', { state: authorityLabel(t, twoWayBook, twoWay.data.scope) })}
+          </Link>
+          {opaqueLabel(t, twoWayBook) && <span className={styles.twoWayBlocked}>{opaqueLabel(t, twoWayBook)}</span>}
+        </p>
+      )}
       <div className={`${styles.filters} ${filters.length > 7 ? styles.filtersCollapsed : ''}`} role="radiogroup" aria-label={t('Filter by device')}
         onKeyDown={(event) => {
           if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;

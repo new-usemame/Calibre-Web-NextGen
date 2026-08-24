@@ -12557,7 +12557,7 @@ msgstr "Synchroniseer alleen boeken op geselecteerde boekenplanken met Kobo"
 
 #: cps/templates/user_edit.html
 msgid "Opt in to Kobo two-way annotation sync"
-msgstr ""
+msgstr "Inschakelen voor Kobo-annotatiesynchronisatie in twee richtingen"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -12869,6 +12869,107 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#: cps/spa_strings.py
+msgid "All books"
+msgstr "Alle boeken"
+
+#: cps/spa_strings.py
+msgid "Beta"
+msgstr "Bèta"
+
+#: cps/spa_strings.py
+msgid "Book {id}"
+msgstr "Boek {id}"
+
+#: cps/spa_strings.py
+msgid "Every book syncs as it becomes ready. You can exclude individual books below."
+msgstr "Elk boek synchroniseert zodra het klaar is. Hieronder kun je individuele boeken uitsluiten."
+
+#: cps/spa_strings.py
+msgid "Excluded"
+msgstr "Uitgesloten"
+
+#: cps/spa_strings.py
+msgid "Has pen or drawing notes"
+msgstr "Heeft pen- of tekennotities"
+
+#: cps/spa_strings.py
+msgid "Included"
+msgstr "Inbegrepen"
+
+#: cps/spa_strings.py
+msgid "Kobo two-way annotation sync"
+msgstr "Kobo-annotaties in twee richtingen synchroniseren"
+
+#: cps/spa_strings.py
+msgid "Kobo two-way sync: {state}"
+msgstr "Kobo-synchronisatie in twee richtingen: {state}"
+
+#: cps/spa_strings.py
+msgid "No books are ready yet — they appear here as they become ready."
+msgstr "Nog geen boeken klaar — ze verschijnen hier zodra ze klaar zijn."
+
+#: cps/spa_strings.py
+msgid "Not picked"
+msgstr "Niet gekozen"
+
+#: cps/spa_strings.py
+msgid "Not set up yet"
+msgstr "Nog niet ingesteld"
+
+#: cps/spa_strings.py
+msgid "Off by default. While in beta, opting in only records your preference and recovery evidence — it does not change what your Kobo receives yet."
+msgstr "Standaard uit. Tijdens de bèta registreert inschakelen alleen je voorkeur en herstelbewijs — het verandert nog niets aan wat je Kobo ontvangt."
+
+#: cps/spa_strings.py
+msgid "Only the books you pick below sync. Switching here starts from none picked — you choose each book yourself."
+msgstr "Alleen de boeken die je hieronder kiest, synchroniseren. Overschakelen begint met niets gekozen — je kiest elk boek zelf."
+
+#: cps/spa_strings.py
+msgid "Opting in does not sync a book straight away. Each book is set up and checked first — its real state is shown here."
+msgstr "Inschakelen synchroniseert een boek niet meteen. Elk boek wordt eerst ingesteld en gecontroleerd — de echte status wordt hier getoond."
+
+#: cps/spa_strings.py
+msgid "Paused after a problem"
+msgstr "Gepauzeerd na een probleem"
+
+#: cps/spa_strings.py
+msgid "Picked"
+msgstr "Gekozen"
+
+#: cps/spa_strings.py
+msgid "Selected books"
+msgstr "Geselecteerde boeken"
+
+#: cps/spa_strings.py
+msgid "Set up Kobo sync first — then this preference becomes available."
+msgstr "Stel eerst Kobo-synchronisatie in — daarna wordt deze voorkeur beschikbaar."
+
+#: cps/spa_strings.py
+msgid "Setting up…"
+msgstr "Instellen…"
+
+#: cps/spa_strings.py
+msgid "The server-wide option is also off, so nothing can sync yet. An administrator can enable it in the classic server settings."
+msgstr "De serverbrede optie is ook uit, dus er kan nog niets synchroniseren. Een beheerder kan dit inschakelen in de klassieke serverinstellingen."
+
+#: cps/spa_strings.py
+msgid "This feature is currently disabled at server level."
+msgstr "Deze functie is momenteel uitgeschakeld op serverniveau."
+
+#: cps/spa_strings.py
+msgid "Two-way sync active"
+msgstr "Synchronisatie in twee richtingen actief"
+
+#: cps/spa_strings.py
+msgid "Two-way sync preference saved."
+msgstr "Voorkeur voor synchronisatie in twee richtingen opgeslagen."
+
+#: cps/spa_strings.py
+msgid "Which books sync?"
+msgstr "Welke boeken synchroniseren?"
+
 
 #~ msgid ""
 #~ "We repaired this book for your Kobo. Sync your device — and if "

@@ -69,6 +69,7 @@ from .reader_settings import (
 import shutil
 import sqlite3
 import subprocess
+import threading
 import time
 
 from cps.cwa_db_loader import load_cwa_db
@@ -1277,41 +1278,75 @@ _CRITICAL_LONGRUNS = ("cwa-ingest-service", "metadata-change-detector")
 # gevent is deliberately unpatched, so a blocking request greenlet freezes
 # the whole application (#1799).  Prefer a recent successful observation for
 # this one distinguishable transient state, but bound it so a permanently
-# locked/broken library cannot be reported healthy forever.
+# locked library cannot be reported healthy forever. This is deliberately a
+# grace period, not proof of current readability: corruption hidden behind a
+# qualifying lock is discovered only when that lock clears; after the grace
+# expires the still-locked DB degrades even though its contents remain unknown.
 _METADATA_DB_LOCK_STALE_GRACE_SECONDS = 5 * 60
 _metadata_db_last_good = (None, 0.0)
+_HEALTH_DB_PROBE_GATE = threading.Lock()
+_HEALTH_S6_PROBE_GATE = threading.Lock()
+
+
+def _metadata_db_identity(db_path):
+    """Return an identity for the database object, following symlinks."""
+    stat_result = os.stat(db_path, follow_symlinks=True)
+    return stat_result.st_dev, stat_result.st_ino
 
 
 def _probe_metadata_db():
     """Return whether metadata.db is readable without waiting on a writer.
 
-    A lock may reuse a recent known-good result for a bounded interval.  Any
-    other failure is immediately unhealthy; the cache never masks corruption,
-    a missing database, or a stale lock beyond the explicit grace period.
+    A lock may reuse a recent known-good result for the same database object
+    for a bounded interval. A lock-free corrupt or missing DB is unhealthy
+    immediately. Corruption whose first observable error is a qualifying lock
+    can only be detected once that lock clears. If it outlasts the grace, the
+    lock itself is unhealthy without making any claim about the DB contents.
     """
     global _metadata_db_last_good
 
     conn = None
-    db_path = None
+    db_identity = None
+    resolved_db_path = None
     try:
-        db_path = os.path.abspath(
-            os.path.join(cwa_get_library_location(), "metadata.db")
-        )
-        db_uri = _Path(db_path).as_uri() + "?mode=ro"
+        db_path = _Path(cwa_get_library_location()) / "metadata.db"
+        # Resolve before identifying and opening the database. A lexical path
+        # is not an identity: a symlinked library root can be retargeted from
+        # one library to another while retaining exactly the same spelling.
+        resolved_db_path = db_path.resolve(strict=True)
+        db_identity = _metadata_db_identity(resolved_db_path)
+        db_uri = resolved_db_path.as_uri() + "?mode=ro"
         # mode=ro prevents a missing metadata.db from being created by the
         # liveness probe. timeout=0 makes writer contention observable rather
         # than parking a native worker for SQLite's historical 30s timeout.
         conn = sqlite3.connect(db_uri, uri=True, timeout=0)
         conn.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
-        _metadata_db_last_good = (db_path, time.monotonic())
+        # Do not attach the successful observation to an object replaced while
+        # it was open. The next probe will assess the replacement on its own.
+        if _metadata_db_identity(resolved_db_path) != db_identity:
+            return False
+        _metadata_db_last_good = (db_identity, time.monotonic())
         return True
     except sqlite3.OperationalError as exc:
         if "locked" in str(exc).lower():
-            cached_path, cached_at = _metadata_db_last_good
-            return (
-                cached_path == db_path
-                and time.monotonic() - cached_at <= _METADATA_DB_LOCK_STALE_GRACE_SECONDS
-            )
+            cached_identity, cached_at = _metadata_db_last_good
+            try:
+                current_identity = _metadata_db_identity(resolved_db_path)
+            except (OSError, TypeError):
+                return False
+            age = time.monotonic() - cached_at
+            if (
+                cached_identity == db_identity == current_identity
+                and age <= _METADATA_DB_LOCK_STALE_GRACE_SECONDS
+            ):
+                log.warning(
+                    "Health metadata probe is answering from a %.1fs-old stale known-good "
+                    "result because metadata.db is locked; corruption cannot be ruled out "
+                    "until the lock clears (bounded grace %.0fs)",
+                    age,
+                    _METADATA_DB_LOCK_STALE_GRACE_SECONDS,
+                )
+                return True
         return False
     except Exception:
         return False
@@ -1363,6 +1398,32 @@ def _check_s6_service_status():
     return {service: ("up" if service in active else "down") for service in _CRITICAL_LONGRUNS}
 
 
+def _run_single_flight_health_probe(gate, probe, already_running_result, label):
+    """Offload one probe without retaining another worker while it is wedged.
+
+    SQLite's busy timeout and ``subprocess.run``'s timeout are not wall-clock
+    deadlines for every filesystem or kernel operation. Holding the gate until
+    the native worker actually returns means repeated container healthchecks
+    can consume at most one shared-pool worker per probe type. A duplicate DB
+    probe fails closed; a duplicate s6 probe reports the existing intentional
+    ``unknown`` state rather than fabricating either ``up`` or ``down``.
+    """
+    if not gate.acquire(blocking=False):
+        log.warning(
+            "Previous %s health probe is still in flight; not retaining another worker",
+            label,
+        )
+        return already_running_result
+
+    def run_and_release_gate():
+        try:
+            return probe()
+        finally:
+            gate.release()
+
+    return _run_blocking(run_and_release_gate)
+
+
 @web.route("/health")
 def health_check():
     uptime = time.time() - _start_time
@@ -1382,13 +1443,23 @@ def health_check():
             "version": f"Calibre-Web-NextGen/{constants.INSTALLED_VERSION}",
         }), 503
 
-    # Both helpers perform unpatched blocking I/O.  Waiting for them on the
+    # Both helpers perform unpatched blocking I/O. Waiting for them on the
     # request greenlet freezes gevent's single hub thread and every other
-    # request.  The shared offloader runs the syscalls on real OS threads and
-    # waits cooperatively, preserving honest results without self-inflicted
-    # downtime (#1799).
-    db_up = _run_blocking(_probe_metadata_db)
-    services_status = _run_blocking(_check_s6_service_status)
+    # request. The shared offloader runs the syscalls on real OS threads and
+    # waits cooperatively; the per-kind gates ensure a wedged mount or fork can
+    # retain at most two workers across repeated healthchecks (#1799).
+    db_up = _run_single_flight_health_probe(
+        _HEALTH_DB_PROBE_GATE,
+        _probe_metadata_db,
+        False,
+        "metadata DB",
+    )
+    services_status = _run_single_flight_health_probe(
+        _HEALTH_S6_PROBE_GATE,
+        _check_s6_service_status,
+        {service: "unknown" for service in _CRITICAL_LONGRUNS},
+        "s6",
+    )
     any_service_down = any(state == "down" for state in services_status.values())
     healthy = db_up and not any_service_down
 

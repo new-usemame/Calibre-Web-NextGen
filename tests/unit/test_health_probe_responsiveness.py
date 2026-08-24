@@ -20,6 +20,7 @@ keeps accepting concurrent work.
 from __future__ import annotations
 
 import http.client
+import logging
 import sqlite3
 import threading
 import time
@@ -78,6 +79,30 @@ def test_locked_metadata_probe_returns_promptly_without_stalling_another_request
     writer.execute("BEGIN EXCLUSIVE")
     writer.execute("UPDATE books SET title = 'writer still working' WHERE id = 1")
 
+    unlock_fired = threading.Event()
+    probe_entered = threading.Event()
+    probe_entered_while_locked = threading.Event()
+
+    def safety_unlock() -> None:
+        writer.rollback()
+        unlock_fired.set()
+
+    safety_timer = threading.Timer(_SAFETY_UNLOCK_SECONDS, safety_unlock)
+    real_sqlite_connect = sqlite3.connect
+
+    def connect_and_arm_safety_unlock(*args, **kwargs):
+        # Arm only after /health has entered the real DB probe. Starting this
+        # timer before the client thread lets an overloaded CI worker unlock
+        # the fixture before the buggy request ever reaches SQLite.
+        if not probe_entered.is_set():
+            if not unlock_fired.is_set():
+                probe_entered_while_locked.set()
+            probe_entered.set()
+            safety_timer.start()
+        return real_sqlite_connect(*args, **kwargs)
+
+    monkeypatch.setattr(web_module.sqlite3, "connect", connect_and_arm_safety_unlock)
+
     app = Flask(__name__)
     app.register_blueprint(web_module.web)
 
@@ -89,27 +114,27 @@ def test_locked_metadata_probe_returns_promptly_without_stalling_another_request
     server.start()
 
     results: dict[str, tuple[int, float]] = {}
-    unlock_fired = threading.Event()
 
-    def safety_unlock() -> None:
-        writer.rollback()
-        unlock_fired.set()
+    def delayed_health_request() -> None:
+        # Model an overloaded runner that does not schedule the client until
+        # after the old two-second pre-client timer would already have fired.
+        # Request timing itself begins in _http_get after this scheduling lag.
+        time.sleep(_SAFETY_UNLOCK_SECONDS + 0.25)
+        _http_get(server.server_port, "/health", results)
 
-    safety_timer = threading.Timer(_SAFETY_UNLOCK_SECONDS, safety_unlock)
     health_client = threading.Thread(
-        target=_http_get,
-        args=(server.server_port, "/health", results),
+        target=delayed_health_request,
         daemon=True,
     )
 
     def request_concurrently() -> None:
+        assert probe_entered.wait(timeout=4), "health probe never reached sqlite3.connect"
         time.sleep(0.1)
         _http_get(server.server_port, "/health-probe-concurrent", results)
 
     concurrent_client = threading.Thread(target=request_concurrently, daemon=True)
 
     try:
-        safety_timer.start()
         health_client.start()
         concurrent_client.start()
 
@@ -133,6 +158,11 @@ def test_locked_metadata_probe_returns_promptly_without_stalling_another_request
     )
     assert not concurrent_client.is_alive(), (
         "the concurrent request did not return within the test bound"
+    )
+    assert probe_entered.is_set(), "the safety unlock was not armed by the real DB probe"
+    assert probe_entered_while_locked.is_set(), (
+        "the writer unlocked before /health entered SQLite; the red test can pass "
+        "without exercising lock contention"
     )
 
     health_status, health_elapsed = results["/health"]
@@ -198,7 +228,7 @@ def test_writer_lock_fallback_expires_instead_of_masking_a_deadlock(
     monkeypatch.setattr(
         web_module,
         "_metadata_db_last_good",
-        (str(metadata_db.resolve()), stale_at),
+        (web_module._metadata_db_identity(metadata_db.resolve()), stale_at),
     )
 
     writer = sqlite3.connect(metadata_db)
@@ -209,3 +239,177 @@ def test_writer_lock_fallback_expires_instead_of_masking_a_deadlock(
     finally:
         writer.rollback()
         writer.close()
+
+
+def test_stale_lock_fallback_is_visible_in_operator_logs(monkeypatch, tmp_path, caplog):
+    from cps import web as web_module
+
+    metadata_db = tmp_path / "metadata.db"
+    setup = sqlite3.connect(metadata_db)
+    setup.execute("CREATE TABLE books (id INTEGER PRIMARY KEY)")
+    setup.commit()
+    setup.close()
+
+    monkeypatch.setattr(web_module, "cwa_get_library_location", lambda: str(tmp_path))
+    monkeypatch.setattr(web_module, "_metadata_db_last_good", (None, 0.0))
+    assert web_module._probe_metadata_db() is True
+
+    writer = sqlite3.connect(metadata_db)
+    try:
+        writer.execute("BEGIN EXCLUSIVE")
+        writer.execute("INSERT INTO books DEFAULT VALUES")
+        with caplog.at_level(logging.WARNING, logger="cps.web"):
+            assert web_module._probe_metadata_db() is True
+    finally:
+        writer.rollback()
+        writer.close()
+
+    assert "stale known-good" in caplog.text
+    assert "corruption" in caplog.text
+
+
+def test_stale_cache_is_keyed_to_database_identity_not_symlink_spelling(
+    monkeypatch, tmp_path
+):
+    from cps import web as web_module
+
+    library_a = tmp_path / "library-a"
+    library_b = tmp_path / "library-b"
+    library_a.mkdir()
+    library_b.mkdir()
+    for library in (library_a, library_b):
+        connection = sqlite3.connect(library / "metadata.db")
+        connection.execute("CREATE TABLE books (id INTEGER PRIMARY KEY)")
+        connection.commit()
+        connection.close()
+
+    active_library = tmp_path / "active-library"
+    active_library.symlink_to(library_a, target_is_directory=True)
+    monkeypatch.setattr(
+        web_module,
+        "cwa_get_library_location",
+        lambda: str(active_library),
+    )
+    monkeypatch.setattr(web_module, "_metadata_db_last_good", (None, 0.0))
+    assert web_module._probe_metadata_db() is True
+
+    active_library.unlink()
+    active_library.symlink_to(library_b, target_is_directory=True)
+    writer = sqlite3.connect(library_b / "metadata.db")
+    try:
+        writer.execute("BEGIN EXCLUSIVE")
+        writer.execute("INSERT INTO books DEFAULT VALUES")
+        assert web_module._probe_metadata_db() is False
+    finally:
+        writer.rollback()
+        writer.close()
+
+
+def _call_health(app, web_module, results):
+    with app.test_request_context("/health"):
+        results.append(web_module.health_check())
+
+
+def _response_status(response) -> int:
+    return response[1] if isinstance(response, tuple) else 200
+
+
+def _wait_until(predicate, timeout=2.0):
+    deadline = time.monotonic() + timeout
+    while not predicate() and time.monotonic() < deadline:
+        gevent.sleep(0.01)
+    assert predicate(), "condition did not become true within the test deadline"
+
+
+def test_only_one_health_db_probe_can_remain_in_flight(monkeypatch):
+    from cps import config
+    from cps import web as web_module
+
+    app = Flask(__name__)
+    app.register_blueprint(web_module.web)
+    monkeypatch.setattr(config, "db_configured", True, raising=False)
+    monkeypatch.setattr(
+        web_module, "_HEALTH_DB_PROBE_GATE", threading.Lock(), raising=False
+    )
+    monkeypatch.setattr(
+        web_module, "_HEALTH_S6_PROBE_GATE", threading.Lock(), raising=False
+    )
+
+    started = threading.Event()
+    release = threading.Event()
+    calls = []
+
+    def wedged_db_probe():
+        calls.append(threading.get_ident())
+        started.set()
+        release.wait(timeout=5)
+        return True
+
+    monkeypatch.setattr(web_module, "_probe_metadata_db", wedged_db_probe)
+    monkeypatch.setattr(
+        web_module,
+        "_check_s6_service_status",
+        lambda: {name: "unknown" for name in web_module._CRITICAL_LONGRUNS},
+    )
+
+    first_results = []
+    second_results = []
+    first = gevent.spawn(_call_health, app, web_module, first_results)
+    _wait_until(started.is_set)
+    second = gevent.spawn(_call_health, app, web_module, second_results)
+    gevent.sleep(0.1)
+    calls_before_release = len(calls)
+    second_finished_while_first_wedged = second.ready()
+    release.set()
+    gevent.joinall([first, second], timeout=2)
+
+    assert calls_before_release == 1, "a second DB worker was retained by the next healthcheck"
+    assert second_finished_while_first_wedged, "the duplicate DB probe did not fail fast"
+    assert _response_status(first_results[0]) == 200
+    assert _response_status(second_results[0]) == 503
+
+
+def test_only_one_health_s6_probe_can_remain_in_flight(monkeypatch):
+    from cps import config
+    from cps import web as web_module
+
+    app = Flask(__name__)
+    app.register_blueprint(web_module.web)
+    monkeypatch.setattr(config, "db_configured", True, raising=False)
+    monkeypatch.setattr(
+        web_module, "_HEALTH_DB_PROBE_GATE", threading.Lock(), raising=False
+    )
+    monkeypatch.setattr(
+        web_module, "_HEALTH_S6_PROBE_GATE", threading.Lock(), raising=False
+    )
+    monkeypatch.setattr(web_module, "_probe_metadata_db", lambda: True)
+
+    started = threading.Event()
+    release = threading.Event()
+    calls = []
+
+    def wedged_s6_probe():
+        calls.append(threading.get_ident())
+        started.set()
+        release.wait(timeout=5)
+        return {name: "up" for name in web_module._CRITICAL_LONGRUNS}
+
+    monkeypatch.setattr(web_module, "_check_s6_service_status", wedged_s6_probe)
+
+    first_results = []
+    second_results = []
+    first = gevent.spawn(_call_health, app, web_module, first_results)
+    _wait_until(started.is_set)
+    second = gevent.spawn(_call_health, app, web_module, second_results)
+    gevent.sleep(0.1)
+    calls_before_release = len(calls)
+    second_finished_while_first_wedged = second.ready()
+    release.set()
+    gevent.joinall([first, second], timeout=2)
+
+    assert calls_before_release == 1, "a second s6 worker was retained by the next healthcheck"
+    assert second_finished_while_first_wedged, "the duplicate s6 probe did not return unknown fast"
+    assert _response_status(first_results[0]) == 200
+    assert _response_status(second_results[0]) == 200
+    second_body = second_results[0][0].get_json()
+    assert all(value == "unknown" for value in second_body["services"].values())

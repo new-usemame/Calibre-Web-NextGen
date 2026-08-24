@@ -23,6 +23,9 @@ Dockerfile to the helper. Each test inspects the union of the two so
 either form passes.
 """
 
+import os
+import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -101,9 +104,10 @@ def test_healthcheck_budgets_allow_slow_hosts_but_remain_bounded() -> None:
     """#1799's Docker-in-a-VM host flapped on the old 2s/3s budgets.
 
     Pin the deliberately wider inner/outer pair: curl gets five seconds for
-    slow ARM/VM scheduler and fork variance, and Docker retains a six-second
-    hard stop so a truly dead app still fails fast.  The outer timeout must
-    remain longer than curl's deterministic inner timeout.
+    slow ARM/VM scheduler and fork variance, and Docker retains a seven-second
+    hard stop so a truly dead app still fails fast. The HTTPS-detection DB
+    preflight gets one second, so the outer timeout must cover preflight plus
+    curl plus shell scheduling overhead.
     """
     dockerfile = DOCKERFILE.read_text()
     helper = HEALTHCHECK_HELPER.read_text()
@@ -111,7 +115,56 @@ def test_healthcheck_budgets_allow_slow_hosts_but_remain_bounded() -> None:
     assert "--max-time 5" in helper, (
         "cwa-healthcheck must give /health five bounded seconds on slow ARM/VM hosts (#1799)"
     )
-    assert "HEALTHCHECK --interval=30s --timeout=6s" in dockerfile, (
-        "Docker's outer healthcheck timeout must be six seconds: longer than curl's five-second "
-        "budget, but still bounded for a dead app"
+    assert "timeout 1 sqlite3" in helper, (
+        "HTTPS detection must not consume an unbounded part of the Docker health budget"
     )
+    assert "HEALTHCHECK --interval=30s --timeout=7s" in dockerfile, (
+        "Docker's seven-second outer timeout must cover one second of preflight, five seconds "
+        "of curl, and bounded shell scheduling overhead"
+    )
+
+
+def test_healthcheck_https_sqlite_preflight_has_a_real_wall_clock_bound(tmp_path) -> None:
+    app_db = tmp_path / "app.db"
+    app_db.touch()
+
+    fake_sqlite = tmp_path / "sqlite3"
+    fake_sqlite.write_text("#!/usr/bin/env bash\nsleep 10\n")
+    fake_sqlite.chmod(0o755)
+    fake_curl = tmp_path / "curl"
+    fake_curl.write_text("#!/usr/bin/env bash\nexit 0\n")
+    fake_curl.chmod(0o755)
+
+    helper = tmp_path / "cwa-healthcheck"
+    helper.write_text(
+        HEALTHCHECK_HELPER.read_text().replace("/config/app.db", str(app_db))
+    )
+    helper.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = str(tmp_path) + os.pathsep + env["PATH"]
+    started = time.monotonic()
+    completed = subprocess.run(
+        [str(helper)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=3,
+        check=False,
+    )
+    elapsed = time.monotonic() - started
+
+    assert completed.returncode == 0, completed.stderr
+    assert elapsed < 2.5, f"HTTPS sqlite preflight retained the helper for {elapsed:.2f}s"
+
+
+def test_health_release_notes_state_lock_and_unknown_limits_honestly() -> None:
+    changelog = (REPO_ROOT / "CHANGELOG.md").read_text()
+    divergence = (REPO_ROOT / "CHANGES-vs-upstream.md").read_text()
+
+    assert "corruption behind a qualifying lock" in changelog
+    assert "corruption behind a qualifying lock" in divergence
+    assert "only detected once the lock clears" in changelog
+    assert "contents remain unknown" in changelog
+    assert "explicitly reported `down`" in changelog
+    assert "genuinely down services still report degraded/503" not in changelog

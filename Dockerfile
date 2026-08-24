@@ -463,7 +463,9 @@ VOLUME /calibre-library
 # Calibre metadata.db is reachable and returns 503 on database failure.
 # The helper auto-switches to HTTPS when app.db has a valid cert/key
 # configured, which avoids spurious HTTP-on-HTTPS warnings from gevent.
-# Slow ARM/VM hosts need room for bounded scheduler/fork variance (#1799):
-# curl has 5s, while this 6s outer cap still fails a truly dead app quickly.
-HEALTHCHECK --interval=30s --timeout=6s --start-period=120s --retries=3 \
+# Slow ARM/VM hosts need room for bounded scheduler/fork variance (#1799).
+# HTTPS detection gets <=1s, then curl gets <=5s total (including its connect
+# timeout); this 7s outer cap covers the sequential <=6s plus shell scheduling
+# while still failing a truly dead app quickly.
+HEALTHCHECK --interval=30s --timeout=7s --start-period=120s --retries=3 \
   CMD /usr/local/bin/cwa-healthcheck || exit 1

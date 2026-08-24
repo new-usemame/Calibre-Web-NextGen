@@ -21,11 +21,19 @@ is for things you can see or feel when running the app.
 - **The container healthcheck can no longer freeze the app it is measuring.**
   Database and service probes now run away from gevent's request thread, and a
   normal short-lived `metadata.db` writer lock uses a strictly bounded recent
-  known-good result instead of parking every request. Corrupt databases and
-  genuinely down services still report degraded/503. The probe also gets a
-  little more bounded breathing room on slow ARM and virtual-machine hosts, so
-  healthy containers are less likely to be restarted just for responding
-  slowly. Reported by
+  known-good result for that database object instead of parking every request;
+  using that fallback emits an operator-visible warning. A lock-free corrupt or
+  missing DB is degraded immediately; corruption behind a qualifying lock is
+  only detected once the lock clears. Stale health can be reused for at most a
+  five-minute grace; after that, the lock itself degrades the probe even though
+  the database contents remain unknown.
+  Longruns explicitly reported `down` are degraded, while the pre-existing
+  `unknown` state (no `s6-rc`, timeout, error, or nonzero exit) remains
+  non-degrading. Repeated checks retain at most one DB worker and one service
+  worker even if filesystem I/O wedges. On slow ARM and virtual-machine hosts,
+  HTTPS detection now has a one-second cap before curl's five-second cap, all
+  inside Docker's seven-second outer cap, so a dead app still fails fast.
+  Reported by
   [@hayvan96](https://github.com/hayvan96) and corroborated by
   [@chloeroform](https://github.com/chloeroform)
   ([#1799](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1799)).

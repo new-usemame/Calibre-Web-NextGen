@@ -64,9 +64,14 @@ def test_health_check_offloads_both_blocking_probes_from_the_gevent_hub():
     """
     from cps import web as web_module
 
-    source = inspect.getsource(web_module.health_check)
-    assert "_run_blocking(_probe_metadata_db)" in source
-    assert "_run_blocking(_check_s6_service_status)" in source
+    route_source = inspect.getsource(web_module.health_check)
+    offloader_source = inspect.getsource(web_module._run_single_flight_health_probe)
+    assert "_run_single_flight_health_probe" in route_source
+    assert "_probe_metadata_db" in route_source
+    assert "_check_s6_service_status" in route_source
+    assert "_run_blocking(run_and_release_gate)" in offloader_source
+    assert "gate.acquire(blocking=False)" in offloader_source
+    assert "gate.release()" in offloader_source
 
 
 def test_check_s6_service_status_probes_critical_longruns():

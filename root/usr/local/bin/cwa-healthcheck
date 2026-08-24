@@ -7,7 +7,7 @@ curl_extra=()
 
 if [[ -f /config/app.db ]]; then
   IFS=$'\t' read -r certfile keyfile <<EOF || true
-$(sqlite3 -separator $'\t' /config/app.db "SELECT COALESCE(config_certfile, ''), COALESCE(config_keyfile, '') FROM settings LIMIT 1;" 2>/dev/null || true)
+$(timeout 1 sqlite3 -separator $'\t' /config/app.db "SELECT COALESCE(config_certfile, ''), COALESCE(config_keyfile, '') FROM settings LIMIT 1;" 2>/dev/null || true)
 EOF
   if [[ -n "${certfile:-}" && -n "${keyfile:-}" && -f "$certfile" && -f "$keyfile" ]]; then
     scheme="https"
@@ -15,7 +15,8 @@ EOF
   fi
 fi
 
-# Keep the probe fail-fast and strictly bounded, while allowing scheduler and
-# fork variance observed on slow ARM/VM hosts (#1799). Docker's outer 6s cap
-# remains longer than curl's 5s budget and can still kill a truly dead probe.
+# Keep the probe fail-fast and strictly bounded on slow ARM/VM hosts (#1799).
+# HTTPS detection consumes at most 1s before curl begins; curl then gets at
+# most 5s total (its 1s connect timeout is inside, not added to, that budget).
+# Docker's 7s outer cap covers the sequential <=6s plus shell scheduling.
 exec curl -fsS --connect-timeout 1 --max-time 5 "${curl_extra[@]}" "${scheme}://127.0.0.1:${port}/health"

@@ -1,19 +1,27 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Pin the PR-level guard against structural CHANGELOG loss."""
 
+import importlib.util
+import os
 from pathlib import Path
 
-from scripts.check_changelog_diff import (
-    pull_request_regressions,
-    structural_regressions,
-)
-
-
 ROOT = Path(__file__).resolve().parents[2]
+GUARD_PATH = Path(
+    os.environ.get("CWNG_CHANGELOG_GUARD", ROOT / "scripts" / "check_changelog_diff.py")
+)
+SPEC = importlib.util.spec_from_file_location("cwng_changelog_guard", GUARD_PATH)
+assert SPEC and SPEC.loader
+GUARD = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(GUARD)
+changelog_requirement_errors = GUARD.changelog_requirement_errors
+pull_request_regressions = GUARD.pull_request_regressions
+structural_regressions = GUARD.structural_regressions
 
 
 def test_missing_release_heading_is_rejected():
-    base = """## [Unreleased]\n\n## [v4.1.27] - 2026-08-02\n\n### Fixed\n- **A fix.**\n"""
+    base = (
+        """## [Unreleased]\n\n## [v4.1.27] - 2026-08-02\n\n### Fixed\n- **A fix.**\n"""
+    )
     stale_branch = """## [Unreleased]\n\n### Fixed\n- **A new fix.**\n- **A fix.**\n"""
     errors = structural_regressions(base, stale_branch)
     assert any("v4.1.27" in error for error in errors)
@@ -124,10 +132,46 @@ def test_stale_pr_that_did_edit_changelog_must_preserve_current_releases():
     assert any("v4.1.27" in error for error in errors)
 
 
+def test_pr_can_satisfy_the_changelog_rule_with_a_fragment():
+    assert (
+        changelog_requirement_errors(
+            ["cps/web.py", "tests/unit/test_web.py", "changelog.d/reader-back-link.md"]
+        )
+        == []
+    )
+
+
+def test_direct_changelog_edits_remain_accepted_during_cutover():
+    assert changelog_requirement_errors(["cps/web.py", "CHANGELOG.md"]) == []
+
+
+def test_pr_cannot_satisfy_the_changelog_rule_with_neither_form():
+    errors = changelog_requirement_errors(["cps/web.py", "tests/unit/test_web.py"])
+    assert len(errors) == 1
+    assert "CHANGELOG.md" in errors[0]
+    assert "changelog.d/<pr-or-slug>.md" in errors[0]
+
+
+def test_changelog_directory_readme_is_documentation_not_a_fragment():
+    errors = changelog_requirement_errors(["CONTRIBUTING.md", "changelog.d/README.md"])
+    assert errors
+
+
+def test_fragments_are_direct_markdown_children_with_safe_names():
+    assert changelog_requirement_errors(["changelog.d/fix-123.md"]) == []
+    assert changelog_requirement_errors(["changelog.d/nested/fix.md"])
+    assert changelog_requirement_errors(["changelog.d/fix.txt"])
+
+
 def test_pr_ci_invokes_guard_with_complete_git_history():
-    workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(
+        encoding="utf-8"
+    )
     fast_tests = workflow.split("  fast-tests:", 1)[1].split("\n  #", 1)[0]
     changed_paths = workflow.split("  changed_paths:", 1)[1].split("\n  #", 1)[0]
     assert "fetch-depth: 0" in fast_tests
     assert "fetch-depth: 0" in changed_paths
-    assert 'python3 scripts/check_changelog_diff.py "$BASE_SHA" "$HEAD_SHA"' in changed_paths
+    assert (
+        'python3 scripts/check_changelog_diff.py "$BASE_SHA" "$HEAD_SHA"'
+        in changed_paths
+    )

@@ -138,8 +138,14 @@
       margin-right var(--dur-base) var(--ease-out);
   }
 
-  :is(.nav, .navOpen)::-webkit-scrollbar {
-    display: none;
+  /* `scrollbar-width: none` above is what every current engine reads. The
+     legacy pseudo-element stays behind the same feature guard as the one in
+     styles/global.css: an engine that honours `::-webkit-scrollbar` but lacks
+     the standard properties gets the fallback, and nothing else does (#1089). */
+  @supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
+    :is(.nav, .navOpen)::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) {

@@ -18,6 +18,10 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The Duplicates sidebar link now appears for the people who can actually use
+  it.** Editors can discover the page, while upload-only accounts no longer see
+  a link that leads to a permission error. Administrators remain unchanged.
+
 - **Cover thumbnails load faster, and the gap widens the bigger your library
   gets.** Every cover request searched the whole thumbnail table instead of
   going straight to the row it wanted, and the book grid asked for each cover

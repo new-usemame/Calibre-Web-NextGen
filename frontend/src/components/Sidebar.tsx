@@ -97,7 +97,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const shelves = shelvesData?.items ?? [];
   const magicShelves = useMagicShelves().data?.items ?? [];
   const me = useMe().data;
-  const canUpload = !!me?.role?.upload;
+  const canEdit = !!me?.role?.edit;
   const isAdmin = !!me?.role?.admin;
   const isAuthed = !!me?.id;
 
@@ -331,7 +331,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   </li>
                 );
               })}
-              {(canUpload || isAdmin) && showDuplicates && (
+              {(canEdit || isAdmin) && showDuplicates && (
                 <li>
                   <Link
                     href="/duplicates"

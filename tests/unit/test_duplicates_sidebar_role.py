@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
+"""Source-level pins for the Duplicates role contract.
+
+These tests prove that the named role expression remains in ``Sidebar.tsx``
+and that the API guard accepts admin or edit.  They do not render the SPA and
+would not notice if the component stopped rendering the link entirely.  The
+executable UI/API contract lives in
+``frontend/e2e/duplicates-sidebar-role.spec.ts``.
+"""
 import inspect
 from pathlib import Path
 from types import SimpleNamespace

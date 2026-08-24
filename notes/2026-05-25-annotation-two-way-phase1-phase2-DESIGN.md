@@ -7,6 +7,16 @@
 > 4.45.23792) is the **authority** on Edge 4 and supersedes every statement here about
 > it. Stage 0 of that design is merged.
 >
+> **It is wrong in two independent ways, not one.** The first is the annotation
+> fetch: the device treats `GET /api/v3/content/<uuid>/annotations` as an
+> authoritative replacement set, so a row the server adds is created on-device.
+> The second is the ETag, which is what the "closed protocol" argument really
+> rested on — Nickel accepts a **CWNG-authored** ETag, stores it byte-for-byte,
+> and echoes it back in the next `checkforchanges`. It is opaque to the device.
+> So the server does not need to synthesise anything resembling a Kobo manifest
+> to be believed, which was the assumed blocker. Measured 2026-08-23; recorded
+> as §11.2 CLOSED in the authority.
+>
 > Everything else in this document — the Phase 1 web-reader create path and the Phase 2
 > KOReader bridge — still stands and is unaffected.
 

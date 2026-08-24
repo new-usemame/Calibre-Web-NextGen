@@ -6,8 +6,10 @@ schema, preference API and SPA controls, with both gates default-off so nothing 
 
 **Supersedes:** `notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md` on the
 Edge 4 question only. That document states server → stock Nickel is "permanently out
-(protocol)"; it predates any hardware measurement and is wrong. Its Phase 1 and Phase 2
-content is unaffected.
+(protocol)"; it predates any hardware measurement and is wrong on two counts — the
+annotation GET is an authoritative replacement set (§2), and the ETag is opaque to
+Nickel (§11.2, CLOSED 2026-08-23), so no manifest synthesis is required. Its Phase 1
+and Phase 2 content is unaffected.
 
 **Date:** 2026-08-16
 

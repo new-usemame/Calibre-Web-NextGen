@@ -37,6 +37,10 @@ is for things you can see or feel when running the app.
   [@hayvan96](https://github.com/hayvan96) and corroborated by
   [@chloeroform](https://github.com/chloeroform)
   ([#1799](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1799)).
+- **Pull requests opened before a release no longer fail their changelog CI
+  check after that release is tagged.** The guard now considers only releases
+  contained in the branch under test, while retaining the committed release
+  ledger as a strict fallback when Git tag reachability is unavailable.
 
 - **Cover thumbnails load faster, and the gap widens the bigger your library
   gets.** Every cover request searched the whole thumbnail table instead of

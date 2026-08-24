@@ -459,9 +459,11 @@ VOLUME /cwa-book-ingest
 VOLUME /calibre-library
 
 # Health check for container orchestration
-# Targets the /health endpoint (cps/web.py:1051) which verifies the
+# Targets the /health endpoint (cps/web.py) which verifies the
 # Calibre metadata.db is reachable and returns 503 on database failure.
 # The helper auto-switches to HTTPS when app.db has a valid cert/key
 # configured, which avoids spurious HTTP-on-HTTPS warnings from gevent.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=120s --retries=3 \
+# Slow ARM/VM hosts need room for bounded scheduler/fork variance (#1799):
+# curl has 5s, while this 6s outer cap still fails a truly dead app quickly.
+HEALTHCHECK --interval=30s --timeout=6s --start-period=120s --retries=3 \
   CMD /usr/local/bin/cwa-healthcheck || exit 1

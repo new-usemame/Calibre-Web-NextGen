@@ -15,4 +15,7 @@ EOF
   fi
 fi
 
-exec curl -fsS --connect-timeout 1 --max-time 2 "${curl_extra[@]}" "${scheme}://127.0.0.1:${port}/health"
+# Keep the probe fail-fast and strictly bounded, while allowing scheduler and
+# fork variance observed on slow ARM/VM hosts (#1799). Docker's outer 6s cap
+# remains longer than curl's 5s budget and can still kill a truly dead probe.
+exec curl -fsS --connect-timeout 1 --max-time 5 "${curl_extra[@]}" "${scheme}://127.0.0.1:${port}/health"

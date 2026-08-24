@@ -95,3 +95,23 @@ def test_healthcheck_curl_has_bounded_max_time(healthcheck_sources: str) -> None
         "HEALTHCHECK curl must pass --max-time so a wedged gevent loop "
         "produces a deterministic, bounded probe failure."
     )
+
+
+def test_healthcheck_budgets_allow_slow_hosts_but_remain_bounded() -> None:
+    """#1799's Docker-in-a-VM host flapped on the old 2s/3s budgets.
+
+    Pin the deliberately wider inner/outer pair: curl gets five seconds for
+    slow ARM/VM scheduler and fork variance, and Docker retains a six-second
+    hard stop so a truly dead app still fails fast.  The outer timeout must
+    remain longer than curl's deterministic inner timeout.
+    """
+    dockerfile = DOCKERFILE.read_text()
+    helper = HEALTHCHECK_HELPER.read_text()
+
+    assert "--max-time 5" in helper, (
+        "cwa-healthcheck must give /health five bounded seconds on slow ARM/VM hosts (#1799)"
+    )
+    assert "HEALTHCHECK --interval=30s --timeout=6s" in dockerfile, (
+        "Docker's outer healthcheck timeout must be six seconds: longer than curl's five-second "
+        "budget, but still bounded for a dead app"
+    )

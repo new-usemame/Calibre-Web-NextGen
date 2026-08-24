@@ -18,6 +18,18 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The container healthcheck can no longer freeze the app it is measuring.**
+  Database and service probes now run away from gevent's request thread, and a
+  normal short-lived `metadata.db` writer lock uses a strictly bounded recent
+  known-good result instead of parking every request. Corrupt databases and
+  genuinely down services still report degraded/503. The probe also gets a
+  little more bounded breathing room on slow ARM and virtual-machine hosts, so
+  healthy containers are less likely to be restarted just for responding
+  slowly. Reported by
+  [@hayvan96](https://github.com/hayvan96) and corroborated by
+  [@chloeroform](https://github.com/chloeroform)
+  ([#1799](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1799)).
+
 - **Cover thumbnails load faster, and the gap widens the bigger your library
   gets.** Every cover request searched the whole thumbnail table instead of
   going straight to the row it wanted, and the book grid asked for each cover

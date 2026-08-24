@@ -55,6 +55,20 @@ def test_health_check_calls_a_service_status_helper():
     )
 
 
+def test_health_check_offloads_both_blocking_probes_from_the_gevent_hub():
+    """The DB read and s6 subprocess must never run on a request greenlet.
+
+    CWNG deliberately does not monkey-patch stdlib I/O.  Calling either
+    helper inline therefore freezes every request, which made Docker's own
+    healthcheck self-inflict the #1799 restart loop.
+    """
+    from cps import web as web_module
+
+    source = inspect.getsource(web_module.health_check)
+    assert "_run_blocking(_probe_metadata_db)" in source
+    assert "_run_blocking(_check_s6_service_status)" in source
+
+
 def test_check_s6_service_status_probes_critical_longruns():
     """Source-pin: the helper probes each critical longrun by name.
 

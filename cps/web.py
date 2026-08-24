@@ -14,6 +14,7 @@ import re
 import zipfile
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from pathlib import Path as _Path
 
 from flask import Blueprint, jsonify
 from flask import request, redirect, send_from_directory, send_file, make_response, flash, abort, url_for, Response, g
@@ -54,6 +55,7 @@ from .render_template import render_title_template
 from .kobo_sync_status import change_archived_books
 from . import limiter
 from .services.worker import WorkerThread
+from .services.parallel import run_blocking as _run_blocking
 from .tasks_status import render_task_status
 from .usermanagement import user_login_required
 from .string_helper import strip_whitespaces
@@ -1270,28 +1272,52 @@ def render_magic_shelf(shelf_id, sort_param, page):
 # ~200k-book production trace from @FRaccie.
 _CRITICAL_LONGRUNS = ("cwa-ingest-service", "metadata-change-detector")
 
+# A metadata writer is normal during ingest, checksum backfill, or a direct
+# calibredb operation.  Waiting on SQLite's busy timeout here is unsafe:
+# gevent is deliberately unpatched, so a blocking request greenlet freezes
+# the whole application (#1799).  Prefer a recent successful observation for
+# this one distinguishable transient state, but bound it so a permanently
+# locked/broken library cannot be reported healthy forever.
+_METADATA_DB_LOCK_STALE_GRACE_SECONDS = 5 * 60
+_metadata_db_last_good = (None, 0.0)
+
 
 def _probe_metadata_db():
-    """Return True if metadata.db opens and ``SELECT 1`` succeeds."""
+    """Return whether metadata.db is readable without waiting on a writer.
+
+    A lock may reuse a recent known-good result for a bounded interval.  Any
+    other failure is immediately unhealthy; the cache never masks corruption,
+    a missing database, or a stale lock beyond the explicit grace period.
+    """
+    global _metadata_db_last_good
+
+    conn = None
+    db_path = None
     try:
-        db_path = os.path.join(cwa_get_library_location(), "metadata.db")
-        retries = 3
-        while retries:
-            try:
-                conn = sqlite3.connect(db_path, timeout=30)
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1")
-                conn.close()
-                return True
-            except sqlite3.OperationalError as e:
-                if 'locked' in str(e).lower() and retries > 1:
-                    time.sleep(0.1)
-                    retries -= 1
-                    continue
-                raise
+        db_path = os.path.abspath(
+            os.path.join(cwa_get_library_location(), "metadata.db")
+        )
+        db_uri = _Path(db_path).as_uri() + "?mode=ro"
+        # mode=ro prevents a missing metadata.db from being created by the
+        # liveness probe. timeout=0 makes writer contention observable rather
+        # than parking a native worker for SQLite's historical 30s timeout.
+        conn = sqlite3.connect(db_uri, uri=True, timeout=0)
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
+        _metadata_db_last_good = (db_path, time.monotonic())
+        return True
+    except sqlite3.OperationalError as exc:
+        if "locked" in str(exc).lower():
+            cached_path, cached_at = _metadata_db_last_good
+            return (
+                cached_path == db_path
+                and time.monotonic() - cached_at <= _METADATA_DB_LOCK_STALE_GRACE_SECONDS
+            )
+        return False
     except Exception:
         return False
-    return False
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def _check_s6_service_status():
@@ -1356,8 +1382,13 @@ def health_check():
             "version": f"Calibre-Web-NextGen/{constants.INSTALLED_VERSION}",
         }), 503
 
-    db_up = _probe_metadata_db()
-    services_status = _check_s6_service_status()
+    # Both helpers perform unpatched blocking I/O.  Waiting for them on the
+    # request greenlet freezes gevent's single hub thread and every other
+    # request.  The shared offloader runs the syscalls on real OS threads and
+    # waits cooperatively, preserving honest results without self-inflicted
+    # downtime (#1799).
+    db_up = _run_blocking(_probe_metadata_db)
+    services_status = _run_blocking(_check_s6_service_status)
     any_service_down = any(state == "down" for state in services_status.values())
     healthy = db_up and not any_service_down
 

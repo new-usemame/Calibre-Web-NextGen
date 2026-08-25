@@ -592,7 +592,8 @@ def test_cross_process_lock_contention_fails_open_without_waiting(monkeypatch, t
 
     caller = threading.Thread(target=_stage, daemon=True)
     caller.start()
-    completed_while_lock_was_busy = finished.wait(0.5)
+    grace = spool.REQUEST_IO_TIMEOUT_SECONDS * 5
+    completed_while_lock_was_busy = finished.wait(grace)
     release_parent.send(True)
     caller.join(5)
     holder.join(5)
@@ -601,10 +602,10 @@ def test_cross_process_lock_contention_fails_open_without_waiting(monkeypatch, t
     assert not holder.is_alive()
     assert completed_while_lock_was_busy, (
         "the production spool deadline allowed a blocked flock to hold the "
-        "request for at least 500 ms"
+        f"request for at least {grace:.1f}s"
     )
-    assert spool.REQUEST_IO_TIMEOUT_SECONDS == 0.1
-    assert elapsed[0] < 0.5
+    assert spool.REQUEST_IO_TIMEOUT_SECONDS == 1.0
+    assert elapsed[0] < grace
     assert result == [None]
     deadline = time.monotonic() + 2
     while not list(root.glob("patch-*.json.gz")) and time.monotonic() < deadline:

@@ -64,10 +64,13 @@ This unauthenticated diagnostic has a separate directory and retention budget:
 <config>/.cwng-private-observability/kobo-reading-services-unauthenticated/
 ```
 
-It is capped at 32 records, 8 MiB compressed total, 24 hours, and 1 MiB for an
-individual body. Requests without a bounded `Content-Length` or beyond 1 MiB
-are refused normally but not read or captured. The diagnostic remains off by
-default; when it is off, the auth gate does not consume the request body.
+It is capped at 32 records, 8 MiB compressed total, and 1 MiB for an individual
+body. Records older than 24 hours are pruned when the next unauthenticated
+capture is persisted; 24 hours is therefore an age target, not a wall-clock
+maximum during a quiet period. Requests without a bounded `Content-Length` or
+beyond 1 MiB are refused normally but not read or captured. The diagnostic
+remains off by default; when it is off, the auth gate does not consume the
+request body.
 Unauthenticated churn therefore cannot evict authenticated exchange captures
 or any always-on recovery record.
 
@@ -84,11 +87,12 @@ diagnostic gate. Its records live at:
 
 The spool stores the exact raw body as base64 plus its byte length and SHA-256,
 the entitlement/user/origin-device identifiers needed to route a controlled
-replay, and one processing outcome: `staged`, `dispatch_exception`, or
-`dispatch_completed`. It never stores request headers. A completed record is
-retained too because completion of the route does not prove that every member
-commit succeeded. Replay is deliberately a server-side operator action; CWNG
-does not automatically reapply a PATCH or risk applying the same delta twice.
+replay, and one processing outcome: `staged`, `dispatch_refused`,
+`dispatch_exception`, or `dispatch_completed`. It never stores request headers.
+A completed record is retained too because completion of the route does not
+prove that every member commit succeeded. Replay is deliberately a server-side
+operator action; CWNG does not automatically reapply a PATCH or risk applying
+the same delta twice.
 `cps.services.kobo_patch_spool.iter_replay_candidates()` identifies definitely
 interrupted records and `load_spooled_patch(path)` verifies the stored length
 and digest before returning the original bytes.
@@ -100,11 +104,17 @@ the request waits at most 100 ms; timeout, lock contention, or any storage
 failure degrades to no new recovery record without changing the PATCH route.
 
 It is capped at 512 files, 64 MiB compressed total, 14 days, and 16 MiB per
-PATCH body. `staged` and `dispatch_exception` records are protected: when the
-only way to admit a new body would be to remove one, the new body is not
-staged. Evictable completed records are moved through a durable transaction so
-a failed new write restores the prior record set. A deadline-driven maintenance
-worker enforces the age limit even while no new PATCHes arrive. An oversized
+PATCH body. `staged`, `dispatch_refused`, and `dispatch_exception` records are
+protected: when the only way to admit a new body would be to remove one, the
+new body is not staged. Retries with the same user, entitlement, origin device, and exact body
+refresh one record regardless of the previous outcome; they do not consume
+additional slots. The refreshed record is protected until that attempt finishes.
+This identity rule also applies to bodies CWNG cannot parse or fully persist:
+the refusal remains replayable because complete persistence is unproven.
+Only completed records are evictable to admit distinct bodies.
+Evictable records are moved through a durable transaction so a failed new write
+restores the prior record set. A deadline-driven maintenance worker enforces
+the age limit even while no new PATCHes arrive. An oversized
 body or any storage failure is reported without body content and cannot change
 parsing, dispatch, the existing ownership-unknown 503, or the upstream response
 returned to the Kobo. The same repository, support-bundle, and external-backup

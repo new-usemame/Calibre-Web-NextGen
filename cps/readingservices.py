@@ -629,6 +629,20 @@ class KoboAnnotation(TypedDict):
     type: str  # "note" or "highlight"
 
 
+def _dispatch_kobo_annotation_deletes(annotation_sync, deleted, entitlement_id, book):
+    if deleted is not None and not isinstance(deleted, list):
+        log.warning(
+            "Ignoring deletedAnnotationIds for entitlement %s: expected a list",
+            entitlement_id,
+        )
+    elif deleted:
+        # Nickel can only name annotations Kobo created: CWNG has no annotation
+        # writeback to Kobo. If F-3b565b implements writeback, this provenance
+        # authority must be revisited.
+        annotation_sync.dispatch_annotation_deletes(
+            deleted, current_user, book_id=book.id,
+            deletable_sources={"kobo"},
+        )
 
 
 @csrf.exempt
@@ -673,8 +687,16 @@ def handle_annotations(entitlement_id):
     )
     if request.method == "PATCH":
         patch_spool_ticket = _stage_patch_for_recovery(raw_body, entitlement_id)
+        # The conservative default is replayable. Every post-stage exit crosses
+        # the single finally block below, so a new return cannot silently leave
+        # its ticket in the ambiguous initial state. Only a completed dispatch
+        # overrides it; every refusal remains an unresolved replay candidate.
+        patch_spool_outcome = "dispatch_exception"
         try:
-            data = request.get_json(silent=True)
+            # The raw body is the authority here. A proxy or client can strip
+            # or alter Content-Type without changing whether these bytes are a
+            # valid, addressable JSON batch.
+            data = request.get_json(silent=True, force=True)
             nonempty_unaddressable_body = False
             if not isinstance(data, dict):
                 if raw_body.strip():
@@ -692,6 +714,7 @@ def handle_annotations(entitlement_id):
                 # Do not proxy: checkforchanges containment prevents an owned
                 # book from healing this local gap by downloading from Kobo.
                 # A visible PATCH failure preserves the opportunity to retry.
+                patch_spool_outcome = "dispatch_refused"
                 return make_response(
                     jsonify({"error": "Annotation capture temporarily unavailable"}), 503,
                 )
@@ -707,6 +730,7 @@ def handle_annotations(entitlement_id):
                         "Refusing local annotation capture for entitlement %s: "
                         "PATCH body is not a JSON object", entitlement_id,
                     )
+                    patch_spool_outcome = "dispatch_refused"
                     return make_response(
                         jsonify({"error": "Annotation capture temporarily unavailable"}),
                         503,
@@ -714,7 +738,19 @@ def handle_annotations(entitlement_id):
                 from cps.services import annotation_sync
                 updated = data.get("updatedAnnotations")
                 deleted = data.get("deletedAnnotationIds")
-                if "updatedAnnotations" in data:
+                deterministic_update_rejection = (
+                    bool(updated) and not isinstance(updated, list)
+                )
+                # Falsy non-list spellings cannot contain an annotation. Treat
+                # them as an empty update set so a delete-carrying batch is not
+                # trapped in a permanent retry. A truthy non-list value may be
+                # a malformed annotation and still goes through the defensive
+                # dispatcher, whose False result is refused below.
+                if deterministic_update_rejection:
+                    _dispatch_kobo_annotation_deletes(
+                        annotation_sync, deleted, entitlement_id, book,
+                    )
+                if updated:
                     raw_materializations = None
                     trace_id = None
                     if isinstance(updated, list) and updated:
@@ -754,36 +790,32 @@ def handle_annotations(entitlement_id):
                         updated, book, current_user, **dispatch_kwargs,
                     )
                     if persisted is False:
+                        # False means complete batch persistence is unproven,
+                        # not that zero rows reached SQLite. On this engine a
+                        # released SAVEPOINT can survive a later rollback, so
+                        # keep the raw body for replay/reconciliation either way.
                         log.error(
                             "Kobo annotation PATCH was not fully persisted for "
                             "user_id=%s book_id=%s; refusing to acknowledge it upstream",
                             getattr(current_user, "id", None), book.id,
                         )
+                        patch_spool_outcome = "dispatch_refused"
                         return make_response(
                             jsonify({"error": "Annotation capture temporarily unavailable"}),
                             503,
                         )
-                if deleted is not None and not isinstance(deleted, list):
-                    log.warning(
-                        "Ignoring deletedAnnotationIds for entitlement %s: expected a list",
-                        entitlement_id,
+                if not deterministic_update_rejection:
+                    _dispatch_kobo_annotation_deletes(
+                        annotation_sync, deleted, entitlement_id, book,
                     )
-                elif deleted:
-                    # Nickel can only name annotations Kobo created: CWNG has
-                    # no annotation writeback to Kobo. If F-3b565b implements
-                    # writeback, this provenance authority must be revisited.
-                    annotation_sync.dispatch_annotation_deletes(
-                        deleted, current_user, book_id=book.id,
-                        deletable_sources={"kobo"},
-                    )
+            patch_spool_outcome = "dispatch_completed"
         except Exception:
-            _mark_patch_spool_outcome(patch_spool_ticket, "dispatch_exception")
             log.exception("Error processing PATCH annotations")
             return make_response(
                 jsonify({"error": "Annotation capture temporarily unavailable"}), 503,
             )
-        else:
-            _mark_patch_spool_outcome(patch_spool_ticket, "dispatch_completed")
+        finally:
+            _mark_patch_spool_outcome(patch_spool_ticket, patch_spool_outcome)
     # Proxy both GET + PATCH. Do not refuse GET: hardware testing showed that a
     # 503 (or a hung request) makes Nickel empty its local annotations. The safe
     # containment point is checkforchanges, before Nickel decides to GET.

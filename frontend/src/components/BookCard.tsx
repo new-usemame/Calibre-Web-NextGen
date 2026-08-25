@@ -29,9 +29,9 @@ interface BookCardProps {
    *  on their ereaders, so Read Now is redundant"). Persisted per browser and
    *  toggled from the catalog's View settings.
    *
-   *  This removes the row rather than hiding it: a merely-transparent control
-   *  (`opacity: 0`) is still focusable, so a user who has switched these off
-   *  would keep tabbing through two invisible controls per card. Both
+   *  This removes the row rather than hiding it: an `opacity: 0` control (what
+   *  the hover-reveal uses) is still focusable, so a user who has switched these
+   *  off would keep tabbing through two invisible controls per card. Both
    *  actions remain on the book's own page, which the cover already links to. */
   hideActions?: boolean;
 }

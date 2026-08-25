@@ -10,8 +10,8 @@ import { test, expect } from '@playwright/test';
  * View settings, persisted per browser.
  *
  * The load-bearing assertion is that switching it off REMOVES the controls
- * rather than hiding them. A merely-transparent control (`opacity: 0`) leaves
- * a focusable link in the tab order — a keyboard user who turned these off would
+ * rather than hiding them. The hover-reveal uses `opacity: 0`, which leaves a
+ * focusable link in the tab order — a keyboard user who turned these off would
  * otherwise tab through two invisible controls on every card in the grid.
  */
 

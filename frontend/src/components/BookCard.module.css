@@ -48,22 +48,12 @@
 }
 
 /* Lift on hover or when anything in the card (card control or an action button)
-   is focused. Keyed off .wrap so focusing a sibling action button lifts too.
-
-   The ring is --accent-ring (translucent amber), not solid --accent. Amber has
-   three jobs on this card and they were all shouting at the same volume: the
-   hover ring, the primary "Read now" action, and the selected state. Since the
-   read action now carries a solid --accent fill on hover, a solid ring around
-   the cover directly above it competed with — and visually beat — the control
-   it was meant to accompany, which is why the action read as a caption.
-   Ranking, loudest last: hover ring (translucent) < primary action (solid fill)
-   = selected (solid 3px ring, below — a persistent semantic state, and the only
-   signal that a card is selected, so it keeps full strength). */
+   is focused. Keyed off .wrap so focusing a sibling action button lifts too. */
 .wrap:hover .coverWrap,
 .wrap:focus-within .coverWrap {
   transform: translateY(-4px);
   box-shadow: var(--elev-3);
-  outline-color: var(--accent-ring);
+  outline-color: var(--accent);
 }
 
 /* Selected state: persistent amber ring + dim so the selection reads at a glance. */
@@ -281,20 +271,10 @@
 }
 
 /* Quick-edit pencil (fork #572). Lives in `.actionRow`, in normal flow beside
-   the read link — NOT absolutely positioned over the card (#1166).
-
-   It wears surface tokens, not --cover-control-*: those exist for controls
-   sitting ON cover artwork (opaque and palette-independent so contrast never
-   depends on the image), but since #1166 this button sits on the card surface
-   below the cover — where they made it an opaque near-black disc with a white
-   hairline on every pale theme, a control visibly foreign to the card. As an
-   on-surface control it uses the same vocabulary as the Button primitive:
-   raised fill + hairline + muted icon at rest, darker fill + stronger text and
-   border on hover. The icon (the information that identifies it) measures
-   5.3–17.9:1 against both its fill and the page in every theme — the hairline
-   is refinement, not the identifier (SC 1.4.11). No amber anywhere in its
-   states: only one element on the card gets to be the loud accent, and that is
-   the read action. */
+   the read link — NOT absolutely positioned over the card (#1166). It uses
+   on-surface tokens here; --cover-control-* is reserved for controls over
+   unpredictable cover artwork. Hover/focus-reveal like the remove button, but
+   always reachable via keyboard focus. */
 .quickEditBtn {
   flex: 0 0 auto;
   /* A card with no readable format has no "Read now" link, so the pencil is
@@ -302,31 +282,32 @@
      a control users have always found at bottom-right, on exactly the
      MOBI/AZW3 cards this fix was meant to help. */
   margin-left: auto;
-  /* 32px: the same height as the read link beside it — one shared row height
-     instead of a 32px pill next to a 24px coin. Above the 24px SC 2.5.8 floor;
-     touch still takes it to 44px in the media block below. */
-  width: 32px;
-  height: 32px;
-  /* --r-md, not --r-full: the pair shares one radius family (the Button
-     primitive's), so the row reads as two states of one control set rather
-     than a pill beside a coin. */
-  border-radius: var(--r-md);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
   background: var(--surface-2);
   color: var(--text-muted);
   border: 1px solid var(--border);
+  box-shadow: var(--elev-1);
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Always present at rest (operator: the actions "look not part of the thing"
-     when they appear from nowhere on hover). Hover INTENSIFIES the control;
-     it no longer introduces it. */
-  transition: background var(--dur-fast) var(--ease),
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease),
               color var(--dur-fast) var(--ease),
               border-color var(--dur-fast) var(--ease);
 }
 
-.quickEditBtn:hover,
+.wrap:hover .quickEditBtn,
+.wrap:focus-within .quickEditBtn,
 .quickEditBtn:focus-visible {
+  opacity: 1;
+}
+
+.quickEditBtn:hover,
+.quickEditBtn:focus-visible,
+.quickEditBtn:active {
   background: var(--surface-3);
   color: var(--text);
   border-color: var(--border-strong);
@@ -374,14 +355,6 @@
   justify-content: center;
   gap: var(--sp-1);
   border-radius: var(--r-md);
-  /* Resting state: a quiet accent-tinted container with the AA-safe text
-     variant (measured 4.8–10.2:1 against the tint over page/surface in all
-     five themes — do NOT "simplify" the text color to --accent, which fails
-     SC 1.4.3 on this fill; tokens.css:36-39 documents the measurement).
-     The card's primary action is visible without hover — hover intensifies it
-     to the Button primitive's solid `.primary` pairing, it no longer
-     introduces it from nothing. */
-  background: var(--accent-soft);
   color: var(--accent-text);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
@@ -389,8 +362,8 @@
   /* One line, always. Two-line labels are what grew the row into the metadata. */
   white-space: nowrap;
   overflow: hidden;
-  transition: background var(--dur-fast) var(--ease),
-              color var(--dur-fast) var(--ease);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .readNow svg {
@@ -408,23 +381,17 @@
   text-overflow: ellipsis;
 }
 
-/* Hover/focus: the Button `.primary` vocabulary — solid --accent fill with
-   --on-accent text (5.0–13.1:1 across the five themes). */
+.wrap:hover .readNow,
+.wrap:focus-within .readNow,
+.readNow:focus-visible { opacity: 1; }
+
 .readNow:hover,
-.readNow:focus-visible {
-  background: var(--accent);
-  color: var(--on-accent);
-}
+.readNow:focus-visible { background: var(--accent-soft); }
 
 /* `any-pointer` also covers hybrid devices (for example, an iPad with a
    trackpad): touch must not lose actions merely because a fine pointer exists. */
 @media (any-hover: none), (any-pointer: coarse) {
-  /* `opacity: 1` used to be the point of this block for .readNow and
-     .quickEditBtn — both rested at 0 and only touch un-hid them. They now rest
-     visible on every pointer type, so only the sizing is still doing work here.
-     .removeBtn still rests hidden (it is an overlay control on the artwork, and
-     keeping the grid calm is deliberate), so it keeps its opacity override. */
-  .readNow { min-height: 44px; }
+  .readNow { min-height: 44px; opacity: 1; }
   /* Bigger where legibility is worst — a phone held at arm's length is the
      case the reporter was describing. */
   .readBadge, .readingBadge, .hiddenBadge {
@@ -435,8 +402,8 @@
   .removeBtn, .quickEditBtn {
     width: 44px;
     height: 44px;
+    opacity: 1;
   }
-  .removeBtn { opacity: 1; }
 }
 
 /* Narrow cards — the Compact and Dense grids, which are 3 and 4 columns on a

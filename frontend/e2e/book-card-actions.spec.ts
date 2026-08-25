@@ -62,25 +62,52 @@ test('book-card actions keep a shared baseline for touch, mouse, and keyboard', 
       await expect(quickEdit).toHaveCount(1);
       await expectRevealed(quickEdit, true, `${theme}: the adjacent quick-edit action is touch-reachable`);
     } else {
-      // Pointer devices: the actions have a VISIBLE RESTING STATE — hover
-      // intensifies the quiet accent-tint container to the solid primary fill,
-      // it no longer introduces the control from opacity:0. (Operator: the
-      // appear-from-nowhere actions "look not part of the thing".)
-      const bgOf = (node: HTMLElement) => getComputedStyle(node).backgroundColor;
       await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
       await page.mouse.move(0, 0);
-      await expectRevealed(firstRead, true, `${theme}: Read now is present at rest, not hover-only`);
-      const restBg = await firstRead.evaluate(bgOf);
-
-      await firstRead.hover();
-      await expect.poll(() => firstRead.evaluate(bgOf),
-        { message: `${theme}: hover intensifies the resting container` }).not.toBe(restBg);
-
+      await expectRevealed(firstRead, false, `${theme}: desktop starts with the clean hover treatment`);
+      await firstCard.hover();
+      await expectRevealed(firstRead, true, `${theme}: mouse hover reveals Read now`);
       await page.mouse.move(0, 0);
       await firstRead.focus();
-      await expectRevealed(firstRead, true, `${theme}: keyboard focus keeps Read now visible`);
-      await expect.poll(() => firstRead.evaluate(bgOf),
-        { message: `${theme}: focus intensifies the resting container` }).not.toBe(restBg);
+      await expectRevealed(firstRead, true, `${theme}: keyboard focus reveals Read now`);
     }
   }
+});
+
+test('quick-edit pencil uses the light-theme card-surface palette', async ({ page }) => {
+  await page.goto('/app');
+  const quickEdit = page.locator('a[aria-label^="Edit "]').first();
+  await expect(quickEdit).toHaveCount(1);
+
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  if (!isTouchProject()) {
+    await quickEdit.locator('..').locator('..').locator('a[aria-label^="Open details for"]').hover();
+  }
+  await expectRevealed(quickEdit, true, 'light: quick edit is revealed before its visible palette is measured');
+
+  const expected = await quickEdit.evaluate(() => {
+    const resolveToken = (token: string) => {
+      const probe = document.createElement('span');
+      probe.style.color = `var(${token})`;
+      document.body.appendChild(probe);
+      const resolved = getComputedStyle(probe).color;
+      probe.remove();
+      return resolved;
+    };
+    return {
+      background: resolveToken('--surface-2'),
+      color: resolveToken('--text-muted'),
+      border: resolveToken('--border'),
+    };
+  });
+
+  await expect.poll(() => quickEdit.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      background: style.backgroundColor,
+      color: style.color,
+      border: style.borderColor,
+    };
+  }), { message: 'light: quick edit resolves to the on-surface palette' }).toEqual(expected);
 });

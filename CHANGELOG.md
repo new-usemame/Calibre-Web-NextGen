@@ -914,16 +914,9 @@ is for things you can see or feel when running the app.
   original styles are untouched and Edge mirror is still the default, so nothing
   changes unless you pick one. Requested by @mgrimace (#1280).
 
-### Changed
+### Fixed
 
-- **The "Read now" and edit buttons under each cover look like buttons now, and
-  stop appearing out of nowhere.** With a mouse or trackpad the two controls
-  were invisible until you pointed at a book, and what appeared was bare amber
-  text beside a small dark circle — two different shapes that looked like they
-  belonged neither to the card nor to each other. They now sit there quietly all
-  the time, share one height and one corner shape, and simply grow stronger when
-  you hover instead of arriving from nothing. Touchscreens are unchanged; the
-  buttons were already always visible there.
+- **The edit pencil beneath book covers now matches the card surface in light theme instead of appearing as a near-black cover overlay.**
 
 ## [v4.1.33] - 2026-08-08
 
@@ -1878,6 +1871,7 @@ is for things you can see or feel when running the app.
 ### Changed
 
 - **The "read" mark on a book cover is now a green "Read" label at the bottom-left, instead of a small tick in the corner.** It was a 22-pixel checkmark circle in the top-right with no wording, which was easy to miss at a glance — the reporter, who reads in the light theme because of their eyesight, pointed out that the classic view's labelled green badge was far easier to spot. It now says what it means, sits where the classic one sits, and gets larger again on phones and tablets. The wording follows your language, so a German library reads "Gelesen" exactly as the classic view does. Reported by [@uschi1](https://github.com/new-usemame/Calibre-Web-NextGen/issues/351) ([#1117](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1117)).
+
 
 ### Fixed
 

@@ -16,6 +16,24 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.41] - 2026-08-25
+
+### Added
+
+- **Kobo hardware experiments can now record the complete Reading Services
+  exchange instead of relying on request-line access logs.** Operators can use
+  a deliberately explicit private-data environment gate to capture the device
+  request, the actual filtered request sent to Kobo, Kobo's raw response, and
+  the final byte stream returned to the device for `checkforchanges` and
+  annotation GET/PATCH calls. Credentials are redacted, records never enter
+  ordinary logs or support bundles, and local retention is capped.
+
+### Changed
+
+- **Contributors no longer have to edit the same changelog insertion point in
+  every pull request.** Each change now carries an isolated `changelog.d`
+  fragment, and release preparation assembles the fragments deterministically.
+
 ### Fixed
 
 - **A series added or changed in the library now reaches the Kobo copy of the
@@ -47,6 +65,83 @@ is for things you can see or feel when running the app.
   by @ericsilberberg on Discord, who was running NextGen and stock Calibre-Web
   side by side and noticed pages populating more slowly here
   ([#1571](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1571)).
+
+- **A comic dropped into the ingest folder now keeps the title, series, issue
+  number, author and language its `ComicInfo.xml` already carries.** Auto-ingest
+  ran a bare `calibredb add` for comic files, which does not read that embedded
+  metadata, so a `.cbz`/`.cbr` tagged by ComicTagger, Kapowarr, Mylar3 or a
+  well-tagged scene release landed as `<filename>` by `Unknown` — the same
+  guesswork an untagged file gets. Uploading the identical file by hand through
+  the web UI already read it correctly; ingest now does too. A comic with no
+  embedded tags is unaffected. Contributed by
+  [@rfsbraz](https://github.com/rfsbraz)
+  ([#1690](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1690),
+  [#1691](https://github.com/new-usemame/Calibre-Web-NextGen/pull/1691)).
+
+- **Kobo annotation uploads are no longer acknowledged when their JSON shape
+  prevents CWNG from addressing the uploaded annotations.** Non-empty
+  non-object bodies and non-empty non-list annotation batches now receive a
+  temporary failure so the device retains the delta for retry, while legitimate
+  empty sync and delete-carrying batches continue normally. Operators running
+  the explicit private
+  Reading Services diagnostic can also capture the body of a pre-authentication
+  401 refusal in a separate, tightly bounded unauthenticated store. Repeated
+  attempts for the same unresolved upload now share one protected recovery
+  record, preventing one retrying device from exhausting the instance-wide
+  spool and denying recovery staging to other users.
+
+- **Kobo annotation recovery copies could be deleted by maintenance meant for a
+  different folder.** The background job that expires old recovery records
+  looked up which folder to clean when it eventually ran, rather than when it
+  was scheduled, so a change in between could point it somewhere else. It now
+  carries its target with it.
+
+- **A highlight that fails to save no longer looks saved.** If the database
+  rejected the write, the web reader still showed the highlight as created and
+  a delete still reported success — the change was gone but nothing said so.
+  Those paths now report the failure, and KOReader is told its push did not
+  land instead of being acknowledged.
+
+- **Slow storage no longer discards Kobo annotation recovery bodies.** If a
+  durable spool write outlasts the request deadline, it now finishes in the
+  background, and one following PATCH can also be admitted instead of being
+  rejected merely because the first write is still completing.
+
+- **A Kobo annotation upload now has a bounded local recovery record even if
+  local processing throws before it can persist the delta.** Before parsing or
+  dispatch, CWNG fsyncs the exact raw PATCH body and its new directory entries.
+  Blocking storage work runs off the gevent hub behind a 100 ms request
+  deadline; on timeout or any storage failure, the PATCH continues without a
+  new record. Unresolved records are never evicted to admit a newer body, and
+  transactional replacement restores the previous record set if a new write
+  fails. Private retention remains bounded even when no new PATCH arrives. The
+  device still receives the same explicit failure it does today when nothing
+  was stored — recovery is in addition to that refusal, not a replacement for
+  it.
+
+- **Bulk actions now report partial failures truthfully.** Delete, read/unread,
+  add-to-shelf, and metadata updates count each request separately; failed books
+  are reported instead of being included in a false success total, and only
+  confirmed deletions are removed from the library cache.
+
+- **Restoring a Kobo backup no longer drops the annotations from most of your
+  books.** The recovery importer only understood the chapter identifier that a
+  Kobo writes for books whose EPUB keeps its package file at the top level. For
+  every other book — the common case — it counted the annotations as
+  unreadable and skipped them, so a restore that reported success could bring
+  back a fraction of what the backup held. Those annotations now import.
+
+- **Kobo PATCH recovery no longer commits a record after retention scheduling
+  has already failed.** Timer admission now happens before the durable spool
+  transaction, so a maintenance setup failure leaves the established recovery
+  record set unchanged and the annotation PATCH still fails open.
+
+- **Test-suite reliability: concurrent test processes no longer fight over the
+  same lock file.** Several maintenance scripts guard themselves with a
+  one-at-a-time lock in the system temp directory, which is correct when the app
+  runs but meant any second process on the machine — a parallel test worker, a
+  second test run, or the app itself — could make unrelated tests report
+  failures. Each test process now gets its own temp directory.
 
 ## [v4.1.40] - 2026-08-23
 
@@ -172,15 +267,6 @@ is for things you can see or feel when running the app.
   source, and anything genuinely missing is listed again. Docker users see the
   same list as before, minus two rows that never applied. Packaging work by
   @chloeroform (#1442).
-
-- **A comic dropped into the ingest folder now keeps the title, series, issue
-  number, author and language its `ComicInfo.xml` already carries.** Auto-ingest
-  ran a bare `calibredb add` for comic files, which does not read that embedded
-  metadata, so a `.cbz`/`.cbr` tagged by ComicTagger, Kapowarr, Mylar3 or a
-  well-tagged scene release landed as `<filename>` by `Unknown` — the same
-  guesswork an untagged file gets. Uploading the identical file by hand through
-  the web UI already read it correctly; ingest now does too. A comic with no
-  embedded tags is unaffected.
 
 ## [v4.1.39] - 2026-08-21
 

@@ -56,6 +56,65 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.41',
+    date: '2026-08-25',
+    items: [
+      {
+        title: 'A failed highlight save now tells you it failed',
+        body: 'The web reader no longer leaves a highlight on the page after the database rejects it, and deleting an unsaved highlight no longer reports success. KOReader is likewise told when its change did not land so it can retry instead of quietly losing it.',
+        category: 'Reading',
+      },
+      {
+        title: 'Updated series details reach the Kobo copy of a book',
+        body: 'Downloading a KEPUB could remove the EPUB 3 series metadata Kobo firmware reads, even after the stored book had been corrected. Served books now keep the current series name and index alongside their other metadata.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo backup restores bring back annotations from every book layout',
+        body: 'The importer previously understood only books whose EPUB package file sat at the top level, so most restored books silently lost their annotations. It now recognizes the common subdirectory layout too.',
+        category: 'Sync',
+      },
+      {
+        title: 'Bulk actions report exactly what succeeded',
+        body: 'Delete, read and unread, add-to-shelf, and metadata actions now count each book separately. Failed books remain visible and are reported instead of being included in a false success total.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Book covers arrive with less waiting and less database work',
+        body: 'Cover requests now go straight to the thumbnail they need, and the book grid no longer asks for both WebP and JPEG versions of every cover. The improvement grows with the size of your library.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'The book-card edit pencil fits every theme',
+        body: 'On light, sepia and high-contrast themes, the pencil under a cover no longer appears as a dark sticker meant for controls drawn over artwork. It now uses the same quiet surface colours as the rest of the card.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Auto-ingested comics keep their embedded details',
+        body: 'A CBZ or CBR dropped into the ingest folder now brings along the title, series, issue number, author and language stored in ComicInfo.xml instead of falling back to its filename and Unknown. Comics without embedded tags continue through the usual lookup.',
+        category: 'Library',
+      },
+      {
+        title: 'Kobo keeps annotation uploads that CWNG cannot safely read',
+        body: 'Malformed non-empty uploads now receive a temporary failure instead of a false acknowledgement, so the device retains the change for retry. Repeated attempts share one protected recovery record rather than crowding out uploads from other readers.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo annotation recovery withstands slow storage and interrupted maintenance',
+        body: 'Recovery copies now finish safely in the background when storage exceeds the request deadline, keep the folder and retention rules they started with, and are not committed unless cleanup can be scheduled. An early processing failure can still leave one bounded local copy for recovery.',
+        category: 'Sync',
+      },
+      {
+        title: 'Kobo diagnostics can capture the exchange that access logs miss',
+        body: 'Operators investigating Kobo hardware can enable an explicit private-data gate to record the device request, the filtered request sent upstream, Kobo\'s response and the final bytes returned to the reader. Credentials are redacted, ordinary logs and support bundles stay clean, and local retention is capped.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
     version: 'v4.1.40',
     date: '2026-08-23',
     items: [

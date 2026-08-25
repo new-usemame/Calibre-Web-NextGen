@@ -18,6 +18,14 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **The small edit pencil under each book cover no longer looks like a dark
+  sticker on the light, sepia and high-contrast themes.** It was drawn with the
+  palette reserved for controls that sit *on top of* cover artwork — deliberately
+  opaque and the same colour whatever theme you use, so it stays readable over any
+  image. Since it moved out from over the cover and onto the card itself, that made
+  it a near-black disc with a white outline on a pale card. It now uses the same
+  quiet surface colours as every other control on the card, in every theme.
+
 - **Pull requests opened before a release no longer fail their changelog CI
   check after that release is tagged.** The guard now considers only releases
   contained in the branch under test, while retaining the committed release

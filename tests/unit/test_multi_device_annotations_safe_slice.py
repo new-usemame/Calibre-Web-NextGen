@@ -347,3 +347,41 @@ def test_non_uuid_book_id_accepted_only_on_exact_match(value, book_uuid, accepte
     else:
         with pytest.raises(ContentIdError):
             normalize_content_id(value, book_uuid=book_uuid)
+
+
+def test_device_content_id_folds_on_the_first_bang_when_the_href_contains_one():
+    """`!` is a legal character in an EPUB path segment, so the fold must split
+    on the device grammar's separators and not on the last bang it can find.
+
+    Guards a mutation the rest of the suite does not catch: widening
+    ``_KOBO_DEVICE``'s opf-dir group from ``([^!]+)`` to ``(.+)`` makes the
+    match greedy, and ``uuid!OEBPS!ch!apter.xhtml`` folds to
+    ``OEBPS!ch/apter.xhtml`` — a silently wrong chapter path that resolves to
+    nothing, with no error for the user to see.
+    """
+    from cps.services.annotation_content_id import normalize_content_id
+
+    book = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+    assert normalize_content_id(
+        f"{book}!OEBPS!ch!apter.xhtml",
+        book_uuid=book,
+        allow_kobo_device_content_id=True,
+    ) == f"{book}!!OEBPS/ch!apter.xhtml"
+
+
+def test_device_content_id_uppercase_uuid_is_canonicalised():
+    """A device uuid in upper case belongs to the same book and must normalise.
+
+    Guards the mutation that drops ``_normal_uuid`` from the device branch:
+    without it the raw device spelling is compared against the canonical book
+    uuid, so the reader's own book is rejected as "does not belong to this
+    book" — an annotation lost to letter case.
+    """
+    from cps.services.annotation_content_id import normalize_content_id
+
+    book = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+    assert normalize_content_id(
+        f"{book.upper()}!OEBPS!chapter.xhtml",
+        book_uuid=book,
+        allow_kobo_device_content_id=True,
+    ) == f"{book}!!OEBPS/chapter.xhtml"

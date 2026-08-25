@@ -193,6 +193,7 @@ def test_apply_wrong_type_skipped(session):
     "../unbounded-client-shape",
     "x" * 2049,
     "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa!!chapter.xhtml",
+    "b3d1b38b-74fd-43b7-a796-996e5a6a8b04!OEBPS!chapter.xhtml",
 ])
 def test_portable_boundary_rejects_invalid_or_wrong_book_content_id(content_id):
     from cps.services.annotation_portable import validate_portable_payload

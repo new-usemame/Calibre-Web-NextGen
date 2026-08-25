@@ -109,6 +109,48 @@ def test_content_id_normalizes_both_legacy_shapes_idempotently():
     assert normalize_content_id(raw, book_uuid=book, allow_legacy_file_uri=True) == canonical
 
 
+def test_device_content_id_requires_explicit_import_opt_in():
+    from cps.services.annotation_content_id import normalize_content_id, ContentIdError
+    book = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+    device = f"{book}!OEBPS!chapter.xhtml"
+    canonical = f"{book}!!OEBPS/chapter.xhtml"
+
+    with pytest.raises(ContentIdError):
+        normalize_content_id(device, book_uuid=book)
+    assert normalize_content_id(
+        device, book_uuid=book, allow_kobo_device_content_id=True,
+    ) == canonical
+    assert normalize_content_id(
+        canonical, book_uuid=book, allow_kobo_device_content_id=True,
+    ) == canonical
+
+
+@pytest.mark.parametrize(
+    ("device_content_id", "message"),
+    [
+        pytest.param(
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa!OEBPS!chapter.xhtml",
+            "content_id does not belong to this book",
+            id="wrong-book",
+        ),
+        pytest.param("{book}!..!../outside.xhtml", "escapes", id="escape"),
+        pytest.param("{book}!OEBPS//Text!chapter.xhtml", "unsafe segment", id="empty-segment"),
+        pytest.param("{book}!OEBPS!chapter\x1f.xhtml", "control character", id="control"),
+        pytest.param("{book}!OEBPS!" + "x" * 1536, "too long", id="chapter-length"),
+    ],
+)
+def test_device_content_id_is_validated_after_folding(device_content_id, message):
+    from cps.services.annotation_content_id import normalize_content_id, ContentIdError
+    book = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+
+    with pytest.raises(ContentIdError, match=message):
+        normalize_content_id(
+            device_content_id.format(book=book),
+            book_uuid=book,
+            allow_kobo_device_content_id=True,
+        )
+
+
 def test_backfill_is_conservative_and_idempotent():
     from cps import ub
     engine = create_engine("sqlite:///:memory:")
@@ -116,11 +158,12 @@ def test_backfill_is_conservative_and_idempotent():
         conn.execute(text("CREATE TABLE annotation (id INTEGER PRIMARY KEY, book_id INTEGER, content_id TEXT)"))
         uuid = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
         wrong = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-        conn.execute(text("INSERT INTO annotation VALUES (1, 5, :v), (2, 5, :u), (3, 5, :w), (4, 99, :m)"), {
+        conn.execute(text("INSERT INTO annotation VALUES (1, 5, :v), (2, 5, :u), (3, 5, :w), (4, 99, :m), (5, 5, :d)"), {
             "v": f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/c.xhtml",
             "u": "opaque-old-value",
             "w": f"file:///mnt/onboard/{wrong}.epub#(6)OEBPS/wrong.xhtml",
             "m": f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/missing.xhtml",
+            "d": f"{uuid}!OEBPS!device-only.xhtml",
         })
     ub.migrate_multi_device_annotation_safe_slice(engine, None)
     lookup = lambda book_id: uuid if book_id == 5 else None
@@ -133,6 +176,7 @@ def test_backfill_is_conservative_and_idempotent():
     assert once[1][1] == "opaque-old-value"
     assert once[2][1] == f"file:///mnt/onboard/{wrong}.epub#(6)OEBPS/wrong.xhtml"
     assert once[3][1] == f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/missing.xhtml"
+    assert once[4][1] == f"{uuid}!OEBPS!device-only.xhtml"
 
 
 def test_backfill_repairs_journaled_wrong_book_without_overwriting_later_edits():

@@ -560,7 +560,10 @@ def ingest_bookmarks(sqlite_path, user_id, session, book_lookup, commit,
         from .services.annotation_content_id import normalize_content_id, ContentIdError
         try:
             content_id = normalize_content_id(
-                bm.content_id, book_uuid=resolved_uuid, allow_legacy_file_uri=True
+                bm.content_id,
+                book_uuid=resolved_uuid,
+                allow_legacy_file_uri=True,
+                allow_kobo_device_content_id=True,
             )
         except ContentIdError:
             skipped_invalid_content_id += 1

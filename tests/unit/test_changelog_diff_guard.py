@@ -216,9 +216,7 @@ def test_pr_ci_invokes_guard_with_complete_git_history():
     )
 
 
-def test_a_rename_out_of_a_shipping_directory_still_reports_the_shipping_path(
-    tmp_path, monkeypatch
-):
+def test_a_rename_out_of_a_shipping_directory_still_reports_the_shipping_path(tmp_path):
     """`git mv cps/x.py wiki-src/x.py` must not read as a wiki-only change.
 
     With git's rename detection on, `git diff --name-only` reports a detected
@@ -251,11 +249,10 @@ def test_a_rename_out_of_a_shipping_directory_still_reports_the_shipping_path(
     git("mv", "cps/shipping_module.py", "wiki-src/shipping_module.py")
     git("commit", "-qm", "move it out of the application")
 
-    # _changed_paths shells out to git in the CURRENT directory, which is how
-    # CI invokes it. Stand in the throwaway repository so the diff is the one
-    # this test built.
-    monkeypatch.chdir(tmp_path)
-    paths = GUARD._changed_paths("HEAD~1", "HEAD")
+    # Pass cwd rather than chdir()ing: a test-local chdir is global to the
+    # interpreter, and this suite runs under xdist with background retention
+    # timers live in the same process.
+    paths = GUARD._changed_paths("HEAD~1", "HEAD", cwd=tmp_path)
 
     assert "cps/shipping_module.py" in paths, (
         "the rename's source was dropped, so the guard cannot see that a "

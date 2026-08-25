@@ -5,9 +5,10 @@
 Unlike the opt-in exchange observer, this is an always-on data-integrity
 primitive. A successful stage returns only after the exact body and every new
 directory entry are fsynced, before JSON parsing or local dispatch begins.
-Storage runs on gevent's native threadpool behind a hard request deadline: a
-busy or wedged spool returns no ticket and never blocks the worker hub without
-bound.
+Storage runs on the gevent hub's native threadpool behind a hard request
+deadline. Once admitted, an operation remains owned by its native worker until
+completion even if the request stops waiting; one successor can queue behind a
+slow operation without creating an unbounded spool backlog.
 
 Unresolved records (``staged`` / ``dispatch_refused`` /
 ``dispatch_exception``) are never evicted to admit a new body. Repeated attempts
@@ -49,10 +50,11 @@ MAX_BODY_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
 MAX_FILES = 512
 MAX_AGE_SECONDS = 14 * 24 * 60 * 60
-REQUEST_IO_TIMEOUT_SECONDS = 0.1
+REQUEST_IO_TIMEOUT_SECONDS = 1.0
+MAX_PENDING_IO_OPERATIONS = 2
 
 _PROCESS_LOCK = threading.Lock()
-_REQUEST_IO_GATE = threading.Lock()
+_REQUEST_IO_SLOTS = threading.BoundedSemaphore(MAX_PENDING_IO_OPERATIONS)
 _VALID_OUTCOMES = {
     "staged", "dispatch_completed", "dispatch_exception", "dispatch_refused",
 }
@@ -82,8 +84,37 @@ class _SpoolUnavailable(Exception):
     pass
 
 
-class _SpoolCancelled(Exception):
-    pass
+class _RequestIOPermit:
+    """One admitted operation's release-once semaphore ownership."""
+
+    def __init__(self, semaphore):
+        self._semaphore = semaphore
+        self._release_lock = threading.Lock()
+        self._released = False
+
+    @classmethod
+    def acquire(cls):
+        semaphore = _REQUEST_IO_SLOTS
+        if not semaphore.acquire(blocking=False):
+            return None
+        return cls(semaphore)
+
+    def release(self):
+        with self._release_lock:
+            if self._released:
+                return False
+            self._released = True
+        self._semaphore.release()
+        return True
+
+
+def _reset_request_io_slots_after_fork():
+    """Discard permits whose native worker owners do not survive a fork."""
+    global _REQUEST_IO_SLOTS
+    _REQUEST_IO_SLOTS = threading.BoundedSemaphore(MAX_PENDING_IO_OPERATIONS)
+
+
+os.register_at_fork(after_in_child=_reset_request_io_slots_after_fork)
 
 
 def _spool_root() -> Path:
@@ -119,22 +150,28 @@ def is_replay_candidate(status) -> bool:
 
 
 def _run_off_hub_bounded(function, *args):
-    """Run blocking spool I/O off-hub and bound the caller's wait."""
-    if not _REQUEST_IO_GATE.acquire(blocking=False):
-        raise _SpoolUnavailable("another spool storage operation is still active")
-    cancelled = threading.Event()
+    """Run I/O off-hub while leaving admitted work owned after timeout."""
+    permit = _RequestIOPermit.acquire()
+    if permit is None:
+        raise _SpoolUnavailable("the bounded spool storage queue is full")
+    request_timed_out = threading.Event()
+    result = None
     try:
         timeout = Timeout.start_new(REQUEST_IO_TIMEOUT_SECONDS)
     except BaseException:
-        _REQUEST_IO_GATE.release()
+        permit.release()
         raise
     try:
         try:
             result = get_hub().threadpool.spawn(
-                _capture_worker_result, function, args, cancelled,
+                _capture_worker_result,
+                function,
+                args,
+                request_timed_out,
+                permit,
             )
         except BaseException:
-            _REQUEST_IO_GATE.release()
+            permit.release()
             raise
         value, error = result.get()
         if error is not None:
@@ -143,7 +180,11 @@ def _run_off_hub_bounded(function, *args):
     except Timeout as error:
         if error is not timeout:
             raise
-        cancelled.set()
+        request_timed_out.set()
+        if result is None:
+            raise _SpoolUnavailable(
+                "the spool storage worker was not admitted before the deadline"
+            ) from None
         raise _SpoolDeadlineExceeded(
             f"Kobo PATCH spool exceeded {REQUEST_IO_TIMEOUT_SECONDS:.3f}s deadline"
         ) from None
@@ -151,15 +192,30 @@ def _run_off_hub_bounded(function, *args):
         timeout.cancel()
 
 
-def _capture_worker_result(function, args, cancelled):
+def _capture_worker_result(function, args, request_timed_out, permit):
     """Return worker errors as values so gevent does not log expected failures."""
+    operation = getattr(function, "__name__", type(function).__name__)
     try:
         try:
-            return function(*args, cancelled), None
+            value = function(*args)
+            if request_timed_out.is_set():
+                log.info(
+                    "Kobo PATCH recovery storage completed after request "
+                    "deadline operation=%s",
+                    operation,
+                )
+            return value, None
         except Exception as error:
+            if request_timed_out.is_set():
+                log.error(
+                    "Kobo PATCH recovery storage failed after request deadline "
+                    "operation=%s",
+                    operation,
+                    exc_info=True,
+                )
             return None, error
     finally:
-        _REQUEST_IO_GATE.release()
+        permit.release()
 
 
 def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
@@ -213,7 +269,8 @@ def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
         return None
     except _SpoolDeadlineExceeded:
         log.error(
-            "Kobo PATCH recovery spool timed out; new body not staged "
+            "Kobo PATCH recovery spool timed out; storage continues off-request "
+            "but no ticket is returned "
             "user_id=%s bytes=%s deadline_ms=%s",
             user_id, len(raw_body), int(REQUEST_IO_TIMEOUT_SECONDS * 1000),
         )
@@ -260,7 +317,14 @@ class PatchSpoolTicket:
                     self.spool_id, self.attempt_id, status,
                 )
             return applied
-        except (_SpoolNoRoom, _SpoolDeadlineExceeded, _SpoolUnavailable):
+        except _SpoolDeadlineExceeded:
+            log.error(
+                "Kobo PATCH recovery outcome update timed out; storage "
+                "continues off-request spool_id=%s status=%s",
+                self.spool_id, status,
+            )
+            return False
+        except (_SpoolNoRoom, _SpoolUnavailable):
             log.error(
                 "Kobo PATCH recovery outcome update unavailable; preserving "
                 "staged record spool_id=%s status=%s",
@@ -296,11 +360,6 @@ class _RootLock:
 
 def _locked_root(root):
     return _RootLock(root)
-
-
-def _ensure_not_cancelled(cancelled):
-    if cancelled is not None and cancelled.is_set():
-        raise _SpoolCancelled("spool request deadline elapsed")
 
 
 def _compress(record) -> bytes:
@@ -508,7 +567,7 @@ def _recover_transactions_locked(root):
 
 
 def _install_record_locked(
-    final_path, compressed, *, victims, replacing_path=None, cancelled=None,
+    final_path, compressed, *, victims, replacing_path=None,
 ):
     """Install one record with crash-recoverable eviction/replacement."""
     final_path = Path(final_path)
@@ -537,18 +596,15 @@ def _install_record_locked(
     final_installed = False
     committed = False
     try:
-        _replace_record_locked(prepared_path, compressed, cancelled=cancelled)
-        _ensure_not_cancelled(cancelled)
+        _replace_record_locked(prepared_path, compressed)
         _write_journal(journal_path, journal)
         for original, retired in mappings:
             os.replace(original, retired)
         _fsync_directory(root)
-        _ensure_not_cancelled(cancelled)
 
         os.replace(prepared_path, final_path)
         final_installed = True
         _fsync_directory(root)
-        _ensure_not_cancelled(cancelled)
 
         journal["state"] = "committed"
         _write_journal(journal_path, journal)
@@ -613,13 +669,11 @@ def _find_matching_replay_identity_locked(inventory, incoming):
     return matches
 
 
-def _write_or_reuse_record(incoming, compressed, cancelled=None):
+def _write_or_reuse_record(incoming, compressed):
     root = _spool_root()
     with _PROCESS_LOCK:
-        _ensure_not_cancelled(cancelled)
         _ensure_private_root(root)
         with _locked_root(root):
-            _ensure_not_cancelled(cancelled)
             _recover_transactions_locked(root)
             inventory = _record_inventory(root)
             matches = _find_matching_replay_identity_locked(
@@ -664,7 +718,6 @@ def _write_or_reuse_record(incoming, compressed, cancelled=None):
                     compressed,
                     victims=victims,
                     replacing_path=existing_path,
-                    cancelled=cancelled,
                 )
                 result = (
                     refreshed["spool_id"],
@@ -682,7 +735,7 @@ def _write_or_reuse_record(incoming, compressed, cancelled=None):
                 )
                 _schedule_retention(root, time.time() + MAX_AGE_SECONDS)
                 _install_record_locked(
-                    path, compressed, victims=victims, cancelled=cancelled,
+                    path, compressed, victims=victims,
                 )
                 result = (
                     incoming["spool_id"],
@@ -706,15 +759,13 @@ def _find_record_path_by_spool_id_locked(root, spool_id):
 
 
 def _mark_dispatch_outcome_blocking(
-    path, spool_id, attempt_id, status, cancelled=None,
+    path, spool_id, attempt_id, status,
 ):
     path = Path(path)
     root = path.parent
     with _PROCESS_LOCK:
-        _ensure_not_cancelled(cancelled)
         _ensure_private_root(root)
         with _locked_root(root):
-            _ensure_not_cancelled(cancelled)
             _recover_transactions_locked(root)
             if not path.exists():
                 path = _find_record_path_by_spool_id_locked(root, spool_id)
@@ -738,12 +789,11 @@ def _mark_dispatch_outcome_blocking(
                 compressed,
                 victims=victims,
                 replacing_path=path,
-                cancelled=cancelled,
             )
     return new_path, True
 
 
-def _replace_record_locked(path, compressed, cancelled=None):
+def _replace_record_locked(path, compressed):
     path = Path(path)
     temp_fd, temp_name = tempfile.mkstemp(
         prefix=".patch-", suffix=".tmp", dir=path.parent,
@@ -755,10 +805,8 @@ def _replace_record_locked(path, compressed, cancelled=None):
             stream.write(compressed)
             stream.flush()
             os.fsync(stream.fileno())
-        _ensure_not_cancelled(cancelled)
         os.replace(temp_name, path)
         _fsync_directory(path.parent)
-        _ensure_not_cancelled(cancelled)
     finally:
         if temp_fd is not None:
             os.close(temp_fd)

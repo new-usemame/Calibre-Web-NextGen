@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 from flask import Flask
+from gevent import reinit as gevent_reinit
 
 import cps.readingservices as rs
 
@@ -46,6 +47,24 @@ def _records(spool, root):
     return [(path, spool.load_spooled_patch(path)) for path in paths]
 
 
+def _wait_for_full_request_io_capacity(spool, timeout=2):
+    """Probe and restore the exact two-slot capacity after background work."""
+    deadline = time.monotonic() + timeout
+    capacity = []
+    while time.monotonic() < deadline:
+        capacity = [
+            spool._REQUEST_IO_SLOTS.acquire(blocking=False)
+            for _index in range(spool.MAX_PENDING_IO_OPERATIONS + 1)
+        ]
+        for acquired in capacity:
+            if acquired:
+                spool._REQUEST_IO_SLOTS.release()
+        if capacity == [True, True, False]:
+            return capacity
+        time.sleep(0.01)
+    return capacity
+
+
 def _hold_advisory_lock(lock_path, ready, release):
     """Hold the real cross-process spool lock until the parent releases it."""
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
@@ -56,6 +75,28 @@ def _hold_advisory_lock(lock_path, ready, release):
     finally:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
+
+
+def _stage_in_forked_child(root, result):
+    """Stage once in a forked child and report the durable body."""
+    gevent_reinit()
+    spool = _module()
+    spool._spool_root = lambda: Path(root)
+    process_lock_inherited_locked = spool._PROCESS_LOCK.locked()
+    spool.stage_patch(
+        raw_body=RAW_PATCH, entitlement_id=BOOK_UUID,
+        user_id=7, origin_device_id=None,
+    )
+    deadline = time.monotonic() + 2
+    paths = []
+    while not paths and time.monotonic() < deadline:
+        paths = list(Path(root).glob("patch-*.json.gz"))
+        if not paths:
+            time.sleep(0.01)
+    body = spool.load_spooled_patch(paths[0])["body"] if paths else None
+
+    capacity = _wait_for_full_request_io_capacity(spool)
+    result.send((body, capacity, process_lock_inherited_locked))
 
 
 def _app(monkeypatch, *, dispatch):
@@ -169,6 +210,7 @@ def test_parse_exception_still_leaves_replay_candidate(monkeypatch, tmp_path):
     assert response.status_code == 503
     [(_path, record)] = _records(spool, root)
     assert record["body"] == RAW_PATCH
+    assert _wait_for_full_request_io_capacity(spool) == [True, True, False]
     assert record["dispatch_status"] == "dispatch_exception"
 
 
@@ -534,20 +576,24 @@ def test_cross_process_lock_contention_fails_open_without_waiting(monkeypatch, t
     ready_parent.recv()
 
     result = []
+    elapsed = []
     finished = threading.Event()
 
     def _stage():
+        started = time.monotonic()
         try:
             result.append(spool.stage_patch(
                 raw_body=RAW_PATCH, entitlement_id=BOOK_UUID,
                 user_id=7, origin_device_id=None,
             ))
         finally:
+            elapsed.append(time.monotonic() - started)
             finished.set()
 
     caller = threading.Thread(target=_stage, daemon=True)
     caller.start()
-    completed_while_lock_was_busy = finished.wait(0.2)
+    grace = spool.REQUEST_IO_TIMEOUT_SECONDS * 5
+    completed_while_lock_was_busy = finished.wait(grace)
     release_parent.send(True)
     caller.join(5)
     holder.join(5)
@@ -555,17 +601,200 @@ def test_cross_process_lock_contention_fails_open_without_waiting(monkeypatch, t
     assert not caller.is_alive()
     assert not holder.is_alive()
     assert completed_while_lock_was_busy, (
-        "blocking flock waited on another process; in production that stalls "
-        "every greenlet in this worker's gevent hub"
+        "the production spool deadline allowed a blocked flock to hold the "
+        f"request for at least {grace:.1f}s"
     )
+    assert spool.REQUEST_IO_TIMEOUT_SECONDS == 1.0
+    assert elapsed[0] < grace
     assert result == [None]
+    deadline = time.monotonic() + 2
+    while not list(root.glob("patch-*.json.gz")) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    [(_path, record)] = _records(spool, root)
+    assert record["body"] == RAW_PATCH
 
 
 @pytest.mark.unit
-def test_busy_spool_rejects_new_work_immediately(monkeypatch, tmp_path):
-    """A wedged worker opens the circuit instead of accumulating more work."""
+def test_forked_child_recovers_full_request_io_capacity(monkeypatch, tmp_path):
+    """Parent-only permit owners cannot poison a live-forked child."""
     spool, root = _root(monkeypatch, tmp_path)
-    assert spool._REQUEST_IO_GATE.acquire(blocking=False)
+    release = threading.Event()
+    ready = [threading.Event(), threading.Event()]
+
+    def _hold_slot(signal):
+        assert spool._REQUEST_IO_SLOTS.acquire(blocking=False)
+        signal.set()
+        assert release.wait(5)
+        spool._REQUEST_IO_SLOTS.release()
+
+    holders = [
+        threading.Thread(target=_hold_slot, args=(signal,), daemon=True)
+        for signal in ready
+    ]
+    for holder in holders:
+        holder.start()
+    assert all(signal.wait(2) for signal in ready)
+
+    context = multiprocessing.get_context("fork")
+    result_parent, result_child = context.Pipe(duplex=False)
+    child = context.Process(
+        target=_stage_in_forked_child, args=(root, result_child),
+    )
+    child.start()
+    try:
+        assert result_parent.poll(5), "forked child did not report its stage"
+        body, capacity, process_lock_inherited_locked = result_parent.recv()
+    finally:
+        release.set()
+        child.join(5)
+        for holder in holders:
+            holder.join(5)
+
+    assert not child.is_alive()
+    assert all(not holder.is_alive() for holder in holders)
+    assert process_lock_inherited_locked is False
+    assert body == RAW_PATCH
+    assert capacity == [True, True, False]
+
+
+@pytest.mark.unit
+def test_spool_uses_the_hub_owned_threadpool(monkeypatch, tmp_path):
+    """Spool calls cannot create a dedicated pool with an unmanaged lifecycle."""
+    spool, _root_path = _root(monkeypatch, tmp_path)
+    hub_pool = spool.get_hub().threadpool
+    pool_type = type(hub_pool)
+    real_spawn = pool_type.spawn
+    used_pools = []
+
+    def _track_spawn(pool, *args, **kwargs):
+        used_pools.append(pool)
+        return real_spawn(pool, *args, **kwargs)
+
+    monkeypatch.setattr(pool_type, "spawn", _track_spawn)
+    ticket = spool.stage_patch(
+        raw_body=RAW_PATCH, entitlement_id=BOOK_UUID,
+        user_id=7, origin_device_id=None,
+    )
+
+    assert ticket is not None
+    assert used_pools == [hub_pool]
+
+
+@pytest.mark.unit
+def test_spawn_enqueue_then_raise_releases_the_permit_exactly_once(
+    monkeypatch, tmp_path,
+):
+    """Caller and queued worker share one idempotent permit owner."""
+    spool, root = _root(monkeypatch, tmp_path)
+    hub_pool = spool.get_hub().threadpool
+    pool_type = type(hub_pool)
+    real_spawn = pool_type.spawn
+    real_write = spool._write_or_reuse_record
+    worker_started = threading.Event()
+    release_worker = threading.Event()
+    submitted = []
+
+    def _stall_write(*args):
+        worker_started.set()
+        assert release_worker.wait(2)
+        return real_write(*args)
+
+    def _enqueue_then_raise(pool, *args, **kwargs):
+        submitted.append(real_spawn(pool, *args, **kwargs))
+        raise RuntimeError("spawn raised after enqueue")
+
+    monkeypatch.setattr(spool, "_write_or_reuse_record", _stall_write)
+    monkeypatch.setattr(pool_type, "spawn", _enqueue_then_raise)
+    ticket = spool.stage_patch(
+        raw_body=RAW_PATCH, entitlement_id=BOOK_UUID,
+        user_id=7, origin_device_id=None,
+    )
+    assert ticket is None
+    assert worker_started.wait(2)
+    release_worker.set()
+    submitted[0].get(timeout=2)
+
+    deadline = time.monotonic() + 2
+    while not list(root.glob("patch-*.json.gz")) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    [(_path, record)] = _records(spool, root)
+    assert record["body"] == RAW_PATCH
+
+    assert spool._REQUEST_IO_SLOTS.acquire(blocking=False)
+    assert spool._REQUEST_IO_SLOTS.acquire(blocking=False)
+    try:
+        assert not spool._REQUEST_IO_SLOTS.acquire(blocking=False)
+    finally:
+        spool._REQUEST_IO_SLOTS.release()
+        spool._REQUEST_IO_SLOTS.release()
+
+
+@pytest.mark.unit
+def test_timed_out_stage_finishes_and_does_not_poison_its_successor(
+    monkeypatch, tmp_path,
+):
+    """The request deadline relinquishes the result, not the recovery bytes."""
+    spool, root = _root(monkeypatch, tmp_path)
+    monkeypatch.setattr(spool, "REQUEST_IO_TIMEOUT_SECONDS", 0.02)
+    real_write = spool._write_or_reuse_record
+    first_started = threading.Event()
+    release_first = threading.Event()
+    workers_finished = {
+        "book-slow": threading.Event(),
+        "book-next": threading.Event(),
+    }
+
+    def _stall_first(incoming, compressed, cancelled=None):
+        entitlement_id = incoming["entitlement_id"]
+        try:
+            if entitlement_id == "book-slow":
+                first_started.set()
+                assert release_first.wait(2), "test did not release the slow write"
+            if cancelled is None:
+                return real_write(incoming, compressed)
+            return real_write(incoming, compressed, cancelled)
+        finally:
+            workers_finished[entitlement_id].set()
+
+    monkeypatch.setattr(spool, "_write_or_reuse_record", _stall_first)
+    slow_body = b'{"updatedAnnotations":[{"id":"slow-body"}]}'
+    next_body = b'{"updatedAnnotations":[{"id":"next-body"}]}'
+
+    started = time.monotonic()
+    first = spool.stage_patch(
+        raw_body=slow_body, entitlement_id="book-slow",
+        user_id=7, origin_device_id=None,
+    )
+    first_elapsed = time.monotonic() - started
+    assert first_started.is_set()
+
+    started = time.monotonic()
+    second = spool.stage_patch(
+        raw_body=next_body, entitlement_id="book-next",
+        user_id=7, origin_device_id=None,
+    )
+    second_elapsed = time.monotonic() - started
+    release_first.set()
+
+    assert first is None
+    assert second is None or second.spool_id
+    assert first_elapsed < 1.5 and second_elapsed < 1.5
+    assert workers_finished["book-slow"].wait(2)
+    assert workers_finished["book-next"].wait(2)
+    bodies = {record["body"] for _path, record in _records(spool, root)}
+    assert bodies == {slow_body, next_body}, (
+        "the elapsed request deadline discarded a body or rejected the next "
+        "stage while the first storage worker was still finishing"
+    )
+    assert _wait_for_full_request_io_capacity(spool) == [True, True, False]
+
+
+@pytest.mark.unit
+def test_pending_spool_work_is_bounded(monkeypatch, tmp_path):
+    """Two pending operations cannot grow into an unbounded memory queue."""
+    spool, root = _root(monkeypatch, tmp_path)
+    assert spool._REQUEST_IO_SLOTS.acquire(blocking=False)
+    assert spool._REQUEST_IO_SLOTS.acquire(blocking=False)
     try:
         started = time.monotonic()
         ticket = spool.stage_patch(
@@ -574,7 +803,8 @@ def test_busy_spool_rejects_new_work_immediately(monkeypatch, tmp_path):
         )
         elapsed = time.monotonic() - started
     finally:
-        spool._REQUEST_IO_GATE.release()
+        spool._REQUEST_IO_SLOTS.release()
+        spool._REQUEST_IO_SLOTS.release()
 
     assert ticket is None
     assert elapsed < 0.05

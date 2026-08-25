@@ -271,8 +271,10 @@
 }
 
 /* Quick-edit pencil (fork #572). Lives in `.actionRow`, in normal flow beside
-   the read link — NOT absolutely positioned over the card (#1166). Hover/
-   focus-reveal like the remove button, but always reachable via keyboard focus. */
+   the read link — NOT absolutely positioned over the card (#1166). It uses
+   on-surface tokens here; --cover-control-* is reserved for controls over
+   unpredictable cover artwork. Hover/focus-reveal like the remove button, but
+   always reachable via keyboard focus. */
 .quickEditBtn {
   flex: 0 0 auto;
   /* A card with no readable format has no "Read now" link, so the pencil is
@@ -283,9 +285,9 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-full);
-  background: var(--cover-control-bg);
-  color: var(--cover-control-fg);
-  border: 1px solid var(--cover-control-border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
   box-shadow: var(--elev-1);
   display: flex;
   align-items: center;

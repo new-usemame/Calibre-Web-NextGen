@@ -58,9 +58,8 @@ from .services import parallel
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS
 from .tasks.mail import TaskEmail
 from .tasks.thumbnail import TaskClearCoverThumbnailCache, TaskGenerateCoverThumbnails
@@ -1594,8 +1593,11 @@ def get_book_cover_internal(book, resolution=None):
         if resolution:
             cache = fs.FileSystem()
             # Check for both webp and jpg thumbnails, generate missing ones
-            webp_thumb = get_book_cover_thumbnail_by_format(book, resolution, 'webp')
-            jpg_thumb = get_book_cover_thumbnail_by_format(book, resolution, 'jpg')
+            thumbnails = get_book_cover_thumbnails_by_formats(
+                book, resolution, ('webp', 'jpg')
+            )
+            webp_thumb = thumbnails.get('webp')
+            jpg_thumb = thumbnails.get('jpg')
 
             # CWA #1339 (@Altycoder): treat content-stale thumbnails as
             # missing. The Thumbnail table keys on `entity_id = book.id`,
@@ -1794,6 +1796,27 @@ def get_book_cover_thumbnail_by_format(book, resolution, format):
                 .filter(ub.Thumbnail.format == format)
                 .filter(or_(ub.Thumbnail.expiration.is_(None), ub.Thumbnail.expiration > datetime.now(timezone.utc)))
                 .first())
+
+
+def get_book_cover_thumbnails_by_formats(book, resolution, formats):
+    """Get the first non-expired cover thumbnail for each requested format."""
+    if not book or not book.has_cover:
+        return {}
+
+    thumbnails = (ub.session
+                  .query(ub.Thumbnail)
+                  .filter(ub.Thumbnail.type == THUMBNAIL_TYPE_COVER)
+                  .filter(ub.Thumbnail.entity_id == book.id)
+                  .filter(ub.Thumbnail.resolution == resolution)
+                  .filter(ub.Thumbnail.format.in_(formats))
+                  .filter(or_(ub.Thumbnail.expiration.is_(None),
+                              ub.Thumbnail.expiration > datetime.now(timezone.utc)))
+                  .order_by(ub.Thumbnail.format.asc(), ub.Thumbnail.id.asc())
+                  .all())
+    first_by_format = {}
+    for thumbnail in thumbnails:
+        first_by_format.setdefault(thumbnail.format, thumbnail)
+    return first_by_format
 
 
 def get_series_thumbnail_on_failure(series_id, resolution):

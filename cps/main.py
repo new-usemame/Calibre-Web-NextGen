@@ -124,6 +124,8 @@ def main():
         limiter.limit("3/minute", key_func=get_remote_address)(kobo)
         app.register_blueprint(readingservices_api_v3)
         app.register_blueprint(readingservices_userstorage)
+        from .services import kobo_patch_spool
+        kobo_patch_spool.start_retention_maintenance()
     if oauth_available:
         app.register_blueprint(oauth)
 

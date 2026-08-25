@@ -318,12 +318,13 @@ def test_database_failure_rolls_back_only_that_member_and_later_members_continue
     monkeypatch.setattr(s, "rollback", recording_rollback)
     monkeypatch.setattr(annotation_sync, "_upsert_annotation", fail_one)
 
-    dispatch_annotation_sync([
+    result = dispatch_annotation_sync([
         _payload("uuid-before", text_="before"),
         _payload("uuid-db-failure", text_="lost only with failed write"),
         _payload("uuid-after", text_="after"),
     ], _book(), user)
 
+    assert result is False
     assert rollback_calls == [True]
     assert [row.annotation_id for row in s.query(ub.Annotation).order_by(ub.Annotation.id)] == [
         "uuid-before", "uuid-after",

@@ -51,7 +51,8 @@ def _log_shelf_activity(event_type, book_id, shelf_obj):
     """Best-effort CWA activity log for a shelf add/remove. Never raises — a
     logging backend failure must not fail the underlying shelf operation."""
     try:
-        from scripts.cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         import json
         book = calibre_db.session.query(db.Books).filter(db.Books.id == book_id).one_or_none()
         CWA_DB().log_activity(

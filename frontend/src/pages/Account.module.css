@@ -172,3 +172,104 @@
 
 .appPwForm { display: flex; gap: var(--sp-2); align-items: stretch; }
 .appPwForm .input { flex: 1; }
+
+/* Kobo two-way annotation sync (Stage 0 / BETA) */
+.betaPill {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  /* --accent-text is the palette's AA-rated amber for small text on tinted
+     surfaces (--accent itself is only 3.95:1 on --accent-soft). */
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  padding: 2px var(--sp-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scopeGroup {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+  margin: 0 0 var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.scopeOption {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-height: 44px; /* touch target */
+  padding: var(--sp-2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.scopeOption:has(input:checked) {
+  background: var(--accent-soft);
+}
+.scopeOption input { margin-top: var(--sp-1); }
+.scopeIcon { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+.scopeText { display: flex; flex-direction: column; gap: 2px; }
+.scopeText strong { color: var(--text); font-size: var(--fs-sm); }
+.scopeText small { color: var(--text-muted); font-size: var(--fs-sm); }
+
+.twoWayBooks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.twoWayBook {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.twoWayBookMain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.twoWayBookTitle {
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+
+.twoWayReason {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  font-family: var(--font-mono, monospace);
+}
+
+.stateMuted,
+.stateInfo,
+.stateOk,
+.stateWarn {
+  font-size: var(--fs-xs);
+  border-radius: var(--r-full);
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border);
+  /* Tint carries the tone; the label text stays on the palette's primary
+     --text so small badge text keeps AA contrast on every theme (measured
+     8.8-10.7:1 dark/light on the composited tints). */
+  color: var(--text);
+}
+.stateMuted { color: var(--text-muted); background: var(--surface-3); }
+.stateInfo { background: var(--accent-soft); }
+.stateOk { background: var(--success-soft); border-color: var(--success-border); }
+.stateWarn { background: var(--danger-soft); border-color: var(--danger-border); }

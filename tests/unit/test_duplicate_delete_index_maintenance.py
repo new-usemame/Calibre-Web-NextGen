@@ -223,7 +223,8 @@ def _load_editbooks_module(delete_key_calls):
             "_current_max_book_id": lambda: 1,
         },
     )
-    _install_stub("cwa_db", {"CWA_DB": _CwaDB})
+    cwa_db = _install_stub("cwa_db", {"CWA_DB": _CwaDB})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db})
     _install_stub(
         "sqlalchemy.exc",
         {
@@ -318,7 +319,8 @@ def _load_duplicates_module(delete_key_calls):
             "_current_max_book_id": lambda: 1,
         },
     )
-    _install_stub("cwa_db", {"CWA_DB": _CwaDB})
+    cwa_db = _install_stub("cwa_db", {"CWA_DB": _CwaDB})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db})
     _install_stub(
         "sqlalchemy",
         {

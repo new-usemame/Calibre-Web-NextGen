@@ -2532,6 +2532,26 @@ msgstr "Módosítva (legrégebbi → legutóbbi)"
 msgid "Manual (drag below)"
 msgstr "Kézi (húzd át alább)"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} added to the shelf; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} book(s) deleted; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} updated; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Metadata applied to {succeeded}; {failed} failed."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Read now"
 msgstr ""
@@ -3958,6 +3978,10 @@ msgid "Advanced search"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "All books"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All shelves"
 msgstr ""
 
@@ -4076,6 +4100,10 @@ msgstr ""
 msgid "Basic configuration"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Beta"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Black"
 msgstr "Fekete"
@@ -4090,6 +4118,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Book order"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4711,6 +4744,15 @@ msgid "Enter at least 2 characters"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Every book syncs as it becomes ready. You can exclude individual books below."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Excluded"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Exit full screen"
 msgstr ""
 
@@ -4868,6 +4910,10 @@ msgid "HTML is allowed and sanitized on display."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Has pen or drawing notes"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Header name"
 msgstr ""
 
@@ -4967,6 +5013,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Included"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Issuer / base URL"
 msgstr ""
 
@@ -5008,6 +5058,15 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Kobo sync on"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Kobo two-way annotation sync"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Kobo two-way sync: {state}"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
@@ -5248,6 +5307,10 @@ msgid "Next page"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "No books are ready yet — they appear here as they become ready."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
 msgstr ""
 
@@ -5326,11 +5389,19 @@ msgid "Not in current file"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Not picked"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Not seen lately"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Not set"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Not set up yet"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
@@ -5352,6 +5423,12 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Off by default. While in beta, opting in only records your preference and "
+"recovery evidence — it does not change what your Kobo receives yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Oldest"
 msgstr ""
 
@@ -5368,6 +5445,12 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/read.html
 msgid "One column"
 msgstr "Egy oszlop"
+
+#: cps/spa_strings.py
+msgid ""
+"Only the books you pick below sync. Switching here starts from none picked — "
+"you choose each book yourself."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -5411,6 +5494,16 @@ msgstr ""
 msgid "Opens in classic view"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Opt in to Kobo two-way annotation sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Opting in does not sync a book straight away. Each book is set up and "
+"checked first — its real state is shown here."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr ""
@@ -5443,6 +5536,10 @@ msgstr "Jelszó"
 msgid "Password (leave blank to keep)"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Paused after a problem"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
@@ -5450,6 +5547,10 @@ msgid ""
 msgstr ""
 "Válassz borítót bármely támogatott forrásból, illessz be egy URL-t, tölts "
 "fel egy fájlt, vagy használd a könyvbe beágyazott borítót."
+
+#: cps/spa_strings.py
+msgid "Picked"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5781,6 +5882,10 @@ msgstr ""
 msgid "Select note: {text}"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Selected books"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
 msgstr "Küldés"
@@ -5848,6 +5953,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Set up Kobo sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Set up Kobo sync first — then this preference becomes available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Setting up…"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6050,7 +6163,17 @@ msgid "That URL is not a usable image."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"The server-wide option is also off, so nothing can sync yet. An "
+"administrator can enable it in the classic server settings."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This device will no longer sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This feature is currently disabled at server level."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6106,6 +6229,14 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
 msgstr "Két oszlop"
+
+#: cps/spa_strings.py
+msgid "Two-way sync active"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Two-way sync preference saved."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "UI / display configuration"
@@ -6260,6 +6391,10 @@ msgstr "Zárolás esetén a metaadatok lekérése nem írja felül ezt a borít�
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Which books sync?"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6471,6 +6606,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "…or paste an image URL"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "← Back"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -12613,10 +12752,6 @@ msgstr ""
 msgid "Sync only books in selected shelves with Kobo"
 msgstr ""
 "Csak a kiválasztott polcokon lévő könyveket szinkronizálja Kobo eszközzel"
-
-#: cps/templates/user_edit.html
-msgid "Opt in to Kobo two-way annotation sync"
-msgstr ""
 
 #: cps/templates/user_edit.html
 msgid ""

@@ -56,6 +56,83 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.40',
+    date: '2026-08-23',
+    items: [
+      {
+        title: 'A slimmer desktop sidebar leaves more room for your books',
+        body: 'On mouse-and-keyboard desktops, navigation now rests as a narrow icon rail and expands over the page when you hover over it or focus it with the keyboard. Touch devices and smaller screens keep the familiar menu drawer.',
+        category: 'Library',
+      },
+      {
+        title: 'The desktop sidebar gets out of the way after navigation',
+        body: 'Opening a destination from the expanded sidebar now keeps the rail collapsed while you move into the page, so it cannot cover the controls you just opened. Returning to the rail or focusing it with the keyboard still expands it normally.',
+        category: 'Library',
+      },
+      {
+        title: 'Return to the list you opened a book from',
+        body: 'The book-page back link now returns to the same author, series, tag, shelf, discovery view or library search instead of dropping you at the library root. A destination survives reloading the book page, although the list then opens at the top; advanced-search criteria are not restored.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Discover picks stay put when you return to the tab',
+        body: 'The broader focus-refresh fix did not cover the random Discover strip, so switching away and back could still replace its books and spend bandwidth. Its picks now remain until you shuffle them or reload the page.',
+        category: 'Library',
+        link: { to: '/discover', label: 'Browse Discover' },
+      },
+      {
+        title: 'A Kobo cannot erase local highlights during a sync transition',
+        body: 'An expired Calibre-Web session, newly disabled Kobo sync, or an alternate spelling of the change-check request could make a Kobo replace its local highlights with an empty cloud response. Every equivalent request now keeps owned books out of that destructive path while Kobo-store content continues to sync normally.',
+        category: 'Sync',
+      },
+      {
+        title: 'Duplicate-book merges keep your newest highlight or note',
+        body: 'When both copies of a duplicate book held the same annotation, the merge could discard the newer edit simply because it belonged to the book being removed. It now keeps the newest complete version and its sync state.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Deleting KOReader highlights stays fast on heavily annotated books',
+        body: 'Removing a handful of highlights made the server inspect every KOReader highlight in that book first, so the work grew with the size of your collection rather than with the number of deletions. It now looks up only the highlights being removed. Which highlights get deleted is unchanged, and unrelated highlights are untouched.',
+        category: 'Sync',
+      },
+      {
+        title: 'Book deletion is easy to find where you expect it',
+        body: 'The edit page now places Delete book beside Edit metadata, and the book page gives deletion its own clearly labelled destructive section. The controls remain permission-gated and always ask for confirmation.',
+        category: 'Library',
+      },
+      {
+        title: 'Manage shared smart shelves with the permissions you already have',
+        body: 'Edit, Duplicate and Delete now appear independently when the server allows each action, even when someone else owns the public smart shelf. Kobo sync remains available only to the shelf owner.',
+        category: 'Library',
+        link: { to: '/magic', label: 'Smart shelves' },
+      },
+      {
+        title: 'Library activity keeps reaching your statistics',
+        body: 'Source-tree and container installs launched outside the application directory no longer lose activity records for smart shelves, searches, shelves, OPDS, Kobo sync and related actions.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Profile pictures and update reminders follow your data directory',
+        body: 'Source and bare-metal installs no longer assume those files live under the container-only /config path. Profile pictures stay visible and editable, and the once-a-day update reminder retains its state wherever the configured data directory lives.',
+        category: 'Account',
+      },
+      {
+        title: 'Reverse proxies and pooled clients keep a reliable connection',
+        body: 'The server now clearly tells HTTP/1.1 clients when it will close a connection, preventing an already-closing socket from being reused for the next page or API request.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The Statistics page reports genuinely missing packages',
+        body: 'Dependencies that do not apply to your system are now left out, while a package that is truly missing is visible again. This helps source installs catch an incomplete upgrade before it causes an import failure.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.39',
     date: '2026-08-21',
     items: [

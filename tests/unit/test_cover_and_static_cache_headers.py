@@ -299,8 +299,12 @@ def _thumbnail_app(monkeypatch, tmp_path, have_webp, have_jpg, generated_at=LAST
         "jpg": SimpleNamespace(filename="book_42_r2.jpg", generated_at=generated_at),
     }
     present = {"webp": have_webp, "jpg": have_jpg}
-    monkeypatch.setattr(helper, "get_book_cover_thumbnail_by_format",
-                        lambda book, res, fmt: thumbs[fmt], raising=False)
+    monkeypatch.setattr(
+        helper,
+        "get_book_cover_thumbnails_by_formats",
+        lambda book, res, formats: {fmt: thumbs[fmt] for fmt in formats},
+        raising=False,
+    )
 
     class _Cache:
         def get_cache_file_exists(self, filename, _type):
@@ -366,8 +370,12 @@ def test_a_resized_request_falling_back_to_the_original_is_not_immutable(monkeyp
     monkeypatch.setattr(helper.config, "get_book_path", lambda: str(tmp_path), raising=False)
     monkeypatch.setattr(helper.config, "config_use_google_drive", False, raising=False)
     # No thumbnail rows, and no ImageMagick, so nothing is queued either.
-    monkeypatch.setattr(helper, "get_book_cover_thumbnail_by_format",
-                        lambda *a, **kw: None, raising=False)
+    monkeypatch.setattr(
+        helper,
+        "get_book_cover_thumbnails_by_formats",
+        lambda *args, **kwargs: {},
+        raising=False,
+    )
     monkeypatch.setattr(helper, "use_IM", False, raising=False)
 
     book = SimpleNamespace(id=42, has_cover=1, path="Some Author/Some Book (42)",

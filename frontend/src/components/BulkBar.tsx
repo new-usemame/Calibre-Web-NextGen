@@ -77,21 +77,41 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
   const onDelete = () => {
     if (!window.confirm(t('Delete {n} book(s)? This cannot be undone.', { n: count }))) return;
     remove.mutate(ids, {
-      onSuccess: () => { announce(t('{n} book(s) deleted.', { n: count })); onChanged?.(); onClear(); },
+      onSuccess: (result) => {
+        const succeeded = result.succeededIds.length;
+        const failed = result.failedIds.length;
+        announce(failed
+          ? t('{succeeded} book(s) deleted; {failed} failed.', { succeeded, failed })
+          : t('{n} book(s) deleted.', { n: succeeded }), { assertive: failed > 0 });
+        if (succeeded) onChanged?.();
+        if (!failed) onClear();
+      },
     });
   };
 
   const doMarkRead = (read: boolean) =>
     markRead.mutate({ ids, read }, {
-      onSuccess: () => {
-        announce(read ? t('{n} marked as read.', { n: count }) : t('{n} marked as unread.', { n: count }));
-        onChanged?.();
+      onSuccess: (result) => {
+        const succeeded = result.succeededIds.length;
+        const failed = result.failedIds.length;
+        announce(failed
+          ? t('{succeeded} updated; {failed} failed.', { succeeded, failed })
+          : (read ? t('{n} marked as read.', { n: succeeded }) : t('{n} marked as unread.', { n: succeeded })),
+        { assertive: failed > 0 });
+        if (succeeded) onChanged?.();
       },
     });
 
   const doAddToShelf = (shelfId: number) => {
     addToShelf.mutate({ ids, shelfId }, {
-      onSuccess: () => { announce(t('{n} book(s) added to the shelf.', { n: count })); onChanged?.(); },
+      onSuccess: (result) => {
+        const succeeded = result.succeededIds.length;
+        const failed = result.failedIds.length;
+        announce(failed
+          ? t('{succeeded} added to the shelf; {failed} failed.', { succeeded, failed })
+          : t('{n} book(s) added to the shelf.', { n: succeeded }), { assertive: failed > 0 });
+        if (succeeded) onChanged?.();
+      },
     });
     setShelfOpen(false);
   };
@@ -107,11 +127,17 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
     if (meta.authors.trim()) fields.authors = meta.authors.trim();
     if (Object.keys(fields).length === 0) return;
     setMetadata.mutate({ ids, fields }, {
-      onSuccess: () => {
-        announce(t('Metadata applied to {n} book(s).', { n: count }));
-        onChanged?.();
-        setMetaOpen(false);
-        setMeta({ tags: '', series: '', publishers: '', languages: '', authors: '' });
+      onSuccess: (result) => {
+        const succeeded = result.succeededIds.length;
+        const failed = result.failedIds.length;
+        announce(failed
+          ? t('Metadata applied to {succeeded}; {failed} failed.', { succeeded, failed })
+          : t('Metadata applied to {n} book(s).', { n: succeeded }), { assertive: failed > 0 });
+        if (succeeded) onChanged?.();
+        if (!failed) {
+          setMetaOpen(false);
+          setMeta({ tags: '', series: '', publishers: '', languages: '', authors: '' });
+        }
       },
     });
   };

@@ -1,6 +1,15 @@
 # Kobo two-way annotation sync — authoritative-set design
 
-**Status:** design only; no production implementation is authorized by this document
+**Status:** the **authority** on Kobo two-way annotation sync. Stage 0 (§10) is merged —
+schema, preference API and SPA controls, with both gates default-off so nothing syncs.
+**Stages 1–5 are not authorized by this document** and each remains hardware-gated.
+
+**Supersedes:** `notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md` on the
+Edge 4 question only. That document states server → stock Nickel is "permanently out
+(protocol)"; it predates any hardware measurement and is wrong on two counts — the
+annotation GET is an authoritative replacement set (§2), and the ETag is opaque to
+Nickel (§11.2, CLOSED 2026-08-23), so no manifest synthesis is required. Its Phase 1
+and Phase 2 content is unaffected.
 
 **Date:** 2026-08-16
 
@@ -592,6 +601,28 @@ annotation_revision
 
 **[ASSUMED — RECOMMENDATION]** Ship additive schema, backup schema 3, raw lexical capture, exact projection invariants, authority state, metrics, and UI controls with both gates forced off. Continue current safe owned-book trigger suppression.
 
+**[OBSERVED — IMPLEMENTED 2026-08-23]** A separate passive exchange observer records the complete
+device request, the exact filtered body sent upstream, the raw upstream response, and the final
+device response for `checkforchanges` plus annotation GET/PATCH. It is off unless
+`CWNG_KOBO_READING_SERVICES_CAPTURE` exactly equals
+`I_UNDERSTAND_THIS_CAPTURES_PRIVATE_READING_DATA`. Credential-bearing headers are redacted; raw
+annotation text exists only inside mode-0600 gzip records under the mode-0700 private directory
+`<config>/.cwng-private-observability/kobo-reading-services/`. The directory is not part of the
+annotation backup format or the support debug bundle. Retention is bounded to 256 records, 64 MiB
+compressed, seven days, and 16 MiB for any one body. Capture finalization is an after-response
+observer, storage exceptions are swallowed, and executed route tests prove identical status,
+headers, and body with the gate off, on, and throwing.
+
+**[OBSERVED — IMPLEMENTED 2026-08-23]** Annotation PATCH has a separate always-on recovery spool.
+The exact raw request body is atomically written and fsynced before JSON parsing, ownership
+resolution, or dispatch, so a processing exception leaves a server-side replay artifact without
+changing the response sent to Nickel. Records contain no headers, use the same private mode-0700
+parent and mode-0600 files, and are bounded to 512 records, 64 MiB compressed, 14 days, and 16 MiB
+per body. Normal-return records remain during retention because return from the dispatcher is not
+proof that every member committed. Replay is manual and integrity-checked; it is not automatic.
+This implements F-5c1146 addendum point (2). The finding's response-code/failed-member half remains
+open until the independent PATCH failure hardware experiment completes.
+
 **[ASSUMED — RECOMMENDATION]** Test migration on fresh, legacy, partially created, and repeated-run databases. Prove generic annotation values and `cfi_range` behavior are unchanged.
 
 ### Stage 1 — seed-only observe mode
@@ -626,23 +657,99 @@ annotation_revision
 
 **[OBSERVED]** No measured `checkforchanges` request contained more than one content ID.
 
+**[OBSERVED 2026-08-23]** Still true with request bodies finally captured. Every captured
+`checkforchanges` carried exactly **one** entry, shaped `{"ContentId": …, "etag": …}`, and the
+device only asked about a book it had **just had open** — books it was not actively reading were
+absent from the request entirely. So the batching question is not merely unmeasured, it may be
+hard to provoke: to see a multi-entry request you likely have to make several books active in one
+session. The `etag` the device sends is exactly the token it has stored for that book, which is
+what makes the section 7.3 equality test workable.
+
+**[OBSERVED 2026-08-23]** The annotations GET the trigger produces is
+`GET /api/v3/content/<id>/annotations?limit=100` — the device asks for a page size of 100, which
+is the concrete number section 11.4's pagination work has to satisfy.
+
 **[ASSUMED — RECOMMENDATION]** Implement array parsing and independent per-entry decisions now, but gate production claims about batch ordering/partial upstream merge until tested.
 
 **[ASSUMED — RECOMMENDATION]** Closing experiment: open/close or force sync with at least two changed books, capture request/response order, and test a mixed batch containing one CWNG-authoritative owned book, one unseeded owned book, and one non-owned Kobo book.
 
-### 11.2 Arbitrary ETag grammar
+### 11.2 Arbitrary ETag grammar — **CLOSED 2026-08-23. Nickel treats the ETag as opaque.**
 
 **[OBSERVED]** Kobo's emitted ETag is a structured composite manifest, not an opaque random token.
 
-**[ASSUMED]** Nickel may still treat the HTTP ETag as opaque for equality, but this has not been observed.
+**[OBSERVED 2026-08-23 — the Stage 3 experiment was run on hardware and it passed.]** Nickel
+accepts a CWNG-authored ETag that shares none of Kobo's manifest grammar, stores it byte-for-byte,
+and sends it back on the next `checkforchanges`.
 
-**[ASSUMED — RECOMMENDATION]** Closing experiment is Stage 3: serve an unchanged set with a valid non-composite CWNG ETag and verify exact echo on two subsequent cycles before enabling any changed set.
+Instrument: the arming-file-gated scratch probe, hard-scoped to one ContentId, on the deployed
+server, against the operator's Clara BW. Subject: a book that was **already downloaded, had zero
+annotations, and carried the measured empty-set token `W/"0"`** — chosen so that no annotation
+could be lost whichever way the experiment went. The served body was the book's true state,
+`{"annotations":[],"nextPageOffsetToken":null}`, so the device's set could not change.
+
+    Cycle A  device -> checkforchanges  [{ContentId: 053742ff…, etag: W/"0"}]
+             server -> names the book so Nickel issues its GET
+             device -> GET /api/v3/content/053742ff…/annotations?limit=100
+             server -> 200, 45 bytes, ETag W/"CWNG:63e653e9-…:1:7be828578aae0f01"
+             device DB AnnotationsSyncToken:  W/"0"  ->  W/"CWNG:63e653e9-…:1:7be828578aae0f01"
+                                              ADOPTED BYTE-FOR-BYTE
+
+    Cycle B  device -> checkforchanges  [{ContentId: 053742ff…,
+                        etag: W/"CWNG:63e653e9-…:1:7be828578aae0f01"}]
+                                              ECHOED BYTE-FOR-BYTE
+
+Device integrity across the whole run: 30 `Bookmark` rows before and after, zero added, zero
+removed, zero modified.
+
+➡️ **Option B is viable and Option A is unnecessary.** CWNG does not need to reverse-engineer or
+synthesize Kobo's composite manifest; byte equality against a CWNG-owned revision ETag is a sound
+unchanged/changed test. The `W/"CWNG:<generation-id>:<authority-revision>:<digest-prefix>"` format
+recommended in section 7.2 is the exact string that was accepted and echoed.
+
+**[OBSERVED 2026-08-23 — unexplained, and it matters for rollback]** Serving `W/"0"` *after* the
+device had adopted a CWNG token did **not** move the stored token back; it stayed on the CWNG
+value. One attempt only, not a controlled test, and a follow-up cycle serving revision `2` could
+not be driven because Nickel throttled further syncs. **Do not assume a served ETag can always
+replace a stored one** — a rollback path that depends on overwriting the device's token is
+unproven. Discriminating test: serve a *different* CWNG revision and see whether that is adopted;
+if it is, `W/"0"` is being rejected specifically rather than adoption being conditional.
 
 ### 11.3 Empty-set ETag and deletion representation
 
-**[ASSUMED]** The exact upstream ETag for a genuinely empty annotation set and the composite-manifest representation of deletion have not been measured.
+**[OBSERVED 2026-08-23]** The empty-set token is `W/"0"`. Measured on the operator's Clara BW
+(read-only DB copy `db-20260822-235633`): of the ten books carrying a non-blank
+`content.AnnotationsSyncToken`, the four with zero `Bookmark` rows all hold exactly `W/"0"`, and
+every book holding a composite manifest has at least one annotation. So an empty authoritative set
+does have a representable, non-synthesised token, and the "do not synthesize a composite empty
+token" restriction below is satisfied by replaying `W/"0"` rather than by refusing to serve.
 
-**[ASSUMED — RECOMMENDATION]** Closing experiment: seed a book with zero annotations, capture GET body/header and next check; then create one annotation, sync, delete it, and capture every manifest transition. Until then, accept an empty seed only with exact device/upstream ETag equality and do not synthesize a composite empty token.
+**[OBSERVED 2026-08-23]** Two further properties of the composite manifest, from the same device,
+comparing three snapshots taken 2026-08-21 00:20, 2026-08-22 10:43 and 2026-08-22 23:56:
+
+* Entries are ordered by an **ASCII sort on the stable-ID hash**, not by creation time, position, or
+  the leading letter. Observed on a 14-entry manifest whose leading letters run A,A,C,B,A,B,B,B,B,B,
+  B,C,B,C while the hashes are strictly ascending.
+* The **stable-ID hash is invariant across version bumps**; only the `<version-int>` moves. Three
+  entries advanced their version between snapshots with byte-identical hashes.
+
+**[OBSERVED 2026-08-23 — UNEXPLAINED, do not design against it yet]** The manifest is **not
+one-book-one-annotation-set**. Six different books carry manifests with the *same fourteen*
+stable-ID hashes but *different* per-entry version ints, and only one of those books (`1984`) has
+fourteen annotations; two of them have none at all. Either the hash is not an annotation identity,
+or the token is not scoped per book. This matters because section 7.3 requires that no ETag match
+for one book may suppress or name another, and a manifest shared across books is exactly the shape
+that would break that. **Resolve this before any ETag-equality comparison is trusted across books.**
+
+**[ASSUMED]** The composite-manifest representation of deletion has still not been measured, and
+neither has the derivation of the stable-ID hash (it is not a plain MD5/SHA1/raw-bytes base64 of
+`BookmarkID` -- all four were tested against a 14-entry manifest and none matched).
+
+**[ASSUMED]** The composite-manifest transition from a nonempty set through deletion of its final
+annotation has not been measured.
+
+**[ASSUMED — RECOMMENDATION]** Remaining closing experiment: create one annotation, sync, delete it,
+and capture every manifest transition. Until then, accept an empty seed only with exact
+device/upstream ETag equality and do not synthesize the nonempty-to-empty deletion transition.
 
 ### 11.4 Server-initiated seed request and upstream pagination
 

@@ -2595,6 +2595,26 @@ msgstr "Modificado (más antiguo → más reciente)"
 msgid "Manual (drag below)"
 msgstr "Manual (arrastra abajo)"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} added to the shelf; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} book(s) deleted; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} updated; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Metadata applied to {succeeded}; {failed} failed."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Read now"
 msgstr "Leer ahora"
@@ -4049,6 +4069,10 @@ msgid "Advanced search"
 msgstr "Búsqueda avanzada"
 
 #: cps/spa_strings.py
+msgid "All books"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All shelves"
 msgstr "Todas las estanterías"
 
@@ -4169,6 +4193,10 @@ msgstr "DN base"
 msgid "Basic configuration"
 msgstr "Configuración básica"
 
+#: cps/spa_strings.py
+msgid "Beta"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Black"
 msgstr "Negro"
@@ -4183,6 +4211,11 @@ msgstr "Densidad de libros"
 
 #: cps/spa_strings.py
 msgid "Book order"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4811,6 +4844,15 @@ msgid "Enter at least 2 characters"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Every book syncs as it becomes ready. You can exclude individual books below."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Excluded"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Exit full screen"
 msgstr ""
 
@@ -4970,6 +5012,10 @@ msgid "HTML is allowed and sanitized on display."
 msgstr "Se permite HTML y se sanea al mostrarlo."
 
 #: cps/spa_strings.py
+msgid "Has pen or drawing notes"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Header name"
 msgstr "Nombre de la cabecera"
 
@@ -5071,6 +5117,10 @@ msgstr ""
 "lector clásico para otros formatos."
 
 #: cps/spa_strings.py
+msgid "Included"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Issuer / base URL"
 msgstr "Emisor / URL base"
 
@@ -5113,6 +5163,15 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Kobo sync on"
 msgstr "Sincronización con Kobo activada"
+
+#: cps/spa_strings.py
+msgid "Kobo two-way annotation sync"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Kobo two-way sync: {state}"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/listenmp3.html
@@ -5353,6 +5412,10 @@ msgid "Next page"
 msgstr "Página siguiente"
 
 #: cps/spa_strings.py
+msgid "No books are ready yet — they appear here as they become ready."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
 msgstr "Ningún libro coincide con esta estantería inteligente por ahora."
 
@@ -5432,12 +5495,20 @@ msgid "Not in current file"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Not picked"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Not seen lately"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Not set"
 msgstr "Sin definir"
+
+#: cps/spa_strings.py
+msgid "Not set up yet"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Note"
@@ -5455,6 +5526,12 @@ msgstr ""
 msgid ""
 "Nothing here yet. Highlight or write a note while reading, or import from a "
 "Kobo device."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. While in beta, opting in only records your preference and "
+"recovery evidence — it does not change what your Kobo receives yet."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5476,6 +5553,12 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/read.html
 msgid "One column"
 msgstr "Una columna"
+
+#: cps/spa_strings.py
+msgid ""
+"Only the books you pick below sync. Switching here starts from none picked — "
+"you choose each book yourself."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -5519,6 +5602,16 @@ msgstr ""
 msgid "Opens in classic view"
 msgstr "Se abre en la vista clásica"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Opt in to Kobo two-way annotation sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Opting in does not sync a book straight away. Each book is set up and "
+"checked first — its real state is shown here."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "Lector de PDF"
@@ -5553,6 +5646,10 @@ msgstr "Contraseña"
 msgid "Password (leave blank to keep)"
 msgstr "Contraseña (déjala en blanco para mantenerla)"
 
+#: cps/spa_strings.py
+msgid "Paused after a problem"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
@@ -5560,6 +5657,10 @@ msgid ""
 msgstr ""
 "Elige una portada de cualquier fuente compatible, pega una URL, sube un "
 "archivo o usa la portada incrustada en el propio libro."
+
+#: cps/spa_strings.py
+msgid "Picked"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5896,6 +5997,10 @@ msgstr "Seleccionar varios"
 msgid "Select note: {text}"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Selected books"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
 msgstr "Enviar"
@@ -5965,6 +6070,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Set up Kobo sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Set up Kobo sync first — then this preference becomes available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Setting up…"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6168,7 +6281,17 @@ msgid "That URL is not a usable image."
 msgstr "Esa URL no es una imagen utilizable."
 
 #: cps/spa_strings.py
+msgid ""
+"The server-wide option is also off, so nothing can sync yet. An "
+"administrator can enable it in the classic server settings."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This device will no longer sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This feature is currently disabled at server level."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6228,6 +6351,14 @@ msgstr "Confiar en la cabecera de autenticación"
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
 msgstr "Dos columnas"
+
+#: cps/spa_strings.py
+msgid "Two-way sync active"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Two-way sync preference saved."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "UI / display configuration"
@@ -6388,6 +6519,10 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
 msgstr "Cuándo se sincronizó por primera vez el progreso de lectura"
+
+#: cps/spa_strings.py
+msgid "Which books sync?"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -6603,6 +6738,10 @@ msgstr "{ok} de {total} fuentes respondieron"
 #: cps/spa_strings.py
 msgid "…or paste an image URL"
 msgstr "…o pega una URL de imagen"
+
+#: cps/spa_strings.py
+msgid "← Back"
+msgstr "← Volver"
 
 #: cps/spa_strings.py
 msgid "← Back to book"
@@ -12948,10 +13087,6 @@ msgstr ""
 #: cps/templates/user_edit.html
 msgid "Sync only books in selected shelves with Kobo"
 msgstr "Sincronizar con Kobo solo los libros de las estanterías seleccionadas"
-
-#: cps/templates/user_edit.html
-msgid "Opt in to Kobo two-way annotation sync"
-msgstr ""
 
 #: cps/templates/user_edit.html
 msgid ""

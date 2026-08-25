@@ -295,6 +295,14 @@ class User(UserBase, Base):
     kobo_two_way_annotation_sync = Column(
         Boolean, nullable=False, default=False, server_default=text("0"),
     )
+    # Stage 0 scope for the same feature: 'all' (every book syncs as it
+    # becomes ready) or 'selected' (the user picks books individually; a book
+    # is opted out via KoboAnnotationBookState.authority_status='disabled').
+    # Validated at the API layer; like the gate columns above there is no
+    # DB-level CHECK so the ALTER path stays version-safe.
+    kobo_two_way_annotation_scope = Column(
+        String(16), nullable=False, default='all', server_default=text("'all'"),
+    )
     hardcover_token = Column(String, default=None)
     # New per-user theme (0=default/light, 1=caliBlur) replacing global-only behavior
     theme = Column(Integer, default=1)
@@ -360,6 +368,7 @@ class Anonymous(AnonymousUserMixin, UserBase):
         self.kobo_only_shelves_sync = None
         self.opds_only_shelves_sync = None
         self.kobo_two_way_annotation_sync = False
+        self.kobo_two_way_annotation_scope = 'all'
         self.view_settings = {}
         self.allowed_column_value = None
         self.allowed_tags = None
@@ -394,6 +403,7 @@ class Anonymous(AnonymousUserMixin, UserBase):
         self.kobo_only_shelves_sync = data.kobo_only_shelves_sync
         self.opds_only_shelves_sync = data.opds_only_shelves_sync
         self.kobo_two_way_annotation_sync = data.kobo_two_way_annotation_sync
+        self.kobo_two_way_annotation_scope = data.kobo_two_way_annotation_scope
         self.hardcover_token = data.hardcover_token
         self.auto_send_enabled = data.auto_send_enabled
         # Presentation columns live on User, not on the shared UserBase mixin,
@@ -1781,6 +1791,9 @@ def filename(context):
 
 class Thumbnail(Base):
     __tablename__ = 'thumbnail'
+    __table_args__ = (
+        Index('ix_thumbnail_cover_lookup', 'type', 'entity_id', 'resolution', 'format'),
+    )
 
     id = Column(Integer, primary_key=True)
     entity_id = Column(Integer)
@@ -3426,6 +3439,10 @@ def _ensure_kobo_two_way_gate_columns(engine):
         engine, "settings", "config_kobo_two_way_annotation_sync",
         "config_kobo_two_way_annotation_sync BOOLEAN NOT NULL DEFAULT 0",
     )
+    _add_column_if_missing(
+        engine, "user", "kobo_two_way_annotation_scope",
+        "kobo_two_way_annotation_scope VARCHAR(16) NOT NULL DEFAULT 'all'",
+    )
     has_user = _table_columns(engine, "user") is not None
     has_settings = _table_columns(engine, "settings") is not None
     with engine.begin() as conn:
@@ -3433,6 +3450,10 @@ def _ensure_kobo_two_way_gate_columns(engine):
             conn.execute(text(
                 "UPDATE user SET kobo_two_way_annotation_sync=0 "
                 "WHERE kobo_two_way_annotation_sync IS NULL"
+            ))
+            conn.execute(text(
+                "UPDATE user SET kobo_two_way_annotation_scope='all' "
+                "WHERE kobo_two_way_annotation_scope IS NULL"
             ))
         if has_settings:
             conn.execute(text(
@@ -3995,9 +4016,30 @@ def migrate_bookmark_format_lowercase(engine, _session):
             log.info("[bookmark-format-migration] merged %d rows; lowercased %d rows", merged, updated)
 
 
+def migrate_thumbnail_lookup_index(engine, _session):
+    """Ensure the current app.db has the cover-thumbnail lookup index.
+
+    Do not gate this on a CONFIG_DIR marker: callers can select or restore a
+    different app.db while keeping the same config directory. The database-
+    scoped ``IF NOT EXISTS`` is the idempotency guard.
+    """
+    try:
+        _run_ddl_with_retry(
+            engine,
+            "CREATE INDEX IF NOT EXISTS ix_thumbnail_cover_lookup "
+            "ON thumbnail(type, entity_id, resolution, format)",
+        )
+    except Exception as error:
+        log.warning(
+            "[thumbnail-lookup-index-migration] index creation failed: %s",
+            error,
+        )
+
+
 def migrate_Database(_session):
     engine = _session.bind
     add_missing_tables(engine, _session)
+    migrate_thumbnail_lookup_index(engine, _session)
     migrate_registration_table(engine, _session)
     migrate_user_session_table(engine, _session)
     migrate_user_table(engine, _session)

@@ -22,9 +22,8 @@ from .translation_notice import last_notified, record_notified
 from datetime import datetime
 import os.path
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 
 log = logger.create()

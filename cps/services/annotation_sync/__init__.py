@@ -611,25 +611,32 @@ def _mark_pending(session, annotation, user):
 
 
 def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_id=None,
-                             raw_materializations=None, trace_id=None) -> None:
+                             raw_materializations=None, trace_id=None) -> bool:
     """Persist each valid annotation independently, then fan it out.
 
     Device batches are a transport convenience, not a transaction boundary: one
     malformed member or failed write must not roll back already-preserved user
     data or prevent later members from being attempted.
+
+    Return ``True`` only when every addressable member was persisted (or was an
+    idempotent/stale no-op).  ``False`` is transport-significant: the Reading
+    Services route must not proxy a success to Kobo, because Nickel uploads
+    deltas and may never offer an acknowledged member again.
     """
     from cps import ub
     if not payload_annotations:
-        return
+        return True
     if not isinstance(payload_annotations, list):
         log.warning("Skipping annotation batch because updatedAnnotations is not a list")
-        return
+        return False
     jobs = []
+    all_persisted = True
     for index, payload in enumerate(payload_annotations):
         if not isinstance(payload, dict):
             log.warning(
                 "Skipping non-object annotation member at updatedAnnotations[%d]", index,
             )
+            all_persisted = False
             continue
         pending_job = None
         try:
@@ -652,6 +659,7 @@ def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_i
                 push_annotation_to_handlers(ub.session, ann, book, user, payload=payload)
             committed = ub.session_commit()
             if committed is False:
+                all_persisted = False
                 log.error(
                     "Annotation %s could not be committed; continuing with the batch",
                     payload.get("id"),
@@ -665,6 +673,7 @@ def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_i
                     annotation_count=1,
                 )
         except Exception:
+            all_persisted = False
             # A failed SQLAlchemy transaction poisons the scoped session until an
             # explicit rollback. Do that here, then continue: prior annotations
             # were committed independently and later annotations still deserve a
@@ -678,6 +687,7 @@ def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_i
         if pending_job is not None:
             jobs.append(pending_job)
     _enqueue(user, jobs, book=book)
+    return all_persisted
 
 
 def dispatch_existing_annotation_sync(annotation, book, user) -> None:

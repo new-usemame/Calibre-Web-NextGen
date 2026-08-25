@@ -776,3 +776,143 @@ def test_unreadable_patch_body_still_refuses_but_unreadable_get_body_does_not(
 
     get_response = app.test_client().get(f"/annotations/{BOOK_UUID}")
     assert get_response.status_code != 503
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("unresolved_status", ["staged", "dispatch_exception", "dispatch_refused"])
+def test_full_spool_never_evicts_any_unresolved_status(
+    monkeypatch, tmp_path, unresolved_status,
+):
+    """Eviction protection is pinned for EVERY unresolved status, not just `staged`.
+
+    Raised by the cross-family review of #1861: making `dispatch_refused`
+    evictable in `_select_victims` passed the entire suite, because the only
+    protection test staged a record and left it `staged`. That is a one-line
+    regression of this subsystem's headline invariant — a contributor
+    "relieving spool pressure" would silently collect the only copy of a body
+    the device still believes undelivered, which is the exact data-loss class
+    the spool exists to prevent.
+
+    `dispatch_refused` in particular must stay protected: it means the batch
+    was refused with nothing persisted, so the body genuinely is a replay
+    candidate (#1869).
+    """
+    spool, root = _root(monkeypatch, tmp_path)
+    monkeypatch.setattr(spool, "MAX_FILES", 1)
+    monkeypatch.setattr(spool, "MAX_TOTAL_BYTES", 1024 * 1024)
+
+    first = spool.stage_patch(
+        raw_body=b'{"updatedAnnotations":[{"id":"must-survive"}]}',
+        entitlement_id="book-first", user_id=7, origin_device_id=None,
+    )
+    assert first is not None
+    if unresolved_status != "staged":
+        # mark_dispatch_outcome rewrites the record under a new status-bearing
+        # filename and updates the ticket's own path.
+        first.mark_dispatch_outcome(unresolved_status)
+    surviving = first.path
+    assert spool.load_spooled_patch(surviving)["dispatch_status"] == unresolved_status
+
+    second = spool.stage_patch(
+        raw_body=b'{"updatedAnnotations":[{"id":"new-arrival"}]}',
+        entitlement_id="book-second", user_id=7, origin_device_id=None,
+    )
+
+    assert surviving.exists(), (
+        f"a {unresolved_status} record was evicted to admit a different body; "
+        "it is the only surviving copy of a PATCH the device believes delivered"
+    )
+    assert second is None, (
+        "the new record must fail open while only unresolved records remain"
+    )
+    assert len(list(root.glob("patch-*.json.gz"))) == 1
+
+
+@pytest.mark.unit
+def test_retention_schedule_failure_happens_before_the_REUSE_record_commit(
+    monkeypatch, tmp_path,
+):
+    """The same ordering, pinned at the reuse site rather than the new-record one.
+
+    Raised by the cross-family review of #1861: `_write_or_reuse_record` has TWO
+    `_install_record_locked` sites since the replay-identity rewrite, and the
+    existing ordering test stages only once, so it instruments the new-record
+    site alone. Moving `_schedule_retention` after the install at the *reuse*
+    site passed the whole suite.
+
+    The invariant is #1860's: a timer-creation failure must abort BEFORE the
+    record commits, or the caller is told no recovery record exists while an
+    unexpiring one sits on disk. A retry of an identical body takes the reuse
+    path, so it needs its own pin.
+    """
+    spool, root = _root(monkeypatch, tmp_path)
+
+    first = spool.stage_patch(
+        raw_body=RAW_PATCH, entitlement_id=BOOK_UUID,
+        user_id=7, origin_device_id=None,
+    )
+    assert first is not None
+    before = spool.load_spooled_patch(first.path)
+
+    def _fail_schedule(*_args, **_kwargs):
+        raise RuntimeError("simulated timer creation failure")
+
+    monkeypatch.setattr(spool, "_schedule_retention", _fail_schedule)
+    retry = spool.stage_patch(
+        raw_body=RAW_PATCH, entitlement_id=BOOK_UUID,
+        user_id=7, origin_device_id=None,
+    )
+
+    assert retry is None, "a failed retention schedule must not yield a ticket"
+    survivors = list(root.glob("patch-*.json.gz"))
+    assert len(survivors) == 1, (
+        "the reuse path committed a record despite the scheduler failing"
+    )
+    after = spool.load_spooled_patch(survivors[0])
+    assert after["attempt_count"] == before["attempt_count"], (
+        "the reuse path refreshed the record before its retention timer existed"
+    )
+
+
+@pytest.mark.unit
+def test_a_filename_digest_match_does_not_merge_a_different_body(monkeypatch, tmp_path):
+    """The filename digest is a lookup key; identity is decided on every field.
+
+    Raised by the cross-family review of #1861: skipping the
+    `_same_replay_identity` re-comparison and trusting the filename digest
+    passed the whole suite. The merge keeps the EXISTING record's body, so a
+    filename/content mismatch would silently discard the incoming one — and
+    the PR advertises "every field is compared before merging".
+
+    Only reachable through on-disk corruption that preserves a filename, or a
+    SHA-256 collision. Pinned anyway, because the guard is one `if` and the
+    thing it protects is the only copy of somebody's annotations.
+    """
+    import base64
+    import gzip
+    import json
+
+    spool, root = _root(monkeypatch, tmp_path)
+
+    first = spool.stage_patch(
+        raw_body=RAW_PATCH, entitlement_id=BOOK_UUID,
+        user_id=7, origin_device_id=None,
+    )
+    assert first is not None
+
+    # Corrupt the body in place, keeping the filename — and therefore the
+    # identity digest the lookup keys on — exactly as it was.
+    record = json.loads(gzip.decompress(first.path.read_bytes()))
+    record["body_base64"] = base64.b64encode(b'{"updatedAnnotations":[{"id":"different"}]}').decode()
+    first.path.write_bytes(spool._compress(record))
+
+    retry = spool.stage_patch(
+        raw_body=RAW_PATCH, entitlement_id=BOOK_UUID,
+        user_id=7, origin_device_id=None,
+    )
+
+    assert retry is not None, "the retry must still be staged"
+    assert len(list(root.glob("patch-*.json.gz"))) == 2, (
+        "the retry merged into a record whose body differs — the filename "
+        "digest was trusted instead of comparing the identity fields"
+    )

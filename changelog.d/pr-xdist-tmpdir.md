@@ -1,8 +1,8 @@
 ### Fixed
 
-- **Test-suite reliability: parallel test workers no longer collide on the
-  shared temp directory.** Several maintenance scripts guard themselves with a
-  one-at-a-time lock file in the system temp directory, which is correct when
-  the app runs but means parallel test workers were fighting over the same lock
-  and reporting each other's losses as failures. Each worker now gets its own
-  temp directory, so those runs are stable.
+- **Test-suite reliability: concurrent test processes no longer fight over the
+  same lock file.** Several maintenance scripts guard themselves with a
+  one-at-a-time lock in the system temp directory, which is correct when the app
+  runs but meant any second process on the machine — a parallel test worker, a
+  second test run, or the app itself — could make unrelated tests report
+  failures. Each test process now gets its own temp directory.

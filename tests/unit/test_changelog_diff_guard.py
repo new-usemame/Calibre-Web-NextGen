@@ -1,19 +1,28 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Pin the PR-level guard against structural CHANGELOG loss."""
 
+import importlib.util
+import os
 from pathlib import Path
 
-from scripts.check_changelog_diff import (
-    pull_request_regressions,
-    structural_regressions,
-)
-
-
 ROOT = Path(__file__).resolve().parents[2]
+GUARD_PATH = Path(
+    os.environ.get("CWNG_CHANGELOG_GUARD", ROOT / "scripts" / "check_changelog_diff.py")
+)
+SPEC = importlib.util.spec_from_file_location("cwng_changelog_guard", GUARD_PATH)
+assert SPEC and SPEC.loader
+GUARD = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(GUARD)
+changelog_requirement_errors = GUARD.changelog_requirement_errors
+pull_request_errors = GUARD.pull_request_errors
+pull_request_regressions = GUARD.pull_request_regressions
+structural_regressions = GUARD.structural_regressions
 
 
 def test_missing_release_heading_is_rejected():
-    base = """## [Unreleased]\n\n## [v4.1.27] - 2026-08-02\n\n### Fixed\n- **A fix.**\n"""
+    base = (
+        """## [Unreleased]\n\n## [v4.1.27] - 2026-08-02\n\n### Fixed\n- **A fix.**\n"""
+    )
     stale_branch = """## [Unreleased]\n\n### Fixed\n- **A new fix.**\n- **A fix.**\n"""
     errors = structural_regressions(base, stale_branch)
     assert any("v4.1.27" in error for error in errors)
@@ -124,10 +133,132 @@ def test_stale_pr_that_did_edit_changelog_must_preserve_current_releases():
     assert any("v4.1.27" in error for error in errors)
 
 
+def test_pr_can_satisfy_the_changelog_rule_with_a_fragment():
+    assert (
+        changelog_requirement_errors(
+            ["cps/web.py", "tests/unit/test_web.py", "changelog.d/reader-back-link.md"]
+        )
+        == []
+    )
+
+
+def test_direct_changelog_edits_remain_accepted_during_cutover():
+    assert changelog_requirement_errors(["cps/web.py", "CHANGELOG.md"]) == []
+
+
+def test_pr_cannot_satisfy_the_changelog_rule_with_neither_form():
+    errors = changelog_requirement_errors(["cps/web.py"])
+    assert len(errors) == 1
+    assert "CHANGELOG.md" in errors[0]
+    assert "changelog.d/<pr-or-slug>.md" in errors[0]
+
+
+def test_findings_ledger_only_pr_does_not_require_a_changelog_entry():
+    assert changelog_requirement_errors(["findings/kobo/F-66edbc.md"]) == []
+
+
+def test_mixing_a_findings_ledger_with_shipping_code_requires_an_entry():
+    errors = changelog_requirement_errors(
+        ["findings/kobo/F-66edbc.md", "cps/readingservices.py"]
+    )
+    assert len(errors) == 1
+    assert "shipping paths" in errors[0]
+
+
+def test_other_allowlisted_non_shipping_paths_do_not_require_an_entry():
+    for path in (
+        "notes/kobo-hardware-run.md",
+        "docs/install/compose.md",
+        "wiki-src/Contributing.md",
+        "tests/unit/test_changelog_diff_guard.py",
+        "changelog.d/README.md",
+        "scripts/check_changelog_diff.py",
+    ):
+        assert changelog_requirement_errors([path]) == []
+
+
+def test_github_paths_and_top_level_dotfiles_are_not_blanket_exempt():
+    for path in (".github/workflows/tests.yml", ".dockerignore", ".editorconfig"):
+        assert changelog_requirement_errors([path])
+
+
+def test_changelog_directory_readme_is_documentation_not_a_fragment():
+    errors = changelog_requirement_errors(["cps/web.py", "changelog.d/README.md"])
+    assert errors
+
+
+def test_non_shipping_exemption_does_not_bypass_structural_regressions():
+    base = """## [Unreleased]\n\n### Fixed\n- **First fix.**\n- **Second fix.**\n"""
+    damaged = """## [Unreleased]\n\n### Fixed\n- **First fix.**\n"""
+    errors = pull_request_errors(
+        ["findings/kobo/F-66edbc.md"], base, base, damaged
+    )
+    assert any("loses 1" in error for error in errors)
+
+
+def test_fragments_are_direct_markdown_children_with_safe_names():
+    assert changelog_requirement_errors(["changelog.d/fix-123.md"]) == []
+    assert changelog_requirement_errors(["changelog.d/nested/fix.md"])
+    assert changelog_requirement_errors(["changelog.d/fix.txt"])
+
+
 def test_pr_ci_invokes_guard_with_complete_git_history():
-    workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(
+        encoding="utf-8"
+    )
     fast_tests = workflow.split("  fast-tests:", 1)[1].split("\n  #", 1)[0]
     changed_paths = workflow.split("  changed_paths:", 1)[1].split("\n  #", 1)[0]
     assert "fetch-depth: 0" in fast_tests
     assert "fetch-depth: 0" in changed_paths
-    assert 'python3 scripts/check_changelog_diff.py "$BASE_SHA" "$HEAD_SHA"' in changed_paths
+    assert (
+        'python3 scripts/check_changelog_diff.py "$BASE_SHA" "$HEAD_SHA"'
+        in changed_paths
+    )
+
+
+def test_a_rename_out_of_a_shipping_directory_still_reports_the_shipping_path(tmp_path):
+    """`git mv cps/x.py wiki-src/x.py` must not read as a wiki-only change.
+
+    With git's rename detection on, `git diff --name-only` reports a detected
+    rename by its DESTINATION alone. A module moved out of `cps/` into any
+    exempt directory would then reach the classifier as a single non-shipping
+    path, and code that vanished from the application would merge with no
+    release note -- the exact loss this guard exists to prevent.
+
+    This exercises `_changed_paths` against a real repository rather than a
+    hand-written path list, because the defect lives in how the paths are
+    OBTAINED, not in how they are classified. A test that passes both paths in
+    by hand cannot fail on it.
+    """
+    import subprocess
+
+    def git(*args):
+        subprocess.run(
+            ["git", "-C", str(tmp_path), *args],
+            check=True, capture_output=True,
+        )
+
+    git("init", "-q", ".")
+    git("config", "user.email", "guard@test.invalid")
+    git("config", "user.name", "guard-test")
+    (tmp_path / "cps").mkdir()
+    (tmp_path / "wiki-src").mkdir()
+    (tmp_path / "cps" / "shipping_module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    git("mv", "cps/shipping_module.py", "wiki-src/shipping_module.py")
+    git("commit", "-qm", "move it out of the application")
+
+    # Pass cwd rather than chdir()ing: a test-local chdir is global to the
+    # interpreter, and this suite runs under xdist with background retention
+    # timers live in the same process.
+    paths = GUARD._changed_paths("HEAD~1", "HEAD", cwd=tmp_path)
+
+    assert "cps/shipping_module.py" in paths, (
+        "the rename's source was dropped, so the guard cannot see that a "
+        f"shipping file left the application; got {paths}"
+    )
+    assert changelog_requirement_errors(paths), (
+        "a diff that removes a module from cps/ must still require a "
+        "release-note entry"
+    )

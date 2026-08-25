@@ -237,7 +237,15 @@ def kobo_put(monkeypatch):
 
     kobo_ub = MagicMock(session=_SessionProxy())
     kobo_ub.session_flush = lambda *a, **k: session.flush()
-    kobo_ub.session_commit = lambda *a, **k: session.commit()
+    def _session_commit(*_a, **_k):
+        # Mirror the real ``ub.session_commit`` contract: True when the write
+        # landed. The old stub returned ``session.commit()``, i.e. None — so
+        # any caller that correctly checked the result would have looked broken
+        # here, which is part of why the unchecked commit survived.
+        session.commit()
+        return True
+
+    kobo_ub.session_commit = _session_commit
     kobo_ub.ReadBook = SimpleNamespace(STATUS_UNREAD=0, STATUS_IN_PROGRESS=1, STATUS_FINISHED=2)
 
     monkeypatch.setattr(kobo_module, "ub", kobo_ub)
@@ -313,6 +321,48 @@ def test_bookmark_only_put_still_records_the_devices_own_state(kobo_put):
     assert bookmark.location_value == "kobo.6.1", "the KoboSpan the device seeks to is still stored"
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize("clock", [
+    "not-a-clock",
+    "9999-12-31T23:59:59-23:59",
+    "0001-01-01T00:00:00+23:59",
+])
+def test_state_put_preserves_stored_clocks_when_device_clock_is_rejected(kobo_put, clock):
+    """A rejected device observation must not be replaced with server ``now``."""
+    from datetime import datetime, timezone
+
+    kobo_module, app, _session = kobo_put
+    reading_state = kobo_module.get_or_create_reading_state(BOOK_ID)
+    old_bookmark_clock = datetime(2020, 1, 2, tzinfo=timezone.utc)
+    reading_state.current_bookmark.last_modified = old_bookmark_clock
+    payload = _state_put_payload(64.5)
+    payload["ReadingStates"][0]["LastModified"] = clock
+
+    with app.test_request_context(json=payload, method="PUT"):
+        response = _handler(kobo_module)("uuid-under-test")
+
+    assert response.get_json()["RequestResult"] == "Success"
+    assert reading_state.current_bookmark.progress_percent == 64.5
+    assert reading_state.current_bookmark.last_modified == old_bookmark_clock
+
+
+@pytest.mark.unit
+def test_state_put_still_applies_a_valid_device_clock(kobo_put):
+    """The rejected-clock branch must not change valid-input behaviour."""
+    from datetime import datetime, timezone
+
+    kobo_module, app, _session = kobo_put
+    reading_state = kobo_module.get_or_create_reading_state(BOOK_ID)
+
+    with app.test_request_context(json=_state_put_payload(65.5), method="PUT"):
+        response = _handler(kobo_module)("uuid-under-test")
+
+    assert response.get_json()["RequestResult"] == "Success"
+    assert reading_state.current_bookmark.last_modified == datetime(
+        2026, 8, 14, 6, 0, tzinfo=timezone.utc,
+    )
+
+
 # ── the call site, because the bug was a call that was never made ────────────
 
 @pytest.mark.unit
@@ -375,3 +425,39 @@ def test_settles_pending_writes_before_opening_the_savepoint():
     src = inspect.getsource(share_kobo_progress_with_koreader)
     assert "session_flush()" in src
     assert src.index("session_flush()") < src.index("begin_nested()")
+
+
+@pytest.mark.unit
+def test_state_put_does_not_report_success_when_the_commit_rolled_back(
+    kobo_put, monkeypatch,
+):
+    """A rolled-back reading state must not be answered ``Success``.
+
+    ``ub.session_commit()`` returns ``False`` when it caught an
+    ``OperationalError``/``InvalidRequestError`` and rolled back, and its own
+    docstring says callers whose answer to the user depends on the write
+    landing MUST check it — citing #1318, which is precisely "a rolled-back
+    bookmark was still answered 201".
+
+    This handler ignored the result and returned ``RequestResult: Success``
+    unconditionally, so a device whose progress was NOT stored was told it was,
+    cleared its queue, and the server kept the older position.
+    """
+    kobo_module, app, _session = kobo_put
+    monkeypatch.setattr(kobo_module.ub, "session_commit", lambda *a, **k: False)
+
+    with app.test_request_context(json=_state_put_payload(63.5), method="PUT"):
+        response = _handler(kobo_module)("uuid-under-test")
+
+    if isinstance(response, tuple):
+        body, status = response[0], response[1]
+        body = body if isinstance(body, str) else body.get_data(as_text=True)
+    else:
+        body, status = response.get_data(as_text=True), response.status_code
+
+    assert status >= 500, (
+        f"a rolled-back state write must not be answered {status}"
+    )
+    assert "Success" not in body, (
+        "the device must not be told the write landed when it was rolled back"
+    )

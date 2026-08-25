@@ -1,0 +1,13 @@
+{
+  "area": "testing",
+  "body": "VERIFIED against the code, and a scare I raised and then retracted — the CI gate is fine.\n\nIn CI this is correct. `.github/workflows/tests.yml` builds the image from the PR's own\ncontext (`context: .`, `push: false`, `load: true`) and TAGS it\n`crocodilestick/calibre-web-automated:latest`, then sets\n`CWA_TEST_IMAGE: \"crocodilestick/calibre-web-automated:latest\"` (tests.yml:341). The\nupstream-looking name is a local alias for the PR build, so the lane genuinely exercises\nour code.\n\nThe footgun is local. Run `pytest tests/docker/ tests/integration/` by hand without first\nbuilding that tag and the name resolves to UPSTREAM's PUBLISHED image — so the suite\nreports confidently about software that is not ours, with no warning that it did so.\n\nTwo things make it worse than a documentation gap:\n\n1. `tests/conftest_volumes.py:332` HARD-CODES `crocodilestick/calibre-web-automated:latest`\n   and ignores `CWA_TEST_IMAGE` entirely, while `tests/conftest.py:618` honours it\n   (`os.getenv('CWA_TEST_IMAGE', 'crocodilestick/calibre-web-automated:dev')`). So even\n   setting the env var does not redirect the volume-mode fallback. The two conftests\n   disagree about how the image is chosen.\n2. `conftest.py`'s DEFAULT is upstream's `:dev` tag, so the failure mode is a silent\n   wrong-target rather than a missing-image error.\n\nMeasured 2026-08-18: a delegate ran that collection on this Mac and got\n`62 passed, 50 skipped, 6 failed`, then correctly reported it could not be treated as\nbranch verification. It was right, and only because it happened to check. A less careful\nrun would have reported those numbers as evidence about the branch.\n\nFix direction: make `conftest_volumes.py` honour `CWA_TEST_IMAGE` like `conftest.py` does,\nand make the default a name that CANNOT be satisfied by an upstream pull (e.g. a\n`cwng-local/...` tag) so a local run fails loudly instead of testing the wrong software.",
+  "created": "2026-08-18",
+  "id": "F-40a954",
+  "refs": [
+    "#1744"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "Running the Docker integration suite locally silently tests UPSTREAM's image, not the branch"
+}

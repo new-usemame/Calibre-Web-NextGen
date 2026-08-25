@@ -41,6 +41,8 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const announce = useAnnouncer();
   const navRef = useRef<HTMLElement>(null);
   const update = useUpdateSidebar();
+  const [hoverSuppressed, setHoverSuppressed] = useState(false);
+  const hoverExitObserved = useRef(false);
 
   // #585 v3: inline sidebar edit mode (toggled by the Customize capsule).
   const [editMode, setEditMode] = useState(false);
@@ -65,6 +67,30 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     if (isMobile && !open) node.setAttribute('inert', '');
     else node.removeAttribute('inert');
   }, [isMobile, open]);
+
+  useEffect(() => {
+    if (!hoverSuppressed) return;
+
+    // A route click can leave the pointer either inside the 64px rail or over
+    // the overlay strip that is about to disappear. Keep stale hover suppressed
+    // for the pointer's whole journey out; only a later return to the nav is
+    // fresh hover intent. A layout-induced pointerleave is deliberately ignored.
+    const trackPointerJourney = (event: PointerEvent) => {
+      const node = navRef.current;
+      if (!node) return;
+      const pointerInsideNav = event.composedPath().includes(node);
+
+      if (!hoverExitObserved.current) {
+        if (!pointerInsideNav) hoverExitObserved.current = true;
+        return;
+      }
+
+      if (pointerInsideNav) setHoverSuppressed(false);
+    };
+
+    window.addEventListener('pointermove', trackPointerJourney, true);
+    return () => window.removeEventListener('pointermove', trackPointerJourney, true);
+  }, [hoverSuppressed]);
 
   useFocusTrap(navRef, { onClose, active: isMobile && open });
   const { data: shelvesData } = useShelves();
@@ -113,10 +139,10 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   // ── normal-mode ordered region (browse/discovery + Shelves block, in order) ─
   const renderShelvesBlock = () => (
     <Fragment key="shelves-block">
-      <div className={styles.sectionHeader}>
+      <div>
         <Link
           href="/shelves"
-          className={isActive(location, '/shelves', true) ? styles.sectionTitleActive : styles.sectionTitle}
+          className={isActive(location, '/shelves', true) ? styles.itemActive : styles.item}
           onClick={onNavigate}
         >
           <BookCopy size={16} className={styles.icon} aria-hidden="true" focusable={false} />
@@ -193,9 +219,15 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
       {open && <div className={styles.scrim} onClick={onClose} aria-hidden="true" />}
       <nav
         ref={navRef}
-        className={open ? styles.navOpen : styles.nav}
+        className={`${open ? styles.navOpen : styles.nav}${hoverSuppressed ? ` ${styles.hoverSuppressed}` : ''}`}
         aria-label={t('Browse')}
         tabIndex={-1}
+        onClickCapture={(event) => {
+          if (event.target instanceof Element && event.target.closest('a[href]')) {
+            hoverExitObserved.current = false;
+            setHoverSuppressed(true);
+          }
+        }}
       >
         {/* Mobile-only close affordance (labelled); hidden on the desktop rail. */}
         <button type="button" className={styles.drawerClose} onClick={onClose} aria-label={t('Close menu')}>
@@ -256,19 +288,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
 
             {/* Smart shelves + power features (pinned). */}
             <ul className={styles.list} role="list">
-              {showList && (
-                <li>
-                  <Link
-                    href="/table"
-                    className={isActive(location, '/table', true) ? styles.itemActive : styles.item}
-                    aria-current={isActive(location, '/table', true) ? 'page' : undefined}
-                    onClick={onNavigate}
-                  >
-                    <Table2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                    <span>{t('Table view')}</span>
-                  </Link>
-                </li>
-              )}
               <li>
                 <Link
                   href="/magic"
@@ -287,16 +306,31 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   <li key={`ms-${ms.id}`}>
                     <Link
                       href={href}
-                      className={active ? styles.shelfItemActive : styles.shelfItem}
+                      className={`${active ? styles.shelfItemActive : styles.shelfItem} ${styles.magicShelfItem}`}
                       aria-current={active ? 'page' : undefined}
+                      aria-label={ms.name}
                       onClick={onNavigate}
                       title={ms.name}
                     >
-                      <span className={styles.shelfName}>{ms.icon} {ms.name}</span>
+                      <span className={styles.magicShelfIcon} aria-hidden="true">{ms.icon}</span>
+                      <span className={styles.magicShelfName}>{ms.name}</span>
                     </Link>
                   </li>
                 );
               })}
+              {showList && (
+                <li>
+                  <Link
+                    href="/table"
+                    className={isActive(location, '/table', true) ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/table', true) ? 'page' : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Table2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Table view')}</span>
+                  </Link>
+                </li>
+              )}
               {(canUpload || isAdmin) && showDuplicates && (
                 <li>
                   <Link

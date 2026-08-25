@@ -3,14 +3,17 @@ import { test, expect } from '@playwright/test';
 /*
  * #989 — replacing a cover looked like it did nothing.
  *
- * Reported by @chloeroform, who linked the exact call sites. The cover lives
- * at a stable path (/cover/<id>/og), so after a replacement the refetched book
- * hands back a byte-identical `src`. React re-renders, the browser serves its
- * cached copy, and the preview never changes — the upload succeeded and looked
- * like a no-op.
+ * Reported by @chloeroform, who linked the exact call sites. The cover lived
+ * at a stable path, so after a replacement the refetched book handed back a
+ * byte-identical `src`. React re-renders, the browser serves its cached copy,
+ * and the preview never changes — the upload succeeded and looked like a no-op.
  *
  * The API already answers the upload with a cache-busted URL for exactly this
  * reason; the frontend was discarding it.
+ *
+ * Every cover URL is now versioned by Books.last_modified (`?c=`), which the
+ * cover-replace endpoint bumps, so the refetched book carries a different URL
+ * too — the buster is no longer only on the upload's own response.
  *
  * Asserts the observable property — the preview's src changes — rather than
  * pixels, because "the image on screen is the new one" is what the reporter
@@ -45,6 +48,10 @@ test('replacing a cover updates the preview immediately (#989)', async ({ page }
     .not.toBe(before);
 
   const after = await preview.getAttribute('src');
+  // `?c=<last_modified>` is the server's own cover version token; `?t=` is the
+  // legacy per-apply stamp. Either is a real buster — what must never happen is
+  // a bare URL, because cover responses are cached hard and the browser would
+  // keep showing the old image (#989).
   expect(after, 'the refreshed preview must carry a cache-buster, or the browser '
-    + 'serves the old image from cache (#989)').toContain('?t=');
+    + 'serves the old image from cache (#989)').toMatch(/[?&](c|t)=/);
 });

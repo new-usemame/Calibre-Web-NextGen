@@ -22,10 +22,16 @@
   <div id="annotations-import-result" style="margin-top: 1.5em; display: none;">
     <h3>{{ _('Import summary') }}</h3>
     <ul>
-      <li><strong id="result-imported">0</strong> {{ _('new highlights imported') }}</li>
+      <li><strong id="result-imported">0</strong> {{ _('new annotations imported') }}</li>
+      <li><strong id="result-updated">0</strong> {{ _('existing annotations updated from a newer device copy') }}</li>
       <li><strong id="result-existing">0</strong> {{ _('already imported (skipped)') }}</li>
+      <li><strong id="result-newer-server">0</strong> {{ _('different or undated device entries older than server state (skipped)') }}</li>
       <li><strong id="result-orphan">0</strong> {{ _('for books not in this library (skipped)') }}</li>
-      <li><strong id="result-hidden">0</strong> {{ _('hidden on device (skipped)') }}</li>
+      <li><strong id="result-hidden">0</strong> {{ _('hidden on device (reported, not applied)') }}</li>
+      <li><strong id="result-empty">0</strong> {{ _('empty bookmark rows with no annotation content (skipped)') }}</li>
+      <li><strong id="result-invalid">0</strong> {{ _('invalid bookmark rows (skipped)') }}</li>
+      <li><strong id="result-invalid-content">0</strong> {{ _('entries with invalid book positions (skipped)') }}</li>
+      <li><strong id="result-failed">0</strong> {{ _('entries not saved because the import transaction failed') }}</li>
       <li><strong id="result-total">0</strong> {{ _('total entries seen') }}</li>
     </ul>
   </div>
@@ -60,9 +66,15 @@
       statusEl.textContent = '';
       if (res.ok) {
         document.getElementById('result-imported').textContent = res.body.imported || 0;
+        document.getElementById('result-updated').textContent = res.body.updated || 0;
         document.getElementById('result-existing').textContent = res.body.skipped_existing || 0;
+        document.getElementById('result-newer-server').textContent = res.body.skipped_newer_server || 0;
         document.getElementById('result-orphan').textContent = res.body.skipped_orphan || 0;
         document.getElementById('result-hidden').textContent = res.body.skipped_hidden || 0;
+        document.getElementById('result-empty').textContent = res.body.skipped_empty || 0;
+        document.getElementById('result-invalid').textContent = res.body.skipped_invalid || 0;
+        document.getElementById('result-invalid-content').textContent = res.body.skipped_invalid_content_id || 0;
+        document.getElementById('result-failed').textContent = res.body.failed || 0;
         document.getElementById('result-total').textContent = res.body.total_seen || 0;
         resultEl.style.display = 'block';
       } else {

@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "MEASURED on the operator's own device and deployed server, 2026-08-18.\n\nThe Kobo uploads a DELTA, never its full set. So any annotation created while\nCWNG was not capturing is invisible to the server forever — the device will not\nre-offer it, and `checkforchanges` containment (correctly) keeps the book out of\nthe Kobo-cloud download.\n\nMeasured gap, same user, same 4 books, device vs server:\n\n  | book                | device highlights | server annotations |\n  |---------------------|-------------------|--------------------|\n  | The Able McLaughlins| 1                 | 1                  |\n  | 1984                | 10                | 2                  |\n  | Alice Adams         | 2                 | 0                  |\n  | The Age of Innocence| 4                 | 4                  |\n\n10 device-only highlights. I did NOT establish why each was missed — the missing\nones cluster in windows where the device was being driven for instrumentation,\nso pointing the device at a capture proxy is at least as likely an explanation\nas a live defect. What is established:\n\n- the LIVE path is healthy. A highlight created on hardware just now\n  (\"surveillance\", 1984) reached the server within seconds with correct text,\n  type and source. So this is not an active sync bug.\n- there is NO automatic recovery. `kobo_annotation_seed_capture` and\n  `kobo_annotation_seed_capture_page` are both EMPTY on the deployed server, and\n  `kobo_device_book_annotation_state` and `annotation_device_state` likewise. The\n  seeding machinery exists in the schema and has never run.\n- the designed manual recovery — uploading KoboReader.sqlite via\n  `/annotations/import` — silently drops dogears and note-only rows, and cannot\n  apply an edit to an annotation the server already has. Both recorded\n  separately.\n\nSo the product's answer to \"the server missed one\" is currently: nothing\nautomatic, and a manual path with known holes. That is the gap worth closing, and\nit is independent of whichever cause produced these particular 10.",
+  "created": "2026-08-18",
+  "id": "F-a66189",
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "Annotations made outside a working capture window are unrecoverable, and no seed capture has ever run"
+}

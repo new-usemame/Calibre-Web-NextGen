@@ -56,6 +56,189 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.40',
+    date: '2026-08-23',
+    items: [
+      {
+        title: 'A slimmer desktop sidebar leaves more room for your books',
+        body: 'On mouse-and-keyboard desktops, navigation now rests as a narrow icon rail and expands over the page when you hover over it or focus it with the keyboard. Touch devices and smaller screens keep the familiar menu drawer.',
+        category: 'Library',
+      },
+      {
+        title: 'The desktop sidebar gets out of the way after navigation',
+        body: 'Opening a destination from the expanded sidebar now keeps the rail collapsed while you move into the page, so it cannot cover the controls you just opened. Returning to the rail or focusing it with the keyboard still expands it normally.',
+        category: 'Library',
+      },
+      {
+        title: 'Return to the list you opened a book from',
+        body: 'The book-page back link now returns to the same author, series, tag, shelf, discovery view or library search instead of dropping you at the library root. A destination survives reloading the book page, although the list then opens at the top; advanced-search criteria are not restored.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Discover picks stay put when you return to the tab',
+        body: 'The broader focus-refresh fix did not cover the random Discover strip, so switching away and back could still replace its books and spend bandwidth. Its picks now remain until you shuffle them or reload the page.',
+        category: 'Library',
+        link: { to: '/discover', label: 'Browse Discover' },
+      },
+      {
+        title: 'A Kobo cannot erase local highlights during a sync transition',
+        body: 'An expired Calibre-Web session, newly disabled Kobo sync, or an alternate spelling of the change-check request could make a Kobo replace its local highlights with an empty cloud response. Every equivalent request now keeps owned books out of that destructive path while Kobo-store content continues to sync normally.',
+        category: 'Sync',
+      },
+      {
+        title: 'Duplicate-book merges keep your newest highlight or note',
+        body: 'When both copies of a duplicate book held the same annotation, the merge could discard the newer edit simply because it belonged to the book being removed. It now keeps the newest complete version and its sync state.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Deleting KOReader highlights stays fast on heavily annotated books',
+        body: 'Removing a handful of highlights made the server inspect every KOReader highlight in that book first, so the work grew with the size of your collection rather than with the number of deletions. It now looks up only the highlights being removed. Which highlights get deleted is unchanged, and unrelated highlights are untouched.',
+        category: 'Sync',
+      },
+      {
+        title: 'Book deletion is easy to find where you expect it',
+        body: 'The edit page now places Delete book beside Edit metadata, and the book page gives deletion its own clearly labelled destructive section. The controls remain permission-gated and always ask for confirmation.',
+        category: 'Library',
+      },
+      {
+        title: 'Manage shared smart shelves with the permissions you already have',
+        body: 'Edit, Duplicate and Delete now appear independently when the server allows each action, even when someone else owns the public smart shelf. Kobo sync remains available only to the shelf owner.',
+        category: 'Library',
+        link: { to: '/magic', label: 'Smart shelves' },
+      },
+      {
+        title: 'Library activity keeps reaching your statistics',
+        body: 'Source-tree and container installs launched outside the application directory no longer lose activity records for smart shelves, searches, shelves, OPDS, Kobo sync and related actions.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Profile pictures and update reminders follow your data directory',
+        body: 'Source and bare-metal installs no longer assume those files live under the container-only /config path. Profile pictures stay visible and editable, and the once-a-day update reminder retains its state wherever the configured data directory lives.',
+        category: 'Account',
+      },
+      {
+        title: 'Reverse proxies and pooled clients keep a reliable connection',
+        body: 'The server now clearly tells HTTP/1.1 clients when it will close a connection, preventing an already-closing socket from being reused for the next page or API request.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'The Statistics page reports genuinely missing packages',
+        body: 'Dependencies that do not apply to your system are now left out, while a package that is truly missing is visible again. This helps source installs catch an incomplete upgrade before it causes an import failure.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+    ],
+  },
+  {
+    version: 'v4.1.39',
+    date: '2026-08-21',
+    items: [
+      {
+        title: 'A KOReader sync cannot delete highlights made elsewhere',
+        body: 'KOReader could take ownership of a highlight made on a Kobo or in the web reader and later remove it. It can still update those highlights, but now deletes only highlights that originated in KOReader.',
+        category: 'Sync',
+      },
+      {
+        title: 'See which books you have started in every New UI list',
+        body: 'Books in progress now carry an amber Reading badge across the library, shelves, magic shelves and search results. It uses the same reading state already shared with Kobo and KOReader.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Highlights work in more chapters of newly processed books',
+        body: 'Books that pack many chapters into one file, including most Project Gutenberg editions, are now stored one file per chapter when uploaded, converted or auto-ingested. Books you have already highlighted are left unchanged unless they already use that safe chapter-by-chapter structure.',
+        category: 'Reading',
+        link: { to: '/upload', label: 'Upload a book' },
+      },
+      {
+        title: 'Kobo repair notices tell you what to do next',
+        body: 'After CWNG repairs a Kobo book, the notice now asks you to sync and try highlighting again, then explains when to remove and redownload the book. The book page also covers readers other than Kobo.',
+        category: 'Sync',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'KOReader highlight colours match the device',
+        body: 'Blue and green no longer arrive swapped, Kobo pink is named correctly, and greyscale-reader highlights no longer fall back to yellow. The plugin and server now share the same device-measured colour mapping.',
+        category: 'Sync',
+      },
+      {
+        title: 'Reduce Motion now stops every loading spinner',
+        body: 'All seven loading indicators in the New UI now respect your system Reduce Motion setting. Nothing changes when reduced motion is not enabled.',
+        category: 'Account',
+      },
+      {
+        title: 'Container updates and restarts shut down cleanly',
+        body: 'The ingest watcher no longer blocks the service until Docker forcibly kills it at the end of the shutdown grace period. It now stops its watcher and cleanup helpers promptly so in-flight requests can finish normally.',
+        category: 'Admin',
+      },
+      {
+        title: 'Book covers load with less repeated network traffic',
+        body: 'The New UI now reuses versioned covers while scrolling and requests a book-page image sized for the screen instead of the full original. Existing open pages keep their current cover until refreshed, and servers without resized-cover support retain the previous fallback.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'A replacement cover reaches every place that uses it',
+        body: 'Replacing a cover in the New UI or through automatic metadata now records the book as changed. Other pages refresh correctly, Kobo is told to sync it, and a background job is requested to write it into the downloadable book file.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Imported Kobo highlights keep their real colours',
+        body: 'Highlights from a KoboReader.sqlite upload now appear as yellow, pink, blue, green or grey across the reader, Highlights page and exports. Unknown colours stay visibly unknown, and notes can again be saved on imported pink or grey highlights.',
+        category: 'Sync',
+      },
+      {
+        title: 'Active imports no longer trigger a false duplicate warning',
+        body: 'Bare-metal installs and servers with customized ingest marker paths could ask for a manual duplicate scan while an import was still running. The importer and duplicate index now use the same configured marker location.',
+        category: 'Library',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'Returning to the tab no longer refreshes the whole app',
+        body: 'Focusing the browser tab no longer launches a burst of requests for every cached part of the New UI. Live polling such as the task queue continues normally.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Opening the library avoids a useless page download',
+        body: 'The unfiltered library no longer requests an unnamed entity list that the server answered with a full HTML page the app could not use. That removes a failed request and retry each time the main library loads.',
+        category: 'Under the hood',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Kobo highlights return in books with anchored chapter links',
+        body: 'CWNG now repairs table-of-contents links that point to an unnecessary anchor at the top of a chapter, including safe repairs to existing converted books after upgrade. Sync and open the repaired book on your Kobo to download it and make existing highlights appear again.',
+        category: 'Sync',
+      },
+      {
+        title: 'Highlight compatibility warnings report a real chapter count',
+        body: 'The Kobo compatibility warning no longer counts page-number anchors as broken chapters. Logs now count only table-of-contents entries that actually determine where a Kobo can show highlights.',
+        category: 'Admin',
+      },
+    ],
+  },
+  {
+    version: 'v4.1.38',
+    date: '2026-08-17',
+    items: [
+      {
+        title: 'Kobo two-way annotation sync begins with a safe opt-in',
+        body: 'Settings now include separate server-wide and per-user opt-ins for future two-way Kobo highlight sync, both switched off by default. This first stage only stores recovery evidence: turning the controls on does not change anything sent to a Kobo yet.',
+        category: 'Sync',
+        link: { to: '/admin', label: 'Open administration' },
+      },
+      {
+        title: 'An unsupported KEPUB no longer restarts the whole repair scan',
+        body: 'A KEPUB that is too large to repair or has an older unsupported structure could make every server restart scan the entire library again, causing high CPU, database lock errors, and repeated crashes. The repair task now records that refusal once, reports the book as unsupported, and finishes normally; genuine read failures are still retried.',
+        category: 'Library',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.37',
     date: '2026-08-17',
     items: [

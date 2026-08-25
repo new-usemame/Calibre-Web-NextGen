@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
-import { Router, Route, Switch, useLocation } from 'wouter';
+import { Router, Route, Switch, useLocation, useSearch } from 'wouter';
 import { RouteA11y } from './lib/a11y/useRouteA11y';
 import { BASE_PREFIX, type AdvancedSearchParams } from './lib/api';
 import { bodyFontStack, displayFontStack } from './lib/fonts';
@@ -34,6 +34,7 @@ import { SpinnerCentered } from './components/Spinner';
 import { I18nProvider } from './lib/i18n';
 import { usePostAuthRedirect } from './lib/authRedirect';
 import { AUTH_ROUTES, SPA_ROUTES } from './lib/routes';
+import { recordOrigin } from './lib/backLink';
 
 // The reader pulls in epub.js (large) — load it only when a book is opened so it
 // stays out of the initial bundle.
@@ -58,6 +59,13 @@ function RouteBoundary({ children }: { children: ReactNode }) {
       {children}
     </RoutedErrorBoundary>
   );
+}
+
+function OriginTracker() {
+  const [location] = useLocation();
+  const search = useSearch();
+  useEffect(() => { recordOrigin(location, search); }, [location, search]);
+  return null;
 }
 
 // A saved default view (#498) FILTERS the library; it does not replace it with
@@ -140,6 +148,7 @@ export function App() {
     <I18nProvider locale={me.locale}>
     <Router base={ROUTER_BASE}>
       <RouteA11y instanceName={me.instance_name} />
+      <OriginTracker />
       <RouteBoundary>
       <Switch>
         {/* Full-screen reader — outside the app shell (no sidebar/topbar). */}

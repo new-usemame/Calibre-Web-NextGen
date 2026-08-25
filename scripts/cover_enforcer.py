@@ -476,6 +476,51 @@ class Enforcer:
         return dirs['calibre_library_dir'] # Returns without / on the end
 
 
+    def _restat_format_size_after_modification(self, book_id: str, file_format: str, file_path: str) -> None:
+        """Re-stat data.uncompressed_size after rewriting a format in place (#1711).
+
+        cps/kobo.py advertises this column to a paired device verbatim as
+        ``"Size"``, and the device stores it (``content.___FileSize``). Rewriting
+        the file with ebook-polish or ebook-meta changes the byte count, so
+        leaving the column alone advertises a size the server will not serve.
+        Measured on a live library: 8 of 435 format rows stale, and the three
+        stale KEPUB rows were exactly the three books enforced in one pass.
+
+        The two other in-place writers already do this --
+        kepub_package_repair.py sets it from os.path.getsize, and
+        editbooks._refresh_format_sizes re-stats every format inside the same
+        commit boundary. The enforcer was the one that did not.
+
+        Best-effort: a failure here must not fail an enforcement pass that has
+        already written the file correctly.
+        """
+        try:
+            size = os.path.getsize(file_path)
+        except OSError as e:
+            print(f"[cover-metadata-enforcer] Warning: could not stat {file_path} "
+                  f"to refresh its size: {e}", flush=True)
+            return
+        try:
+            metadb_path = os.path.join(
+                (self.split_library or {}).get("db_path", self.calibre_library),
+                "metadata.db"
+            )
+            con = sqlite3.connect(metadb_path, timeout=60)
+            try:
+                cur = con.execute(
+                    "UPDATE data SET uncompressed_size=? WHERE book=? AND format=?",
+                    (size, int(book_id), file_format.upper()),
+                )
+                con.commit()
+                if cur.rowcount:
+                    print(f"[cover-metadata-enforcer] Refreshed size for book {book_id} "
+                          f"format {file_format.upper()} -> {size} bytes", flush=True)
+            finally:
+                con.close()
+        except Exception as e:
+            print(f"[cover-metadata-enforcer] Warning: Failed to refresh format size "
+                  f"for book {book_id}: {e}", flush=True)
+
     def _recalculate_checksum_after_modification(self, book_id: str, file_format: str, file_path: str) -> None:
         """Calculate and store new checksum after modifying a book file."""
         try:
@@ -960,6 +1005,9 @@ class Enforcer:
 
                     # Calculate and store new checksum after modification
                     self._recalculate_checksum_after_modification(book.book_id, book.file_format, file)
+                    # The bytes on disk just changed; the size Kobo is told must
+                    # change with them (#1711).
+                    self._restat_format_size_after_modification(book.book_id, book.file_format, file)
 
                 book_objects.append(book)
 

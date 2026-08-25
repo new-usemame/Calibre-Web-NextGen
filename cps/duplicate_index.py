@@ -7,7 +7,6 @@
 import hashlib
 import json
 import os
-import sys
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -25,8 +24,8 @@ from .duplicates import (
     normalize_text_for_duplicates,
 )
 
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 
 log = logger.create()
@@ -34,8 +33,6 @@ log = logger.create()
 NORMALIZATION_VERSION = "duplicate-index-v3"  # v3: + accent-fold (NFKD) + punctuation-to-space, precision-preserving (D6)
 MAX_INCREMENTAL_BOOK_IDS = 1000
 DUPLICATE_INDEX_REBUILD_BATCH_SIZE = 250
-INGEST_BATCH_DIRTY_FILE = "/config/cwa_ingest_batch_dirty"
-INGEST_BATCH_ACTIVE_FILE = "/config/cwa_ingest_batch_active"
 
 CRITERIA_KEYS = (
     "duplicate_detection_title",
@@ -565,11 +562,25 @@ def has_valid_duplicate_index_baseline(settings, candidate_book_ids=None):
     return missing_book_ids.issubset(candidate_ids)
 
 
+def get_ingest_batch_dirty_file() -> str:
+    return os.environ.get("CWA_INGEST_BATCH_DIRTY_FILE") or os.path.join(
+        constants.CONFIG_DIR, "cwa_ingest_batch_dirty"
+    )
+
+
+def get_ingest_batch_active_file() -> str:
+    return os.environ.get("CWA_INGEST_BATCH_ACTIVE_FILE") or os.path.join(
+        constants.CONFIG_DIR, "cwa_ingest_batch_active"
+    )
+
+
 def ingest_batch_follow_up_pending():
+    dirty_file = get_ingest_batch_dirty_file()
+    active_file = get_ingest_batch_active_file()
     return (
-        os.path.exists(INGEST_BATCH_ACTIVE_FILE)
-        or os.path.exists(INGEST_BATCH_DIRTY_FILE)
-        or os.path.exists(f"{INGEST_BATCH_DIRTY_FILE}.running")
+        os.path.exists(active_file)
+        or os.path.exists(dirty_file)
+        or os.path.exists(f"{dirty_file}.running")
     )
 
 

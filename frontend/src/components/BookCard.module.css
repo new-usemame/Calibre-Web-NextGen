@@ -165,7 +165,7 @@
    the word in the reporter's classic screenshot. Green rather than --accent
    because "done" reads as green far more universally than amber, and because
    the amber circle was competing with the accent-coloured hover actions. */
-.readBadge {
+.readBadge, .readingBadge {
   min-height: 24px;
   padding: 0 var(--sp-2);
   border-radius: var(--r-full);
@@ -176,7 +176,6 @@
      2.20:1: an accessibility regression inside an accessibility fix. This
      pairing is 5.35:1 in every theme, and the shadow separates it from dark
      covers. */
-  background: #1f7a44;
   color: #fff;
   box-shadow: var(--elev-1);
   display: inline-flex;
@@ -187,6 +186,17 @@
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
+}
+
+.readBadge {
+  background: #1f7a44;
+}
+
+/* Sync-driven in-progress state (#1702). Amber mirrors the classic Reading
+   badge while remaining distinct from the green finished state. Like Read,
+   this fixed pairing is self-contrasting because it sits over cover artwork. */
+.readingBadge {
+  background: #925700;
 }
 
 /* Personal-library state: quiet but explicit when Show hidden books is on.
@@ -261,8 +271,10 @@
 }
 
 /* Quick-edit pencil (fork #572). Lives in `.actionRow`, in normal flow beside
-   the read link — NOT absolutely positioned over the card (#1166). Hover/
-   focus-reveal like the remove button, but always reachable via keyboard focus. */
+   the read link — NOT absolutely positioned over the card (#1166). It uses
+   on-surface tokens here; --cover-control-* is reserved for controls over
+   unpredictable cover artwork. Hover/focus-reveal like the remove button, but
+   always reachable via keyboard focus. */
 .quickEditBtn {
   flex: 0 0 auto;
   /* A card with no readable format has no "Read now" link, so the pencil is
@@ -273,9 +285,9 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-full);
-  background: var(--cover-control-bg);
-  color: var(--cover-control-fg);
-  border: 1px solid var(--cover-control-border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
   box-shadow: var(--elev-1);
   display: flex;
   align-items: center;
@@ -379,7 +391,10 @@
   .readNow { min-height: 44px; opacity: 1; }
   /* Bigger where legibility is worst — a phone held at arm's length is the
      case the reporter was describing. */
-  .readBadge, .hiddenBadge { min-height: 28px; font-size: var(--fs-sm); }
+  .readBadge, .readingBadge, .hiddenBadge {
+    min-height: 28px;
+    font-size: var(--fs-sm);
+  }
   .seriesBadge { min-width: 28px; height: 28px; font-size: var(--fs-sm); }
   .removeBtn, .quickEditBtn {
     width: 44px;

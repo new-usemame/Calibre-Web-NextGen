@@ -16,6 +16,7 @@ from . import api_v1
 from .. import logger
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
+from .serializers import cover_url_for
 
 log = logger.create()
 
@@ -42,7 +43,8 @@ def list_duplicates():
     needs_scan = False
     groups = []
     try:
-        from scripts.cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         from ..duplicate_index import (
             get_duplicate_groups_from_index,
             duplicate_index_needs_manual_full_scan,
@@ -70,7 +72,7 @@ def list_duplicates():
                 "title": b.title,
                 "authors": (getattr(b, "author_names", "") or "").replace("|", ","),
                 "formats": [d.format for d in (getattr(b, "data", None) or [])],
-                "cover_url": ("/cover/%d/sm" % b.id) if getattr(b, "has_cover", 0) else None,
+                "cover_url": cover_url_for(b, "sm"),
             } for b in g.get("books", [])],
         })
     return jsonify({"items": items, "needs_scan": needs_scan})

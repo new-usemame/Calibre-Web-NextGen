@@ -268,10 +268,8 @@ def trigger_hardcover_auto_fetch():
             return json.dumps(show_text), 400
         
         # Get settings
-        import sys as _sys
-        if constants.SCRIPTS_DIR not in _sys.path:
-            _sys.path.insert(1, constants.SCRIPTS_DIR)
-        from cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
         from cps.services.worker import WorkerThread
         
@@ -670,6 +668,10 @@ def configuration():
                                  config=config,
                                  provider=oauth_bb.oauthblueprints,
                                  feature_support=feature_support,
+                                 kobo_two_way_emergency_disabled=(
+                                     os.environ.get("CWNG_KOBO_TWO_WAY_ANNOTATIONS", "").strip().lower()
+                                     in {"0", "false", "off", "no"}
+                                 ),
                                  hardcover_token_status=hardcover_status,
                                  title=_("Basic Configuration"), page="config")
 
@@ -1438,10 +1440,37 @@ def ajax_kobo_resend(userid, bookid):
 
 def do_kobo_resend(userid, bookid):
     # Force re-delivery of one book to one user's Kobo on the next sync.
-    # Clears the (user_id, book_id) row from kobo_synced_books so the
-    # sync emits NewEntitlement, and bumps Books.last_modified so the
-    # sync filter (Books.last_modified > sync_token.books_last_modified)
-    # picks the book up regardless of where the device's cursor is.
+    #
+    # Two writes, and only the second does what it says on its own:
+    #
+    #   * bump Books.last_modified, so the sync filter
+    #     (Books.last_modified > sync_token.books_last_modified) picks the book
+    #     up regardless of where the device's cursor sits;
+    #   * clear the (user_id, book_id) row from kobo_synced_books.
+    #
+    # ⚠️ This comment used to say the deletion is what makes the sync emit
+    # NewEntitlement. It is not, and believing so is what made the only
+    # regression test for this helper assert a causal chain the code cannot
+    # perform (F-cc5efb). get_kobo_created_ts (cps/kobo.py) derives the
+    # NewEntitlement / ChangedEntitlement choice from Books.timestamp and the
+    # joined date_added ONLY — it never reads kobo_synced_books, and the sync
+    # query deliberately does not filter on that table either because it is
+    # user-keyed and doing so would break multi-device sync (cps/kobo.py, see
+    # the comments around the changed-book query).
+    #
+    # The deletion still matters, by a different route: HandleSyncRequest resets
+    # the WHOLE sync token — books_last_created included — to datetime.min when
+    # the user has no kobo_synced_books rows left at all (cps/kobo.py, "if no
+    # books synced don't respect sync_token"). So removing the user's LAST row
+    # does produce NewEntitlement, which is the single-book case anyone would
+    # test by hand and is presumably how the wrong explanation survived. With
+    # any other synced row remaining, this emits ChangedEntitlement.
+    #
+    # 🚨 Whether a Kobo re-downloads the file on a ChangedEntitlement is
+    # UNOBSERVED (F-3e383a). The success message below tells the admin the
+    # device "will re-receive the book"; that claim is only established for the
+    # empty-table case above. Do not strengthen it without measuring on
+    # hardware.
     book = calibre_db.session.query(db.Books).filter(db.Books.id == bookid).first()
     if book is None:
         message = _("Book {} not found").format(bookid)
@@ -2806,6 +2835,7 @@ def _configuration_update_helper():
         _config_checkbox_int(to_save, "config_register_email")
         prev_kobo_sync = bool(config.config_kobo_sync)
         reboot_required |= _config_checkbox_int(to_save, "config_kobo_sync")
+        _config_checkbox_int(to_save, "config_kobo_two_way_annotation_sync")
         _config_int(to_save, "config_external_port")
         _config_checkbox_int(to_save, "config_kobo_proxy")
         _config_checkbox(to_save, "config_kobo_prefer_kepub")
@@ -3088,6 +3118,9 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.denied_column_value = config.config_denied_column_value
         # No default value for kobo sync shelf setting
         content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync", 0) == "on"
+        content.kobo_two_way_annotation_sync = (
+            to_save.get("kobo_two_way_annotation_sync", 0) == "on"
+        )
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
         ub.session.add(content)
         ub.session.commit()
@@ -3168,6 +3201,10 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         # the setting, so the two cannot disagree.
         kobo_sync_status.update_on_sync_shelfs(content.id)
     content.opds_only_shelves_sync = int(to_save.get("opds_only_shelves_sync") == "on") or 0
+    if "kobo_two_way_annotation_sync_present" in to_save:
+        content.kobo_two_way_annotation_sync = int(
+            to_save.get("kobo_two_way_annotation_sync") == "on"
+        ) or 0
     # Auto-send and metadata fetch settings
     content.auto_send_enabled = to_save.get("auto_send_enabled") == "on"
     content.auto_metadata_fetch = to_save.get("auto_metadata_fetch") == "on"

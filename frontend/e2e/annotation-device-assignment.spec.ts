@@ -121,8 +121,10 @@ test('a standalone note is drawn as a note, not as a highlight that lost its tex
 
   const note = page.getByRole('listitem').filter({ hasText: 'The middle section drags.' });
   await expect(note).toBeVisible();
-  // The API projects `highlight_color or "yellow"` for legacy rows, so an
-  // unguarded render puts a swatch announced as "Yellow" beside an empty quote.
+  // An unguarded render puts a colour swatch beside an empty quote. The API
+  // used to make this worse by projecting a default "yellow" onto a row with no
+  // colour, so the swatch was even announced as "Yellow"; it no longer does
+  // (F-5769c9), but the guard is what keeps the note drawn as a note.
   await expect(note.getByRole('img')).toHaveCount(0);
   await expect(note.locator('blockquote')).toHaveCount(0);
   // 'unanchored' is not 'unresolved': nothing failed to resolve, so the row must

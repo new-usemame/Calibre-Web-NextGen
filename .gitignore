@@ -287,3 +287,19 @@ wiki-generated/
 /app.db-journal
 /app.db-wal
 /app.db-shm
+#
+# Same shape, found 2026-08-17: annotation_backup.get_backup_root() resolves
+# `Path(constants.CONFIG_DIR) / "annotation-backups"`, and under the unit suite
+# CONFIG_DIR is the checkout, so a plain `pytest tests/unit` leaves 22 real
+# gzipped annotation payloads at `<repo>/annotation-backups/<user>/<book>/`.
+# Those are user highlight data, they were untracked and unignored, and any
+# `git add -A` after a local test run would have committed them.
+# tests/unit/test_1712_annotation_backup_not_committable.py derives the name
+# from the service so this entry cannot drift away from what the code writes.
+/annotation-backups/
+
+# Raw Kobo Reading Services exchanges and pre-dispatch PATCH recovery records.
+# These contain private annotation text. In Docker they live under /config;
+# a bare source run falls back to the repository root, so make the entire
+# private-observability parent structurally uncommittable.
+.cwng-private-observability/

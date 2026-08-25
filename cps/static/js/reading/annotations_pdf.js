@@ -19,8 +19,16 @@
         yellow: "rgba(240, 196, 25, 0.40)",
         red:    "rgba(217, 83, 79, 0.40)",
         green:  "rgba(92, 184, 92, 0.40)",
-        blue:   "rgba(91, 192, 222, 0.40)"
+        blue:   "rgba(91, 192, 222, 0.40)",
+        // The Kobo palette also has pink and grey (F-5769c9). Without entries
+        // for them, every highlight from a greyscale device would miss this
+        // table and take the fallback below.
+        pink:   "rgba(232, 175, 207, 0.40)",
+        grey:   "rgba(160, 160, 160, 0.40)"
     };
+    // Unknown or absent — visible, but deliberately not a palette colour, so a
+    // colour we failed to resolve never passes for one the reader chose.
+    var UNKNOWN_RGBA = "rgba(208, 203, 194, 0.40)";
 
     // Annotations cache, keyed by pdf_page (1-indexed).
     var byPage = {};
@@ -76,7 +84,7 @@
         // the original render context. (Authoring tools must normalize.)
         var quads = byPage[pageNum];
         quads.forEach(function (row) {
-            var color = COLOR_RGBA[row.highlight_color] || COLOR_RGBA.yellow;
+            var color = COLOR_RGBA[row.highlight_color] || UNKNOWN_RGBA;
             // pdf_quad is a list of [x, y, w, h] in normalized 0..1 coords
             // relative to page width/height. This avoids the points->px
             // conversion gymnastics and works regardless of zoom.

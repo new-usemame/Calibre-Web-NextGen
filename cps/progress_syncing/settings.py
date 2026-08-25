@@ -7,13 +7,9 @@
 
 """Helpers for KOReader sync feature flags."""
 
-import sys
 import time
 
-from .. import constants, logger
-
-# Access CWA_DB from scripts path (consistent with existing patterns)
-sys.path.insert(1, constants.SCRIPTS_DIR)
+from .. import logger
 
 log = logger.create()
 
@@ -31,7 +27,8 @@ def is_koreader_sync_enabled() -> bool:
     """Return True if KOReader sync is enabled in CWA settings."""
     global _LAST_FAILED_READ_WARN
     try:
-        from cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         settings = CWA_DB().cwa_settings
         return bool(settings.get('koreader_sync_enabled', 0))
     except Exception as e:

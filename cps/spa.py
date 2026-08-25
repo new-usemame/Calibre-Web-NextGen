@@ -193,7 +193,21 @@ def _render_shell(index_path, prefix):
         '<script>window.__CWNG_PREFIX__=%s;window.__CWNG_VERSION__=%s;</script>'
     ) % (static, static, json.dumps(prefix), json.dumps(constants.INSTALLED_VERSION))
     html = html.replace("</head>", inject + "</head>", 1)
-    return Response(html, mimetype="text/html")
+    resp = Response(html, mimetype="text/html")
+    # The shell NAMES the content-addressed bundle files, which are served
+    # `immutable` for a year (web.add_static_asset_cache_headers) and are deleted
+    # by the next Vite build (emptyOutDir). A shell served without cache
+    # directives is heuristically cacheable, so a browser could keep asking for
+    # an asset filename that no longer exists — a white page after an upgrade.
+    # `no-cache` still allows a stored copy, it just requires revalidation, which
+    # is exactly the freshness the pointer document needs.
+    #
+    # Scope, precisely: this keeps a NEWLY LOADED shell from naming deleted
+    # bundles. It cannot help a tab that is already running, which may still try
+    # to lazy-import a chunk the next build removed; that needs a deploy that
+    # retains one previous asset generation, which is a separate change.
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @spa.route("/app")

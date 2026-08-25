@@ -95,7 +95,7 @@ def test_stock_store_proxy_results_remain_after_local_removal(monkeypatch):
     monkeypatch.setattr(kobo_module.config, "config_kobo_proxy", True, raising=False)
     monkeypatch.setattr("cps.kobo.make_request_to_kobo_store",
                         lambda _token: store_response)
-    monkeypatch.setattr("scripts.cwa_db.CWA_DB", lambda: SimpleNamespace(
+    monkeypatch.setattr("cwa_db.CWA_DB", lambda: SimpleNamespace(
         log_activity=lambda **_kwargs: None))
     local = [{"ChangedEntitlement": {"source": "local-hard-delete"}}]
     token = Token()
@@ -126,7 +126,7 @@ def test_missing_store_headers_are_omitted(monkeypatch):
     monkeypatch.setattr(kobo_module.config, "config_kobo_proxy", True, raising=False)
     monkeypatch.setattr("cps.kobo.make_request_to_kobo_store",
                         lambda _token: SimpleNamespace(json=lambda: [], headers={}))
-    monkeypatch.setattr("scripts.cwa_db.CWA_DB", lambda: SimpleNamespace(
+    monkeypatch.setattr("cwa_db.CWA_DB", lambda: SimpleNamespace(
         log_activity=lambda **_kwargs: None))
     app = Flask(__name__)
     with app.test_request_context("/"):

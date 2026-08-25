@@ -209,6 +209,14 @@
     </div>
     <div data-related="kobo-settings">
       <div class="form-group" style="margin-left:10px;">
+        <input type="checkbox" id="config_kobo_two_way_annotation_sync" name="config_kobo_two_way_annotation_sync" {% if config.config_kobo_two_way_annotation_sync %}checked{% endif %} aria-describedby="kobo-two-way-annotation-help">
+        <label for="config_kobo_two_way_annotation_sync">{{_('Allow Kobo two-way annotation sync')}}</label>
+        <p id="kobo-two-way-annotation-help" class="help-block">{{_('Stage 0 records exact Kobo annotation evidence only. Device responses remain unchanged. This opt-in defaults off and must also be enabled for each user before a later rollout stage can use local authority.')}}</p>
+        {% if kobo_two_way_emergency_disabled %}
+        <p class="help-block" role="status">{{_('The CWNG_KOBO_TWO_WAY_ANNOTATIONS emergency override currently forces this feature off.')}}</p>
+        {% endif %}
+      </div>
+      <div class="form-group" style="margin-left:10px;">
         <input type="checkbox" id="config_kobo_proxy" name="config_kobo_proxy"  {% if config.config_kobo_proxy %}checked{% endif %}>
         <label for="config_kobo_proxy">{{_('Proxy unknown requests to Kobo Store')}}</label>
       </div>

@@ -1,0 +1,13 @@
+{
+  "area": "spa",
+  "body": "Two independent gaps in `cps/api/edit.py:set_cover`:\n\n1. No `helper.book_cover_is_locked` check. `cover_picker.cover_picker_apply` refuses every\n   apply kind with a 409 while the per-book cover lock is set (janeczku/calibre-web#2165), and\n   the classic editor honours it on its cover-URL path. The SPA endpoint writes regardless, so a\n   user who deliberately locked a cover can have it replaced from the new UI's edit page.\n2. It resolves the book with `calibre_db.get_filtered_book(book_id)` using strict defaults,\n   while `cps/api/books.py`'s detail endpoint deliberately passes\n   `allow_show_archived=True, allow_show_hidden=True` so a user can open their OWN hidden or\n   archived book. The neighbouring delete endpoints in the same module pass those flags too.\n   Result: the edit page opens, and replacing the cover 404s.\n\nFound by an adversarial review of PR #1739. Not fixed there: both are behaviour changes\nunrelated to that PR's cache policy, and (1) in particular would newly refuse writes that\ncurrently succeed, which deserves its own change and its own release note.",
+  "created": "2026-08-18",
+  "id": "F-65c93f",
+  "refs": [
+    "#1739"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "SPA cover endpoint ignores the cover lock and 404s on the user's own hidden or archived book"
+}

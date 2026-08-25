@@ -17,16 +17,48 @@ local function assertEqual(actual, expected, message)
     end
 end
 
+-- The measured Kobo table (Clara BW 4.45.23792, finding F-5769c9). These
+-- assertions previously encoded the WRONG mapping and so defended the bug:
+-- they asserted red -> 1, green -> 2, blue -> 3 and out-of-range -> yellow.
 local function testColorMapping()
+    -- name -> Bookmark.Color, every value the device actually has
     assertEqual(KP.colorNameToKoboInt("yellow"), 0, "yellow -> 0")
-    assertEqual(KP.colorNameToKoboInt("red"), 1, "red -> 1")
-    assertEqual(KP.colorNameToKoboInt("green"), 2, "green -> 2")
-    assertEqual(KP.colorNameToKoboInt("blue"), 3, "blue -> 3")
-    assertEqual(KP.colorNameToKoboInt("chartreuse"), 0, "unknown -> 0 (yellow)")
-    assertEqual(KP.colorNameToKoboInt(nil), 0, "nil -> 0")
+    assertEqual(KP.colorNameToKoboInt("pink"), 1, "pink -> 1")
+    assertEqual(KP.colorNameToKoboInt("blue"), 2, "blue -> 2")
+    assertEqual(KP.colorNameToKoboInt("green"), 3, "green -> 3")
+    assertEqual(KP.colorNameToKoboInt("grey"), 4, "grey -> 4")
+    assertEqual(KP.colorNameToKoboInt("gray"), 4, "the other spelling folds too")
+
+    -- Bookmark.Color -> name
     assertEqual(KP.koboIntToColorName(0), "yellow", "0 -> yellow")
-    assertEqual(KP.koboIntToColorName(3), "blue", "3 -> blue")
-    assertEqual(KP.koboIntToColorName(99), "yellow", "out-of-range -> yellow")
+    assertEqual(KP.koboIntToColorName(1), "pink", "1 -> pink, NOT red")
+    assertEqual(KP.koboIntToColorName(2), "blue", "2 -> blue")
+    assertEqual(KP.koboIntToColorName(3), "green", "3 -> green")
+
+    -- The omission that mattered most. A greyscale device writes Color=4 for
+    -- EVERY organic highlight, so while 4 was missing every highlight ever made
+    -- on a Clara BW came back as yellow.
+    assertEqual(KP.koboIntToColorName(4), "grey", "4 -> grey, not yellow")
+
+    -- Blue and green must not swap. Asserted as a round trip so a future edit
+    -- cannot pass by flipping both tables together.
+    assertEqual(KP.koboIntToColorName(KP.colorNameToKoboInt("blue")), "blue", "blue round-trips")
+    assertEqual(KP.koboIntToColorName(KP.colorNameToKoboInt("green")), "green", "green round-trips")
+
+    -- A Kobo has no red. Writing one picks the nearest colour it does have, and
+    -- that is deliberately one-directional: the device is showing pink, so pink
+    -- is what comes back.
+    assertEqual(KP.colorNameToKoboInt("red"), 1, "red is written as the nearest, pink")
+    assertEqual(KP.koboIntToColorName(1), "pink", "and reads back as pink, never red")
+
+    -- Writing needs an integer, so an unknown name still has to become one.
+    assertEqual(KP.colorNameToKoboInt("chartreuse"), 0, "unknown name -> yellow (documented last resort)")
+    assertEqual(KP.colorNameToKoboInt(nil), 0, "nil -> yellow")
+
+    -- Reading does NOT: an unknown code must not be reported as a real colour,
+    -- or a failed lookup is indistinguishable from a genuine yellow highlight.
+    assertEqual(KP.koboIntToColorName(99), nil, "out-of-range -> nil, never yellow")
+    assertEqual(KP.koboIntToColorName(nil), nil, "nil code -> nil")
 end
 
 local function testSelectorEscaping()
@@ -60,7 +92,7 @@ local function testBuildBookmarkRow()
     assertEqual(row.EndOffset, 17, "end offset")
     assertEqual(row.Text, "the passage", "Text = highlighted_text")
     assertEqual(row.Annotation, "my note", "Annotation = note_text")
-    assertEqual(row.Color, 2, "Color = green int")
+    assertEqual(row.Color, 3, "green is Kobo Color 3, not 2 -- see the measured table")
     assertEqual(row.Type, "highlight", "Type = highlight")
 end
 
@@ -75,7 +107,7 @@ local function testBookmarkRowToPortable()
     }
     local p = KP.bookmarkRowToPortable(row)
     assertEqual(p.annotation_id, "dev-1", "annotation_id = BookmarkID")
-    assertEqual(p.color, "red", "Color 1 -> red")
+    assertEqual(p.color, "pink", "Color 1 is pink; a Kobo has no red at all")
     assertEqual(p.start_kobospan, "kobo.4.1", "start span extracted")
     assertEqual(p.end_kobospan, "kobo.4.2", "end span extracted")
     assertEqual(p.start_offset, 0, "start offset")

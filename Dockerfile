@@ -352,12 +352,11 @@ RUN \
 COPY --chown=abc:abc . /app/calibre-web-automated/
 
 RUN \
-  # The `frontend/` directory should be in `.dockerignore` but is used during
-  # STAGE 0 to build the SPA. We therefore manually remove it.
-  rm -Rf /app/calibre-web-automated/frontend && \
   # Install our Python package. The dependencies were installed in STEP 3.1.
   /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ \
-    -e /app/calibre-web-automated
+    -e /app/calibre-web-automated && \
+  # These files were necessary to build the image, we can remove them now.
+  rm -Rf /app/calibre-web-automated/{frontend,pyproject.toml,VERSION}
 
 # STEP 6.1 - Copy the Vite-built SPA bundle from the frontend-build stage.
 # The source tree's cps/static/app is .dockerignore'd, so this COPY is the

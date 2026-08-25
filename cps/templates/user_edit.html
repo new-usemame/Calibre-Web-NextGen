@@ -358,6 +358,12 @@
                     padding: 2rem;">
           <input type="checkbox" name="kobo_only_shelves_sync" id="kobo_only_shelves_sync" {% if content.kobo_only_shelves_sync %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="kobo_only_shelves_sync">{{_('Sync only books in selected shelves with Kobo')}}</label>
+          <div style="margin-top: 12px;">
+            <input type="hidden" name="kobo_two_way_annotation_sync_present" value="1">
+            <input type="checkbox" name="kobo_two_way_annotation_sync" id="kobo_two_way_annotation_sync" {% if content.kobo_two_way_annotation_sync %}checked{% endif %} aria-describedby="kobo-two-way-user-help" style="accent-color: var(--color-secondary);">
+            <label for="kobo_two_way_annotation_sync">{{_('Opt in to Kobo two-way annotation sync')}}</label>
+            <p id="kobo-two-way-user-help" class="help-block">{{_('Defaults off. Stage 0 only captures recovery evidence and does not change annotations returned to your Kobo. The administrator must separately enable the instance-level opt-in.')}}</p>
+          </div>
         </div>
         {% endif %}
       </div>

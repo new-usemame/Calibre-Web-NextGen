@@ -11,6 +11,8 @@
   flex-shrink: 0;
 }
 
+@media (prefers-reduced-motion: reduce) { .ring { animation: none; } }
+
 .centered {
   display: flex;
   align-items: center;

@@ -27,7 +27,7 @@ itself (an omission never deletes) lives in
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 from types import SimpleNamespace
 
@@ -155,6 +155,79 @@ def test_deleted_row_dispatches_delete_fanout(env):
                deleted_ids=["fanout-me"])
 
     assert handler.deletes == ["r1"]
+
+
+def test_delete_query_materializes_only_requested_ids_in_bounded_chunks(
+    env, monkeypatch,
+):
+    """Deleting N ids must not load every highlight in the scoped book.
+
+    The request is deliberately larger than SQLite's historical 999-variable
+    ceiling.  This catches both failure modes: filtering the whole book in
+    Python, and replacing that scan with one unbounded ``IN (...)`` clause.
+    """
+    s, user = env
+    user_id = user.id
+    requested = [f"delete-{index}" for index in range(1001)]
+    unrelated = [f"keep-{index}" for index in range(25)]
+    s.add_all([
+        ub.Annotation(
+            user_id=user_id, annotation_id=aid, book_id=7, source="koreader",
+            highlighted_text="t", highlight_color="yellow",
+            start_container_path="span#kobo.1.1", start_offset=0,
+            end_container_path="span#kobo.1.1", end_offset=4, hidden=False,
+        )
+        for aid in requested + unrelated
+    ])
+    s.commit()
+    s.expunge_all()
+
+    loaded_ids = []
+    in_query_bind_counts = []
+
+    def _record_load(row, _context):
+        loaded_ids.append(row.annotation_id)
+
+    def _record_query(_conn, _cursor, statement, parameters, _context, _many):
+        if "annotation.annotation_id IN (" in statement:
+            in_query_bind_counts.append(len(parameters))
+
+    fanout_calls = []
+
+    def _record_fanout(ids, fanout_user, **kwargs):
+        fanout_calls.append((ids, fanout_user.id, kwargs))
+
+    from cps.services import annotation_sync
+    monkeypatch.setattr(
+        annotation_sync, "dispatch_annotation_deletes", _record_fanout,
+    )
+    event.listen(ub.Annotation, "load", _record_load)
+    event.listen(s.get_bind(), "before_cursor_execute", _record_query)
+    try:
+        summary = apply_push(
+            [], user=SimpleNamespace(id=user_id), book=_book(),
+            session=s, commit=s.commit, deleted_ids=requested,
+        )
+    finally:
+        event.remove(ub.Annotation, "load", _record_load)
+        event.remove(s.get_bind(), "before_cursor_execute", _record_query)
+
+    assert len(loaded_ids) == len(requested), (
+        f"delete of {len(requested)} ids materialized {len(loaded_ids)} live "
+        "rows from the scoped book; work must scale with requested deletions, "
+        "not total highlights"
+    )
+    assert set(loaded_ids) == set(requested)
+    assert len(in_query_bind_counts) >= 2
+    assert max(in_query_bind_counts) <= 904
+    assert summary["deleted"] == len(requested)
+    assert len(fanout_calls) == len(requested)
+    assert {call[0][0] for call in fanout_calls} == set(requested)
+    assert all(call[0] and len(call[0]) == 1 for call in fanout_calls)
+    assert all(call[1] == user_id for call in fanout_calls)
+    assert all(call[2] == {
+        "book_id": 7, "deletable_sources": {"koreader"},
+    } for call in fanout_calls)
 
 
 # --- over the wire ---------------------------------------------------------

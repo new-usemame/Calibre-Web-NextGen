@@ -34,3 +34,12 @@
 }
 @media (pointer: coarse) { .toolbar button, .toolbar a, .toolbar summary, .meta select, .groupHeader button { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
+/* Stage 0 Kobo two-way sync state chip (read-only; managed on Account) */
+.twoWayChip { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-3); font-size: var(--fs-sm); }
+.twoWayChip a { color: var(--text-muted); }
+.twoWayBlocked {
+  font-size: var(--fs-xs); color: var(--text);
+  background: var(--danger-soft); border: 1px solid var(--danger-border);
+  border-radius: var(--r-full); padding: 2px var(--sp-2);
+}

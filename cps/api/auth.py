@@ -129,6 +129,12 @@ def _server_features():
         # per-shelf toggle that would otherwise store inert intent (#870).
         "kobo_sync_magic_shelves": bool(
             getattr(config, "config_kobo_sync_magic_shelves", False)),
+        # Stage 0 two-way annotation sync, instance-gated and default off.
+        # Surfaced so the SPA never calls the preference endpoint on a server
+        # that does not have it: an older backend answers 404, which the book
+        # page would otherwise raise as a console error on every single view.
+        "kobo_two_way_annotations": bool(
+            getattr(config, "config_kobo_two_way_annotation_sync", False)),
         # The admin's "Enable Uploads" switch. Classic gates its navbar upload
         # button on this (layout.html: role_upload() and g.allow_upload); the
         # SPA had no way to see it and offered Upload regardless (#1288).
@@ -138,14 +144,6 @@ def _server_features():
     }
 
 
-# Written by cps.cwa_functions.set_profile_picture (the profile_pictures
-# blueprint): a {username: "data:image/…;base64,…"} map. The classic UI reads
-# the whole map via /profile_pictures/user_profiles.json and looks the name up
-# client-side; the SPA gets only the current user's picture on /me instead, so
-# it never downloads every user's avatar. Path is kept in sync with that writer.
-_USER_PROFILES_JSON = "/config/user_profiles.json"
-
-
 def _user_avatar(name):
     """Return the profile-picture data-URI set for ``name`` in the classic
     profile-pictures panel, or None. A missing file, malformed JSON, absent
@@ -153,7 +151,7 @@ def _user_avatar(name):
     back to a neutral glyph. The ``data:image/`` guard keeps a corrupted entry
     from becoming an arbitrary URL the frontend would render."""
     try:
-        with open(_USER_PROFILES_JSON, "r") as fh:
+        with open(constants.USER_PROFILES_JSON, "r") as fh:
             data = json.load(fh)
     except (OSError, ValueError):
         return None

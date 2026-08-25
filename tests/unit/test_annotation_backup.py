@@ -182,7 +182,7 @@ class TestJsonRoundTrip:
         with gzip.open(path, "rb") as fh:
             payload = json.loads(fh.read())
 
-        assert payload["schema_version"] == 2
+        assert payload["schema_version"] == 3
         assert payload["user_id"] == 7
         assert payload["book_id"] == 348
         assert payload["annotation_count"] == 1
@@ -347,12 +347,17 @@ class TestRetention:
 
 @pytest.mark.unit
 class TestEdgeCases:
-    def test_no_annotations_no_backup(self, memory_db):
+    def test_no_annotations_records_empty_set(self, memory_db):
         from cps.services import annotation_backup
 
         session, _, _ = memory_db
         result = annotation_backup.run_backup_now(7, 999, session=session)
-        assert result is None
+        assert result is not None
+        with gzip.open(result, "rb") as fh:
+            payload = json.loads(fh.read())
+        assert payload["schema_version"] == 3
+        assert payload["annotation_count"] == 0
+        assert payload["annotations"] == []
 
     def test_orphan_book_id_skipped_by_collector(self, memory_db):
         """Annotation rows with ``book_id=None`` (sideloaded books CW

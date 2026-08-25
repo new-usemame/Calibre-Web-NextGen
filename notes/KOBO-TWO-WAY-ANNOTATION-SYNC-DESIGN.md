@@ -1,6 +1,15 @@
 # Kobo two-way annotation sync — authoritative-set design
 
-**Status:** design only; no production implementation is authorized by this document
+**Status:** the **authority** on Kobo two-way annotation sync. Stage 0 (§10) is merged —
+schema, preference API and SPA controls, with both gates default-off so nothing syncs.
+**Stages 1–5 are not authorized by this document** and each remains hardware-gated.
+
+**Supersedes:** `notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md` on the
+Edge 4 question only. That document states server → stock Nickel is "permanently out
+(protocol)"; it predates any hardware measurement and is wrong on two counts — the
+annotation GET is an authoritative replacement set (§2), and the ETag is opaque to
+Nickel (§11.2, CLOSED 2026-08-23), so no manifest synthesis is required. Its Phase 1
+and Phase 2 content is unaffected.
 
 **Date:** 2026-08-16
 
@@ -126,6 +135,8 @@ kobo_annotation_materialization
 
 **[ASSUMED — RECOMMENDATION]** The ingest parser must operate on `request.get_data()` or the upstream response bytes and retain lexical byte spans. Calling `request.get_json()` and then `json.dumps()` cannot guarantee byte-identical replay because it may change object order, whitespace, Unicode escape spelling, and slash/dot escaping.
 
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** The lexical scanner rejects duplicate JSON object keys before storing any sidecar. In particular, duplicate `updatedAnnotations`, `id`, or `location` members enter the existing logged best-effort capture-failure path. Python's decoder otherwise keeps the last duplicate while a first-match lexical scan can keep different bytes; accepting either representation would invalidate the parsed/raw agreement claim.
+
 **[ASSUMED — RECOMMENDATION]** On output, the serializer emits the stored `raw_location_json` bytes directly as the `location` value. It may rebuild the surrounding annotation object after a valid server edit, but a test must assert that the emitted byte range for `location` is identical to the stored byte range.
 
 **[ASSUMED — RECOMMENDATION]** `raw_annotation_json` is the replay template and forward-compatibility record; the parsed `Annotation` columns remain the query/edit/render representation. A materialization update and its parsed-column update occur in one transaction, and the transaction aborts if the two representations fail invariant checks.
@@ -173,6 +184,8 @@ kobo_annotation_book_state
 
 **[ASSUMED — RECOMMENDATION]** `generation_id` is a random UUID created with the state row and never reused after a destructive reset/reseed. It prevents an old device ETag from accidentally matching a new authority history whose integer revision restarted.
 
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** `kobo_annotation_book_state.content_id` means the bare Kobo book content ID only after live wire/entitlement evidence binds it. `annotation.content_id` is chapter-scoped (`book!!chapter`) and must never be copied into this field. Legacy migration rows therefore use a bounded `legacy-book:<book_id>` sentinel that is explicitly not a wire lookup key. Stage 1 must resolve the wire content ID to a library `book_id`, fall back to the existing `(user_id, book_id)` row, and atomically replace its sentinel; it must not insert a second row and collide with `UNIQUE(user_id, book_id)`.
+
 **[ASSUMED — RECOMMENDATION]** `authority_revision` advances atomically with every accepted member change or tombstone affecting the served set. `set_digest` is SHA-256 over the ordered, exact outgoing annotation objects and is an integrity check, not the protocol ETag.
 
 **[ASSUMED — RECOMMENDATION]** `authority_status='authoritative'` is a positive assertion that CWNG knows the complete set, including the complete empty set. No other status may result in a successful annotation GET.
@@ -186,6 +199,18 @@ kobo_annotation_book_state
 **[ASSUMED — RECOMMENDATION]** One opaque row blocks authoring of the entire Kobo set for that book, including edits or deletions of otherwise ordinary highlights and notes. The implementation must not scope the prohibition only to the markup row.
 
 **[ASSUMED — RECOMMENDATION]** `present` is sticky: ordinary cloud seeds, PATCH deltas, omission from a later response, type changes, or an empty attachments observation cannot downgrade it. A future explicit recovery procedure would require a fresh complete device-database audit plus a matching accepted cloud seed and is outside this first implementation.
+
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** Sticky knowledge is stored independently of the mutable authority row:
+
+```text
+kobo_opaque_content_present_guard
+  user_id          INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE
+  book_id          INTEGER NOT NULL
+  first_observed_at DATETIME NOT NULL
+  PRIMARY KEY(user_id, book_id)
+```
+
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** SQLite triggers reject a direct `present -> unknown|absent` update and reject an `unknown|absent` insert whenever this guard exists. Inserts or updates to `present` create the guard. Deleting and reinserting mutable authority state therefore cannot erase the observation, and `INSERT OR REPLACE` cannot bypass it. A complete user/book privacy purge intentionally deletes both authority state and the guard; deleting authority state alone retains the guard.
 
 **[ASSUMED — RECOMMENDATION]** `absent` requires set-level evidence, not a spot check: either a contemporaneous database audit of the same device whose declared ETag exactly matches the accepted cloud seed, with the same annotation IDs and NULL `ExtraAnnotationData` on every row for that book; or, after the carrier experiment succeeds, an accepted complete seed in which every annotation has empty attachments. An audit of a different/stale device or a subset of rows leaves status `unknown`.
 
@@ -330,17 +355,23 @@ annotation_revision
 
 **[ASSUMED — RECOMMENDATION]** Do not backfill `kobo_annotation_materialization` from parsed path columns. Reconstructing JSON would lose the observed escape spelling, optional-field presence, property order, `attachments`, and exact timestamp spelling.
 
-**[ASSUMED — RECOMMENDATION]** Insert one `kobo_annotation_book_state` for every distinct existing `(user_id, book_id)` with status `unseeded`, revision `0`, no digest, no ETag, and `opaque_content_status='unknown'`. Existing annotations remain fully usable in the web UI but are not declared a complete Kobo set or safe for authoring.
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** Insert one `kobo_annotation_book_state` for every distinct existing non-NULL `(user_id, book_id)` whose user still exists, with status `unseeded`, revision `0`, no digest, no ETag, `opaque_content_status='unknown'`, and a non-wire `legacy-book:<book_id>` content sentinel. NULL-key and deleted-user groups are left unchanged and logged by count. Existing annotations remain fully usable in the web UI but are not declared a complete Kobo set or safe for authoring.
 
 **[ASSUMED — RECOMMENDATION]** Leave `last_editor_device_id` NULL for historical rows. `source='kobo'` identifies an ingest protocol, not a specific physical actor.
 
 **[ASSUMED — RECOMMENDATION]** Before any two-way implementation is enabled, increment the annotation backup format to schema version 3 and include every generic annotation column plus the Kobo materialization and book-authority metadata. Add a synchronous pre-replacement backup that records empty sets; the current asynchronous rolling backup is supplementary, not the transaction precondition.
 
-**[ASSUMED — RECOMMENDATION]** A schema-capability check runs before route ownership logic. If any required table, column, or index is missing, the instance-wide two-way feature evaluates false and owned books stay behind the current `checkforchanges -> []` containment behavior.
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** A schema-capability check runs before route ownership logic. If any required table, column, index, sticky-evidence table, or sticky trigger is missing, the instance-wide two-way feature evaluates false and owned books stay behind the current `checkforchanges -> []` containment behavior. Fresh `create_all`, upgrade migration, and the end of the full startup migration sequence all install/heal the triggers so a later table rebuild cannot leave the same boot certified as capable without them.
 
-**[ASSUMED — RECOMMENDATION]** If the startup migration cannot complete or its postconditions fail, startup should fail before serving requests. If an older binary is rolled back over the additive schema, it ignores the new tables/columns and continues to use the existing annotation paths; it must not drop them automatically.
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** Startup raises for a Stage 0 DDL failure, an annotation row-count change, a newly created Stage 0 foreign-key violation, or a newly inserted authority row that is not `unseeded/unknown`. If an older binary is rolled back over the additive schema, it ignores the new tables/columns and continues to use the existing annotation paths; it must not drop them automatically.
 
-**[ASSUMED — RECOMMENDATION]** Migration postconditions are: annotation row count unchanged; all pre-existing text, note, color, content IDs, parsed locations, CFI/xpointer/PDF/comic positions, hidden state, source, and device fields value-identical; every existing group has exactly one unseeded state row; and `PRAGMA foreign_key_check` is clean. Any failed postcondition rolls back.
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** Production migration postconditions are deliberately provenance-scoped:
+
+- Annotation row count is fatal if changed. Per-value identity for text, notes, colors, content IDs, parsed locations, CFI/xpointer/PDF/comic positions, hidden/source/device fields is proven by migration tests and production-snapshot dry runs, not by duplicating every annotation value into memory during each startup. The migration updates only newly added columns.
+- Every eligible legacy group is expected to have one state. Failure of a new insert is fatal; a surviving non-one cardinality can only come from pre-existing partial/non-canonical state and is count-logged while gates remain fail-closed. NULL-key and deleted-user groups are also count-logged and skipped rather than making an unrelated historical row prevent startup.
+- Foreign-key checks are fatal only for new violations in Stage 0-owned tables or `annotation.last_editor_device_id`. The migration records the scoped baseline before DDL/backfill and compares afterward. Database-wide historical orphans are count-logged because long-lived SQLite installations commonly accumulated them with FK enforcement off; Stage 0 must not claim or block startup on violations it did not create.
+
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** User/book purge is part of the schema lifecycle. It deletes raw materializations before annotation IDs can recycle, then device acknowledgment, seed-page, seed-capture, cursor, snapshot, authority, and sticky-guard rows in child-first order. Immutable seed/snapshot children are deleted because they can contain annotation payloads and have no valid ownership or restore meaning after their user/book scope is erased. ORM parent relationships mirror those cascades for ordinary non-bulk deletes; the explicit purge remains authoritative because app-wide SQLite FK enforcement and bulk cascades cannot be assumed.
 
 ## 4. Verbatim location and web-reader coexistence
 
@@ -535,6 +566,8 @@ annotation_revision
 
 **[ASSUMED — RECOMMENDATION]** Add `user.kobo_two_way_annotation_sync BOOLEAN NOT NULL DEFAULT 0` as the per-user opt-in. Existing and new users both default off because this feature can delete native rows by omission.
 
+**[OBSERVED — STAGE 0 IMPLEMENTATION]** The rendered user checkbox submits a companion presence marker. Profile/admin save paths mutate the opt-in only when that marker is present: rendered+checked enables, rendered+unchecked disables, and a form where Kobo controls were not rendered preserves the stored value. This avoids a hidden control silently resetting an opt-in and is required before Stage 1 consumes the flag.
+
 **[ASSUMED — RECOMMENDATION]** Both flags must be true and the book state must be authoritative. Disabling either flag immediately stops naming owned books in `checkforchanges`; it does not delete authority data, annotations, seed captures, or backups.
 
 **[ASSUMED — RECOMMENDATION]** A per-book opaque-content quarantine affects only annotation authoring/replacement for that book. It does not block the preceding `PUT /kobo/<token>/v1/library/<uuid>/state`, reading-position persistence, library sync, downloads, shelves, or annotation sync for other books.
@@ -567,6 +600,44 @@ annotation_revision
 ### Stage 0 — schema and passive capture
 
 **[ASSUMED — RECOMMENDATION]** Ship additive schema, backup schema 3, raw lexical capture, exact projection invariants, authority state, metrics, and UI controls with both gates forced off. Continue current safe owned-book trigger suppression.
+
+**[OBSERVED — IMPLEMENTED 2026-08-23]** A separate passive exchange observer records the complete
+device request, the exact filtered body sent upstream, the raw upstream response, and the final
+device response for `checkforchanges` plus annotation GET/PATCH. It is off unless
+`CWNG_KOBO_READING_SERVICES_CAPTURE` exactly equals
+`I_UNDERSTAND_THIS_CAPTURES_PRIVATE_READING_DATA`. Credential-bearing headers are redacted; raw
+annotation text exists only inside mode-0600 gzip records under the mode-0700 private directory
+`<config>/.cwng-private-observability/kobo-reading-services/`. The directory is not part of the
+annotation backup format or the support debug bundle. Retention is bounded to 256 records, 64 MiB
+compressed, seven days, and 16 MiB for any one body. Capture finalization is an after-response
+observer, storage runs off the gevent hub with a 100 ms request deadline, storage exceptions are
+swallowed, and executed route tests prove identical status, headers, and body with the gate off,
+on, and throwing.
+
+**[OBSERVED — IMPLEMENTED 2026-08-24]** An annotation PATCH refused before authentication can be
+captured only while the same explicit private-data gate is enabled. The schema-version-2 record is
+marked `authentication='unauthenticated'` with `user_id=null`; CWNG does not infer an owner. These
+records never enter the always-on recovery spool. They use a separate mode-0700 directory and
+independent locks capped at 32 records, 8 MiB compressed, and 1 MiB per body. Records older than 24
+hours are pruned on the next unauthenticated capture write, so 24 hours is an age target rather than
+a wall-clock maximum during a quiet period. A missing or out-of-bound `Content-Length` is not read.
+Thus unauthenticated traffic cannot consume the non-evictable recovery budget or evict authenticated
+exchange diagnostics.
+
+**[OBSERVED — IMPLEMENTED 2026-08-23]** Annotation PATCH has a separate always-on recovery spool.
+The exact raw request body is atomically written and fsynced before JSON parsing, ownership
+resolution, or dispatch, so a processing exception leaves a server-side replay artifact without
+changing the response sent to Nickel. Records contain no headers, use the same private mode-0700
+parent and mode-0600 files, and are bounded to 512 records, 64 MiB compressed, 14 days, and 16 MiB
+per body. Normal-return records remain during retention because return from the dispatcher is not
+proof that every member committed. Replay is manual and integrity-checked; it is not automatic.
+Unresolved records are never evicted to admit a distinct body. Retries with the same user,
+entitlement, origin device, and exact raw bytes atomically refresh one record regardless of its
+previous outcome, so repeated delivery cannot consume the instance-wide spool one slot at a time.
+An unresolved outcome means complete persistence is unproven; it does not assert that SQLite
+stored nothing, because SAVEPOINT writes may survive a later outer rollback on the current engine.
+This implements F-5c1146 addendum point (2). The finding's response-code/failed-member half remains
+open until the independent PATCH failure hardware experiment completes.
 
 **[ASSUMED — RECOMMENDATION]** Test migration on fresh, legacy, partially created, and repeated-run databases. Prove generic annotation values and `cfi_range` behavior are unchanged.
 
@@ -602,23 +673,99 @@ annotation_revision
 
 **[OBSERVED]** No measured `checkforchanges` request contained more than one content ID.
 
+**[OBSERVED 2026-08-23]** Still true with request bodies finally captured. Every captured
+`checkforchanges` carried exactly **one** entry, shaped `{"ContentId": …, "etag": …}`, and the
+device only asked about a book it had **just had open** — books it was not actively reading were
+absent from the request entirely. So the batching question is not merely unmeasured, it may be
+hard to provoke: to see a multi-entry request you likely have to make several books active in one
+session. The `etag` the device sends is exactly the token it has stored for that book, which is
+what makes the section 7.3 equality test workable.
+
+**[OBSERVED 2026-08-23]** The annotations GET the trigger produces is
+`GET /api/v3/content/<id>/annotations?limit=100` — the device asks for a page size of 100, which
+is the concrete number section 11.4's pagination work has to satisfy.
+
 **[ASSUMED — RECOMMENDATION]** Implement array parsing and independent per-entry decisions now, but gate production claims about batch ordering/partial upstream merge until tested.
 
 **[ASSUMED — RECOMMENDATION]** Closing experiment: open/close or force sync with at least two changed books, capture request/response order, and test a mixed batch containing one CWNG-authoritative owned book, one unseeded owned book, and one non-owned Kobo book.
 
-### 11.2 Arbitrary ETag grammar
+### 11.2 Arbitrary ETag grammar — **CLOSED 2026-08-23. Nickel treats the ETag as opaque.**
 
 **[OBSERVED]** Kobo's emitted ETag is a structured composite manifest, not an opaque random token.
 
-**[ASSUMED]** Nickel may still treat the HTTP ETag as opaque for equality, but this has not been observed.
+**[OBSERVED 2026-08-23 — the Stage 3 experiment was run on hardware and it passed.]** Nickel
+accepts a CWNG-authored ETag that shares none of Kobo's manifest grammar, stores it byte-for-byte,
+and sends it back on the next `checkforchanges`.
 
-**[ASSUMED — RECOMMENDATION]** Closing experiment is Stage 3: serve an unchanged set with a valid non-composite CWNG ETag and verify exact echo on two subsequent cycles before enabling any changed set.
+Instrument: the arming-file-gated scratch probe, hard-scoped to one ContentId, on the deployed
+server, against the operator's Clara BW. Subject: a book that was **already downloaded, had zero
+annotations, and carried the measured empty-set token `W/"0"`** — chosen so that no annotation
+could be lost whichever way the experiment went. The served body was the book's true state,
+`{"annotations":[],"nextPageOffsetToken":null}`, so the device's set could not change.
+
+    Cycle A  device -> checkforchanges  [{ContentId: 053742ff…, etag: W/"0"}]
+             server -> names the book so Nickel issues its GET
+             device -> GET /api/v3/content/053742ff…/annotations?limit=100
+             server -> 200, 45 bytes, ETag W/"CWNG:63e653e9-…:1:7be828578aae0f01"
+             device DB AnnotationsSyncToken:  W/"0"  ->  W/"CWNG:63e653e9-…:1:7be828578aae0f01"
+                                              ADOPTED BYTE-FOR-BYTE
+
+    Cycle B  device -> checkforchanges  [{ContentId: 053742ff…,
+                        etag: W/"CWNG:63e653e9-…:1:7be828578aae0f01"}]
+                                              ECHOED BYTE-FOR-BYTE
+
+Device integrity across the whole run: 30 `Bookmark` rows before and after, zero added, zero
+removed, zero modified.
+
+➡️ **Option B is viable and Option A is unnecessary.** CWNG does not need to reverse-engineer or
+synthesize Kobo's composite manifest; byte equality against a CWNG-owned revision ETag is a sound
+unchanged/changed test. The `W/"CWNG:<generation-id>:<authority-revision>:<digest-prefix>"` format
+recommended in section 7.2 is the exact string that was accepted and echoed.
+
+**[OBSERVED 2026-08-23 — unexplained, and it matters for rollback]** Serving `W/"0"` *after* the
+device had adopted a CWNG token did **not** move the stored token back; it stayed on the CWNG
+value. One attempt only, not a controlled test, and a follow-up cycle serving revision `2` could
+not be driven because Nickel throttled further syncs. **Do not assume a served ETag can always
+replace a stored one** — a rollback path that depends on overwriting the device's token is
+unproven. Discriminating test: serve a *different* CWNG revision and see whether that is adopted;
+if it is, `W/"0"` is being rejected specifically rather than adoption being conditional.
 
 ### 11.3 Empty-set ETag and deletion representation
 
-**[ASSUMED]** The exact upstream ETag for a genuinely empty annotation set and the composite-manifest representation of deletion have not been measured.
+**[OBSERVED 2026-08-23]** The empty-set token is `W/"0"`. Measured on the operator's Clara BW
+(read-only DB copy `db-20260822-235633`): of the ten books carrying a non-blank
+`content.AnnotationsSyncToken`, the four with zero `Bookmark` rows all hold exactly `W/"0"`, and
+every book holding a composite manifest has at least one annotation. So an empty authoritative set
+does have a representable, non-synthesised token, and the "do not synthesize a composite empty
+token" restriction below is satisfied by replaying `W/"0"` rather than by refusing to serve.
 
-**[ASSUMED — RECOMMENDATION]** Closing experiment: seed a book with zero annotations, capture GET body/header and next check; then create one annotation, sync, delete it, and capture every manifest transition. Until then, accept an empty seed only with exact device/upstream ETag equality and do not synthesize a composite empty token.
+**[OBSERVED 2026-08-23]** Two further properties of the composite manifest, from the same device,
+comparing three snapshots taken 2026-08-21 00:20, 2026-08-22 10:43 and 2026-08-22 23:56:
+
+* Entries are ordered by an **ASCII sort on the stable-ID hash**, not by creation time, position, or
+  the leading letter. Observed on a 14-entry manifest whose leading letters run A,A,C,B,A,B,B,B,B,B,
+  B,C,B,C while the hashes are strictly ascending.
+* The **stable-ID hash is invariant across version bumps**; only the `<version-int>` moves. Three
+  entries advanced their version between snapshots with byte-identical hashes.
+
+**[OBSERVED 2026-08-23 — UNEXPLAINED, do not design against it yet]** The manifest is **not
+one-book-one-annotation-set**. Six different books carry manifests with the *same fourteen*
+stable-ID hashes but *different* per-entry version ints, and only one of those books (`1984`) has
+fourteen annotations; two of them have none at all. Either the hash is not an annotation identity,
+or the token is not scoped per book. This matters because section 7.3 requires that no ETag match
+for one book may suppress or name another, and a manifest shared across books is exactly the shape
+that would break that. **Resolve this before any ETag-equality comparison is trusted across books.**
+
+**[ASSUMED]** The composite-manifest representation of deletion has still not been measured, and
+neither has the derivation of the stable-ID hash (it is not a plain MD5/SHA1/raw-bytes base64 of
+`BookmarkID` -- all four were tested against a 14-entry manifest and none matched).
+
+**[ASSUMED]** The composite-manifest transition from a nonempty set through deletion of its final
+annotation has not been measured.
+
+**[ASSUMED — RECOMMENDATION]** Remaining closing experiment: create one annotation, sync, delete it,
+and capture every manifest transition. Until then, accept an empty seed only with exact
+device/upstream ETag equality and do not synthesize the nonempty-to-empty deletion transition.
 
 ### 11.4 Server-initiated seed request and upstream pagination
 

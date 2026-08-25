@@ -875,6 +875,10 @@ msgid "Uploaded file is not a SQLite database."
 msgstr "上傳的檔案不是 SQLite 資料庫"
 
 #: cps/annotations.py
+msgid "Uploaded database has no readable Kobo Bookmark table."
+msgstr ""
+
+#: cps/annotations.py
 #, python-format
 msgid "File exceeds %(max)d MB."
 msgstr "檔案超過 %(max)d MB"
@@ -2412,6 +2416,26 @@ msgstr "修改時間（最舊 → 最近）"
 msgid "Manual (drag below)"
 msgstr "手動（向下拖曳）"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} added to the shelf; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} book(s) deleted; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} updated; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Metadata applied to {succeeded}; {failed} failed."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Read now"
 msgstr "馬上閱讀"
@@ -3103,6 +3127,10 @@ msgstr "出版社 (使用,分隔)"
 msgid "Read"
 msgstr "已讀"
 
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Reading"
+msgstr "閱讀"
+
 #: cps/spa_strings.py
 msgid "Reading progress"
 msgstr "閱讀進度"
@@ -3359,10 +3387,6 @@ msgid ""
 "The interface is translated into your language; these update notes are "
 "written in English."
 msgstr "介面已翻譯成您的語言，這些更新說明是用英文書寫的"
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Reading"
-msgstr "閱讀"
 
 #: cps/spa_strings.py
 msgid "Grid view"
@@ -3650,19 +3674,6 @@ msgid "{count} notices dismissed permanently."
 msgstr ""
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"CWNG repaired {count} books previously sent to your Kobo. Older highlights "
-"may still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"CWNG repaired a book previously sent to your Kobo. Older highlights may "
-"still need to be recreated on the device."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "There is new information about your library."
 msgstr ""
 
@@ -3673,13 +3684,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This book was repaired after it had already been sent to a Kobo. Download "
-"the updated book; highlights created before the repair may remain invisible "
-"and may need to be recreated."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -3860,6 +3864,10 @@ msgid "Advanced search"
 msgstr "進階搜尋"
 
 #: cps/spa_strings.py
+msgid "All books"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All shelves"
 msgstr "全部書架"
 
@@ -3978,6 +3986,10 @@ msgstr ""
 msgid "Basic configuration"
 msgstr "基本配置"
 
+#: cps/spa_strings.py
+msgid "Beta"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Black"
 msgstr "黑色"
@@ -3992,6 +4004,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Book order"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4611,6 +4628,15 @@ msgid "Enter at least 2 characters"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Every book syncs as it becomes ready. You can exclude individual books below."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Excluded"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Exit full screen"
 msgstr ""
 
@@ -4740,6 +4766,10 @@ msgid "Gradient — palette-matched top/bottom blend"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Grey"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Group by"
 msgstr ""
 
@@ -4761,6 +4791,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "HTML is allowed and sanitized on display."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Has pen or drawing notes"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4863,6 +4897,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Included"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Issuer / base URL"
 msgstr ""
 
@@ -4904,6 +4942,15 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Kobo sync on"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Kobo two-way annotation sync"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Kobo two-way sync: {state}"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
@@ -5144,6 +5191,10 @@ msgid "Next page"
 msgstr "下一頁"
 
 #: cps/spa_strings.py
+msgid "No books are ready yet — they appear here as they become ready."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
 msgstr ""
 
@@ -5222,11 +5273,19 @@ msgid "Not in current file"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Not picked"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Not seen lately"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Not set"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Not set up yet"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
@@ -5248,6 +5307,12 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"Off by default. While in beta, opting in only records your preference and "
+"recovery evidence — it does not change what your Kobo receives yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Oldest"
 msgstr "最舊"
 
@@ -5263,6 +5328,12 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "One column"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Only the books you pick below sync. Switching here starts from none picked — "
+"you choose each book yourself."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5307,6 +5378,16 @@ msgstr ""
 msgid "Opens in classic view"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Opt in to Kobo two-way annotation sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Opting in does not sync a book straight away. Each book is set up and "
+"checked first — its real state is shown here."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr ""
@@ -5339,6 +5420,10 @@ msgstr "密碼"
 msgid "Password (leave blank to keep)"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Paused after a problem"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
@@ -5346,8 +5431,16 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Picked"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Picked up {label}. Drag to reorder, release to drop."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Pink"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/admin.html
@@ -5671,6 +5764,10 @@ msgstr ""
 msgid "Select note: {text}"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Selected books"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
 msgstr ""
@@ -5738,6 +5835,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Set up Kobo sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Set up Kobo sync first — then this preference becomes available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Setting up…"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5940,7 +6045,17 @@ msgid "That URL is not a usable image."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"The server-wide option is also off, so nothing can sync yet. An "
+"administrator can enable it in the classic server settings."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This device will no longer sync."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This feature is currently disabled at server level."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5998,6 +6113,14 @@ msgid "Two columns"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Two-way sync active"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Two-way sync preference saved."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "UI / display configuration"
 msgstr "UI / 顯示設定"
 
@@ -6012,6 +6135,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "取消隱藏"
+
+#: cps/spa_strings.py
+msgid "Unknown color"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unknown device"
@@ -6114,6 +6241,29 @@ msgid "Warning: this highlight can’t be shown in the book"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again. If you read it some other way, "
+"download it again to get the repaired copy."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"We repaired {count} books for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove them "
+"from your Kobo and let them download again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Web reader"
 msgstr ""
 
@@ -6123,6 +6273,10 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Which books sync?"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6335,6 +6489,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "…or paste an image URL"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "← Back"
+msgstr "返回"
 
 #: cps/spa_strings.py
 msgid "← Back to book"
@@ -6955,7 +7113,20 @@ msgstr ""
 
 #: cps/tasks/kepub_package_repair.py
 #, python-format
+msgid ""
+"%(clean)d clean, %(repaired)d repaired, %(unsupported)d unsupported, "
+"%(failed)d failed"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+#, python-format
 msgid "%(count)d KEPUB repair(s) failed"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+msgid ""
+"KEPUB repair finished, but the completion marker could not be saved; the "
+"scan will run again"
 msgstr ""
 
 #: cps/tasks/mail.py
@@ -7414,11 +7585,19 @@ msgid "Import summary"
 msgstr ""
 
 #: cps/templates/annotations_import.html
-msgid "new highlights imported"
+msgid "new annotations imported"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "existing annotations updated from a newer device copy"
 msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "already imported (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "different or undated device entries older than server state (skipped)"
 msgstr ""
 
 #: cps/templates/annotations_import.html
@@ -7427,7 +7606,23 @@ msgid "for books not in this library (skipped)"
 msgstr "本書籍在此書庫中"
 
 #: cps/templates/annotations_import.html
-msgid "hidden on device (skipped)"
+msgid "hidden on device (reported, not applied)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "empty bookmark rows with no annotation content (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "invalid bookmark rows (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries with invalid book positions (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries not saved because the import transaction failed"
 msgstr ""
 
 #: cps/templates/annotations_import.html
@@ -8194,6 +8389,23 @@ msgid ""
 "during upgrades. When enabled, each user gets a hide button on the book "
 "detail page that drops the book out of their own index/search/OPDS without "
 "affecting other users. Recovery is via the profile page (Hidden Books link)."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Allow Kobo two-way annotation sync"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"Stage 0 records exact Kobo annotation evidence only. Device responses remain "
+"unchanged. This opt-in defaults off and must also be enabled for each user "
+"before a later rollout stage can use local authority."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"The CWNG_KOBO_TWO_WAY_ANNOTATIONS emergency override currently forces this "
+"feature off."
 msgstr ""
 
 #: cps/templates/config_edit.html
@@ -12168,6 +12380,13 @@ msgstr ""
 #: cps/templates/user_edit.html
 msgid "Sync only books in selected shelves with Kobo"
 msgstr "僅同步所選書架中的書籍到 Kobo"
+
+#: cps/templates/user_edit.html
+msgid ""
+"Defaults off. Stage 0 only captures recovery evidence and does not change "
+"annotations returned to your Kobo. The administrator must separately enable "
+"the instance-level opt-in."
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"

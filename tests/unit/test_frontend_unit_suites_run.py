@@ -31,6 +31,7 @@ pytestmark = pytest.mark.unit
 
 REPO = Path(__file__).resolve().parents[2]
 SUITE_DIR = REPO / "frontend" / "tests" / "unit"
+NODE_MODULES = REPO / "frontend" / "node_modules"
 # Explicit file paths, never the directory. `node --test <dir>` fails to apply
 # type stripping to the .ts files it discovers and reports a bare "test failed"
 # with no assertion behind it, while `node --test <file>` on the same suite
@@ -60,6 +61,18 @@ def test_frontend_unit_suite_passes(suite: Path):
                 "node; Fast Tests needs it too."
             )
         pytest.skip("no node available locally (CI has one)")
+
+    if not NODE_MODULES.is_dir():
+        if os.environ.get("CI"):
+            pytest.fail(
+                "frontend/node_modules is absent on CI: the Fast Tests job's "
+                "'Install frontend dependencies (npm ci)' step must run before "
+                "the frontend Node unit suites"
+            )
+        pytest.skip(
+            "frontend/node_modules is absent; run npm ci in frontend to execute "
+            "the frontend Node unit suites"
+        )
 
     # Type stripping is unflagged only from Node 23.6 and CI pins 22, so the
     # flag has to be supplied -- but it must go through NODE_OPTIONS, not argv.

@@ -51,7 +51,13 @@ def test_serialize_book_detail_full():
     assert out["authors"] == [{"id": 7, "name": "Frank Herbert"}]
     assert out["series"] == {"id": 3, "name": "Dune Chronicles"}
     assert out["series_index"] == "1.0"
-    assert out["cover_url"] == "/cover/42/og"
+    # `md`, not `og`: web.get_cover maps `og` to COVER_THUMBNAIL_ORIGINAL == 0,
+    # which is falsy, so helper.get_book_cover_internal skips its thumbnail
+    # branch and serves the unresized library file. No `?c=` here — this fixture
+    # has no last_modified, and an unversioned URL is exactly what the server
+    # then declines to cache long.
+    assert out["cover_url"] == "/cover/42/md"
+    assert out["cover_srcset"] == "/cover/42/sm 1x, /cover/42/md 2x"
     assert out["pubdate"] == "1965-08-01"
     assert out["description_html"] == "<p>A spice epic.</p>"
     assert out["tags"] == [{"id": 11, "name": "sci-fi"}]
@@ -83,6 +89,7 @@ def test_serialize_book_detail_empty():
     out = serialize_book_detail(book, read=False, archived=False)
 
     assert out["cover_url"] is None
+    assert out["cover_srcset"] is None
     assert out["pubdate"] is None
     assert out["description_html"] is None
     assert out["tags"] == []

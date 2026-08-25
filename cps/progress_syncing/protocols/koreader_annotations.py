@@ -46,8 +46,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from flask import request
+from sqlalchemy.exc import SQLAlchemyError
 
 from ... import csrf, logger, ub
+from ...annotations import _commit_required
 from .kosync import (
     kosync,
     authenticate_user,
@@ -55,6 +57,7 @@ from .kosync import (
     create_sync_response,
     is_valid_key_field,
     _require_kosync_enabled,
+    ERROR_INTERNAL,
     ERROR_UNAUTHORIZED_USER,
     ERROR_DOCUMENT_FIELD_MISSING,
 )
@@ -65,6 +68,10 @@ log = logger.create()
 # actually owns, so a KOReader sync can never touch a Kobo-native or web-reader
 # highlight.
 _DELETABLE_SOURCES = {"koreader"}
+
+# Keep ``annotation_id IN (...)`` below SQLite's historical 999-variable
+# ceiling after the user/book/source predicates take their own bind slots.
+_DELETE_ID_CHUNK_SIZE = 900
 
 
 def _now():
@@ -100,6 +107,8 @@ def apply_push(annotations, *, user, book, session, commit,
     the user has since deleted; they are soft-deleted (see
     :func:`_apply_deletes`). Omission from ``annotations`` means nothing on its
     own — see the module docstring for why the server never infers a delete.
+    Inline ``hidden`` uses the same ``_DELETABLE_SOURCES`` authority as those
+    named deletes.
     """
     from ...services.annotation_portable import apply_portable
     from ...services import annotation_sync
@@ -111,6 +120,10 @@ def apply_push(annotations, *, user, book, session, commit,
         row, action = apply_portable(
             payload, user_id=user.id, book=book, session=session, commit=commit,
             origin_device_id=origin_device_id,
+            # This protocol owns the single authority decision. The portable
+            # helper receives the decision; it does not grow a second source
+            # list that could drift from named-delete enforcement.
+            deletable_sources=_DELETABLE_SOURCES,
         )
         summary[action] = summary.get(action, 0) + 1
         if row is None or action == "skipped":
@@ -119,6 +132,7 @@ def apply_push(annotations, *, user, book, session, commit,
             if action == "deleted":
                 annotation_sync.dispatch_annotation_deletes(
                     [row.annotation_id], user, book_id=book.id,
+                    deletable_sources=_DELETABLE_SOURCES,
                 )
             else:
                 annotation_sync.dispatch_existing_annotation_sync(row, book, user)
@@ -160,29 +174,34 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
     if not wanted:
         return 0
 
-    stale = [
-        row for row in session.query(ub.Annotation).filter(
-            ub.Annotation.user_id == user.id,
-            ub.Annotation.book_id == book.id,
-            ub.Annotation.source == source,
-        ).filter(
-            (ub.Annotation.hidden.is_(None))
-            | (ub.Annotation.hidden == False)  # noqa: E712 — SQLA needs ==
-        ).all()
-        if row.annotation_id in wanted
-    ]
+    base_query = session.query(ub.Annotation).filter(
+        ub.Annotation.user_id == user.id,
+        ub.Annotation.book_id == book.id,
+        ub.Annotation.source == source,
+    ).filter(
+        (ub.Annotation.hidden.is_(None))
+        | (ub.Annotation.hidden == False)  # noqa: E712 — SQLA needs ==
+    )
+    wanted_ids = sorted(wanted)
+    stale = []
+    for start in range(0, len(wanted_ids), _DELETE_ID_CHUNK_SIZE):
+        chunk = wanted_ids[start:start + _DELETE_ID_CHUNK_SIZE]
+        stale.extend(
+            base_query.filter(ub.Annotation.annotation_id.in_(chunk)).all()
+        )
     if not stale:
         return 0
 
     for row in stale:
         row.hidden = True
         row.last_synced = _now()
-    commit()
+    _commit_required(commit)
 
     for row in stale:
         try:
             annotation_sync.dispatch_annotation_deletes(
                 [row.annotation_id], user, book_id=book.id,
+                deletable_sources=_DELETABLE_SOURCES,
             )
         except Exception:  # pragma: no cover - fan-out must never fail the push
             log.exception("koreader annotation delete fan-out failed for %s", row.annotation_id)
@@ -414,12 +433,20 @@ def push_annotations():
     except Exception:
         log.warning("KOReader annotation attribution failed", exc_info=True)
 
-    summary = apply_push(
-        annotations, user=user, book=book,
-        session=ub.session, commit=ub.session_commit,
-        deleted_ids=deleted_ids, delete_source=delete_source,
-        origin_device_id=origin_device_id,
-    )
+    try:
+        summary = apply_push(
+            annotations, user=user, book=book,
+            session=ub.session, commit=ub.session_commit,
+            deleted_ids=deleted_ids, delete_source=delete_source,
+            origin_device_id=origin_device_id,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        ub.session.rollback()
+        log.exception(
+            "KOReader annotation push database write failed: user=%s book=%s document=%s",
+            user.id, book_id, _loggable(document),
+        )
+        return _reject(user, document, ERROR_INTERNAL, "Database error", status=503)
     summary["document"] = document
     # `reconciled` means the device NAMED deletions on this push, not that any
     # row matched — naming an id that is already hidden or unknown is a no-op

@@ -53,6 +53,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Verify all commits committed by new-usemame (or exempt by label)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -65,6 +67,20 @@ jobs:
             echo "::notice::validate-author exempted by 'community-contribution' label."
             echo "Operator has accepted the contributor's commits as-is."
             echo "Auto-merge remains gated by tier label, forbidden paths, and CI green."
+            exit 0
+          fi
+
+          # Trusted-collaborator exemption (operator decision, 2026-08-22):
+          # a PR authored by someone with write or admin on this repo is a
+          # trusted contribution — the same trust that granted them write
+          # covers their commit identity, so no per-PR label dance. Everything
+          # else still gates them: the main ruleset (PR + 1 approval +
+          # required checks) applies to write users too.
+          AUTHOR='${{ github.event.pull_request.user.login }}'
+          PERM=$(gh api "repos/${{ github.repository }}/collaborators/$AUTHOR/permission" \
+                   --jq .permission 2>/dev/null || echo none)
+          if [ "$PERM" = "write" ] || [ "$PERM" = "admin" ]; then
+            echo "::notice::validate-author exempted: PR author '$AUTHOR' has $PERM access."
             exit 0
           fi
 

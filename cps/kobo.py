@@ -977,7 +977,8 @@ def generate_sync_response(sync_token, sync_results):
 
     # Track Kobo sync activity
     try:
-        from scripts.cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         import json as json_lib
         cwa_db = CWA_DB()
         cwa_db.log_activity(
@@ -1732,9 +1733,15 @@ def HandleStateRequest(book_uuid):
             # Use the device's own timestamp so the GET response mirrors it back,
             # preventing the "newer PT" conflict popup. Official Kobo cloud does the same.
             lm_str = request_reading_state.get("LastModified")
-            request_lm = (datetime.strptime(lm_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-                          if lm_str else datetime.now(timezone.utc))
+            request_lm = parse_kobo_timestamp(lm_str)
             g.kobo_reading_state_lm = request_lm
+            if request_lm is None:
+                # ``None`` is an observation rejection, not permission to
+                # manufacture an ordering clock. Keep the parent's last
+                # accepted clock so the before_flush hook does not replace it
+                # with server ``now`` while the position itself is preserved.
+                g.kobo_reading_state_lm = getattr(
+                    kobo_reading_state, "last_modified", None)
 
             request_bookmark = request_reading_state["CurrentBookmark"]
             if request_bookmark:
@@ -1746,7 +1753,7 @@ def HandleStateRequest(book_uuid):
                     current_bookmark.location_value = location["Value"]
                     current_bookmark.location_type = location["Type"]
                     current_bookmark.location_source = location["Source"]
-                current_bookmark.last_modified = request_lm
+                _apply_kobo_last_modified(current_bookmark, request_lm)
                 update_results_response["CurrentBookmarkResult"] = {"Result": "Success"}
 
             request_statistics = request_reading_state["Statistics"]
@@ -1758,7 +1765,7 @@ def HandleStateRequest(book_uuid):
                 remaining = request_statistics.get("RemainingTimeMinutes")
                 if remaining is not None:
                     statistics.remaining_time_minutes = int(remaining)
-                statistics.last_modified = request_lm
+                _apply_kobo_last_modified(statistics, request_lm)
                 update_results_response["StatisticsResult"] = {"Result": "Success"}
 
             request_status_info = request_reading_state["StatusInfo"]
@@ -1770,7 +1777,7 @@ def HandleStateRequest(book_uuid):
                         book_read.times_started_reading += 1
                         book_read.last_time_started_reading = datetime.now(timezone.utc)
                     book_read.read_status = new_book_read_status
-                    book_read.last_modified = request_lm
+                    _apply_kobo_last_modified(book_read, request_lm)
                 update_results_response["StatusInfoResult"] = {"Result": "Success"}
         except (KeyError, TypeError, ValueError, StatementError):
             log.debug("Received malformed v1/library/<book_uuid>/state request.")
@@ -1783,7 +1790,14 @@ def HandleStateRequest(book_uuid):
                 current_user.id, book.id, request_bookmark["ProgressPercent"])
 
         ub.session.merge(kobo_reading_state)
-        ub.session_commit()
+        # #1318 again, on the reading-state path: ``session_commit()`` returns
+        # False when it caught an OperationalError/InvalidRequestError and
+        # rolled back, and its docstring is explicit that callers whose answer
+        # depends on the write landing MUST check it. Answering "Success" for a
+        # rolled-back write makes the device clear its queue and keeps the
+        # server on the older position, with nothing anywhere reporting it.
+        if not ub.session_commit():
+            return "", 500
         return jsonify({
             "RequestResult": "Success",
             "UpdateResults": [update_results_response],
@@ -1888,6 +1902,58 @@ def get_ub_read_status(kobo_read_status):
         "Reading": ub.ReadBook.STATUS_IN_PROGRESS,
     }
     return string_to_enum_map[kobo_read_status]
+
+
+def parse_kobo_timestamp(value):
+    """Parse a Kobo ``LastModified`` into an aware UTC datetime, or ``None``.
+
+    Kobo sends ISO-8601 UTC, but **not** always to whole seconds: a Libra Colour
+    on 5.10.226356 sends ``2026-08-17T17:56:53.254Z`` (#1706). The previous
+    ``strptime(value, "%Y-%m-%dT%H:%M:%SZ")`` raised ValueError on the
+    fractional part, which the caller's ``except`` turned into a 400 -- so one
+    unexpected millisecond field failed the whole reading-state sync, and the
+    error text blamed a missing ``ReadingStates`` key.
+
+    Returns ``None`` rather than raising: this timestamp exists only to mirror
+    the device's own value back so it does not raise a "newer progress" popup.
+    Losing it costs a popup; failing the request costs the sync.
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    # fromisoformat only learned to accept a trailing "Z" in 3.11.
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _apply_kobo_last_modified(target, observed_clock):
+    """Apply a valid device clock, or retain the row's accepted clock.
+
+    The Kobo state columns have SQLAlchemy ``onupdate=now`` defaults. Merely
+    declining to assign ``last_modified`` on a rejected clock is insufficient:
+    changing another field would still replace it with server time. Marking the
+    loaded value as explicitly supplied keeps that real stored observation in
+    the UPDATE instead. Test doubles have no SQLAlchemy state and need no such
+    handling.
+    """
+    if observed_clock is not None:
+        target.last_modified = observed_clock
+        return
+    if hasattr(target, "_sa_instance_state"):
+        from sqlalchemy.orm.attributes import flag_modified
+        # Load an expired value before flagging it, then make SQLAlchemy include
+        # that value instead of firing the column's ``onupdate`` default.
+        target.last_modified
+        flag_modified(target, "last_modified")
 
 
 def get_or_create_reading_state(book_id):

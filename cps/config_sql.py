@@ -104,6 +104,11 @@ class _Settings(_Base):
     config_use_https = Column(Boolean, default=False)
     config_kobo_sync = Column(Boolean, default=False)
     config_kobo_sync_magic_shelves = Column(Boolean, default=False)
+    # Stage 0 only stores this opt-in. Reading-services ownership remains with
+    # the existing proxy/containment paths until a later rollout stage.
+    config_kobo_two_way_annotation_sync = Column(
+        Boolean, nullable=False, default=False, server_default=text("0"),
+    )
 
     # Canonical server-wide Hardcover enable flag. Before fork #900,
     # auto-fetch had a second flag in cwa.db; the migration marker makes the

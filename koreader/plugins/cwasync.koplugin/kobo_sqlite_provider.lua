@@ -25,19 +25,68 @@ local KoboSqliteProvider = {}
 
 local DEFAULT_KOBO_DB = "/mnt/onboard/.kobo/KoboReader.sqlite"
 
--- Kobo's Color codes (Bookmark.Color). Web/KOReader use the 4 named colors a
--- Kobo round-trips; anything else degrades to yellow.
-local COLOR_NAME_TO_INT = { yellow = 0, red = 1, green = 2, blue = 3 }
-local COLOR_INT_TO_NAME = { [0] = "yellow", [1] = "red", [2] = "green", [3] = "blue" }
+-- Kobo's Color codes (Bookmark.Color).
+--
+-- MEASURED on the operator's Kobo Clara BW, firmware 4.45.23792, 2026-08-18, by
+-- serving each palette hex in an authored response and reading Bookmark.Color
+-- back (finding F-5769c9). This is the same table the server keeps in
+-- cps/services/annotation_colors.py, and the two must not drift.
+--
+--   0  #F6F3B3  yellow
+--   1  #E8AFCF  pink
+--   2  #B2E1E8  blue
+--   3  #C6E09E  green
+--   4  #A0A0A0  grey
+--
+-- The previous table here was wrong in three ways and the plugin's own tests
+-- pinned every one of them: it called 1 "red", it had 2 and 3 swapped so every
+-- green highlight was written to the device as blue and every blue one as
+-- green, and it had no entry for 4 at all. That last omission was the worst:
+-- a greyscale device such as the Clara BW writes Color=4 for EVERY organic
+-- highlight, so with `or "yellow"` every highlight it had ever made came back
+-- from the device as yellow.
+local COLOR_NAME_TO_INT = {
+    yellow = 0,
+    pink   = 1,
+    blue   = 2,
+    green  = 3,
+    grey   = 4,
+    gray   = 4,   -- the other spelling, folded like the server folds it
+}
+local COLOR_INT_TO_NAME = {
+    [0] = "yellow",
+    [1] = "pink",
+    [2] = "blue",
+    [3] = "green",
+    [4] = "grey",
+}
+
+-- A Kobo cannot represent red at all; red exists only in the web reader's
+-- palette. Writing a red highlight to a device therefore has to pick something,
+-- and pink is the nearest of the five it does have. Deliberately one-directional:
+-- Color=1 always reads back as "pink", never as "red", because pink is what the
+-- device is actually showing.
+local WRITE_ONLY_NEAREST = { red = 1 }
 
 -- ── Pure field-mapping helpers (unit-tested) ──────────────────────────────
 
+-- name -> Bookmark.Color. The column needs an integer, so an unrecognised name
+-- still has to become something; yellow is the documented last resort rather
+-- than an accident of `or 0`.
 function KoboSqliteProvider.colorNameToKoboInt(name)
-    return COLOR_NAME_TO_INT[name] or 0
+    if type(name) == "string" then
+        name = name:lower()
+    end
+    return COLOR_NAME_TO_INT[name] or WRITE_ONLY_NEAREST[name] or 0
 end
 
+-- Bookmark.Color -> name, or nil when the device sent an integer this table does
+-- not know. Deliberately NOT "yellow": a failed lookup that answers with a real
+-- colour is indistinguishable downstream from a genuine yellow highlight, which
+-- is the mistake the server's table documents as rule 1 ("never invent a
+-- colour"). Callers omit an unknown colour rather than misreporting one.
 function KoboSqliteProvider.koboIntToColorName(code)
-    return COLOR_INT_TO_NAME[code] or "yellow"
+    return COLOR_INT_TO_NAME[code]
 end
 
 -- "kobo.4.1" -> "span#kobo\.4\.1" (Kobo escapes the dots in the CSS selector).

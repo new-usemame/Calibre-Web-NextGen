@@ -29,6 +29,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - **New here?** See [Quick start](#quick-start) below.
 - **Want to back the work?** [**Sponsor on GitHub**](https://github.com/sponsors/new-usemame) — no rewards, no paywalled features, one-time or monthly. [Here's what it actually pays for.](#supporting-the-project)
 - **Setting up with an AI assistant** (Claude, ChatGPT, etc.)? Point it at [`AI_README.md`](AI_README.md) — a setup guide written for the assistant to follow, verify, and hand back to you working.
+- **Wondering how AI is used here?** [How AI is used](#how-ai-is-used) — used heavily to develop this fork, not at all in the software you run, and what gates it.
 
 ---
 
@@ -58,6 +59,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - [Differences from upstream](#differences-from-upstream)
 - [Contributing](#contributing)
 - [Supporting the project](#supporting-the-project)
+- [How AI is used](#how-ai-is-used)
 - [Credits](#credits)
 
 ---
@@ -678,34 +680,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `███████████████████░` 97% | 2717/2797 | 0 |
-| Spanish (`es`) | `███████████████████░` 94% | 2639/2797 | 0 |
-| Polish (`pl`) | `███████████████████░` 93% | 2603/2797 | 0 |
-| French (`fr`) | `█████████████████░░░` 83% | 2310/2797 | 127 |
-| German (`de`) | `███████████████░░░░░` 74% | 2069/2797 | 62 |
-| Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1854/2797 | 292 |
-| Hungarian (`hu`) | `████████████░░░░░░░░` 59% | 1644/2797 | 121 |
-| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 50% | 1406/2797 | 310 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████░░░░░░░░░░` 49% | 1381/2797 | 182 |
-| Japanese (`ja`) | `█████████░░░░░░░░░░░` 47% | 1318/2797 | 247 |
-| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 43% | 1212/2797 | 318 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████░░░░░░░░░░░░` 42% | 1174/2797 | 348 |
-| Italian (`it`) | `███████░░░░░░░░░░░░░` 34% | 955/2797 | 269 |
-| Korean (`ko`) | `███████░░░░░░░░░░░░░` 34% | 946/2797 | 269 |
-| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 28% | 788/2797 | 286 |
-| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 27% | 747/2797 | 313 |
-| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 25% | 699/2797 | 360 |
-| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 24% | 676/2797 | 362 |
-| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 24% | 675/2797 | 361 |
-| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 21% | 582/2797 | 388 |
-| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 504/2797 | 399 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 475/2797 | 408 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2797 | 372 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 15% | 431/2797 | 435 |
-| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2797 | 357 |
-| Finnish (`fi`) | `███░░░░░░░░░░░░░░░░░` 13% | 354/2797 | 388 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 10% | 289/2797 | 385 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 207/2797 | 343 |
+| Russian (`ru`) | `████████████████████` 99% | 2803/2844 | 0 |
+| Spanish (`es`) | `███████████████████░` 93% | 2638/2844 | 0 |
+| Polish (`pl`) | `██████████████████░░` 92% | 2602/2844 | 0 |
+| French (`fr`) | `████████████████░░░░` 82% | 2344/2844 | 127 |
+| German (`de`) | `███████████████░░░░░` 76% | 2172/2844 | 12 |
+| Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1888/2844 | 292 |
+| Hungarian (`hu`) | `████████████░░░░░░░░` 58% | 1644/2844 | 121 |
+| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 50% | 1407/2844 | 310 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████░░░░░░░░░░` 49% | 1382/2844 | 182 |
+| Japanese (`ja`) | `█████████░░░░░░░░░░░` 46% | 1318/2844 | 247 |
+| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 43% | 1212/2844 | 318 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████░░░░░░░░░░░░` 41% | 1174/2844 | 348 |
+| Italian (`it`) | `███████░░░░░░░░░░░░░` 34% | 955/2844 | 269 |
+| Korean (`ko`) | `███████░░░░░░░░░░░░░` 33% | 946/2844 | 269 |
+| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 28% | 788/2844 | 286 |
+| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 26% | 747/2844 | 313 |
+| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 25% | 699/2844 | 360 |
+| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 24% | 676/2844 | 362 |
+| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 24% | 675/2844 | 361 |
+| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 20% | 582/2844 | 388 |
+| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 504/2844 | 399 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 475/2844 | 408 |
+| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2844 | 372 |
+| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 15% | 431/2844 | 435 |
+| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2844 | 357 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 354/2844 | 388 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 10% | 289/2844 | 385 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 207/2844 | 343 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---
@@ -727,9 +729,9 @@ Governance: [`GOVERNANCE.md`](GOVERNANCE.md). Contributing details: [`CONTRIBUTI
 Since May 2026: **188 releases, 673 merged pull requests, 262 issues closed, and 155 contributors credited by name.**
 <!-- funding-stats:end -->
 
-This build exists because the project it's based on stopped cutting releases in February with a
-queue of community pull requests still sitting in it — real bug fixes, written by real people,
-that weren't going to reach anybody. Shipping them turned out to be a full-time habit.
+This build exists to ship community bug fixes on a fast, regular release cadence — real fixes,
+written by real people, packaged so they reach users quickly. It complements the upstream
+projects it builds on, and their maintainers have our respect and our credits below.
 
 **Nothing here is paywalled and nothing ever will be.** No sponsor-only features, no private
 Discord, no early access, no "pro" tier. Every line is GPL-3.0 and free whether you contribute
@@ -742,6 +744,22 @@ If it hasn't, that's completely fine — it stays free either way.
 - **[Ko-fi](https://ko-fi.com/calibrewebnextgen)** — the same thing, if you already have an account there.
 
 The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md) when something breaks. That helps more than a few dollars does.
+
+---
+
+## How AI is used
+
+The codebase itself is Calibre-Web and Calibre-Web-Automated — written over many years by their
+human maintainers and contributors, who are credited in [Credits](#credits). What this fork adds
+on top — its own fixes, their regression tests, the changelog and most issue replies — is largely
+produced by an AI assistant working from a written brief, with human review gates: merges require
+CI plus a regression test verified to fail without the fix, and anything adding a dependency,
+changing a licence or introducing an external URL is decided by a person.
+
+**The shipped application itself contains no AI:** no model dependency, no inference call, no
+telemetry, and your library is not sent anywhere.
+
+[**Read the full disclosure →**](docs/AI-USAGE.md)
 
 ---
 

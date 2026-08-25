@@ -5,10 +5,10 @@
 Unlike the opt-in exchange observer, this is an always-on data-integrity
 primitive. A successful stage returns only after the exact body and every new
 directory entry are fsynced, before JSON parsing or local dispatch begins.
-Storage runs on a small gevent native threadpool behind a hard request
+Storage runs on the gevent hub's native threadpool behind a hard request
 deadline. Once admitted, an operation remains owned by its native worker until
 completion even if the request stops waiting; one successor can queue behind a
-slow operation without creating an unbounded storage backlog.
+slow operation without creating an unbounded spool backlog.
 
 Unresolved records (``staged`` / ``dispatch_refused`` /
 ``dispatch_exception``) are never evicted to admit a new body. Repeated attempts
@@ -40,7 +40,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from gevent import Timeout, get_hub
-from gevent.threadpool import ThreadPool
 
 from .. import constants
 
@@ -51,12 +50,11 @@ MAX_BODY_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
 MAX_FILES = 512
 MAX_AGE_SECONDS = 14 * 24 * 60 * 60
-REQUEST_IO_TIMEOUT_SECONDS = 1.0
+REQUEST_IO_TIMEOUT_SECONDS = 0.1
 MAX_PENDING_IO_OPERATIONS = 2
 
 _PROCESS_LOCK = threading.Lock()
 _REQUEST_IO_SLOTS = threading.BoundedSemaphore(MAX_PENDING_IO_OPERATIONS)
-_SPOOL_THREADPOOL_LOCAL = threading.local()
 _VALID_OUTCOMES = {
     "staged", "dispatch_completed", "dispatch_exception", "dispatch_refused",
 }
@@ -84,6 +82,39 @@ class _SpoolDeadlineExceeded(Exception):
 
 class _SpoolUnavailable(Exception):
     pass
+
+
+class _RequestIOPermit:
+    """One admitted operation's release-once semaphore ownership."""
+
+    def __init__(self, semaphore):
+        self._semaphore = semaphore
+        self._release_lock = threading.Lock()
+        self._released = False
+
+    @classmethod
+    def acquire(cls):
+        semaphore = _REQUEST_IO_SLOTS
+        if not semaphore.acquire(blocking=False):
+            return None
+        return cls(semaphore)
+
+    def release(self):
+        with self._release_lock:
+            if self._released:
+                return False
+            self._released = True
+        self._semaphore.release()
+        return True
+
+
+def _reset_request_io_slots_after_fork():
+    """Discard permits whose native worker owners do not survive a fork."""
+    global _REQUEST_IO_SLOTS
+    _REQUEST_IO_SLOTS = threading.BoundedSemaphore(MAX_PENDING_IO_OPERATIONS)
+
+
+os.register_at_fork(after_in_child=_reset_request_io_slots_after_fork)
 
 
 def _spool_root() -> Path:
@@ -118,34 +149,29 @@ def is_replay_candidate(status) -> bool:
     return status in _UNRESOLVED_OUTCOMES
 
 
-def _spool_threadpool():
-    """Return this native caller thread's dedicated gevent spool pool."""
-    hub = get_hub()
-    pool = getattr(_SPOOL_THREADPOOL_LOCAL, "pool", None)
-    if pool is None or pool.hub is not hub or pool.pid != os.getpid():
-        pool = ThreadPool(MAX_PENDING_IO_OPERATIONS, hub=hub)
-        _SPOOL_THREADPOOL_LOCAL.pool = pool
-    return pool
-
-
 def _run_off_hub_bounded(function, *args):
     """Run I/O off-hub while leaving admitted work owned after timeout."""
-    if not _REQUEST_IO_SLOTS.acquire(blocking=False):
+    permit = _RequestIOPermit.acquire()
+    if permit is None:
         raise _SpoolUnavailable("the bounded spool storage queue is full")
     request_timed_out = threading.Event()
     result = None
     try:
         timeout = Timeout.start_new(REQUEST_IO_TIMEOUT_SECONDS)
     except BaseException:
-        _REQUEST_IO_SLOTS.release()
+        permit.release()
         raise
     try:
         try:
-            result = _spool_threadpool().spawn(
-                _capture_worker_result, function, args, request_timed_out,
+            result = get_hub().threadpool.spawn(
+                _capture_worker_result,
+                function,
+                args,
+                request_timed_out,
+                permit,
             )
         except BaseException:
-            _REQUEST_IO_SLOTS.release()
+            permit.release()
             raise
         value, error = result.get()
         if error is not None:
@@ -166,7 +192,7 @@ def _run_off_hub_bounded(function, *args):
         timeout.cancel()
 
 
-def _capture_worker_result(function, args, request_timed_out):
+def _capture_worker_result(function, args, request_timed_out, permit):
     """Return worker errors as values so gevent does not log expected failures."""
     operation = getattr(function, "__name__", type(function).__name__)
     try:
@@ -189,7 +215,7 @@ def _capture_worker_result(function, args, request_timed_out):
                 )
             return None, error
     finally:
-        _REQUEST_IO_SLOTS.release()
+        permit.release()
 
 
 def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):

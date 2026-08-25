@@ -419,8 +419,55 @@ def mock_calibre_tools(mocker):
 # Skip Markers for Conditional Tests
 # ============================================================================
 
+def _isolate_worker_tempdir():
+    """Give each xdist worker its own tempdir.
+
+    `scripts/` guards five one-at-a-time operations with a singleton keyed on
+    `tempfile.gettempdir()`:
+
+        ingest_processor.py:176    cover_enforcer.py:168
+        convert_library.py:64,74   kindle_epub_fixer.py:85,113,123
+
+    Those guards are correct production behaviour -- one ingest, one enforcer
+    run at a time. Under `-n N` every worker resolves the same path, so the
+    losers of a legitimate collision surface as test failures, in whichever
+    tests happen to share the moment. Two are already observed doing it:
+    `test_1094_failed_conversion_imports_original.py` (3-6 failures per run,
+    `main()` returning 2 from `if not initialize_runtime()`) and
+    `test_script_import_side_effects.py::...[convert_library]`. Both pass
+    serially, which is what made this look like flakiness rather than a
+    collision the harness itself was creating.
+
+    This is not a new mechanism. `test_1372_kepub_metadata_enforcement.py`
+    already does it by hand for one import, monkeypatching `tempfile.gettempdir`
+    to a private directory so `cover_enforcer`'s module-scope lock cannot race
+    `test_802`'s -- see the comment there. This promotes that workaround from
+    one file to the harness, and that local monkeypatch can go once this has
+    settled.
+
+    BOTH assignments are load-bearing and neither is sufficient alone:
+    `gettempdir()` caches its answer into `tempfile.tempdir`, so setting only
+    the environment variable leaves this process on the shared path, while
+    setting only the module global leaves subprocesses on it -- and
+    `ingest_processor` is invoked as a subprocess by some of these tests. Half
+    an application looks like the fixture not quite working rather than like a
+    fixture that was only half applied.
+
+    No-op outside xdist, so a serial run keeps the system tempdir.
+    """
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if not worker:
+        return None
+    root = os.path.join(tempfile.gettempdir(), "cwng-xdist", worker)
+    os.makedirs(root, exist_ok=True)
+    os.environ["TMPDIR"] = root
+    tempfile.tempdir = root
+    return root
+
+
 def pytest_configure(config):
     """Register custom markers."""
+    _isolate_worker_tempdir()
     config.addinivalue_line(
         "markers", "requires_docker: mark test as requiring Docker environment"
     )

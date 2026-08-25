@@ -295,8 +295,7 @@
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease),
               background var(--dur-fast) var(--ease),
-              color var(--dur-fast) var(--ease),
-              border-color var(--dur-fast) var(--ease);
+              color var(--dur-fast) var(--ease);
 }
 
 .wrap:hover .quickEditBtn,
@@ -305,12 +304,10 @@
   opacity: 1;
 }
 
-.quickEditBtn:hover,
-.quickEditBtn:focus-visible,
-.quickEditBtn:active {
-  background: var(--surface-3);
-  color: var(--text);
-  border-color: var(--border-strong);
+.quickEditBtn:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
 }
 
 /* The card's bottom action row: read link + edit pencil, side by side in normal

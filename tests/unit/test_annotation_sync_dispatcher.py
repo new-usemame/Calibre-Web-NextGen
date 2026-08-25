@@ -94,6 +94,15 @@ def test_dispatch_creates_annotation_and_sync_target(patched_session):
     assert targets[0].target_record_id == "r1"
 
 
+@pytest.mark.parametrize("batch", [None, {}, {"id": "not-a-list"}, "not-a-list"])
+def test_dispatch_refuses_every_non_list_batch_before_empty_shortcut(
+    patched_session, batch,
+):
+    _session, user = patched_session
+
+    assert dispatch_annotation_sync(batch, _book(), user) is False
+
+
 def test_dispatch_updates_existing_annotation(patched_session):
     s, user = patched_session
     register_handler(StubHandler())

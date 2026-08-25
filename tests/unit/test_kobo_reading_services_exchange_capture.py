@@ -9,8 +9,10 @@ import importlib
 import json
 import os
 import stat
+import time
 from types import SimpleNamespace
 
+import gevent
 import pytest
 from flask import Flask, jsonify, request
 
@@ -282,6 +284,166 @@ def test_capture_enabled_and_capture_failure_leave_response_byte_identical(monke
     )
     failed = app.test_client().post("/api/v3/content/checkforchanges", json=payload)
     assert (failed.status_code, failed.get_data(), list(failed.headers.items())) == baseline_triplet
+
+
+@pytest.mark.unit
+def test_unauthenticated_patch_401_captures_body_with_explicit_provenance_outside_spool(
+    monkeypatch, tmp_path,
+):
+    capture = _module()
+    unauthenticated_root = tmp_path / "unauthenticated-exchange-captures"
+    recovery_spool_root = tmp_path / "recovery-spool-must-stay-empty"
+    monkeypatch.setenv(capture.ENABLE_ENV, ACK)
+    monkeypatch.setattr(
+        capture, "_unauthenticated_capture_root",
+        lambda: unauthenticated_root,
+        raising=False,
+    )
+    from cps.services import kobo_patch_spool
+    monkeypatch.setattr(kobo_patch_spool, "_spool_root", lambda: recovery_spool_root)
+    monkeypatch.setattr(rs.config, "config_kobo_sync", True, raising=False)
+    monkeypatch.setattr(
+        rs, "current_user", SimpleNamespace(is_authenticated=False, id=None),
+    )
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("the refused PATCH must not be sent upstream"),
+    )
+    raw_body = b'{"updatedAnnotations":[{"id":"annotation-1","noteText":"private"}]}'
+    app = Flask(__name__)
+
+    @app.patch("/api/v3/content/<content_id>/annotations")
+    @rs.requires_reading_services_auth_and_config
+    def annotations(content_id):
+        del content_id
+        pytest.fail("the unauthenticated PATCH must not reach the handler")
+
+    response = app.test_client().patch(
+        f"/api/v3/content/{OWNED}/annotations",
+        data=raw_body,
+        content_type="application/json",
+        headers={"Authorization": "Bearer must-be-redacted"},
+    )
+
+    assert response.status_code == 401
+    [record] = _records(unauthenticated_root)
+    assert record["schema_version"] == 2
+    assert record["exchange"] == "annotations_patch_unauthenticated"
+    assert record["request_provenance"] == {
+        "authentication": "unauthenticated",
+        "user_id": None,
+    }
+    assert record["device_request"]["body"]["data"].encode() == raw_body
+    assert dict(record["device_request"]["headers"])["Authorization"] \
+        == "***REDACTED***"
+    assert record["upstream_request"] is None
+    assert record["upstream_response"] is None
+    assert record["device_response"]["status"] == 401
+    assert record["device_response"]["body"]["data"].encode() == response.get_data()
+    assert not recovery_spool_root.exists()
+
+
+@pytest.mark.unit
+def test_unauthenticated_capture_is_off_by_default_and_does_not_read_the_body(
+    monkeypatch, tmp_path,
+):
+    capture = _module()
+    unauthenticated_root = tmp_path / "must-not-exist"
+    monkeypatch.delenv(capture.ENABLE_ENV, raising=False)
+    monkeypatch.setattr(
+        capture, "_unauthenticated_capture_root",
+        lambda: unauthenticated_root,
+        raising=False,
+    )
+    monkeypatch.setattr(rs.config, "config_kobo_sync", True, raising=False)
+    monkeypatch.setattr(
+        rs, "current_user", SimpleNamespace(is_authenticated=False, id=None),
+    )
+    app = Flask(__name__)
+
+    @app.patch("/api/v3/content/<content_id>/annotations")
+    @rs.requires_reading_services_auth_and_config
+    def annotations(content_id):
+        del content_id
+        pytest.fail("the unauthenticated PATCH must not reach the handler")
+
+    monkeypatch.setattr(
+        app.request_class,
+        "get_data",
+        lambda *_args, **_kwargs: pytest.fail(
+            "an off diagnostic must not consume an unauthenticated request body"
+        ),
+    )
+    response = app.test_client().patch(
+        f"/api/v3/content/{OWNED}/annotations",
+        data=b'{"updatedAnnotations":[{"id":"annotation-1"}]}',
+        content_type="application/json",
+    )
+
+    assert response.status_code == 401
+    assert not unauthenticated_root.exists()
+
+
+@pytest.mark.unit
+def test_unauthenticated_capture_churn_cannot_evict_authenticated_diagnostics(
+    monkeypatch, tmp_path,
+):
+    capture, authenticated_root = _enable(monkeypatch, tmp_path)
+    unauthenticated_root = tmp_path / "separate-unauthenticated-budget"
+    monkeypatch.setattr(
+        capture, "_unauthenticated_capture_root", lambda: unauthenticated_root,
+    )
+    monkeypatch.setattr(capture, "UNAUTHENTICATED_MAX_FILES", 2)
+    monkeypatch.setattr(capture, "UNAUTHENTICATED_MAX_TOTAL_BYTES", 1024 * 1024)
+
+    authenticated = capture.begin_capture(
+        exchange="annotations_patch", method="PATCH", path="/annotations/book",
+        query_string=b"", headers=[], body=b'{"updatedAnnotations":[]}',
+        authentication="authenticated", user_id=7,
+    )
+    assert _finish(authenticated) is True
+
+    for index in range(4):
+        unauthenticated = capture.begin_capture(
+            exchange="annotations_patch_unauthenticated", method="PATCH",
+            path=f"/annotations/untrusted-{index}", query_string=b"",
+            headers=[], body=str(index).encode(),
+            authentication="unauthenticated", user_id=None,
+        )
+        assert _finish(unauthenticated) is True
+
+    [authenticated_record] = _records(authenticated_root)
+    assert authenticated_record["request_provenance"]["user_id"] == 7
+    assert len(_records(unauthenticated_root)) == 2
+
+
+@pytest.mark.unit
+def test_capture_persistence_yields_to_gevent_hub(monkeypatch, tmp_path):
+    capture, _root = _enable(monkeypatch, tmp_path)
+    session = capture.begin_capture(
+        exchange="annotations_patch", method="PATCH", path="/annotations/book",
+        query_string=b"", headers=[], body=b'{"updatedAnnotations":[]}',
+        authentication="authenticated", user_id=7,
+    )
+    original_persist = session._persist
+    events = []
+
+    def slow_native_io():
+        time.sleep(0.05)
+        original_persist()
+        events.append("persisted")
+
+    def hub_ticker():
+        gevent.sleep(0.01)
+        events.append("hub-ran")
+
+    monkeypatch.setattr(session, "_persist", slow_native_io)
+    ticker = gevent.spawn(hub_ticker)
+
+    assert _finish(session) is True
+    ticker.join(timeout=1)
+
+    assert events == ["hub-ran", "persisted"]
 
 
 @pytest.mark.unit

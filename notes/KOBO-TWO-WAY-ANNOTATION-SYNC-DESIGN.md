@@ -610,8 +610,19 @@ annotation text exists only inside mode-0600 gzip records under the mode-0700 pr
 `<config>/.cwng-private-observability/kobo-reading-services/`. The directory is not part of the
 annotation backup format or the support debug bundle. Retention is bounded to 256 records, 64 MiB
 compressed, seven days, and 16 MiB for any one body. Capture finalization is an after-response
-observer, storage exceptions are swallowed, and executed route tests prove identical status,
-headers, and body with the gate off, on, and throwing.
+observer, storage runs off the gevent hub with a 100 ms request deadline, storage exceptions are
+swallowed, and executed route tests prove identical status, headers, and body with the gate off,
+on, and throwing.
+
+**[OBSERVED — IMPLEMENTED 2026-08-24]** An annotation PATCH refused before authentication can be
+captured only while the same explicit private-data gate is enabled. The schema-version-2 record is
+marked `authentication='unauthenticated'` with `user_id=null`; CWNG does not infer an owner. These
+records never enter the always-on recovery spool. They use a separate mode-0700 directory and
+independent locks capped at 32 records, 8 MiB compressed, and 1 MiB per body. Records older than 24
+hours are pruned on the next unauthenticated capture write, so 24 hours is an age target rather than
+a wall-clock maximum during a quiet period. A missing or out-of-bound `Content-Length` is not read.
+Thus unauthenticated traffic cannot consume the non-evictable recovery budget or evict authenticated
+exchange diagnostics.
 
 **[OBSERVED — IMPLEMENTED 2026-08-23]** Annotation PATCH has a separate always-on recovery spool.
 The exact raw request body is atomically written and fsynced before JSON parsing, ownership
@@ -620,6 +631,11 @@ changing the response sent to Nickel. Records contain no headers, use the same p
 parent and mode-0600 files, and are bounded to 512 records, 64 MiB compressed, 14 days, and 16 MiB
 per body. Normal-return records remain during retention because return from the dispatcher is not
 proof that every member committed. Replay is manual and integrity-checked; it is not automatic.
+Unresolved records are never evicted to admit a distinct body. Retries with the same user,
+entitlement, origin device, and exact raw bytes atomically refresh one record regardless of its
+previous outcome, so repeated delivery cannot consume the instance-wide spool one slot at a time.
+An unresolved outcome means complete persistence is unproven; it does not assert that SQLite
+stored nothing, because SAVEPOINT writes may survive a later outer rollback on the current engine.
 This implements F-5c1146 addendum point (2). The finding's response-code/failed-member half remains
 open until the independent PATCH failure hardware experiment completes.
 

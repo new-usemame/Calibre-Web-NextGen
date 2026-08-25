@@ -9,12 +9,14 @@ Storage runs on gevent's native threadpool behind a hard request deadline: a
 busy or wedged spool returns no ticket and never blocks the worker hub without
 bound.
 
-Unresolved records (``staged`` / ``dispatch_exception``) are never evicted to
-admit a new body. Admission and outcome replacement use a small durable
-transaction journal, so a failed or interrupted write restores the prior
-record set. Successful records can be evicted within the advertised count and
-compressed-byte bounds. A deadline-driven maintenance thread enforces age
-retention even when no later PATCH arrives.
+Unresolved records (``staged`` / ``dispatch_refused`` /
+``dispatch_exception``) are never evicted to admit a new body. Repeated attempts
+for the same user, entitlement, device, and exact body refresh one record
+instead of consuming another slot, regardless of the prior attempt's outcome.
+Admission, deduplication, and outcome replacement use a small durable
+transaction journal, so a failed or interrupted write restores the prior record
+set. A deadline-driven maintenance thread enforces age retention even when no
+later PATCH arrives.
 
 The spool stores no request headers or credentials. It is a local recovery
 artifact, excluded from annotation backups and support bundles.
@@ -51,8 +53,18 @@ REQUEST_IO_TIMEOUT_SECONDS = 0.1
 
 _PROCESS_LOCK = threading.Lock()
 _REQUEST_IO_GATE = threading.Lock()
-_VALID_OUTCOMES = {"staged", "dispatch_completed", "dispatch_exception"}
-_UNRESOLVED_OUTCOMES = {"staged", "dispatch_exception"}
+_VALID_OUTCOMES = {
+    "staged", "dispatch_completed", "dispatch_exception", "dispatch_refused",
+}
+_UNRESOLVED_OUTCOMES = {"staged", "dispatch_exception", "dispatch_refused"}
+_REPLAY_IDENTITY_FIELDS = (
+    "user_id",
+    "entitlement_id",
+    "origin_device_id",
+    "body_length",
+    "body_sha256",
+    "body_base64",
+)
 _RETENTION_TIMERS_LOCK = threading.Lock()
 _RETENTION_TIMERS = {}
 _RETENTION_STARTED = False
@@ -84,6 +96,15 @@ def _spool_root() -> Path:
 
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(bytes(value)).hexdigest()
+
+
+def _replay_identity_sha256(record) -> str:
+    serialized = json.dumps(
+        [record.get(field) for field in _REPLAY_IDENTITY_FIELDS],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256_bytes(serialized)
 
 
 def _body_within_bound(raw_body) -> bool:
@@ -152,11 +173,13 @@ def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
     try:
         raw_body = bytes(raw_body)
         spool_id = secrets.token_hex(16)
+        attempt_id = secrets.token_hex(16)
         now = datetime.now(timezone.utc).isoformat()
         record = {
-            "schema_version": 1,
+            "schema_version": 2,
             "spool_id": spool_id,
             "received_at": now,
+            "last_received_at": now,
             "entitlement_id": str(entitlement_id),
             "user_id": user_id,
             "origin_device_id": origin_device_id,
@@ -166,14 +189,21 @@ def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
             "body_base64": base64.b64encode(raw_body).decode("ascii"),
             "dispatch_status": "staged",
             "dispatch_updated_at": now,
+            "dispatch_attempt_id": attempt_id,
+            "attempt_count": 1,
         }
+        record["replay_identity_sha256"] = _replay_identity_sha256(record)
         compressed = _compress(record)
-        path = _run_off_hub_bounded(_write_new_record, spool_id, compressed)
-        log.info(
-            "Kobo PATCH recovery body staged spool_id=%s user_id=%s bytes=%s",
-            spool_id, user_id, len(raw_body),
+        spool_id, path, attempt_id, reused = _run_off_hub_bounded(
+            _write_or_reuse_record, record, compressed,
         )
-        return PatchSpoolTicket(spool_id=spool_id, path=path)
+        log.info(
+            "Kobo PATCH recovery body %s spool_id=%s user_id=%s bytes=%s",
+            "restaged" if reused else "staged", spool_id, user_id, len(raw_body),
+        )
+        return PatchSpoolTicket(
+            spool_id=spool_id, path=path, attempt_id=attempt_id,
+        )
     except _SpoolNoRoom:
         log.warning(
             "Kobo PATCH recovery spool full of established unresolved records; "
@@ -206,19 +236,30 @@ def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
 
 
 class PatchSpoolTicket:
-    def __init__(self, *, spool_id, path):
+    def __init__(self, *, spool_id, path, attempt_id):
         self.spool_id = spool_id
         self.path = Path(path)
+        self.attempt_id = attempt_id
 
     def mark_dispatch_outcome(self, status) -> bool:
         if status not in _VALID_OUTCOMES - {"staged"}:
             raise ValueError("invalid Kobo PATCH dispatch outcome")
         try:
-            new_path = _run_off_hub_bounded(
-                _mark_dispatch_outcome_blocking, self.path, status,
+            new_path, applied = _run_off_hub_bounded(
+                _mark_dispatch_outcome_blocking,
+                self.path,
+                self.spool_id,
+                self.attempt_id,
+                status,
             )
             self.path = Path(new_path)
-            return True
+            if not applied:
+                log.info(
+                    "Ignored stale Kobo PATCH recovery outcome spool_id=%s "
+                    "attempt_id=%s status=%s",
+                    self.spool_id, self.attempt_id, status,
+                )
+            return applied
         except (_SpoolNoRoom, _SpoolDeadlineExceeded, _SpoolUnavailable):
             log.error(
                 "Kobo PATCH recovery outcome update unavailable; preserving "
@@ -325,6 +366,36 @@ def _path_with_status(path, status):
             stem = stem[:-len(suffix)]
             break
     return path.with_name(f"{stem}-{status}.json.gz")
+
+
+def _identity_from_path(path):
+    stem = Path(path).name.removesuffix(".json.gz")
+    for status in _VALID_OUTCOMES:
+        suffix = f"-{status}"
+        if stem.endswith(suffix):
+            stem = stem[:-len(suffix)]
+            break
+    candidate = stem.rsplit("-", 1)[-1]
+    if len(candidate) != 64:
+        return None
+    try:
+        int(candidate, 16)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _path_with_identity_and_status(path, identity, status):
+    path = Path(path)
+    if _identity_from_path(path) == identity:
+        return _path_with_status(path, status)
+    stem = path.name.removesuffix(".json.gz")
+    for known_status in _VALID_OUTCOMES:
+        suffix = f"-{known_status}"
+        if stem.endswith(suffix):
+            stem = stem[:-len(suffix)]
+            break
+    return path.with_name(f"{stem}-{identity}-{status}.json.gz")
 
 
 def _record_inventory(root):
@@ -514,7 +585,35 @@ def _install_record_locked(
         )
 
 
-def _write_new_record(spool_id, compressed, cancelled=None):
+def _same_replay_identity(record, incoming):
+    return all(
+        record.get(field) == incoming.get(field)
+        for field in _REPLAY_IDENTITY_FIELDS
+    )
+
+
+def _find_matching_replay_identity_locked(inventory, incoming):
+    matches = []
+    incoming_identity = incoming["replay_identity_sha256"]
+    for item in inventory:
+        disk_identity = _identity_from_path(item["path"])
+        if disk_identity is not None and disk_identity != incoming_identity:
+            continue
+        try:
+            record = _load_disk_record(item["path"])
+        except FileNotFoundError:
+            continue
+        except Exception:
+            # An unreadable record cannot be proven identical and must not
+            # absorb a different request. If unresolved, it remains protected
+            # by the normal admission policy.
+            continue
+        if _same_replay_identity(record, incoming):
+            matches.append((item["path"], record))
+    return matches
+
+
+def _write_or_reuse_record(incoming, compressed, cancelled=None):
     root = _spool_root()
     with _PROCESS_LOCK:
         _ensure_not_cancelled(cancelled)
@@ -523,20 +622,92 @@ def _write_new_record(spool_id, compressed, cancelled=None):
             _ensure_not_cancelled(cancelled)
             _recover_transactions_locked(root)
             inventory = _record_inventory(root)
-            victims = _select_victims(
-                inventory, incoming_bytes=len(compressed),
+            matches = _find_matching_replay_identity_locked(
+                inventory, incoming,
             )
-            path = root / (
-                f"patch-{time.time_ns():020d}-{spool_id}-staged.json.gz"
-            )
-            _schedule_retention(root, time.time() + MAX_AGE_SECONDS)
-            _install_record_locked(
-                path, compressed, victims=victims, cancelled=cancelled,
-            )
-    return path
+            if matches:
+                existing_path, existing = matches[0]
+                duplicate_paths = [path for path, _record in matches[1:]]
+                now = incoming["received_at"]
+                refreshed = dict(existing)
+                refreshed.update({
+                    "schema_version": max(2, int(existing.get("schema_version", 1))),
+                    "last_received_at": now,
+                    "dispatch_status": "staged",
+                    "dispatch_updated_at": now,
+                    "dispatch_attempt_id": incoming["dispatch_attempt_id"],
+                    "attempt_count": sum(
+                        int(record.get("attempt_count", 1))
+                        for _path, record in matches
+                    ) + 1,
+                    "replay_identity_sha256": incoming["replay_identity_sha256"],
+                })
+                compressed = _compress(refreshed)
+                deduplicated_inventory = [
+                    item for item in inventory
+                    if item["path"] not in duplicate_paths
+                ]
+                victims = _select_victims(
+                    deduplicated_inventory,
+                    incoming_bytes=len(compressed),
+                    replacing_path=existing_path,
+                )
+                victims = duplicate_paths + victims
+                path = _path_with_identity_and_status(
+                    existing_path,
+                    incoming["replay_identity_sha256"],
+                    "staged",
+                )
+                _schedule_retention(root, time.time() + MAX_AGE_SECONDS)
+                _install_record_locked(
+                    path,
+                    compressed,
+                    victims=victims,
+                    replacing_path=existing_path,
+                    cancelled=cancelled,
+                )
+                result = (
+                    refreshed["spool_id"],
+                    path,
+                    incoming["dispatch_attempt_id"],
+                    True,
+                )
+            else:
+                victims = _select_victims(
+                    inventory, incoming_bytes=len(compressed),
+                )
+                path = root / (
+                    f"patch-{time.time_ns():020d}-{incoming['spool_id']}-"
+                    f"{incoming['replay_identity_sha256']}-staged.json.gz"
+                )
+                _schedule_retention(root, time.time() + MAX_AGE_SECONDS)
+                _install_record_locked(
+                    path, compressed, victims=victims, cancelled=cancelled,
+                )
+                result = (
+                    incoming["spool_id"],
+                    path,
+                    incoming["dispatch_attempt_id"],
+                    False,
+                )
+    return result
 
 
-def _mark_dispatch_outcome_blocking(path, status, cancelled=None):
+def _find_record_path_by_spool_id_locked(root, spool_id):
+    for candidate in _record_paths(root):
+        try:
+            if _load_disk_record(candidate).get("spool_id") == spool_id:
+                return candidate
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+    return None
+
+
+def _mark_dispatch_outcome_blocking(
+    path, spool_id, attempt_id, status, cancelled=None,
+):
     path = Path(path)
     root = path.parent
     with _PROCESS_LOCK:
@@ -545,7 +716,15 @@ def _mark_dispatch_outcome_blocking(path, status, cancelled=None):
         with _locked_root(root):
             _ensure_not_cancelled(cancelled)
             _recover_transactions_locked(root)
+            if not path.exists():
+                path = _find_record_path_by_spool_id_locked(root, spool_id)
+                if path is None:
+                    raise FileNotFoundError(
+                        f"Kobo PATCH spool record not found: {spool_id}"
+                    )
             record = _load_disk_record(path)
+            if record.get("dispatch_attempt_id") != attempt_id:
+                return path, False
             record["dispatch_status"] = status
             record["dispatch_updated_at"] = datetime.now(timezone.utc).isoformat()
             compressed = _compress(record)
@@ -561,7 +740,7 @@ def _mark_dispatch_outcome_blocking(path, status, cancelled=None):
                 replacing_path=path,
                 cancelled=cancelled,
             )
-    return new_path
+    return new_path, True
 
 
 def _replace_record_locked(path, compressed, cancelled=None):

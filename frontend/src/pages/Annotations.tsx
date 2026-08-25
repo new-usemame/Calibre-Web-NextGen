@@ -3,8 +3,9 @@ import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ChevronLeft, Download, Highlighter, MoreHorizontal, Upload as UploadIcon } from 'lucide-react';
 import { apiGet, apiPatch, apiPost, apiUrl } from '../lib/api';
-import { useBook } from '../lib/queries';
+import { useBook, useMe, useKoboTwoWayAnnotations, selectKoboTwoWayBook } from '../lib/queries';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { BulkSelectionBar } from '../components/BulkBar';
@@ -28,7 +29,15 @@ interface ActiveDevice extends DeviceSummary { public_id: string; active: boolea
 interface Payload { annotations: Annotation[]; annotation_count: number; devices: Record<string, DeviceSummary> }
 type Entry = { kind: 'annotation'; annotation: Annotation } | { kind: 'group'; id: string | null; label: string; count: number };
 
-const COLOR_HEX: Record<string, string> = { yellow: '#e6c34a', red: '#d9534f', green: '#5cb85c', blue: '#5b9bd5' };
+/* The API normalises the stored wire hex to a display name (F-5769c9), so this
+ * keys on names and must cover the WHOLE Kobo palette — pink and grey included.
+ * Every organic highlight from a greyscale device (Clara BW) is grey; without a
+ * grey entry they all fall through to yellow, which is the bug this page was
+ * showing. `red` has no Kobo equivalent and is web-reader only. */
+const COLOR_HEX: Record<string, string> = {
+  yellow: '#e6c34a', red: '#d9534f', green: '#5cb85c', blue: '#5b9bd5',
+  pink: '#e8afcf', grey: '#a0a0a0',
+};
 const CHUNK_SIZE = 500;
 
 function chunks<T>(items: T[], size: number): T[][] {
@@ -41,6 +50,13 @@ export function Annotations({ id }: { id: string }) {
   const t = useT();
   const announce = useAnnouncer();
   const book = useBook(id).data;
+  const me = useMe().data;
+  /* Stage 0 two-way sync state chip — read-only here; changes happen on the
+   * Account page. Guests skip the query entirely (it would only 401). */
+  const twoWay = useKoboTwoWayAnnotations({
+    enabled: !!me && !me.role?.anonymous && !!me.features?.kobo_two_way_annotations,
+  });
+  const twoWayBook = selectKoboTwoWayBook(twoWay.data, Number(id));
   const { data, isLoading, error } = useQuery<Payload>({
     queryKey: ['annotations', id], queryFn: () => apiGet(`/annotations/${id}/data.json`),
   });
@@ -165,7 +181,17 @@ export function Annotations({ id }: { id: string }) {
   };
 
   if (isLoading) return <SpinnerCentered size={40} />;
-  const colorName = (color: string | null) => ({ yellow: t('Yellow'), red: t('Red'), green: t('Green'), blue: t('Blue') })[color || 'yellow'] || t('Yellow');
+  /* A colour we cannot name is announced as unknown, never as a specific one.
+   * Two shapes reach here: null (the column is empty, or the device's colour
+   * code was one we cannot resolve) and a non-null token this palette has no
+   * entry for (a foreign vocabulary's name, a hex from a newer device, which
+   * the API preserves rather than discards). Both are "unknown" to a reader;
+   * telling a screen-reader user "Yellow" for either is the same category
+   * error as painting it yellow. */
+  const colorName = (color: string | null) => (color
+    ? ({ yellow: t('Yellow'), red: t('Red'), green: t('Green'), blue: t('Blue'),
+         pink: t('Pink'), grey: t('Grey') } as Record<string, string>)[color] || t('Unknown color')
+    : t('Unknown color'));
   const sourceLabel = (source: string | null) => source === 'kobo' ? t('Kobo') : source === 'koreader' ? t('KOReader') : source === 'webreader' ? t('Web reader') : t('Unknown source');
   const toggle = (annotationId: string) => setSelected((current) => {
     const next = new Set(current); if (next.has(annotationId)) next.delete(annotationId); else next.add(annotationId); return next;
@@ -189,7 +215,18 @@ export function Annotations({ id }: { id: string }) {
   return (
     <main className={styles.container}>
       <Link href={`/book/${id}`} className={styles.back}><ChevronLeft size={16} aria-hidden="true" /> {t('Back to book')}</Link>
-      <div className={styles.header}><Highlighter size={22} aria-hidden="true" /><h1>{t('Highlights')}{book ? ` — ${book.title}` : ''}</h1><span>{annotations.length}</span></div>
+      <div className={styles.header}><Highlighter size={22} aria-hidden="true" /><h1>{t('Highlights and notes')}{book ? ` — ${book.title}` : ''}</h1><span>{annotations.length}</span></div>
+      {/* Stage 0 per-book two-way state, surfaced honestly (a toggle alone
+          would look broken: opted-in ≠ synced). Only shown when the user has
+          opted in and this book has pipeline state. */}
+      {twoWay.data?.enabled && twoWayBook && (
+        <p className={styles.twoWayChip}>
+          <Link href="/account">
+            {t('Kobo two-way sync: {state}', { state: authorityLabel(t, twoWayBook, twoWay.data.scope) })}
+          </Link>
+          {opaqueLabel(t, twoWayBook) && <span className={styles.twoWayBlocked}>{opaqueLabel(t, twoWayBook)}</span>}
+        </p>
+      )}
       <div className={`${styles.filters} ${filters.length > 7 ? styles.filtersCollapsed : ''}`} role="radiogroup" aria-label={t('Filter by device')}
         onKeyDown={(event) => {
           if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
@@ -200,7 +237,7 @@ export function Annotations({ id }: { id: string }) {
         }}>
         {filters.map((item, index) => <button key={item.id} ref={index === 0 ? filterFirstRef : undefined} type="button" role="radio"
           aria-checked={filter === item.id} tabIndex={filter === item.id ? 0 : -1}
-          aria-label={t('{name}, {n} highlights', { name: item.label, n: item.count })}
+          aria-label={t('{name}, {n} highlights and notes', { name: item.label, n: item.count })}
           className={filter === item.id ? styles.filterActive : styles.filter}
           onClick={() => { setFilter(item.id); setSelected(new Set()); }}>{item.label} <span>{item.count}</span></button>)}
       </div>
@@ -237,21 +274,23 @@ export function Annotations({ id }: { id: string }) {
         </select>
         {progress && <span>{t('{done} of {total}', { done: progress.done, total: progress.total })}</span>}
       </BulkSelectionBar>}
-      {error ? <EmptyState message={error instanceof Error ? error.message : t('Could not load highlights.')} /> : !annotations.length ?
-        <EmptyState message={t('No highlights yet. Highlight while reading, or import from a Kobo device.')} /> :
+      {error ? <EmptyState message={error instanceof Error ? error.message : t('Could not load highlights and notes.')} /> : !annotations.length ?
+        <EmptyState message={t('Nothing here yet. Highlight or write a note while reading, or import from a Kobo device.')} /> :
         <VirtualizedList items={entries} itemKey={(entry) => entry.kind === 'group' ? `group-${entry.id}` : entry.annotation.annotation_id}
-          rowHeight={78} ariaLabel={t('Highlights')} renderItem={(entry) => entry.kind === 'group' ? (
+          rowHeight={78} ariaLabel={t('Highlights and notes')} renderItem={(entry) => entry.kind === 'group' ? (
             <div className={styles.groupHeader}><strong>{entry.label}</strong><span>{entry.count}</span>
               {selecting && <button type="button" onClick={() => setSelected((current) => new Set([...current, ...filtered.filter((row) => assignmentOf(row) === entry.id).map((row) => row.annotation_id)]))}>{t('Select all in group')}</button>}
             </div>
           ) : (() => {
             const row = entry.annotation; const current = assignmentOf(row);
-            /* A standalone note has no passage and no colour. The API projects a default
-             * colour for it (`r.highlight_color or "yellow"`, a legacy fallback for old
-             * rows), so drawing the swatch and the blockquote unconditionally shows a
-             * swatch announced as "Yellow" beside an EMPTY quote — a highlight that looks
-             * like it lost its text. Draw the row as what it is. Credit: the rule and the
-             * reasoning come from #1544 on main; this keeps them through the merge. */
+            /* A standalone note has no passage and no colour. Drawing the swatch and
+             * the blockquote unconditionally puts a swatch beside an EMPTY quote — a
+             * highlight that looks like it lost its text. Draw the row as what it is.
+             * Credit: the rule and the reasoning come from #1544 on main; this keeps
+             * them through the merge. (It used to be worse: the API projected a
+             * default colour onto these rows, so the swatch was announced "Yellow".
+             * It no longer does — see F-5769c9 — but the row still must not draw a
+             * highlight's furniture.) */
             const unanchored = row.position_type === 'unanchored';
             const quoteName = (unanchored ? row.note_text || '' : row.highlighted_text).slice(0, 60);
             /* Announcing a note as "Select highlight" is the same category error in the
@@ -268,7 +307,11 @@ export function Annotations({ id }: { id: string }) {
                 if (selecting) toggle(row.annotation_id);
               }}>
               {selecting && <label className={styles.rowSelect} onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected.has(row.annotation_id)} onChange={() => toggle(row.annotation_id)} aria-label={selectLabel} /><span className={styles.srOnly}>{selectLabel}</span></label>}
-              {!unanchored && <span className={styles.bar} role="img" aria-label={colorName(row.highlight_color)} style={{ background: COLOR_HEX[row.highlight_color || 'yellow'] || COLOR_HEX.yellow }} />}
+              {/* A colour we cannot name gets the neutral, not yellow: this swatch is
+                  LABELLED, so painting yellow under an "Unknown color" label would tell a
+                  sighted user one thing and a screen-reader user another. */}
+              {!unanchored && <span className={styles.bar} role="img" aria-label={colorName(row.highlight_color)}
+                style={{ background: (row.highlight_color && COLOR_HEX[row.highlight_color]) || 'var(--border)' }} />}
               <div className={styles.body}>
                 {!unanchored && <blockquote className={styles.quote}>{row.highlighted_text}</blockquote>}{row.note_text && <p className={styles.note}>{row.note_text}</p>}
                 <div className={styles.meta}><span>{sourceLabel(row.source)}</span><span aria-hidden="true">·</span>

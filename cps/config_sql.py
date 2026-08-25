@@ -104,6 +104,11 @@ class _Settings(_Base):
     config_use_https = Column(Boolean, default=False)
     config_kobo_sync = Column(Boolean, default=False)
     config_kobo_sync_magic_shelves = Column(Boolean, default=False)
+    # Stage 0 only stores this opt-in. Reading-services ownership remains with
+    # the existing proxy/containment paths until a later rollout stage.
+    config_kobo_two_way_annotation_sync = Column(
+        Boolean, nullable=False, default=False, server_default=text("0"),
+    )
 
     # Canonical server-wide Hardcover enable flag. Before fork #900,
     # auto-fetch had a second flag in cwa.db; the migration marker makes the
@@ -156,6 +161,12 @@ class _Settings(_Base):
     config_kobo_cover_padding_color = Column(String, default="")
     config_kobo_prefer_kepub = Column(Boolean, default=True)
     config_kobo_kepub_backfill_completed = Column(Boolean, default=False)
+    # Legacy #1647 watermark retained only for schema/rollback compatibility.
+    # It is deliberately not read: SQLite can reuse KoboSyncedBooks INTEGER
+    # PRIMARY KEY values after deletes, so max(id) is not a monotonic work-set.
+    config_kobo_kepub_backfill_watermark = Column(Integer, default=0)
+    # Versioned repair gates can advance without accumulating one-off booleans.
+    config_kobo_kepub_package_repair_version = Column(Integer, default=0)
 
     # Fork #225 (@froggybottomboys): admin-set server-wide announcement
     # banner. Empty string = no banner. Layout.html renders the banner
@@ -193,6 +204,9 @@ class _Settings(_Base):
     config_calibre = Column(String)
     config_rarfile_location = Column(String, default=None)
     config_upload_formats = Column(String, default=','.join(constants.EXTENSIONS_UPLOAD))
+    # One-time append of the fork #1608 LCPL default to existing rows. A
+    # dedicated marker preserves any later user removal of lcpl.
+    config_upload_formats_lcpl_migrated = Column(Boolean, default=False)
     config_unicode_filename = Column(Boolean, default=False)
     config_embed_metadata = Column(Boolean, default=True)
 
@@ -204,6 +218,7 @@ class _Settings(_Base):
     config_ldap_auto_create_users = Column(Boolean, default=True)
     config_oauth_redirect_host = Column(String, default='')
     config_disable_standard_login = Column(Boolean, default=False)
+    config_enable_oauth_auto_forward = Column(Boolean, default=False)
     config_enable_oauth_group_admin_management = Column(Boolean, default=True)
 
     schedule_start_time = Column(Integer, default=4)
@@ -296,6 +311,7 @@ class ConfigSQL(object):
         self._fernet = Fernet(secret_key)
         self.cli = cli
         self.load()
+        self.reconcile_lcpl_upload_format()
 
         change = False
 
@@ -563,6 +579,30 @@ class ConfigSQL(object):
             self.config_hardcover_sync_migrated = True
             self.save()
         return self.hardcover_sync_enabled()
+
+    def reconcile_lcpl_upload_format(self):
+        """Inherit LCPL once when an existing allowlist accepts ACSM."""
+        if not bool(getattr(
+                self, "config_upload_formats_lcpl_migrated", False)):
+            raw_formats = getattr(self, "config_upload_formats", "") or ""
+            normalized = []
+            for raw_format in str(raw_formats).split(','):
+                upload_format = raw_format.strip().lower()
+                if upload_format not in normalized:
+                    normalized.append(upload_format)
+
+            # LCPL is Readium's analogue of Adobe's ACSM, so an existing ACSM
+            # entry demonstrates that licence/ticket uploads belong here. If
+            # ACSM was removed or never allowed, preserve the administrator's
+            # list byte-for-byte; LCPL can still be added in Basic Configuration.
+            # The empty allow-all sentinel also remains unchanged.
+            if "acsm" in normalized and "lcpl" not in normalized:
+                normalized.append("lcpl")
+                self.config_upload_formats = ','.join(normalized)
+
+            self.config_upload_formats_lcpl_migrated = True
+            self.save()
+        return self.config_upload_formats
 
     def resolved_comicvine_api_key(self):
         """The install's OWN ComicVine API key, or "" when none is set.

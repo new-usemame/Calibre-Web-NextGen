@@ -37,9 +37,12 @@ from werkzeug.exceptions import HTTPException
 
 from .web import cwa_get_num_books_in_library
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB, INTEGER_SETTINGS, FLOAT_SETTINGS, JSON_SETTINGS
+from cps.cwa_db_loader import load_cwa_db
+_cwa_db_module = load_cwa_db()
+CWA_DB = _cwa_db_module.CWA_DB
+INTEGER_SETTINGS = _cwa_db_module.INTEGER_SETTINGS
+FLOAT_SETTINGS = _cwa_db_module.FLOAT_SETTINGS
+JSON_SETTINGS = _cwa_db_module.JSON_SETTINGS
 from .services.background_scheduler import BackgroundScheduler, DateTrigger
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 # TaskReconnectDatabase deliberately not imported here — the post-ingest
@@ -350,7 +353,8 @@ def cwa_internal_schedule_auto_send():
 
         # Persist scheduled intent in cwa.db
         try:
-            from cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
             db = CWA_DB()
             row_id = db.scheduled_add_autosend(book_id, user_id, run_at_utc_iso, username, title)
         except Exception as e:
@@ -364,7 +368,8 @@ def cwa_internal_schedule_auto_send():
             should_enqueue = True
             try:
                 if row_id is not None:
-                    from cwa_db import CWA_DB
+                    from cps.cwa_db_loader import load_cwa_db
+                    CWA_DB = load_cwa_db().CWA_DB
                     changed = CWA_DB().scheduled_mark_dispatched(int(row_id))
                     # Only enqueue if state actually moved to dispatched (i.e., was not cancelled)
                     should_enqueue = bool(changed)
@@ -383,7 +388,8 @@ def cwa_internal_schedule_auto_send():
         # Persist scheduler job id for cancellation support
         try:
             if row_id is not None and job is not None:
-                from cwa_db import CWA_DB
+                from cps.cwa_db_loader import load_cwa_db
+                CWA_DB = load_cwa_db().CWA_DB
                 CWA_DB().scheduled_update_job_id(int(row_id), str(job.id))
         except Exception as e:
             log.error(f"Failed to store scheduler job id for auto-send: {e}")
@@ -705,7 +711,8 @@ def cwa_scheduled_cancel():
         return jsonify({"error": "Invalid id"}), 400
 
     try:
-        from cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         db = CWA_DB()
         row = db.scheduled_get_by_id(sid)
         if not row:
@@ -744,7 +751,7 @@ def set_cwa_settings():
     cwa_settings = cwa_db.cwa_settings
     previous_koreader_enabled = bool(cwa_settings.get('koreader_sync_enabled', 0))
 
-    ignorable_formats = ['acsm', 'azw', 'azw3', 'azw4', 'cbz',
+    ignorable_formats = ['acsm', 'lcpl', 'azw', 'azw3', 'azw4', 'cbz',
                         'cbr', 'cb7', 'cbc', 'chm',
                         'djvu', 'docx', 'epub', 'fb2',
                         'fbz', 'html', 'htmlz', 'kepub', 'lit',
@@ -1731,7 +1738,8 @@ def debug_stats_data():
 @admin_required
 def cwa_scheduled_upcoming():
     try:
-        from cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         db = CWA_DB()
         rows = db.scheduled_get_upcoming_autosend(limit=100)
         return jsonify({"items": rows}), 200
@@ -2690,7 +2698,7 @@ def get_status():
 @user_login_required
 def user_profiles_json():
     try:
-        json_path = "/config/user_profiles.json"
+        json_path = constants.USER_PROFILES_JSON
         with open(json_path, "r") as file:
             data = json.load(file)
         return jsonify(data)
@@ -2767,7 +2775,7 @@ def set_profile_picture():
 
         try:
             # Path to the JSON file
-            json_path = "/config/user_profiles.json"
+            json_path = constants.USER_PROFILES_JSON
             log.debug(f"Opening JSON file at: {json_path}")
 
             # Read the existing data from the JSON file and update it

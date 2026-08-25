@@ -1013,15 +1013,18 @@ $(function() {
         });
     });
 
-    $("#config_submit").click(function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.blur();
+    function submitConfigForm($form, submitter) {
         window.scrollTo({top: 0, behavior: 'smooth'});
         var request_path = "/admin/ajaxconfig";
+        var formData = $form.serialize();
+        if (submitter && submitter.name) {
+            var submitterData = {};
+            submitterData[submitter.name] = submitter.value;
+            formData += (formData ? "&" : "") + $.param(submitterData);
+        }
         $("#flash_success").remove();
         $("#flash_danger").remove();
-        $.post(getPath() + request_path, $(this).closest("form").serialize(), function(data) {
+        $.post(getPath() + request_path, formData, function(data) {
             $('#config_upload_formats').val(data.config_upload);
             if(data.reboot) {
                 $("#spinning_success").show();
@@ -1044,6 +1047,17 @@ $(function() {
                 handle_response(data.result);
             }
         });
+    }
+
+    $("#config_form").submit(function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        submitConfigForm($(this));
+    });
+
+    $("#kobo_kepub_backfill").click(function() {
+        this.blur();
+        submitConfigForm($(this).closest("form"), this);
     });
 
     $("#delete_shelf").click(function(event) {

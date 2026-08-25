@@ -34,6 +34,7 @@ import service_user
 # no-op fallback so callsites that reference these names work even if
 # the lazy load hasn't happened yet (or fails in a test environment).
 _calibre_plugins = None
+_normalize_kepub_package = None
 _CPS_ROOT = str(app_paths.app_root())
 
 # Anchor for the shared conversion budget (#1094). Bound at import so it
@@ -64,7 +65,7 @@ def _load_fork_cps_imports() -> None:
     @navels' fast-exit design. Safe to call multiple times; both
     rebinds are idempotent.
     """
-    global _calibre_plugins, metadata_db_write_lock
+    global _calibre_plugins, metadata_db_write_lock, _normalize_kepub_package
 
     if _CPS_ROOT not in sys.path:
         sys.path.insert(0, _CPS_ROOT)
@@ -80,6 +81,14 @@ def _load_fork_cps_imports() -> None:
         metadata_db_write_lock = _module_lock
     except ImportError:
         metadata_db_write_lock = _noop_metadata_db_write_lock
+
+    try:
+        from cps.services.kepub_package_normalizer import (
+            normalize_kepub_package as _module_normalize,
+        )
+        _normalize_kepub_package = _module_normalize
+    except ImportError:
+        _normalize_kepub_package = None
 
 
 # Retry calibredb add on transient "database is locked" / BusyError.
@@ -146,6 +155,7 @@ fetch_and_apply_metadata = None
 TaskAutoSend = None
 WorkerThread = None
 _ub = None
+_uploader = None
 CWA_DB = None
 EPUBFixer = None
 audiobook = None
@@ -358,7 +368,7 @@ def _load_runtime_dependencies() -> None:
 
 def _load_optional_cps_modules() -> None:
     global _GDRIVE_AVAILABLE, _CPS_AVAILABLE
-    global _gdriveutils, _cps_config, fetch_and_apply_metadata, TaskAutoSend, WorkerThread, _ub
+    global _gdriveutils, _cps_config, fetch_and_apply_metadata, TaskAutoSend, WorkerThread, _ub, _uploader
 
     if _GDRIVE_AVAILABLE and _CPS_AVAILABLE:
         return
@@ -390,12 +400,14 @@ def _load_optional_cps_modules() -> None:
             from cps.tasks.auto_send import TaskAutoSend as LoadedTaskAutoSend
             from cps.services.worker import WorkerThread as LoadedWorkerThread
             from cps import ub as loaded_ub
+            from cps import uploader as loaded_uploader
             from cps.calibre_init import init_calibre_db_from_app_db
             init_calibre_db_from_app_db(get_app_db_path())
             fetch_and_apply_metadata = loaded_fetch_and_apply_metadata
             TaskAutoSend = LoadedTaskAutoSend
             WorkerThread = LoadedWorkerThread
             _ub = loaded_ub
+            _uploader = loaded_uploader
             _CPS_AVAILABLE = True
             print("[ingest-processor] Auto-send and metadata functionality available", flush=True)
         except ImportError as e:
@@ -404,6 +416,7 @@ def _load_optional_cps_modules() -> None:
             TaskAutoSend = None
             WorkerThread = None
             _ub = None
+            _uploader = None
             _CPS_AVAILABLE = False
 
     except Exception as e:
@@ -599,11 +612,15 @@ def get_internal_api_headers():
     return {"X-Forwarded-For": "127.0.0.1"}
 
 def get_ingest_batch_dirty_file() -> str:
-    return os.environ.get("CWA_INGEST_BATCH_DIRTY_FILE", "/config/cwa_ingest_batch_dirty")
+    return os.environ.get("CWA_INGEST_BATCH_DIRTY_FILE") or str(
+        app_paths.config_dir() / "cwa_ingest_batch_dirty"
+    )
 
 
 def get_ingest_batch_active_file() -> str:
-    return os.environ.get("CWA_INGEST_BATCH_ACTIVE_FILE", "/config/cwa_ingest_batch_active")
+    return os.environ.get("CWA_INGEST_BATCH_ACTIVE_FILE") or str(
+        app_paths.config_dir() / "cwa_ingest_batch_active"
+    )
 
 
 def mark_ingest_batch_dirty() -> None:
@@ -799,7 +816,22 @@ _CONVERSION_FAILURE_GUIDANCE = {
         "the downloaded EPUB/PDF into the ingest folder instead. The original file "
         "has been moved to the failed books folder (processed_books/failed)."
     ),
+    'lcpl': (
+        "LCPL_NOTICE: '{filename}' is a Readium LCP licence file, not an ebook — "
+        "fulfilling it requires an LCP-capable Calibre plugin. If Calibre attempted "
+        "fulfilment and one is installed, its own output appears above this line and "
+        "explains why fulfilment failed. Your "
+        "recovery options are: (1) set CWA_CALIBRE_USER_PLUGINS=true and place the "
+        "plugin zip in /config/.config/calibre/plugins (see the 'Calibre plugins' "
+        "section of the README), or (2) fulfil the licence in an LCP-capable desktop "
+        "reader, then drop the resulting EPUB/PDF into the ingest folder instead. "
+        "The original file has been moved to the failed books folder "
+        "(processed_books/failed)."
+    ),
 }
+
+# Unlike ACSM's #984 refinement, LCPL has no marker-based branch because no
+# real LCP plugin output markers have been measured; add one only with evidence.
 
 
 # fork #984: the guidance above is right only when no ACSM plugin is present.
@@ -823,6 +855,50 @@ _ACSM_PLUGIN_RAN_GUIDANCE = (
     "the downloaded EPUB/PDF into the ingest folder instead. The original file "
     "has been moved to the failed books folder (processed_books/failed)."
 )
+
+
+def stamp_books_with_import_time(connection, book_ids, now=None):
+    """Set ``books.timestamp`` to the import time for every freshly added book.
+
+    ``calibredb add`` derives ``timestamp`` from the file's own metadata, which
+    for most EPUBs is the publication date and can be years old. Left alone, a
+    book imported today lands wherever its publication date falls in "Newest"
+    rather than at the top, which is fork #1331 as @Oakwhisper described it: one
+    book added that day, sitting in the middle of the list.
+
+    One ``calibredb add`` can report several ids — ``_parse_added_book_ids``
+    handles ``Added book ids: 4, 5`` precisely because that happens — so every
+    id from the run needs the same correction. Stamping only the last one leaves
+    the rest of the batch carrying publication dates, which is what made the
+    ordering look arbitrary rather than simply wrong.
+
+    :param connection: Open sqlite3 connection to ``metadata.db`` with the
+        ``title_sort`` function registered, since updating ``books`` fires a
+        trigger that calls it.
+    :param book_ids: The ids ``calibredb add`` reported. ``None`` entries and
+        duplicates are ignored; a non-integer id is skipped rather than raising.
+    :param now: Timestamp to write, in calibre's stored format. Defaults to the
+        current time.
+    :return: Number of rows updated.
+    """
+    ids = set()
+    for book_id in book_ids or []:
+        try:
+            ids.add(int(book_id))
+        except (TypeError, ValueError):
+            continue
+    if not ids:
+        return 0
+    if now is None:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00")
+    ordered = sorted(ids)
+    placeholders = ",".join("?" * len(ordered))
+    cur = connection.cursor()
+    cur.execute(
+        "UPDATE books SET timestamp = ? WHERE id IN ({})".format(placeholders),
+        [now, *ordered],
+    )
+    return cur.rowcount
 
 
 def _acsm_plugin_failure_reason(converter_output):
@@ -946,9 +1022,14 @@ def _run_converter_streaming(cmd, env, timeout=None):
 
 # fork #1094: formats where a failed conversion means "this was never a book".
 # Importing the original rescues a real book whose conversion failed, but for
-# these it would file a junk entry — an .acsm is an Adobe fulfillment ticket,
-# and the guidance above promises the user it went to processed_books/failed.
-_NOT_A_BOOK_FORMATS = frozenset({'acsm'})
+# these it would file a junk entry — .acsm is an Adobe fulfilment ticket and
+# .lcpl a Readium LCP licence; backup("failed") preserves either in that folder.
+_NOT_A_BOOK_FORMATS = frozenset({'acsm', 'lcpl'})
+
+
+def is_a_book_format(input_format) -> bool:
+    """False for formats that are tickets/licences rather than books."""
+    return (input_format or '').lower() not in _NOT_A_BOOK_FORMATS
 
 
 def is_rescuable_on_conversion_failure(input_format) -> bool:
@@ -958,7 +1039,7 @@ def is_rescuable_on_conversion_failure(input_format) -> bool:
     whether the file is a readable book. False for formats that are not
     books at all, where the original is a ticket or container.
     """
-    return (input_format or '').lower() not in _NOT_A_BOOK_FORMATS
+    return is_a_book_format(input_format)
 
 
 def conversion_failure_guidance(input_format, filename, converter_output=None):
@@ -985,6 +1066,29 @@ def conversion_failure_guidance(input_format, filename, converter_output=None):
             return _ACSM_PLUGIN_RAN_GUIDANCE.format(
                 filename=filename, reason=reason)
     return template.format(filename=filename)
+
+
+def _fail_not_a_book_input(processor, filepath) -> None:
+    """Preserve a ticket/licence and explain why it was not imported."""
+    if processor.backup(filepath, backup_type="failed"):
+        _remove_completed_import_manifest(filepath)
+    guidance = conversion_failure_guidance(
+        processor.input_format, processor.filename
+    )
+    if guidance:
+        print(f"\n[ingest-processor]: {guidance}\n", flush=True)
+
+
+def _remove_completed_import_manifest(filepath) -> None:
+    """Remove only a successfully handled browser-upload import sidecar."""
+    manifest_path = filepath + ".cwa.json"
+    try:
+        with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
+            manifest = json.load(manifest_file)
+        if isinstance(manifest, dict) and manifest.get("action") == "import":
+            os.remove(manifest_path)
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        pass
 
 
 class NewBookProcessor:
@@ -1027,7 +1131,7 @@ class NewBookProcessor:
 
         # Formats
         self.supported_book_formats = {
-            'acsm','azw','azw3','azw4','cbz','cbr','cb7','cbc','chm','djvu','docx','epub','fb2','fbz','html','htmlz','kepub','kfx','kfx-zip','lit','lrf','mobi','odt','pdf','prc','pdb','pml','rb','rtf','snb','tcr','txtz','txt'
+            'acsm','lcpl','azw','azw3','azw4','cbz','cbr','cb7','cbc','chm','djvu','docx','epub','fb2','fbz','html','htmlz','kepub','kfx','kfx-zip','lit','lrf','mobi','odt','pdf','prc','pdb','pml','rb','rtf','snb','tcr','txtz','txt'
         }
         self.hierarchy_of_success = {
             'epub','kepub','lit','mobi','azw','azw3','fb2','fbz','azw4','prc','odt','lrf','pdb','cbz','pml','rb','cbr','cb7','cbc','chm','djvu','snb','tcr','pdf','docx','rtf','html','htmlz','txtz','txt'
@@ -1168,6 +1272,105 @@ class NewBookProcessor:
         except Exception as e:
             print(f"[ingest-processor] WARN: Could not register title_sort function: {e}", flush=True)
             return False
+
+    def _fix_unicode_path(self, book_id: int) -> None:
+        """Rename the path calibredb add generated with ascii_filename() to the
+        CWA-canonical form produced by get_valid_filename_shared().
+
+        calibredb always uses its internal ascii_filename() UDF when constructing
+        on-disk paths, which transliterates Unicode (e.g. CJK characters) to
+        romanized ASCII regardless of any preference. For example, a book by
+        小野不由美 lands at Xiao Ye Bu You Mei/... on disk even when the library
+        is configured for Unicode filenames.
+
+        CWA's web-UI edit/save path already calls get_valid_filename_shared() and
+        preserves Unicode. This method applies the same logic immediately after
+        calibredb add so ingest and the web UI produce consistent paths.
+        """
+        try:
+            _ensure_project_root_on_path()
+            from cps.utils.filename_sanitizer import get_valid_filename_shared
+        except ImportError as e:
+            print(f"[ingest-processor] WARN: filename_sanitizer unavailable; skipping path fix: {e}", flush=True)
+            return
+
+        try:
+            with sqlite3.connect(get_app_db_path(), timeout=30) as con:
+                row = con.execute(
+                    "SELECT config_unicode_filename FROM settings LIMIT 1"
+                ).fetchone()
+            unicode_filename = bool(row[0]) if row and row[0] is not None else False
+        except Exception as e:
+            print(f"[ingest-processor] WARN: Could not read unicode_filename setting; skipping path fix: {e}", flush=True)
+            return
+
+        if unicode_filename:
+            return  # user wants ASCII filenames; calibredb already produced them
+
+        try:
+            with sqlite3.connect(self.metadata_db, timeout=30) as con:
+                if not self._register_title_sort_function(con):
+                    print(f"[ingest-processor] INFO: Skipping path fix for book {book_id} (title_sort unavailable).", flush=True)
+                    return
+                cur = con.cursor()
+                row = cur.execute(
+                    """SELECT b.title, b.path,
+                              (SELECT a.name FROM authors a
+                               JOIN books_authors_link l ON a.id = l.author
+                               WHERE l.book = b.id ORDER BY l.id ASC LIMIT 1)
+                       FROM books b WHERE b.id = ?""",
+                    (book_id,),
+                ).fetchone()
+                if not row:
+                    return
+                title, old_path, first_author = row
+                first_author = first_author or "Unknown"
+
+                try:
+                    author_dir = get_valid_filename_shared(first_author, chars=96)
+                    title_dir  = get_valid_filename_shared(title, chars=96)
+                    new_name   = (get_valid_filename_shared(title, chars=42)
+                                  + " - "
+                                  + get_valid_filename_shared(first_author, chars=42))
+                except ValueError as e:
+                    print(f"[ingest-processor] WARN: Skipping path fix for book {book_id}: invalid filename: {e}", flush=True)
+                    return
+
+                new_path = f"{author_dir}/{title_dir} ({book_id})"
+                if old_path == new_path:
+                    return  # already correct (ASCII-only title/author, or already fixed)
+
+                data_rows = cur.execute(
+                    "SELECT id, name, format FROM data WHERE book = ?", (book_id,)
+                ).fetchall()
+
+                old_abs = os.path.join(self.library_dir, old_path)
+                new_abs = os.path.join(self.library_dir, new_path)
+
+                if os.path.exists(old_abs):
+                    os.makedirs(os.path.dirname(new_abs), exist_ok=True)
+                    shutil.move(old_abs, new_abs)
+                elif not os.path.exists(new_abs):
+                    print(f"[ingest-processor] WARN: Path fix skipped for book {book_id}: directory not found at {old_abs!r}", flush=True)
+                    return
+
+                for data_id, old_name, fmt in data_rows:
+                    ext = fmt.lower()
+                    src = os.path.join(new_abs, f"{old_name}.{ext}")
+                    dst = os.path.join(new_abs, f"{new_name}.{ext}")
+                    if src != dst and os.path.exists(src):
+                        shutil.move(src, dst)
+                    cur.execute("UPDATE data SET name = ? WHERE id = ?", (new_name, data_id))
+
+                cur.execute("UPDATE books SET path = ? WHERE id = ?", (new_path, book_id))
+                print(
+                    f"[ingest-processor] INFO: Fixed path for book {book_id}: "
+                    f"{old_path!r} → {new_path!r}",
+                    flush=True,
+                )
+        except Exception as e:
+            print(f"[ingest-processor] WARN: Failed to fix path for book {book_id}: {e}", flush=True)
+
     def get_split_library(self) -> dict[str, str] | None:
         """Checks whether or not the user has split library enabled. Returns None if they don't and the path of the Split Library location if True."""
         app_db_path = get_app_db_path()
@@ -1285,9 +1488,11 @@ class NewBookProcessor:
             # Name the absolute directory: "moved to failed backup" on its own
             # left users with nowhere to look (#1094).
             print(f"[ingest-processor]: Saved a copy of {os.path.basename(input_file)} to {output_path}", flush=True)
+            return True
         except Exception as e:
             # Never let backups crash ingest; just log the problem
             print(f"[ingest-processor]: ERROR - Failed to backup '{input_file}' to '{output_path}': {e}")
+            return False
 
 
     def convert_book(self, end_format=None) -> tuple[bool, str]:
@@ -1480,8 +1685,84 @@ class NewBookProcessor:
         return False # Timeout reached
 
 
+    _COMIC_INGEST_EXTENSIONS = {'.cbz', '.cbt', '.cbr', '.cb7'}
+
+    def _comic_calibredb_metadata_args(self, staged_path) -> list:
+        """Read embedded ComicInfo.xml/CBI metadata so a tagged comic imports
+        with its real title/series/authors instead of calibredb's bare
+        filename guess. The ingest watcher never called cps.uploader.process
+        (the same reader the manual web-upload path already uses), so a
+        comic tagged by ComicTagger/Kapowarr/Mylar3 lost that metadata on
+        auto-ingest even though the identical file uploaded by hand kept it.
+
+        strict=True (see uploader.process docstring) means an untagged
+        comic gets no calibredb flags here and falls through to the
+        existing filename/web-lookup behavior, unchanged.
+        """
+        if Path(staged_path).suffix.lower() not in self._COMIC_INGEST_EXTENSIONS:
+            return []
+        if not _CPS_AVAILABLE or _uploader is None:
+            return []
+
+        try:
+            rar_executable = getattr(_cps_config, 'config_rarfile_location', '') if _cps_config else ''
+            meta = _uploader.process(
+                str(staged_path),
+                Path(staged_path).stem,
+                Path(staged_path).suffix,
+                rar_executable,
+                no_cover=True,
+                strict=True,
+            )
+        except Exception as e:
+            print(f"[ingest-processor] WARN: Could not read embedded comic metadata from "
+                  f"{staged_path}: {e}", flush=True)
+            return []
+
+        args = []
+        if meta.title:
+            args += ["--title", meta.title]
+        if meta.author:
+            args += ["--authors", meta.author]
+        if meta.series:
+            args += ["--series", meta.series]
+            # Issue numbers ("1A", "Annual 1", "½") aren't always numeric;
+            # calibredb --series-index requires a number, so drop a value
+            # it would reject rather than fail the whole import over it.
+            if meta.series_id:
+                try:
+                    float(meta.series_id)
+                    args += ["--series-index", str(meta.series_id)]
+                except ValueError:
+                    pass
+        if meta.languages:
+            args += ["--languages", meta.languages]
+        return args
+
 
     def add_book_to_library(self, book_path:str, text: bool=True, format: str="text" ) -> None:
+        # Normalize a KEPUB before it enters the library (#1715). Every ingest
+        # route lands here -- kepubify output, a file already in the target
+        # format, and a format the user told CWA not to convert -- and none of
+        # them normalized, so a Kobo would derive each chapter's id from the TOC
+        # entry verbatim, fragment included, and file every highlight made there
+        # under an id no spine row carries. The repair task cannot cover for this:
+        # it is one-shot per REPAIR_VERSION.
+        # This is a new-book boundary, so it explicitly opts into spine
+        # splitting. Existing-library repair keeps the default disabled.
+        # Non-fatal by design: normalize_kepub_package logs and returns None with
+        # the archive untouched, and importing an un-normalized KEPUB beats
+        # refusing the ingest.
+        if os.path.splitext(book_path)[1].lower() == ".kepub":
+            if _normalize_kepub_package is None:
+                _load_optional_cps_modules()
+            if _normalize_kepub_package is not None:
+                try:
+                    _normalize_kepub_package(book_path, split_chapters=True)
+                except Exception as e:
+                    print(f"[ingest-processor] WARN: could not normalize KEPUB "
+                          f"{book_path}: {e}", flush=True)
+
         # If kindle-epub-fixer is on, run it first and import the *fixed* file.
         if self.target_format == "epub" and self.is_kindle_epub_fixer:
             fixed_epub_path = Path(self.tmp_conversion_dir) / os.path.basename(book_path)
@@ -1534,13 +1815,14 @@ class NewBookProcessor:
             # Required for fork #192 — without it, mergerfs/SMB/NFS
             # POSIX-lock weakness lets apsw.BusyError poison the import.
             if text:
+                comic_meta_args = self._comic_calibredb_metadata_args(staged_path)
                 with metadata_db_write_lock():
                     result = _run_calibredb_add_with_retry(
                         cmd=[
                             "calibredb", "add", str(staged_path),
                             "--automerge", self.cwa_settings['auto_ingest_automerge'],
                             f"--library-path={self.library_dir}",
-                        ],
+                        ] + comic_meta_args,
                         env=self.calibre_env,
                     )
                 added_ids = self._parse_added_book_ids((result.stdout or '') + '\n' + (result.stderr or ''))
@@ -1619,6 +1901,11 @@ class NewBookProcessor:
             else:
                 self.fetch_metadata_if_enabled(staged_path.stem)
 
+            # Fix paths garbled by calibredb add's ascii_filename() transliteration.
+            # Runs after fetch_metadata so any author-name update is already in the DB.
+            if self.last_added_book_id is not None:
+                self._fix_unicode_path(self.last_added_book_id)
+
             # Trigger auto-send for users who have it enabled
             if self.last_added_book_id is not None:
                 self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path)
@@ -1639,16 +1926,21 @@ class NewBookProcessor:
             # so they appear at the top of "Recently Added" views.
             # calibredb sets timestamp from EPUB metadata (publication date), which can be
             # years in the past, making new imports invisible in recently-added sorting.
-            if self.last_added_book_id is not None:
+            # Every id from this add, not just the last: one add can report
+            # several (see _parse_added_book_ids), and any id left unstamped
+            # keeps the publication date calibredb gave it (fork #1331).
+            imported_ids = self.last_added_book_ids or (
+                [self.last_added_book_id] if self.last_added_book_id is not None else []
+            )
+            if imported_ids:
                 try:
                     with sqlite3.connect(self.metadata_db, timeout=30) as con:
                         if not self._register_title_sort_function(con):
                             print("[ingest-processor] INFO: Skipping timestamp adjust (title_sort SQL function unavailable).", flush=True)
                         else:
-                            cur = con.cursor()
                             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00")
-                            cur.execute('UPDATE books SET timestamp = ? WHERE id = ?', (now, self.last_added_book_id))
-                            print(f"[ingest-processor] INFO: Set timestamp to {now} for newly imported book id={self.last_added_book_id}.", flush=True)
+                            affected = stamp_books_with_import_time(con, imported_ids, now)
+                            print(f"[ingest-processor] INFO: Set timestamp to {now} for {affected} newly imported book(s): {imported_ids}.", flush=True)
                 except Exception as e:
                     print(f"[ingest-processor] WARN: Failed to set timestamp for new book: {e}", flush=True)
 
@@ -2117,8 +2409,11 @@ def main(filepath=None):
                     if book_id > -1:
                         # Validate book exists before attempting add_format
                         if nbp._validate_book_exists(book_id):
-                            nbp.add_format_to_book(book_id, filepath)
-                            success = True
+                            if is_a_book_format(nbp.input_format):
+                                nbp.add_format_to_book(book_id, filepath)
+                                success = True
+                            else:
+                                _fail_not_a_book_input(nbp, filepath)
                         else:
                             print(f"[ingest-processor] ERROR: Book ID {book_id} not found in library for {os.path.basename(filepath)}", flush=True)
                             nbp.backup(filepath, backup_type="failed")
@@ -2154,8 +2449,11 @@ def main(filepath=None):
             return 0
 
         if nbp.is_target_format: # File can just be imported
-            print(f"\n[ingest-processor]: No conversion needed for {nbp.filename}, importing now...", flush=True)
-            nbp.add_book_to_library(filepath)
+            if is_a_book_format(nbp.input_format):
+                print(f"\n[ingest-processor]: No conversion needed for {nbp.filename}, importing now...", flush=True)
+                nbp.add_book_to_library(filepath)
+            else:
+                _fail_not_a_book_input(nbp, filepath)
         elif nbp.is_supported_audiobook():
             print(f"\n[ingest-processor]: No conversion needed for {nbp.filename}, is audiobook, importing now...", flush=True)
             nbp.add_book_to_library(filepath, False, Path(nbp.filename).suffix)
@@ -2169,8 +2467,11 @@ def main(filepath=None):
                 conversion_attempted = False
 
                 if nbp.input_format in nbp.convert_ignored_formats: # File could be converted & the converter is activated but the user has specified files of this format should not be converted
-                    print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
-                    nbp.add_book_to_library(filepath)
+                    if is_a_book_format(nbp.input_format):
+                        print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
+                        nbp.add_book_to_library(filepath)
+                    else:
+                        _fail_not_a_book_input(nbp, filepath)
                     convert_successful = False
                 elif nbp.target_format == "kepub": # File is not in the convert ignore list and target is kepub, so we start the kepub conversion process
                     conversion_attempted = True
@@ -2213,8 +2514,11 @@ def main(filepath=None):
                     nbp.add_book_to_library(filepath)
 
             elif nbp.can_convert and not nbp.auto_convert_on: # Books not in target format but Auto-Converter is off so files are imported anyway
-                print(f"\n[ingest-processor]: {nbp.filename} not in target format but CWA Auto-Convert is deactivated so importing the file anyway...", flush=True)
-                nbp.add_book_to_library(filepath)
+                if is_a_book_format(nbp.input_format):
+                    print(f"\n[ingest-processor]: {nbp.filename} not in target format but CWA Auto-Convert is deactivated so importing the file anyway...", flush=True)
+                    nbp.add_book_to_library(filepath)
+                else:
+                    _fail_not_a_book_input(nbp, filepath)
             else:
                 print(f"[ingest-processor]: Cannot convert {nbp.filepath}. {nbp.input_format} is currently unsupported / is not a known ebook format.", flush=True)
 

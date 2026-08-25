@@ -86,13 +86,19 @@ export function BookCard({
             the WCAG pass: it announces the badge once, rather than letting the
             icon and the adjacent text be read as two separate things. Keep it
             even now that the label is visible. */}
-        {book.read && (
+        {book.in_progress ? (
+          <span className={styles.readingBadge} role="img" aria-label={t('Reading')}
+            data-testid="reading-badge">
+            <BookOpen size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
+            {t('Reading')}
+          </span>
+        ) : book.read ? (
           <span className={styles.readBadge} role="img" aria-label={t('Read')}
             data-testid="read-badge">
             <Check size={13} strokeWidth={3} aria-hidden="true" focusable={false} />
             {t('Read')}
           </span>
-        )}
+        ) : null}
         {book.hidden && (
           <span className={styles.hiddenBadge} role="img" aria-label={t('Hidden')}
             data-testid="hidden-book-badge">
@@ -118,12 +124,18 @@ export function BookCard({
     </div>
   );
 
+  // dir="auto" per field, not once on the card (#1073, reported by @raphaelbahat).
+  // The browser picks direction from the first strong directional character in
+  // THAT string, so a Hebrew title above an English author renders each the right
+  // way round. A single card-level or book-level flag has to be wrong about one
+  // of them, and keying off the book's language metadata would miss the many
+  // libraries that leave language unset — which is the case in the report.
   const info = (
     <div className={styles.info}>
-      <p className={styles.title}>{book.title}</p>
-      <p className={styles.author}>{authorStr}</p>
+      <p className={styles.title} dir="auto">{book.title}</p>
+      <p className={styles.author} dir="auto">{authorStr}</p>
       {seriesLine && (
-        <p className={styles.series} data-testid="book-card-series">{seriesLine}</p>
+        <p className={styles.series} dir="auto" data-testid="book-card-series">{seriesLine}</p>
       )}
     </div>
   );

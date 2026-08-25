@@ -41,6 +41,7 @@ def _load_duplicates_module():
     _install_stub("cps.csrf", {"exempt": lambda f: f})
     _install_stub("cps.config")
     _install_stub("cps.helper")
+    _install_stub("cps.user_book_data")
 
     _install_stub("cps.services")
     _install_stub(
@@ -89,7 +90,15 @@ def _load_duplicates_module():
         },
     )
     _install_stub("flask_babel", {"gettext": lambda text: text})
-    _install_stub("sqlalchemy", {"func": object(), "and_": lambda *args, **kwargs: None, "case": lambda *args, **kwargs: None})
+    _install_stub(
+        "sqlalchemy",
+        {
+            "func": object(),
+            "and_": lambda *args, **kwargs: None,
+            "case": lambda *args, **kwargs: None,
+            "or_": lambda *args, **kwargs: None,
+        },
+    )
     _install_stub("sqlalchemy.sql")
     _install_stub("sqlalchemy.sql.expression", {"true": True, "false": False})
     _install_stub("sqlalchemy.orm", {"joinedload": lambda *args, **kwargs: None})
@@ -98,7 +107,8 @@ def _load_duplicates_module():
         def __init__(self):
             self.cwa_settings = {}
 
-    _install_stub("cwa_db", {"CWA_DB": _CWA_DB})
+    cwa_db = _install_stub("cwa_db", {"CWA_DB": _CWA_DB})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db})
 
     duplicates_path = pathlib.Path(__file__).resolve().parents[2] / "cps" / "duplicates.py"
     spec = importlib.util.spec_from_file_location("cps.duplicates", duplicates_path)

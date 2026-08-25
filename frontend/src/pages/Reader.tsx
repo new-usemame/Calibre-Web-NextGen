@@ -4,6 +4,7 @@ import ePub from 'epubjs';
 import {
   ChevronLeft, ChevronRight, X, List, Sun, Moon, Coffee, Loader2, Trash2,
   SlidersHorizontal, StickyNote, Highlighter, MoonStar, Maximize, Minimize,
+  Search,
 } from 'lucide-react';
 import {
   type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
@@ -16,6 +17,10 @@ import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import {
+  DEFAULT_HIT_CAP, MIN_QUERY_LENGTH, searchBook, type SearchHit,
+} from '../lib/reader/searchBook';
+import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
 import styles from './Reader.module.css';
 
 // Highlight colors as ARIA/label keys (SC 1.4.1: a color must never be conveyed
@@ -23,10 +28,20 @@ import styles from './Reader.module.css';
 const HILITE_ORDER = ['yellow', 'green', 'blue', 'red'] as const;
 type HiliteColor = (typeof HILITE_ORDER)[number];
 
-// Highlight colors (match the legacy/Kobo set). Rendered semi-transparent.
+// Fill for a highlight the reader RENDERS. Wider than HILITE_ORDER on purpose:
+// the palette the reader OFFERS is four colours, but a Kobo can hand us pink or
+// grey (F-5769c9) and those have to paint as themselves rather than fall
+// through to yellow. Rendered semi-transparent.
 const HILITE_FILL: Record<string, string> = {
   yellow: '#e6c34a', red: '#d9534f', green: '#5cb85c', blue: '#5b9bd5',
+  pink: '#e8afcf', grey: '#a0a0a0',
 };
+
+// What an unknown or absent colour paints as. Deliberately NOT a palette entry:
+// a highlight still has to be visible, but falling back to yellow would make a
+// colour we could not resolve indistinguishable from one the reader really did
+// choose — the invented-colour bug this file's server side stopped doing.
+const UNKNOWN_FILL = '#d0cbc2';
 
 type ReaderTheme = 'light' | 'sepia' | 'dark' | 'black';
 
@@ -45,6 +60,10 @@ interface AnnRow {
   /** 'webreader' | 'kobo' | 'koreader' | null — shown so a device highlight is
    *  identifiable, and because only some origins carry a usable CFI. */
   source: string | null;
+  /** Public id of the device that MADE this highlight, or null. Resolved
+   *  against the `devices` map in the same response — never rendered raw, and
+   *  never used to filter: see the loader below. */
+  origin_device_id?: string | null;
   /** 'cfi' | 'pdf_quad' | 'comic_page' | 'koreader_xpointer' | 'unanchored' |
    *  null. Only 'unanchored' concerns this list: such a row is a note ABOUT the
    *  book with no passage attached, so it must not be drawn as a highlight that
@@ -177,6 +196,13 @@ export function Reader({ id }: { id: string }) {
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const tocRef = useRef<HTMLElement>(null);
+  const searchRef = useRef<HTMLElement>(null);
+  const searchFieldRef = useRef<HTMLInputElement>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  // The in-flight scan, so the next one can wait for it to finish touching the
+  // book's shared spine items. See the search effect for why abort alone is not
+  // enough.
+  const searchRunRef = useRef<Promise<unknown> | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   // Edit/remove popover for an existing highlight (#782). Separate from popRef
@@ -197,6 +223,10 @@ export function Reader({ id }: { id: string }) {
   // data.json on mount so a tapped highlight can show its note without a
   // round-trip, and kept in step with every create/edit/remove.
   const notesRef = useRef<Map<string, string>>(new Map());
+  /* public_id -> label, from the same response as the rows. An OLDER backend
+   * omits the envelope entirely, which is how a client can tell; an empty map
+   * then means every row is simply unlabelled rather than wrong. */
+  const [devices, setDevices] = useState<Record<string, { label?: string }>>({});
   const renditionRef = useRef<any>(null);
   const bookRef = useRef<any>(null);
 
@@ -217,6 +247,29 @@ export function Reader({ id }: { id: string }) {
   const saveFailureAnnounced = useRef(false);
   // Hold the freshest saved CFI so it survives re-renders without re-running the effect.
   const savedCfiRef = useRef<string | null>(null);
+  /*
+   * True while the book sits where a JUMP put it rather than where the reader
+   * read to. Going to a saved highlight is "show me that passage", not "this is
+   * my place now" — but epub.js cannot tell the two apart: `display()` reports a
+   * relocation exactly like a page turn does, and the handler below used to
+   * persist every one of them.
+   *
+   * Two things went wrong because of that. The mild one: tapping a highlight to
+   * re-read it moved the reader's bookmark to the highlight. The severe one:
+   * the same save carries a percentage, and the server finishes a book at
+   * FINISHED_PERCENT_THRESHOLD (99.0, kosync.py) — so opening a highlight in a
+   * book's last pages marked the whole book FINISHED and pushed that on to Kobo
+   * sync and Hardcover. Un-finishing is guarded server-side; wrongly finishing
+   * was not.
+   *
+   * Cleared by the reader's OWN navigation, deliberately not by the next
+   * `relocated` event: one `display()` can report more than once while the
+   * layout settles, and a fix keyed to the first report would quietly persist
+   * the second. Keying on user intent instead means the flag holds however many
+   * events a jump produces, and reading on from the destination still saves --
+   * because at that point the reader really is reading there.
+   */
+  const previewingRef = useRef(false);
 
   const [rendered, setRendered] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
@@ -224,6 +277,13 @@ export function Reader({ id }: { id: string }) {
   const [rtl, setRtl] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
+  const [searchTruncated, setSearchTruncated] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchComplete, setSearchComplete] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [annOpen, setAnnOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Resolved once: whether this browser can do element fullscreen at all.
@@ -269,7 +329,10 @@ export function Reader({ id }: { id: string }) {
     cfiRange: string;
     text: string;
     annotationId?: string;
-    color: HiliteColor;
+    // A string, not HiliteColor: 'create' and 'standalone' seed it from the
+    // four the palette offers, but 'edit' carries whatever the existing
+    // highlight already is, which for an imported one can be pink or grey.
+    color: string;
     note: string;
   } | null>(null);
 
@@ -303,6 +366,12 @@ export function Reader({ id }: { id: string }) {
   const closeActiveHl = useCallback(() => setActiveHl(null), []);
   const closeComposer = useCallback(() => setComposer(null), []);
   const closeAnnDrawer = useCallback(() => setAnnOpen(false), []);
+  const closeSearch = useCallback(() => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    setSearching(false);
+    setSearchOpen(false);
+  }, []);
 
   useFocusTrap(tocRef, { onClose: closeToc, active: tocOpen });
   useFocusTrap(settingsRef, { onClose: closeSettings, active: settingsOpen });
@@ -310,6 +379,13 @@ export function Reader({ id }: { id: string }) {
   useFocusTrap(hlPopRef, { onClose: closeActiveHl, active: !!activeHl });
   useFocusTrap(notePopRef, { onClose: closeComposer, active: !!composer });
   useFocusTrap(annRef, { onClose: closeAnnDrawer, active: annOpen });
+  useFocusTrap(searchRef, { onClose: closeSearch, active: searchOpen });
+
+  // Declared after the trap registration: the trap first establishes the
+  // drawer boundary, then this puts the caret where a search starts.
+  useEffect(() => {
+    if (searchOpen) searchFieldRef.current?.focus();
+  }, [searchOpen]);
 
   /*
    * Land the caret in the note field when the composer opens, so a phone user
@@ -337,6 +413,81 @@ export function Reader({ id }: { id: string }) {
     field.setSelectionRange(field.value.length, field.value.length);
   }, [composer?.mode, composer?.annotationId, composer?.cfiRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Search only after typing settles. Every replacement, close and unmount
+  // aborts the scan so an obsolete full-book walk cannot compete with the next.
+  useEffect(() => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+
+    const query = searchQuery.trim();
+    if (!searchOpen || query.length < MIN_QUERY_LENGTH) {
+      setSearching(false);
+      setSearchHits([]);
+      setSearchTruncated(false);
+      setSearchComplete(false);
+      setSearchError(null);
+      return;
+    }
+
+    setSearching(true);
+    setSearchHits([]);
+    setSearchTruncated(false);
+    setSearchComplete(false);
+    setSearchError(null);
+
+    const timer = window.setTimeout(() => {
+      const epubBook = bookRef.current;
+      if (!epubBook) {
+        setSearching(false);
+        setSearchError(t('Could not search this book.'));
+        return;
+      }
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+      /*
+       * Wait for the previous scan to actually STOP before starting this one.
+       *
+       * Aborting is not stopping. The signal is only checked between sections,
+       * so an aborted scan is still inside `section.load()`/`search()` and will
+       * still run its `finally` -> `section.unload()`. Spine items belong to the
+       * Book and are shared, not copied per scan, so that late unload can clear
+       * the very document this scan is reading. searchBook treats the resulting
+       * throw as one unreadable chapter and continues, which means the failure
+       * is SILENTLY MISSING MATCHES -- the one failure a search must not have.
+       *
+       * Serialising costs one section's latency on a query the reader has
+       * already stopped typing, and buys a correct result set.
+       */
+      const prior = searchRunRef.current;
+      const run = (async () => {
+        if (prior) await prior.catch(() => undefined);
+        if (controller.signal.aborted) return;
+        return searchBook(epubBook, query, { signal: controller.signal });
+      })();
+      searchRunRef.current = run;
+      void run.then((outcome) => {
+        if (controller.signal.aborted || !outcome) return;
+        setSearchHits(outcome.hits);
+        setSearchTruncated(outcome.truncated);
+        setSearchComplete(true);
+        setSearching(false);
+      }).catch(() => {
+        if (controller.signal.aborted) return;
+        setSearchError(t('Could not search this book.'));
+        setSearchComplete(true);
+        setSearching(false);
+      });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      searchAbortRef.current?.abort();
+      searchAbortRef.current = null;
+    };
+  }, [searchOpen, searchQuery, t]);
+
+  useEffect(() => () => searchAbortRef.current?.abort(), []);
+
   // Open the edit/remove popover for a highlight the reader was tapped on (#782).
   // Closes the create-color popover so the two never show at once.
   const openHighlightEditor = useCallback((cfiRange: string, annotationId: string, color: string) => {
@@ -358,7 +509,7 @@ export function Reader({ id }: { id: string }) {
   const paintHighlight = useCallback((
     cfiRange: string, color: string, annotationId: string, hasNote = false,
   ) => {
-    const fill = HILITE_FILL[color] || HILITE_FILL.yellow;
+    const fill = HILITE_FILL[color] || UNKNOWN_FILL;
     try {
       renditionRef.current?.annotations?.highlight(
         cfiRange,
@@ -462,8 +613,12 @@ export function Reader({ id }: { id: string }) {
     setActiveHl(null);
     setComposer({
       mode: 'edit', cfiRange: hl.cfiRange, text: '', annotationId: hl.id,
-      color: (HILITE_ORDER as readonly string[]).includes(hl.color)
-        ? hl.color as HiliteColor : 'yellow',
+      // Carry the highlight's own colour through verbatim, even when it is one
+      // the create palette does not offer (a Kobo pink or grey). Coercing it to
+      // yellow here repainted an imported highlight yellow the moment its owner
+      // opened the note composer. No swatch shows as pressed for such a colour,
+      // which is correct — it is not one of the four on offer.
+      color: hl.color,
       note: hl.note,
     });
   }, [activeHl]);
@@ -529,14 +684,48 @@ export function Reader({ id }: { id: string }) {
   const goToAnnotation = useCallback((row: AnnRow) => {
     if (!row.cfi_range) return;
     setAnnOpen(false);
+    // Set BEFORE display(): epub.js can report the relocation synchronously, so
+    // arming the flag afterwards would arm it too late to suppress anything.
+    previewingRef.current = true;
     try {
       Promise.resolve(renditionRef.current?.display(row.cfi_range)).catch(() => {
+        // The jump never happened, so the book is still where the reader left
+        // it. Disarm, or the next real page turn would be swallowed as if it
+        // were part of a preview.
+        previewingRef.current = false;
         announce(t('Could not open that highlight.'));
       });
     } catch {
+      previewingRef.current = false;
       announce(t('Could not open that highlight.'));
     }
   }, [announce, t]);
+
+  const goToSearchResult = useCallback((cfi: string) => {
+    closeSearch();
+    /*
+     * A search hit is a preview, exactly like a highlight jump, and arms the
+     * same flag -- see previewingRef.
+     *
+     * This is the composition that does NOT come for free. The two changes
+     * merged with no conflict: the preview flag landed on `goToAnnotation`, and
+     * search arrived as its own `display()` caller that the flag had never heard
+     * of. Nothing was overwritten and nothing was reported, so search would have
+     * shipped the same defect the flag exists to prevent -- looking up a word
+     * near the end of a book would move the reader's place there and, past 99%,
+     * mark the book finished.
+     */
+    previewingRef.current = true;
+    try {
+      Promise.resolve(renditionRef.current?.display(cfi)).catch(() => {
+        previewingRef.current = false;
+        announce(t('Could not open that search result.'));
+      });
+    } catch {
+      previewingRef.current = false;
+      announce(t('Could not open that search result.'));
+    }
+  }, [announce, closeSearch, t]);
 
   const toggleFullscreen = useCallback(() => {
     const d = document as FsDoc;
@@ -777,8 +966,11 @@ export function Reader({ id }: { id: string }) {
     } catch { /* same-origin blob content; guard regardless */ }
   }, [fontPct, fontFamily, margin, lineHeight]);
 
-  const goPrev = useCallback(() => renditionRef.current?.prev(), []);
-  const goNext = useCallback(() => renditionRef.current?.next(), []);
+  // A page turn is the reader moving themselves, so it ends any preview: from
+  // here on the relocations are theirs and the position saves again. This is the
+  // ONLY thing that clears the flag — see previewingRef's note.
+  const goPrev = useCallback(() => { previewingRef.current = false; return renditionRef.current?.prev(); }, []);
+  const goNext = useCallback(() => { previewingRef.current = false; return renditionRef.current?.next(); }, []);
 
   // Which way the page physically turns. In an RTL book the left of the screen
   // is forward, so the left zone advances and the right zone goes back. Labels
@@ -873,7 +1065,12 @@ export function Reader({ id }: { id: string }) {
           const exact = epubBook.locations.length()
             ? epubBook.locations.percentageFromCfi(cfi) * 100
             : undefined;
-          persistCfi(cfi, exact);
+          // A previewed jump still MOVED the book, so the progress readout
+          // tracks it — that number describes where the reader is looking, and
+          // showing the old one would be a lie about the page on screen. What
+          // it must not do is SAVE: the bookmark, the synced percentage and the
+          // finished-at-99% decision all hang off persistCfi.
+          if (!previewingRef.current) persistCfi(cfi, exact);
           if (exact !== undefined) setProgress(Math.round(exact));
         });
 
@@ -885,12 +1082,24 @@ export function Reader({ id }: { id: string }) {
           .then((d) => {
             if (cancelled || !d) return;
             notesRef.current.clear();
+            /*
+             * Take the rows and the device map from the SAME response, and take
+             * every row regardless of whether its device resolves.
+             *
+             * This is an outer join on purpose. On a real library only a
+             * minority of rows carry attribution at all — measured 3 of 14 on
+             * the household instance, the rest predating the feature — so
+             * filtering on resolution would empty most of the drawer to add a
+             * label. An unresolved id renders as no label; it never removes a
+             * highlight the reader made.
+             */
+            setDevices((d.devices || {}) as Record<string, { label?: string }>);
             setAnnList((d.annotations || []) as AnnRow[]);
             (d.annotations || []).forEach((a: any) => {
               const note = (a.note_text || '').trim();
               if (note && a.annotation_id) notesRef.current.set(a.annotation_id, note);
               if (a.cfi_range) {
-                paintHighlight(a.cfi_range, a.highlight_color || 'yellow', a.annotation_id, !!note);
+                paintHighlight(a.cfi_range, a.highlight_color ?? '', a.annotation_id, !!note);
               }
             });
           })
@@ -1027,16 +1236,23 @@ export function Reader({ id }: { id: string }) {
         </Link>
         <span className={styles.bookTitle} aria-hidden="true">{book.title}</span>
         <div className={styles.barControls}>
-          <button className={styles.iconBtn} onClick={() => setTocOpen((o) => !o)}
+          <button className={styles.iconBtn} onClick={() => { closeSearch(); setTocOpen((o) => !o); }}
             aria-label={t('Table of contents')} aria-expanded={tocOpen} title={t('Contents')}>
             <List size={19} aria-hidden="true" focusable={false} />
           </button>
-          <button className={styles.iconBtn} onClick={() => { setTocOpen(false); setAnnOpen((o) => !o); }}
+          <button className={styles.iconBtn} onClick={() => {
+            setTocOpen(false); closeSearch(); setAnnOpen((o) => !o);
+          }}
             aria-label={t('Highlights and notes')} aria-expanded={annOpen} title={t('Highlights and notes')}>
             <Highlighter size={19} aria-hidden="true" focusable={false} />
             {annList.length > 0 && (
               <span className={styles.annCount} aria-hidden="true">{annList.length}</span>
             )}
+          </button>
+          <button className={styles.iconBtn} onClick={() => {
+            setTocOpen(false); setAnnOpen(false); setSettingsOpen(false); setSearchOpen(true);
+          }} aria-label={t('Search inside book')} aria-expanded={searchOpen} title={t('Search inside book')}>
+            <Search size={19} aria-hidden="true" focusable={false} />
           </button>
           {canFullscreen && (
             <button className={styles.iconBtn} onClick={toggleFullscreen}
@@ -1048,7 +1264,7 @@ export function Reader({ id }: { id: string }) {
                 : <Maximize size={19} aria-hidden="true" focusable={false} />}
             </button>
           )}
-          <button className={styles.iconBtn} onClick={() => setSettingsOpen((o) => !o)}
+          <button className={styles.iconBtn} onClick={() => { closeSearch(); setSettingsOpen((o) => !o); }}
             aria-label={t('Reading appearance')} aria-expanded={settingsOpen} title={t('Reading appearance')}>
             <SlidersHorizontal size={19} aria-hidden="true" focusable={false} />
           </button>
@@ -1081,6 +1297,58 @@ export function Reader({ id }: { id: string }) {
         </>
       )}
 
+      {/* Full-book search drawer. The result excerpts are book-controlled text,
+          so matching is rendered as React text + <mark>, never injected HTML. */}
+      {searchOpen && (
+        <>
+          <div className={styles.tocScrim} onClick={closeSearch} aria-hidden="true" />
+          <nav ref={searchRef} className={styles.toc} aria-label={t('Search this book')} tabIndex={-1}>
+            <div className={styles.panelHeading}>
+              <p className={styles.tocHeading}>{t('Search this book')}</p>
+              <button className={styles.iconBtn} onClick={closeSearch} aria-label={t('Close')}>
+                <X size={18} aria-hidden="true" focusable={false} />
+              </button>
+            </div>
+            <label className={styles.searchField} htmlFor="reader-book-search">
+              <span>{t('Search term')}</span>
+              <input ref={searchFieldRef} id="reader-book-search" type="search"
+                value={searchQuery} placeholder={t('Enter at least 2 characters')}
+                onChange={(event) => setSearchQuery(event.target.value)} />
+            </label>
+            <p className={styles.searchStatus} role="status">
+              {searching ? (
+                <><Loader2 className={styles.spin} size={16} aria-hidden="true" focusable={false} />
+                  {t('Searching this book…')}</>
+              ) : searchError ? searchError
+                : searchComplete && searchTruncated
+                  ? t('Showing the first {count} matches.', { count: Math.min(DEFAULT_HIT_CAP, searchHits.length) })
+                  : searchComplete ? t('{count} matches', { count: searchHits.length }) : ''}
+            </p>
+            {searchComplete && searchHits.length === 0 && !searchError ? (
+              <p className={styles.tocEmpty}>{t('No matches found in this book.')}</p>
+            ) : searchHits.length > 0 ? (
+              <ul className={styles.searchResults} role="list">
+                {searchHits.map((hit, index) => (
+                  <li key={`${hit.cfi}-${index}`}>
+                    <button className={styles.searchResult} onClick={() => goToSearchResult(hit.cfi)}>
+                      <span className={styles.searchChapter}>
+                        {chapterLabelForHref(hit.href, toc)}
+                      </span>
+                      <span className={styles.searchExcerpt}>
+                        {splitSearchExcerpt(hit.excerpt, searchQuery).map((part, partIndex) =>
+                          part.matched
+                            ? <mark key={partIndex}>{part.text}</mark>
+                            : <span key={partIndex}>{part.text}</span>)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </nav>
+        </>
+      )}
+
       {/* Highlights & notes drawer (#325). Mirrors the TOC drawer's shape so the
           two read as siblings; jumping closes it, as picking a chapter does. */}
       {annOpen && (
@@ -1106,7 +1374,7 @@ export function Reader({ id }: { id: string }) {
             ) : (
               <ul role="list">
                 {annList.map((row) => {
-                  const colour = HILITE_FILL[row.highlight_color || 'yellow'] || HILITE_FILL.yellow;
+                  const colour = HILITE_FILL[row.highlight_color ?? ''] ?? UNKNOWN_FILL;
                   /*
                    * A standalone note is a note ABOUT the book, with no passage
                    * attached — a deliberate state, not a broken highlight.
@@ -1146,11 +1414,26 @@ export function Reader({ id }: { id: string }) {
                               {row.note_text}
                             </span>
                           )}
-                          {/* Origin matters to a reader who syncs a device: it
-                              explains why some rows cannot be jumped to. */}
-                          {row.source && row.source !== 'webreader' && (
-                            <span className={styles.annSource}>{row.source}</span>
-                          )}
+                          {/*
+                            * Which device made it. Matters to a reader who syncs
+                            * one, because it explains why some rows cannot be
+                            * jumped to.
+                            *
+                            * Prefer the device's own label over the raw `source`
+                            * slug — "Kobo Clara" is what the reader named it;
+                            * "kobo" is what our schema calls it. Falls back to
+                            * the slug when the id does not resolve, and shows
+                            * nothing at all rather than an id when neither is
+                            * available.
+                            */}
+                          {(() => {
+                            const label = row.origin_device_id
+                              ? devices[row.origin_device_id]?.label
+                              : undefined;
+                            const shown = label
+                              || (row.source && row.source !== 'webreader' ? row.source : '');
+                            return shown ? <span className={styles.annSource}>{shown}</span> : null;
+                          })()}
                         </span>
                       </button>
                     </li>

@@ -158,7 +158,9 @@ def test_real_hardcover_handler_gates_then_tombstones_without_repush(patched_ses
     assert client.calls[0][0] == "add"
 
     from cps.services.annotation_sync import dispatch_annotation_deletes
-    dispatch_annotation_deletes([row.annotation_id], user)
+    dispatch_annotation_deletes(
+        [row.annotation_id], user, deletable_sources=None,
+    )
     assert client.calls[1] == ("delete", 91)
 
     dispatch_existing_annotation_sync(row, _book(), user)

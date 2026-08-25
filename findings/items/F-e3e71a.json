@@ -1,0 +1,13 @@
+{
+  "area": "db",
+  "body": "`cps/db.py` `setup_db`, DESKTOP_COMPAT_MODE branch.\n\nThe branch logs, unconditionally:\n\n    \"DESKTOP_COMPAT_MODE=true: using per-request SQLite connections. \"\n    \"calibre desktop can access the library between web requests. \"\n    \"WAL mode remains disabled (NETWORK_SHARE_MODE behaviour).\"\n\nbut the code that actually converts the database to DELETE journal mode is\ngated on `if nsm and db_writable:` — i.e. it only runs when NETWORK_SHARE_MODE\nis ALSO set.\n\n`journal_mode` is persisted in the SQLite file header (MEASURED: set WAL, close\nevery connection, reopen in a fresh process -> still reports `wal`). So on the\ncommon upgrade path — user runs normally for a while, the library becomes WAL,\nthen they set DESKTOP_COMPAT_MODE=true to let calibre desktop in — the library\nstays in WAL and the log asserts the opposite.\n\nNeither branch *sets* WAL when desktop_compat is true, so nothing regresses; the\ndefect is that the log states a mode it never established. An operator reading\nit to diagnose a calibre-desktop coexistence problem is told the wrong thing.\n\nFix shape: either extend the conversion to `if db_writable:` inside the branch,\nor make the log report the journal mode it actually observed. The second is\nsafer — the code comment above the conversion warns that per-connection mode\nswitches checkpoint the WAL and can destroy frames another writer wrote, so\nconverting unconditionally is not obviously correct on a local library.\n\nAdjacent, same code path, lower value: `db_writable = os.access(dbpath, os.W_OK)`\nchecks the *file*, but WAL must create `-wal`/`-shm` in the *directory*. MEASURED\n(uid 1000, dir 0555, writable db file): the pragma fails with \"attempt to write a\nreadonly database\", the surrounding `except Exception: pass` swallows it, and the\ndatabase correctly stays in DELETE. Self-protecting, so no user-visible bug — but\nthe gate does not mean what it reads like it means.",
+  "created": "2026-08-14",
+  "id": "F-e3e71a",
+  "refs": [
+    "#1572"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "DESKTOP_COMPAT_MODE logs 'WAL mode remains disabled' without ever converting an existing WAL library back to DELETE"
+}

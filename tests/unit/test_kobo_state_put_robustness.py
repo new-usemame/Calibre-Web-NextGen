@@ -29,6 +29,10 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from cps import ub
 
 
 def _make_statistics(spent_reading_minutes=None,
@@ -69,6 +73,31 @@ class TestStatisticsResponseFalsyCheck:
         ))
         assert "SpentReadingMinutes" not in resp
         assert "RemainingTimeMinutes" not in resp
+
+
+@pytest.mark.unit
+def test_rejected_clock_defeats_the_real_onupdate_default():
+    """Changing progress must not let SQLAlchemy manufacture a newer clock."""
+    from cps.kobo import _apply_kobo_last_modified
+
+    engine = create_engine("sqlite:///:memory:")
+    ub.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    old_clock = datetime(2020, 1, 2)
+    state = ub.KoboReadingState(user_id=1, book_id=2)
+    state.current_bookmark = ub.KoboBookmark(
+        progress_percent=1.0, last_modified=old_clock,
+    )
+    session.add(state)
+    session.commit()
+
+    state.current_bookmark.progress_percent = 2.0
+    _apply_kobo_last_modified(state.current_bookmark, None)
+    session.commit()
+
+    assert state.current_bookmark.progress_percent == 2.0
+    assert state.current_bookmark.last_modified == old_clock
+    session.close()
 
 
 @pytest.mark.unit

@@ -102,11 +102,20 @@ class TestMigrate:
         assert moved.highlighted_text == "hl"
         assert session.query(ub.AnnotationSyncTarget).count() == 1
 
-    def test_annotation_clash_keeps_winner_row(self, session):
+    def test_annotation_clash_keeps_newer_destination_row(self, session):
         from cps import ub
         from cps.user_book_data import migrate_user_book_data
-        keep = _annotation(ub, WINNER, text="winner-copy")
-        lose = _annotation(ub, LOSER, text="loser-copy")
+        keep = _annotation(
+            ub, WINNER, text="newer-destination-copy", note_text="keep me",
+            server_modified_at=datetime(2026, 7, 20), content_revision=9,
+        )
+        lose = _annotation(
+            ub, LOSER, text="stale-source-copy",
+            server_modified_at=datetime(2026, 1, 1), content_revision=1,
+        )
+        keep.sync_targets.append(
+            ub.AnnotationSyncTarget(target="readwise", status="synced")
+        )
         lose.sync_targets.append(ub.AnnotationSyncTarget(target="hardcover", status="pending"))
         session.add_all([keep, lose])
         session.commit()
@@ -115,9 +124,106 @@ class TestMigrate:
         session.commit()
 
         rows = session.query(ub.Annotation).all()
-        assert len(rows) == 1 and rows[0].highlighted_text == "winner-copy"
-        # the dropped loser row's sync-target child went with it
-        assert session.query(ub.AnnotationSyncTarget).count() == 0
+        assert len(rows) == 1
+        assert rows[0].book_id == WINNER
+        assert rows[0].highlighted_text == "newer-destination-copy"
+        assert rows[0].note_text == "keep me"
+        # Only the dropped source row's sync-target child is removed.
+        targets = session.query(ub.AnnotationSyncTarget).all()
+        assert len(targets) == 1
+        assert targets[0].annotation_id == rows[0].id
+        assert targets[0].target == "readwise"
+
+    def test_annotation_clash_moves_newer_source_row_and_drops_destination_children(
+        self, session,
+    ):
+        from cps import ub
+        from cps.user_book_data import migrate_user_book_data
+        keep = _annotation(
+            ub, WINNER, text="stale-destination-copy", note_text=None,
+            server_modified_at=datetime(2026, 1, 1), content_revision=1,
+        )
+        lose = _annotation(
+            ub, LOSER, text="newer-source-copy", note_text="recent note",
+            server_modified_at=datetime(2026, 7, 20), content_revision=9,
+        )
+        keep.sync_targets.append(
+            ub.AnnotationSyncTarget(target="hardcover", status="synced")
+        )
+        lose.sync_targets.append(
+            ub.AnnotationSyncTarget(target="readwise", status="pending")
+        )
+        session.add_all([keep, lose])
+        session.commit()
+        source_id = lose.id
+
+        migrate_user_book_data(LOSER, WINNER, session=session)
+        session.commit()
+
+        row = session.query(ub.Annotation).one()
+        assert row.id == source_id
+        assert row.book_id == WINNER
+        assert row.highlighted_text == "newer-source-copy"
+        assert row.note_text == "recent note"
+        assert row.content_revision == 9
+        targets = session.query(ub.AnnotationSyncTarget).all()
+        assert len(targets) == 1
+        assert targets[0].annotation_id == row.id
+        assert targets[0].target == "readwise"
+
+    def test_annotation_clash_uses_client_clock_when_server_clocks_are_null(
+        self, session,
+    ):
+        from cps import ub
+        from cps.user_book_data import migrate_user_book_data
+        session.add_all([
+            _annotation(
+                ub, WINNER, text="stale-destination-copy",
+                client_modified_at=datetime(2026, 1, 1), content_revision=9,
+            ),
+            _annotation(
+                ub, LOSER, text="newer-source-copy",
+                client_modified_at=datetime(2026, 7, 20), content_revision=1,
+            ),
+        ])
+        session.commit()
+
+        migrate_user_book_data(LOSER, WINNER, session=session)
+        session.commit()
+
+        row = session.query(ub.Annotation).one()
+        assert row.book_id == WINNER
+        assert row.highlighted_text == "newer-source-copy"
+
+    def test_annotation_clash_null_clocks_use_revision_then_destination_tie_break(
+        self, session,
+    ):
+        from cps import ub
+        from cps.user_book_data import migrate_user_book_data
+        session.add_all([
+            _annotation(ub, WINNER, annotation_id="revision", text="revision-2",
+                        content_revision=2),
+            _annotation(ub, LOSER, annotation_id="revision", text="revision-7",
+                        content_revision=7),
+            _annotation(ub, WINNER, annotation_id="tie", text="destination-tie",
+                        content_revision=4),
+            _annotation(ub, LOSER, annotation_id="tie", text="source-tie",
+                        content_revision=4),
+        ])
+        session.commit()
+
+        migrate_user_book_data(LOSER, WINNER, session=session)
+        session.commit()
+
+        rows = {
+            row.annotation_id: row
+            for row in session.query(ub.Annotation).order_by(ub.Annotation.annotation_id)
+        }
+        assert set(rows) == {"revision", "tie"}
+        assert rows["revision"].book_id == WINNER
+        assert rows["revision"].highlighted_text == "revision-7"
+        assert rows["tie"].book_id == WINNER
+        assert rows["tie"].highlighted_text == "destination-tie"
 
     def test_kobo_reading_state_newer_loser_wins(self, session):
         from cps import ub
@@ -298,6 +404,102 @@ class TestPurge:
         session.commit()
 
         assert session.query(ub.BookShelf).count() == 1
+
+    def test_stage0_evidence_is_purged_before_annotation_id_reuse(self, session):
+        """Account erasure must not alias old raw bytes onto a recycled id."""
+        from cps import ub
+        from cps.user_book_data import purge_user_book_data
+
+        user = ub.User(name="stage0-owner", email="owner@example.invalid", role=0)
+        user.password = "x"
+        session.add(user)
+        session.commit()
+        annotation = _annotation(
+            ub, LOSER, annotation_id="old-annotation", user_id=user.id,
+            text="SECRET HIGHLIGHT TEXT",
+        )
+        session.add(annotation)
+        session.commit()
+        old_annotation_id = annotation.id
+        session.add(ub.KoboAnnotationMaterialization(
+            annotation_id=annotation.id,
+            raw_annotation_json=b'{"highlightedText":"SECRET HIGHLIGHT TEXT"}',
+            raw_location_json=b'{"span":{}}',
+            raw_client_modified_utc="t",
+            payload_sha256="0" * 64,
+            provenance="kobo_patch",
+            attachments_state="missing",
+            serveable=False,
+        ))
+        state = ub.KoboAnnotationBookState(
+            user_id=user.id, book_id=LOSER, content_id="legacy-book:202",
+            generation_id="generation", authority_status="authoritative",
+            authority_revision=1, opaque_content_status="present",
+        )
+        session.add(state)
+        session.commit()
+        capture = ub.KoboAnnotationSeedCapture(
+            book_state_id=state.id, result="accepted",
+        )
+        snapshot = ub.KoboAnnotationPageSnapshot(
+            snapshot_id="purge-snapshot", book_state_id=state.id,
+            authority_revision=1, etag="etag", ordered_payload_gzip=b"payload",
+            annotation_count=1, page_size=10,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+        session.add_all([
+            ub.KoboDeviceBookAnnotationState(
+                device_id=999, book_state_id=state.id,
+            ),
+            capture,
+            snapshot,
+        ])
+        session.commit()
+        session.add_all([
+            ub.KoboAnnotationSeedCapturePage(
+                seed_capture_id=capture.id, page_number=0,
+                response_body_gzip=b"page", response_sha256="1" * 64,
+            ),
+            ub.KoboAnnotationPageCursor(
+                token="purge-cursor", snapshot_id=snapshot.snapshot_id,
+                page_offset=0,
+            ),
+        ])
+        session.commit()
+
+        purge_user_book_data(user_id=user.id, session=session)
+        session.delete(user)
+        session.commit()
+
+        for model in (
+            ub.KoboAnnotationMaterialization,
+            ub.KoboAnnotationBookState,
+            ub.KoboOpaqueContentPresentGuard,
+            ub.KoboDeviceBookAnnotationState,
+            ub.KoboAnnotationSeedCapture,
+            ub.KoboAnnotationSeedCapturePage,
+            ub.KoboAnnotationPageSnapshot,
+            ub.KoboAnnotationPageCursor,
+        ):
+            assert session.query(model).count() == 0, model.__name__
+
+        replacement_user = ub.User(
+            name="replacement-owner", email="replacement@example.invalid", role=0,
+        )
+        replacement_user.password = "x"
+        session.add(replacement_user)
+        session.commit()
+        replacement = _annotation(
+            ub, WINNER, annotation_id="new-annotation",
+            user_id=replacement_user.id, text="new owner text",
+        )
+        session.add(replacement)
+        session.commit()
+
+        assert replacement.id == old_annotation_id
+        assert session.query(ub.KoboAnnotationMaterialization).filter_by(
+            annotation_id=replacement.id,
+        ).count() == 0
 
     def test_book_purge_can_retain_backup_snapshots(self, session, tmp_path):
         from cps import ub

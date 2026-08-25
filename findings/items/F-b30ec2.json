@@ -1,0 +1,13 @@
+{
+  "area": "testing",
+  "body": "OBSERVED 2026-08-17 while verifying #1685. Running `python -m pytest tests/unit -q` leaves an\nuntracked `annotation-backups/` directory in the repository root containing real gzipped snapshot\nfiles.\n\nCause: `cps/services/annotation_backup.py:82` resolves the backup root as\n`Path(constants.CONFIG_DIR) / \"annotation-backups\"`, and under some test contexts CONFIG_DIR\nresolves to the current working directory rather than a temporary one.\n\nNOT introduced by #1685 — the directory predates that branch. It is also NOT in `.gitignore`, so it\nshows up as untracked for anyone who runs the suite, and a careless `git add -A` would commit\ngzipped annotation payloads.\n\nNeither `tests/unit/test_annotation_backup.py` nor `tests/unit/test_kobo_annotation_stage0.py`\nproduces it in isolation, so the writer is some other test that reaches the backup path with the\ndefault CONFIG_DIR. Finding that caller is step one.\n\nTwo fixes, the second being the real one:\n1. Add `annotation-backups/` to `.gitignore` so it can never be committed by accident.\n2. Point CONFIG_DIR at a tmpdir in the test context, so the suite stops writing outside its own\n   scratch space at all.",
+  "created": "2026-08-17",
+  "id": "F-b30ec2",
+  "refs": [
+    "#1685"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "Unit tests write annotation-backups/ into the repo root"
+}

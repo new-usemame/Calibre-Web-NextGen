@@ -6,11 +6,14 @@ import {
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
+import { settleById } from './bulkResults';
+import { createEntityListQueryOptions } from './entityListQueryOptions';
 import type { MetadataProvider, MetaSearchResponse } from './api';
 import type {
   Me, Book, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
   SearchOptions, AdvancedSearchParams, AdvSearchResult, Account, ProfileUpdate,
   BookMetadata, MetadataUpdate, UploadResult, AdminUser, AboutInfo, TaskItem, AuthConfig,
+  NoticeInbox, KoboTwoWaySettings, KoboTwoWayBookState, KoboTwoWayUpdate,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
@@ -179,6 +182,7 @@ export function useDiscover(count: number, nonce: number) {
     queryKey: ['discover-strip', count, nonce],
     queryFn: () => apiGet<BooksPage>(`/api/v1/books?filter=discover&per_page=${count}`),
     staleTime: 0,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 }
@@ -255,11 +259,10 @@ export function useBooks(q: BooksQuery) {
 /** Fetch an entity-browse list (authors/series/tags/publishers/languages).
  *  `plural` is the endpoint segment (e.g. "authors"). */
 export function useEntityList(plural: string) {
-  return useQuery<EntityList>({
-    queryKey: ['entities', plural],
-    queryFn: () => apiGet<EntityList>(`/api/v1/${plural}`),
-    staleTime: 60000,
-  });
+  return useQuery<EntityList>(createEntityListQueryOptions(
+    plural,
+    () => apiGet<EntityList>(`/api/v1/${plural}`),
+  ));
 }
 
 /** The tag a rename collided with, carried on the 409 so the caller can offer
@@ -579,6 +582,7 @@ export interface SecurityConfig {
   ldap: SecurityLdap;
   oauth: {
     redirect_host: string; disable_standard_login: boolean;
+    enable_oauth_auto_forward: boolean;
     enable_group_admin_management: boolean; generic: SecurityOauthGeneric;
     providers: { name: string; client_id: string; has_secret: boolean; active: boolean }[];
   };
@@ -593,7 +597,8 @@ export interface SecurityUpdate {
   remote_login?: boolean;
   ldap?: Partial<Omit<SecurityLdap, 'has_password'>> & { serv_password?: string };
   oauth?: {
-    redirect_host?: string; disable_standard_login?: boolean; enable_group_admin_management?: boolean;
+    redirect_host?: string; disable_standard_login?: boolean; enable_oauth_auto_forward?: boolean;
+    enable_group_admin_management?: boolean;
     generic?: Partial<Omit<SecurityOauthGeneric, 'has_secret' | 'active'>> & { client_secret?: string };
     providers?: { name: string; client_id?: string; client_secret?: string }[];
   };
@@ -646,25 +651,26 @@ export function useBulkActions() {
     void qc.invalidateQueries({ queryKey: ['books'] });
     void qc.invalidateQueries({ queryKey: ['shelves'] });
   };
-  const settle = (ps: Promise<unknown>[]) => Promise.allSettled(ps);
-
   const markRead = useMutation({
     mutationFn: (v: { ids: number[]; read: boolean }) =>
-      settle(v.ids.map((id) => apiPost(`/api/v1/books/${id}/read`, { read: v.read }))),
+      settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/read`, { read: v.read })),
     onSuccess: refresh,
   });
   const addToShelf = useMutation({
     mutationFn: (v: { ids: number[]; shelfId: number }) =>
       // tolerate 409 (already on shelf) per book
-      settle(v.ids.map((id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`).catch(() => null))),
+      settleById(v.ids, (id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`).catch((err) => {
+        if (err instanceof ApiError && err.status === 409) return null;
+        throw err;
+      })),
     onSuccess: refresh,
   });
   const remove = useMutation({
-    mutationFn: (ids: number[]) => settle(ids.map((id) => apiPost(`/api/v1/books/${id}/delete`))),
-    onSuccess: (_data, ids) => {
+    mutationFn: (ids: number[]) => settleById(ids, (id) => apiPost(`/api/v1/books/${id}/delete`)),
+    onSuccess: ({ succeededIds }) => {
       // Evict deleted books from every cached catalog snapshot so a later
       // scroll-restore can't resurrect them as ghost cards (#578).
-      ids.forEach(removeBookFromCache);
+      succeededIds.forEach(removeBookFromCache);
       refresh();
     },
   });
@@ -672,7 +678,7 @@ export function useBulkActions() {
   // the per-book metadata endpoint (replace semantics for the filled fields).
   const setMetadata = useMutation({
     mutationFn: (v: { ids: number[]; fields: MetadataUpdate }) =>
-      settle(v.ids.map((id) => apiPost(`/api/v1/books/${id}/metadata`, v.fields))),
+      settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/metadata`, v.fields)),
     onSuccess: refresh,
   });
   return { markRead, addToShelf, remove, setMetadata };
@@ -1029,6 +1035,50 @@ export function useRevokeAppPassword() {
   });
 }
 
+// ── Kobo two-way annotation sync (Stage 0 — preferences over a dead switch) ──
+
+const KOBO_TWO_WAY_KEY = ['kobo-two-way-annotations'] as const;
+
+export function useKoboTwoWayAnnotations(options?: { enabled?: boolean }) {
+  return useQuery<KoboTwoWaySettings>({
+    queryKey: KOBO_TWO_WAY_KEY,
+    queryFn: () => apiGet<KoboTwoWaySettings>('/api/v1/account/kobo-two-way-annotations'),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/** Find one book's state inside the settings payload (book pages' chip). */
+export function selectKoboTwoWayBook(
+  data: KoboTwoWaySettings | undefined,
+  bookId: number,
+): KoboTwoWayBookState | undefined {
+  return data?.books.find((b) => b.book_id === bookId);
+}
+
+export function useUpdateKoboTwoWayAnnotations() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: KoboTwoWayUpdate) =>
+      apiPost<KoboTwoWaySettings>('/api/v1/account/kobo-two-way-annotations', vars),
+    onSuccess: (data) => qc.setQueryData(KOBO_TWO_WAY_KEY, data),
+  });
+}
+
+export function useSetKoboTwoWayBook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { book_id: number; enabled: boolean }) =>
+      apiPost<{ book: KoboTwoWayBookState }>('/api/v1/account/kobo-two-way-annotations/books', vars),
+    onSuccess: (data) => {
+      qc.setQueryData<KoboTwoWaySettings>(KOBO_TWO_WAY_KEY, (old) =>
+        old
+          ? { ...old, books: old.books.map((b) => (b.book_id === data.book.book_id ? data.book : b)) }
+          : old,
+      );
+    },
+  });
+}
+
 // ── Advanced search ──────────────────────────────────────────────────────────
 
 export function useSearchOptions() {
@@ -1153,7 +1203,19 @@ export function useToggleMagicShelfKoboSync(id: string | number) {
   });
 }
 
-export interface MagicShelfItem { id: number; name: string; icon: string; is_public: boolean; is_owner: boolean; is_system: boolean; kobo_sync?: boolean }
+export interface MagicShelfItem {
+  id: number;
+  name: string;
+  icon: string;
+  is_public: boolean;
+  is_owner: boolean;
+  is_system: boolean;
+  kobo_sync?: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_duplicate: boolean;
+  can_kobo_sync: boolean;
+}
 
 export function useMagicShelves() {
   return useQuery<{ items: MagicShelfItem[] }>({
@@ -1164,8 +1226,7 @@ export function useMagicShelves() {
 }
 
 export function useMagicShelfBooks(id: string | number, page = 1) {
-  return useQuery<{ id: number; name: string; icon: string; is_owner: boolean; is_system: boolean;
-    kobo_sync?: boolean } & BooksPage>({
+  return useQuery<MagicShelfItem & BooksPage>({
     queryKey: ['magicshelf', String(id), page],
     queryFn: () => apiGet(`/api/v1/magicshelf/${id}?page=${page}`),
     enabled: String(id).length > 0,
@@ -1222,6 +1283,36 @@ export function useDismissDuplicate() {
     mutationFn: (groupHash: string) =>
       apiPost(`/duplicates/dismiss/${encodeURIComponent(groupHash)}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['duplicates'] }),
+  });
+}
+
+// ── Generic user notices ───────────────────────────────────────────────────
+
+export function useNotices(bookId?: string | number) {
+  const suffix = bookId == null ? '' : `?book_id=${encodeURIComponent(String(bookId))}`;
+  return useQuery<NoticeInbox>({
+    queryKey: ['notices', bookId == null ? 'all' : String(bookId)],
+    queryFn: () => apiGet<NoticeInbox>(`/api/v1/notices${suffix}`),
+  });
+}
+
+export function useDismissNotice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (noticeId: number) =>
+      apiPost<{ dismissed: number; remaining: number }>(`/api/v1/notices/${noticeId}/dismiss`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['notices'] }),
+  });
+}
+
+export function useDismissNotices() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (noticeIds: number[]) =>
+      apiPost<{ dismissed: number; remaining: number }>('/api/v1/notices/dismiss', {
+        notice_ids: noticeIds,
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['notices'] }),
   });
 }
 

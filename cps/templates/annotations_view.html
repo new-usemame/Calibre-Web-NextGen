@@ -17,15 +17,21 @@
 
     <ol class="cwa-annotation-list">
       {% for ann in annotations %}
-        <li id="ann-{{ ann.annotation_id }}" class="cwa-annotation cwa-annotation-{{ ann.highlight_color or 'yellow' }}">
+        {# `ann_color` is what to print; `ann_swatch` is the only thing safe to put
+           in a class name. They differ for a colour we cannot name — and for a row
+           with no colour at all, where the modifier is omitted entirely rather than
+           defaulting the row's border to yellow. #}
+        {% set ann_color = ann.highlight_color|annotation_color %}
+        {% set ann_swatch = ann.highlight_color|annotation_palette_class %}
+        <li id="ann-{{ ann.annotation_id }}" class="cwa-annotation{% if ann_swatch %} cwa-annotation-{{ ann_swatch }}{% endif %}">
           <blockquote>{{ ann.highlighted_text or '' }}</blockquote>
           {% if ann.note_text %}
             <p class="cwa-annotation-note">{{ _('Note:') }} {{ ann.note_text }}</p>
           {% endif %}
           <p class="text-muted small">
-            {% if ann.highlight_color %}
-              <span class="cwa-annotation-swatch cwa-annotation-swatch-{{ ann.highlight_color }}" aria-label="{{ ann.highlight_color }}"></span>
-              {{ ann.highlight_color }}
+            {% if ann_color %}
+              <span class="cwa-annotation-swatch{% if ann_swatch %} cwa-annotation-swatch-{{ ann_swatch }}{% endif %}" aria-label="{{ ann_color }}"></span>
+              {{ ann_color }}
             {% endif %}
             {% if ann.chapter_progress is not none %}
               · {{ _('Chapter progress: %(pct)d%%', pct=(ann.chapter_progress * 100)|int) }}
@@ -55,6 +61,10 @@
   .cwa-annotation-red    { border-left-color: #d9534f; }
   .cwa-annotation-green  { border-left-color: #5cb85c; }
   .cwa-annotation-blue   { border-left-color: #5bc0de; }
+  /* A Kobo also makes pink and grey (F-5769c9); without these the row falls
+     back to the neutral #ccc border while the label says "pink". */
+  .cwa-annotation-pink   { border-left-color: #e8afcf; }
+  .cwa-annotation-grey   { border-left-color: #a0a0a0; }
   .cwa-annotation blockquote { margin: 0 0 0.4em 0; padding: 0; border: 0; font-style: italic; }
   .cwa-annotation-note { margin: 0.2em 0; }
   .cwa-annotation-swatch { display: inline-block; width: 0.9em; height: 0.9em; vertical-align: middle; margin-right: 0.2em; border-radius: 2px; border: 1px solid rgba(0,0,0,0.1); }
@@ -62,5 +72,7 @@
   .cwa-annotation-swatch-red    { background: #d9534f; }
   .cwa-annotation-swatch-green  { background: #5cb85c; }
   .cwa-annotation-swatch-blue   { background: #5bc0de; }
+  .cwa-annotation-swatch-pink   { background: #e8afcf; }
+  .cwa-annotation-swatch-grey   { background: #a0a0a0; }
 </style>
 {% endblock %}

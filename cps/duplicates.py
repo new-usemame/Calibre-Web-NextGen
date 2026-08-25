@@ -20,7 +20,7 @@ import threading
 import time
 from shutil import copyfile
 
-from . import db, calibre_db, constants, logger, ub, csrf, config, helper, user_book_data
+from . import db, calibre_db, logger, ub, csrf, config, helper, user_book_data
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 from .admin import admin_required  
 from .usermanagement import login_required_if_no_ano
@@ -28,9 +28,8 @@ from .render_template import render_title_template
 from .duplicate_notice import duplicate_setup_notice_file
 from .cw_login import current_user
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 duplicates = Blueprint('duplicates', __name__)
 log = logger.create()
@@ -897,7 +896,7 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
     # than trying to do complex joins for duplicate detection
     books_query = (calibre_db.session.query(db.Books)
                    .filter(get_common_filters(user_id=user_id))  # Respect user permissions and library filtering
-                   .order_by(db.Books.title, db.Books.timestamp.desc()))
+                   .order_by(db.Books.title, db.Books.timestamp.desc(), db.Books.id.desc()))
 
     if candidate_ids is not None:
         if not candidate_ids:
@@ -1957,8 +1956,9 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                         # #708: record the Kobo deletion tombstone BEFORE anything
                         # touches kobo_synced_books. record_book_deletion reads this
                         # book's kobo_synced_books rows to learn which users had it on
-                        # a device (so their next sync emits a DeletedEntitlement that
-                        # removes it), but migrate_user_book_data below deletes exactly
+                        # a device (so their next sync emits an archived
+                        # ChangedEntitlement that removes it), but
+                        # migrate_user_book_data below deletes exactly
                         # those rows — and delete_whole_book's own tombstone call runs
                         # even later. Run in that order the tombstone is silently
                         # skipped and the removed duplicate lingers on the Kobo forever.

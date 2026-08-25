@@ -29,10 +29,11 @@ from flask import (
     Response,
     send_from_directory,
     g,
+    has_request_context,
 )
 from .cw_login import current_user
 from werkzeug.datastructures import Headers
-from sqlalchemy import func
+from sqlalchemy import String, case, cast, func, literal
 from sqlalchemy.sql.expression import and_, or_
 from sqlalchemy.exc import StatementError
 from sqlalchemy.orm import joinedload
@@ -62,6 +63,61 @@ kobo_auth.disable_failed_auth_redirect_for_blueprint(kobo)
 kobo_auth.register_url_value_preprocessor(kobo)
 
 log = logger.create()
+
+
+def normalized_books_last_modified(value):
+    """Return a UTC, fixed-width SQL key for calibre's mixed timestamp text.
+
+    ``metadata.db`` declares ``books.last_modified`` as TIMESTAMP but stores
+    TEXT.  Calibre includes a UTC offset while SQLAlchemy writes a naive value,
+    so comparing the raw strings makes the suffix decide the keyset result.
+
+    SQLite's ``strftime('%f')`` stops at milliseconds.  Extract consecutive
+    fractional digits only, right-pad with zeroes, and truncate to six digits
+    so this SQL key has the same microsecond precision as the Python datetime
+    carried by SyncToken. ``strftime`` supplies the UTC-normalized whole-second
+    portion; timezone offsets therefore cannot affect comparison or ordering.
+    """
+    raw_value = cast(value, String)
+    fraction_start = func.instr(raw_value, ".")
+    fraction_tail = func.substr(raw_value, fraction_start + 1)
+
+    # ltrim removes the leading digit run; the length difference is therefore
+    # exactly the fraction's width up to its first non-digit. Offset digits can
+    # never leak back in after their leading '+' or '-' stops the run.
+    fraction_width = (
+        func.length(fraction_tail)
+        - func.length(func.ltrim(fraction_tail, "0123456789"))
+    )
+    fraction_digits = func.substr(fraction_tail, 1, fraction_width)
+
+    microseconds = case(
+        (fraction_start > 0,
+         func.substr(fraction_digits + literal("000000"), 1, 6)),
+        else_="000000",
+    )
+    return (
+        func.strftime("%Y-%m-%d %H:%M:%S", value)
+        + literal(".")
+        + microseconds
+    )
+
+
+def books_keyset_after_cursor(cursor_lm, cursor_id):
+    """Build the normalized ``(last_modified, id)`` Kobo keyset predicate."""
+    normalized_stored = normalized_books_last_modified(db.Books.last_modified)
+    normalized_cursor = normalized_books_last_modified(cursor_lm)
+    return or_(
+        normalized_stored > normalized_cursor,
+        and_(normalized_stored == normalized_cursor, db.Books.id > cursor_id),
+    )
+
+
+def books_cursor_datetime(value):
+    """Put a dialect-parsed datetime on the cursor's UTC-naive basis."""
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
 
 
 def get_store_url_for_current_request():
@@ -307,7 +363,9 @@ def HandleSyncRequest():
         # detection on the next sync treats the cache as fresh.
         sync_token.magic_shelf_membership_at = datetime.min
 
-    new_books_last_modified = sync_token.books_last_modified  # needed for sync selected shelfs only
+    new_books_last_modified = books_cursor_datetime(
+        sync_token.books_last_modified
+    )  # needed for sync selected shelfs only
     new_books_last_created = sync_token.books_last_created  # needed to distinguish between new and changed entitlement
     new_reading_state_last_modified = sync_token.reading_state_last_modified
 
@@ -402,10 +460,7 @@ def HandleSyncRequest():
     # the first post-upgrade sync.
     cursor_lm = sync_token.books_last_modified
     cursor_id = sync_token.books_last_id
-    composite_keyset_books_only = or_(
-        db.Books.last_modified > cursor_lm,
-        and_(db.Books.last_modified == cursor_lm, db.Books.id > cursor_id),
-    )
+    composite_keyset_books_only = books_keyset_after_cursor(cursor_lm, cursor_id)
 
     # Magic-shelf membership arm (fork #359): magic-shelf-only books are not in
     # book_shelf_link, so BookShelf.date_added is NULL and Books.last_modified is
@@ -509,7 +564,7 @@ def HandleSyncRequest():
                            .filter(inner_cursor_filter_with_bookshelf)
                            .filter(db.Data.format.in_(KOBO_FORMATS))
                            .filter(calibre_db.common_filters(allow_show_archived=True))
-                           .order_by(db.Books.last_modified)
+                           .order_by(normalized_books_last_modified(db.Books.last_modified))
                            .order_by(db.Books.id)
                            .outerjoin(ub.BookShelf, db.Books.id == ub.BookShelf.book_id)
                            .outerjoin(ub.Shelf, ub.Shelf.id == ub.BookShelf.shelf)
@@ -545,14 +600,36 @@ def HandleSyncRequest():
                            .filter(inner_cursor_filter_sync_all)
                            .filter(calibre_db.common_filters(allow_show_archived=True))
                            .filter(db.Data.format.in_(KOBO_FORMATS))
-                           .order_by(db.Books.last_modified)
+                           .order_by(normalized_books_last_modified(db.Books.last_modified))
                            .order_by(db.Books.id)
                            .options(joinedload(db.Books.authors),
                                     joinedload(db.Books.publishers),
                                     joinedload(db.Books.series),
                                     joinedload(db.Books.languages),
                                     joinedload(db.Books.comments),
-                                    joinedload(db.Books.data)))
+                                    joinedload(db.Books.data))
+                           # `.join(db.Data)` yields ONE ROW PER KOBO-ELIGIBLE
+                           # FORMAT, not per book, so a book holding both an
+                           # EPUB and a KEPUB counts and paginates twice. The
+                           # shelf branch above already ends `.distinct()`;
+                           # this branch did not, and the asymmetry is the bug.
+                           #
+                           # Two consequences, both measured:
+                           #   * `changed entries` below reports format rows,
+                           #     not books -- which is why users report a
+                           #     number "well past my library size" (#347,
+                           #     #1634) and why that number is not evidence of
+                           #     a loop.
+                           #   * LIMIT applies to the multiplied rows while the
+                           #     ORM uniquifies afterwards, so a page of
+                           #     SYNC_ITEM_LIMIT delivers only ~half that many
+                           #     books and the device needs twice the round
+                           #     trips.
+                           #
+                           # Entitlements were never duplicated -- legacy Query
+                           # uniquifies entity rows -- so this is a throughput
+                           # and diagnostics defect, not data corruption.
+                           .distinct())
     log.debug("Kobo Sync: changed entries: {}".format(changed_entries.count()))
 
     reading_states_in_new_entitlements = []
@@ -561,7 +638,7 @@ def HandleSyncRequest():
     # the joined-load query twice per sync request.
     books_list = changed_entries.limit(SYNC_ITEM_LIMIT).all()
     log.debug("Kobo Sync: selected to sync: {}".format(len(books_list)))
-    synced_book_ids = []
+    delivered_book_identities = []
     for book in books_list:
         kobo_reading_state = book.KoboReadingState  # None when no record exists yet
         entitlement = {
@@ -583,7 +660,7 @@ def HandleSyncRequest():
             sync_results.append({"ChangedEntitlement": entitlement})
 
         new_books_last_modified = max(
-            book.Books.last_modified.replace(tzinfo=None), new_books_last_modified
+            books_cursor_datetime(book.Books.last_modified), new_books_last_modified
         )
 
         # Also advance the cursor by BookShelf.date_added when the row
@@ -604,12 +681,12 @@ def HandleSyncRequest():
             new_books_last_modified = max(date_added, new_books_last_modified)
 
         new_books_last_created = max(ts_created, new_books_last_created)
-        synced_book_ids.append(book.Books.id)
+        delivered_book_identities.append((book.Books.id, str(book.Books.uuid)))
 
     # Persist the whole emitted page before response/token construction.  In
     # particular, the next request must not observe zero synced rows and reset
     # its token.  The batch helper also avoids one SQLite fsync per book.
-    kobo_sync_status.add_synced_books_batch(synced_book_ids)
+    kobo_sync_status.add_synced_books_batch(delivered_book_identities)
 
     # Magic-shelf sub-cursor: advance to the highest magic-shelf book id
     # emitted this round. magic_shelf_book_ids may be empty when the arm
@@ -647,9 +724,7 @@ def HandleSyncRequest():
     #   - If the batch was empty, keep the existing cursor id (no emission).
     if books_list:
         last_book = books_list[-1]
-        last_book_lm = last_book.Books.last_modified
-        if hasattr(last_book_lm, "replace") and getattr(last_book_lm, "tzinfo", None) is not None:
-            last_book_lm = last_book_lm.replace(tzinfo=None)
+        last_book_lm = books_cursor_datetime(last_book.Books.last_modified)
         if new_books_last_modified == last_book_lm:
             new_books_last_id = last_book.Books.id
         else:
@@ -701,10 +776,13 @@ def HandleSyncRequest():
 
     # no. of books returned
     book_count = changed_entries.count()
-    # Mirror the reading-states branch below: only signal `continue` when
-    # the result set exceeds the batch cap, so an exhaustive batch ends
-    # the session and the device persists the advanced synctoken.
-    cont_sync = bool(book_count > SYNC_ITEM_LIMIT)
+    # PR #248 established that Kobo firmware pins the request cursor whenever
+    # `x-kobo-sync: continue` is present.  Comparing against the page cap fixed
+    # partial pages, but a full page still formed a closed loop: firmware kept
+    # the old token, so the same full page was returned forever.  End every
+    # local session so the advanced composite cursor is persisted; the device
+    # starts the next session with that returned token and drains the next page.
+    cont_sync = False
     log.debug("Kobo Sync: remaining books to sync: {}".format(book_count))
     # generate reading state data
     changed_reading_states = ub.session.query(ub.KoboReadingState)
@@ -729,7 +807,9 @@ def HandleSyncRequest():
              ub.KoboReadingState.book_id.notin_(reading_states_in_new_entitlements)))\
         .order_by(ub.KoboReadingState.last_modified)
     log.debug("Kobo Sync: changed states: {}".format(changed_reading_states.count()))
-    cont_sync |= bool(changed_reading_states.count() > SYNC_ITEM_LIMIT)
+    # Do not set local continuation for a full reading-state page.  It has the
+    # same firmware cursor-pinning semantics as the books signal above; ending
+    # the session is what lets the returned reading-state cursor take effect.
     for kobo_reading_state in changed_reading_states.limit(SYNC_ITEM_LIMIT).all():
         book = calibre_db.session.query(db.Books).filter(db.Books.id == kobo_reading_state.book_id).one_or_none()
         if book:
@@ -839,18 +919,9 @@ def HandleSyncRequest():
             ta = ta.replace(tzinfo=None)
         new_archived_last_modified = max(ta, new_archived_last_modified)
 
-    # If there are MORE pending deletions than SYNC_ITEM_LIMIT, mark
-    # cont_sync so the device comes back for the next page rather than
-    # losing tombstones to the page cap.
-    if len(pending_deletions) >= SYNC_ITEM_LIMIT:
-        remaining = (
-            ub.session.query(ub.KoboDeletedBook)
-            .filter(ub.KoboDeletedBook.user_id == current_user.id)
-            .filter(ub.KoboDeletedBook.deleted_at > new_archived_last_modified)
-            .count()
-        )
-        if remaining > 0:
-            cont_sync = True
+    # Likewise, never set local continuation for deletion pages.  The returned
+    # archive cursor must be persisted before the next page can be selected;
+    # pinning the old cursor would just replay these tombstones indefinitely.
 
     # update last created timestamp to distinguish between new and changed entitlements
     if not cont_sync:
@@ -868,12 +939,12 @@ def HandleSyncRequest():
     sync_token.archive_last_modified = new_archived_last_modified
     sync_token.reading_state_last_modified = new_reading_state_last_modified
 
-    return generate_sync_response(sync_token, sync_results, cont_sync)
+    return generate_sync_response(sync_token, sync_results)
 
 
-def generate_sync_response(sync_token, sync_results, set_cont=False):
+def generate_sync_response(sync_token, sync_results):
     extra_headers = {}
-    if config.config_kobo_proxy and not set_cont:
+    if config.config_kobo_proxy:
         # Merge in sync results from the official Kobo store.
         try:
             store_response = make_request_to_kobo_store(sync_token)
@@ -881,19 +952,33 @@ def generate_sync_response(sync_token, sync_results, set_cont=False):
             store_sync_results = store_response.json()
             sync_results += store_sync_results
             sync_token.merge_from_store_response(store_response)
-            extra_headers["x-kobo-sync"] = store_response.headers.get("x-kobo-sync")
-            extra_headers["x-kobo-sync-mode"] = store_response.headers.get("x-kobo-sync-mode")
-            extra_headers["x-kobo-recent-reads"] = store_response.headers.get("x-kobo-recent-reads")
+            for header_name in (
+                "x-kobo-sync",
+                "x-kobo-sync-mode",
+                "x-kobo-recent-reads",
+            ):
+                header_value = store_response.headers.get(header_name)
+                if header_value is None:
+                    continue
+                # Kobo firmware pins the incoming token whenever `continue`
+                # is present.  Local page selection depends on the device
+                # persisting our returned token, so a store continuation must
+                # never escape on the combined response.
+                if (
+                    header_name == "x-kobo-sync"
+                    and str(header_value).strip().lower() == "continue"
+                ):
+                    continue
+                extra_headers[header_name] = header_value
 
         except Exception as ex:
             log.error_or_exception("Failed to receive or parse response from Kobo's sync endpoint: {}".format(ex))
-    if set_cont:
-        extra_headers["x-kobo-sync"] = "continue"
     sync_token.to_headers(extra_headers)
 
     # Track Kobo sync activity
     try:
-        from scripts.cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         import json as json_lib
         cwa_db = CWA_DB()
         cwa_db.log_activity(
@@ -1113,12 +1198,91 @@ def _normalize_cover_uuid(image_id):
     return normalize_cover_uuid(image_id)
 
 
+_REQUESTING_DEVICE_ASPECT_G_KEY = "_kobo_requesting_device_aspect"
+
+
+def _requesting_device_aspect():
+    """Aspect preset for the Kobo making *this* request, or None.
+
+    The padding aspect is a single instance-wide setting, which is wrong the
+    moment a household owns two different Kobos: one of them gets covers shaped
+    for the other. We already record every device's model (`Device.model`, fed
+    by the `x-kobo-devicemodel` header on every authenticated Kobo request), so
+    the information needed to shape covers correctly is present and was simply
+    never consulted.
+
+    Resolution order:
+      1. the `x-kobo-devicemodel` header on this request -- the device speaking
+         for itself, and the only source that is certainly about *this* device;
+      2. the model recorded for this user's Kobo, when the header is absent and
+         the answer is unambiguous (exactly one preset is implied).
+
+    Returns None whenever the answer is not certain -- unknown model, no
+    request context, no user, or more than one candidate device with no header
+    to disambiguate. None means "keep the configured aspect", i.e. exactly
+    today's behaviour, so this can only make covers more correct, never less.
+    """
+    if not has_request_context():
+        return None
+
+    resolved = None
+    try:
+        if hasattr(g, _REQUESTING_DEVICE_ASPECT_G_KEY):
+            return getattr(g, _REQUESTING_DEVICE_ASPECT_G_KEY)
+
+        header_model = request.headers.get("x-kobo-devicemodel")
+        preset = cover_preview.preset_for_device_model(header_model)
+        if preset:
+            resolved = preset
+        else:
+            # No usable header. Fall back to what this user's Kobos told us
+            # earlier, but only when their mapped models imply one preset.
+            # Different presets with no header are ambiguous; the configured
+            # value is the more honest answer.
+            user_id = getattr(current_user, "id", None)
+            if user_id:
+                models = [
+                    row[0]
+                    for row in ub.session.query(ub.Device.model)
+                    .filter(ub.Device.user_id == user_id,
+                            ub.Device.kind == "kobo",
+                            ub.Device.active.is_(True))
+                    .all()
+                ]
+                candidates = {cover_preview.preset_for_device_model(m) for m in models}
+                candidates.discard(None)
+                if len(candidates) == 1:
+                    resolved = candidates.pop()
+    except Exception as exc:
+        # Cover shaping must never be the reason a sync or a cover fetch fails.
+        log.debug("Kobo Sync: could not resolve a per-device cover aspect: %s", exc)
+        resolved = None
+
+    # This function runs once per book on sync-metadata construction. Cache
+    # both a preset and the fail-safe None for this request so an absent or
+    # unrecognised header cannot turn into one Device query per book.
+    try:
+        setattr(g, _REQUESTING_DEVICE_ASPECT_G_KEY, resolved)
+    except Exception as exc:
+        # A cache failure must not make cover shaping fail. Resolution remains
+        # usable for this call; the next call will simply resolve again.
+        log.debug("Kobo Sync: could not cache the per-device cover aspect: %s", exc)
+    return resolved
+
+
 def _current_padding_settings():
-    """Snapshot of the admin's Kobo-padding config. Centralized so the
-    sync-metadata path and the cover-serving path agree on the same hash."""
+    """Snapshot of the admin's Kobo-padding config, with the aspect narrowed to
+    the requesting device when we can identify it.
+
+    Centralized so the sync-metadata path and the cover-serving path agree on
+    the same hash -- and note that agreement is what makes the per-device
+    aspect safe: `settings_hash()` already folds in `target_aspect`, so two
+    devices resolve to two different CoverImageIds and two different cache
+    entries, with no cross-contamination and no extra bookkeeping."""
+    configured = getattr(config, "config_kobo_cover_padding_aspect", "kobo_libra_color") or "kobo_libra_color"
     return cover_preview.CoverPreviewSettings(
         enabled=bool(getattr(config, "config_kobo_cover_padding_enabled", False)),
-        target_aspect=getattr(config, "config_kobo_cover_padding_aspect", "kobo_libra_color") or "kobo_libra_color",
+        target_aspect=_requesting_device_aspect() or configured,
         fill_mode=getattr(config, "config_kobo_cover_padding_fill_mode", "edge_mirror") or "edge_mirror",
         manual_color=getattr(config, "config_kobo_cover_padding_color", "") or "",
     )
@@ -1569,9 +1733,15 @@ def HandleStateRequest(book_uuid):
             # Use the device's own timestamp so the GET response mirrors it back,
             # preventing the "newer PT" conflict popup. Official Kobo cloud does the same.
             lm_str = request_reading_state.get("LastModified")
-            request_lm = (datetime.strptime(lm_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-                          if lm_str else datetime.now(timezone.utc))
+            request_lm = parse_kobo_timestamp(lm_str)
             g.kobo_reading_state_lm = request_lm
+            if request_lm is None:
+                # ``None`` is an observation rejection, not permission to
+                # manufacture an ordering clock. Keep the parent's last
+                # accepted clock so the before_flush hook does not replace it
+                # with server ``now`` while the position itself is preserved.
+                g.kobo_reading_state_lm = getattr(
+                    kobo_reading_state, "last_modified", None)
 
             request_bookmark = request_reading_state["CurrentBookmark"]
             if request_bookmark:
@@ -1583,7 +1753,7 @@ def HandleStateRequest(book_uuid):
                     current_bookmark.location_value = location["Value"]
                     current_bookmark.location_type = location["Type"]
                     current_bookmark.location_source = location["Source"]
-                current_bookmark.last_modified = request_lm
+                _apply_kobo_last_modified(current_bookmark, request_lm)
                 update_results_response["CurrentBookmarkResult"] = {"Result": "Success"}
 
             request_statistics = request_reading_state["Statistics"]
@@ -1595,7 +1765,7 @@ def HandleStateRequest(book_uuid):
                 remaining = request_statistics.get("RemainingTimeMinutes")
                 if remaining is not None:
                     statistics.remaining_time_minutes = int(remaining)
-                statistics.last_modified = request_lm
+                _apply_kobo_last_modified(statistics, request_lm)
                 update_results_response["StatisticsResult"] = {"Result": "Success"}
 
             request_status_info = request_reading_state["StatusInfo"]
@@ -1607,7 +1777,7 @@ def HandleStateRequest(book_uuid):
                         book_read.times_started_reading += 1
                         book_read.last_time_started_reading = datetime.now(timezone.utc)
                     book_read.read_status = new_book_read_status
-                    book_read.last_modified = request_lm
+                    _apply_kobo_last_modified(book_read, request_lm)
                 update_results_response["StatusInfoResult"] = {"Result": "Success"}
         except (KeyError, TypeError, ValueError, StatementError):
             log.debug("Received malformed v1/library/<book_uuid>/state request.")
@@ -1616,13 +1786,63 @@ def HandleStateRequest(book_uuid):
 
         if request_bookmark and request_bookmark.get("ProgressPercent") is not None:
             push_reading_state_to_hardcover(current_user, book, request_bookmark["ProgressPercent"])
+            share_kobo_progress_with_koreader(
+                current_user.id, book.id, request_bookmark["ProgressPercent"])
 
         ub.session.merge(kobo_reading_state)
-        ub.session_commit()
+        # #1318 again, on the reading-state path: ``session_commit()`` returns
+        # False when it caught an OperationalError/InvalidRequestError and
+        # rolled back, and its docstring is explicit that callers whose answer
+        # depends on the write landing MUST check it. Answering "Success" for a
+        # rolled-back write makes the device clear its queue and keeps the
+        # server on the older position, with nothing anywhere reporting it.
+        if not ub.session_commit():
+            return "", 500
         return jsonify({
             "RequestResult": "Success",
             "UpdateResults": [update_results_response],
         })
+
+
+def share_kobo_progress_with_koreader(user_id, book_id, percentage):
+    """Publish a Kobo's reading percentage onto the carrier KOReader pulls from.
+
+    #1425 gap 1. KOReader fetches ``KOSyncProgress`` over kosync; a Kobo sync
+    wrote ``KoboBookmark`` and never that table, so a KOReader device had
+    nothing to fetch and carried on from where *it* last was. Same shape as
+    #1366, where the web reader was the missing producer.
+
+    What transfers is the percentage, not the position. A Kobo reports a
+    ``KoboSpan`` addressing the kepub *that device holds*, which KOReader's
+    engine cannot resolve, so the row is stored percentage-only and served as
+    ``position_kind: "percentage"``. Clients that have not advertised support
+    for that are served nothing, exactly as before (see
+    ``record_percentage_only_progress``).
+
+    Best-effort, and deliberately so: a Kobo's own sync is the required write
+    here, and it must not fail because the KOReader carrier could not be
+    written. On failure the device keeps its state and the next PUT retries.
+
+    :param user_id: Owner of the reading position.
+    :param book_id: Calibre book id — the key ``update_progress`` converges on.
+    :param percentage: Reading progress, 0-100, as the device reported it.
+    :return: None
+    """
+    # Imported lazily: ``kosync`` imports this module for
+    # ``push_reading_state_to_hardcover``, so a module-level import is a cycle.
+    from .progress_syncing.protocols.kosync import record_percentage_only_progress
+
+    try:
+        # A SAVEPOINT only contains what is flushed after it, so the Kobo's own
+        # bookmark, statistics and status writes have to be settled first or a
+        # rollback here would take them with it (#1318, same precondition the
+        # web reader path documents).
+        ub.session_flush()
+        with ub.session.begin_nested():
+            record_percentage_only_progress(user_id, book_id, percentage, device="Kobo")
+    except Exception as e:
+        log.warning("Could not share Kobo progress with KOReader for user %s book %s: %s",
+                    user_id, book_id, e)
 
 
 def push_reading_state_to_hardcover(user, book: db.Books, progress_percentage: int):
@@ -1682,6 +1902,58 @@ def get_ub_read_status(kobo_read_status):
         "Reading": ub.ReadBook.STATUS_IN_PROGRESS,
     }
     return string_to_enum_map[kobo_read_status]
+
+
+def parse_kobo_timestamp(value):
+    """Parse a Kobo ``LastModified`` into an aware UTC datetime, or ``None``.
+
+    Kobo sends ISO-8601 UTC, but **not** always to whole seconds: a Libra Colour
+    on 5.10.226356 sends ``2026-08-17T17:56:53.254Z`` (#1706). The previous
+    ``strptime(value, "%Y-%m-%dT%H:%M:%SZ")`` raised ValueError on the
+    fractional part, which the caller's ``except`` turned into a 400 -- so one
+    unexpected millisecond field failed the whole reading-state sync, and the
+    error text blamed a missing ``ReadingStates`` key.
+
+    Returns ``None`` rather than raising: this timestamp exists only to mirror
+    the device's own value back so it does not raise a "newer progress" popup.
+    Losing it costs a popup; failing the request costs the sync.
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    # fromisoformat only learned to accept a trailing "Z" in 3.11.
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _apply_kobo_last_modified(target, observed_clock):
+    """Apply a valid device clock, or retain the row's accepted clock.
+
+    The Kobo state columns have SQLAlchemy ``onupdate=now`` defaults. Merely
+    declining to assign ``last_modified`` on a rejected clock is insufficient:
+    changing another field would still replace it with server time. Marking the
+    loaded value as explicitly supplied keeps that real stored observation in
+    the UPDATE instead. Test doubles have no SQLAlchemy state and need no such
+    handling.
+    """
+    if observed_clock is not None:
+        target.last_modified = observed_clock
+        return
+    if hasattr(target, "_sa_instance_state"):
+        from sqlalchemy.orm.attributes import flag_modified
+        # Load an expired value before flagging it, then make SQLAlchemy include
+        # that value instead of firing the column's ``onupdate`` default.
+        target.last_modified
+        flag_modified(target, "last_modified")
 
 
 def get_or_create_reading_state(book_id):

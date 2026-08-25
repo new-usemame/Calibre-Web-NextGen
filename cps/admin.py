@@ -22,8 +22,9 @@ import subprocess
 import tempfile
 import fcntl
 
-from flask import Blueprint, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
+from flask import Blueprint, current_app, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
 from markupsafe import Markup
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from .cw_login import current_user
 from flask_babel import gettext as _
 from flask_babel import get_locale, format_time, format_datetime, format_timedelta, LazyString
@@ -42,6 +43,18 @@ from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config
 from .services.worker import WorkerThread
+from .services.kobo_import import (
+    KoboContentDatabaseError,
+    KoboUploadError,
+    MAX_KOBO_DATABASE_UPLOAD_BYTES,
+    ParsedKoboBook,
+    parse_kobo_device_books,
+    temporary_kobo_database,
+)
+from .services.kobo_reconcile import (
+    build_reconciliation_preview,
+    scan_from_candidates,
+)
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
 from .cw_babel import get_available_translations, get_available_locale, get_user_locale_language
@@ -255,10 +268,8 @@ def trigger_hardcover_auto_fetch():
             return json.dumps(show_text), 400
         
         # Get settings
-        import sys as _sys
-        if constants.SCRIPTS_DIR not in _sys.path:
-            _sys.path.insert(1, constants.SCRIPTS_DIR)
-        from cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
         from cps.services.worker import WorkerThread
         
@@ -657,6 +668,10 @@ def configuration():
                                  config=config,
                                  provider=oauth_bb.oauthblueprints,
                                  feature_support=feature_support,
+                                 kobo_two_way_emergency_disabled=(
+                                     os.environ.get("CWNG_KOBO_TWO_WAY_ANNOTATIONS", "").strip().lower()
+                                     in {"0", "false", "off", "no"}
+                                 ),
                                  hardcover_token_status=hardcover_status,
                                  title=_("Basic Configuration"), page="config")
 
@@ -1425,10 +1440,37 @@ def ajax_kobo_resend(userid, bookid):
 
 def do_kobo_resend(userid, bookid):
     # Force re-delivery of one book to one user's Kobo on the next sync.
-    # Clears the (user_id, book_id) row from kobo_synced_books so the
-    # sync emits NewEntitlement, and bumps Books.last_modified so the
-    # sync filter (Books.last_modified > sync_token.books_last_modified)
-    # picks the book up regardless of where the device's cursor is.
+    #
+    # Two writes, and only the second does what it says on its own:
+    #
+    #   * bump Books.last_modified, so the sync filter
+    #     (Books.last_modified > sync_token.books_last_modified) picks the book
+    #     up regardless of where the device's cursor sits;
+    #   * clear the (user_id, book_id) row from kobo_synced_books.
+    #
+    # ⚠️ This comment used to say the deletion is what makes the sync emit
+    # NewEntitlement. It is not, and believing so is what made the only
+    # regression test for this helper assert a causal chain the code cannot
+    # perform (F-cc5efb). get_kobo_created_ts (cps/kobo.py) derives the
+    # NewEntitlement / ChangedEntitlement choice from Books.timestamp and the
+    # joined date_added ONLY — it never reads kobo_synced_books, and the sync
+    # query deliberately does not filter on that table either because it is
+    # user-keyed and doing so would break multi-device sync (cps/kobo.py, see
+    # the comments around the changed-book query).
+    #
+    # The deletion still matters, by a different route: HandleSyncRequest resets
+    # the WHOLE sync token — books_last_created included — to datetime.min when
+    # the user has no kobo_synced_books rows left at all (cps/kobo.py, "if no
+    # books synced don't respect sync_token"). So removing the user's LAST row
+    # does produce NewEntitlement, which is the single-book case anyone would
+    # test by hand and is presumably how the wrong explanation survived. With
+    # any other synced row remaining, this emits ChangedEntitlement.
+    #
+    # 🚨 Whether a Kobo re-downloads the file on a ChangedEntitlement is
+    # UNOBSERVED (F-3e383a). The success message below tells the admin the
+    # device "will re-receive the book"; that claim is only established for the
+    # empty-table case above. Do not strengthen it without measuring on
+    # hardware.
     book = calibre_db.session.query(db.Books).filter(db.Books.id == bookid).first()
     if book is None:
         message = _("Book {} not found").format(bookid)
@@ -1450,6 +1492,147 @@ def do_kobo_resend(userid, bookid):
     ub.session_commit(message)
     return Response(json.dumps([{"type": "success", "message": message}]),
                     mimetype='application/json')
+
+
+_KOBO_RECONCILE_TOKEN_SALT = "kobo-stranded-entitlement-preview"
+_KOBO_RECONCILE_TOKEN_MAX_AGE = 30 * 60
+
+
+def _kobo_reconcile_serializer():
+    return URLSafeTimedSerializer(
+        current_app.config["SECRET_KEY"], salt=_KOBO_RECONCILE_TOKEN_SALT)
+
+
+def _kobo_reconcile_user(user_id):
+    return ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first()
+
+
+def _kobo_reconciliation_preview(user_id, scan):
+    tombstone_uuids = {
+        row.book_uuid for row in
+        ub.session.query(ub.KoboDeletedBook.book_uuid).filter(
+            ub.KoboDeletedBook.user_id == user_id).all()
+    }
+    synced_book_uuids = {
+        row.book_uuid for row in
+        ub.session.query(ub.KoboSyncedBooks.book_uuid).filter(
+            ub.KoboSyncedBooks.user_id == user_id,
+            ub.KoboSyncedBooks.book_uuid.isnot(None),
+        ).all()
+    }
+    return build_reconciliation_preview(
+        scan,
+        existing_tombstone_uuids=tombstone_uuids,
+        synced_book_uuids=synced_book_uuids,
+        book_lookup=calibre_db.get_book_by_uuid,
+    )
+
+
+def _render_kobo_reconcile(user, preview=None, confirmation_token=None,
+                           result=None, error=None):
+    return render_title_template(
+        "kobo_reconcile.html",
+        user=user,
+        preview=preview,
+        confirmation_token=confirmation_token,
+        result=result,
+        error=error,
+        max_upload_mb=MAX_KOBO_DATABASE_UPLOAD_BYTES // (1024 * 1024),
+        title=_("Reconcile deleted Kobo books for %(user)s", user=user.name),
+        page="edituser",
+    )
+
+
+@admi.route("/admin/user/<int:user_id>/kobo-reconcile", methods=["GET", "POST"])
+@user_login_required
+@admin_required
+def kobo_reconcile(user_id):
+    user = _kobo_reconcile_user(user_id)
+    if user is None or user.role_anonymous():
+        abort(404)
+    if request.method == "GET":
+        return _render_kobo_reconcile(user)
+
+    try:
+        with temporary_kobo_database(
+                request.files.get("file"), request.content_length or 0) as sqlite_path:
+            scan = parse_kobo_device_books(sqlite_path)
+    except KoboUploadError as upload_error:
+        messages = {
+            "no_file": _("Choose a KoboReader.sqlite file."),
+            "not_sqlite": _("The uploaded file is not a SQLite database."),
+            "too_large": _(
+                "The file is larger than %(max)d MB.",
+                max=MAX_KOBO_DATABASE_UPLOAD_BYTES // (1024 * 1024),
+            ),
+        }
+        return _render_kobo_reconcile(user, error=messages[upload_error.code]), \
+            upload_error.status_code
+    except KoboContentDatabaseError as database_error:
+        return _render_kobo_reconcile(user, error=str(database_error)), 400
+
+    preview = _kobo_reconciliation_preview(user.id, scan)
+    confirmation_token = None
+    if preview.candidates:
+        confirmation_token = _kobo_reconcile_serializer().dumps({
+            "user_id": user.id,
+            "books": [
+                [book.uuid, book.title]
+                for book in preview.candidates
+            ],
+        })
+    return _render_kobo_reconcile(
+        user, preview=preview, confirmation_token=confirmation_token)
+
+
+@admi.route("/admin/user/<int:user_id>/kobo-reconcile/confirm", methods=["POST"])
+@user_login_required
+@admin_required
+def kobo_reconcile_confirm(user_id):
+    user = _kobo_reconcile_user(user_id)
+    if user is None or user.role_anonymous():
+        abort(404)
+    try:
+        payload = _kobo_reconcile_serializer().loads(
+            request.form.get("confirmation_token", ""),
+            max_age=_KOBO_RECONCILE_TOKEN_MAX_AGE,
+        )
+        if payload.get("user_id") != user.id:
+            raise BadSignature("preview belongs to another user")
+        preview_books = {
+            str(book_uuid): ParsedKoboBook(uuid=str(book_uuid), title=str(title))
+            for book_uuid, title in payload.get("books", [])
+        }
+    except (BadSignature, SignatureExpired, TypeError, ValueError):
+        return _render_kobo_reconcile(
+            user,
+            error=_("This preview is invalid or expired. Upload the device database again."),
+        ), 400
+
+    selected_uuids = list(dict.fromkeys(request.form.getlist("book_uuid")))
+    if not selected_uuids:
+        return _render_kobo_reconcile(
+            user, error=_("Select at least one book to archive.")), 400
+    if any(book_uuid not in preview_books for book_uuid in selected_uuids):
+        return _render_kobo_reconcile(
+            user,
+            error=_("The selected books do not match this preview. Upload the device database again."),
+        ), 400
+    candidates = tuple(preview_books[book_uuid] for book_uuid in selected_uuids)
+
+    preview = _kobo_reconciliation_preview(user.id, scan_from_candidates(candidates))
+    written = kobo_sync_status.record_user_book_deletions(
+        user.id,
+        [book.uuid for book in preview.candidates],
+        session=ub.session,
+    )
+    result = {
+        "written": written,
+        "already_scheduled": preview.already_scheduled,
+        "skipped_present": preview.skipped_present,
+        "skipped_unresolved": preview.skipped_unresolved,
+    }
+    return _render_kobo_reconcile(user, result=result)
 
 
 def check_valid_read_column(column):
@@ -2652,6 +2835,7 @@ def _configuration_update_helper():
         _config_checkbox_int(to_save, "config_register_email")
         prev_kobo_sync = bool(config.config_kobo_sync)
         reboot_required |= _config_checkbox_int(to_save, "config_kobo_sync")
+        _config_checkbox_int(to_save, "config_kobo_two_way_annotation_sync")
         _config_int(to_save, "config_external_port")
         _config_checkbox_int(to_save, "config_kobo_proxy")
         _config_checkbox(to_save, "config_kobo_prefer_kepub")
@@ -2787,6 +2971,7 @@ def _configuration_update_helper():
 
         # security configuration
         _config_checkbox(to_save, "config_disable_standard_login")
+        _config_checkbox(to_save, "config_enable_oauth_auto_forward")
         _config_checkbox(to_save, "config_enable_oauth_group_admin_management")
         _config_checkbox(to_save, "config_check_extensions")
         _config_checkbox(to_save, "config_use_https")
@@ -2933,6 +3118,9 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.denied_column_value = config.config_denied_column_value
         # No default value for kobo sync shelf setting
         content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync", 0) == "on"
+        content.kobo_two_way_annotation_sync = (
+            to_save.get("kobo_two_way_annotation_sync", 0) == "on"
+        )
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
         ub.session.add(content)
         ub.session.commit()
@@ -3013,6 +3201,10 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         # the setting, so the two cannot disagree.
         kobo_sync_status.update_on_sync_shelfs(content.id)
     content.opds_only_shelves_sync = int(to_save.get("opds_only_shelves_sync") == "on") or 0
+    if "kobo_two_way_annotation_sync_present" in to_save:
+        content.kobo_two_way_annotation_sync = int(
+            to_save.get("kobo_two_way_annotation_sync") == "on"
+        ) or 0
     # Auto-send and metadata fetch settings
     content.auto_send_enabled = to_save.get("auto_send_enabled") == "on"
     content.auto_metadata_fetch = to_save.get("auto_metadata_fetch") == "on"

@@ -41,6 +41,7 @@ def _fake_user(**kw):
     there). Deliberately NOT a stub of serialize_user itself — see
     test_serialize_user_carries_kobo_only_shelves_sync."""
     defaults = dict(id=1, name="admin", locale="en", theme=0,
+                    is_authenticated=True,
                     ui_font_body=None, ui_font_display=None,
                     kobo_only_shelves_sync=0, view_settings={},
                     sidebar_view=0, sidebar_order=None)
@@ -111,8 +112,9 @@ def test_shelf_item_includes_kobo_sync():
     from cps.api import magicshelves as mod
     with patch.object(mod.magic_shelf, "system_magic_shelf_display_name",
                       lambda s: s.name):
-        assert mod._shelf_item(_shelf(kobo_sync=True), 7)["kobo_sync"] is True
-        assert mod._shelf_item(_shelf(kobo_sync=False), 7)["kobo_sync"] is False
+        viewer = _fake_user(id=7)
+        assert mod._shelf_item(_shelf(kobo_sync=True), viewer)["kobo_sync"] is True
+        assert mod._shelf_item(_shelf(kobo_sync=False), viewer)["kobo_sync"] is False
 
 
 # ── the toggle endpoint ──────────────────────────────────────────────────────
@@ -246,7 +248,7 @@ def test_spa_shelf_view_renders_the_toggle():
     assert "useToggleMagicShelfKoboSync" in src
     assert "me?.features?.kobo_sync" in src
     assert "me?.features?.kobo_sync_magic_shelves" in src
-    assert "data.is_owner" in src
+    assert "data.can_kobo_sync" in src
 
 
 # ── #866 regression found while wiring #870 ──────────────────────────────────

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import posixpath
 import re
 import uuid
 from pathlib import PurePosixPath
@@ -11,6 +12,7 @@ from pathlib import PurePosixPath
 MAX_CONTENT_ID_LENGTH = 2048
 _UUID = r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"
 _CANONICAL = re.compile(rf"^({_UUID})!!(.+)$")
+_KOBO_DEVICE = re.compile(rf"^({_UUID})!([^!]+)!(.+)$")
 _LEGACY_FILE = re.compile(
     r"^file:///mnt/(?:onboard|sd|sdcard)/([^?#]+)#\([0-9]{1,4}\)(.+)$"
 )
@@ -47,13 +49,33 @@ def _chapter(value: str) -> str:
         raise ContentIdError("content_id chapter path is not relative")
     if any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise ContentIdError("content_id chapter path contains control characters")
-    if any(part in ("", ".", "..") for part in value.split("/")):
+    # Preserve the existing rejection of empty path segments before normpath
+    # can erase them. Besides repeated separators, this rejects URL authority
+    # syntax such as "http://example.test/chapter.xhtml".
+    if "" in value.split("/"):
         raise ContentIdError("content_id chapter path contains an unsafe segment")
-    return value
+    # Real clients emit CONTAINED traversals. A Kobo whose OPF references a file
+    # outside the OPF directory (an EPUB3 nav at the zip root declared
+    # href="../nav.xhtml") joins paths without normalizing, so it sends e.g.
+    # "OPS/../OPS/chapter-017.xml" -- unambiguously "OPS/chapter-017.xml".
+    # This guard exists to stop a path ESCAPING the book container, not to reject
+    # every dot segment; rejecting the contained case cost real annotations their
+    # content_id and left them unresolvable in the web reader.
+    normalized = posixpath.normpath(value)
+    if (normalized.startswith("../") or normalized.startswith("/")
+            or normalized in (".", "..")):
+        raise ContentIdError("content_id chapter path escapes the book container")
+    return normalized
 
 
-def normalize_content_id(value, *, book_uuid=None, allow_legacy_file_uri=False):
-    """Return canonical ``uuid!!chapter`` or reject; ``None`` remains ``None``."""
+def normalize_content_id(value, *, book_uuid=None, allow_legacy_file_uri=False,
+                         allow_kobo_device_content_id=False):
+    """Return canonical ``uuid!!chapter`` or reject; ``None`` remains ``None``.
+
+    ``allow_kobo_device_content_id`` is for KoboReader.sqlite recovery imports.
+    It admits the device-only ``uuid!opf-dir!href`` spelling without widening
+    the ordinary wire/portable grammar.
+    """
     if value is None:
         return None
     if not isinstance(value, str) or not value or len(value) > MAX_CONTENT_ID_LENGTH:
@@ -70,6 +92,17 @@ def normalize_content_id(value, *, book_uuid=None, allow_legacy_file_uri=False):
         if expected and actual != expected:
             raise ContentIdError("content_id does not belong to this book")
         return f"{actual}!!{_chapter(match.group(2))}"
+    if allow_kobo_device_content_id:
+        match = _KOBO_DEVICE.fullmatch(value)
+        if match:
+            actual = _normal_uuid(match.group(1))
+            if expected and actual != expected:
+                raise ContentIdError("content_id does not belong to this book")
+            # Validate the complete folded path. This keeps traversal, control,
+            # empty-segment, relative-path, and length checks identical to the
+            # canonical grammar instead of trusting either device segment.
+            chapter = _chapter(f"{match.group(2)}/{match.group(3)}")
+            return f"{actual}!!{chapter}"
     if allow_legacy_file_uri:
         match = _LEGACY_FILE.fullmatch(value)
         if match and expected:

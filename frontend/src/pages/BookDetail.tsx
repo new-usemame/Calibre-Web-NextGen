@@ -4,7 +4,9 @@ import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image 
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
+  useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
 } from '../lib/queries';
+import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
 import { Pill } from '../components/Pill';
 import { AddToShelf } from '../components/AddToShelf';
@@ -14,11 +16,25 @@ import { AUTHOR_SEPARATOR } from '../lib/authors';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import type { CustomColumn, CustomColumnValue, EntityRef } from '../lib/api';
-import { ApiError, resourceUrl } from '../lib/api';
+import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { BookUserNotices } from '../components/UserNotices';
+import { backTarget } from '../lib/backLink';
+
+/* `fetchpriority` is a plain DOM attribute. react-dom 18.3 has no knowledge of
+   it, so the camelCase `fetchPriority` that @types/react declares would trip its
+   "React does not recognize the prop" development warning — it still renders,
+   because setAttribute lowercases the name, but the warning is noise. Spelling
+   it the way the DOM does avoids that. It is declared with its own type rather
+   than asserted to be ImgHTMLAttributes, because it demonstrably is NOT one of
+   those attributes in these typings — that is the whole reason this exists.
+   Spreading a typed variable (not an inline literal) is what keeps TS happy.
+   Drop the indirection on the React 19 upgrade, which knows the attribute. */
+type LowercaseFetchPriority = { fetchpriority: 'high' | 'low' | 'auto' };
+const COVER_PRIORITY: LowercaseFetchPriority = { fetchpriority: 'high' };
 
 function formatBytes(bytes: number): string {
   const mb = bytes / (1024 * 1024);
@@ -249,8 +265,13 @@ export function BookDetail() {
   const sendToEreader = useSendToEreader(id);
   const deleteBook = useDeleteBook(id);
   const reloadMetadata = useReloadMetadata(id);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const me = useMe().data;
+  /* Stage 0 two-way sync state chip (read-only; manage it on Account). */
+  const twoWay = useKoboTwoWayAnnotations({
+    enabled: !!me && !me.role?.anonymous && !!me.features?.kobo_two_way_annotations,
+  });
+  const bookBackTarget = backTarget(location);
   // The send-to-e-reader button only renders when mail is configured + the user
   // can download, so defer the account fetch (which carries the saved e-reader
   // address used to prefill the recipient field, #715) until that's possible.
@@ -260,12 +281,19 @@ export function BookDetail() {
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reloadMessage, setReloadMessage] = useState('');
+  // Shelf membership for the metadata list (#1254). Both queries are already
+  // in flight for the always-rendered AddToShelf popover below and share its
+  // cache keys, so reading them here costs no extra request.
+  const shelfMembership = useBookShelves(id).data;
+  const visibleShelves = useShelves().data;
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !book) {
     return (
       <main className={styles.container}>
-        <Link href="/" className={styles.back}>{t('← Library')}</Link>
+        <Link href={bookBackTarget.href} className={styles.back}>
+          {t(bookBackTarget.isOrigin ? '← Back' : '← Library')}
+        </Link>
         <EmptyState message={error instanceof Error ? error.message : t('Book not found.')} />
       </main>
     );
@@ -273,19 +301,43 @@ export function BookDetail() {
 
   const primaryReadTarget = getPrimaryReadTarget(book.id, book.formats.map((f) => f.format));
 
+  // The membership endpoint returns ids only, and both it and the shelf list
+  // apply the same server-side visibility filter (own shelves + public ones),
+  // so every id here resolves to a name the caller is allowed to see.
+  const onShelfIds = new Set(shelfMembership?.shelf_ids ?? []);
+  const bookShelves = (visibleShelves?.items ?? []).filter((s) => onShelfIds.has(s.id));
+
   return (
     <main className={styles.container}>
-      <Link href="/" className={styles.back}>{t('← Library')}</Link>
+      <Link href={bookBackTarget.href} className={styles.back}>
+        {t(bookBackTarget.isOrigin ? '← Back' : '← Library')}
+      </Link>
+
+      <BookUserNotices bookId={book.id} />
 
       <div className={styles.layout}>
         {/* LEFT: cover */}
         <div className={styles.coverCol}>
           <div className={styles.coverWrap}>
+            {/* This cover is the page's largest paint, and the SPA builds it in
+                JS — the preload scanner never sees it, so it starts at the
+                browser's default (low) image priority. COVER_PRIORITY lifts it.
+                `decoding="async"` is a HINT, not a guarantee: it allows the
+                browser to present the rest of the page before this image's
+                decode completes — it does not promise a particular thread, and
+                the browser may also choose to present the image later. The srcset offers sm at 1x and md at 2x —
+                the resolution constants ARE density multipliers (1/2/4) and the
+                column is a fixed 280px, so md suits 2x while lg would usually be
+                the unresized original again (its 4x target height exceeds most
+                covers, and the thumbnailer only downscales). */}
             {book.cover_url ? (
               <img
                 src={resourceUrl(book.cover_url)}
+                srcSet={book.cover_srcset ? resourceSrcSet(book.cover_srcset) : undefined}
                 alt={book.title}
                 className={styles.cover}
+                decoding="async"
+                {...COVER_PRIORITY}
               />
             ) : (
               <div className={styles.coverFallback} aria-label={book.title}>
@@ -307,9 +359,12 @@ export function BookDetail() {
         {/* RIGHT: info */}
         <div className={styles.infoCol}>
           <div>
-            <h1 className={styles.title}>{book.title}</h1>
+            {/* dir="auto" per field (#1073): direction follows each string's own
+                first strong character, so a Hebrew title and a Latin series name
+                on the same page each render correctly. */}
+            <h1 className={styles.title} dir="auto">{book.title}</h1>
             {book.authors.length > 0 && (
-              <p className={styles.authors}>
+              <p className={styles.authors} dir="auto">
                 {book.authors.map((a, i) => (
                   <span key={a.id}>
                     {i > 0 && AUTHOR_SEPARATOR}
@@ -319,7 +374,7 @@ export function BookDetail() {
               </p>
             )}
             {book.series && (
-              <p className={styles.series}>
+              <p className={styles.series} dir="auto">
                 <Link href={`/series/${book.series.id}`} className={styles.metaLink}>
                   {book.series.name}
                 </Link>
@@ -358,7 +413,7 @@ export function BookDetail() {
           </div>
 
           {/* Actions */}
-          <div className={styles.actions}>
+          <div className={styles.actions} data-testid="book-actions">
             {primaryReadTarget ? (
               <Link href={primaryReadTarget} className={styles.actionPrimary}>
                 {t('Read now')}
@@ -478,6 +533,19 @@ export function BookDetail() {
               {t('Highlights')}
             </Link>
 
+            {/* Stage 0 per-book two-way state, when the user opted in and the
+                book has pipeline state. Read-only; manage it on Account. */}
+            {(() => {
+              const twoWayBook = selectKoboTwoWayBook(twoWay.data, book.id);
+              if (!twoWay.data?.enabled || !twoWayBook) return null;
+              return (
+                <Link href="/account" className={styles.twoWayChip}>
+                  {t('Kobo two-way sync: {state}', { state: authorityLabel(t, twoWayBook, twoWay.data.scope) })}
+                  {opaqueLabel(t, twoWayBook) && <span className={styles.twoWayBlocked}>{opaqueLabel(t, twoWayBook)}</span>}
+                </Link>
+              );
+            })()}
+
             {/* Personal action, deliberately outside the delete-role gate. It
                 sits immediately beside Delete when Delete is available and is
                 still the final action for ordinary users. Guest sessions cannot
@@ -498,10 +566,18 @@ export function BookDetail() {
               </button>
             )}
 
-            {/* Delete the whole book — DB + files (fork #803). Hidden entirely for
-                users without the delete role; the server re-checks and returns 403,
-                so this is a UX gate, not the security boundary. */}
-            {me?.role?.delete_books && (
+          </div>
+          <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
+
+          {/* Whole-book deletion is intentionally separated from the wrapping row
+              of ordinary action chips (#1046). The server still re-checks the role;
+              this gate and grouping are the discoverability/UX layer. */}
+          {me?.role?.delete_books && (
+            <section className={styles.dangerZone} data-testid="book-destructive-actions"
+              aria-labelledby={`delete-book-heading-${book.id}`}>
+              <h2 id={`delete-book-heading-${book.id}`} className={styles.dangerZoneTitle}>
+                {t('Delete book')}
+              </h2>
               <button
                 type="button"
                 className={styles.actionDanger}
@@ -523,12 +599,8 @@ export function BookDetail() {
                 <Trash2 size={14} aria-hidden="true" focusable={false} />
                 {deleteBook.isPending ? t('Deleting…') : t('Delete')}
               </button>
-            )}
-          </div>
-          <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
-
-          {deleteError && (
-            <p className={styles.deleteErr} role="alert">{deleteError}</p>
+              {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
+            </section>
           )}
 
           {/* Send-to-e-reader panel */}
@@ -628,6 +700,22 @@ export function BookDetail() {
                 </dd>
               </>
             )}
+            {bookShelves.length > 0 && (
+              <>
+                {/* Always the plural msgid: "Shelf" is translated in no locale
+                    today, so a count-switched label would render English for a
+                    single shelf everywhere. */}
+                <dt className={styles.metaLabel}>{t('Shelves')}</dt>
+                <dd className={styles.metaValue} data-testid="book-shelves">
+                  {bookShelves.map((s, i) => (
+                    <span key={s.id}>
+                      {i > 0 && ', '}
+                      <Link href={`/shelf/${s.id}`} className={styles.metaLink}>{s.name}</Link>
+                    </span>
+                  ))}
+                </dd>
+              </>
+            )}
             {book.identifiers.map((id, i) => (
               <Fragment key={`id-${i}`}>
                 <dt className={styles.metaLabel}>{id.label || id.type.toUpperCase()}</dt>
@@ -641,7 +729,7 @@ export function BookDetail() {
             {(book.custom_columns ?? []).map((column) => (
               <Fragment key={`custom-${column.id}`}>
                 <dt className={styles.metaLabel}>{column.name}</dt>
-                <dd className={styles.metaValue}>
+                <dd className={styles.metaValue} dir="auto">
                   {column.datatype === 'comments' && column.values[0]?.value_html ? (
                     <span
                       // value_html is sanitized by the API serializer.
@@ -661,6 +749,7 @@ export function BookDetail() {
           {book.description_html && (
             <div
               className={styles.description}
+              dir="auto"
               // description_html is sanitized server-side in serialize_book_detail
               // (cps/clean_html.clean_string — bleach/nh3 allowlist, same as the
               // legacy templates), so it is safe to render here.

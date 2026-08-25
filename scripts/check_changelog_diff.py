@@ -13,6 +13,11 @@ import sys
 # This guard cares about heading identity, not date typography.
 RELEASE_HEADING = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]", re.MULTILINE)
 ENTRY_LEAD = re.compile(r"^- \*\*", re.MULTILINE)
+FRAGMENT_PATH = re.compile(r"^changelog\.d/[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
+NON_SHIPPING_PATH_PREFIXES = ("docs/", "findings/", "notes/", "tests/", "wiki-src/")
+NON_SHIPPING_PATHS = frozenset(
+    {"changelog.d/README.md", "scripts/check_changelog_diff.py"}
+)
 
 
 def _distinct_entries(text: str) -> set[str]:
@@ -77,6 +82,42 @@ def pull_request_regressions(
     return structural_regressions(target, proposed)
 
 
+def _is_non_shipping_path(path: str) -> bool:
+    return path in NON_SHIPPING_PATHS or path.startswith(
+        NON_SHIPPING_PATH_PREFIXES
+    )
+
+
+def changelog_requirement_errors(changed_paths: list[str]) -> list[str]:
+    """Require a changelog entry unless every changed path is non-shipping."""
+    if "CHANGELOG.md" in changed_paths:
+        return []
+    if any(
+        FRAGMENT_PATH.fullmatch(path) and path != "changelog.d/README.md"
+        for path in changed_paths
+    ):
+        return []
+    if changed_paths and all(_is_non_shipping_path(path) for path in changed_paths):
+        return []
+    return [
+        "This PR changes shipping paths but neither CHANGELOG.md nor "
+        "changelog.d/<pr-or-slug>.md. Add a categorized changelog fragment; "
+        "changelog.d/README.md documents the format."
+    ]
+
+
+def pull_request_errors(
+    changed_paths: list[str],
+    target: str,
+    branch_point: str,
+    proposed: str,
+) -> list[str]:
+    """Return every requirement and structural error for a pull request."""
+    errors = changelog_requirement_errors(changed_paths)
+    errors.extend(pull_request_regressions(target, branch_point, proposed))
+    return errors
+
+
 def _file_at(ref: str) -> str:
     result = subprocess.run(
         ["git", "show", f"{ref}:CHANGELOG.md"],
@@ -105,6 +146,34 @@ def _merge_base(base_ref: str, head_ref: str) -> str:
     return result.stdout.strip()
 
 
+def _changed_paths(branch_point: str, head_ref: str, cwd=None) -> list[str]:
+    # --no-renames, deliberately. With rename detection on, `git mv` out of a
+    # shipping directory is reported by its DESTINATION only, so
+    # `git mv cps/thing.py docs/thing.py` reaches the classifier as a lone
+    # `docs/` path -- non-shipping -- and a module that vanished from the
+    # application merges with no release note. Splitting the rename into its
+    # delete and its add keeps the shipping side visible to the guard.
+    result = subprocess.run(
+        ["git", "diff", "--no-renames", "--name-only", "-z", branch_point, head_ref],
+        check=False,
+        capture_output=True,
+        # `cwd` exists so a test can point this at a throwaway repository
+        # WITHOUT chdir()ing the process. A test-local chdir is global to the
+        # interpreter and perturbs anything running on a background thread.
+        cwd=cwd,
+    )
+    if result.returncode:
+        detail = result.stderr.decode(errors="replace").strip() or "git diff failed"
+        raise RuntimeError(
+            f"cannot list PR paths between {branch_point} and {head_ref}: {detail}"
+        )
+    return [
+        raw.decode("utf-8", errors="surrogateescape")
+        for raw in result.stdout.split(b"\0")
+        if raw
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Reject structural CHANGELOG.md loss between two git refs."
@@ -115,7 +184,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         branch_point = _merge_base(args.base_ref, args.head_ref)
-        errors = pull_request_regressions(
+        errors = pull_request_errors(
+            _changed_paths(branch_point, args.head_ref),
             _file_at(args.base_ref),
             _file_at(branch_point),
             _file_at(args.head_ref),
@@ -132,7 +202,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         "CHANGELOG integrity guard passed: "
-        "no PR-authored release structure was lost."
+        "the entry requirement is satisfied or every changed path is "
+        "non-shipping, and no PR-authored release structure was lost."
     )
     return 0
 

@@ -10,15 +10,14 @@ import re
 import unicodedata
 from difflib import SequenceMatcher
 
-from cps import constants, logger, db
+from cps import logger, db
 from cps.metadata_constants import (
     DEFAULT_METADATA_PROVIDER_HIERARCHY,
     DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON,
 )
 from cps.search_metadata import cl as metadata_providers
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 log = logger.create()
 
@@ -338,12 +337,41 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
                 updated = True
                 cover_updated = True
 
+        if cover_updated:
+            # A replaced cover IS a book change and has to be recorded as one.
+            # Writing cover.jpg alone leaves Books.last_modified untouched, and
+            # that column is the version token every cover URL carries — so an
+            # automated metadata fetch used to swap the image while every UI kept
+            # asking for the old URL. Cover responses are cacheable now, which
+            # turns that from "stale until the page reloads" into "stale until
+            # the browser evicts it", so this bump is load-bearing rather than
+            # cosmetic. Single source of truth: helper.mark_book_modified.
+            #
+            # set_dirty=False on purpose: `book` belongs to calibre_db_instance's
+            # session, while helper's set_metadata_dirty writes through helper's
+            # own module-level calibre_db — a different session, and the wrong
+            # one to touch from the ingest subprocess. The caller owns the
+            # metadata write-back for this very fetch; the timestamp is the part
+            # that was being dropped, and it is a plain attribute assignment.
+            from cps import helper
+            helper.mark_book_modified(book, set_dirty=False)
+
         if updated:
             calibre_db_instance.session.commit()
             if cover_updated:
+                from cps import helper
+                # #707: the new cover must also be embedded into the book file,
+                # not only written to cover.jpg. Best-effort by design — it
+                # queues an enforcement record, it does not perform the embed.
+                # AFTER the commit: the enforcer reads the book back out of
+                # metadata.db, so a record published ahead of the transaction
+                # can be consumed against the pre-commit row.
+                try:
+                    helper.log_metadata_change(book, {'cover': True})
+                except Exception as e:
+                    log.warning(f"Cover enforcement record failed for book {book.id}: {e}")
                 # Regenerate the cached thumbnails so the new cover shows in
                 # the grid, same as a manual cover edit.
-                from cps import helper
                 try:
                     helper.replace_cover_thumbnail_cache(
                         book.id, book_path=book.path,

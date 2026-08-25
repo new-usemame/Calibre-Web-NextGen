@@ -1,0 +1,13 @@
+{
+  "area": "ingest",
+  "body": "PRE-EXISTING, unchanged by #1744, and NOT a privilege-boundary crossing. Raised by the\nsecurity review of #1744 for awareness, and recorded here so it is not rediscovered.\n\n`root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run:40` does\n`echo $((timeout_minutes * 60))` where `timeout_minutes` comes from\n`sqlite3 /config/cwa.db \"SELECT ingest_timeout_minutes FROM cwa_settings LIMIT 1;\"`.\nBash arithmetic contexts recursively evaluate variable contents, so a non-numeric value\nthere is a shell-eval primitive rather than a parse error. Sibling reads in the same file\nshare the shape.\n\nWhy it is NOT being fixed as part of #1744:\n- the value is settable only by an operator/admin who already commands the conversion\n  pipeline, so no privilege boundary is crossed;\n- #1744 neither introduced it nor made it more reachable, and widening that PR's scope\n  would have obscured the shutdown fix it exists to deliver.\n\nFix direction when someone does take it: validate the DB value as an integer before it\nreaches `$(( ))` — e.g. `case $v in (*[!0-9]*|'') v=15;; esac` — rather than relying on\nthe column's intended type. Cheap, and it removes the class rather than this instance.",
+  "created": "2026-08-18",
+  "id": "F-fc734f",
+  "refs": [
+    "#1744"
+  ],
+  "severity": "security",
+  "source": "audit",
+  "status": "open",
+  "title": "cwa-ingest-service evaluates a DB-sourced value in an arithmetic context (shell-eval primitive)"
+}

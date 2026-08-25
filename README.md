@@ -29,6 +29,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - **New here?** See [Quick start](#quick-start) below.
 - **Want to back the work?** [**Sponsor on GitHub**](https://github.com/sponsors/new-usemame) — no rewards, no paywalled features, one-time or monthly. [Here's what it actually pays for.](#supporting-the-project)
 - **Setting up with an AI assistant** (Claude, ChatGPT, etc.)? Point it at [`AI_README.md`](AI_README.md) — a setup guide written for the assistant to follow, verify, and hand back to you working.
+- **Wondering how AI is used here?** [How AI is used](#how-ai-is-used) — used heavily to develop this fork, not at all in the software you run, and what gates it.
 
 ---
 
@@ -58,6 +59,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - [Differences from upstream](#differences-from-upstream)
 - [Contributing](#contributing)
 - [Supporting the project](#supporting-the-project)
+- [How AI is used](#how-ai-is-used)
 - [Credits](#credits)
 
 ---
@@ -412,7 +414,7 @@ Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input w
 To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
 
 ```
-docker exec -e HOME=/config calibre-web /app/calibre/calibre-customize -a "/config/.config/calibre/plugins/<plugin file>.zip"
+docker exec -e HOME=/config calibre-web /opt/calibre/calibre-customize -a "/config/.config/calibre/plugins/<plugin file>.zip"
 ```
 
 The feature is off by default because it runs third-party plugin code inside your container — only install plugins you trust, from their official release pages. Which plugins are appropriate to use is your call.
@@ -524,6 +526,41 @@ Read your CWA library on a Kobo e-reader, with reading progress syncing both way
 2. Open your user page (Admin → Users → your user, or your own profile) and click **Create/View** next to **Kobo Sync Token**. The dialog shows the exact `api_endpoint=` line for your account.
 3. Plug the Kobo into a computer over USB and open `.kobo/Kobo/Kobo eReader.conf` in a text editor. Add or replace the `api_endpoint=` line with the one from the dialog, save, and eject the device cleanly.
 4. On the Kobo, sync. Books on your Kobo Sync shelves appear on the device, and progress flows back to CWA.
+
+> ### ℹ️ Where your highlights travel, and how to check
+>
+> `api_endpoint` routes **library sync**. Your **highlights and notes** travel over a separate
+> reading-services channel governed by a different key, `reading_services_host`.
+>
+> **You should not normally need to touch that key.** CWA advertises the right value during sync
+> initialization, and a device that performs a full initialization against your server adopts it on
+> its own. That is the supported path.
+>
+> 🚨 **Do not hand-edit `reading_services_host` in the conf file.** Doing so has been measured to
+> break syncing outright on at least one device — a Kobo Clara BW on firmware 4.42.23291 began
+> failing every sync with `FailedSync / WebRequestErr`, and recovered only when the key was set back
+> to `readingservices.kobo.com`. A Kobo Libra Colour on 4.45.23697 is unaffected and routes
+> annotations through CWA happily, so this is **not** universal — but we cannot yet predict which
+> devices tolerate it, and the failure leaves you with a reader that will not sync and no obvious
+> cause.
+>
+> **If your sync has already broken after editing that key:** set `reading_services_host` back to
+> `readingservices.kobo.com`, save, eject cleanly, and sync again.
+>
+> **To see whether annotations are reaching CWA**, make a highlight on the device, sync, and watch:
+>
+> ```bash
+> docker logs -f calibre-web 2>&1 | grep -iE "annotations|reading services"
+> ```
+>
+> Silence means your highlights are going to Kobo's servers rather than yours. The safe way to
+> change that is to get the device to perform a **full initialization** against CWA — re-generate
+> the Kobo Sync Token and re-pair — rather than editing the key by hand.
+>
+> This matters because CWA's protection against a Kobo deleting its own highlights after a sync
+> (upstream [calibre-web#2610](https://github.com/janeczku/calibre-web/issues/2610)) works by
+> answering that channel, and it cannot protect a request it never receives. Until the device is
+> routing annotations through CWA, treat highlights made on it as device-only and back them up.
 
 To confirm the device is reaching your server, watch the logs while you sync — you should see requests to `/kobo/<token>/v1/...`:
 
@@ -643,34 +680,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Spanish (`es`) | `███████████████████░` 97% | 2643/2725 | 0 |
-| Russian (`ru`) | `███████████████████░` 96% | 2620/2725 | 0 |
-| Polish (`pl`) | `███████████████████░` 96% | 2607/2725 | 0 |
-| French (`fr`) | `█████████████████░░░` 84% | 2281/2725 | 127 |
-| German (`de`) | `██████████████░░░░░░` 69% | 1891/2725 | 121 |
-| Dutch (`nl`) | `█████████████░░░░░░░` 67% | 1817/2725 | 292 |
-| Hungarian (`hu`) | `████████████░░░░░░░░` 60% | 1646/2725 | 121 |
-| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 52% | 1410/2725 | 310 |
-| Japanese (`ja`) | `██████████░░░░░░░░░░` 48% | 1320/2725 | 247 |
-| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 45% | 1214/2725 | 318 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `█████████░░░░░░░░░░░` 43% | 1176/2725 | 348 |
-| Italian (`it`) | `███████░░░░░░░░░░░░░` 35% | 957/2725 | 269 |
-| Korean (`ko`) | `███████░░░░░░░░░░░░░` 35% | 948/2725 | 269 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `███████░░░░░░░░░░░░░` 34% | 918/2725 | 249 |
-| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 29% | 790/2725 | 286 |
-| Slovak (`sk`) | `██████░░░░░░░░░░░░░░` 28% | 749/2725 | 313 |
-| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 26% | 701/2725 | 360 |
-| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 25% | 678/2725 | 362 |
-| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 25% | 677/2725 | 361 |
-| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 21% | 584/2725 | 388 |
-| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 19% | 506/2725 | 399 |
-| Czech (`cs`) | `████░░░░░░░░░░░░░░░░` 18% | 477/2725 | 408 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2725 | 372 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 16% | 431/2725 | 435 |
-| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2725 | 357 |
-| Finnish (`fi`) | `███░░░░░░░░░░░░░░░░░` 13% | 354/2725 | 388 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 11% | 289/2725 | 385 |
-| Khmer (`km`) | `██░░░░░░░░░░░░░░░░░░` 8% | 207/2725 | 343 |
+| Russian (`ru`) | `████████████████████` 99% | 2803/2844 | 0 |
+| Spanish (`es`) | `███████████████████░` 93% | 2638/2844 | 0 |
+| Polish (`pl`) | `██████████████████░░` 92% | 2602/2844 | 0 |
+| French (`fr`) | `████████████████░░░░` 82% | 2344/2844 | 127 |
+| German (`de`) | `███████████████░░░░░` 76% | 2172/2844 | 12 |
+| Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1888/2844 | 292 |
+| Hungarian (`hu`) | `████████████░░░░░░░░` 58% | 1644/2844 | 121 |
+| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 50% | 1407/2844 | 310 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████░░░░░░░░░░` 49% | 1382/2844 | 182 |
+| Japanese (`ja`) | `█████████░░░░░░░░░░░` 46% | 1318/2844 | 247 |
+| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 43% | 1212/2844 | 318 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████░░░░░░░░░░░░` 41% | 1174/2844 | 348 |
+| Italian (`it`) | `███████░░░░░░░░░░░░░` 34% | 955/2844 | 269 |
+| Korean (`ko`) | `███████░░░░░░░░░░░░░` 33% | 946/2844 | 269 |
+| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 28% | 788/2844 | 286 |
+| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 26% | 747/2844 | 313 |
+| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 25% | 699/2844 | 360 |
+| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 24% | 676/2844 | 362 |
+| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 24% | 675/2844 | 361 |
+| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 20% | 582/2844 | 388 |
+| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 504/2844 | 399 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 475/2844 | 408 |
+| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2844 | 372 |
+| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 15% | 431/2844 | 435 |
+| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2844 | 357 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 354/2844 | 388 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 10% | 289/2844 | 385 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 207/2844 | 343 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---
@@ -692,9 +729,9 @@ Governance: [`GOVERNANCE.md`](GOVERNANCE.md). Contributing details: [`CONTRIBUTI
 Since May 2026: **188 releases, 673 merged pull requests, 262 issues closed, and 155 contributors credited by name.**
 <!-- funding-stats:end -->
 
-This build exists because the project it's based on stopped cutting releases in February with a
-queue of community pull requests still sitting in it — real bug fixes, written by real people,
-that weren't going to reach anybody. Shipping them turned out to be a full-time habit.
+This build exists to ship community bug fixes on a fast, regular release cadence — real fixes,
+written by real people, packaged so they reach users quickly. It complements the upstream
+projects it builds on, and their maintainers have our respect and our credits below.
 
 **Nothing here is paywalled and nothing ever will be.** No sponsor-only features, no private
 Discord, no early access, no "pro" tier. Every line is GPL-3.0 and free whether you contribute
@@ -707,6 +744,22 @@ If it hasn't, that's completely fine — it stays free either way.
 - **[Ko-fi](https://ko-fi.com/calibrewebnextgen)** — the same thing, if you already have an account there.
 
 The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md) when something breaks. That helps more than a few dollars does.
+
+---
+
+## How AI is used
+
+The codebase itself is Calibre-Web and Calibre-Web-Automated — written over many years by their
+human maintainers and contributors, who are credited in [Credits](#credits). What this fork adds
+on top — its own fixes, their regression tests, the changelog and most issue replies — is largely
+produced by an AI assistant working from a written brief, with human review gates: merges require
+CI plus a regression test verified to fail without the fix, and anything adding a dependency,
+changing a licence or introducing an external URL is decided by a person.
+
+**The shipped application itself contains no AI:** no model dependency, no inference call, no
+telemetry, and your library is not sent anywhere.
+
+[**Read the full disclosure →**](docs/AI-USAGE.md)
 
 ---
 

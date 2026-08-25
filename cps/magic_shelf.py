@@ -29,6 +29,43 @@ MAGIC_SHELF_ORDER_MODES = {
 DEFAULT_MAGIC_SHELF_ORDER_MODE = 'name_asc'
 
 
+def is_magic_shelf_owner(shelf, user):
+    """Return whether an authenticated user owns ``shelf``."""
+    return bool(user.is_authenticated and shelf.user_id == user.id)
+
+
+def can_edit_magic_shelf(shelf, user):
+    """Classic edit permission: owner or administrator."""
+    return bool(user.is_authenticated and (
+        is_magic_shelf_owner(shelf, user) or user.role_admin()
+    ))
+
+
+def can_duplicate_magic_shelf(shelf, user):
+    """Classic duplicate permission: owner or any viewer of a public shelf."""
+    return bool(user.is_authenticated and (
+        is_magic_shelf_owner(shelf, user) or shelf.is_public
+    ))
+
+
+def has_magic_shelf_delete_authority(shelf, user):
+    """Role/ownership portion of the classic delete decision."""
+    return bool(user.is_authenticated
+                and (is_magic_shelf_owner(shelf, user)
+                     or (shelf.is_public == 1 and user.role_edit_shelfs())))
+
+
+def can_delete_magic_shelf(shelf, user):
+    """Classic delete permission, including the system-shelf prohibition."""
+    return bool(has_magic_shelf_delete_authority(shelf, user)
+                and not getattr(shelf, 'is_system', False))
+
+
+def can_kobo_sync_magic_shelf(shelf, user):
+    """Kobo selects smart shelves by owner, so this action is owner-only."""
+    return is_magic_shelf_owner(shelf, user)
+
+
 # The rule engine and both editors consume this definition.  Keep database
 # bindings private; build_rule_schema() strips them before serving JSON.
 _TEXT_OPERATORS = (

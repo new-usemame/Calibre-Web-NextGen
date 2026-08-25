@@ -135,8 +135,11 @@ class _FakeProcessor:
         self._convert_result = convert_result
         # Recorded calls
         self.imported = []
+        self.added_formats = []
         self.convert_book_calls = 0
         self.convert_to_kepub_calls = 0
+        self.backed_up = []
+        self.delete_current_file_calls = 0
 
     # -- flow stubs ----------------------------------------------------
     def is_file_in_use(self, timeout=None):
@@ -157,13 +160,20 @@ class _FakeProcessor:
         self.imported.append(filepath)
 
     def add_format_to_book(self, book_id, filepath):
-        pass
+        self.added_formats.append((book_id, filepath))
+
+    def _validate_book_exists(self, book_id):
+        return True
+
+    def backup(self, filepath, backup_type):
+        self.backed_up.append((filepath, backup_type))
+        return True
 
     def set_library_permissions(self):
         pass
 
     def delete_current_file(self):
-        pass
+        self.delete_current_file_calls += 1
 
 
 def _run_main(
@@ -560,9 +570,9 @@ class TestKepubFailureAlwaysReturnsAPair:
 
 
 class TestNotABookFormatsAreNotRescued:
-    """An .acsm is an Adobe fulfillment ticket, not a book. Rescuing it would
-    file a junk library entry AND contradict the guidance CWA already prints,
-    which promises the file went to processed_books/failed (fork #448)."""
+    """ACSM tickets and LCPL licences are not books. Rescuing either would
+    file a junk library entry AND contradict the guidance CWA prints, which
+    promises the file went to processed_books/failed (forks #448 and #1608)."""
 
     def test_acsm_conversion_failure_does_not_import_the_ticket(
         self, monkeypatch, tmp_path
@@ -586,6 +596,25 @@ class TestNotABookFormatsAreNotRescued:
             "an .acsm ticket must not be filed as a book when it fails to convert"
         )
 
+    @pytest.mark.parametrize(
+        "fmt, expected",
+        [
+            ("pdf", True),
+            ("mobi", True),
+            ("azw3", True),
+            ("PDF", True),
+            ("djvu", True),
+            (None, True),
+            ("", True),
+            ("acsm", False),
+            ("ACSM", False),
+            ("lcpl", False),
+            ("LCPL", False),
+        ],
+    )
+    def test_is_a_book_format_truth_table(self, fmt, expected):
+        assert ingest_processor.is_a_book_format(fmt) is expected
+
     def test_real_book_formats_are_rescuable(self):
         for fmt in ("pdf", "mobi", "azw3", "PDF", "djvu", None, ""):
             assert ingest_processor.is_rescuable_on_conversion_failure(fmt) is True
@@ -603,6 +632,198 @@ class TestNotABookFormatsAreNotRescued:
             )
             assert guidance, f"{fmt} is skipped on failure but explains nothing"
             assert "processed_books/failed" in guidance
+
+    def test_successful_failure_backup_removes_only_the_import_sidecar(
+        self, monkeypatch, tmp_path
+    ):
+        source = tmp_path / "Library Loan.lcpl"
+        source.write_text("licence contents")
+        import_manifest = Path(str(source) + ".cwa.json")
+        import_manifest.write_text('{"action": "import"}')
+        failed_manifest = Path(str(source) + ".cwa.failed.json")
+        failed_manifest.write_text("preserve this")
+        failed_dir = tmp_path / "processed_books" / "failed"
+        monkeypatch.setitem(
+            ingest_processor.backup_destinations, "failed", str(failed_dir)
+        )
+
+        processor = object.__new__(ingest_processor.NewBookProcessor)
+        processor.input_format = "lcpl"
+        processor.filename = source.name
+        ingest_processor._fail_not_a_book_input(processor, str(source))
+
+        assert (failed_dir / source.name).read_text() == "licence contents"
+        assert source.read_text() == "licence contents"
+        assert not import_manifest.exists()
+        assert failed_manifest.read_text() == "preserve this"
+
+    def test_failed_backup_keeps_the_import_sidecar(self, tmp_path):
+        source = tmp_path / "Library Loan.lcpl"
+        source.write_text("licence contents")
+        import_manifest = Path(str(source) + ".cwa.json")
+        import_manifest.write_text('{"action": "import"}')
+
+        processor = object.__new__(ingest_processor.NewBookProcessor)
+        processor.input_format = "lcpl"
+        processor.filename = source.name
+        processor.backup = lambda *_args, **_kwargs: False
+        ingest_processor._fail_not_a_book_input(processor, str(source))
+
+        assert source.read_text() == "licence contents"
+        assert import_manifest.read_text() == '{"action": "import"}'
+
+
+class TestAutoConvertOffDoesNotImportTickets:
+    @staticmethod
+    def _run(
+        monkeypatch,
+        tmp_path,
+        capsys,
+        fmt,
+        *,
+        auto_convert_on=False,
+        convert_ignored=False,
+        is_target_format=False,
+    ):
+        source = tmp_path / f"Ticket.{fmt}"
+        source.write_text("ticket contents")
+        holder = {}
+
+        def _factory(filepath):
+            fake = _FakeProcessor(filepath, convert_result=(False, ""))
+            fake.input_format = fmt
+            fake.auto_convert_on = auto_convert_on
+            fake.is_target_format = is_target_format
+            if convert_ignored:
+                fake.convert_ignored_formats = [fmt]
+            holder["fake"] = fake
+            return fake
+
+        monkeypatch.setattr(ingest_processor, "NewBookProcessor", _factory)
+        monkeypatch.setattr(
+            ingest_processor, "_acquire_process_lock_or_exit", lambda: None
+        )
+
+        assert ingest_processor.main(str(source)) == 0
+        return holder["fake"], str(source), capsys.readouterr().out
+
+    @staticmethod
+    def _assert_ticket_was_failed_not_imported(fake, source, output, notice):
+        assert fake.imported == []
+        assert fake.backed_up == [(source, "failed")]
+        assert fake.delete_current_file_calls == 1
+        assert notice in output
+        assert "processed_books/failed" in output
+        assert "is currently unsupported / is not a known ebook format" not in output
+
+    def test_lcpl_gets_guidance_and_never_becomes_a_book(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        result = self._run(monkeypatch, tmp_path, capsys, "lcpl")
+        self._assert_ticket_was_failed_not_imported(
+            *result, notice="LCPL_NOTICE:"
+        )
+
+    def test_acsm_gets_guidance_and_never_becomes_a_book(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        result = self._run(monkeypatch, tmp_path, capsys, "acsm")
+        self._assert_ticket_was_failed_not_imported(
+            *result, notice="ACSM_NOTICE:"
+        )
+
+    def test_ignored_lcpl_conversion_never_imports_the_licence(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        result = self._run(
+            monkeypatch,
+            tmp_path,
+            capsys,
+            "lcpl",
+            auto_convert_on=True,
+            convert_ignored=True,
+        )
+        self._assert_ticket_was_failed_not_imported(
+            *result, notice="LCPL_NOTICE:"
+        )
+
+    def test_lcpl_cannot_be_imported_via_a_stale_target_setting(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        result = self._run(
+            monkeypatch,
+            tmp_path,
+            capsys,
+            "lcpl",
+            auto_convert_on=True,
+            is_target_format=True,
+        )
+        self._assert_ticket_was_failed_not_imported(
+            *result, notice="LCPL_NOTICE:"
+        )
+
+
+class TestAddFormatManifestDoesNotAttachTickets:
+    @pytest.mark.parametrize(
+        "fmt, notice", [("lcpl", "LCPL_NOTICE:"), ("acsm", "ACSM_NOTICE:")]
+    )
+    def test_ticket_manifest_is_failed_instead_of_attached(
+        self, monkeypatch, tmp_path, capsys, fmt, notice
+    ):
+        source = tmp_path / f"Ticket.{fmt}"
+        source.write_text("ticket contents")
+        manifest = Path(str(source) + ".cwa.json")
+        manifest.write_text('{"action": "add_format", "book_id": 7}')
+        holder = {}
+
+        def _factory(filepath):
+            fake = _FakeProcessor(filepath, convert_result=(False, ""))
+            fake.input_format = fmt
+            holder["fake"] = fake
+            return fake
+
+        monkeypatch.setattr(ingest_processor, "NewBookProcessor", _factory)
+        monkeypatch.setattr(
+            ingest_processor, "_acquire_process_lock_or_exit", lambda: None
+        )
+
+        assert ingest_processor.main(str(source)) == 0
+        fake = holder["fake"]
+        output = capsys.readouterr().out
+        assert fake.added_formats == []
+        assert fake.imported == []
+        assert fake.backed_up == [(str(source), "failed")]
+        assert notice in output
+        assert "processed_books/failed" in output
+        assert not manifest.exists()
+        assert Path(str(source) + ".cwa.failed.json").exists()
+
+    def test_real_book_manifest_still_attaches_the_format(
+        self, monkeypatch, tmp_path
+    ):
+        source = tmp_path / "Book.epub"
+        source.write_bytes(b"ebook contents")
+        manifest = Path(str(source) + ".cwa.json")
+        manifest.write_text('{"action": "add_format", "book_id": 7}')
+        holder = {}
+
+        def _factory(filepath):
+            fake = _FakeProcessor(filepath, convert_result=(False, ""))
+            fake.input_format = "epub"
+            holder["fake"] = fake
+            return fake
+
+        monkeypatch.setattr(ingest_processor, "NewBookProcessor", _factory)
+        monkeypatch.setattr(
+            ingest_processor, "_acquire_process_lock_or_exit", lambda: None
+        )
+
+        assert ingest_processor.main(str(source)) == 0
+        fake = holder["fake"]
+        assert fake.added_formats == [(7, str(source))]
+        assert fake.backed_up == []
+        assert not manifest.exists()
+        assert not Path(str(source) + ".cwa.failed.json").exists()
 
 
 class TestFailedBackupIsDiscoverable:

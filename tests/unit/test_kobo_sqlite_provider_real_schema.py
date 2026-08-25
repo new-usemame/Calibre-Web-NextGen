@@ -108,7 +108,13 @@ def _provider_shaped_row(bookmark_id="cwn-web-abc123", volume_id="vol-uuid-1"):
         "Type": "highlight",
         "DateCreated": "2026-05-30T12:00:00Z",
         "DateModified": "2026-05-30T12:00:00Z",
-        "Hidden": 0,
+        # The string, not 0 — this is what the provider itself writes
+        # (kobo_sqlite_provider.lua: `Hidden = "false"`) and what Nickel
+        # writes. The column is declared BOOL, but SQLite keeps the word as
+        # TEXT because it is not numeric-convertible. This file exists to
+        # replay the provider's EXACT insert, so the value has to be exact
+        # too; an integer here is the drift it is meant to catch.
+        "Hidden": "false",
     }
 
 

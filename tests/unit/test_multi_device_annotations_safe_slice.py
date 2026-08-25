@@ -82,7 +82,13 @@ def test_registry_failure_does_not_break_reading_services_request(monkeypatch):
     monkeypatch.setattr(readingservices, "current_user", SimpleNamespace(is_authenticated=True, id=7))
     monkeypatch.setattr(device_registry, "sessionmaker", lambda **_kwargs: (_ for _ in ()).throw(OSError("disk")))
     wrapped = readingservices.requires_reading_services_auth_and_config(lambda: ("upstream", 207))
-    with app.test_request_context("/api/v3/content/x/annotations", headers={"x-kobo-deviceid": "b" * 64}):
+    # PATCH, not GET: device registration happens on the upload direction, and a
+    # GET on this path is now intercepted by the annotation-download guard before
+    # the decorator's pass-through can run (that guard is the subject of its own
+    # test module). The property under test -- a registry failure must not break
+    # the request -- is unchanged.
+    with app.test_request_context("/api/v3/content/x/annotations", method="PATCH",
+                                  headers={"x-kobo-deviceid": "b" * 64}):
         assert wrapped() == ("upstream", 207)
 
 
@@ -103,6 +109,48 @@ def test_content_id_normalizes_both_legacy_shapes_idempotently():
     assert normalize_content_id(raw, book_uuid=book, allow_legacy_file_uri=True) == canonical
 
 
+def test_device_content_id_requires_explicit_import_opt_in():
+    from cps.services.annotation_content_id import normalize_content_id, ContentIdError
+    book = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+    device = f"{book}!OEBPS!chapter.xhtml"
+    canonical = f"{book}!!OEBPS/chapter.xhtml"
+
+    with pytest.raises(ContentIdError):
+        normalize_content_id(device, book_uuid=book)
+    assert normalize_content_id(
+        device, book_uuid=book, allow_kobo_device_content_id=True,
+    ) == canonical
+    assert normalize_content_id(
+        canonical, book_uuid=book, allow_kobo_device_content_id=True,
+    ) == canonical
+
+
+@pytest.mark.parametrize(
+    ("device_content_id", "message"),
+    [
+        pytest.param(
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa!OEBPS!chapter.xhtml",
+            "content_id does not belong to this book",
+            id="wrong-book",
+        ),
+        pytest.param("{book}!..!../outside.xhtml", "escapes", id="escape"),
+        pytest.param("{book}!OEBPS//Text!chapter.xhtml", "unsafe segment", id="empty-segment"),
+        pytest.param("{book}!OEBPS!chapter\x1f.xhtml", "control character", id="control"),
+        pytest.param("{book}!OEBPS!" + "x" * 1536, "too long", id="chapter-length"),
+    ],
+)
+def test_device_content_id_is_validated_after_folding(device_content_id, message):
+    from cps.services.annotation_content_id import normalize_content_id, ContentIdError
+    book = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+
+    with pytest.raises(ContentIdError, match=message):
+        normalize_content_id(
+            device_content_id.format(book=book),
+            book_uuid=book,
+            allow_kobo_device_content_id=True,
+        )
+
+
 def test_backfill_is_conservative_and_idempotent():
     from cps import ub
     engine = create_engine("sqlite:///:memory:")
@@ -110,11 +158,12 @@ def test_backfill_is_conservative_and_idempotent():
         conn.execute(text("CREATE TABLE annotation (id INTEGER PRIMARY KEY, book_id INTEGER, content_id TEXT)"))
         uuid = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
         wrong = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-        conn.execute(text("INSERT INTO annotation VALUES (1, 5, :v), (2, 5, :u), (3, 5, :w), (4, 99, :m)"), {
+        conn.execute(text("INSERT INTO annotation VALUES (1, 5, :v), (2, 5, :u), (3, 5, :w), (4, 99, :m), (5, 5, :d)"), {
             "v": f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/c.xhtml",
             "u": "opaque-old-value",
             "w": f"file:///mnt/onboard/{wrong}.epub#(6)OEBPS/wrong.xhtml",
             "m": f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/missing.xhtml",
+            "d": f"{uuid}!OEBPS!device-only.xhtml",
         })
     ub.migrate_multi_device_annotation_safe_slice(engine, None)
     lookup = lambda book_id: uuid if book_id == 5 else None
@@ -127,6 +176,7 @@ def test_backfill_is_conservative_and_idempotent():
     assert once[1][1] == "opaque-old-value"
     assert once[2][1] == f"file:///mnt/onboard/{wrong}.epub#(6)OEBPS/wrong.xhtml"
     assert once[3][1] == f"file:///mnt/onboard/{uuid}.epub#(6)OEBPS/missing.xhtml"
+    assert once[4][1] == f"{uuid}!OEBPS!device-only.xhtml"
 
 
 def test_backfill_repairs_journaled_wrong_book_without_overwriting_later_edits():
@@ -169,12 +219,52 @@ def test_client_last_modified_missing_malformed_valid(db_session, raw, expected)
                              SimpleNamespace(id=5, uuid="b3d1b38b-74fd-43b7-a796-996e5a6a8b04"),
                              SimpleNamespace(id=7))
     if expected == "malformed":
-        assert row is None
-        assert db_session.query(ub.Annotation).count() == 0
+        # A malformed CLOCK READING must not destroy the user's words. This
+        # previously asserted the annotation was discarded, which is the same
+        # data-loss shape as the content-location gate: the highlight text is
+        # irreplaceable, the timestamp is an ordering hint. Store it, drop only
+        # the hint.
+        assert row is not None
+        assert row.highlighted_text == "text"
+        assert row.client_modified_at is None
+        assert db_session.query(ub.Annotation).count() == 1
     elif expected == "missing":
         assert row.client_modified_at is None
     else:
         assert row.client_modified_at == datetime(2026, 8, 9, 14, 52, 21)
+
+
+def test_malformed_client_clock_does_not_suppress_an_existing_annotation_edit(db_session):
+    """A rejected clock is not an undated update.
+
+    Once a row has a valid timestamp, collapsing a later malformed timestamp to
+    the ordinary "missing" sentinel makes the stale-update guard discard the
+    user's changed text and note.  Apply the edit by arrival order, but retain
+    the last valid ordering hint.
+    """
+    from cps.services.annotation_sync import _upsert_annotation
+
+    book = SimpleNamespace(id=5, uuid="b3d1b38b-74fd-43b7-a796-996e5a6a8b04")
+    user = SimpleNamespace(id=7)
+    row = _upsert_annotation(db_session, {
+        "id": "bad-clock-existing",
+        "highlightedText": "first",
+        "noteText": "first note",
+        "clientLastModifiedUtc": "2026-08-09T15:00:00Z",
+    }, book, user)
+    db_session.flush()
+
+    updated = _upsert_annotation(db_session, {
+        "id": "bad-clock-existing",
+        "highlightedText": "edited",
+        "noteText": "edited note",
+        "clientLastModifiedUtc": "not-a-clock",
+    }, book, user)
+
+    assert updated is row
+    assert row.highlighted_text == "edited"
+    assert row.note_text == "edited note"
+    assert row.client_modified_at == datetime(2026, 8, 9, 15, 0)
 
 
 def test_kobo_create_records_origin_once_and_update_cannot_replace_it(db_session):
@@ -257,3 +347,41 @@ def test_non_uuid_book_id_accepted_only_on_exact_match(value, book_uuid, accepte
     else:
         with pytest.raises(ContentIdError):
             normalize_content_id(value, book_uuid=book_uuid)
+
+
+def test_device_content_id_folds_on_the_first_bang_when_the_href_contains_one():
+    """`!` is a legal character in an EPUB path segment, so the fold must split
+    on the device grammar's separators and not on the last bang it can find.
+
+    Guards a mutation the rest of the suite does not catch: widening
+    ``_KOBO_DEVICE``'s opf-dir group from ``([^!]+)`` to ``(.+)`` makes the
+    match greedy, and ``uuid!OEBPS!ch!apter.xhtml`` folds to
+    ``OEBPS!ch/apter.xhtml`` — a silently wrong chapter path that resolves to
+    nothing, with no error for the user to see.
+    """
+    from cps.services.annotation_content_id import normalize_content_id
+
+    book = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+    assert normalize_content_id(
+        f"{book}!OEBPS!ch!apter.xhtml",
+        book_uuid=book,
+        allow_kobo_device_content_id=True,
+    ) == f"{book}!!OEBPS/ch!apter.xhtml"
+
+
+def test_device_content_id_uppercase_uuid_is_canonicalised():
+    """A device uuid in upper case belongs to the same book and must normalise.
+
+    Guards the mutation that drops ``_normal_uuid`` from the device branch:
+    without it the raw device spelling is compared against the canonical book
+    uuid, so the reader's own book is rejected as "does not belong to this
+    book" — an annotation lost to letter case.
+    """
+    from cps.services.annotation_content_id import normalize_content_id
+
+    book = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+    assert normalize_content_id(
+        f"{book.upper()}!OEBPS!chapter.xhtml",
+        book_uuid=book,
+        allow_kobo_device_content_id=True,
+    ) == f"{book}!!OEBPS/chapter.xhtml"

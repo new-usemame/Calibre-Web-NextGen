@@ -168,6 +168,7 @@ RUN \
   libxdamage1 \
   libgl1 \
   libglx-mesa0 \
+  libxcb-cursor0 \
   xz-utils \
   binutils && \
   echo "**** install lsof 4.99.5 from source (fixes hanging issue with 4.95, #654) ****" && \
@@ -230,26 +231,11 @@ COPY --from=kepubify_mirror /kepubify /usr/bin/kepubify
 
 # STEP 5 - Install Calibre
 RUN \
-  # STEP 5.1 - Make the /app/calibre directory for the installed files
-  mkdir -p /app/calibre && \
-  # STEP 5.2 - Download the desired version of Calibre, determined by the CALIBRE_RELEASE variable and the architecture of the build environment
-  if [ "$(uname -m)" == "x86_64" ]; then \
   curl -fL --retry 30 --retry-delay 15 --retry-all-errors -o \
-  /calibre.txz \
-  "https://download.calibre-ebook.com/${CALIBRE_RELEASE}/calibre-${CALIBRE_RELEASE}-x86_64.txz"; \
-  elif [ "$(uname -m)" == "aarch64" ]; then \
-  curl -fL --retry 30 --retry-delay 15 --retry-all-errors -o \
-  /calibre.txz \
-  "https://download.calibre-ebook.com/${CALIBRE_RELEASE}/calibre-${CALIBRE_RELEASE}-arm64.txz"; \
-  fi && \
-  # STEP 5.3 - Extract the downloaded file to /app/calibre
-  tar xf \
-  /calibre.txz -C \
-  /app/calibre && \
-  # STEP 5.3.1 - Remove the ABI tag from the extracted libQt6* files to allow them to be used on older kernels
-  # Removed in V3.1.4 because it was breaking Calibre features that require Qt6. Replaced with a kernel check in the cwa-init service
-  # STEP 5.4 - Delete the extracted calibre.txz to save space in final image
-  rm /calibre.txz
+  /linux-installer.sh \
+  https://download.calibre-ebook.com/linux-installer.sh && \
+  sh /linux-installer.sh version=${CALIBRE_RELEASE} && \
+  rm /linux-installer.sh
 
 # ============================================================================
 # STAGE 2: Final - Build the final runtime image
@@ -307,7 +293,7 @@ SHELL ["/bin/bash", "-c"]
 # Copy installed dependencies from the dependencies stage
 COPY --from=dependencies /lsiopy /lsiopy
 COPY --from=dependencies /usr/bin/kepubify /usr/bin/kepubify
-COPY --from=dependencies /app/calibre /app/calibre
+COPY --from=dependencies /opt/calibre /opt/calibre
 COPY --from=dependencies /usr/bin/lsof /usr/bin/lsof
 # Self-contained Python 3.13 from python-build-standalone — no PPA needed at runtime
 COPY --from=dependencies /opt/python /opt/python
@@ -366,12 +352,11 @@ RUN \
 COPY --chown=abc:abc . /app/calibre-web-automated/
 
 RUN \
-  # The `frontend/` directory should be in `.dockerignore` but is used during
-  # STAGE 0 to build the SPA. We therefore manually remove it.
-  rm -Rf /app/calibre-web-automated/frontend && \
   # Install our Python package. The dependencies were installed in STEP 3.1.
   /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ \
-    -e /app/calibre-web-automated
+    -e /app/calibre-web-automated && \
+  # These files were necessary to build the image, we can remove them now.
+  rm -Rf /app/calibre-web-automated/{frontend,pyproject.toml,VERSION}
 
 # STEP 6.1 - Copy the Vite-built SPA bundle from the frontend-build stage.
 # The source tree's cps/static/app is .dockerignore'd, so this COPY is the
@@ -436,7 +421,7 @@ COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 
 # Bake Calibre's /usr/bin symlinks into the image (#875; original patch by
 # @chloeroform in #1014). The binaries themselves already ship in the image
-# (COPY --from=dependencies /app/calibre above), but the /usr/bin entry
+# (COPY --from=dependencies /opt/calibre above), but the /usr/bin entry
 # points did not, so `calibredb --version` failed on a cold boot and the
 # calibre-binaries-setup s6 service ran calibre_postinstall on EVERY start --
 # ~12s of a ~60s startup. With the links present that check passes and the
@@ -444,7 +429,7 @@ COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 # where the links are missing (e.g. a non-Ubuntu base).
 #
 # The link set mirrors the entry points calibre_postinstall itself creates:
-# every executable at the top level of /app/calibre except the installer
+# every executable at the top level of /opt/calibre except the installer
 # itself and calibre-complete (the bash-completion helper, which upstream
 # reaches through the completion scripts rather than through PATH).
 # `test -x` resolves the symlink without executing the binary, so this stays
@@ -453,7 +438,7 @@ COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 # Nothing else that ran at boot moves here: the Qt6 / kernel ABI check and
 # the PUID/PGID ownership pass live in the cwa-init service, which runs
 # before this one and is gated on its own sentinel.
-RUN find /app/calibre -maxdepth 1 -type f -perm -u+x \
+RUN find /opt/calibre -maxdepth 1 -type f -perm -u+x \
   ! -name 'calibre_postinstall' ! -name 'calibre-complete' \
   -exec ln -sf {} /usr/bin/ \; && \
   test -x /usr/bin/calibredb

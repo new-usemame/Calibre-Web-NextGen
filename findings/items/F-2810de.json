@@ -1,0 +1,13 @@
+{
+  "area": "infra",
+  "body": "`cps/services/calibre_db_lock._resolve_lock_path` falls back to the literal `/config`\n(`DEFAULT_LOCK_DIR`) rather than the configured config directory, overridable only by\n`CWA_METADATA_LOCK_DIR`. On any install where `/config` does not exist — every bare-metal\ndeployment — acquiring the lock raises `FileNotFoundError`.\n\nIts callers (`cps/editbooks.py` do_edit_book, `cps/api/browse.py`) therefore fail there. This\nwas found while considering whether `cps/api/edit.py:set_cover` should take the same lock for\nconsistency during PR #1739: it should, but adopting it as-is would turn a working SPA cover\nupload into a 500 on exactly those installs, so the call was deliberately not added and this\nwas filed instead.\n\nSmallest fix: resolve the lock directory through the same config-dir SSOT the rest of the app\nuses (cf. fork #1614), creating it if absent; then add the lock to `set_cover`.",
+  "created": "2026-08-18",
+  "id": "F-2810de",
+  "refs": [
+    "#1739"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "metadata_db_write_lock hard-codes /config, so callers break on installs without it"
+}

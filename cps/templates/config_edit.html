@@ -98,7 +98,7 @@
 {% block body %}
 <div class="discover">
   <h2 style="font-size: 15px;">{{title}}</h2>
-<form role="form" method="POST" autocomplete="off">
+<form role="form" method="POST" id="config_form" autocomplete="off">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <div class="settings-container">
@@ -209,6 +209,14 @@
     </div>
     <div data-related="kobo-settings">
       <div class="form-group" style="margin-left:10px;">
+        <input type="checkbox" id="config_kobo_two_way_annotation_sync" name="config_kobo_two_way_annotation_sync" {% if config.config_kobo_two_way_annotation_sync %}checked{% endif %} aria-describedby="kobo-two-way-annotation-help">
+        <label for="config_kobo_two_way_annotation_sync">{{_('Allow Kobo two-way annotation sync')}}</label>
+        <p id="kobo-two-way-annotation-help" class="help-block">{{_('Stage 0 records exact Kobo annotation evidence only. Device responses remain unchanged. This opt-in defaults off and must also be enabled for each user before a later rollout stage can use local authority.')}}</p>
+        {% if kobo_two_way_emergency_disabled %}
+        <p class="help-block" role="status">{{_('The CWNG_KOBO_TWO_WAY_ANNOTATIONS emergency override currently forces this feature off.')}}</p>
+        {% endif %}
+      </div>
+      <div class="form-group" style="margin-left:10px;">
         <input type="checkbox" id="config_kobo_proxy" name="config_kobo_proxy"  {% if config.config_kobo_proxy %}checked{% endif %}>
         <label for="config_kobo_proxy">{{_('Proxy unknown requests to Kobo Store')}}</label>
       </div>
@@ -219,7 +227,7 @@
         <p id="kepubify-missing-help" class="help-block">{{_('Kepubify was not found. Set its path under External binaries before this preference can convert books.')}}</p>
         {% else %}
         <p class="help-block">{{_('Missing KEPUB files are created for books already delivered to a Kobo. EPUB remains the source format.')}}</p>
-        <button class="btn btn-default" type="submit" name="kobo_kepub_backfill" value="on">{{_('Convert missing KEPUBs now')}}</button>
+        <button class="btn btn-default" type="button" id="kobo_kepub_backfill" name="kobo_kepub_backfill" value="on">{{_('Convert missing KEPUBs now')}}</button>
         {% endif %}
       </div>
       <div class="form-group" style="margin-left:10px;">
@@ -680,6 +688,11 @@
                 <div class="help-block">{{_('Hides the standard login form. Users must log in via OAuth or LDAP. Ensure you have a working alternative login method before enabling.')}}</div>
             </div>
             <div class="form-group">
+                <input type="checkbox" id="config_enable_oauth_auto_forward" name="config_enable_oauth_auto_forward" {% if config.config_enable_oauth_auto_forward %}checked{% endif %}>
+                <label for="config_enable_oauth_auto_forward">{{_('Automatically forward to the only OAuth provider')}}</label>
+                <div class="help-block">{{_('When enabled and exactly one OAuth provider is active, visiting the login page starts it automatically. Add ?local=1 to the login URL to open the normal login page instead. That page still accepts a username and password only while the setting above is left off.')}}</div>
+            </div>
+            <div class="form-group">
                 <input type="checkbox" id="config_enable_oauth_group_admin_management" name="config_enable_oauth_group_admin_management" {% if config.config_enable_oauth_group_admin_management %}checked{% endif %}>
                 <label for="config_enable_oauth_group_admin_management">{{_('Enable OAuth Group-Based Admin Role Management')}}</label>
                 <div class="help-block">{{_('When enabled, admin privileges are automatically granted or revoked based on OAuth group membership. Disable this to manually manage admin roles in the user management panel, preventing OAuth logins from overriding local role assignments.')}}</div>
@@ -743,7 +756,7 @@
 
     <div class="cwa-form-actions" style="max-width: 900px; justify-self: center; width: -webkit-fill-available; margin-inline: 2rem;">
       <a href="{{ url_for('admin.admin') }}" id="config_back" class="btn btn-secondary">{{_('Cancel')}}</a>
-      <button type="button" name="submit" id="config_submit" class="btn btn-default">{{_('Save')}}</button>
+      <button type="submit" name="submit" id="config_submit" class="btn btn-default">{{_('Save')}}</button>
     </div>
   </form>
 </div>

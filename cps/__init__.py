@@ -5,8 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-__package__ = "cps"
-
 import sys
 import os
 import mimetypes
@@ -21,7 +19,6 @@ from . import constants
 from .cli import CliParameter
 from .reverseproxy import ReverseProxied
 from .server import WebServer
-from .dep_check import dependency_check
 from .updater import Updater
 from . import config_sql
 from . import cache_buster
@@ -67,6 +64,7 @@ mimetypes.add_type('text/css', '.css')
 mimetypes.add_type('application/x-ms-reader', '.lit')
 mimetypes.add_type('text/javascript; charset=UTF-8', '.js')
 mimetypes.add_type('application/vnd.adobe.adept+xml', '.acsm')
+mimetypes.add_type('application/vnd.readium.lcp.license.v1.0+json', '.lcpl')
 mimetypes.add_type('application/vnd.amazon.ebook', '.kfx')
 mimetypes.add_type('application/zip', '.kfx-zip')
 
@@ -210,21 +208,6 @@ def create_app():
         updater_thread.dry_run()
         sys.exit(0)
     updater_thread.start()
-    requirements = dependency_check()
-    for res in requirements:
-        if res['found'] == "not installed":
-            message = ('Cannot import {name} module, it is needed to run calibre-web, '
-                       'please install it using "pip install {name}"').format(name=res["name"])
-            log.info(message)
-            print("*** " + message + " ***")
-            web_server.stop(True)
-            sys.exit(8)
-    for res in requirements + dependency_check(True):
-        log.info('*** "{}" version does not meet the requirements. '
-                 'Should: {}, Found: {}, please consider installing required version ***'
-                 .format(res['name'],
-                         res['target'],
-                         res['found']))
     app.wsgi_app = ReverseProxied(app.wsgi_app)
 
     if os.environ.get('FLASK_DEBUG'):

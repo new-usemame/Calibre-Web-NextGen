@@ -14,40 +14,106 @@ from sqlalchemy.sql.expression import or_, and_, true
 log = logger.create()
 
 
-# Add the current book id to kobo_synced_books table for current user, if entry is already present,
-# do nothing (safety precaution)
-def add_synced_books(book_id):
-    is_present = ub.session.query(ub.KoboSyncedBooks).filter(ub.KoboSyncedBooks.book_id == book_id)\
-        .filter(ub.KoboSyncedBooks.user_id == current_user.id).count()
-    if not is_present:
-        synced_book = ub.KoboSyncedBooks()
-        synced_book.user_id = current_user.id
-        synced_book.book_id = book_id
-        ub.session.add(synced_book)
-        ub.session_commit()
+# Record the current user's delivered book identity.
+def add_synced_books(book_id, book_uuid=None):
+    synced_book = ub.session.query(ub.KoboSyncedBooks).filter(
+        ub.KoboSyncedBooks.book_id == book_id,
+        ub.KoboSyncedBooks.user_id == current_user.id,
+    ).one_or_none()
+    if synced_book is None:
+        ub.session.add(ub.KoboSyncedBooks(
+            user_id=current_user.id,
+            book_id=book_id,
+            book_uuid=str(book_uuid) if book_uuid else None,
+        ))
+    elif book_uuid and synced_book.book_uuid != str(book_uuid):
+        synced_book.book_uuid = str(book_uuid)
+    ub.session_commit()
 
 
-def add_synced_books_batch(book_ids):
-    """Record one sync page for the current user in a single transaction."""
-    page_book_ids = set(book_ids)
-    if not page_book_ids:
+def _book_identity(identity):
+    if isinstance(identity, (tuple, list)) and len(identity) == 2:
+        book_id, book_uuid = identity
+        return int(book_id), str(book_uuid) if book_uuid else None
+    return int(identity), None
+
+
+def add_synced_books_batch(book_identities):
+    """Record a delivered page, retaining each UUID when the caller has it."""
+    page_books = dict(_book_identity(identity) for identity in book_identities)
+    if not page_books:
         return
 
     user_id = current_user.id
-    present_book_ids = {
-        row.book_id for row in
-        ub.session.query(ub.KoboSyncedBooks.book_id).filter(
+    present = {
+        row.book_id: row for row in
+        ub.session.query(ub.KoboSyncedBooks).filter(
             ub.KoboSyncedBooks.user_id == user_id,
-            ub.KoboSyncedBooks.book_id.in_(page_book_ids),
+            ub.KoboSyncedBooks.book_id.in_(page_books),
         ).all()
     }
-    missing_book_ids = page_book_ids - present_book_ids
+    for book_id, row in present.items():
+        book_uuid = page_books[book_id]
+        if book_uuid and row.book_uuid != book_uuid:
+            row.book_uuid = book_uuid
+    missing_book_ids = set(page_books) - set(present)
     if missing_book_ids:
         ub.session.bulk_save_objects([
-            ub.KoboSyncedBooks(user_id=user_id, book_id=book_id)
+            ub.KoboSyncedBooks(
+                user_id=user_id,
+                book_id=book_id,
+                book_uuid=page_books[book_id],
+            )
             for book_id in missing_book_ids
         ])
     ub.session_commit()
+
+
+def _record_user_book_deletions(session, user_id, book_deletions, deleted_at):
+    added = 0
+    for book_id, book_uuid in book_deletions:
+        if not book_uuid:
+            continue
+        existing = (
+            session.query(ub.KoboDeletedBook)
+            .filter(ub.KoboDeletedBook.user_id == user_id,
+                    ub.KoboDeletedBook.book_uuid == book_uuid)
+            .one_or_none()
+        )
+        if existing is None:
+            session.add(ub.KoboDeletedBook(
+                user_id=user_id,
+                book_uuid=book_uuid,
+                deleted_at=deleted_at,
+            ))
+            added += 1
+        if book_id is not None:
+            session.query(ub.KoboSyncedBooks).filter(
+                ub.KoboSyncedBooks.user_id == user_id,
+                ub.KoboSyncedBooks.book_id == book_id,
+            ).delete(synchronize_session=False)
+    return added
+
+
+def record_user_book_deletions(user_id, book_uuids, session=None):
+    """Record explicitly confirmed UUID tombstones for one user."""
+    s = session if session else ub.session
+    normalized = list(dict.fromkeys(
+        str(book_uuid) for book_uuid in book_uuids if book_uuid
+    ))
+    if not normalized:
+        return 0
+    added = _record_user_book_deletions(
+        s,
+        int(user_id),
+        [(None, book_uuid) for book_uuid in normalized],
+        datetime.now(timezone.utc),
+    )
+    if session is None:
+        ub.session_commit()
+    else:
+        ub.session_commit(_session=s)
+    return added
 
 
 def record_book_deletion(book_id, book_uuid, session=None):
@@ -59,51 +125,42 @@ def record_book_deletion(book_id, book_uuid, session=None):
 
     For every (user_id, book_id) pair in kobo_synced_books with this
     book_id, inserts a kobo_deleted_book row capturing the UUID. The
-    Kobo sync handler emits DeletedEntitlement for these rows on each
-    affected user's next sync, then advances archive_last_modified past
-    them so the device sees each tombstone exactly once. Without this,
+    Kobo sync handler emits an archived ChangedEntitlement for these rows on
+    each affected user's next sync, then advances archive_last_modified past
+    them so each device cursor moves beyond the tombstone. Without this,
     the device retains the book locally forever — calibre absence is
     not interpreted as deletion, only tombstones are.
 
-    No-op when book_uuid is falsy (defensive — shouldn't happen, but
-    saves us from corrupt rows if upstream changes).
+    The UUID retained at delivery wins whenever it is present, even if the
+    caller also supplies one: it is what that user's device was actually told
+    the book was, and the caller's value is only a fallback for rows written
+    before UUID retention existed. If both are empty the row is a no-op.
 
-    Idempotent per (user_id, book_uuid): the UNIQUE constraint coalesces
-    re-runs to the existing row (deleted_at unchanged) via
-    INSERT OR IGNORE semantics.
+    Idempotent per (user_id, book_uuid): the existing-row check preserves the
+    first tombstone timestamp, backed by the table's unique constraint.
     """
-    if not book_uuid:
-        return
     s = session if session else ub.session
-    affected_user_ids = [
-        row.user_id for row in
-        s.query(ub.KoboSyncedBooks.user_id)
-         .filter(ub.KoboSyncedBooks.book_id == book_id)
-         .all()
-    ]
-    if not affected_user_ids:
+    affected_rows = s.query(ub.KoboSyncedBooks).filter(
+        ub.KoboSyncedBooks.book_id == book_id).all()
+    if not affected_rows:
         return
 
     now = datetime.now(timezone.utc)
-    for user_id in affected_user_ids:
-        existing = (
-            s.query(ub.KoboDeletedBook)
-             .filter(ub.KoboDeletedBook.user_id == user_id,
-                     ub.KoboDeletedBook.book_uuid == book_uuid)
-             .one_or_none()
+    recorded = False
+    for synced_book in affected_rows:
+        retained_uuid = synced_book.book_uuid or book_uuid
+        if not retained_uuid:
+            continue
+        _record_user_book_deletions(
+            s,
+            synced_book.user_id,
+            [(book_id, str(retained_uuid))],
+            now,
         )
-        if existing is None:
-            s.add(ub.KoboDeletedBook(
-                user_id=user_id,
-                book_uuid=book_uuid,
-                deleted_at=now,
-            ))
+        recorded = True
 
-    # Clear the now-stale kobo_synced_books rows so the per-user
-    # two-way-deletion logic doesn't trip over them on a later sync.
-    s.query(ub.KoboSyncedBooks).filter(
-        ub.KoboSyncedBooks.book_id == book_id
-    ).delete(synchronize_session=False)
+    if not recorded:
+        return
 
     if session is None:
         ub.session_commit()

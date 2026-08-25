@@ -1,0 +1,11 @@
+{
+  "area": "tooling",
+  "body": "`.gitignore:251` reads `frontend/node_modules/`. The trailing slash restricts the\nrule to **directories**, so a `node_modules` that is a **symlink** is not ignored\n— git sees a file, `git check-ignore` reports no match, and it shows up as an\nuntracked path that `git add -A` will happily commit.\n\nWhat lands if it does: a symlink whose target is an absolute path on one\nmachine. It breaks for every other contributor and in CI, and it reads as noise\nin review rather than as a bug.\n\nObserved 2026-08-10 while building the zero-egress report builder: a worktree on\nthe Crucial X8 had no `node_modules`, so it was symlinked to the main checkout's\ncopy to run `tsc`/`vite` without a second 167 MB install. `git status` then\nlisted `frontend/node_modules` as untracked, and `git check-ignore -v` confirmed\nno rule matched. Only staging files explicitly avoided committing it.\n\nSymlinking `node_modules` is not exotic — pnpm does it by default, and it is the\nobvious move for a throwaway worktree.\n\nFix: drop the trailing slash (`frontend/node_modules`), which matches both a\ndirectory and a symlink. Worth a sweep of `.gitignore` for sibling\ndirectory-only rules covering paths that are commonly symlinked.",
+  "created": "2026-08-10",
+  "id": "F-f30e75",
+  "refs": [],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "gitignore's trailing-slash node_modules rule does not match a symlinked node_modules"
+}

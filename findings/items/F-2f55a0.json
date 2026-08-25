@@ -1,0 +1,11 @@
+{
+  "area": "testing",
+  "body": "Observed 2026-08-14 while measuring the blast radius of #1331 (PR #1602).\n\n`tests/unit/test_1596_module_entry_point.py` fails four tests on a clean\n`origin/main` checkout (815632762) under `repo/.venv`:\n\n- TestModuleEntryPoint::test_module_is_executable_from_an_unrelated_cwd\n- TestModuleEntryPoint::test_help_names_the_program_not_the_dunder_file\n- TestCwdCannotShadowTheApplication::test_minus_P_ignores_a_cps_sitting_in_the_cwd[module]\n- TestCwdCannotShadowTheApplication::test_minus_P_ignores_a_cps_sitting_in_the_cwd[package]\n\nCI is green on the same commit, so this is an environment difference, not a\nrepo regression — these tests spawn `python -m cps` from an unrelated working\ndirectory, which needs the package importable from somewhere other than the\ncheckout. The venv the tick uses does not have it installed.\n\nWhy it matters rather than being a local annoyance: a red local suite is what\nwedges a tick. A pass that runs the unit suite before merging has to A/B every\nfailure against main to find out whether it caused it, and the next pass pays\nthe same cost again. The failure also teaches sessions to read a red suite as\nnormal, which is exactly how a real regression gets waved through.\n\nFix is either an editable install in the documented local-dev venv setup, or a\nskip guarded on `cps` being importable from outside the checkout with a reason\nthat names this. Not fixed here — it is outside #1331's diff and #1596 is\nrecent enough that its author's intent should be read first.\n\nMEASURED, not inferred: the same four fail on the unmodified main worktree in\nthe same environment; 6009 tests pass around them.",
+  "created": "2026-08-14",
+  "id": "F-2f55a0",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Four unit tests fail on a clean local checkout but pass in CI"
+}

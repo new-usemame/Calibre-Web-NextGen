@@ -12,8 +12,8 @@ msgstr ""
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
-"proton.me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
+"me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -362,6 +362,38 @@ msgstr ""
 msgid ""
 "Book {0} was not in the sync record for user {1}; last_modified bumped so "
 "the device will receive on next sync"
+msgstr ""
+
+#: cps/admin.py cps/templates/kobo_reconcile.html
+#, python-format
+msgid "Reconcile deleted Kobo books for %(user)s"
+msgstr ""
+
+#: cps/admin.py
+msgid "Choose a KoboReader.sqlite file."
+msgstr ""
+
+#: cps/admin.py
+msgid "The uploaded file is not a SQLite database."
+msgstr ""
+
+#: cps/admin.py
+#, python-format
+msgid "The file is larger than %(max)d MB."
+msgstr ""
+
+#: cps/admin.py
+msgid "This preview is invalid or expired. Upload the device database again."
+msgstr ""
+
+#: cps/admin.py
+msgid "Select at least one book to archive."
+msgstr ""
+
+#: cps/admin.py
+msgid ""
+"The selected books do not match this preview. Upload the device database "
+"again."
 msgstr ""
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
@@ -893,12 +925,16 @@ msgid "No file uploaded."
 msgstr "Bestand %(file)s geüpload"
 
 #: cps/annotations.py
-#, python-format
-msgid "File exceeds %(max)d MB."
+msgid "Uploaded file is not a SQLite database."
 msgstr ""
 
 #: cps/annotations.py
-msgid "Uploaded file is not a SQLite database."
+msgid "Uploaded database has no readable Kobo Bookmark table."
+msgstr ""
+
+#: cps/annotations.py
+#, python-format
+msgid "File exceeds %(max)d MB."
 msgstr ""
 
 #: cps/annotations.py cps/templates/annotations_view.html
@@ -1415,7 +1451,8 @@ msgstr "De metagegevens zijn bijgewerkt"
 msgid "Error editing book: {}"
 msgstr "Fout tijdens bijwerken van boek: {}"
 
-#: cps/editbooks.py cps/updater.py cps/uploader.py
+#: cps/editbooks.py cps/templates/kobo_reconcile.html cps/updater.py
+#: cps/uploader.py
 msgid "Unknown"
 msgstr "Onbekend"
 
@@ -2476,6 +2513,26 @@ msgstr ""
 msgid "Manual (drag below)"
 msgstr ""
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} added to the shelf; {failed} failed."
+msgstr "{succeeded} toegevoegd aan de plank; {failed} mislukt."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} book(s) deleted; {failed} failed."
+msgstr "{succeeded} boek(en) verwijderd; {failed} mislukt."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} updated; {failed} failed."
+msgstr "{succeeded} bijgewerkt; {failed} mislukt."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Metadata applied to {succeeded}; {failed} failed."
+msgstr "Metadata toegepast op {succeeded}; {failed} mislukt."
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Read now"
 msgstr "Nu lezen"
@@ -2618,12 +2675,12 @@ msgid "Not rated"
 msgstr "Niet beoordeeld"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
 msgid "Yes"
 msgstr "Ja"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/search_form.html
+#: cps/templates/kobo_reconcile.html cps/templates/search_form.html
 msgid "No"
 msgstr "Nee"
 
@@ -2818,7 +2875,8 @@ msgid "App passwords"
 msgstr "App-wachtwoorden"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cwa_settings.html cps/templates/search_form.html
+#: cps/templates/cwa_settings.html cps/templates/kobo_reconcile.html
+#: cps/templates/search_form.html
 msgid "Author"
 msgstr "Auteur"
 
@@ -3174,6 +3232,10 @@ msgstr "Uitgevers (komma-gescheiden)"
 msgid "Read"
 msgstr "Gelezen"
 
+#: cps/spa_strings.py cps/templates/image.html
+msgid "Reading"
+msgstr "Lezen"
+
 #: cps/spa_strings.py
 msgid "Reading progress"
 msgstr "Leesvoortgang"
@@ -3434,10 +3496,6 @@ msgstr ""
 "De interface is vertaald naar jouw taal; deze update-notities zijn "
 "geschreven in het Engels."
 
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Reading"
-msgstr "Lezen"
-
 #: cps/spa_strings.py
 msgid "Grid view"
 msgstr "Rasterweergave"
@@ -3534,6 +3592,10 @@ msgstr "Verken je bibliotheek"
 #: cps/spa_strings.py
 msgid "Go to Upload"
 msgstr "Ga naar Uploaden"
+
+#: cps/spa_strings.py
+msgid "Open Tasks"
+msgstr "Taken openen"
 
 #: cps/spa_strings.py
 msgid "Open search"
@@ -3709,6 +3771,60 @@ msgid "Dismiss help announcement"
 msgstr "Hulpmelding sluiten"
 
 #: cps/spa_strings.py
+msgid "Kobo book compatibility repaired"
+msgstr "Compatibiliteit van Kobo-boek hersteld"
+
+#: cps/spa_strings.py
+msgid "Library notice"
+msgstr "Bibliotheekmelding"
+
+#: cps/spa_strings.py
+msgid "Show affected books"
+msgstr "Betrokken boeken tonen"
+
+#: cps/spa_strings.py
+msgid "Untitled book"
+msgstr "Boek zonder titel"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} notices dismissed permanently."
+msgstr "{count} meldingen permanent gesloten."
+
+#: cps/spa_strings.py
+msgid "There is new information about your library."
+msgstr "Er is nieuwe informatie over uw bibliotheek."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Dismiss all {count} notices permanently"
+msgstr "Alle {count} meldingen permanent sluiten"
+
+#: cps/spa_strings.py
+msgid "Dismiss all"
+msgstr "Alles sluiten"
+
+#: cps/spa_strings.py
+msgid "There is new information about this book."
+msgstr "Er is nieuwe informatie over dit boek."
+
+#: cps/spa_strings.py
+msgid "Notice dismissed permanently."
+msgstr "Melding permanent gesloten."
+
+#: cps/spa_strings.py
+msgid "Dismiss permanently"
+msgstr "Permanent sluiten"
+
+#: cps/spa_strings.py
+msgid "Could not dismiss the notices. Please try again."
+msgstr "De meldingen konden niet worden gesloten. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not dismiss the notice. Please try again."
+msgstr "De melding kon niet worden gesloten. Probeer het opnieuw."
+
+#: cps/spa_strings.py
 msgid "Open Ko-fi →"
 msgstr "Ko-fi openen →"
 
@@ -3872,6 +3988,10 @@ msgid "Advanced search"
 msgstr "Geavanceerd zoeken"
 
 #: cps/spa_strings.py
+msgid "All books"
+msgstr "Alle boeken"
+
+#: cps/spa_strings.py
 msgid "All shelves"
 msgstr "Alle boekenplanken"
 
@@ -3919,7 +4039,7 @@ msgid "Applying…"
 msgstr "Toepassen…"
 
 #: cps/spa_strings.py cps/templates/book_table.html
-#: cps/templates/duplicates.html
+#: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Archive"
 msgstr "Archiveren"
 
@@ -3992,6 +4112,10 @@ msgstr "Basis DN"
 msgid "Basic configuration"
 msgstr "Basisconfiguratie"
 
+#: cps/spa_strings.py
+msgid "Beta"
+msgstr "Bèta"
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Black"
 msgstr "Zwart"
@@ -4007,6 +4131,11 @@ msgstr "Boekdichtheid"
 #: cps/spa_strings.py
 msgid "Book order"
 msgstr "Boekvolgorde"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}"
+msgstr "Boek {id}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4209,8 +4338,8 @@ msgid "Could not load e-readers."
 msgstr "E-readers konden niet worden geladen."
 
 #: cps/spa_strings.py
-msgid "Could not load highlights."
-msgstr "Kan markeringen niet laden."
+msgid "Could not load highlights and notes."
+msgstr "Kan markeringen en notities niet laden."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -4231,6 +4360,10 @@ msgstr "Kan gebruikers niet laden."
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
 msgstr "Kan die markering niet openen."
+
+#: cps/spa_strings.py
+msgid "Could not open that search result."
+msgstr "Kan dat zoekresultaat niet openen."
 
 #: cps/spa_strings.py
 msgid "Could not read this comic archive."
@@ -4275,6 +4408,10 @@ msgstr "Kan titel niet opslaan."
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
 msgstr "Kan je leespositie niet opslaan."
+
+#: cps/spa_strings.py
+msgid "Could not search this book."
+msgstr "Kan dit boek niet doorzoeken."
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
@@ -4623,6 +4760,21 @@ msgid "Encryption"
 msgstr "Encryptie"
 
 #: cps/spa_strings.py
+msgid "Enter at least 2 characters"
+msgstr "Voer ten minste 2 tekens in"
+
+#: cps/spa_strings.py
+msgid ""
+"Every book syncs as it becomes ready. You can exclude individual books below."
+msgstr ""
+"Elk boek synchroniseert zodra het klaar is. Hieronder kun je individuele "
+"boeken uitsluiten."
+
+#: cps/spa_strings.py
+msgid "Excluded"
+msgstr "Uitgesloten"
+
+#: cps/spa_strings.py
 msgid "Exit full screen"
 msgstr "Volledig scherm verlaten"
 
@@ -4755,6 +4907,10 @@ msgid "Gradient — palette-matched top/bottom blend"
 msgstr "Kleurverloop — op palet afgestemde menging van boven- en onderkant"
 
 #: cps/spa_strings.py
+msgid "Grey"
+msgstr "Grijs"
+
+#: cps/spa_strings.py
 msgid "Group by"
 msgstr "Groeperen op"
 
@@ -4777,6 +4933,10 @@ msgstr "Groep object filter"
 #: cps/spa_strings.py
 msgid "HTML is allowed and sanitized on display."
 msgstr "HTML is toegestaan en wordt bij weergave opgeschoond."
+
+#: cps/spa_strings.py
+msgid "Has pen or drawing notes"
+msgstr "Heeft pen- of tekennotities"
 
 #: cps/spa_strings.py
 msgid "Header name"
@@ -4881,6 +5041,10 @@ msgstr ""
 "klassieke lezer voor andere formaten."
 
 #: cps/spa_strings.py
+msgid "Included"
+msgstr "Inbegrepen"
+
+#: cps/spa_strings.py
 msgid "Issuer / base URL"
 msgstr "Issuer / basis-URL"
 
@@ -4925,6 +5089,15 @@ msgstr "Kobo-instelling"
 #: cps/spa_strings.py
 msgid "Kobo sync on"
 msgstr "Kobo sync aan"
+
+#: cps/spa_strings.py
+msgid "Kobo two-way annotation sync"
+msgstr "Kobo-annotaties in twee richtingen synchroniseren"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Kobo two-way sync: {state}"
+msgstr "Kobo-synchronisatie in twee richtingen: {state}"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/listenmp3.html
@@ -5164,6 +5337,10 @@ msgid "Next page"
 msgstr "Volgende pagina"
 
 #: cps/spa_strings.py
+msgid "No books are ready yet — they appear here as they become ready."
+msgstr "Nog geen boeken klaar — ze verschijnen hier zodra ze klaar zijn."
+
+#: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
 msgstr ""
 "Er zijn momenteel geen boeken die overeenkomen met deze slimme boekenplank."
@@ -5194,15 +5371,12 @@ msgid "No excluded tags"
 msgstr "Geen uitgesloten labels"
 
 #: cps/spa_strings.py
-msgid ""
-"No highlights yet. Highlight while reading, or import from a Kobo device."
-msgstr ""
-"Nog geen markeringen. Markeer tijdens het lezen, of importeer van een Kobo-"
-"apparaat."
-
-#: cps/spa_strings.py
 msgid "No highlights yet. Select text in the book to make one."
 msgstr "Nog geen markeringen. Selecteer tekst in het boek om er een te maken."
+
+#: cps/spa_strings.py
+msgid "No matches found in this book."
+msgstr "Geen resultaten gevonden in dit boek."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5248,12 +5422,20 @@ msgid "Not in current file"
 msgstr "Niet in het huidige bestand"
 
 #: cps/spa_strings.py
+msgid "Not picked"
+msgstr "Niet gekozen"
+
+#: cps/spa_strings.py
 msgid "Not seen lately"
 msgstr "Onlangs niet gezien"
 
 #: cps/spa_strings.py
 msgid "Not set"
 msgstr "Niet ingesteld"
+
+#: cps/spa_strings.py
+msgid "Not set up yet"
+msgstr "Nog niet ingesteld"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Note"
@@ -5266,6 +5448,22 @@ msgstr "Notitie verwijderd"
 #: cps/spa_strings.py
 msgid "Note saved"
 msgstr "Notitie opgeslagen"
+
+#: cps/spa_strings.py
+msgid ""
+"Nothing here yet. Highlight or write a note while reading, or import from a "
+"Kobo device."
+msgstr ""
+"Nog niets. Markeer of schrijf een notitie tijdens het lezen, of importeer "
+"van een Kobo-apparaat."
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. While in beta, opting in only records your preference and "
+"recovery evidence — it does not change what your Kobo receives yet."
+msgstr ""
+"Standaard uit. Tijdens de bèta registreert inschakelen alleen je voorkeur en "
+"herstelbewijs — het verandert nog niets aan wat je Kobo ontvangt."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -5288,8 +5486,20 @@ msgid "One column"
 msgstr "Éé kolom"
 
 #: cps/spa_strings.py
+msgid ""
+"Only the books you pick below sync. Switching here starts from none picked — "
+"you choose each book yourself."
+msgstr ""
+"Alleen de boeken die je hieronder kiest, synchroniseren. Overschakelen "
+"begint met niets gekozen — je kiest elk boek zelf."
+
+#: cps/spa_strings.py
 msgid "Open Account"
 msgstr "Account openen"
+
+#: cps/spa_strings.py
+msgid "Open administration"
+msgstr "Beheer openen"
 
 #: cps/spa_strings.py
 msgid "Open classic reader"
@@ -5327,6 +5537,18 @@ msgstr ""
 msgid "Opens in classic view"
 msgstr "Opent in klassieke weergave"
 
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Opt in to Kobo two-way annotation sync"
+msgstr "Inschakelen voor Kobo-annotatiesynchronisatie in twee richtingen"
+
+#: cps/spa_strings.py
+msgid ""
+"Opting in does not sync a book straight away. Each book is set up and "
+"checked first — its real state is shown here."
+msgstr ""
+"Inschakelen synchroniseert een boek niet meteen. Elk boek wordt eerst "
+"ingesteld en gecontroleerd — de echte status wordt hier getoond."
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "PDF-lezer"
@@ -5361,6 +5583,10 @@ msgstr "Wachtwoord"
 msgid "Password (leave blank to keep)"
 msgstr "Wachtwoord (laat leeg om te behouden)"
 
+#: cps/spa_strings.py
+msgid "Paused after a problem"
+msgstr "Gepauzeerd na een probleem"
+
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
@@ -5370,9 +5596,17 @@ msgstr ""
 "een bestand, of gebruik de omslag die in het boek zelf is ingesloten."
 
 #: cps/spa_strings.py
+msgid "Picked"
+msgstr "Gekozen"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Picked up {label}. Drag to reorder, release to drop."
 msgstr "{label} opgepakt. Sleep om te herschikken, laat los om neer te zetten."
+
+#: cps/spa_strings.py
+msgid "Pink"
+msgstr "Roze"
 
 #: cps/spa_strings.py cps/templates/admin.html
 msgid "Port"
@@ -5641,12 +5875,28 @@ msgid "Scopes"
 msgstr "Scopes"
 
 #: cps/spa_strings.py
+msgid "Search inside book"
+msgstr "Zoeken in het boek"
+
+#: cps/spa_strings.py
+msgid "Search term"
+msgstr "Zoekterm"
+
+#: cps/spa_strings.py
+msgid "Search this book"
+msgstr "Dit boek doorzoeken"
+
+#: cps/spa_strings.py
 msgid "Search title, author…"
 msgstr "Zoeken op titel, auteur…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
 msgstr "Elke bron doorzoeken…"
+
+#: cps/spa_strings.py
+msgid "Searching this book…"
+msgstr "Dit boek wordt doorzocht…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
@@ -5686,6 +5936,10 @@ msgstr "Meerdere selecteren"
 #, python-brace-format
 msgid "Select note: {text}"
 msgstr "Notitie selecteren: {text}"
+
+#: cps/spa_strings.py
+msgid "Selected books"
+msgstr "Geselecteerde boeken"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
@@ -5759,6 +6013,15 @@ msgid "Set up Kobo sync"
 msgstr "Kobo-synchronisatie instellen"
 
 #: cps/spa_strings.py
+msgid "Set up Kobo sync first — then this preference becomes available."
+msgstr ""
+"Stel eerst Kobo-synchronisatie in — daarna wordt deze voorkeur beschikbaar."
+
+#: cps/spa_strings.py
+msgid "Setting up…"
+msgstr "Instellen…"
+
+#: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Instellingen opgeslagen."
 
@@ -5811,6 +6074,11 @@ msgstr "Verborgen boeken tonen"
 #: cps/spa_strings.py
 msgid "Show password"
 msgstr "Wachtwoord tonen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing the first {count} matches."
+msgstr "De eerste {count} resultaten worden weergegeven."
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
@@ -5871,6 +6139,10 @@ msgstr "Sorteervolgorde"
 #: cps/spa_strings.py
 msgid "Source details"
 msgstr "Brondetails"
+
+#: cps/spa_strings.py
+msgid "Start the only OAuth provider automatically"
+msgstr "Start de enige OAuth-provider automatisch"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Started reading"
@@ -5949,8 +6221,20 @@ msgid "That URL is not a usable image."
 msgstr "Die URL is geen bruikbare afbeelding."
 
 #: cps/spa_strings.py
+msgid ""
+"The server-wide option is also off, so nothing can sync yet. An "
+"administrator can enable it in the classic server settings."
+msgstr ""
+"De serverbrede optie is ook uit, dus er kan nog niets synchroniseren. Een "
+"beheerder kan dit inschakelen in de klassieke serverinstellingen."
+
+#: cps/spa_strings.py
 msgid "This device will no longer sync."
 msgstr "Dit apparaat wordt niet meer gesynchroniseerd."
+
+#: cps/spa_strings.py
+msgid "This feature is currently disabled at server level."
+msgstr "Deze functie is momenteel uitgeschakeld op serverniveau."
 
 #: cps/spa_strings.py
 msgid "This format opens in the full-screen reader."
@@ -6011,6 +6295,14 @@ msgid "Two columns"
 msgstr "Twee kolommen"
 
 #: cps/spa_strings.py
+msgid "Two-way sync active"
+msgstr "Synchronisatie in twee richtingen actief"
+
+#: cps/spa_strings.py
+msgid "Two-way sync preference saved."
+msgstr "Voorkeur voor synchronisatie in twee richtingen opgeslagen."
+
+#: cps/spa_strings.py
 msgid "UI / display configuration"
 msgstr "UI / weergave-configuratie"
 
@@ -6025,6 +6317,10 @@ msgstr "Ongedaan maken"
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Zichtbaar maken"
+
+#: cps/spa_strings.py
+msgid "Unknown color"
+msgstr "Onbekende kleur"
 
 #: cps/spa_strings.py
 msgid "Unknown device"
@@ -6049,6 +6345,10 @@ msgstr "Zonder titel"
 #: cps/spa_strings.py
 msgid "Update failed."
 msgstr "Bijwerken mislukt."
+
+#: cps/spa_strings.py
+msgid "Upload a book"
+msgstr "Een boek uploaden"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Upload as cover"
@@ -6125,6 +6425,40 @@ msgid "Warning: this highlight can’t be shown in the book"
 msgstr "Waarschuwing: deze markering kan niet in het boek worden weergegeven"
 
 #: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again."
+msgstr ""
+"We hebben dit boek hersteld voor je Kobo. Als je moeite had met markeren, "
+"probeer het opnieuw na het synchroniseren — en als het dan nog steeds niet "
+"werkt, verwijder het boek van je Kobo en laat het opnieuw downloaden."
+
+#: cps/spa_strings.py
+msgid ""
+"We repaired this book for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove the book "
+"from your Kobo and let it download again. If you read it some other way, "
+"download it again to get the repaired copy."
+msgstr ""
+"We hebben dit boek hersteld voor je Kobo. Als je moeite had met markeren, "
+"probeer het opnieuw na het synchroniseren — en als het dan nog steeds niet "
+"werkt, verwijder het boek van je Kobo en laat het opnieuw downloaden. Lees "
+"je het op een andere manier, download het dan opnieuw voor de herstelde "
+"versie."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"We repaired {count} books for your Kobo. If you were having trouble "
+"highlighting, try after sync — and if it still doesn’t work, remove them "
+"from your Kobo and let them download again."
+msgstr ""
+"We hebben {count} boeken hersteld voor je Kobo. Als je moeite had met "
+"markeren, probeer het opnieuw na het synchroniseren — en als het dan nog "
+"steeds niet werkt, verwijder ze van je Kobo en laat ze opnieuw downloaden."
+
+#: cps/spa_strings.py
 msgid "Web reader"
 msgstr "Weblezer"
 
@@ -6137,6 +6471,21 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
 msgstr "Wanneer de leesvoortgang voor het eerst is gesynchroniseerd"
+
+#: cps/spa_strings.py
+msgid "Which books sync?"
+msgstr "Welke boeken synchroniseren?"
+
+#: cps/spa_strings.py
+msgid ""
+"With automatic start on, the login page goes straight to the provider. Add ?"
+"local=1 to the login URL to reach the password form, which keeps working as "
+"long as standard password login is left enabled."
+msgstr ""
+"Als automatisch starten aanstaat, gaat de inlogpagina rechtstreeks naar de "
+"provider. Voeg ?local=1 toe aan de inlog-URL om het wachtwoordformulier te "
+"bereiken; dat blijft werken zolang standaard inloggen met wachtwoord "
+"ingeschakeld blijft."
 
 #: cps/spa_strings.py
 msgid "Write a note"
@@ -6263,6 +6612,11 @@ msgstr "{count} bestanden afgewezen"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{count} matches"
+msgstr "{count} resultaten"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{count} result"
 msgstr "{count} resultaat"
 
@@ -6293,8 +6647,8 @@ msgstr "{name} verwijderd."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{name}, {n} highlights"
-msgstr "{name}, {n} markeringen"
+msgid "{name}, {n} highlights and notes"
+msgstr "{name}, {n} markeringen en notities"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6313,24 +6667,25 @@ msgstr "{n} gevonden"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{n} highlights"
-msgstr "{n} markeringen"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{n} highlights assigned to this device will become Unknown device."
-msgstr ""
-"{n} markeringen die aan dit apparaat zijn toegewezen, worden Onbekend "
-"apparaat."
+msgid "{n} highlights and notes"
+msgstr "{n} markeringen en notities"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
-"{n} highlights were made on this device. They are not deleted. Their origin "
-"history is kept."
+"{n} highlights and notes assigned to this device will become Unknown device."
 msgstr ""
-"{n} markeringen zijn op dit apparaat gemaakt. Ze worden niet verwijderd. Hun "
-"herkomstgeschiedenis blijft bewaard."
+"{n} markeringen en notities die aan dit apparaat zijn toegewezen, worden "
+"Onbekend apparaat."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} highlights and notes were made on this device. They are not deleted. "
+"Their origin history is kept."
+msgstr ""
+"{n} markeringen en notities zijn op dit apparaat gemaakt. Ze worden niet "
+"verwijderd. Hun herkomstgeschiedenis blijft bewaard."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6345,6 +6700,10 @@ msgstr "{ok} van de {total} bronnen hebben geantwoord"
 #: cps/spa_strings.py
 msgid "…or paste an image URL"
 msgstr "…of plak een afbeelding-URL"
+
+#: cps/spa_strings.py
+msgid "← Back"
+msgstr "← Terug"
 
 #: cps/spa_strings.py
 msgid "← Back to book"
@@ -6644,8 +7003,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
-"(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
+"%(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -6964,6 +7323,32 @@ msgstr ""
 #: cps/tasks/kepub_backfill.py
 #, python-format
 msgid "%(count)d KEPUB conversion(s) failed"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+msgid "Repair existing KEPUB packages"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+msgid "Google Drive KEPUB repair is not supported"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+#, python-format
+msgid ""
+"%(clean)d clean, %(repaired)d repaired, %(unsupported)d unsupported, "
+"%(failed)d failed"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+#, python-format
+msgid "%(count)d KEPUB repair(s) failed"
+msgstr ""
+
+#: cps/tasks/kepub_package_repair.py
+msgid ""
+"KEPUB repair finished, but the completion marker could not be saved; the "
+"scan will run again"
 msgstr ""
 
 #: cps/tasks/mail.py
@@ -7426,7 +7811,7 @@ msgid ""
 "never stored on the server."
 msgstr ""
 
-#: cps/templates/annotations_import.html
+#: cps/templates/annotations_import.html cps/templates/kobo_reconcile.html
 msgid "KoboReader.sqlite"
 msgstr ""
 
@@ -7435,11 +7820,19 @@ msgid "Import summary"
 msgstr ""
 
 #: cps/templates/annotations_import.html
-msgid "new highlights imported"
+msgid "new annotations imported"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "existing annotations updated from a newer device copy"
 msgstr ""
 
 #: cps/templates/annotations_import.html
 msgid "already imported (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "different or undated device entries older than server state (skipped)"
 msgstr ""
 
 #: cps/templates/annotations_import.html
@@ -7448,7 +7841,23 @@ msgid "for books not in this library (skipped)"
 msgstr "Boeken in deze bibliotheek"
 
 #: cps/templates/annotations_import.html
-msgid "hidden on device (skipped)"
+msgid "hidden on device (reported, not applied)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "empty bookmark rows with no annotation content (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "invalid bookmark rows (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries with invalid book positions (skipped)"
+msgstr ""
+
+#: cps/templates/annotations_import.html
+msgid "entries not saved because the import transaction failed"
 msgstr ""
 
 #: cps/templates/annotations_import.html
@@ -8214,6 +8623,7 @@ msgstr "Inloggen op afstand inschakelen ('magic link')"
 #: cps/templates/config_edit.html
 msgid "Allow users to hide books from their personal library"
 msgstr ""
+"Gebruikers toestaan om boeken te verbergen in hun persoonlijke bibliotheek"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8221,6 +8631,23 @@ msgid ""
 "during upgrades. When enabled, each user gets a hide button on the book "
 "detail page that drops the book out of their own index/search/OPDS without "
 "affecting other users. Recovery is via the profile page (Hidden Books link)."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Allow Kobo two-way annotation sync"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"Stage 0 records exact Kobo annotation evidence only. Device responses remain "
+"unchanged. This opt-in defaults off and must also be enabled for each user "
+"before a later rollout stage can use local authority."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"The CWNG_KOBO_TWO_WAY_ANNOTATIONS emergency override currently forces this "
+"feature off."
 msgstr ""
 
 #: cps/templates/config_edit.html
@@ -8245,7 +8672,7 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Convert missing KEPUBs now"
-msgstr ""
+msgstr "Converteer ontbrekende KEPUBs nu"
 
 #: cps/templates/config_edit.html
 msgid "Server External Port (for port forwarded API calls)"
@@ -8254,6 +8681,8 @@ msgstr "Server Externe Port (voor port doorgestuurde API oproepen)"
 #: cps/templates/config_edit.html
 msgid "Sync Kobo annotations to Hardcover (Requires API key per user)"
 msgstr ""
+"Synchroniseer aantekeningen naar Hardcover (API sleutel per gebruiker "
+"vereist)"
 
 #: cps/templates/config_edit.html
 msgid "Pad book covers to Kobo screen aspect ratio"
@@ -8475,7 +8904,7 @@ msgstr "LDAP Server is OpenLDAP?"
 
 #: cps/templates/config_edit.html
 msgid "Auto-create users from LDAP"
-msgstr ""
+msgstr "Automatisch gebruikers aanmaken uit LDAP"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8518,7 +8947,7 @@ msgstr "LDAP Lid Gebruiker Filter"
 
 #: cps/templates/config_edit.html
 msgid "Important:"
-msgstr ""
+msgstr "Belangrijk:"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -8786,6 +9215,18 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
+msgid "Automatically forward to the only OAuth provider"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"When enabled and exactly one OAuth provider is active, visiting the login "
+"page starts it automatically. Add ?local=1 to the login URL to open the "
+"normal login page instead. That page still accepts a username and password "
+"only while the setting above is left off."
+msgstr ""
+
+#: cps/templates/config_edit.html
 msgid "Enable OAuth Group-Based Admin Role Management"
 msgstr ""
 
@@ -9048,7 +9489,7 @@ msgstr "Voeg toegestane/geweigerde aangepaste kolomwaarden toe"
 
 #: cps/templates/cover_picker.html
 msgid "Use a URL"
-msgstr ""
+msgstr "Gebruik een URL"
 
 #: cps/templates/cover_picker.html
 #, fuzzy
@@ -9164,7 +9605,7 @@ msgstr ""
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Starting..."
-msgstr ""
+msgstr "Starten..."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Cancelling..."
@@ -9176,7 +9617,7 @@ msgstr ""
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Search by title/author"
-msgstr ""
+msgstr "Zoek op titel/auteur"
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Run on selected book"
@@ -10561,7 +11002,7 @@ msgstr ""
 msgid "Keep Largest File Size - Keep book with largest total file size"
 msgstr ""
 
-#: cps/templates/duplicates.html
+#: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "Voorbeeld"
 
@@ -10955,6 +11396,147 @@ msgstr "Openbare boekenplank"
 msgid "Add Series to Shelf"
 msgstr "Toevoegen aan boekenplank"
 
+#: cps/templates/kobo_reconcile.html
+msgid ""
+"Upload this user's KoboReader.sqlite to find device books whose UUID no "
+"longer exists in this library."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid ""
+"Preview and sample entries are excluded automatically when Kobo marks them "
+"with Accessibility -1."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid ""
+"No genuine Kobo Store purchase was available for validation. Kobo Store "
+"books may appear in the preview, and the evidence shown is not proof that "
+"this server delivered a book."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid ""
+"Select only books you know came from this server. Selecting a book schedules "
+"its device copy for archival on the next sync."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid ""
+"Recorded sync means this server retained a UUID-bearing delivery record. No "
+"does not prove the book was never delivered by an older version."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "The uploaded database is deleted as soon as the preview is built."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid ""
+"%(count)d deleted books were scheduled to be archived the next time this "
+"user's Kobo syncs."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d were already scheduled."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d are currently in the library and were not changed."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d could not be verified and were not changed."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d device books are not in the library and require your review."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "Device title"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "ISBN"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "Recorded sync"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "File size"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "Book UUID"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "Archive %(title)s"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d bytes"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "Archive selected books on the next Kobo sync"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "Excluded from this action"
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d preview or sample entries were excluded."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid ""
+"%(count)d device entries could not be classified because Accessibility was "
+"unavailable."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d device volume rows had no usable UUID."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d books are still in the library."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d library lookups could not be completed."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "%(count)d books were already scheduled for archival."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+#, python-format
+msgid "Maximum file size: %(max)d MB."
+msgstr ""
+
+#: cps/templates/kobo_reconcile.html
+msgid "Build preview"
+msgstr ""
+
 #: cps/templates/kosync_plugin.html
 #, fuzzy
 msgid "KOReader Sync is disabled."
@@ -11307,18 +11889,10 @@ msgstr "en van de harde schijf"
 
 #: cps/templates/modal_dialogs.html
 msgid ""
-"Important Kobo Note: deleted books will remain on any paired Kobo device."
+"Deleting this book also tries to archive its copy on paired Kobo devices the "
+"next time they sync. If that update cannot be recorded, the book may remain "
+"on a device."
 msgstr ""
-"Belangrijke Kobo Opmerking: Verwijderde boeken zullen op alle gekoppelde "
-"Kobo Apparaten blijven."
-
-#: cps/templates/modal_dialogs.html
-msgid ""
-"Books must first be archived and the device synced before a book can safely "
-"be deleted."
-msgstr ""
-"Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
-"gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -12114,8 +12688,25 @@ msgid ""
 msgstr ""
 
 #: cps/templates/user_edit.html
+msgid "Reconcile books deleted before Kobo archival tracking"
+msgstr ""
+
+#: cps/templates/user_edit.html
+msgid ""
+"Upload this user's KoboReader.sqlite, then select only books you know this "
+"server delivered and that are no longer in the library."
+msgstr ""
+
+#: cps/templates/user_edit.html
 msgid "Sync only books in selected shelves with Kobo"
 msgstr "Synchroniseer alleen boeken op geselecteerde boekenplanken met Kobo"
+
+#: cps/templates/user_edit.html
+msgid ""
+"Defaults off. Stage 0 only captures recovery evidence and does not change "
+"annotations returned to your Kobo. The administrator must separately enable "
+"the instance-level opt-in."
+msgstr ""
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"
@@ -12421,6 +13012,131 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#~ msgid ""
+#~ "We repaired this book for your Kobo. Sync your device — and if "
+#~ "highlighting still does not work, remove the book from your Kobo and let "
+#~ "it download again. Highlights you made before the repair may not come "
+#~ "back."
+#~ msgstr ""
+#~ "We hebben dit boek hersteld voor je Kobo. Synchroniseer je apparaat — en "
+#~ "als markeren nog steeds niet werkt, verwijder het boek van je Kobo en "
+#~ "laat het opnieuw downloaden. Markeringen die je vóór het herstel hebt "
+#~ "gemaakt, komen mogelijk niet terug."
+
+#~ msgid ""
+#~ "We repaired this book for your Kobo. Sync your device — and if "
+#~ "highlighting still does not work, remove the book from your Kobo and let "
+#~ "it download again. If you read it some other way, download it again to "
+#~ "get the repaired copy. Highlights you made before the repair may not come "
+#~ "back."
+#~ msgstr ""
+#~ "We hebben dit boek hersteld voor je Kobo. Synchroniseer je apparaat — en "
+#~ "als markeren nog steeds niet werkt, verwijder het boek van je Kobo en "
+#~ "laat het opnieuw downloaden. Lees je het op een ander apparaat of in een "
+#~ "andere app, download het dan opnieuw om de herstelde versie te krijgen. "
+#~ "Markeringen die je vóór het herstel hebt gemaakt, komen mogelijk niet "
+#~ "terug."
+
+#, python-brace-format
+#~ msgid ""
+#~ "We repaired {count} books for your Kobo. Sync your device — and if "
+#~ "highlighting still does not work, remove the book from your Kobo and let "
+#~ "it download again. Highlights you made before the repair may not come "
+#~ "back."
+#~ msgstr ""
+#~ "We hebben {count} boeken hersteld voor je Kobo. Synchroniseer je apparaat "
+#~ "— en als markeren nog steeds niet werkt, verwijder het boek van je Kobo "
+#~ "en laat het opnieuw downloaden. Markeringen die je vóór het herstel hebt "
+#~ "gemaakt, komen mogelijk niet terug."
+
+#~ msgid ""
+#~ "We repaired this book for your Kobo. If you were having trouble "
+#~ "highlighting, try again after your next sync. Highlights you made before "
+#~ "the repair may still not appear, and may need to be made again."
+#~ msgstr ""
+#~ "We hebben dit boek hersteld voor je Kobo. Als je moeite had met markeren, "
+#~ "probeer het opnieuw na je volgende synchronisatie. Markeringen die je "
+#~ "vóór het herstel hebt gemaakt, verschijnen mogelijk nog steeds niet en "
+#~ "moeten misschien opnieuw worden gemaakt."
+
+#~ msgid ""
+#~ "We repaired this book for your Kobo. If you were having trouble "
+#~ "highlighting, try again after your next sync. If you read it some other "
+#~ "way, download it again to get the repaired copy. Highlights you made "
+#~ "before the repair may still not appear, and may need to be made again."
+#~ msgstr ""
+#~ "We hebben dit boek hersteld voor je Kobo. Als je moeite had met markeren, "
+#~ "probeer het opnieuw na je volgende synchronisatie. Lees je het op een "
+#~ "andere manier, download het dan opnieuw voor de herstelde versie. "
+#~ "Markeringen die je vóór het herstel hebt gemaakt, verschijnen mogelijk "
+#~ "nog steeds niet en moeten misschien opnieuw worden gemaakt."
+
+#, python-brace-format
+#~ msgid ""
+#~ "We repaired {count} books for your Kobo. If you were having trouble "
+#~ "highlighting, try again after your next sync. Highlights you made before "
+#~ "the repair may still not appear, and may need to be made again."
+#~ msgstr ""
+#~ "We hebben {count} boeken hersteld voor je Kobo. Als je moeite had met "
+#~ "markeren, probeer het opnieuw na je volgende synchronisatie. Markeringen "
+#~ "die je vóór het herstel hebt gemaakt, verschijnen mogelijk nog steeds "
+#~ "niet en moeten misschien opnieuw worden gemaakt."
+
+#, python-brace-format
+#~ msgid ""
+#~ "CWNG repaired {count} books previously sent to your Kobo. Older "
+#~ "highlights may still need to be recreated on the device."
+#~ msgstr ""
+#~ "CWNG heeft {count} boeken hersteld die eerder naar uw Kobo zijn gestuurd. "
+#~ "Mogelijk moet u oudere markeringen opnieuw aanmaken op het apparaat."
+
+#~ msgid ""
+#~ "CWNG repaired a book previously sent to your Kobo. Older highlights may "
+#~ "still need to be recreated on the device."
+#~ msgstr ""
+#~ "CWNG heeft een boek hersteld dat eerder naar uw Kobo is gestuurd. "
+#~ "Mogelijk moet u oudere markeringen opnieuw aanmaken op het apparaat."
+
+#~ msgid ""
+#~ "This book was repaired after it had already been sent to a Kobo. Download "
+#~ "the updated book; highlights created before the repair may remain "
+#~ "invisible and may need to be recreated."
+#~ msgstr ""
+#~ "Dit boek is hersteld nadat het al naar een Kobo was gestuurd. Download "
+#~ "het bijgewerkte boek; markeringen die vóór het herstel zijn gemaakt, "
+#~ "kunnen onzichtbaar blijven en moeten mogelijk opnieuw worden aangemaakt."
+
+#~ msgid "Could not load highlights."
+#~ msgstr "Kan markeringen niet laden."
+
+#~ msgid ""
+#~ "No highlights yet. Highlight while reading, or import from a Kobo device."
+#~ msgstr ""
+#~ "Nog geen markeringen. Markeer tijdens het lezen, of importeer van een "
+#~ "Kobo-apparaat."
+
+#, python-brace-format
+#~ msgid "{name}, {n} highlights"
+#~ msgstr "{name}, {n} markeringen"
+
+#, python-brace-format
+#~ msgid "{n} highlights"
+#~ msgstr "{n} markeringen"
+
+#, python-brace-format
+#~ msgid "{n} highlights assigned to this device will become Unknown device."
+#~ msgstr ""
+#~ "{n} markeringen die aan dit apparaat zijn toegewezen, worden Onbekend "
+#~ "apparaat."
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights were made on this device. They are not deleted. Their "
+#~ "origin history is kept."
+#~ msgstr ""
+#~ "{n} markeringen zijn op dit apparaat gemaakt. Ze worden niet verwijderd. "
+#~ "Hun herkomstgeschiedenis blijft bewaard."
+
 #~ msgid "Bulk actions"
 #~ msgstr "Bulkacties"
 
@@ -12597,11 +13313,10 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
-#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
-#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
-#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
-#~ "bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
+#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
+#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
+#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"
@@ -12912,3 +13627,16 @@ msgstr "Toon gelezen/niet gelezen selectie"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"
+
+#~ msgid ""
+#~ "Important Kobo Note: deleted books will remain on any paired Kobo device."
+#~ msgstr ""
+#~ "Belangrijke Kobo Opmerking: Verwijderde boeken zullen op alle gekoppelde "
+#~ "Kobo Apparaten blijven."
+
+#~ msgid ""
+#~ "Books must first be archived and the device synced before a book can "
+#~ "safely be deleted."
+#~ msgstr ""
+#~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
+#~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."

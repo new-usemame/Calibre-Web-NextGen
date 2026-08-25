@@ -360,6 +360,17 @@ class TestMigrationPreservesAllUserData:
         engine = create_engine("sqlite:///:memory:", future=True)
         with engine.connect() as conn:
             conn.exec_driver_sql("PRAGMA foreign_keys = OFF")
+            # The production app DB always has these parent users.  Keep the
+            # synthetic fixture foreign-key-clean so later additive migrations
+            # can enforce their documented PRAGMA foreign_key_check postcondition.
+            conn.exec_driver_sql(
+                "CREATE TABLE user (id INTEGER PRIMARY KEY, name VARCHAR(64))"
+            )
+            for user_id in range(1, 6):
+                conn.exec_driver_sql(
+                    "INSERT INTO user (id, name) VALUES (?, ?)",
+                    (user_id, f"fixture-user-{user_id}"),
+                )
             conn.exec_driver_sql(PRE_H1_SCHEMA)
             conn.exec_driver_sql(PRE_H1_INDEX_USER_ANN)
             conn.exec_driver_sql(PRE_H1_INDEX_USER_BOOK)
@@ -532,6 +543,7 @@ class TestMigrationPreservesAllUserData:
 
         production = re.findall(
             r"^\s*(migrate_annotation_\w+|migrate_kobo_annotation_\w+|"
+            r"migrate_kobo_two_way_annotation_\w+|"
             r"migrate_multi_device_annotation_\w+|migrate_device_management_\w+)\(",
             inspect.getsource(ub.migrate_Database), re.M,
         )
@@ -564,6 +576,7 @@ class TestMigrationPreservesAllUserData:
         ub.migrate_annotation_koreader_identity(engine, session)
         ub.migrate_multi_device_annotation_safe_slice(engine, session)
         ub.migrate_device_management_slice(engine, session)
+        ub.migrate_kobo_two_way_annotation_sync(engine, session)
 
         # Fresh session: ORM read must work on every row.
         s2 = session_maker()

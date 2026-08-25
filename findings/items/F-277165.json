@@ -1,0 +1,13 @@
+{
+  "area": "kobo",
+  "body": "`helper.get_book_cover_with_uuid` (cps/helper.py) and `helper.get_kobo_cover_source_path`\nresolve the book with `calibre_db.get_book_by_uuid`, which applies NO filter (cps/db.py) —\nunlike the numbered `/cover/<id>` route, which goes through `get_filtered_book` and therefore\n`common_filters`. `cps/kobo.py`'s cover handler uses the same raw lookup.\n\nA policy-aware alternative already exists and is used elsewhere:\n`get_book_by_uuid_for_kobo(..., enforce_policy=True)` (cps/db.py).\n\nSo a Kobo cover request naming another user's restricted book's UUID is answered from that\nbook rather than refused. Pre-existing; found by an adversarial review of PR #1739 (which\nasked explicitly whether its new cache policy could attach to \"a different user's book\" — the\ncaching change does not reach this path, but the underlying lookup does).\n\nSmallest fix: use the policy-aware lookup in both UUID cover helpers.",
+  "created": "2026-08-18",
+  "id": "F-277165",
+  "refs": [
+    "#1739"
+  ],
+  "severity": "security",
+  "source": "audit",
+  "status": "open",
+  "title": "Kobo cover lookup by UUID bypasses per-user visibility filtering"
+}

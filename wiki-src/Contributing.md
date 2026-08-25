@@ -16,4 +16,8 @@ To contribute a translation, edit the `.po` file under [cps/translations/](https
 
 ---
 
+{{repo:README.md#how-ai-is-used|heading}}
+
+---
+
 {{repo:README.md#credits|heading}}

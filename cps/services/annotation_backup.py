@@ -34,6 +34,7 @@ Resource budget (per fork #240):
 from __future__ import annotations
 
 import datetime
+import base64
 import gzip
 import hashlib
 import json
@@ -50,7 +51,7 @@ log = logging.getLogger(__name__)
 # Schema version embedded in every JSON backup so a restore endpoint
 # (future PR) can reject incompatible formats cleanly rather than
 # loading garbage.
-BACKUP_SCHEMA_VERSION = 2
+BACKUP_SCHEMA_VERSION = 3
 
 # Number of snapshots retained per `(user_id, book_id)` pair.
 RETENTION_COUNT = 3
@@ -205,16 +206,9 @@ def _run_one(user_id: int, book_id: int, session=None) -> Optional[Path]:
             ub.Annotation.book_id == book_id,
         ).order_by(ub.Annotation.id.asc()).all()
 
-        if not rows:
-            # User has no annotations for this book — could happen if
-            # the only annotation was deleted between enqueue and run.
-            # The previous backup (if any) is the last good state, which
-            # is the correct semantics — don't write an empty snapshot.
-            return None
-
-        payload = _serialize(user_id, book_id, rows)
+        payload = _serialize(user_id, book_id, rows, session=session)
         content_hash = hashlib.sha256(
-            _canonical_bytes(payload["annotations"])
+            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
         ).hexdigest()
 
         latest = (
@@ -270,38 +264,59 @@ def _run_one(user_id: int, book_id: int, session=None) -> Optional[Path]:
                 pass
 
 
-def _serialize(user_id: int, book_id: int, rows: list) -> dict:
-    """Build the JSON-serializable payload — every column on every
-    annotation, plus envelope metadata."""
-    annotations = []
-    for r in rows:
-        annotations.append({
-            "id": r.id,
-            "annotation_id": r.annotation_id,
-            "highlighted_text": r.highlighted_text,
-            "highlight_color": r.highlight_color,
-            "note_text": r.note_text,
-            "content_id": r.content_id,
-            "start_container_path": r.start_container_path,
-            "start_container_child_index": r.start_container_child_index,
-            "start_offset": r.start_offset,
-            "end_container_path": r.end_container_path,
-            "end_container_child_index": r.end_container_child_index,
-            "end_offset": r.end_offset,
-            "context_string": r.context_string,
-            "chapter_progress": r.chapter_progress,
-            "cfi_range": r.cfi_range,
-            "source": r.source,
-            "hidden": bool(r.hidden) if r.hidden is not None else False,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-            "last_synced": r.last_synced.isoformat() if r.last_synced else None,
-        })
+def _json_value(value):
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        return {"base64": base64.b64encode(value).decode("ascii")}
+    return value
+
+
+def _row_dict(row, columns):
+    return {column.name: _json_value(getattr(row, column.name)) for column in columns}
+
+
+def _serialize(user_id: int, book_id: int, rows: list, session=None) -> dict:
+    """Build schema-3 evidence including every generic and Kobo-sidecar field."""
+    from .. import ub
+
+    annotation_columns = list(ub.Annotation.__table__.columns)
+    annotations = [_row_dict(row, annotation_columns) for row in rows]
+    annotation_row_ids = [row.id for row in rows if row.id is not None]
+    materialization_rows = []
+    book_authority = None
+    if session is not None:
+        if annotation_row_ids:
+            materialization_rows = (
+                session.query(ub.KoboAnnotationMaterialization)
+                .filter(ub.KoboAnnotationMaterialization.annotation_id.in_(annotation_row_ids))
+                .order_by(ub.KoboAnnotationMaterialization.annotation_id.asc())
+                .all()
+            )
+        authority_row = (
+            session.query(ub.KoboAnnotationBookState)
+            .filter(
+                ub.KoboAnnotationBookState.user_id == user_id,
+                ub.KoboAnnotationBookState.book_id == book_id,
+            )
+            .first()
+        )
+        if authority_row is not None:
+            book_authority = _row_dict(
+                authority_row, ub.KoboAnnotationBookState.__table__.columns,
+            )
     return {
         "schema_version": BACKUP_SCHEMA_VERSION,
         "user_id": user_id,
         "book_id": book_id,
         "annotation_count": len(annotations),
+        "annotation_columns": [column.name for column in annotation_columns],
         "annotations": annotations,
+        "materializations": [
+            _row_dict(row, ub.KoboAnnotationMaterialization.__table__.columns)
+            for row in materialization_rows
+        ],
+        "book_authority": book_authority,
     }
 
 

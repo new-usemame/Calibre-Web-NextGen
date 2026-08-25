@@ -15,14 +15,16 @@ from flask import jsonify, request, Response
 from flask_babel import get_locale
 
 from . import api_v1
-from .serializers import serialize_book_detail
-from .. import calibre_db, config, db, ub, isoLanguages
+from .serializers import serialize_book_detail, cover_url_for
+from .. import calibre_db, config, db, ub, isoLanguages, logger
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 import time
 
 from ..editbooks import edit_book_param, delete_book_from_table, modify_identifiers
-from ..helper import convert_book_format, save_cover, save_cover_from_url, tags_filters, get_convert_options
+from ..helper import (convert_book_format, save_cover, save_cover_from_url, tags_filters,
+                     get_convert_options, mark_book_modified, log_metadata_change,
+                     replace_cover_thumbnail_cache)
 
 # Fields the SPA edit form can change, applied in this order. Title/authors come
 # first because they may restructure the book's directory; the rest follow.
@@ -34,6 +36,8 @@ EDITABLE_FIELDS = [
 # Custom columns (#pages, #status, …) are addressed by their calibre table name,
 # the same key the classic editor's form fields and inline table editor use.
 CUSTOM_COLUMN_PREFIX = "custom_column_"
+
+log = logger.create()
 
 
 def _err(code, message, status):
@@ -491,7 +495,80 @@ def set_cover(book_id):
             return _err("invalid_request", "Provide an image file or a cover URL", 400)
         ok, message = save_cover_from_url(url, book.path)
 
-    if ok:
-        # Cache-bust so the browser refetches the replaced image immediately.
-        return jsonify({"ok": True, "cover_url": "/cover/%d/og?t=%d" % (book_id, int(time.time()))})
-    return _err("cover_failed", str(message), 400)
+    if not ok:
+        return _err("cover_failed", str(message), 400)
+
+    # A new cover IS a book change and has to be recorded as one. Writing
+    # cover.jpg alone leaves Books.last_modified untouched, and that column is
+    # what every cover URL is versioned by (jinjia's `last_modified` filter, the
+    # /api/v1 serializers) AND what Kobo native sync re-selects on. Without this
+    # the classic UI and every already-rendered SPA page kept asking for the old
+    # cover URL, so the replaced cover only appeared on the one response below —
+    # and with cover responses now cacheable, a stale image would survive in the
+    # browser until it was evicted. cover_picker's apply path has always done
+    # this; this one did not. Single source of truth: helper.mark_book_modified.
+    #
+    # NOT held under services.calibre_db_lock.metadata_db_write_lock, which
+    # editbooks.do_edit_book and api.browse do take. That lock hard-codes
+    # /config for its lock file rather than resolving the configured config dir,
+    # so on an install without /config (any bare-metal deployment) acquiring it
+    # raises — and adopting it here would turn a working cover upload into a 500
+    # on exactly those installs. Recorded as a finding rather than papered over;
+    # the fix belongs in the lock's path resolution, not in this caller.
+    try:
+        book.has_cover = 1
+        mark_book_modified(book)
+        calibre_db.session.commit()
+    except Exception as exc:
+        # The bytes are already on disk — save_cover writes the library file
+        # before anything touches the database — so this is a PARTIALLY APPLIED
+        # change: the library file has changed, while has_cover/last_modified/
+        # Kobo state still describe the old cover. Which of the two a client
+        # then sees depends on the book: for a replacement, a fresh fetch gets
+        # the new image under the old version token; for a book that had no
+        # cover, the rolled-back has_cover=0 makes the route answer with the
+        # placeholder even though the file exists. Reporting success would hide
+        # either, so the caller is told the save failed and can retry.
+        log.error("set_cover: failed to record cover change for book %s: %s", book_id, exc)
+        try:
+            calibre_db.session.rollback()
+        except Exception:
+            pass
+        return _err("cover_failed", "Cover save failed", 500)
+
+    # Post-commit housekeeping, mirroring cover_picker's apply path. Runs AFTER
+    # the commit on purpose: remove_synced_book writes to app.db, so doing it
+    # first would leave it applied against a metadata.db change that never
+    # landed. Separate try blocks — these are unrelated, and one failing must not
+    # skip the other. Both are best-effort: the committed last_modified bump
+    # already drives the cache-bust and Kobo's own re-selection
+    # (Books.last_modified > sync_token.books_last_modified), and a resolution
+    # request whose thumbnail is missing is answered from the original AND left
+    # revalidating, so a browser does pick the regenerated thumbnail up.
+    # #707: the cover should also be embedded into the book file, not only
+    # written to cover.jpg. This QUEUES that work — log_metadata_change writes an
+    # enforcement record for the metadata enforcer to consume, and it swallows
+    # its own failures by design, so it expresses intent and cannot report
+    # delivery. Written AFTER the commit: the enforcer reads the book back out
+    # of metadata.db and re-embeds from it, so a record published ahead of the
+    # transaction can be consumed against the pre-commit row — or survive a
+    # rollback that means there is nothing to enforce.
+    try:
+        log_metadata_change(book, {'cover': True})
+    except Exception as exc:
+        log.error("set_cover: enforcement record failed for book %s: %s", book_id, exc)
+    try:
+        from .. import kobo_sync_status
+        kobo_sync_status.remove_synced_book(book_id, all=True)
+    except Exception as exc:
+        log.error("set_cover: Kobo unsync failed for book %s: %s", book_id, exc)
+    try:
+        replace_cover_thumbnail_cache(book_id, book_path=book.path,
+                                      last_modified=book.last_modified)
+    except Exception as exc:
+        log.error("set_cover: thumbnail refresh failed for book %s: %s", book_id, exc)
+
+    # Answer with the same versioned URL shape the serializers emit, so the
+    # SPA's optimistic preview and the next detail fetch agree on one URL.
+    return jsonify({"ok": True, "cover_url": cover_url_for(book, "md") or
+                    "/cover/%d/md?t=%d" % (book_id, int(time.time()))})

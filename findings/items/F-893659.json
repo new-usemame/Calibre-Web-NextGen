@@ -1,0 +1,13 @@
+{
+  "area": "metadata-editor",
+  "body": "`CalibreDB.get_typeahead` builds its filter as `func.lower(database.name).ilike(\"%\" + query + \"%\")`\nwith the user's term interpolated directly, so a literal `%` or `_` in what the\nuser types is treated as a LIKE wildcard rather than as a character.\n\nTyping \"50%\" in the tag field matches every tag beginning \"50\", and \"_\" matches\nany single character. Parameterised through SQLAlchemy, so this is not an\ninjection — it is a correctness/UX wrinkle: you cannot search for a value that\ncontains one of those characters, and a lone \"%\" matches the whole library.\n\nPre-existing; predates the #1398 ranking work and was left alone there to keep\nthat change scoped to the reported defect. Fix would be to escape `%`, `_` and\nthe escape character itself in the term and pass `escape=\"\\\\\"` to `ilike`.\n\nObserved 2026-08-14 while fixing #1398.",
+  "created": "2026-08-14",
+  "id": "F-893659",
+  "refs": [
+    "#1398"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Typeahead query interpolates the raw term into a LIKE pattern, so % and _ act as wildcards"
+}

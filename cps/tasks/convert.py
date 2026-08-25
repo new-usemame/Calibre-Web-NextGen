@@ -20,10 +20,15 @@ from flask_babel import lazy_gettext as N_
 
 from cps.services.worker import CalibreTask
 from cps import db
+from cps import ub
 from cps import logger, config
-from cps.subproc_wrapper import process_open
+from cps.subproc_wrapper import process_open, stream_process_output
 from flask_babel import gettext as _
 from cps.file_helper import get_temp_dir
+from cps.services.kepub_package_normalizer import (
+    count_fragment_anchored_toc_targets,
+    normalize_kepub_package,
+)
 
 from cps.tasks.mail import TaskEmail
 from cps import gdriveutils, helper
@@ -31,6 +36,17 @@ from cps.constants import SUPPORTED_CALIBRE_BINARIES
 from cps.string_helper import strip_whitespaces
 
 log = logger.create()
+
+
+def _log_fragment_anchored_toc(book, path):
+    count = count_fragment_anchored_toc_targets(path)
+    if count:
+        log.warning(
+            "KEPUB for book '%s' (id %d) has %d fragment-anchored TOC targets; "
+            "Kobo highlights in this book may not appear on the device",
+            book.title, book.id, count,
+        )
+    return count
 
 
 def _valid_archive(path, book_format):
@@ -167,7 +183,7 @@ class TaskConvert(CalibreTask):
                 local_db.session.close()
                 return os.path.basename(file_path + format_new_ext)
         else:
-            log.info("Book id %d - target format of %s does not exist. Moving forward with convert.",
+            log.info("Book id %d has no %s yet; starting conversion.",
                      book_id,
                      format_new_ext)
 
@@ -186,6 +202,8 @@ class TaskConvert(CalibreTask):
         if check == 0:
             cur_book = local_db.get_book(book_id)
             if os.path.isfile(file_path + format_new_ext):
+                if self.settings['new_book_format'].upper() == 'KEPUB':
+                    _log_fragment_anchored_toc(cur_book, file_path + format_new_ext)
                 new_format = local_db.session.query(db.Data).filter(db.Data.book == book_id) \
                     .filter(db.Data.format == self.settings['new_book_format'].upper()).one_or_none()
                 if not new_format:
@@ -220,6 +238,41 @@ class TaskConvert(CalibreTask):
         self._handleError(error_message)
         return
 
+    def _book_has_annotations(self):
+        """True when any user holds a highlight or note against this book.
+
+        Conversion targets a book already in the library, so this task can be
+        asked to regenerate the KEPUB of something that has been read and
+        highlighted. Splitting renames spine documents; every stored annotation
+        is anchored to the document it was made in (Kobo `ContentID`, web-reader
+        `cfi_range`, KOReader position), so renaming strands them. Normalization
+        never renames anything, which is why only the split is withheld.
+
+        Uses `ub.init_db_thread()` rather than the global `ub.session`: this runs
+        on a worker thread, and the global session belongs to the web request
+        (see cps/tasks/annotation_sync.py).
+
+        Fails CLOSED. If the annotation store cannot be read this reports True and
+        the package is merely normalized -- the behaviour before splitting
+        existed, which is the safe side.
+        """
+        session = None
+        try:
+            session = ub.init_db_thread()
+            return session.query(ub.Annotation).filter(
+                ub.Annotation.book_id == self.book_id).first() is not None
+        except Exception:
+            log.exception(
+                "Could not check annotations for book %s; not splitting its KEPUB",
+                self.book_id)
+            return True
+        finally:
+            if session is not None:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+
     def _convert_kepubify(self, file_path, format_old_ext, format_new_ext):
         if config.config_embed_metadata and config.config_binariesdir:
             tmp_dir, temp_file_name = helper.do_calibre_export(self.book_id, format_old_ext[1:])
@@ -241,16 +294,26 @@ class TaskConvert(CalibreTask):
         except OSError as e:
             return 1, N_("Kepubify-converter failed: %(error)s", error=e)
         self.progress = 0.01
-        while True:
-            nextline = p.stdout.readlines()
-            nextline = [x.strip('\n') for x in nextline if x != '\n']
-            for line in nextline:
+
+        def _log_kepubify_line(line):
+            if isinstance(line, bytes):
+                line = line.decode('utf-8', errors="ignore")
+            line = line.strip('\r\n')
+            if line:
                 log.debug(line)
-            if p.poll() is not None:
-                break
+
+        # Same pipe-pair hazard as the ebook-convert path (#1110): this used to
+        # read stdout to EOF and never drain stderr at all, so a chatty kepubify
+        # could wedge the task. Draining stderr also gives us an error to report.
+        kepubify_traceback = stream_process_output(p, _log_kepubify_line)
 
         # process returncode
         check = p.returncode
+        if check != 0:
+            for ele in kepubify_traceback:
+                if isinstance(ele, bytes):
+                    ele = ele.decode('utf-8', errors="ignore")
+                log.debug(ele.strip('\r\n'))
 
         # move file
         if check == 0:
@@ -264,6 +327,35 @@ class TaskConvert(CalibreTask):
                 os.close(temp_fd)
                 try:
                     copyfile(converted_file[0], temp_destination)
+                    # Split only newly generated packages. Existing-library
+                    # repair deliberately keeps the normalizer's default-off
+                    # split policy because changing spine filenames can orphan
+                    # annotations already stored on a Kobo.
+                    # None means normalization or splitting could not process
+                    # this package.
+                    # Continue with the un-normalized KEPUB rather than failing the
+                    # conversion: an un-normalized KEPUB is exactly what we ship
+                    # today, whereas withholding it drops the user back to EPUB
+                    # delivery, where a Kobo cannot save highlights at all
+                    # (upstream calibre-web #1484). The normalizer already logs a
+                    # warning, leaves the archive untouched, and _valid_archive
+                    # below still rejects a genuinely corrupt one.
+                    # `destination` is still the OLD package at this point —
+                    # os.replace below is what swaps it — so it can be asked
+                    # whether it was already split. Same rule as the upload path
+                    # (F-bbd10e): an annotated book may be re-split only when the
+                    # stored package was already split, because piece naming is
+                    # deterministic and a re-split then reproduces the very names
+                    # its annotations are anchored to.
+                    from cps.services.kepub_spine_splitter import (
+                        package_was_split_by_us,
+                    )
+
+                    may_split = not self._book_has_annotations() or (
+                        os.path.exists(destination)
+                        and package_was_split_by_us(destination))
+                    normalize_kepub_package(
+                        temp_destination, split_chapters=may_split)
                     if not _valid_archive(temp_destination, format_new_ext[1:]):
                         return 1, N_("Kepubify produced an invalid KEPUB archive")
                     os.replace(temp_destination, destination)
@@ -309,18 +401,22 @@ class TaskConvert(CalibreTask):
                                '--with-library', library_path]
                 p = process_open(opf_command, quotes, my_env, newlines=False)
                 lines = list()
-                while p.poll() is None:
-                    lines.append(p.stdout.readline())
+                calibre_traceback = stream_process_output(p, lines.append)
                 check = p.returncode
-                calibre_traceback = p.stderr.readlines()
                 if check == 0:
                     path_tmp_opf = os.path.join(tmp_dir, "metadata_" + str(uuid4()) + ".opf")
                     with open(path_tmp_opf, 'wb') as fd:
                         fd.write(b''.join(lines))
                 else:
+                    # The probe runs with newlines=False, so these are bytes.
+                    # Comparing them against str silently raised TypeError here
+                    # and buried the real reason the metadata export failed.
                     error_message = ""
                     for ele in calibre_traceback:
-                        if not ele.startswith('Traceback') and not ele.startswith('  File'):
+                        if isinstance(ele, bytes):
+                            ele = ele.decode('utf-8', errors="ignore")
+                        ele = ele.strip('\r\n')
+                        if ele and not ele.startswith('Traceback') and not ele.startswith('  File'):
                             error_message = N_("Calibre failed with error: %(error)s", error=ele)
                     return check, error_message
             quotes = [1, 2]
@@ -362,8 +458,7 @@ class TaskConvert(CalibreTask):
         except OSError as e:
             return 1, N_("Ebook-converter failed: %(error)s", error=e)
 
-        while p.poll() is None:
-            nextline = p.stdout.readline()
+        def _handle_stdout_line(nextline):
             if isinstance(nextline, bytes):
                 nextline = nextline.decode('utf-8', errors="ignore").strip('\r\n')
             if nextline:
@@ -375,9 +470,12 @@ class TaskConvert(CalibreTask):
                 if config.config_use_google_drive:
                     self.progress *= 0.9
 
+        # Drain both pipes together. Reading stderr only after the child
+        # exits deadlocks on chatty converters, notably PDF input (#1110).
+        calibre_traceback = stream_process_output(p, _handle_stdout_line)
+
         # process returncode
         check = p.returncode
-        calibre_traceback = p.stderr.readlines()
         error_message = ""
         for ele in calibre_traceback:
             ele = ele.decode('utf-8', errors="ignore").strip('\n')

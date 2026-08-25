@@ -97,7 +97,8 @@ class TestCreateAnnotation:
         assert row.user_id == 7
         assert row.book_id == 1
         assert row.highlighted_text == "hello world!!!"
-        assert row.highlight_color == "yellow"
+        # The reader sends the NAME; the column stores the wire hex (F-5769c9).
+        assert row.highlight_color == "#F6F3B3"
         assert row.hidden in (False, None)
 
     def test_create_stores_kobospan_path_roundtrip(self, memory_db, tmp_path, monkeypatch):
@@ -207,7 +208,7 @@ def test_create_cfi_only_webreader_annotation(memory_db, tmp_path, monkeypatch):
     assert row.annotation_id.startswith("cwn-web-")
     assert row.cfi_range == "epubcfi(/6/4!/4/2,/1:0,/1:9)"
     assert row.position_type == "cfi"
-    assert row.highlight_color == "green"
+    assert row.highlight_color == "#C6E09E"   # 'green' stored as wire hex
     assert row.start_container_path == "cfi"
 
 

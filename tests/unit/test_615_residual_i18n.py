@@ -237,10 +237,13 @@ def test_system_shelf_api_localizes_display_name_without_mutating_identity(monke
         lambda shelf: "Lecture en cours" if shelf.is_system else shelf.name,
     )
 
-    assert magicshelves._shelf_item(system, 3)["name"] == "Lecture en cours"
-    assert magicshelves._shelf_item(system, 3)["is_system"] is True
-    assert magicshelves._shelf_item(custom, 3)["name"] == "Currently Reading"
-    assert magicshelves._shelf_item(custom, 3)["is_system"] is False
+    viewer = SimpleNamespace(id=3, is_authenticated=True,
+                             role_admin=lambda: False,
+                             role_edit_shelfs=lambda: False)
+    assert magicshelves._shelf_item(system, viewer)["name"] == "Lecture en cours"
+    assert magicshelves._shelf_item(system, viewer)["is_system"] is True
+    assert magicshelves._shelf_item(custom, viewer)["name"] == "Currently Reading"
+    assert magicshelves._shelf_item(custom, viewer)["is_system"] is False
     assert system.name == "Currently Reading"
 
 

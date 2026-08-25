@@ -43,6 +43,7 @@ from .helper import check_valid_domain, check_email, check_username, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
     edit_book_read_status, valid_password, get_kosync_progress_display
 from .pagination import Pagination
+from .sort_orders import BOOK_SORT_ORDERS, book_sort_order
 from .redirect import get_redirect_location
 from .cw_babel import get_available_locale
 from .usermanagement import login_required_if_no_ano
@@ -68,9 +69,8 @@ import sqlite3
 import subprocess
 import time
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 feature_support = {
     'ldap': bool(services.ldap),
@@ -174,6 +174,61 @@ def add_security_headers(resp):
     resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
     resp.headers['X-XSS-Protection'] = '1; mode=block'
     resp.headers['Strict-Transport-Security'] = 'max-age=31536000';
+    return resp
+
+
+# The SPA bundle is content-addressed: Vite emits every file under
+# /static/app/assets/ as <name>-<8-char content hash>.<ext> and wipes the
+# directory on each build (emptyOutDir), so a byte change is always a NAME
+# change and nothing that is not build output survives in there. Those files are
+# therefore immutable at their URL and can be cached for a year. The name shape
+# is the test, not proof of provenance, so a hand-placed file matching it would
+# be wrongly pinned. emptyOutDir removes such a file from the SERVER at the next
+# build; it cannot revoke a copy a browser was already told to keep for a year.
+# Gating on the Vite manifest instead of the filename shape would close that,
+# at the cost of coupling this to the build output.
+#
+# They were not cached at all. Flask's SEND_FILE_MAX_AGE_DEFAULT is None, which
+# makes send_file emit `Cache-Control: no-cache`, so a ~640 KB bundle was
+# revalidated on every single page load. The app does ship a cache-buster
+# (cache_buster.init_cache_busting) that would let us cache more broadly, but
+# it is only installed under FLASK_DEBUG and it only rewrites url_for('static')
+# links — the SPA's asset URLs are baked into the built index.html and never go
+# through url_for. So the rule below is deliberately narrow: ONLY the paths that
+# carry a content hash in the filename. Everything else under /static (js/, css/,
+# the fonts and images the classic UI references by fixed name) keeps
+# revalidating, because an upgrade changes those bytes WITHOUT changing their
+# URL and a long-lived copy would pin a user to the previous release's assets.
+_HASHED_ASSET_PREFIX = '/static/app/assets/'
+_HASHED_ASSET_RE = re.compile(r'-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$')
+IMMUTABLE_ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+# Only a response that actually carries (or validates) the asset may be pinned.
+# A 404 under a hashed-looking name is the dangerous case: caches store negative
+# responses too, so giving one a year would preserve a white page long after a
+# partial deploy, a missing mount or a rollback had been fixed.
+_CACHEABLE_ASSET_STATUSES = frozenset((200, 206, 304))
+
+
+def is_immutable_static_asset(path):
+    """Whether ``path`` names a content-addressed SPA bundle file.
+
+    ``request.path`` is always mount-relative — a reverse-proxy prefix lives in
+    ``script_root``, not here — so the prefix is anchored rather than searched
+    for anywhere in the string.
+    """
+    if not path or not path.startswith(_HASHED_ASSET_PREFIX):
+        return False
+    name = path[len(_HASHED_ASSET_PREFIX):]
+    # One path segment only — never something reached through a nested path.
+    return '/' not in name and bool(_HASHED_ASSET_RE.search(name))
+
+
+@app.after_request
+def add_static_asset_cache_headers(resp):
+    if (request.endpoint == 'static'
+            and resp.status_code in _CACHEABLE_ASSET_STATUSES
+            and is_immutable_static_asset(request.path)):
+        resp.headers['Cache-Control'] = IMMUTABLE_ASSET_CACHE_CONTROL
     return resp
 
 
@@ -501,45 +556,20 @@ def query_char_list(data_colum, db_link):
 
 
 def get_sort_function(sort_param, data):
-    order = [db.Books.timestamp.desc()]
     if sort_param == 'stored':
         sort_param = current_user.get_view_property(data, 'stored')
     else:
         current_user.set_view_property(data, 'stored', sort_param)
-    if sort_param == 'pubnew':
-        order = [db.Books.pubdate.desc()]
-    if sort_param == 'pubold':
-        order = [db.Books.pubdate]
-    if sort_param == 'abc':
-        order = [func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id]
-    if sort_param == 'zyx':
-        order = [func.ng_sort_key(db.Books.sort).desc(), db.Books.sort.desc(), db.Books.id.desc()]
-    if sort_param == 'new':
-        order = [db.Books.timestamp.desc()]
-    if sort_param == 'old':
-        order = [db.Books.timestamp]
-    if sort_param == 'authaz':
-        order = [func.ng_sort_key(db.Books.author_sort), db.Books.author_sort,
-                 func.ng_sort_key(db.Series.name), db.Series.name, db.Books.series_index]
-    if sort_param == 'authza':
-        order = [func.ng_sort_key(db.Books.author_sort).desc(), db.Books.author_sort.desc(),
-                 func.ng_sort_key(db.Series.name).desc(), db.Series.name.desc(), db.Books.series_index.desc()]
-    if sort_param == 'seriesasc':
-        order = [db.Books.series_index.asc()]
-    if sort_param == 'seriesdesc':
-        order = [db.Books.series_index.desc()]
-    if sort_param == 'hotdesc':
-        order = [func.count(ub.Downloads.book_id).desc()]
-    if sort_param == 'hotasc':
-        order = [func.count(ub.Downloads.book_id).asc()]
     if sort_param is None:
         if data == "series":
             # A series page reads in series order by default — matching the
             # OPDS series feed — not newest-first. An explicitly chosen sort
             # is stored above and honored on the next visit. (fork #334 audit)
-            return [db.Books.series_index.asc()], "seriesasc"
+            return BOOK_SORT_ORDERS["seriesasc"], "seriesasc"
         sort_param = "new"
-    return order, sort_param
+    # The ORDER BY itself is shared with the new UI's /api/v1 lists so the two
+    # cannot disagree, and so every sort keeps its unique tiebreaker (#1331).
+    return book_sort_order(sort_param), sort_param
 
 
 def cwa_get_library_location() -> str:
@@ -719,7 +749,11 @@ def render_discover_books(book_id):
 def render_hot_books(page, order):
     if current_user.check_visibility(constants.SIDEBAR_HOT):
         if order[1] not in ['hotasc', 'hotdesc']:
-            order = [func.count(ub.Downloads.book_id).desc()], 'hotdesc'
+            # Through the shared map, not rebuilt here: an order spelled out at
+            # a second call site is a second place to forget the tiebreaker,
+            # and this one is reached by anyone opening /hot with some other
+            # sort stored (#1331).
+            order = BOOK_SORT_ORDERS['hotdesc'], 'hotdesc'
 
         random = false()
         if current_user.show_detail_random():
@@ -1175,7 +1209,8 @@ def render_magic_shelf(shelf_id, sort_param, page):
 
         # Log activity
         try:
-            from scripts.cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
             cwa_db = CWA_DB()
             cwa_db.log_activity(
                 user_id=current_user.id,
@@ -1565,7 +1600,7 @@ def edit_magic_shelf(shelf_id):
     opds_expose_checked = ub.is_opds_magic_shelf_exposed_for_user(current_user.id, shelf.id)
     
     # Check if user can edit this shelf (owner or admin only)
-    if shelf.user_id != current_user.id and not current_user.role_admin():
+    if not magic_shelf.can_edit_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to edit magic shelf {shelf_id} without permission")
         abort(403)
 
@@ -1668,7 +1703,7 @@ def duplicate_magic_shelf(shelf_id):
         return jsonify({"success": False, "message": _("Shelf not found")}), 404
     
     # Users can duplicate their own shelves or any public shelf
-    if shelf.user_id != current_user.id and not shelf.is_public:
+    if not magic_shelf.can_duplicate_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to duplicate private shelf {shelf_id} owned by {shelf.user_id}")
         return jsonify({"success": False, "message": _("Permission denied")}), 403
     
@@ -1718,22 +1753,14 @@ def delete_magic_shelf(shelf_id):
         log.warning(f"Magic shelf {shelf_id} not found for deletion")
         abort(404)
     
-    # Check if user can delete this shelf
-    can_delete = False
-    if shelf.user_id == current_user.id:
-        can_delete = True
-    elif shelf.is_public == 1 and current_user.role_edit_shelfs():
-        can_delete = True
-    
-    if not can_delete:
+    if not magic_shelf.has_magic_shelf_delete_authority(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to delete magic shelf {shelf_id} without permission")
         abort(403)
-    
-    # Prevent deletion of system shelves
-    if shelf.is_system:
+
+    if not magic_shelf.can_delete_magic_shelf(shelf, current_user):
         log.warning(f"User {current_user.id} attempted to delete system shelf {shelf_id}")
         return jsonify({
-            "success": False, 
+            "success": False,
             "message": _("System shelves cannot be deleted. You can hide them in your user profile settings.")
         }), 400
     
@@ -1876,7 +1903,7 @@ def list_books():
         else:
             order = [db.Books.sort.asc()]
     elif not state:
-        order = [db.Books.timestamp.desc()]
+        order = BOOK_SORT_ORDERS["new"]
 
     total_count = filtered_count = calibre_db.session.query(db.Books).filter(
         calibre_db.common_filters(allow_show_archived=True)).count()
@@ -2406,7 +2433,8 @@ def send_to_ereader(book_id, book_format, convert):
         ub.update_download(book_id, int(current_user.id))
         # Track email/send activity
         try:
-            from scripts.cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
             book = calibre_db.get_book(book_id)
             cwa_db = CWA_DB()
             cwa_db.log_activity(
@@ -2484,7 +2512,8 @@ def send_to_selected_ereaders(book_id):
             ub.update_download(book_id, int(current_user.id))
         # Track email/send activity
         try:
-            from scripts.cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
             book = calibre_db.get_book(book_id)
             cwa_db = CWA_DB()
             cwa_db.log_activity(
@@ -2593,7 +2622,8 @@ def handle_login_user(user, remember, message, category):
     
     # Track login activity
     try:
-        from scripts.cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         cwa_db = CWA_DB()
         cwa_db.log_activity(
             user_id=int(user.id),
@@ -2661,14 +2691,13 @@ def login():
     # only suppresses automatic startup; normal SPA-or-Classic routing below
     # still decides which login surface is shown.
     #
-    # ``config_disable_standard_login`` is required as well as the login type:
-    # the two are independent settings, and with the local form still enabled
-    # ``login_post`` below goes on accepting local credentials. Auto-starting
-    # in that state would hide a form whose handler still works, and would
-    # leave an admin with no way back in at the canonical URL if the provider
-    # is unreachable.
+    # Disabling standard login keeps the v4.1.33 auto-start behavior. The
+    # explicit auto-forward setting additionally allows an admin to auto-start
+    # the sole provider while retaining local credentials as a break-glass
+    # path through ``?local=1``.
     if (config.config_login_type == constants.LOGIN_OAUTH
-            and config.config_disable_standard_login
+            and (config.config_disable_standard_login
+                 or getattr(config, "config_enable_oauth_auto_forward", False))
             and feature_support['oauth']):
         oauth_endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
             request.args,
@@ -2807,7 +2836,8 @@ def login_post():
                 
                 # Track failed login attempt
                 try:
-                    from scripts.cwa_db import CWA_DB
+                    from cps.cwa_db_loader import load_cwa_db
+                    CWA_DB = load_cwa_db().CWA_DB
                     cwa_db = CWA_DB()
                     cwa_db.log_activity(
                         user_id=None,
@@ -2850,7 +2880,8 @@ def login_post():
                 
                 # Track failed login attempt
                 try:
-                    from scripts.cwa_db import CWA_DB
+                    from cps.cwa_db_loader import load_cwa_db
+                    CWA_DB = load_cwa_db().CWA_DB
                     cwa_db = CWA_DB()
                     cwa_db.log_activity(
                         user_id=None,
@@ -2915,6 +2946,10 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
             # with the setting, so the two cannot disagree.
             kobo_sync_status.update_on_sync_shelfs(current_user.id)
         current_user.opds_only_shelves_sync = int(to_save.get("opds_only_shelves_sync") == "on") or 0
+        if "kobo_two_way_annotation_sync_present" in to_save:
+            current_user.kobo_two_way_annotation_sync = int(
+                to_save.get("kobo_two_way_annotation_sync") == "on"
+            ) or 0
         current_user.hardcover_token = to_save.get("hardcover_token","" ).replace("Bearer ","" ) or None
         # Auto-send and metadata fetch settings
         current_user.auto_send_enabled = to_save.get("auto_send_enabled") == "on"
@@ -3410,7 +3445,8 @@ def read_book(book_id, book_format):
     # Track read activity
     if current_user.is_authenticated:
         try:
-            from scripts.cwa_db import CWA_DB
+            from cps.cwa_db_loader import load_cwa_db
+            CWA_DB = load_cwa_db().CWA_DB
 
             # Detect source of book discovery
             source = request.args.get('from', 'direct')

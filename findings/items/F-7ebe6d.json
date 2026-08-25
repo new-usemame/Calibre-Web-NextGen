@@ -1,0 +1,11 @@
+{
+  "area": "testing",
+  "body": "Four tests in tests/unit/test_1596_module_entry_point.py fail on a plain\ndeveloper checkout:\n\n    python -P -m cps --help\n    -> No module named cps\n\nThey run the interpreter with -P from an arbitrary cwd, which is the point of\nthe test (the s6 longrun does exactly that with cwd=/config), but it also means\nPYTHONPATH=. cannot help and the package must actually be installed into the\nenvironment. CI installs it, so CI is green and the gap is invisible there;\nrepo/.venv does not, so anyone running the unit suite locally sees four red\ntests unrelated to their change.\n\nConfirmed pre-existing and unrelated to any branch: reproduced on clean main by\nstashing (4 failed, 14 passed).\n\nCost is small but real: it trains local runs to ignore red, which is how a\ngenuine failure gets waved through. Either skip with a clear reason when\nimportlib.util.find_spec(\"cps\") is None outside an install, or have the test\ncreate the editable install it needs.\n\nFound while running blast-radius checks for #1110.",
+  "created": "2026-08-15",
+  "id": "F-7ebe6d",
+  "refs": [],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "test_1596_module_entry_point silently requires an editable install"
+}

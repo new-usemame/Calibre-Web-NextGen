@@ -191,6 +191,10 @@ def create_app():
     lm.anonymous_user = ub.Anonymous
     lm.session_protection = 'strong' if config.config_session == 1 else "basic"
 
+    if not os.path.exists(constants.USER_PROFILES_JSON):
+        with open(constants.USER_PROFILES_JSON, 'w+') as f:
+            f.write('{\n}')
+
     from .calibre_init import init_calibre_db_from_config
     init_calibre_db_from_config(config, cli_param.settings_path)
     calibre_db.init_db()

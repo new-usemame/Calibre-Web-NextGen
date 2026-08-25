@@ -6,6 +6,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import zipfile
+from copy import deepcopy
 from lxml import etree
 
 from . import isoLanguages
@@ -26,6 +27,26 @@ etree.register_namespace("dc", PURL_NAMESPACE)
 
 OPF_NS = {None: OPF_NAMESPACE}  # the default namespace (no prefix)
 NSMAP = {'dc': PURL_NAMESPACE, 'opf': OPF_NAMESPACE}
+
+_KEPUB_MANAGED_DC_ELEMENTS = {
+    "identifier",
+    "title",
+    "creator",
+    "contributor",
+    "date",
+    "description",
+    "publisher",
+    "language",
+    "subject",
+}
+_KEPUB_MANAGED_META_NAMES = {
+    "calibre:author_link_map",
+    "calibre:rating",
+    "calibre:series",
+    "calibre:series_index",
+    "calibre:timestamp",
+    "calibre:title_sort",
+}
 
 
 def updateEpub(src, dest, filename, data, ):
@@ -176,4 +197,241 @@ def replace_metadata(tree, package):
                           encoding='utf-8',
                           pretty_print=True).decode('utf-8')
 
+
+def _local_name(element):
+    tag = element.tag
+    if not isinstance(tag, str):
+        return None
+    return tag.rsplit("}", 1)[-1]
+
+
+def _meta_name(element):
+    if _local_name(element) != "meta":
+        return None
+    return element.get("name")
+
+
+def _is_managed_meta(element):
+    name = _meta_name(element)
+    property_name = (
+        element.get("property")
+        if _local_name(element) == "meta"
+        else None
+    )
+    return bool(
+        name in _KEPUB_MANAGED_META_NAMES
+        or (name and name.startswith("calibre:user_metadata:"))
+        or property_name in _KEPUB_MANAGED_META_NAMES
+        or (property_name and property_name.startswith("calibre:user_metadata"))
+    )
+
+
+def _series_collection_ids(metadata):
+    metas = [
+        element for element in metadata
+        if _local_name(element) == "meta"
+    ]
+    collection_ids = {
+        element.get("id")
+        for element in metas
+        if element.get("property") == "belongs-to-collection"
+        and element.get("id")
+    }
+    return {
+        element.get("refines", "").removeprefix("#")
+        for element in metas
+        if element.get("property") == "collection-type"
+        and "".join(element.itertext()).strip().lower() == "series"
+        and element.get("refines", "").startswith("#")
+    } & collection_ids
+
+
+def _next_metadata_id(tree, base):
+    used = {
+        element.get("id")
+        for element in tree.iter()
+        if isinstance(element.tag, str) and element.get("id")
+    }
+    candidate = base
+    suffix = 2
+    while candidate in used:
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+def merge_kepub_metadata(tree, package):
+    """Merge library-authored metadata into an EPUB3 KEPUB package.
+
+    ``create_new_metadata_backup`` builds an OPF2 metadata block for the
+    separately stored ``metadata.opf`` backup. Replacing a KEPUB's complete
+    EPUB3 block with it discards collection metadata and other refinements the
+    backup builder does not own. Replace only library-managed fields, preserve
+    the remaining EPUB3 children, and emit series in the collection form Kobo
+    firmware consumes.
+    """
+    metadata = tree.xpath('/pkg:package/pkg:metadata', namespaces=default_ns)[0]
+    generated = package.xpath('//metadata', namespaces=default_ns)[0]
+    series_ids = _series_collection_ids(metadata)
+
+    series_name = None
+    series_index = None
+    generated_children = []
+    for child in generated:
+        name = _meta_name(child)
+        if name == "calibre:series":
+            series_name = child.get("content")
+            continue
+        if name == "calibre:series_index":
+            series_index = child.get("content")
+            continue
+        copied = deepcopy(child)
+        if _local_name(copied) == "meta" and not copied.tag.startswith("{"):
+            copied.tag = OPF + "meta"
+        generated_children.append(copied)
+
+    def is_series_child(element):
+        if _meta_name(element) in {"calibre:series", "calibre:series_index"}:
+            return True
+        if _local_name(element) != "meta":
+            return False
+        return (
+            element.get("id") in series_ids
+            and element.get("property") == "belongs-to-collection"
+        ) or element.get("refines", "").removeprefix("#") in series_ids
+
+    referenced_ids = {
+        (element.get("refines") or "").removeprefix("#")
+        for element in metadata
+        if not is_series_child(element)
+        and (element.get("refines") or "").startswith("#")
+    }
+    unique_identifier = tree.get("unique-identifier")
+    if unique_identifier:
+        referenced_ids.add(unique_identifier)
+
+    generated_by_name = {}
+    for child in generated_children:
+        generated_by_name.setdefault(_local_name(child), []).append(child)
+    claimed_generated = set()
+    preserved_anchors = set()
+    unmatched_referenced = []
+    for old_child in metadata:
+        local_name = _local_name(old_child)
+        old_id = old_child.get("id") if isinstance(old_child.tag, str) else None
+        if local_name not in _KEPUB_MANAGED_DC_ELEMENTS or old_id not in referenced_ids:
+            continue
+        candidates = [
+            candidate for candidate in generated_by_name.get(local_name, [])
+            if id(candidate) not in claimed_generated
+        ]
+        old_text = "".join(old_child.itertext()).strip()
+        candidate = next(
+            (
+                item for item in candidates
+                if "".join(item.itertext()).strip() == old_text
+            ),
+            None,
+        )
+        if candidate is None:
+            unmatched_referenced.append(old_child)
+            continue
+        candidate.set("id", old_id)
+        claimed_generated.add(id(candidate))
+
+    # Exact matches take their old ids first. Positional fallback then covers a
+    # changed value without letting a removed first author steal the surviving
+    # author's role/file-as refinements.
+    for old_child in unmatched_referenced:
+        local_name = _local_name(old_child)
+        old_id = old_child.get("id")
+        candidates = [
+            candidate for candidate in generated_by_name.get(local_name, [])
+            if id(candidate) not in claimed_generated
+        ]
+        if local_name != "identifier" and candidates:
+            candidate = candidates[0]
+            candidate.set("id", old_id)
+            claimed_generated.add(id(candidate))
+        elif local_name == "identifier" and old_id == unique_identifier:
+            # Preserve an identity URI absent from the Calibre DB rather than
+            # leaving package@unique-identifier dangling or changing meaning.
+            preserved_anchors.add(old_child)
+
+    removable = []
+    for child in metadata:
+        if child in preserved_anchors:
+            continue
+        if (
+            _local_name(child) in _KEPUB_MANAGED_DC_ELEMENTS
+            or _is_managed_meta(child)
+            or is_series_child(child)
+        ):
+            removable.append(child)
+
+    insertion_index = min(
+        (metadata.index(child) for child in removable),
+        default=len(metadata),
+    )
+    removed_ids = {
+        child.get("id")
+        for child in removable
+        if isinstance(child.tag, str) and child.get("id")
+    }
+    for child in removable:
+        metadata.remove(child)
+    for offset, child in enumerate(generated_children):
+        child_id = child.get("id") if isinstance(child.tag, str) else None
+        if child_id and tree.xpath('//*[@id=$identifier]', identifier=child_id):
+            replacement_id = _next_metadata_id(tree, child_id)
+            child.set("id", replacement_id)
+            for generated_child in generated_children:
+                for element in generated_child.iter():
+                    if element.get("refines") == f"#{child_id}":
+                        element.set("refines", f"#{replacement_id}")
+        metadata.insert(insertion_index + offset, child)
+
+    if series_name:
+        series_id = _next_metadata_id(tree, "calibre-web-series")
+        collection = etree.Element(
+            OPF + "meta",
+            property="belongs-to-collection",
+            id=series_id,
+        )
+        collection.text = series_name
+        collection_type = etree.Element(
+            OPF + "meta",
+            refines=f"#{series_id}",
+            property="collection-type",
+        )
+        collection_type.text = "series"
+        series_children = [collection, collection_type]
+        if series_index not in (None, ""):
+            group_position = etree.Element(
+                OPF + "meta",
+                refines=f"#{series_id}",
+                property="group-position",
+            )
+            group_position.text = series_index
+            series_children.append(group_position)
+        for offset, child in enumerate(series_children, start=len(generated_children)):
+            metadata.insert(insertion_index + offset, child)
+
+    surviving_ids = {
+        element.get("id")
+        for element in tree.iter()
+        if isinstance(element.tag, str) and element.get("id")
+    }
+    orphaned_removed_ids = removed_ids - surviving_ids
+    for child in list(metadata):
+        refined_id = (child.get("refines") or "").removeprefix("#")
+        if refined_id in orphaned_removed_ids:
+            metadata.remove(child)
+
+    return etree.tostring(
+        tree,
+        xml_declaration=True,
+        encoding='utf-8',
+        pretty_print=True,
+    ).decode('utf-8')
 

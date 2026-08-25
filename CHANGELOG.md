@@ -18,6 +18,14 @@ is for things you can see or feel when running the app.
 
 ### Fixed
 
+- **A series added or changed in the library now reaches the Kobo copy of the
+  book.** Download-time metadata embedding was removing the EPUB 3 collection
+  metadata Kobo firmware reads, even when the stored KEPUB had already been
+  corrected. The served KEPUB now carries the current series and index while
+  retaining its cover marker, modified timestamp, refinements, and unrelated
+  collections. Reported by @bjekel
+  ([#1372](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1372)).
+
 - **The small edit pencil under each book cover no longer looks like a dark
   sticker on the light, sepia and high-contrast themes.** It was drawn with the
   palette reserved for controls that sit *on top of* cover artwork — deliberately

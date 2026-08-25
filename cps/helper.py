@@ -65,7 +65,12 @@ from .tasks.mail import TaskEmail
 from .tasks.thumbnail import TaskClearCoverThumbnailCache, TaskGenerateCoverThumbnails
 from .tasks.metadata_backup import TaskBackupMetadata
 from .file_helper import get_temp_dir
-from .epub_helper import get_content_opf, create_new_metadata_backup, updateEpub, replace_metadata
+from .epub_helper import (
+    create_new_metadata_backup,
+    get_content_opf,
+    merge_kepub_metadata,
+    updateEpub,
+)
 from .embed_helper import do_calibre_export
 
 log = logger.create()
@@ -2280,7 +2285,7 @@ def do_kepubify_metadata_replace(book, file_path):
 
     tree, cf_name = get_content_opf(file_path)
     package = create_new_metadata_backup(book, custom_columns, current_user.locale, _("Cover"), lang_type=2)
-    content = replace_metadata(tree, package)
+    content = merge_kepub_metadata(tree, package)
     tmp_dir = get_temp_dir()
     temp_file_name = str(uuid4())
     # open zipfile and replace metadata block in content.opf

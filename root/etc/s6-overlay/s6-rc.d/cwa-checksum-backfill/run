@@ -10,19 +10,8 @@
 
 echo "[cwa-checksum-backfill] Waiting for CWA service to be ready..."
 
-dirs_json="${CWA_DIRS_JSON:-/app/calibre-web-automated/dirs.json}"
-library_path="$(python3 - "$dirs_json" <<'PY'
-import json
-import sys
-
-try:
-    with open(sys.argv[1], "r", encoding="utf-8") as config_file:
-        configured = json.load(config_file).get("calibre_library_dir")
-    print(configured if isinstance(configured, str) and configured.strip() else "/calibre-library")
-except (OSError, ValueError, TypeError):
-    print("/calibre-library")
-PY
-)"
+CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
+library_path="$(python3 "${CWA_APP_PATHS}" calibre_library_dir)"
 metadata_db="${library_path%/}/metadata.db"
 metadata_uri="$(python3 - "$metadata_db" <<'PY'
 import sys

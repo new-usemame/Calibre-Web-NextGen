@@ -41,6 +41,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - [What's included](#whats-included)
 - [Quick start](#quick-start)
 - [Full Docker Compose setup](#full-docker-compose-setup)
+- [Runtime path overrides for packagers](#runtime-path-overrides-for-packagers)
 - [First run](#first-run)
 - [Migrating](#migrating)
   - [From upstream CWA](#from-upstream-cwa)
@@ -175,6 +176,12 @@ services:
       # limit. Free; sign up at https://comicvine.gamespot.com/api/
       # - COMICVINE_API_KEY=...
 
+      # Optional: override paths inside the container. The matching
+      # volume targets below must use the same paths.
+      # - CWA_INGEST_FOLDER=/cwa-book-ingest
+      # - CWA_CALIBRE_LIBRARY_DIR=/calibre-library
+      # - CWA_TMP_CONVERSION_DIR=/config/.cwa_conversion_tmp
+
     volumes:
       # Settings, user database, logs. Empty folder for new installs;
       # for existing CWA users, point at your existing /config.
@@ -212,6 +219,42 @@ services:
 | `/cwa-book-ingest` | Drop zone for new books | Files here are **deleted** after processing. Don't park books here long-term. |
 
 > Don't nest the binds. All three should be separate top-level folders. Putting `ingest` inside `library` produces recursive ingest behavior.
+
+---
+
+## Runtime path overrides for packagers
+
+Bare-metal and distro packages can configure all three runtime paths from the
+process environment instead of editing `dirs.json` inside the installation:
+
+| Environment variable | `dirs.json` fallback | Compiled-in default |
+|---|---|---|
+| `CWA_INGEST_FOLDER` | `ingest_folder` | `/cwa-book-ingest` |
+| `CWA_CALIBRE_LIBRARY_DIR` | `calibre_library_dir` | `/calibre-library` |
+| `CWA_TMP_CONVERSION_DIR` | `tmp_conversion_dir` | `/config/.cwa_conversion_tmp` |
+
+Each non-blank environment value wins for its key. If it is unset or blank,
+CWNG reads that key from the file selected by `CWA_DIRS_JSON`; a missing,
+invalid, or blank file value falls back to the compiled-in default. Existing
+hand-edited `dirs.json` files therefore remain supported.
+
+For example, a systemd unit can load a packager-owned file:
+
+```ini
+[Service]
+EnvironmentFile=/etc/calibre-web-nextgen/paths.env
+```
+
+```bash
+CWA_INGEST_FOLDER=/srv/calibre-web-nextgen/ingest
+CWA_CALIBRE_LIBRARY_DIR=/srv/calibre/library
+CWA_TMP_CONVERSION_DIR=/var/cache/calibre-web-nextgen/conversion
+```
+
+When `CWA_CALIBRE_LIBRARY_DIR` is set, it is authoritative. Automatic library
+discovery will leave `dirs.json` unchanged; if discovery finds a different
+library, startup stops and reports both paths so the environment file can be
+corrected.
 
 ---
 

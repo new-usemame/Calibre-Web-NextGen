@@ -32,7 +32,6 @@ from werkzeug.datastructures import Headers
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import constants, logger, isoLanguages, services, helper, spa, oauth_auto_redirect
-from .constants import DIRS_JSON
 from . import db, ub, config, app
 from . import calibre_db, kobo_sync_status
 from .services.ereader_send import send_includes_own_address
@@ -576,11 +575,7 @@ def get_sort_function(sort_param, data):
 
 
 def cwa_get_library_location() -> str:
-    dirs = {}
-    with open(DIRS_JSON, 'r') as f:
-        dirs: dict[str, str] = json.load(f)
-    library_dir = dirs['calibre_library_dir']
-    return library_dir
+    return constants.calibre_library_dir()
 
 def cwa_get_num_books_in_library() -> int:
     try:

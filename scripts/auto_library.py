@@ -367,7 +367,7 @@ class AutoLibrary:
         else:
             return False
 
-    # Sets the library's location in both dirs.json and the CW db
+    # Persists the selected library without contradicting an environment override.
     def set_library_location(self):
         if self.metadb_path is not None and os.path.exists(self.metadb_path):
             self.update_dirs_json()
@@ -397,7 +397,26 @@ class AutoLibrary:
 
     # Update the dirs.json file with the new library location (lib_path))
     def update_dirs_json(self):
-        """Updates the location of the calibre library stored in dirs.json with the found library"""
+        """Update dirs.json unless the environment is the authoritative source."""
+        environment_library = os.environ.get("CWA_CALIBRE_LIBRARY_DIR", "").strip()
+        if environment_library:
+            if os.path.normpath(environment_library) != os.path.normpath(self.lib_path):
+                print(
+                    "[cwa-auto-library]: ERROR: discovered library "
+                    f"'{self.lib_path}' conflicts with authoritative "
+                    f"CWA_CALIBRE_LIBRARY_DIR='{environment_library}'."
+                )
+                print(
+                    "[cwa-auto-library]: dirs.json and app.db were left unchanged. "
+                    "Set CWA_CALIBRE_LIBRARY_DIR to the directory containing the "
+                    "selected metadata.db, then restart."
+                )
+                sys.exit(1)
+            print(
+                "[cwa-auto-library] CWA_CALIBRE_LIBRARY_DIR is authoritative; "
+                "leaving dirs.json unchanged."
+            )
+            return
         try:
             print("[cwa-auto-library] Updating dirs.json with new library location...")
             with open(self.dirs_path) as f:
@@ -414,10 +433,19 @@ class AutoLibrary:
     # Uses the empty metadata.db shipped in the app root to create a new library
     def make_new_library(self):
         print("[cwa-auto-library]: No existing library found. Creating new library...")
+        if os.environ.get("CWA_CALIBRE_LIBRARY_DIR", "").strip():
+            location_help = (
+                "Set CWA_CALIBRE_LIBRARY_DIR to a directory this user can write to."
+            )
+        else:
+            location_help = (
+                f"Set 'calibre_library_dir' in {self.dirs_path} to a directory "
+                "this user can write to."
+            )
         self.ensure_dir_exists(
             self.library_dir,
             "library directory",
-            f"Set 'calibre_library_dir' in {self.dirs_path} to a directory this user can write to.",
+            location_help,
         )
         self.metadb_path = os.path.join(self.library_dir, "metadata.db")
         create_metadb(self.metadb_path)

@@ -365,6 +365,27 @@ def test_falsey_network_share_mode_walks_everything(harness: Harness):
     assert str(harness.config_root) in walked
 
 
+def test_network_share_mode_skips_per_key_environment_paths(harness: Harness):
+    """#1611 custom bind targets receive the same no-chown protection."""
+    custom_library = harness.tmp / "custom-library"
+    custom_ingest = harness.tmp / "custom-ingest"
+    custom_tmp = harness.tmp / "custom-conversion"
+    for path in (custom_library, custom_ingest, custom_tmp):
+        path.mkdir()
+
+    harness.run(
+        NETWORK_SHARE_MODE="true",
+        CWA_CALIBRE_LIBRARY_DIR=custom_library,
+        CWA_INGEST_FOLDER=custom_ingest,
+        CWA_TMP_CONVERSION_DIR=custom_tmp,
+    )
+
+    walked = harness.chowned_paths()
+    assert str(custom_library) not in walked
+    assert str(custom_ingest) not in walked
+    assert str(custom_tmp) not in walked
+
+
 # --------------------------------------------------------------------------
 # The init unit must actually call the script
 # --------------------------------------------------------------------------

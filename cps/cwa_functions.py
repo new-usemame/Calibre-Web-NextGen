@@ -8,7 +8,7 @@ from flask import Blueprint, redirect, flash, url_for, request, send_from_direct
 from flask_babel import gettext as _, lazy_gettext as _l
 
 from . import logger, config, constants, csrf, helper, ub, calibre_db
-from .constants import DIRS_JSON, LOG_ARCHIVE
+from .constants import LOG_ARCHIVE
 from .metadata_constants import DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON
 from .usermanagement import login_required_if_no_ano, user_login_required
 from .admin import admin_required
@@ -214,9 +214,7 @@ def cwa_switch_theme():
 ##————————————————————————————————————————————————————————————————————————————##
 
 def get_ingest_dir():
-    with open(DIRS_JSON, 'r') as f:
-        dirs = json.load(f)
-        return dirs['ingest_folder']
+    return constants.ingest_folder()
 
 def get_ingest_status():
     """Read the current ingest service status"""
@@ -1958,12 +1956,7 @@ def convert_library_start(queue):
     queue.put(cl_process)
 
 def get_tmp_conversion_dir() -> str:
-    dirs = {}
-    with open(DIRS_JSON, 'r') as f:
-        dirs: dict[str, str] = json.load(f)
-    tmp_conversion_dir = f"{dirs['tmp_conversion_dir']}/"
-
-    return tmp_conversion_dir
+    return f"{constants.tmp_conversion_dir()}/"
 
 def empty_tmp_con_dir(tmp_conversion_dir) -> None:
     try:

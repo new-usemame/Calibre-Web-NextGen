@@ -25,20 +25,27 @@ What                 Environment override                  Default
 app root             ``CWA_APP_ROOT``                       parent of this file's dir
 config dir           ``CALIBRE_DBPATH``                     same as ``cps`` (app root)
 ``dirs.json``        ``CWA_DIRS_JSON``                      ``<app root>/dirs.json``
+ingest folder        ``CWA_INGEST_FOLDER``                  ``/cwa-book-ingest``
+library directory    ``CWA_CALIBRE_LIBRARY_DIR``            ``/calibre-library``
+conversion temp      ``CWA_TMP_CONVERSION_DIR``             ``/config/.cwa_conversion_tmp``
 ``app.db``           ``CWA_APP_DB_PATH``, ``CALIBRE_DBPATH`` ``<config dir>/app.db``
 ===================  ====================================  =========================
 
+The three runtime directories use their matching key in ``dirs.json`` between
+the environment override and the compiled-in default.
+
 Every default here has to match what ``cps`` resolves to, because the two
 halves of the install read and write the same files. Where they disagree, the
-disagreement is invisible in Docker — the image sets the environment variables
-explicitly — and silent everywhere else: scripts seed a database the app never
-opens. Both known cases were fixed together in the #1462 follow-up.
+disagreement is easy to miss in Docker — the image supplies its layout through
+environment values and the shipped ``dirs.json`` — and silent everywhere else:
+scripts seed a database the app never opens. Both known cases were fixed
+together in the #1462 follow-up.
 
 Deliberately dependency-free and free of any ``cps`` import: ``auto_library.py``
 runs before the Flask stack is usable, and ``cover_enforcer.py`` has to survive
 an environment where importing ``cps`` fails outright.
 
-**These four variables are trusted configuration, not user input.** They are read
+**These launch variables are trusted configuration, not user input.** They are read
 from the launch environment — the Dockerfile, the s6 service definitions, or a
 packager's systemd unit — and they were already trusted that way before this
 module existed. Centralising them does widen what one of them reaches:
@@ -55,8 +62,10 @@ so that default never fires there — and de-hardcoding the *app* root must not
 quietly relocate anybody's *databases*.
 """
 
+import json
 import os
 import sys
+import threading
 from pathlib import Path
 
 __all__ = [
@@ -64,12 +73,17 @@ __all__ = [
     "config_dir",
     "stray_legacy_config_dir",
     "dirs_json",
+    "ingest_folder",
+    "calibre_library_dir",
+    "tmp_conversion_dir",
     "app_db_path",
     "scripts_dir",
     "script_path",
     "ensure_app_root_on_sys_path",
     "DEFAULT_CONFIG_DIR",
+    "DEFAULT_INGEST_FOLDER",
     "DEFAULT_LIBRARY_DIR",
+    "DEFAULT_TMP_CONVERSION_DIR",
 ]
 
 #: Where the *container* keeps the writable state. The Dockerfile sets
@@ -79,8 +93,18 @@ __all__ = [
 #: puts config here" is worth being able to reference.
 DEFAULT_CONFIG_DIR = "/config"
 
+#: Container ingest mount, used when neither the environment nor dirs.json
+#: supplies a usable path.
+DEFAULT_INGEST_FOLDER = "/cwa-book-ingest"
+
 #: Legacy library root, used as a last resort by :mod:`library_paths`.
 DEFAULT_LIBRARY_DIR = "/calibre-library"
+
+#: Container conversion scratch directory, used as the final fallback.
+DEFAULT_TMP_CONVERSION_DIR = "/config/.cwa_conversion_tmp"
+
+_DIRS_JSON_LOGGED_KEYS = set()
+_DIRS_JSON_LOG_LOCK = threading.Lock()
 
 
 def _env_path(name):
@@ -243,6 +267,87 @@ def dirs_json():
     return app_root() / "dirs.json"
 
 
+def _configured_dir(key, env_name, default, dirs_json_path=None):
+    """Resolve one runtime directory through environment, file, then default."""
+    override = os.environ.get(env_name)
+    if override is not None and override.strip():
+        return override.strip()
+
+    config_path = Path(dirs_json_path) if dirs_json_path else dirs_json()
+    try:
+        with config_path.open("r", encoding="utf-8") as config_file:
+            configured_dirs = json.load(config_file)
+    except (OSError, ValueError, TypeError):
+        configured_dirs = {}
+
+    configured = configured_dirs.get(key) if isinstance(configured_dirs, dict) else None
+    if isinstance(configured, str) and configured.strip():
+        configured = configured.strip()
+        with _DIRS_JSON_LOG_LOCK:
+            if key not in _DIRS_JSON_LOGGED_KEYS:
+                _DIRS_JSON_LOGGED_KEYS.add(key)
+                print(
+                    f"[cwa-paths] Using dirs.json fallback {key}={configured} "
+                    f"from {config_path}",
+                    file=sys.stderr,
+                )
+        return configured
+    return default
+
+
+def ingest_folder(dirs_json_path=None):
+    """Configured ingest directory, without adding a trailing separator."""
+    return _configured_dir(
+        "ingest_folder",
+        "CWA_INGEST_FOLDER",
+        DEFAULT_INGEST_FOLDER,
+        dirs_json_path,
+    )
+
+
+def calibre_library_dir(dirs_json_path=None):
+    """Configured Calibre library directory, without a trailing separator."""
+    return _configured_dir(
+        "calibre_library_dir",
+        "CWA_CALIBRE_LIBRARY_DIR",
+        DEFAULT_LIBRARY_DIR,
+        dirs_json_path,
+    )
+
+
+def tmp_conversion_dir(dirs_json_path=None):
+    """Configured conversion scratch directory, without a trailing separator."""
+    return _configured_dir(
+        "tmp_conversion_dir",
+        "CWA_TMP_CONVERSION_DIR",
+        DEFAULT_TMP_CONVERSION_DIR,
+        dirs_json_path,
+    )
+
+
+def _main(argv=None):
+    """Expose the same resolver to shell-based s6 consumers."""
+    args = sys.argv[1:] if argv is None else argv
+    commands = {
+        "ingest_folder": ingest_folder,
+        "calibre_library_dir": calibre_library_dir,
+        "tmp_conversion_dir": tmp_conversion_dir,
+    }
+    if len(args) != 1 or args[0] not in {*commands, "all"}:
+        print(
+            "usage: app_paths.py "
+            "{ingest_folder|calibre_library_dir|tmp_conversion_dir|all}",
+            file=sys.stderr,
+        )
+        return 2
+    if args[0] == "all":
+        for resolver in commands.values():
+            print(resolver())
+    else:
+        print(commands[args[0]]())
+    return 0
+
+
 def ensure_app_root_on_sys_path():
     """Put the app root on ``sys.path`` so ``import cps...`` works.
 
@@ -253,3 +358,7 @@ def ensure_app_root_on_sys_path():
     if root not in sys.path:
         sys.path.insert(0, root)
     return root
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

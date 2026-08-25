@@ -2,7 +2,10 @@
 
 echo "========== STARTING CWA-INGEST SERVICE =========="
 
-WATCH_FOLDER=${WATCH_FOLDER:-$(grep -o '"ingest_folder": "[^"]*' /app/calibre-web-automated/dirs.json | grep -o '[^"]*$')}
+# CWA_INGEST_FOLDER is the public path override. WATCH_FOLDER remains a
+# backwards-compatible service-local fallback when the public knob is unset.
+CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
+WATCH_FOLDER=${CWA_INGEST_FOLDER:-${WATCH_FOLDER:-$(python3 "${CWA_APP_PATHS}" ingest_folder)}}
 echo "[cwa-ingest-service] Watching folder: $WATCH_FOLDER"
 
 # Create queue file for retry processing (persistent across restarts)

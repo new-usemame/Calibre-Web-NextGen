@@ -4,7 +4,8 @@
 # Called by the cwa-init s6 unit at every container start.
 #
 # The list is a fixed floor (/config, plus the narrow set of app-tree dirs the
-# runtime user writes) and whatever dirs.json declares. dirs.json ships
+# runtime user writes) and the three paths resolved from environment,
+# dirs.json, or defaults. dirs.json ships
 # calibre_library_dir=/calibre-library and
 # tmp_conversion_dir=/config/.cwa_conversion_tmp, and the old inline version of
 # this logic hardcoded /calibre-library and /config on top of that -- so every
@@ -35,9 +36,9 @@
 # repeated here. The rest of the tree (dirs.json, the code) is written only by
 # root or never, so orphaned build-time ownership is harmless.
 #
-# scripts/auto_library.py also rewrites dirs.json in place at runtime, so a crash
-# mid-write can leave it unparseable -- which must not be able to silently reduce
-# this pass to nothing.
+# scripts/auto_library.py can rewrite dirs.json in place at runtime when the
+# library environment override is unset, so a crash mid-write can leave it
+# unparseable -- which must not be able to silently reduce this pass to nothing.
 #
 # Every path is env-overridable so the logic is testable without a container;
 # see tests/unit/test_set_ownership.py.
@@ -50,7 +51,10 @@ CWA_DIRS_JSON="${CWA_DIRS_JSON:-${CWA_APP_ROOT}/dirs.json}"
 CWA_OWNER_USER="${CWA_OWNER_USER:-abc}"
 CWA_CHOWN="${CWA_CHOWN:-chown}"
 CWA_PYTHON="${CWA_PYTHON:-python3}"
+CWA_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+CWA_APP_PATHS="${CWA_APP_PATHS:-${CWA_SCRIPT_DIR}/app_paths.py}"
 CWA_UID="${CWA_UID:-$(id -u)}"
+CWA_RESOLVED_DIRS=()
 
 log() { echo "[cwa-init] $*"; }
 
@@ -68,31 +72,26 @@ network_share_mode() {
 
 # Bind-mounted trees we must not touch when they live on a network share.
 share_exempt() {
+  local configured
   case "$1" in
-    "${CWA_CONFIG_ROOT}"|"${CWA_CONFIG_ROOT}"/*|/calibre-library|/calibre-library/*|/cwa-book-ingest|/cwa-book-ingest/*)
+    "${CWA_CONFIG_ROOT}"|"${CWA_CONFIG_ROOT}"/*)
       return 0 ;;
-    *) return 1 ;;
   esac
+  for configured in ${CWA_RESOLVED_DIRS[@]+"${CWA_RESOLVED_DIRS[@]}"}; do
+    configured="$(normalise "$configured")"
+    case "$1" in
+      "$configured"|"$configured"/*) return 0 ;;
+    esac
+  done
+  return 1
 }
 
-# Echo the absolute directories declared in dirs.json, one per line. A missing or
-# unparseable file yields nothing; the caller keeps its own floor.
-read_dirs_json() {
-  [ -f "${CWA_DIRS_JSON}" ] || return 0
-  "${CWA_PYTHON}" - "${CWA_DIRS_JSON}" <<'PY'
-import json
-import sys
-
-try:
-    with open(sys.argv[1], "r", encoding="utf-8") as fh:
-        data = json.load(fh)
-    if isinstance(data, dict):
-        for value in data.values():
-            if isinstance(value, str) and value.startswith("/"):
-                print(value)
-except Exception:
-    pass
-PY
+# Echo the three resolved runtime directories, one per line. app_paths owns
+# per-key environment -> dirs.json -> compiled-default precedence for every
+# scripts/ and shell consumer.
+read_configured_dirs() {
+  CWA_APP_ROOT="${CWA_APP_ROOT}" CWA_DIRS_JSON="${CWA_DIRS_JSON}" \
+    "${CWA_PYTHON}" "${CWA_APP_PATHS}" all
 }
 
 # Strip trailing slashes so /config/ and /config compare equal.
@@ -150,8 +149,11 @@ main() {
   fi
 
   while IFS= read -r dir; do
-    [ -n "$dir" ] && candidates+=("$dir")
-  done < <(read_dirs_json)
+    if [ -n "$dir" ]; then
+      CWA_RESOLVED_DIRS+=("$dir")
+      candidates+=("$dir")
+    fi
+  done < <(read_configured_dirs)
 
   local -a requiredDirs=()
   while IFS= read -r dir; do

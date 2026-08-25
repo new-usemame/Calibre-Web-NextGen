@@ -76,6 +76,10 @@ app.db
 *.db-wal
 *.db-shm
 
+# Raw Kobo exchange diagnostics and PATCH recovery bodies can contain private
+# annotation text when a bare source run uses the checkout as CONFIG_DIR.
+.cwng-private-observability/
+
 # Local developer artifacts. All four are git-ignored, so a CI checkout never
 # has them and published images were never affected -- but a local `docker
 # build` copied them straight into /app/calibre-web-automated/. Measured with a

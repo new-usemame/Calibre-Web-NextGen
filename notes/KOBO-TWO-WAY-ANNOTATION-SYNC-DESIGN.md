@@ -601,6 +601,28 @@ annotation_revision
 
 **[ASSUMED — RECOMMENDATION]** Ship additive schema, backup schema 3, raw lexical capture, exact projection invariants, authority state, metrics, and UI controls with both gates forced off. Continue current safe owned-book trigger suppression.
 
+**[OBSERVED — IMPLEMENTED 2026-08-23]** A separate passive exchange observer records the complete
+device request, the exact filtered body sent upstream, the raw upstream response, and the final
+device response for `checkforchanges` plus annotation GET/PATCH. It is off unless
+`CWNG_KOBO_READING_SERVICES_CAPTURE` exactly equals
+`I_UNDERSTAND_THIS_CAPTURES_PRIVATE_READING_DATA`. Credential-bearing headers are redacted; raw
+annotation text exists only inside mode-0600 gzip records under the mode-0700 private directory
+`<config>/.cwng-private-observability/kobo-reading-services/`. The directory is not part of the
+annotation backup format or the support debug bundle. Retention is bounded to 256 records, 64 MiB
+compressed, seven days, and 16 MiB for any one body. Capture finalization is an after-response
+observer, storage exceptions are swallowed, and executed route tests prove identical status,
+headers, and body with the gate off, on, and throwing.
+
+**[OBSERVED — IMPLEMENTED 2026-08-23]** Annotation PATCH has a separate always-on recovery spool.
+The exact raw request body is atomically written and fsynced before JSON parsing, ownership
+resolution, or dispatch, so a processing exception leaves a server-side replay artifact without
+changing the response sent to Nickel. Records contain no headers, use the same private mode-0700
+parent and mode-0600 files, and are bounded to 512 records, 64 MiB compressed, 14 days, and 16 MiB
+per body. Normal-return records remain during retention because return from the dispatcher is not
+proof that every member committed. Replay is manual and integrity-checked; it is not automatic.
+This implements F-5c1146 addendum point (2). The finding's response-code/failed-member half remains
+open until the independent PATCH failure hardware experiment completes.
+
 **[ASSUMED — RECOMMENDATION]** Test migration on fresh, legacy, partially created, and repeated-run databases. Prove generic annotation values and `cfi_range` behavior are unchanged.
 
 ### Stage 1 — seed-only observe mode
@@ -722,7 +744,12 @@ that would break that. **Resolve this before any ETag-equality comparison is tru
 neither has the derivation of the stable-ID hash (it is not a plain MD5/SHA1/raw-bytes base64 of
 `BookmarkID` -- all four were tested against a 14-entry manifest and none matched).
 
-**[ASSUMED — RECOMMENDATION]** Closing experiment: seed a book with zero annotations, capture GET body/header and next check; then create one annotation, sync, delete it, and capture every manifest transition. Until then, accept an empty seed only with exact device/upstream ETag equality and do not synthesize a composite empty token.
+**[ASSUMED]** The composite-manifest transition from a nonempty set through deletion of its final
+annotation has not been measured.
+
+**[ASSUMED — RECOMMENDATION]** Remaining closing experiment: create one annotation, sync, delete it,
+and capture every manifest transition. Until then, accept an empty seed only with exact
+device/upstream ETag equality and do not synthesize the nonempty-to-empty deletion transition.
 
 ### 11.4 Server-initiated seed request and upstream pagination
 

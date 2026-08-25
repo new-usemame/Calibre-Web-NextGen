@@ -61,6 +61,37 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Durable pre-dispatch Kobo PATCH recovery spool (finding F-5c1146 addendum
+  point 2)** — the Stage-0 sidecar is attached only after an Annotation row
+  exists, so a parser or dispatcher exception could lose the device's delta
+  while the route still returned Kobo's upstream response. The route now
+  atomically fsyncs the exact raw body before JSON parsing and dispatch. Private
+  gzip records contain replay routing metadata but no request headers, remain
+  available even after a normally returning dispatch, and are bounded to 512
+  files, 64 MiB compressed, 14 days, and 16 MiB per body. Spool and outcome
+  update failures are fail-open observers of processing: they do not alter the
+  existing 503 branch, proxy behavior, status, headers, or response body. Eight
+  core behavioral tests were RED 8/8 before implementation and GREEN 8/8
+  after it. A full-suite privacy audit then caught the source-run directory as
+  both committable and eligible for the Docker build context (RED 1/1 at each
+  boundary); derived-path git-ignore and Docker-ignore regressions close both.
+  The combined observer/containment/Stage-0 set is 80/80 GREEN. The response-code
+  half of F-5c1146 remains open for the separate hardware result. | SHA `TBD` |
+  release `TBD`.
+
+- **Private, bounded Kobo Reading Services exchange capture** — the access log
+  exposed only request lines, which left the device request order, filtered
+  upstream batch, upstream response, and final device response unobservable.
+  An exact acknowledgement gate now enables mode-0700 local gzip captures for
+  `checkforchanges` and annotation GET/PATCH. Each record preserves all four
+  bodies and per-entry owned/unowned/authority decisions while redacting
+  credential-bearing headers. The observer finalizes after Flask has produced
+  the response, swallows every storage failure, and has byte-for-byte response
+  invariance tests. Retention is bounded to 256 files, 64 MiB compressed, seven
+  days, and 16 MiB per body. Nine new behavioral tests were RED 9/9 before the
+  implementation and GREEN 9/9 after it; the related containment/Stage-0 set is
+  70/70 GREEN. | SHA `TBD` | release `TBD`.
+
 - **Kobo `checkforchanges` containment now covers session/config transition
   windows and alternate route spellings** (finding F-30d264) — the shared
   Reading Services decorator previously proxied the request untouched when the

@@ -14,6 +14,10 @@ import sys
 RELEASE_HEADING = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]", re.MULTILINE)
 ENTRY_LEAD = re.compile(r"^- \*\*", re.MULTILINE)
 FRAGMENT_PATH = re.compile(r"^changelog\.d/[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
+NON_SHIPPING_PATH_PREFIXES = ("docs/", "findings/", "notes/", "tests/")
+NON_SHIPPING_PATHS = frozenset(
+    {"changelog.d/README.md", "scripts/check_changelog_diff.py"}
+)
 
 
 def _distinct_entries(text: str) -> set[str]:
@@ -78,8 +82,14 @@ def pull_request_regressions(
     return structural_regressions(target, proposed)
 
 
+def _is_non_shipping_path(path: str) -> bool:
+    return path in NON_SHIPPING_PATHS or path.startswith(
+        NON_SHIPPING_PATH_PREFIXES
+    )
+
+
 def changelog_requirement_errors(changed_paths: list[str]) -> list[str]:
-    """Require the canonical changelog or one real fragment in every PR."""
+    """Require a changelog entry unless every changed path is non-shipping."""
     if "CHANGELOG.md" in changed_paths:
         return []
     if any(
@@ -87,11 +97,25 @@ def changelog_requirement_errors(changed_paths: list[str]) -> list[str]:
         for path in changed_paths
     ):
         return []
+    if changed_paths and all(_is_non_shipping_path(path) for path in changed_paths):
+        return []
     return [
-        "This PR changes neither CHANGELOG.md nor "
+        "This PR changes shipping paths but neither CHANGELOG.md nor "
         "changelog.d/<pr-or-slug>.md. Add a categorized changelog fragment; "
         "changelog.d/README.md documents the format."
     ]
+
+
+def pull_request_errors(
+    changed_paths: list[str],
+    target: str,
+    branch_point: str,
+    proposed: str,
+) -> list[str]:
+    """Return every requirement and structural error for a pull request."""
+    errors = changelog_requirement_errors(changed_paths)
+    errors.extend(pull_request_regressions(target, branch_point, proposed))
+    return errors
 
 
 def _file_at(ref: str) -> str:
@@ -150,15 +174,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         branch_point = _merge_base(args.base_ref, args.head_ref)
-        errors = changelog_requirement_errors(
-            _changed_paths(branch_point, args.head_ref)
-        )
-        errors.extend(
-            pull_request_regressions(
-                _file_at(args.base_ref),
-                _file_at(branch_point),
-                _file_at(args.head_ref),
-            )
+        errors = pull_request_errors(
+            _changed_paths(branch_point, args.head_ref),
+            _file_at(args.base_ref),
+            _file_at(branch_point),
+            _file_at(args.head_ref),
         )
     except RuntimeError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -172,8 +192,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         "CHANGELOG integrity guard passed: "
-        "a canonical entry or fragment is present and no PR-authored release "
-        "structure was lost."
+        "the entry requirement is satisfied or every changed path is "
+        "non-shipping, and no PR-authored release structure was lost."
     )
     return 0
 

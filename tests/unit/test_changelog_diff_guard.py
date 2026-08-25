@@ -14,6 +14,7 @@ assert SPEC and SPEC.loader
 GUARD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(GUARD)
 changelog_requirement_errors = GUARD.changelog_requirement_errors
+pull_request_errors = GUARD.pull_request_errors
 pull_request_regressions = GUARD.pull_request_regressions
 structural_regressions = GUARD.structural_regressions
 
@@ -146,15 +147,52 @@ def test_direct_changelog_edits_remain_accepted_during_cutover():
 
 
 def test_pr_cannot_satisfy_the_changelog_rule_with_neither_form():
-    errors = changelog_requirement_errors(["cps/web.py", "tests/unit/test_web.py"])
+    errors = changelog_requirement_errors(["cps/web.py"])
     assert len(errors) == 1
     assert "CHANGELOG.md" in errors[0]
     assert "changelog.d/<pr-or-slug>.md" in errors[0]
 
 
+def test_findings_ledger_only_pr_does_not_require_a_changelog_entry():
+    assert changelog_requirement_errors(["findings/kobo/F-66edbc.md"]) == []
+
+
+def test_mixing_a_findings_ledger_with_shipping_code_requires_an_entry():
+    errors = changelog_requirement_errors(
+        ["findings/kobo/F-66edbc.md", "cps/readingservices.py"]
+    )
+    assert len(errors) == 1
+    assert "shipping paths" in errors[0]
+
+
+def test_other_allowlisted_non_shipping_paths_do_not_require_an_entry():
+    for path in (
+        "notes/kobo-hardware-run.md",
+        "docs/install/compose.md",
+        "tests/unit/test_changelog_diff_guard.py",
+        "changelog.d/README.md",
+        "scripts/check_changelog_diff.py",
+    ):
+        assert changelog_requirement_errors([path]) == []
+
+
+def test_github_paths_and_top_level_dotfiles_are_not_blanket_exempt():
+    for path in (".github/workflows/tests.yml", ".dockerignore", ".editorconfig"):
+        assert changelog_requirement_errors([path])
+
+
 def test_changelog_directory_readme_is_documentation_not_a_fragment():
-    errors = changelog_requirement_errors(["CONTRIBUTING.md", "changelog.d/README.md"])
+    errors = changelog_requirement_errors(["cps/web.py", "changelog.d/README.md"])
     assert errors
+
+
+def test_non_shipping_exemption_does_not_bypass_structural_regressions():
+    base = """## [Unreleased]\n\n### Fixed\n- **First fix.**\n- **Second fix.**\n"""
+    damaged = """## [Unreleased]\n\n### Fixed\n- **First fix.**\n"""
+    errors = pull_request_errors(
+        ["findings/kobo/F-66edbc.md"], base, base, damaged
+    )
+    assert any("loses 1" in error for error in errors)
 
 
 def test_fragments_are_direct_markdown_children_with_safe_names():

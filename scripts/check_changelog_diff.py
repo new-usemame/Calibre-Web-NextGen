@@ -147,8 +147,14 @@ def _merge_base(base_ref: str, head_ref: str) -> str:
 
 
 def _changed_paths(branch_point: str, head_ref: str) -> list[str]:
+    # --no-renames, deliberately. With rename detection on, `git mv` out of a
+    # shipping directory is reported by its DESTINATION only, so
+    # `git mv cps/thing.py docs/thing.py` reaches the classifier as a lone
+    # `docs/` path -- non-shipping -- and a module that vanished from the
+    # application merges with no release note. Splitting the rename into its
+    # delete and its add keeps the shipping side visible to the guard.
     result = subprocess.run(
-        ["git", "diff", "--name-only", "-z", branch_point, head_ref],
+        ["git", "diff", "--no-renames", "--name-only", "-z", branch_point, head_ref],
         check=False,
         capture_output=True,
     )

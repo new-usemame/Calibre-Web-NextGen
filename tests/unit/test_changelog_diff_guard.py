@@ -214,3 +214,54 @@ def test_pr_ci_invokes_guard_with_complete_git_history():
         'python3 scripts/check_changelog_diff.py "$BASE_SHA" "$HEAD_SHA"'
         in changed_paths
     )
+
+
+def test_a_rename_out_of_a_shipping_directory_still_reports_the_shipping_path(
+    tmp_path, monkeypatch
+):
+    """`git mv cps/x.py wiki-src/x.py` must not read as a wiki-only change.
+
+    With git's rename detection on, `git diff --name-only` reports a detected
+    rename by its DESTINATION alone. A module moved out of `cps/` into any
+    exempt directory would then reach the classifier as a single non-shipping
+    path, and code that vanished from the application would merge with no
+    release note -- the exact loss this guard exists to prevent.
+
+    This exercises `_changed_paths` against a real repository rather than a
+    hand-written path list, because the defect lives in how the paths are
+    OBTAINED, not in how they are classified. A test that passes both paths in
+    by hand cannot fail on it.
+    """
+    import subprocess
+
+    def git(*args):
+        subprocess.run(
+            ["git", "-C", str(tmp_path), *args],
+            check=True, capture_output=True,
+        )
+
+    git("init", "-q", ".")
+    git("config", "user.email", "guard@test.invalid")
+    git("config", "user.name", "guard-test")
+    (tmp_path / "cps").mkdir()
+    (tmp_path / "wiki-src").mkdir()
+    (tmp_path / "cps" / "shipping_module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    git("mv", "cps/shipping_module.py", "wiki-src/shipping_module.py")
+    git("commit", "-qm", "move it out of the application")
+
+    # _changed_paths shells out to git in the CURRENT directory, which is how
+    # CI invokes it. Stand in the throwaway repository so the diff is the one
+    # this test built.
+    monkeypatch.chdir(tmp_path)
+    paths = GUARD._changed_paths("HEAD~1", "HEAD")
+
+    assert "cps/shipping_module.py" in paths, (
+        "the rename's source was dropped, so the guard cannot see that a "
+        f"shipping file left the application; got {paths}"
+    )
+    assert changelog_requirement_errors(paths), (
+        "a diff that removes a module from cps/ must still require a "
+        "release-note entry"
+    )

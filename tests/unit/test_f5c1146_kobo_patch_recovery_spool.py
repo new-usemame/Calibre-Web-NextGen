@@ -521,6 +521,7 @@ def test_retention_schedule_failure_happens_before_record_commit(monkeypatch, tm
 def test_cross_process_lock_contention_fails_open_without_waiting(monkeypatch, tmp_path):
     """A busy peer must not block this gevent worker's entire request hub."""
     spool, root = _root(monkeypatch, tmp_path)
+    monkeypatch.setattr(spool, "REQUEST_IO_TIMEOUT_SECONDS", 0.05)
     root.mkdir(parents=True)
     context = multiprocessing.get_context("fork")
     ready_parent, ready_child = context.Pipe(duplex=False)
@@ -559,13 +560,78 @@ def test_cross_process_lock_contention_fails_open_without_waiting(monkeypatch, t
         "every greenlet in this worker's gevent hub"
     )
     assert result == [None]
+    deadline = time.monotonic() + 2
+    while not list(root.glob("patch-*.json.gz")) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    [(_path, record)] = _records(spool, root)
+    assert record["body"] == RAW_PATCH
 
 
 @pytest.mark.unit
-def test_busy_spool_rejects_new_work_immediately(monkeypatch, tmp_path):
-    """A wedged worker opens the circuit instead of accumulating more work."""
+def test_timed_out_stage_finishes_and_does_not_poison_its_successor(
+    monkeypatch, tmp_path,
+):
+    """The request deadline relinquishes the result, not the recovery bytes."""
     spool, root = _root(monkeypatch, tmp_path)
-    assert spool._REQUEST_IO_GATE.acquire(blocking=False)
+    monkeypatch.setattr(spool, "REQUEST_IO_TIMEOUT_SECONDS", 0.02)
+    real_write = spool._write_or_reuse_record
+    first_started = threading.Event()
+    release_first = threading.Event()
+    workers_finished = {
+        "book-slow": threading.Event(),
+        "book-next": threading.Event(),
+    }
+
+    def _stall_first(incoming, compressed, cancelled=None):
+        entitlement_id = incoming["entitlement_id"]
+        try:
+            if entitlement_id == "book-slow":
+                first_started.set()
+                assert release_first.wait(2), "test did not release the slow write"
+            if cancelled is None:
+                return real_write(incoming, compressed)
+            return real_write(incoming, compressed, cancelled)
+        finally:
+            workers_finished[entitlement_id].set()
+
+    monkeypatch.setattr(spool, "_write_or_reuse_record", _stall_first)
+    slow_body = b'{"updatedAnnotations":[{"id":"slow-body"}]}'
+    next_body = b'{"updatedAnnotations":[{"id":"next-body"}]}'
+
+    started = time.monotonic()
+    first = spool.stage_patch(
+        raw_body=slow_body, entitlement_id="book-slow",
+        user_id=7, origin_device_id=None,
+    )
+    first_elapsed = time.monotonic() - started
+    assert first_started.is_set()
+
+    started = time.monotonic()
+    second = spool.stage_patch(
+        raw_body=next_body, entitlement_id="book-next",
+        user_id=7, origin_device_id=None,
+    )
+    second_elapsed = time.monotonic() - started
+    release_first.set()
+
+    assert first is None
+    assert second is None or second.spool_id
+    assert first_elapsed < 1.5 and second_elapsed < 1.5
+    assert workers_finished["book-slow"].wait(2)
+    assert workers_finished["book-next"].wait(2)
+    bodies = {record["body"] for _path, record in _records(spool, root)}
+    assert bodies == {slow_body, next_body}, (
+        "the elapsed request deadline discarded a body or rejected the next "
+        "stage while the first storage worker was still finishing"
+    )
+
+
+@pytest.mark.unit
+def test_pending_spool_work_is_bounded(monkeypatch, tmp_path):
+    """Two pending operations cannot grow into an unbounded memory queue."""
+    spool, root = _root(monkeypatch, tmp_path)
+    assert spool._REQUEST_IO_SLOTS.acquire(blocking=False)
+    assert spool._REQUEST_IO_SLOTS.acquire(blocking=False)
     try:
         started = time.monotonic()
         ticket = spool.stage_patch(
@@ -574,7 +640,8 @@ def test_busy_spool_rejects_new_work_immediately(monkeypatch, tmp_path):
         )
         elapsed = time.monotonic() - started
     finally:
-        spool._REQUEST_IO_GATE.release()
+        spool._REQUEST_IO_SLOTS.release()
+        spool._REQUEST_IO_SLOTS.release()
 
     assert ticket is None
     assert elapsed < 0.05

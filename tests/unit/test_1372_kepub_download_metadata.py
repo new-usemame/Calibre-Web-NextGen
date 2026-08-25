@@ -194,6 +194,69 @@ def test_kepub_download_removes_dropped_creator_and_its_refinements(
         ) == []
 
 
+def test_kepub_download_removes_transitive_refinements_of_dropped_creator(
+    monkeypatch, tmp_path
+):
+    def add_two_level_refinement(package):
+        dropped_role = package.xpath(
+            '//*[local-name()="meta"][@refines="#creator-2"]'
+            '[@property="role"]'
+        )[0]
+        dropped_role.set("id", "drop-role")
+        metadata = package.xpath('//*[local-name()="metadata"]')[0]
+        display_sequence = etree.Element(
+            "{http://www.idpf.org/2007/opf}meta",
+            refines="#drop-role",
+            property="display-seq",
+        )
+        display_sequence.text = "1"
+        metadata.append(display_sequence)
+
+    _source, served = _run_download_rewrite(
+        monkeypatch,
+        tmp_path,
+        _book(authors=["Alexandre Dumas"]),
+        source_transform=add_two_level_refinement,
+    )
+
+    with ZipFile(served) as served_zip:
+        _package_name, package = _package(served_zip)
+        assert package.xpath('//*[@id="drop-role"]') == []
+        assert package.xpath('//*[@refines="#drop-role"]') == []
+
+
+def test_kepub_download_does_not_reassign_removed_author_refinements_on_rename(
+    monkeypatch, tmp_path
+):
+    def make_ambiguous_author_change(package):
+        creators = package.xpath('//*[local-name()="creator"]')
+        creators[0].set("id", "first")
+        creators[0].text = "Removed Author"
+        creators[1].set("id", "second")
+        creators[1].text = "Old Surviving Name"
+        for refinement in package.xpath('//*[@refines]'):
+            if refinement.get("refines") == "#creator":
+                refinement.set("refines", "#first")
+            elif refinement.get("refines") == "#creator-2":
+                refinement.set("refines", "#second")
+
+    _source, served = _run_download_rewrite(
+        monkeypatch,
+        tmp_path,
+        _book(authors=["New Surviving Name"]),
+        source_transform=make_ambiguous_author_change,
+    )
+
+    with ZipFile(served) as served_zip:
+        _package_name, package = _package(served_zip)
+        creators = package.xpath('//*[local-name()="creator"]')
+        assert ["".join(element.itertext()) for element in creators] == [
+            "New Surviving Name"
+        ]
+        assert creators[0].get("id") not in {"first", "second"}
+        assert package.xpath('//*[@refines="#first" or @refines="#second"]') == []
+
+
 def test_kepub_download_renames_generated_id_that_collides_with_identity_anchor(
     monkeypatch, tmp_path
 ):

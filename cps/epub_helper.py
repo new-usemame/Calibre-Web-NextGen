@@ -339,24 +339,34 @@ def merge_kepub_metadata(tree, package):
         candidate.set("id", old_id)
         claimed_generated.add(id(candidate))
 
-    # Exact matches take their old ids first. Positional fallback then covers a
-    # changed value without letting a removed first author steal the surviving
-    # author's role/file-as refinements.
+    # Exact matches take their old ids first. A changed value inherits an old
+    # id only when one unmatched old element and one generated element remain
+    # for that field. With any other cardinality the correspondence is
+    # ambiguous (for example, remove one author while renaming another), so
+    # dropping the old refinements is safer than attaching them to the wrong
+    # value.
+    unmatched_by_name = {}
     for old_child in unmatched_referenced:
         local_name = _local_name(old_child)
-        old_id = old_child.get("id")
+        if local_name == "identifier":
+            old_id = old_child.get("id")
+            if old_id == unique_identifier:
+                # Preserve an identity URI absent from the Calibre DB rather than
+                # leaving package@unique-identifier dangling or changing meaning.
+                preserved_anchors.add(old_child)
+        else:
+            unmatched_by_name.setdefault(local_name, []).append(old_child)
+
+    for local_name, old_children in unmatched_by_name.items():
         candidates = [
             candidate for candidate in generated_by_name.get(local_name, [])
             if id(candidate) not in claimed_generated
         ]
-        if local_name != "identifier" and candidates:
+        if len(old_children) == 1 and len(candidates) == 1:
+            old_id = old_children[0].get("id")
             candidate = candidates[0]
             candidate.set("id", old_id)
             claimed_generated.add(id(candidate))
-        elif local_name == "identifier" and old_id == unique_identifier:
-            # Preserve an identity URI absent from the Calibre DB rather than
-            # leaving package@unique-identifier dangling or changing meaning.
-            preserved_anchors.add(old_child)
 
     removable = []
     for child in metadata:
@@ -417,15 +427,24 @@ def merge_kepub_metadata(tree, package):
         for offset, child in enumerate(series_children, start=len(generated_children)):
             metadata.insert(insertion_index + offset, child)
 
-    surviving_ids = {
-        element.get("id")
-        for element in tree.iter()
-        if isinstance(element.tag, str) and element.get("id")
-    }
-    orphaned_removed_ids = removed_ids - surviving_ids
-    for child in list(metadata):
-        refined_id = (child.get("refines") or "").removeprefix("#")
-        if refined_id in orphaned_removed_ids:
+    while True:
+        surviving_ids = {
+            element.get("id")
+            for element in tree.iter()
+            if isinstance(element.tag, str) and element.get("id")
+        }
+        orphaned_removed_ids = removed_ids - surviving_ids
+        orphaned_refinements = [
+            child for child in metadata
+            if (child.get("refines") or "").removeprefix("#")
+            in orphaned_removed_ids
+        ]
+        if not orphaned_refinements:
+            break
+        for child in orphaned_refinements:
+            child_id = child.get("id") if isinstance(child.tag, str) else None
+            if child_id:
+                removed_ids.add(child_id)
             metadata.remove(child)
 
     return etree.tostring(
@@ -434,4 +453,3 @@ def merge_kepub_metadata(tree, package):
         encoding='utf-8',
         pretty_print=True,
     ).decode('utf-8')
-

@@ -297,3 +297,9 @@ wiki-generated/
 # tests/unit/test_1712_annotation_backup_not_committable.py derives the name
 # from the service so this entry cannot drift away from what the code writes.
 /annotation-backups/
+
+# Raw Kobo Reading Services exchanges and pre-dispatch PATCH recovery records.
+# These contain private annotation text. In Docker they live under /config;
+# a bare source run falls back to the repository root, so make the entire
+# private-observability parent structurally uncommittable.
+.cwng-private-observability/

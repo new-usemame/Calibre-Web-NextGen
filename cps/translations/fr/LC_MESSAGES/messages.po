@@ -2623,6 +2623,26 @@ msgstr ""
 msgid "Manual (drag below)"
 msgstr "Manuel (glisser pour réorganiser)"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} added to the shelf; {failed} failed."
+msgstr "{succeeded} ajouté(s) à l'étagère ; {failed} échec(s)."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} book(s) deleted; {failed} failed."
+msgstr "{succeeded} livre(s) supprimé(s) ; {failed} échec(s)."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} updated; {failed} failed."
+msgstr "{succeeded} mis à jour ; {failed} échec(s)."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Metadata applied to {succeeded}; {failed} failed."
+msgstr "Métadonnées appliquées à {succeeded} ; {failed} échec(s)."
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Read now"
 msgstr "Lire"

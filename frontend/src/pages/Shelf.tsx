@@ -17,6 +17,7 @@ import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { getShelfVisibilityAction } from '../lib/shelfVisibility';
 
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const seen = new Set(prev.map((b) => b.id));
@@ -95,6 +96,11 @@ export function Shelf({ id }: { id: string }) {
   const total = data.total;
   const hasMore = books.length < total;
   const canEdit = data.can_edit;
+  const visibilityAction = getShelfVisibilityAction({
+    canEdit,
+    canMakePublic: !!me?.role?.edit_shelfs,
+    isPublic: data.is_public,
+  });
 
   const startRename = () => {
     setDraftName(data.name);
@@ -134,8 +140,9 @@ export function Shelf({ id }: { id: string }) {
   };
 
   const toggleVisibility = () => {
+    if (!visibilityAction) return;
     setActionError(null);
-    updateShelf.mutate({ is_public: !data.is_public }, {
+    updateShelf.mutate({ is_public: visibilityAction === 'make-public' }, {
       onError: (err) => setActionError(err instanceof ApiError ? err.message : t('Could not update shelf.')),
     });
   };
@@ -237,10 +244,14 @@ export function Shelf({ id }: { id: string }) {
               <button className={styles.manageBtn} onClick={startRename}>
                 <Pencil size={14} /> {t('Rename')}
               </button>
-              <button className={styles.manageBtn} onClick={toggleVisibility} disabled={updateShelf.isPending}>
-                {data.is_public ? <Lock size={14} /> : <Globe size={14} />}
-                {data.is_public ? t('Make private') : t('Make public')}
-              </button>
+              {visibilityAction && (
+                <button className={styles.manageBtn} onClick={toggleVisibility} disabled={updateShelf.isPending}>
+                  {visibilityAction === 'make-private'
+                    ? <Lock size={14} aria-hidden="true" focusable={false} />
+                    : <Globe size={14} aria-hidden="true" focusable={false} />}
+                  {visibilityAction === 'make-private' ? t('Make private') : t('Make public')}
+                </button>
+              )}
               {me?.features?.kobo_sync && (
                 <button className={data.kobo_sync ? styles.manageBtnActive : styles.manageBtn}
                   onClick={toggleKoboSync} disabled={updateShelf.isPending}>

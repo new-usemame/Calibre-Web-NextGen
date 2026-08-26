@@ -46,8 +46,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from flask import request
+from sqlalchemy.exc import SQLAlchemyError
 
 from ... import csrf, logger, ub
+from ...annotations import _commit_required
 from .kosync import (
     kosync,
     authenticate_user,
@@ -55,6 +57,7 @@ from .kosync import (
     create_sync_response,
     is_valid_key_field,
     _require_kosync_enabled,
+    ERROR_INTERNAL,
     ERROR_UNAUTHORIZED_USER,
     ERROR_DOCUMENT_FIELD_MISSING,
 )
@@ -192,7 +195,7 @@ def _apply_deletes(deleted_ids, *, user, book, session, commit, source) -> int:
     for row in stale:
         row.hidden = True
         row.last_synced = _now()
-    commit()
+    _commit_required(commit)
 
     for row in stale:
         try:
@@ -430,12 +433,20 @@ def push_annotations():
     except Exception:
         log.warning("KOReader annotation attribution failed", exc_info=True)
 
-    summary = apply_push(
-        annotations, user=user, book=book,
-        session=ub.session, commit=ub.session_commit,
-        deleted_ids=deleted_ids, delete_source=delete_source,
-        origin_device_id=origin_device_id,
-    )
+    try:
+        summary = apply_push(
+            annotations, user=user, book=book,
+            session=ub.session, commit=ub.session_commit,
+            deleted_ids=deleted_ids, delete_source=delete_source,
+            origin_device_id=origin_device_id,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        ub.session.rollback()
+        log.exception(
+            "KOReader annotation push database write failed: user=%s book=%s document=%s",
+            user.id, book_id, _loggable(document),
+        )
+        return _reject(user, document, ERROR_INTERNAL, "Database error", status=503)
     summary["document"] = document
     # `reconciled` means the device NAMED deletions on this push, not that any
     # row matched — naming an id that is already hidden or unknown is a no-op

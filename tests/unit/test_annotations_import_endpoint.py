@@ -197,6 +197,82 @@ class TestIngestCounts:
 
 
 @pytest.mark.unit
+class TestKoboDeviceContentId:
+    BOOK_UUID = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+
+    @staticmethod
+    def _replace_content_id(sqlite_path, content_id):
+        connection = sqlite3.connect(sqlite_path)
+        try:
+            connection.execute(
+                "UPDATE Bookmark SET ContentID = ? WHERE BookmarkID = 'bm-001'",
+                (content_id,),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    @pytest.mark.parametrize(
+        ("device_content_id", "canonical_content_id"),
+        [
+            pytest.param(
+                f"{BOOK_UUID}!OEBPS!5974957359191092168_980-h-0.htm.xhtml",
+                f"{BOOK_UUID}!!OEBPS/5974957359191092168_980-h-0.htm.xhtml",
+                id="measured-device-shape",
+            ),
+            pytest.param(
+                f"{BOOK_UUID}!OEBPS!chapter.xhtml#pgepubid00001",
+                f"{BOOK_UUID}!!OEBPS/chapter.xhtml#pgepubid00001",
+                id="fragment",
+            ),
+            pytest.param(
+                f"{BOOK_UUID}!EPUB/package/Text!part/chapter.xhtml",
+                f"{BOOK_UUID}!!EPUB/package/Text/part/chapter.xhtml",
+                id="nested-opf-directory",
+            ),
+        ],
+    )
+    def test_import_folds_device_content_id_to_canonical_server_form(
+        self, memory_db, synthetic_db, device_content_id, canonical_content_id,
+    ):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        self._replace_content_id(synthetic_db, device_content_id)
+        session, _, _ = memory_db
+
+        result = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=_make_book_lookup({self.BOOK_UUID: 348}), commit=session.commit,
+        )
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-001").one()
+
+        assert result["imported"] == 3, result
+        assert result["skipped_invalid_content_id"] == 0, result
+        assert row.content_id == canonical_content_id
+
+    def test_import_rejects_device_content_id_that_escapes_after_folding(
+        self, memory_db, synthetic_db,
+    ):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        self._replace_content_id(
+            synthetic_db, f"{self.BOOK_UUID}!..!../outside.xhtml",
+        )
+        session, _, _ = memory_db
+
+        result = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=_make_book_lookup({self.BOOK_UUID: 348}), commit=session.commit,
+        )
+
+        assert result["imported"] == 2, result
+        assert result["skipped_invalid_content_id"] == 1, result
+        assert session.query(ub.Annotation).filter_by(annotation_id="bm-001").first() is None
+
+
+@pytest.mark.unit
 class TestPreviouslyInvisibleDeviceRows:
     def test_dogear_and_note_only_row_import_and_every_row_is_accounted(
         self, memory_db, tmp_path,

@@ -6,6 +6,7 @@ import {
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
+import { settleById } from './bulkResults';
 import { createEntityListQueryOptions } from './entityListQueryOptions';
 import type { MetadataProvider, MetaSearchResponse } from './api';
 import type {
@@ -650,25 +651,26 @@ export function useBulkActions() {
     void qc.invalidateQueries({ queryKey: ['books'] });
     void qc.invalidateQueries({ queryKey: ['shelves'] });
   };
-  const settle = (ps: Promise<unknown>[]) => Promise.allSettled(ps);
-
   const markRead = useMutation({
     mutationFn: (v: { ids: number[]; read: boolean }) =>
-      settle(v.ids.map((id) => apiPost(`/api/v1/books/${id}/read`, { read: v.read }))),
+      settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/read`, { read: v.read })),
     onSuccess: refresh,
   });
   const addToShelf = useMutation({
     mutationFn: (v: { ids: number[]; shelfId: number }) =>
       // tolerate 409 (already on shelf) per book
-      settle(v.ids.map((id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`).catch(() => null))),
+      settleById(v.ids, (id) => apiPost(`/api/v1/shelves/${v.shelfId}/books/${id}`).catch((err) => {
+        if (err instanceof ApiError && err.status === 409) return null;
+        throw err;
+      })),
     onSuccess: refresh,
   });
   const remove = useMutation({
-    mutationFn: (ids: number[]) => settle(ids.map((id) => apiPost(`/api/v1/books/${id}/delete`))),
-    onSuccess: (_data, ids) => {
+    mutationFn: (ids: number[]) => settleById(ids, (id) => apiPost(`/api/v1/books/${id}/delete`)),
+    onSuccess: ({ succeededIds }) => {
       // Evict deleted books from every cached catalog snapshot so a later
       // scroll-restore can't resurrect them as ghost cards (#578).
-      ids.forEach(removeBookFromCache);
+      succeededIds.forEach(removeBookFromCache);
       refresh();
     },
   });
@@ -676,7 +678,7 @@ export function useBulkActions() {
   // the per-book metadata endpoint (replace semantics for the filled fields).
   const setMetadata = useMutation({
     mutationFn: (v: { ids: number[]; fields: MetadataUpdate }) =>
-      settle(v.ids.map((id) => apiPost(`/api/v1/books/${id}/metadata`, v.fields))),
+      settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/metadata`, v.fields)),
     onSuccess: refresh,
   });
   return { markRead, addToShelf, remove, setMetadata };

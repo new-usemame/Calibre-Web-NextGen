@@ -419,8 +419,60 @@ def mock_calibre_tools(mocker):
 # Skip Markers for Conditional Tests
 # ============================================================================
 
+def _isolate_pytest_tempdir():
+    """Give every pytest process its own tempdir.
+
+    `scripts/` guards five one-at-a-time operations with a singleton keyed on
+    `tempfile.gettempdir()`:
+
+        ingest_processor.py:176    cover_enforcer.py:168
+        convert_library.py:64,74   kindle_epub_fixer.py:85,113,123
+
+    Those guards are correct production behaviour -- one ingest, one enforcer
+    run at a time. The lock path is derived from the SYSTEM temp directory, so
+    the contended resource is **machine-global, not run-global**: any other
+    process on the host holding it makes these tests fail, whether that process
+    is a sibling xdist worker, a second pytest session, or the preflight suite
+    running while someone works.
+
+    Measured, with the lock held by an unrelated process and pytest run
+    SERIALLY: `12 failed, 57 passed` in
+    `test_1094_failed_conversion_imports_original.py`. Under `-n 4` with no
+    outside holder, the workers contend with each other instead: `3-6 failed`.
+    Same lock, same failure, two different sources of contention -- which is why
+    this keys on the process rather than on the worker id, and why it does not
+    skip the serial case.
+
+    `os.getpid()` is the right key precisely because it is unique per *process*:
+    each xdist worker gets its own, a serial run gets its own, and two
+    concurrent sessions cannot collide the way `gw0`-vs-`gw0` would. Subprocesses
+    inherit `TMPDIR`, so a subprocess spawned by a test shares its parent's
+    directory and nothing else's -- which is what `ingest_processor` needs, since
+    some of these tests invoke it out of process.
+
+    BOTH assignments are load-bearing and neither is sufficient alone:
+    `gettempdir()` caches its answer into `tempfile.tempdir`, so setting only the
+    environment variable leaves this process on the shared path, while setting
+    only the module global leaves subprocesses on it. Half an application looks
+    like the fixture not quite working rather than like a fixture that was only
+    half applied.
+
+    This is not a new mechanism. `test_1372_kepub_metadata_enforcement.py`
+    already does it by hand for one import, monkeypatching `tempfile.gettempdir`
+    to a private directory so `cover_enforcer`'s module-scope lock cannot race
+    `test_802`'s. This promotes that workaround to the harness, and the local one
+    can go once this has settled.
+    """
+    root = os.path.join(tempfile.gettempdir(), "cwng-pytest", str(os.getpid()))
+    os.makedirs(root, exist_ok=True)
+    os.environ["TMPDIR"] = root
+    tempfile.tempdir = root
+    return root
+
+
 def pytest_configure(config):
     """Register custom markers."""
+    _isolate_pytest_tempdir()
     config.addinivalue_line(
         "markers", "requires_docker: mark test as requiring Docker environment"
     )

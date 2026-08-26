@@ -155,6 +155,7 @@ fetch_and_apply_metadata = None
 TaskAutoSend = None
 WorkerThread = None
 _ub = None
+_uploader = None
 CWA_DB = None
 EPUBFixer = None
 audiobook = None
@@ -367,7 +368,7 @@ def _load_runtime_dependencies() -> None:
 
 def _load_optional_cps_modules() -> None:
     global _GDRIVE_AVAILABLE, _CPS_AVAILABLE
-    global _gdriveutils, _cps_config, fetch_and_apply_metadata, TaskAutoSend, WorkerThread, _ub
+    global _gdriveutils, _cps_config, fetch_and_apply_metadata, TaskAutoSend, WorkerThread, _ub, _uploader
 
     if _GDRIVE_AVAILABLE and _CPS_AVAILABLE:
         return
@@ -399,12 +400,14 @@ def _load_optional_cps_modules() -> None:
             from cps.tasks.auto_send import TaskAutoSend as LoadedTaskAutoSend
             from cps.services.worker import WorkerThread as LoadedWorkerThread
             from cps import ub as loaded_ub
+            from cps import uploader as loaded_uploader
             from cps.calibre_init import init_calibre_db_from_app_db
             init_calibre_db_from_app_db(get_app_db_path())
             fetch_and_apply_metadata = loaded_fetch_and_apply_metadata
             TaskAutoSend = LoadedTaskAutoSend
             WorkerThread = LoadedWorkerThread
             _ub = loaded_ub
+            _uploader = loaded_uploader
             _CPS_AVAILABLE = True
             print("[ingest-processor] Auto-send and metadata functionality available", flush=True)
         except ImportError as e:
@@ -413,6 +416,7 @@ def _load_optional_cps_modules() -> None:
             TaskAutoSend = None
             WorkerThread = None
             _ub = None
+            _uploader = None
             _CPS_AVAILABLE = False
 
     except Exception as e:
@@ -1681,6 +1685,60 @@ class NewBookProcessor:
         return False # Timeout reached
 
 
+    _COMIC_INGEST_EXTENSIONS = {'.cbz', '.cbt', '.cbr', '.cb7'}
+
+    def _comic_calibredb_metadata_args(self, staged_path) -> list:
+        """Read embedded ComicInfo.xml/CBI metadata so a tagged comic imports
+        with its real title/series/authors instead of calibredb's bare
+        filename guess. The ingest watcher never called cps.uploader.process
+        (the same reader the manual web-upload path already uses), so a
+        comic tagged by ComicTagger/Kapowarr/Mylar3 lost that metadata on
+        auto-ingest even though the identical file uploaded by hand kept it.
+
+        strict=True (see uploader.process docstring) means an untagged
+        comic gets no calibredb flags here and falls through to the
+        existing filename/web-lookup behavior, unchanged.
+        """
+        if Path(staged_path).suffix.lower() not in self._COMIC_INGEST_EXTENSIONS:
+            return []
+        if not _CPS_AVAILABLE or _uploader is None:
+            return []
+
+        try:
+            rar_executable = getattr(_cps_config, 'config_rarfile_location', '') if _cps_config else ''
+            meta = _uploader.process(
+                str(staged_path),
+                Path(staged_path).stem,
+                Path(staged_path).suffix,
+                rar_executable,
+                no_cover=True,
+                strict=True,
+            )
+        except Exception as e:
+            print(f"[ingest-processor] WARN: Could not read embedded comic metadata from "
+                  f"{staged_path}: {e}", flush=True)
+            return []
+
+        args = []
+        if meta.title:
+            args += ["--title", meta.title]
+        if meta.author:
+            args += ["--authors", meta.author]
+        if meta.series:
+            args += ["--series", meta.series]
+            # Issue numbers ("1A", "Annual 1", "½") aren't always numeric;
+            # calibredb --series-index requires a number, so drop a value
+            # it would reject rather than fail the whole import over it.
+            if meta.series_id:
+                try:
+                    float(meta.series_id)
+                    args += ["--series-index", str(meta.series_id)]
+                except ValueError:
+                    pass
+        if meta.languages:
+            args += ["--languages", meta.languages]
+        return args
+
 
     def add_book_to_library(self, book_path:str, text: bool=True, format: str="text" ) -> None:
         # Normalize a KEPUB before it enters the library (#1715). Every ingest
@@ -1757,13 +1815,14 @@ class NewBookProcessor:
             # Required for fork #192 — without it, mergerfs/SMB/NFS
             # POSIX-lock weakness lets apsw.BusyError poison the import.
             if text:
+                comic_meta_args = self._comic_calibredb_metadata_args(staged_path)
                 with metadata_db_write_lock():
                     result = _run_calibredb_add_with_retry(
                         cmd=[
                             "calibredb", "add", str(staged_path),
                             "--automerge", self.cwa_settings['auto_ingest_automerge'],
                             f"--library-path={self.library_dir}",
-                        ],
+                        ] + comic_meta_args,
                         env=self.calibre_env,
                     )
                 added_ids = self._parse_added_book_ids((result.stdout or '') + '\n' + (result.stderr or ''))

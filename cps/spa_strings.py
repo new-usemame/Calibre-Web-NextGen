@@ -29,6 +29,12 @@ def _(message):  # noqa: E743 - intentional gettext extraction marker, not the b
     return message
 
 
+_("{succeeded} added to the shelf; {failed} failed.")
+_("{succeeded} book(s) deleted; {failed} failed.")
+_("{succeeded} updated; {failed} failed.")
+_("Metadata applied to {succeeded}; {failed} failed.")
+
+
 # #577 — the new-UI "open the reader" button. A distinct msgid from the "Read"
 # read-status label (which is a past participle in many languages, e.g. nl
 # "Gelezen") so the verb and the status can be translated separately.

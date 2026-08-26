@@ -73,3 +73,41 @@ test('book-card actions keep a shared baseline for touch, mouse, and keyboard', 
     }
   }
 });
+
+test('quick-edit pencil uses the light-theme card-surface palette', async ({ page }) => {
+  await page.goto('/app');
+  const quickEdit = page.locator('a[aria-label^="Edit "]').first();
+  await expect(quickEdit).toHaveCount(1);
+
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  if (!isTouchProject()) {
+    await quickEdit.locator('..').locator('..').locator('a[aria-label^="Open details for"]').hover();
+  }
+  await expectRevealed(quickEdit, true, 'light: quick edit is revealed before its visible palette is measured');
+
+  const expected = await quickEdit.evaluate(() => {
+    const resolveToken = (token: string) => {
+      const probe = document.createElement('span');
+      probe.style.color = `var(${token})`;
+      document.body.appendChild(probe);
+      const resolved = getComputedStyle(probe).color;
+      probe.remove();
+      return resolved;
+    };
+    return {
+      background: resolveToken('--surface-2'),
+      color: resolveToken('--text-muted'),
+      border: resolveToken('--border'),
+    };
+  });
+
+  await expect.poll(() => quickEdit.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      background: style.backgroundColor,
+      color: style.color,
+      border: style.borderColor,
+    };
+  }), { message: 'light: quick edit resolves to the on-surface palette' }).toEqual(expected);
+});

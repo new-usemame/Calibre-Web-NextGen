@@ -10,7 +10,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
-"PO-Revision-Date: 2026-08-19 11:00+0300\n"
+"PO-Revision-Date: 2026-08-25 20:45+0300\n"
 "Last-Translator: ZIZA\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -743,8 +743,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py
 msgid "Password length has to be between 1 and 40"
@@ -961,7 +961,7 @@ msgstr "Загруженный файл не является базой дан�
 
 #: cps/annotations.py
 msgid "Uploaded database has no readable Kobo Bookmark table."
-msgstr ""
+msgstr "В загруженной базе данных отсутствует читаемая таблица закладок Kobo."
 
 #: cps/annotations.py
 #, python-format
@@ -2567,6 +2567,26 @@ msgstr "По дате изменения (сначала старые)"
 msgid "Manual (drag below)"
 msgstr "Вручную (перетащите ниже)"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} added to the shelf; {failed} failed."
+msgstr "Добавлено на полку: {succeeded}; с ошибкой: {failed}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} book(s) deleted; {failed} failed."
+msgstr "Удалено книг: {succeeded}; с ошибкой: {failed}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} updated; {failed} failed."
+msgstr "Обновлено: {succeeded}; с ошибкой: {failed}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Metadata applied to {succeeded}; {failed} failed."
+msgstr "Метаданные применены к: {succeeded}; с ошибкой: {failed}."
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Read now"
 msgstr "Читать сейчас"
@@ -4020,7 +4040,7 @@ msgstr "Расширенный поиск"
 
 #: cps/spa_strings.py
 msgid "All books"
-msgstr ""
+msgstr "Все книги"
 
 #: cps/spa_strings.py
 msgid "All shelves"
@@ -4145,7 +4165,7 @@ msgstr "Основные настройки"
 
 #: cps/spa_strings.py
 msgid "Beta"
-msgstr ""
+msgstr "Бета"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Black"
@@ -4166,7 +4186,7 @@ msgstr "Порядок книг"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Book {id}"
-msgstr ""
+msgstr "Книга {id}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4799,10 +4819,12 @@ msgstr "Введите не менее 2 символов"
 msgid ""
 "Every book syncs as it becomes ready. You can exclude individual books below."
 msgstr ""
+"Каждая книга синхронизируется по мере готовности. Ниже вы можете исключить "
+"отдельные книги."
 
 #: cps/spa_strings.py
 msgid "Excluded"
-msgstr ""
+msgstr "Исключено"
 
 #: cps/spa_strings.py
 msgid "Exit full screen"
@@ -4964,7 +4986,7 @@ msgstr "HTML-теги разрешены и очищаются от вредон
 
 #: cps/spa_strings.py
 msgid "Has pen or drawing notes"
-msgstr ""
+msgstr "Есть рукописные или графические заметки"
 
 #: cps/spa_strings.py
 msgid "Header name"
@@ -5069,7 +5091,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Included"
-msgstr ""
+msgstr "Включено"
 
 #: cps/spa_strings.py
 msgid "Issuer / base URL"
@@ -5119,12 +5141,12 @@ msgstr "Синхронизация Kobo включена"
 
 #: cps/spa_strings.py
 msgid "Kobo two-way annotation sync"
-msgstr ""
+msgstr "Двусторонняя синхронизация аннотаций Kobo"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Kobo two-way sync: {state}"
-msgstr ""
+msgstr "Двусторонняя синхронизация Kobo: {state}"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/listenmp3.html
@@ -5368,7 +5390,7 @@ msgstr "Следующая страница"
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
-msgstr ""
+msgstr "Пока нет готовых книг — они будут появляться здесь по мере готовности."
 
 #: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
@@ -5452,7 +5474,7 @@ msgstr "Отсутствует в текущем файле"
 
 #: cps/spa_strings.py
 msgid "Not picked"
-msgstr ""
+msgstr "Не выбрано"
 
 #: cps/spa_strings.py
 msgid "Not seen lately"
@@ -5464,7 +5486,7 @@ msgstr "Не задано"
 
 #: cps/spa_strings.py
 msgid "Not set up yet"
-msgstr ""
+msgstr "Ещё не настроено"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Note"
@@ -5491,6 +5513,9 @@ msgid ""
 "Off by default. While in beta, opting in only records your preference and "
 "recovery evidence — it does not change what your Kobo receives yet."
 msgstr ""
+"По умолчанию отключено. Пока функция находится в бете, её включение лишь "
+"сохраняет ваши настройки и данные для восстановления — это пока не влияет на "
+"то, что получает ваш Kobo."
 
 #: cps/spa_strings.py
 msgid "Oldest"
@@ -5517,6 +5542,9 @@ msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
 msgstr ""
+"Синхронизируются только книги, выбранные ниже. При переключении на этот "
+"режим изначально ничего не выбрано — вы выбираете каждую книгу "
+"самостоятельно."
 
 #: cps/spa_strings.py
 msgid "Open Account"
@@ -5571,6 +5599,8 @@ msgid ""
 "Opting in does not sync a book straight away. Each book is set up and "
 "checked first — its real state is shown here."
 msgstr ""
+"Включение не запускает синхронизацию книги немедленно. Сначала каждая книга "
+"настраивается и проверяется — её реальное состояние отображается здесь."
 
 #: cps/spa_strings.py
 msgid "PDF reader"
@@ -5608,7 +5638,7 @@ msgstr "Пароль (оставьте пустым, чтобы не менят�
 
 #: cps/spa_strings.py
 msgid "Paused after a problem"
-msgstr ""
+msgstr "Приостановлено из-за проблемы"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid ""
@@ -5620,7 +5650,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Picked"
-msgstr ""
+msgstr "Выбрано"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5965,7 +5995,7 @@ msgstr "Выбрать заметку: {text}"
 
 #: cps/spa_strings.py
 msgid "Selected books"
-msgstr ""
+msgstr "Выбранные книги"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
@@ -6041,10 +6071,12 @@ msgstr "Настроить синхронизацию с Kobo"
 #: cps/spa_strings.py
 msgid "Set up Kobo sync first — then this preference becomes available."
 msgstr ""
+"Сначала настройте синхронизацию с Kobo — после этого данная настройка станет "
+"доступной."
 
 #: cps/spa_strings.py
 msgid "Setting up…"
-msgstr ""
+msgstr "Настройка…"
 
 #: cps/spa_strings.py
 msgid "Settings saved."
@@ -6252,6 +6284,9 @@ msgid ""
 "The server-wide option is also off, so nothing can sync yet. An "
 "administrator can enable it in the classic server settings."
 msgstr ""
+"Глобальная настройка сервера также отключена, поэтому синхронизация пока "
+"невозможна. Администратор может включить её в классических настройках "
+"сервера."
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
@@ -6259,7 +6294,7 @@ msgstr "Это устройство больше не будет синхрон�
 
 #: cps/spa_strings.py
 msgid "This feature is currently disabled at server level."
-msgstr ""
+msgstr "В настоящее время эта функция отключена на уровне сервера."
 
 #: cps/spa_strings.py
 msgid "This format opens in the full-screen reader."
@@ -6321,11 +6356,11 @@ msgstr "Две колонки"
 
 #: cps/spa_strings.py
 msgid "Two-way sync active"
-msgstr ""
+msgstr "Двусторонняя синхронизация активна"
 
 #: cps/spa_strings.py
 msgid "Two-way sync preference saved."
-msgstr ""
+msgstr "Настройка двусторонней синхронизации сохранена."
 
 #: cps/spa_strings.py
 msgid "UI / display configuration"
@@ -6455,6 +6490,9 @@ msgid ""
 "highlighting, try after sync — and if it still doesn’t work, remove the book "
 "from your Kobo and let it download again."
 msgstr ""
+"Мы исправили эту книгу для вашего Kobo. Если у вас были проблемы с "
+"выделением текста, попробуйте после синхронизации — а если это не поможет, "
+"удалите книгу с вашего Kobo и позвольте ей скачаться заново."
 
 #: cps/spa_strings.py
 msgid ""
@@ -6463,6 +6501,10 @@ msgid ""
 "from your Kobo and let it download again. If you read it some other way, "
 "download it again to get the repaired copy."
 msgstr ""
+"Мы исправили эту книгу для вашего Kobo. Если у вас были проблемы с "
+"выделением текста, попробуйте после синхронизации — а если это не поможет, "
+"удалите книгу с вашего Kobo и позвольте ей скачаться заново. Если вы читаете "
+"её как-то иначе, скачайте её снова, чтобы получить исправленную копию."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6471,6 +6513,9 @@ msgid ""
 "highlighting, try after sync — and if it still doesn’t work, remove them "
 "from your Kobo and let them download again."
 msgstr ""
+"Мы исправили {count} книг для вашего Kobo. Если у вас были проблемы с "
+"выделением текста, попробуйте после синхронизации — а если это не поможет, "
+"удалите их с вашего Kobo и позвольте им скачаться заново."
 
 #: cps/spa_strings.py
 msgid "Web reader"
@@ -6486,7 +6531,7 @@ msgstr "Когда прогресс чтения был синхронизиро
 
 #: cps/spa_strings.py
 msgid "Which books sync?"
-msgstr ""
+msgstr "Какие книги синхронизируются?"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7811,11 +7856,11 @@ msgstr "Сводка импорта"
 
 #: cps/templates/annotations_import.html
 msgid "new annotations imported"
-msgstr ""
+msgstr "импортированы новые аннотации"
 
 #: cps/templates/annotations_import.html
 msgid "existing annotations updated from a newer device copy"
-msgstr ""
+msgstr "существующие аннотации обновлены из более новой копии на устройстве"
 
 #: cps/templates/annotations_import.html
 msgid "already imported (skipped)"
@@ -7824,6 +7869,8 @@ msgstr "уже импортировано (пропущено)"
 #: cps/templates/annotations_import.html
 msgid "different or undated device entries older than server state (skipped)"
 msgstr ""
+"отличающиеся или недатированные записи устройства, которые старше состояния "
+"сервера (пропущено)"
 
 #: cps/templates/annotations_import.html
 msgid "for books not in this library (skipped)"
@@ -7831,23 +7878,23 @@ msgstr "для книг, отсутствующих в этой библиоте
 
 #: cps/templates/annotations_import.html
 msgid "hidden on device (reported, not applied)"
-msgstr ""
+msgstr "скрыто на устройстве (передано, не применено)"
 
 #: cps/templates/annotations_import.html
 msgid "empty bookmark rows with no annotation content (skipped)"
-msgstr ""
+msgstr "пустые строки закладок без содержимого аннотаций (пропущено)"
 
 #: cps/templates/annotations_import.html
 msgid "invalid bookmark rows (skipped)"
-msgstr ""
+msgstr "некорректные строки закладок (пропущено)"
 
 #: cps/templates/annotations_import.html
 msgid "entries with invalid book positions (skipped)"
-msgstr ""
+msgstr "записи с некорректными позициями в книге (пропущено)"
 
 #: cps/templates/annotations_import.html
 msgid "entries not saved because the import transaction failed"
-msgstr ""
+msgstr "записи не сохранены, так как транзакция импорта завершилась ошибкой"
 
 #: cps/templates/annotations_import.html
 msgid "total entries seen"
@@ -8882,9 +8929,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -9884,9 +9931,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -9909,9 +9956,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -13651,9 +13698,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

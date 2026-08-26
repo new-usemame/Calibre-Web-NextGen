@@ -321,6 +321,108 @@ def _wait_until(predicate, timeout=2.0):
     assert predicate(), "condition did not become true within the test deadline"
 
 
+def test_single_flight_releases_gate_if_offloader_fails_before_worker_starts(
+    monkeypatch,
+):
+    from cps import web as web_module
+
+    gate = threading.Lock()
+    probe_called = False
+    submitted = []
+
+    def reject_before_start(callable_):
+        submitted.append(callable_)
+        raise RuntimeError("offload submission failed")
+
+    def probe():
+        nonlocal probe_called
+        probe_called = True
+
+    monkeypatch.setattr(web_module, "_run_blocking", reject_before_start)
+
+    with pytest.raises(RuntimeError, match="offload submission failed"):
+        web_module._run_single_flight_health_probe(gate, probe, False, "test")
+
+    assert probe_called is False
+    assert gate.locked() is False, "a rejected offload permanently retained the gate"
+    assert submitted[0]() is False, "an abandoned queued callable still ran its probe"
+    assert probe_called is False
+    assert gate.locked() is False, "an abandoned callable double-released the gate"
+
+
+def test_single_flight_does_not_double_release_after_worker_runs(monkeypatch):
+    from cps import web as web_module
+
+    gate = threading.Lock()
+
+    def run_then_raise(callable_):
+        assert callable_() is True
+        raise RuntimeError("offloader failed after worker completion")
+
+    monkeypatch.setattr(web_module, "_run_blocking", run_then_raise)
+
+    with pytest.raises(RuntimeError, match="offloader failed after worker completion"):
+        web_module._run_single_flight_health_probe(gate, lambda: True, False, "test")
+
+    assert gate.locked() is False
+
+
+def test_duplicate_probe_warning_is_once_per_in_flight_probe(monkeypatch):
+    from cps import web as web_module
+
+    gate = threading.Lock()
+    started = threading.Event()
+    release = threading.Event()
+    warnings = []
+
+    monkeypatch.setattr(web_module, "_run_blocking", lambda callable_: callable_())
+    monkeypatch.setattr(
+        web_module.log,
+        "warning",
+        lambda *args, **_kwargs: warnings.append(args),
+    )
+
+    def wedged_probe():
+        started.set()
+        assert release.wait(timeout=2), "test did not release the probe"
+        return True
+
+    def start_flight():
+        started.clear()
+        release.clear()
+        owner = threading.Thread(
+            target=web_module._run_single_flight_health_probe,
+            args=(gate, wedged_probe, False, "test"),
+            daemon=True,
+        )
+        owner.start()
+        assert started.wait(timeout=2), "probe did not start"
+        return owner
+
+    first = start_flight()
+    try:
+        for _ in range(50):
+            assert web_module._run_single_flight_health_probe(
+                gate, lambda: True, False, "test"
+            ) is False
+        assert len(warnings) == 1, "duplicates emitted one warning per request"
+    finally:
+        release.set()
+        first.join(timeout=2)
+    assert not first.is_alive()
+
+    second = start_flight()
+    try:
+        assert web_module._run_single_flight_health_probe(
+            gate, lambda: True, False, "test"
+        ) is False
+        assert len(warnings) == 2, "a later wedged flight produced no fresh warning"
+    finally:
+        release.set()
+        second.join(timeout=2)
+    assert not second.is_alive()
+
+
 def test_only_one_health_db_probe_can_remain_in_flight(monkeypatch):
     from cps import config
     from cps import web as web_module

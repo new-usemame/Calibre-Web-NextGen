@@ -1286,6 +1286,9 @@ _METADATA_DB_LOCK_STALE_GRACE_SECONDS = 5 * 60
 _metadata_db_last_good = (None, 0.0)
 _HEALTH_DB_PROBE_GATE = threading.Lock()
 _HEALTH_S6_PROBE_GATE = threading.Lock()
+# Emit one contention warning per flight, then re-arm when its owner releases.
+_HEALTH_PROBE_WARNING_LOCK = threading.Lock()
+_HEALTH_PROBE_WARNED_GATES = set()
 
 
 def _metadata_db_identity(db_path):
@@ -1409,19 +1412,51 @@ def _run_single_flight_health_probe(gate, probe, already_running_result, label):
     ``unknown`` state rather than fabricating either ``up`` or ``down``.
     """
     if not gate.acquire(blocking=False):
-        log.warning(
-            "Previous %s health probe is still in flight; not retaining another worker",
-            label,
-        )
+        with _HEALTH_PROBE_WARNING_LOCK:
+            warn = gate not in _HEALTH_PROBE_WARNED_GATES
+            if warn:
+                _HEALTH_PROBE_WARNED_GATES.add(gate)
+        if warn:
+            log.warning(
+                "Previous %s health probe is still in flight; not retaining another worker",
+                label,
+            )
         return already_running_result
 
+    # Submission can fail before the callable starts, or a waiting request can
+    # be cancelled after submission. Coordinate ownership so exactly one side
+    # releases the gate and an abandoned queued callable never runs the probe.
+    state_lock = threading.Lock()
+    state = "pending"
+
+    def release_gate():
+        with _HEALTH_PROBE_WARNING_LOCK:
+            _HEALTH_PROBE_WARNED_GATES.discard(gate)
+        gate.release()
+
     def run_and_release_gate():
+        nonlocal state
+        with state_lock:
+            if state == "abandoned":
+                return already_running_result
+            state = "running"
         try:
             return probe()
         finally:
-            gate.release()
+            with state_lock:
+                state = "finished"
+            release_gate()
 
-    return _run_blocking(run_and_release_gate)
+    try:
+        return _run_blocking(run_and_release_gate)
+    except BaseException:
+        with state_lock:
+            release_without_worker = state == "pending"
+            if release_without_worker:
+                state = "abandoned"
+        if release_without_worker:
+            release_gate()
+        raise
 
 
 @web.route("/health")

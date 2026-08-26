@@ -65,6 +65,19 @@ def _wait_for_full_request_io_capacity(spool, timeout=2):
     return capacity
 
 
+@pytest.fixture(autouse=True)
+def _cancel_spool_retention_timers_after_test():
+    """Secondary test isolation; production dependency capture is the fix."""
+    yield
+    spool = _module()
+    with spool._RETENTION_TIMERS_LOCK:
+        timers = [timer for _deadline, timer in spool._RETENTION_TIMERS.values()]
+        spool._RETENTION_TIMERS.clear()
+        spool._RETENTION_STARTED = False
+    for timer in timers:
+        timer.cancel()
+
+
 def _hold_advisory_lock(lock_path, ready, release):
     """Hold the real cross-process spool lock until the parent releases it."""
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
@@ -744,15 +757,13 @@ def test_timed_out_stage_finishes_and_does_not_poison_its_successor(
         "book-next": threading.Event(),
     }
 
-    def _stall_first(incoming, compressed, cancelled=None):
+    def _stall_first(incoming, compressed, root, max_age_seconds):
         entitlement_id = incoming["entitlement_id"]
         try:
             if entitlement_id == "book-slow":
                 first_started.set()
                 assert release_first.wait(2), "test did not release the slow write"
-            if cancelled is None:
-                return real_write(incoming, compressed)
-            return real_write(incoming, compressed, cancelled)
+            return real_write(incoming, compressed, root, max_age_seconds)
         finally:
             workers_finished[entitlement_id].set()
 
@@ -890,6 +901,157 @@ def test_startup_retention_expires_records_before_any_new_patch(monkeypatch, tmp
         time.sleep(0.01)
 
     assert not ticket.path.exists(), "startup did not enforce age without a PATCH"
+
+
+@pytest.mark.unit
+def test_startup_retention_captures_root_and_age_before_thread_runs(
+    monkeypatch, tmp_path,
+):
+    """A late bootstrap must retain the context that created its work."""
+    spool = _module()
+    spawning_root = tmp_path / "spawning-test-spool"
+    next_test_root = tmp_path / "next-test-spool"
+    spawning_root.mkdir()
+    next_test_root.mkdir()
+
+    def _seed_records(root, *, count, age_seconds):
+        for index in range(count):
+            path = root / f"patch-{index:020d}-dispatch_completed.json.gz"
+            path.write_bytes(b"record contents are irrelevant to age expiry")
+            mtime = spool.time.time() - age_seconds
+            os.utime(path, (mtime, mtime))
+
+    # The spawning root's record survives only if the original age bound is
+    # captured. The next test's records are old enough to be deleted under
+    # either bound, so they survive only if the original root is captured.
+    _seed_records(spawning_root, count=1, age_seconds=1)
+    _seed_records(next_test_root, count=3, age_seconds=120)
+    active_root = [spawning_root]
+    monkeypatch.setattr(spool, "_spool_root", lambda: active_root[0])
+    monkeypatch.setattr(spool, "MAX_AGE_SECONDS", 60)
+    monkeypatch.setattr(spool, "_RETENTION_STARTED", False)
+
+    deferred_threads = []
+
+    class _DeferredThread:
+        def __init__(self, *, target, name, daemon, args=()):
+            self.target = target
+            self.args = args
+            self.name = name
+            self.daemon = daemon
+            deferred_threads.append(self)
+
+        def start(self):
+            return None
+
+        def run(self):
+            self.target(*self.args)
+
+    monkeypatch.setattr(spool, "threading", SimpleNamespace(Thread=_DeferredThread))
+    monkeypatch.setattr(spool, "_schedule_retention", lambda *_args: None)
+
+    assert spool.start_retention_maintenance() is True
+    [bootstrap] = deferred_threads
+
+    # Model pytest undoing the spawning test's patches and installing the next
+    # test's different root and much shorter age bound before the OS runs the
+    # daemon thread.
+    active_root[0] = next_test_root
+    monkeypatch.setattr(spool, "MAX_AGE_SECONDS", 0.05)
+    bootstrap.run()
+
+    assert len(list(spawning_root.glob("patch-*.json.gz"))) == 1, (
+        "the bootstrap re-read the age bound after its caller moved on"
+    )
+    assert len(list(next_test_root.glob("patch-*.json.gz"))) == 3, (
+        "the bootstrap expired records belonging to the next test"
+    )
+
+
+@pytest.mark.unit
+def test_stage_patch_captures_root_and_age_before_storage_worker_runs(
+    monkeypatch, tmp_path,
+):
+    """The gevent threadpool gets immutable path and retention inputs too."""
+    spool = _module()
+    spawning_root = tmp_path / "spawning-request-spool"
+    next_root = tmp_path / "later-context-spool"
+    active_root = [spawning_root]
+    monkeypatch.setattr(spool, "_spool_root", lambda: active_root[0])
+    monkeypatch.setattr(spool, "MAX_AGE_SECONDS", 60)
+    scheduled = []
+    monkeypatch.setattr(
+        spool,
+        "_schedule_retention",
+        lambda root, deadline, max_age: scheduled.append(
+            (Path(root), deadline, max_age)
+        ),
+    )
+
+    def _run_after_context_changes(function, *args):
+        active_root[0] = next_root
+        monkeypatch.setattr(spool, "MAX_AGE_SECONDS", 0.05)
+        return function(*args)
+
+    monkeypatch.setattr(spool, "_run_off_hub_bounded", _run_after_context_changes)
+
+    ticket = spool.stage_patch(
+        raw_body=RAW_PATCH,
+        entitlement_id=BOOK_UUID,
+        user_id=7,
+        origin_device_id=None,
+    )
+
+    assert ticket is not None
+    assert ticket.path.parent == spawning_root
+    assert not next_root.exists()
+    [(scheduled_root, _deadline, scheduled_age)] = scheduled
+    assert scheduled_root == spawning_root
+    assert scheduled_age == 60
+
+
+@pytest.mark.unit
+def test_retention_timer_keeps_age_bound_from_when_it_was_scheduled(
+    monkeypatch, tmp_path,
+):
+    """A timer firing later cannot inherit another context's age bound."""
+    spool = _module()
+    root = tmp_path / "timer-spool"
+    root.mkdir()
+    record = root / "patch-00000000000000000000-dispatch_completed.json.gz"
+    record.write_bytes(b"record contents are irrelevant to age expiry")
+    mtime = spool.time.time() - 1
+    os.utime(record, (mtime, mtime))
+    monkeypatch.setattr(spool, "_RETENTION_TIMERS", {})
+
+    deferred_timers = []
+
+    class _DeferredTimer:
+        def __init__(self, interval, target, args=()):
+            self.interval = interval
+            self.target = target
+            self.args = args
+            self.daemon = False
+            deferred_timers.append(self)
+
+        def start(self):
+            return None
+
+        def cancel(self):
+            return None
+
+        def fire(self):
+            self.target(*self.args)
+
+    monkeypatch.setattr(spool, "threading", SimpleNamespace(Timer=_DeferredTimer))
+    deadline = spool.time.time() + 59
+    spool._schedule_retention(root, deadline, 60)
+    first_timer = deferred_timers[0]
+
+    monkeypatch.setattr(spool, "MAX_AGE_SECONDS", 0.05)
+    first_timer.fire()
+
+    assert record.exists(), "the timer re-read a shorter age bound when it fired"
 
 
 @pytest.mark.unit

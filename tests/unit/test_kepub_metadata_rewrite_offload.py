@@ -50,8 +50,8 @@ def test_only_epub_zip_rewrite_is_offloaded(monkeypatch):
     )
     monkeypatch.setattr(
         helper,
-        "replace_metadata",
-        lambda tree, package: events.append(("replace-metadata", in_offload)) or b"content",
+        "merge_kepub_metadata",
+        lambda tree, package: events.append(("merge-metadata", in_offload)) or b"content",
     )
     monkeypatch.setattr(helper, "get_temp_dir", lambda: "/tmp/calibre-web")
     monkeypatch.setattr(helper, "uuid4", lambda: "generated-id")
@@ -71,7 +71,7 @@ def test_only_epub_zip_rewrite_is_offloaded(monkeypatch):
         ("read-opf", False),
         ("gettext", False),
         ("create-metadata", False),
-        ("replace-metadata", False),
+        ("merge-metadata", False),
         ("offload", False),
         ("update-epub", True),
     ]

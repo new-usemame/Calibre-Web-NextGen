@@ -680,7 +680,7 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `████████████████████` 99% | 2803/2844 | 0 |
+| Russian (`ru`) | `████████████████████` 100% | 2844/2844 | 0 |
 | Spanish (`es`) | `███████████████████░` 93% | 2638/2844 | 0 |
 | Polish (`pl`) | `██████████████████░░` 92% | 2602/2844 | 0 |
 | French (`fr`) | `████████████████░░░░` 82% | 2344/2844 | 127 |

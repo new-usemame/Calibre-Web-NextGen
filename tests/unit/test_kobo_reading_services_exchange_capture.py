@@ -9,7 +9,7 @@ import importlib
 import json
 import os
 import stat
-import time
+import threading
 from types import SimpleNamespace
 
 import gevent
@@ -28,11 +28,22 @@ def _module():
     return importlib.import_module("cps.services.kobo_exchange_capture")
 
 
-def _enable(monkeypatch, tmp_path):
+def _run_capture_io_inline(monkeypatch, capture):
+    """Keep persistence-focused tests independent of the request deadline."""
+    monkeypatch.setattr(
+        capture,
+        "_run_off_hub_bounded",
+        lambda _scope, function: function(),
+    )
+
+
+def _enable(monkeypatch, tmp_path, *, run_io_inline=True):
     capture = _module()
     root = tmp_path / "private-captures"
     monkeypatch.setenv(capture.ENABLE_ENV, ACK)
     monkeypatch.setattr(capture, "_capture_root", lambda: root)
+    if run_io_inline:
+        _run_capture_io_inline(monkeypatch, capture)
     return capture, root
 
 
@@ -291,6 +302,7 @@ def test_unauthenticated_patch_401_captures_body_with_explicit_provenance_outsid
     monkeypatch, tmp_path,
 ):
     capture = _module()
+    _run_capture_io_inline(monkeypatch, capture)
     unauthenticated_root = tmp_path / "unauthenticated-exchange-captures"
     recovery_spool_root = tmp_path / "recovery-spool-must-stay-empty"
     monkeypatch.setenv(capture.ENABLE_ENV, ACK)
@@ -419,31 +431,35 @@ def test_unauthenticated_capture_churn_cannot_evict_authenticated_diagnostics(
 
 @pytest.mark.unit
 def test_capture_persistence_yields_to_gevent_hub(monkeypatch, tmp_path):
-    capture, _root = _enable(monkeypatch, tmp_path)
+    capture, _root = _enable(monkeypatch, tmp_path, run_io_inline=False)
+    monkeypatch.setattr(capture, "REQUEST_IO_TIMEOUT_SECONDS", 5.0)
     session = capture.begin_capture(
         exchange="annotations_patch", method="PATCH", path="/annotations/book",
         query_string=b"", headers=[], body=b'{"updatedAnnotations":[]}',
         authentication="authenticated", user_id=7,
     )
-    original_persist = session._persist
+    request_thread = threading.get_ident()
+    release_worker = threading.Event()
+    worker_threads = []
     events = []
 
-    def slow_native_io():
-        time.sleep(0.05)
-        original_persist()
+    def native_io_waiting_on_hub():
+        worker_threads.append(threading.get_ident())
+        assert release_worker.wait(2), "hub greenlet did not release capture worker"
         events.append("persisted")
 
     def hub_ticker():
-        gevent.sleep(0.01)
         events.append("hub-ran")
+        release_worker.set()
 
-    monkeypatch.setattr(session, "_persist", slow_native_io)
+    monkeypatch.setattr(session, "_persist", native_io_waiting_on_hub)
     ticker = gevent.spawn(hub_ticker)
 
     assert _finish(session) is True
-    ticker.join(timeout=1)
+    ticker.get(timeout=1)
 
     assert events == ["hub-ran", "persisted"]
+    assert worker_threads != [request_thread]
 
 
 @pytest.mark.unit

@@ -157,6 +157,18 @@ def test_findings_ledger_only_pr_does_not_require_a_changelog_entry():
     assert changelog_requirement_errors(["findings/kobo/F-66edbc.md"]) == []
 
 
+def test_frontend_e2e_only_pr_does_not_require_a_changelog_entry():
+    assert changelog_requirement_errors(["frontend/e2e/shelf-visibility.spec.ts"]) == []
+
+
+def test_mixing_frontend_e2e_with_shipping_frontend_still_requires_an_entry():
+    errors = changelog_requirement_errors(
+        ["frontend/e2e/shelf-visibility.spec.ts", "frontend/src/pages/Shelf.tsx"]
+    )
+    assert len(errors) == 1
+    assert "shipping paths" in errors[0]
+
+
 def test_mixing_a_findings_ledger_with_shipping_code_requires_an_entry():
     errors = changelog_requirement_errors(
         ["findings/kobo/F-66edbc.md", "cps/readingservices.py"]

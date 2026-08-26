@@ -14,7 +14,14 @@ import sys
 RELEASE_HEADING = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]", re.MULTILINE)
 ENTRY_LEAD = re.compile(r"^- \*\*", re.MULTILINE)
 FRAGMENT_PATH = re.compile(r"^changelog\.d/[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
-NON_SHIPPING_PATH_PREFIXES = ("docs/", "findings/", "notes/", "tests/", "wiki-src/")
+NON_SHIPPING_PATH_PREFIXES = (
+    "docs/",
+    "findings/",
+    "frontend/e2e/",
+    "notes/",
+    "tests/",
+    "wiki-src/",
+)
 NON_SHIPPING_PATHS = frozenset(
     {"changelog.d/README.md", "scripts/check_changelog_diff.py"}
 )

@@ -8,10 +8,16 @@ The observer is deliberately harder to enable than an ordinary boolean flag:
 application database in a hidden, mode-0700 directory.  They are not included
 in the annotation backup format or any repository artifact.
 
-Each gzip record contains the device request, the exact request body actually
-sent upstream, Kobo's response, and the final response returned to the device.
-Credential-bearing headers are redacted.  Annotation text remains only in the
-private record; ordinary logs contain structural counts and capture IDs only.
+Each gzip record contains explicit authentication provenance, the device
+request, the exact request body actually sent upstream, Kobo's response, and
+the final response returned to the device. Credential-bearing headers are
+redacted. Annotation text remains only in the private record; ordinary logs
+contain structural counts and capture IDs only.
+
+Unauthenticated captures are opt-in, carry no user identity, and use a tighter
+independent store so untrusted traffic cannot evict authenticated diagnostics
+or unresolved recovery records. All capture persistence runs off the gevent
+hub behind a hard request deadline.
 
 This module must never participate in request success.  All public mutators are
 best-effort, and :meth:`CaptureSession.finish` swallows storage failures.
@@ -33,6 +39,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from gevent import Timeout, get_hub
+
 from .. import constants
 
 
@@ -49,7 +57,31 @@ MAX_TOTAL_BYTES = 64 * 1024 * 1024
 MAX_FILES = 256
 MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 
-_PROCESS_LOCK = threading.Lock()
+# An unauthenticated refusal has no replay identity and is reachable by anyone
+# who can reach the port.  Keep it out of both the recovery spool and the
+# authenticated diagnostic budget, with tighter independent bounds.
+UNAUTHENTICATED_MAX_BODY_BYTES = 1 * 1024 * 1024
+UNAUTHENTICATED_MAX_TOTAL_BYTES = 8 * 1024 * 1024
+UNAUTHENTICATED_MAX_FILES = 32
+UNAUTHENTICATED_MAX_AGE_SECONDS = 24 * 60 * 60
+REQUEST_IO_TIMEOUT_SECONDS = 0.1
+
+_PROCESS_LOCKS = {
+    "authenticated": threading.Lock(),
+    "unauthenticated": threading.Lock(),
+}
+_REQUEST_IO_GATES = {
+    "authenticated": threading.Lock(),
+    "unauthenticated": threading.Lock(),
+}
+
+
+class _CaptureDeadlineExceeded(Exception):
+    pass
+
+
+class _CaptureUnavailable(Exception):
+    pass
 
 
 def _capture_root() -> Path:
@@ -57,6 +89,14 @@ def _capture_root() -> Path:
         Path(constants.CONFIG_DIR)
         / ".cwng-private-observability"
         / "kobo-reading-services"
+    )
+
+
+def _unauthenticated_capture_root() -> Path:
+    return (
+        Path(constants.CONFIG_DIR)
+        / ".cwng-private-observability"
+        / "kobo-reading-services-unauthenticated"
     )
 
 
@@ -127,18 +167,76 @@ def _leg(*, method=None, path=None, query_string=b"", headers=(), body=b"", stat
     return value
 
 
-def _body_is_within_bound(body) -> bool:
+def _body_is_within_bound(body, *, max_bytes=MAX_BODY_BYTES) -> bool:
     try:
-        return len(body or b"") <= MAX_BODY_BYTES
+        return len(body or b"") <= max_bytes
     except TypeError:
         return False
 
 
-def begin_capture(*, exchange, method, path, query_string, headers, body):
+def _run_off_hub_bounded(scope, function):
+    """Run diagnostic storage on a native thread with a bounded greenlet wait."""
+    gate = _REQUEST_IO_GATES[scope]
+    if not gate.acquire(blocking=False):
+        raise _CaptureUnavailable("another capture storage operation is active")
+    try:
+        timeout = Timeout.start_new(REQUEST_IO_TIMEOUT_SECONDS)
+    except BaseException:
+        gate.release()
+        raise
+    try:
+        try:
+            result = get_hub().threadpool.spawn(
+                _capture_worker_result, function, gate,
+            )
+        except BaseException:
+            gate.release()
+            raise
+        value, error = result.get()
+        if error is not None:
+            raise error
+        return value
+    except Timeout as error:
+        if error is not timeout:
+            raise
+        raise _CaptureDeadlineExceeded(
+            f"Kobo exchange capture exceeded {REQUEST_IO_TIMEOUT_SECONDS:.3f}s deadline"
+        ) from None
+    finally:
+        timeout.cancel()
+
+
+def _capture_worker_result(function, gate):
+    try:
+        try:
+            return function(), None
+        except Exception as error:
+            return None, error
+    finally:
+        gate.release()
+
+
+def begin_capture(
+    *, exchange, method, path, query_string, headers, body,
+    authentication="not_recorded", user_id=None,
+):
     """Begin an exchange capture, or return ``None`` when off/out of bounds."""
     if not enabled():
         return None
-    if not _body_is_within_bound(body):
+    if authentication not in {
+        "authenticated", "unauthenticated", "not_recorded",
+    }:
+        log.warning("Kobo exchange capture skipped: invalid authentication provenance")
+        return None
+    if authentication == "unauthenticated" and user_id is not None:
+        log.warning("Kobo exchange capture skipped: unauthenticated record has a user id")
+        return None
+    max_body_bytes = (
+        UNAUTHENTICATED_MAX_BODY_BYTES
+        if authentication == "unauthenticated"
+        else MAX_BODY_BYTES
+    )
+    if not _body_is_within_bound(body, max_bytes=max_body_bytes):
         log.warning(
             "Kobo exchange capture skipped: device request exceeds body bound exchange=%s bytes=%s",
             str(exchange)[:64], len(body or b""),
@@ -152,6 +250,8 @@ def begin_capture(*, exchange, method, path, query_string, headers, body):
             query_string=query_string,
             headers=headers,
             body=body,
+            authentication=authentication,
+            user_id=user_id,
         )
     except Exception:
         log.warning(
@@ -164,15 +264,33 @@ def begin_capture(*, exchange, method, path, query_string, headers, body):
 class CaptureSession:
     """In-memory exchange envelope committed atomically after the response."""
 
-    def __init__(self, *, exchange, method, path, query_string, headers, body):
+    def __init__(
+        self, *, exchange, method, path, query_string, headers, body,
+        authentication, user_id,
+    ):
         self.capture_id = secrets.token_hex(16)
         self._invalid = False
         self._finished = False
+        self._authentication = authentication
+        self._storage_scope = (
+            "unauthenticated"
+            if authentication == "unauthenticated"
+            else "authenticated"
+        )
+        self._max_body_bytes = (
+            UNAUTHENTICATED_MAX_BODY_BYTES
+            if authentication == "unauthenticated"
+            else MAX_BODY_BYTES
+        )
         self._record = {
-            "schema_version": 1,
+            "schema_version": 2,
             "capture_id": self.capture_id,
             "captured_at": datetime.now(timezone.utc).isoformat(),
             "exchange": str(exchange)[:64],
+            "request_provenance": {
+                "authentication": authentication,
+                "user_id": user_id,
+            },
             "device_request": _leg(
                 method=method,
                 path=path,
@@ -216,7 +334,7 @@ class CaptureSession:
     def record_upstream_request(
         self, *, method, path, query_string, headers, body,
     ) -> bool:
-        if not _body_is_within_bound(body):
+        if not _body_is_within_bound(body, max_bytes=self._max_body_bytes):
             self._invalid = True
             return False
         return self._mutate(lambda: self._record.__setitem__(
@@ -231,7 +349,7 @@ class CaptureSession:
         ))
 
     def record_upstream_response(self, *, status, headers, body) -> bool:
-        if not _body_is_within_bound(body):
+        if not _body_is_within_bound(body, max_bytes=self._max_body_bytes):
             self._invalid = True
             return False
         return self._mutate(lambda: self._record.__setitem__(
@@ -249,7 +367,7 @@ class CaptureSession:
         if self._finished:
             return False
         self._finished = True
-        if not _body_is_within_bound(body):
+        if not _body_is_within_bound(body, max_bytes=self._max_body_bytes):
             self._invalid = True
         try:
             self._record["device_response"] = _leg(
@@ -261,12 +379,18 @@ class CaptureSession:
                     self.capture_id,
                 )
                 return False
-            self._persist()
+            _run_off_hub_bounded(self._storage_scope, self._persist)
             log.info(
                 "Kobo exchange captured capture_id=%s exchange=%s",
                 self.capture_id, self._record["exchange"],
             )
             return True
+        except (_CaptureDeadlineExceeded, _CaptureUnavailable):
+            log.warning(
+                "Kobo exchange capture persistence unavailable capture_id=%s scope=%s",
+                self.capture_id, self._authentication,
+            )
+            return False
         except Exception:
             log.warning(
                 "Kobo exchange capture persistence failed capture_id=%s",
@@ -280,12 +404,20 @@ class CaptureSession:
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")
+        if self._authentication == "unauthenticated":
+            root = _unauthenticated_capture_root()
+            max_files = UNAUTHENTICATED_MAX_FILES
+            max_total_bytes = UNAUTHENTICATED_MAX_TOTAL_BYTES
+            max_age_seconds = UNAUTHENTICATED_MAX_AGE_SECONDS
+        else:
+            root = _capture_root()
+            max_files = MAX_FILES
+            max_total_bytes = MAX_TOTAL_BYTES
+            max_age_seconds = MAX_AGE_SECONDS
         compressed = gzip.compress(serialized, compresslevel=6, mtime=0)
-        if len(compressed) > MAX_TOTAL_BYTES:
+        if len(compressed) > max_total_bytes:
             raise ValueError("one compressed capture exceeds total retention bound")
-
-        root = _capture_root()
-        with _PROCESS_LOCK:
+        with _PROCESS_LOCKS[self._storage_scope]:
             # mkdir(parents=True) does NOT apply `mode` to the intermediates it
             # creates, so the private-observability parent would land at
             # 0777 & ~umask while only the leaf got 0700. Create and tighten it
@@ -299,7 +431,13 @@ class CaptureSession:
             try:
                 os.fchmod(lock_fd, 0o600)
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
-                _prune_locked(root, incoming_bytes=len(compressed))
+                _prune_locked(
+                    root,
+                    incoming_bytes=len(compressed),
+                    max_files=max_files,
+                    max_total_bytes=max_total_bytes,
+                    max_age_seconds=max_age_seconds,
+                )
                 final_path = root / (
                     f"exchange-{time.time_ns():020d}-{self.capture_id}.json.gz"
                 )
@@ -319,7 +457,13 @@ class CaptureSession:
                         os.fsync(directory_fd)
                     finally:
                         os.close(directory_fd)
-                    _prune_locked(root, incoming_bytes=0)
+                    _prune_locked(
+                        root,
+                        incoming_bytes=0,
+                        max_files=max_files,
+                        max_total_bytes=max_total_bytes,
+                        max_age_seconds=max_age_seconds,
+                    )
                 finally:
                     if temp_fd is not None:
                         os.close(temp_fd)
@@ -340,17 +484,30 @@ def _capture_paths(root: Path) -> list[Path]:
     return paths
 
 
-def _file_count_requires_prune(count: int, *, incoming: bool) -> bool:
+def _file_count_requires_prune(
+    count: int, *, incoming: bool, max_files=None,
+) -> bool:
     """Use make-room semantics before a write and hard-limit semantics after."""
-    return count >= MAX_FILES if incoming else count > MAX_FILES
+    if max_files is None:
+        max_files = MAX_FILES
+    return count >= max_files if incoming else count > max_files
 
 
-def _prune_locked(root: Path, *, incoming_bytes: int):
+def _prune_locked(
+    root: Path, *, incoming_bytes: int, max_files=None,
+    max_total_bytes=None, max_age_seconds=None,
+):
+    if max_files is None:
+        max_files = MAX_FILES
+    if max_total_bytes is None:
+        max_total_bytes = MAX_TOTAL_BYTES
+    if max_age_seconds is None:
+        max_age_seconds = MAX_AGE_SECONDS
     now = time.time()
     paths = _capture_paths(root)
     for path in list(paths):
         try:
-            if now - path.stat().st_mtime > MAX_AGE_SECONDS:
+            if now - path.stat().st_mtime > max_age_seconds:
                 path.unlink()
                 paths.remove(path)
         except FileNotFoundError:
@@ -358,8 +515,10 @@ def _prune_locked(root: Path, *, incoming_bytes: int):
 
     total = sum(path.stat().st_size for path in paths if path.exists())
     while paths and (
-        _file_count_requires_prune(len(paths), incoming=bool(incoming_bytes))
-        or total + incoming_bytes > MAX_TOTAL_BYTES
+        _file_count_requires_prune(
+            len(paths), incoming=bool(incoming_bytes), max_files=max_files,
+        )
+        or total + incoming_bytes > max_total_bytes
     ):
         oldest = paths.pop(0)
         try:
@@ -370,6 +529,6 @@ def _prune_locked(root: Path, *, incoming_bytes: int):
             pass
 
     if incoming_bytes and (
-        MAX_FILES < 1 or total + incoming_bytes > MAX_TOTAL_BYTES
+        max_files < 1 or total + incoming_bytes > max_total_bytes
     ):
         raise ValueError("capture retention bounds leave no room for exchange")

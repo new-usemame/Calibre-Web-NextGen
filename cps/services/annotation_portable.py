@@ -268,7 +268,11 @@ def apply_portable(payload, *, user_id, book, session, commit,
 
     row.last_synced = _now()
     try:
-        commit()
+        # Keep the commit contract shared with every annotation writer. Import
+        # at call time so this dependency-light service does not pull in the
+        # Flask blueprint merely to project rows on the read path.
+        from cps.annotations import _commit_required
+        _commit_required(commit)
     except exc.IntegrityError:
         # A parallel device may have inserted the same canonical identity
         # after our SELECT. Roll back this losing INSERT and replay as an

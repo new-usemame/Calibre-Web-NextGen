@@ -55,16 +55,21 @@ CALIBRE_911_EPUB3_SERIES_OPF = """<?xml version="1.0" encoding="utf-8"?>
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="bookid">issue-1372-real-shape</dc:identifier>
     <dc:title id="title">Fixture Title</dc:title>
-    <dc:creator id="creator">Fixture Author</dc:creator>
+    <dc:creator id="creator">Alexandre Dumas</dc:creator>
+    <dc:creator id="creator-2">Auguste Maquet</dc:creator>
     <dc:language>eng</dc:language>
+    <meta property="dcterms:modified">2026-08-23T12:00:00Z</meta>
+    <meta name="cover" content="cover-image"/>
     <!--Image: 671 x 1000 size=63885 q=50-->
     <meta property="belongs-to-collection" id="id-5">Verify Series</meta>
     <meta refines="#id-5" property="collection-type">series</meta>
     <!--Chunk: size=22609 Split on div.chapter-->
     <meta refines="#id-5" property="group-position">3</meta>
     <meta refines="#title" property="title-type">main</meta>
-    <meta refines="#creator" property="file-as">Author, Fixture</meta>
+    <meta refines="#creator" property="file-as">Dumas, Alexandre</meta>
     <meta refines="#creator" property="role">aut</meta>
+    <meta refines="#creator-2" property="file-as">Maquet, Auguste</meta>
+    <meta refines="#creator-2" property="role">aut</meta>
     <meta property="belongs-to-collection" id="id-6">Fixture Set</meta>
     <meta refines="#id-6" property="collection-type">set</meta>
     <meta refines="#id-6" property="group-position">9</meta>
@@ -72,6 +77,7 @@ CALIBRE_911_EPUB3_SERIES_OPF = """<?xml version="1.0" encoding="utf-8"?>
   <manifest>
     <item id="nav" href="../nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+    <item id="cover-image" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
   </manifest>
   <spine><itemref idref="chapter"/></spine>
 </package>

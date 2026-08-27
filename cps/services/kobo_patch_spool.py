@@ -5,16 +5,19 @@
 Unlike the opt-in exchange observer, this is an always-on data-integrity
 primitive. A successful stage returns only after the exact body and every new
 directory entry are fsynced, before JSON parsing or local dispatch begins.
-Storage runs on gevent's native threadpool behind a hard request deadline: a
-busy or wedged spool returns no ticket and never blocks the worker hub without
-bound.
+Storage runs on the gevent hub's native threadpool behind a hard request
+deadline. Once admitted, an operation remains owned by its native worker until
+completion even if the request stops waiting; one successor can queue behind a
+slow operation without creating an unbounded spool backlog.
 
-Unresolved records (``staged`` / ``dispatch_exception``) are never evicted to
-admit a new body. Admission and outcome replacement use a small durable
-transaction journal, so a failed or interrupted write restores the prior
-record set. Successful records can be evicted within the advertised count and
-compressed-byte bounds. A deadline-driven maintenance thread enforces age
-retention even when no later PATCH arrives.
+Unresolved records (``staged`` / ``dispatch_refused`` /
+``dispatch_exception``) are never evicted to admit a new body. Repeated attempts
+for the same user, entitlement, device, and exact body refresh one record
+instead of consuming another slot, regardless of the prior attempt's outcome.
+Admission, deduplication, and outcome replacement use a small durable
+transaction journal, so a failed or interrupted write restores the prior record
+set. A deadline-driven maintenance thread enforces age retention even when no
+later PATCH arrives.
 
 The spool stores no request headers or credentials. It is a local recovery
 artifact, excluded from annotation backups and support bundles.
@@ -47,12 +50,23 @@ MAX_BODY_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
 MAX_FILES = 512
 MAX_AGE_SECONDS = 14 * 24 * 60 * 60
-REQUEST_IO_TIMEOUT_SECONDS = 0.1
+REQUEST_IO_TIMEOUT_SECONDS = 1.0
+MAX_PENDING_IO_OPERATIONS = 2
 
 _PROCESS_LOCK = threading.Lock()
-_REQUEST_IO_GATE = threading.Lock()
-_VALID_OUTCOMES = {"staged", "dispatch_completed", "dispatch_exception"}
-_UNRESOLVED_OUTCOMES = {"staged", "dispatch_exception"}
+_REQUEST_IO_SLOTS = threading.BoundedSemaphore(MAX_PENDING_IO_OPERATIONS)
+_VALID_OUTCOMES = {
+    "staged", "dispatch_completed", "dispatch_exception", "dispatch_refused",
+}
+_UNRESOLVED_OUTCOMES = {"staged", "dispatch_exception", "dispatch_refused"}
+_REPLAY_IDENTITY_FIELDS = (
+    "user_id",
+    "entitlement_id",
+    "origin_device_id",
+    "body_length",
+    "body_sha256",
+    "body_base64",
+)
 _RETENTION_TIMERS_LOCK = threading.Lock()
 _RETENTION_TIMERS = {}
 _RETENTION_STARTED = False
@@ -70,8 +84,37 @@ class _SpoolUnavailable(Exception):
     pass
 
 
-class _SpoolCancelled(Exception):
-    pass
+class _RequestIOPermit:
+    """One admitted operation's release-once semaphore ownership."""
+
+    def __init__(self, semaphore):
+        self._semaphore = semaphore
+        self._release_lock = threading.Lock()
+        self._released = False
+
+    @classmethod
+    def acquire(cls):
+        semaphore = _REQUEST_IO_SLOTS
+        if not semaphore.acquire(blocking=False):
+            return None
+        return cls(semaphore)
+
+    def release(self):
+        with self._release_lock:
+            if self._released:
+                return False
+            self._released = True
+        self._semaphore.release()
+        return True
+
+
+def _reset_request_io_slots_after_fork():
+    """Discard permits whose native worker owners do not survive a fork."""
+    global _REQUEST_IO_SLOTS
+    _REQUEST_IO_SLOTS = threading.BoundedSemaphore(MAX_PENDING_IO_OPERATIONS)
+
+
+os.register_at_fork(after_in_child=_reset_request_io_slots_after_fork)
 
 
 def _spool_root() -> Path:
@@ -86,6 +129,15 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(bytes(value)).hexdigest()
 
 
+def _replay_identity_sha256(record) -> str:
+    serialized = json.dumps(
+        [record.get(field) for field in _REPLAY_IDENTITY_FIELDS],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256_bytes(serialized)
+
+
 def _body_within_bound(raw_body) -> bool:
     try:
         return len(raw_body) <= MAX_BODY_BYTES
@@ -98,22 +150,28 @@ def is_replay_candidate(status) -> bool:
 
 
 def _run_off_hub_bounded(function, *args):
-    """Run blocking spool I/O off-hub and bound the caller's wait."""
-    if not _REQUEST_IO_GATE.acquire(blocking=False):
-        raise _SpoolUnavailable("another spool storage operation is still active")
-    cancelled = threading.Event()
+    """Run I/O off-hub while leaving admitted work owned after timeout."""
+    permit = _RequestIOPermit.acquire()
+    if permit is None:
+        raise _SpoolUnavailable("the bounded spool storage queue is full")
+    request_timed_out = threading.Event()
+    result = None
     try:
         timeout = Timeout.start_new(REQUEST_IO_TIMEOUT_SECONDS)
     except BaseException:
-        _REQUEST_IO_GATE.release()
+        permit.release()
         raise
     try:
         try:
             result = get_hub().threadpool.spawn(
-                _capture_worker_result, function, args, cancelled,
+                _capture_worker_result,
+                function,
+                args,
+                request_timed_out,
+                permit,
             )
         except BaseException:
-            _REQUEST_IO_GATE.release()
+            permit.release()
             raise
         value, error = result.get()
         if error is not None:
@@ -122,7 +180,11 @@ def _run_off_hub_bounded(function, *args):
     except Timeout as error:
         if error is not timeout:
             raise
-        cancelled.set()
+        request_timed_out.set()
+        if result is None:
+            raise _SpoolUnavailable(
+                "the spool storage worker was not admitted before the deadline"
+            ) from None
         raise _SpoolDeadlineExceeded(
             f"Kobo PATCH spool exceeded {REQUEST_IO_TIMEOUT_SECONDS:.3f}s deadline"
         ) from None
@@ -130,15 +192,30 @@ def _run_off_hub_bounded(function, *args):
         timeout.cancel()
 
 
-def _capture_worker_result(function, args, cancelled):
+def _capture_worker_result(function, args, request_timed_out, permit):
     """Return worker errors as values so gevent does not log expected failures."""
+    operation = getattr(function, "__name__", type(function).__name__)
     try:
         try:
-            return function(*args, cancelled), None
+            value = function(*args)
+            if request_timed_out.is_set():
+                log.info(
+                    "Kobo PATCH recovery storage completed after request "
+                    "deadline operation=%s",
+                    operation,
+                )
+            return value, None
         except Exception as error:
+            if request_timed_out.is_set():
+                log.error(
+                    "Kobo PATCH recovery storage failed after request deadline "
+                    "operation=%s",
+                    operation,
+                    exc_info=True,
+                )
             return None, error
     finally:
-        _REQUEST_IO_GATE.release()
+        permit.release()
 
 
 def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
@@ -150,13 +227,17 @@ def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
         )
         return None
     try:
+        root = _spool_root()
+        max_age_seconds = MAX_AGE_SECONDS
         raw_body = bytes(raw_body)
         spool_id = secrets.token_hex(16)
+        attempt_id = secrets.token_hex(16)
         now = datetime.now(timezone.utc).isoformat()
         record = {
-            "schema_version": 1,
+            "schema_version": 2,
             "spool_id": spool_id,
             "received_at": now,
+            "last_received_at": now,
             "entitlement_id": str(entitlement_id),
             "user_id": user_id,
             "origin_device_id": origin_device_id,
@@ -166,14 +247,21 @@ def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
             "body_base64": base64.b64encode(raw_body).decode("ascii"),
             "dispatch_status": "staged",
             "dispatch_updated_at": now,
+            "dispatch_attempt_id": attempt_id,
+            "attempt_count": 1,
         }
+        record["replay_identity_sha256"] = _replay_identity_sha256(record)
         compressed = _compress(record)
-        path = _run_off_hub_bounded(_write_new_record, spool_id, compressed)
-        log.info(
-            "Kobo PATCH recovery body staged spool_id=%s user_id=%s bytes=%s",
-            spool_id, user_id, len(raw_body),
+        spool_id, path, attempt_id, reused = _run_off_hub_bounded(
+            _write_or_reuse_record, record, compressed, root, max_age_seconds,
         )
-        return PatchSpoolTicket(spool_id=spool_id, path=path)
+        log.info(
+            "Kobo PATCH recovery body %s spool_id=%s user_id=%s bytes=%s",
+            "restaged" if reused else "staged", spool_id, user_id, len(raw_body),
+        )
+        return PatchSpoolTicket(
+            spool_id=spool_id, path=path, attempt_id=attempt_id,
+        )
     except _SpoolNoRoom:
         log.warning(
             "Kobo PATCH recovery spool full of established unresolved records; "
@@ -183,7 +271,8 @@ def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
         return None
     except _SpoolDeadlineExceeded:
         log.error(
-            "Kobo PATCH recovery spool timed out; new body not staged "
+            "Kobo PATCH recovery spool timed out; storage continues off-request "
+            "but no ticket is returned "
             "user_id=%s bytes=%s deadline_ms=%s",
             user_id, len(raw_body), int(REQUEST_IO_TIMEOUT_SECONDS * 1000),
         )
@@ -206,20 +295,40 @@ def stage_patch(*, raw_body, entitlement_id, user_id, origin_device_id):
 
 
 class PatchSpoolTicket:
-    def __init__(self, *, spool_id, path):
+    def __init__(self, *, spool_id, path, attempt_id):
         self.spool_id = spool_id
         self.path = Path(path)
+        self.attempt_id = attempt_id
 
     def mark_dispatch_outcome(self, status) -> bool:
         if status not in _VALID_OUTCOMES - {"staged"}:
             raise ValueError("invalid Kobo PATCH dispatch outcome")
         try:
-            new_path = _run_off_hub_bounded(
-                _mark_dispatch_outcome_blocking, self.path, status,
+            max_age_seconds = MAX_AGE_SECONDS
+            new_path, applied = _run_off_hub_bounded(
+                _mark_dispatch_outcome_blocking,
+                self.path,
+                self.spool_id,
+                self.attempt_id,
+                status,
+                max_age_seconds,
             )
             self.path = Path(new_path)
-            return True
-        except (_SpoolNoRoom, _SpoolDeadlineExceeded, _SpoolUnavailable):
+            if not applied:
+                log.info(
+                    "Ignored stale Kobo PATCH recovery outcome spool_id=%s "
+                    "attempt_id=%s status=%s",
+                    self.spool_id, self.attempt_id, status,
+                )
+            return applied
+        except _SpoolDeadlineExceeded:
+            log.error(
+                "Kobo PATCH recovery outcome update timed out; storage "
+                "continues off-request spool_id=%s status=%s",
+                self.spool_id, status,
+            )
+            return False
+        except (_SpoolNoRoom, _SpoolUnavailable):
             log.error(
                 "Kobo PATCH recovery outcome update unavailable; preserving "
                 "staged record spool_id=%s status=%s",
@@ -255,11 +364,6 @@ class _RootLock:
 
 def _locked_root(root):
     return _RootLock(root)
-
-
-def _ensure_not_cancelled(cancelled):
-    if cancelled is not None and cancelled.is_set():
-        raise _SpoolCancelled("spool request deadline elapsed")
 
 
 def _compress(record) -> bytes:
@@ -327,6 +431,36 @@ def _path_with_status(path, status):
     return path.with_name(f"{stem}-{status}.json.gz")
 
 
+def _identity_from_path(path):
+    stem = Path(path).name.removesuffix(".json.gz")
+    for status in _VALID_OUTCOMES:
+        suffix = f"-{status}"
+        if stem.endswith(suffix):
+            stem = stem[:-len(suffix)]
+            break
+    candidate = stem.rsplit("-", 1)[-1]
+    if len(candidate) != 64:
+        return None
+    try:
+        int(candidate, 16)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _path_with_identity_and_status(path, identity, status):
+    path = Path(path)
+    if _identity_from_path(path) == identity:
+        return _path_with_status(path, status)
+    stem = path.name.removesuffix(".json.gz")
+    for known_status in _VALID_OUTCOMES:
+        suffix = f"-{known_status}"
+        if stem.endswith(suffix):
+            stem = stem[:-len(suffix)]
+            break
+    return path.with_name(f"{stem}-{identity}-{status}.json.gz")
+
+
 def _record_inventory(root):
     inventory = []
     for _mtime, _name, path, stat_result in _record_entries(root):
@@ -356,13 +490,15 @@ def _record_inventory(root):
     return inventory
 
 
-def _select_victims(inventory, *, incoming_bytes, replacing_path=None):
+def _select_victims(
+    inventory, *, incoming_bytes, max_age_seconds, replacing_path=None,
+):
     replacing_path = Path(replacing_path) if replacing_path is not None else None
     active = [item for item in inventory if item["path"] != replacing_path]
     victims = []
     now = time.time()
     for item in active:
-        if now - item["mtime"] > MAX_AGE_SECONDS:
+        if now - item["mtime"] > max_age_seconds:
             victims.append(item)
 
     survivors = [item for item in active if item not in victims]
@@ -437,7 +573,7 @@ def _recover_transactions_locked(root):
 
 
 def _install_record_locked(
-    final_path, compressed, *, victims, replacing_path=None, cancelled=None,
+    final_path, compressed, *, victims, replacing_path=None,
 ):
     """Install one record with crash-recoverable eviction/replacement."""
     final_path = Path(final_path)
@@ -466,18 +602,15 @@ def _install_record_locked(
     final_installed = False
     committed = False
     try:
-        _replace_record_locked(prepared_path, compressed, cancelled=cancelled)
-        _ensure_not_cancelled(cancelled)
+        _replace_record_locked(prepared_path, compressed)
         _write_journal(journal_path, journal)
         for original, retired in mappings:
             os.replace(original, retired)
         _fsync_directory(root)
-        _ensure_not_cancelled(cancelled)
 
         os.replace(prepared_path, final_path)
         final_installed = True
         _fsync_directory(root)
-        _ensure_not_cancelled(cancelled)
 
         journal["state"] = "committed"
         _write_journal(journal_path, journal)
@@ -514,44 +647,159 @@ def _install_record_locked(
         )
 
 
-def _write_new_record(spool_id, compressed, cancelled=None):
-    root = _spool_root()
+def _same_replay_identity(record, incoming):
+    return all(
+        record.get(field) == incoming.get(field)
+        for field in _REPLAY_IDENTITY_FIELDS
+    )
+
+
+def _find_matching_replay_identity_locked(inventory, incoming):
+    matches = []
+    incoming_identity = incoming["replay_identity_sha256"]
+    for item in inventory:
+        disk_identity = _identity_from_path(item["path"])
+        if disk_identity is not None and disk_identity != incoming_identity:
+            continue
+        try:
+            record = _load_disk_record(item["path"])
+        except FileNotFoundError:
+            continue
+        except Exception:
+            # An unreadable record cannot be proven identical and must not
+            # absorb a different request. If unresolved, it remains protected
+            # by the normal admission policy.
+            continue
+        if _same_replay_identity(record, incoming):
+            matches.append((item["path"], record))
+    return matches
+
+
+def _write_or_reuse_record(
+    incoming, compressed, root, max_age_seconds,
+):
+    root = Path(root)
     with _PROCESS_LOCK:
-        _ensure_not_cancelled(cancelled)
         _ensure_private_root(root)
         with _locked_root(root):
-            _ensure_not_cancelled(cancelled)
             _recover_transactions_locked(root)
             inventory = _record_inventory(root)
-            victims = _select_victims(
-                inventory, incoming_bytes=len(compressed),
+            matches = _find_matching_replay_identity_locked(
+                inventory, incoming,
             )
-            path = root / (
-                f"patch-{time.time_ns():020d}-{spool_id}-staged.json.gz"
-            )
-            _schedule_retention(root, time.time() + MAX_AGE_SECONDS)
-            _install_record_locked(
-                path, compressed, victims=victims, cancelled=cancelled,
-            )
-    return path
+            if matches:
+                existing_path, existing = matches[0]
+                duplicate_paths = [path for path, _record in matches[1:]]
+                now = incoming["received_at"]
+                refreshed = dict(existing)
+                refreshed.update({
+                    "schema_version": max(2, int(existing.get("schema_version", 1))),
+                    "last_received_at": now,
+                    "dispatch_status": "staged",
+                    "dispatch_updated_at": now,
+                    "dispatch_attempt_id": incoming["dispatch_attempt_id"],
+                    "attempt_count": sum(
+                        int(record.get("attempt_count", 1))
+                        for _path, record in matches
+                    ) + 1,
+                    "replay_identity_sha256": incoming["replay_identity_sha256"],
+                })
+                compressed = _compress(refreshed)
+                deduplicated_inventory = [
+                    item for item in inventory
+                    if item["path"] not in duplicate_paths
+                ]
+                victims = _select_victims(
+                    deduplicated_inventory,
+                    incoming_bytes=len(compressed),
+                    max_age_seconds=max_age_seconds,
+                    replacing_path=existing_path,
+                )
+                victims = duplicate_paths + victims
+                path = _path_with_identity_and_status(
+                    existing_path,
+                    incoming["replay_identity_sha256"],
+                    "staged",
+                )
+                _schedule_retention(
+                    root, time.time() + max_age_seconds, max_age_seconds,
+                )
+                _install_record_locked(
+                    path,
+                    compressed,
+                    victims=victims,
+                    replacing_path=existing_path,
+                )
+                result = (
+                    refreshed["spool_id"],
+                    path,
+                    incoming["dispatch_attempt_id"],
+                    True,
+                )
+            else:
+                victims = _select_victims(
+                    inventory,
+                    incoming_bytes=len(compressed),
+                    max_age_seconds=max_age_seconds,
+                )
+                path = root / (
+                    f"patch-{time.time_ns():020d}-{incoming['spool_id']}-"
+                    f"{incoming['replay_identity_sha256']}-staged.json.gz"
+                )
+                _schedule_retention(
+                    root, time.time() + max_age_seconds, max_age_seconds,
+                )
+                _install_record_locked(
+                    path, compressed, victims=victims,
+                )
+                result = (
+                    incoming["spool_id"],
+                    path,
+                    incoming["dispatch_attempt_id"],
+                    False,
+                )
+    return result
 
 
-def _mark_dispatch_outcome_blocking(path, status, cancelled=None):
+def _find_record_path_by_spool_id_locked(root, spool_id):
+    for candidate in _record_paths(root):
+        try:
+            if _load_disk_record(candidate).get("spool_id") == spool_id:
+                return candidate
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+    return None
+
+
+def _mark_dispatch_outcome_blocking(
+    path, spool_id, attempt_id, status, max_age_seconds,
+):
     path = Path(path)
     root = path.parent
     with _PROCESS_LOCK:
-        _ensure_not_cancelled(cancelled)
         _ensure_private_root(root)
         with _locked_root(root):
-            _ensure_not_cancelled(cancelled)
             _recover_transactions_locked(root)
+            if not path.exists():
+                path = _find_record_path_by_spool_id_locked(root, spool_id)
+                if path is None:
+                    raise FileNotFoundError(
+                        f"Kobo PATCH spool record not found: {spool_id}"
+                    )
             record = _load_disk_record(path)
+            if record.get("dispatch_attempt_id") != attempt_id:
+                return path, False
             record["dispatch_status"] = status
             record["dispatch_updated_at"] = datetime.now(timezone.utc).isoformat()
             compressed = _compress(record)
             inventory = _record_inventory(root)
             victims = _select_victims(
-                inventory, incoming_bytes=len(compressed), replacing_path=path,
+                inventory,
+                incoming_bytes=len(compressed),
+                max_age_seconds=max_age_seconds,
+                replacing_path=path,
             )
             new_path = _path_with_status(path, status)
             _install_record_locked(
@@ -559,12 +807,11 @@ def _mark_dispatch_outcome_blocking(path, status, cancelled=None):
                 compressed,
                 victims=victims,
                 replacing_path=path,
-                cancelled=cancelled,
             )
-    return new_path
+    return new_path, True
 
 
-def _replace_record_locked(path, compressed, cancelled=None):
+def _replace_record_locked(path, compressed):
     path = Path(path)
     temp_fd, temp_name = tempfile.mkstemp(
         prefix=".patch-", suffix=".tmp", dir=path.parent,
@@ -576,10 +823,8 @@ def _replace_record_locked(path, compressed, cancelled=None):
             stream.write(compressed)
             stream.flush()
             os.fsync(stream.fileno())
-        _ensure_not_cancelled(cancelled)
         os.replace(temp_name, path)
         _fsync_directory(path.parent)
-        _ensure_not_cancelled(cancelled)
     finally:
         if temp_fd is not None:
             os.close(temp_fd)
@@ -604,7 +849,7 @@ def load_spooled_patch(path):
     return record
 
 
-def _expire_root_blocking(root):
+def _expire_root_blocking(root, max_age_seconds):
     root = Path(root)
     if not root.exists():
         return None
@@ -615,7 +860,7 @@ def _expire_root_blocking(root):
             now = time.time()
             expired = [
                 item for item in inventory
-                if now - item["mtime"] > MAX_AGE_SECONDS
+                if now - item["mtime"] > max_age_seconds
             ]
             for item in expired:
                 item["path"].unlink(missing_ok=True)
@@ -624,25 +869,25 @@ def _expire_root_blocking(root):
             survivors = [item for item in inventory if item not in expired]
             if not survivors:
                 return None
-            return min(item["mtime"] + MAX_AGE_SECONDS for item in survivors)
+            return min(item["mtime"] + max_age_seconds for item in survivors)
 
 
-def _retention_timer_fired(root, deadline):
+def _retention_timer_fired(root, deadline, max_age_seconds):
     key = str(Path(root))
     with _RETENTION_TIMERS_LOCK:
         current = _RETENTION_TIMERS.get(key)
         if current is not None and current[0] == deadline:
             _RETENTION_TIMERS.pop(key, None)
     try:
-        next_deadline = _expire_root_blocking(root)
+        next_deadline = _expire_root_blocking(root, max_age_seconds)
     except Exception:
         log.error("Kobo PATCH recovery age maintenance failed", exc_info=True)
         next_deadline = time.time() + 1.0
     if next_deadline is not None:
-        _schedule_retention(root, next_deadline)
+        _schedule_retention(root, next_deadline, max_age_seconds)
 
 
-def _schedule_retention(root, deadline):
+def _schedule_retention(root, deadline, max_age_seconds):
     root = Path(root)
     key = str(root)
     with _RETENTION_TIMERS_LOCK:
@@ -654,22 +899,21 @@ def _schedule_retention(root, deadline):
         timer = threading.Timer(
             max(0.001, deadline - time.time()),
             _retention_timer_fired,
-            args=(root, deadline),
+            args=(root, deadline, max_age_seconds),
         )
         timer.daemon = True
         _RETENTION_TIMERS[key] = (deadline, timer)
         timer.start()
 
 
-def _bootstrap_retention():
-    root = _spool_root()
+def _bootstrap_retention(root, max_age_seconds):
     try:
-        next_deadline = _expire_root_blocking(root)
+        next_deadline = _expire_root_blocking(root, max_age_seconds)
     except Exception:
         log.error("Kobo PATCH recovery startup maintenance failed", exc_info=True)
         return
     if next_deadline is not None:
-        _schedule_retention(root, next_deadline)
+        _schedule_retention(root, next_deadline, max_age_seconds)
 
 
 def start_retention_maintenance():
@@ -678,8 +922,11 @@ def start_retention_maintenance():
     with _RETENTION_TIMERS_LOCK:
         if _RETENTION_STARTED:
             return True
+        root = _spool_root()
+        max_age_seconds = MAX_AGE_SECONDS
         thread = threading.Thread(
             target=_bootstrap_retention,
+            args=(root, max_age_seconds),
             name="kobo-patch-spool-retention-bootstrap",
             daemon=True,
         )
@@ -696,10 +943,11 @@ def start_retention_maintenance():
 
 def iter_replay_candidates():
     root = _spool_root()
+    max_age_seconds = MAX_AGE_SECONDS
     if not root.exists():
         return
     try:
-        _expire_root_blocking(root)
+        _expire_root_blocking(root, max_age_seconds)
     except Exception:
         log.error("Kobo PATCH recovery age maintenance failed", exc_info=True)
     for path in _record_paths(root):

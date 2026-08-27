@@ -1177,7 +1177,7 @@ def create_annotation(payload, *, user_id, book, session, commit,
             hidden=False,
         )
         session.add(row)
-        commit()
+        _commit_required(commit)
         return row
 
     # The SPA epub.js reader produces a portable EPUB CFI (not a KoboSpan). Accept
@@ -1214,7 +1214,7 @@ def create_annotation(payload, *, user_id, book, session, commit,
             hidden=False,
         )
         session.add(row)
-        commit()
+        _commit_required(commit)
         return row
 
     end_span = (payload.get("end_kobospan") or "").strip() or start_span
@@ -1249,7 +1249,7 @@ def create_annotation(payload, *, user_id, book, session, commit,
         _ensure_cfi_range(row, book)
     except Exception as e:  # pragma: no cover - defensive
         log.warning("annotations: cfi compute on create failed: %s", e)
-    commit()
+    _commit_required(commit)
     return row
 
 
@@ -1338,8 +1338,10 @@ def reassign_annotation(annotation_id, *, user_id, book_id, assigned_device_publ
             else:
                 state.desired = True
         if commit is not None:
-            if commit() is False:
-                raise AssignmentError("database_error")
+            try:
+                _commit_required(commit)
+            except RuntimeError as error:
+                raise AssignmentError("database_error") from error
         else:
             session.flush()
         return row
@@ -1370,8 +1372,10 @@ def reassign_annotation(annotation_id, *, user_id, book_id, assigned_device_publ
     row.assigned_device_id = target_id
     row.routing_revision = (row.routing_revision or 1) + 1
     if commit is not None:
-        if commit() is False:
-            raise AssignmentError("database_error")
+        try:
+            _commit_required(commit)
+        except RuntimeError as error:
+            raise AssignmentError("database_error") from error
     else:
         session.flush()
     return row
@@ -1411,7 +1415,7 @@ def delete_annotation(annotation_id, *, user_id, book_id, session, commit):
         return None
     row.hidden = True
     row.last_synced = datetime.now(timezone.utc)
-    commit()
+    _commit_required(commit)
     return row
 
 
@@ -1446,6 +1450,8 @@ def annotations_create(book_id):
         )
     except ValueError as e:
         return jsonify({"error": "bad_anchor", "message": str(e)}), 400
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("single annotation create")
     _fanout_to_sync_targets(row, book)
     # Resolve the device map, or the row we just attributed answers
     # origin_device_id: null and the reader renders "Unknown device" for the
@@ -1524,10 +1530,13 @@ def annotation_assignments_bulk():
 def annotations_delete(book_id, annotation_id):
     """Soft-delete a highlight + tombstone any remote sync targets."""
     _resolve_book_or_404(book_id)
-    row = delete_annotation(
-        annotation_id, user_id=current_user.id, book_id=book_id,
-        session=ub.session, commit=ub.session_commit,
-    )
+    try:
+        row = delete_annotation(
+            annotation_id, user_id=current_user.id, book_id=book_id,
+            session=ub.session, commit=ub.session_commit,
+        )
+    except (RuntimeError, SQLAlchemyError):
+        return _database_error_response("single annotation delete")
     if row is None:
         abort(404)
     # Propagate the delete to any remote sync targets (Hardcover) — no-op when

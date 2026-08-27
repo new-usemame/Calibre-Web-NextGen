@@ -91,8 +91,8 @@ function TagRow({ id, name, count, href }: { id: number | string; name: string; 
           {conflict && (
             <div className={styles.rowConfirm} role="alert">
               <span>{conflict.count === 1
-                ? t('"{{name}}" already exists on {count} book. Merge this tag into it?', { name: conflict.name, count: conflict.count })
-                : t('"{{name}}" already exists on {count} books. Merge this tag into it?', { name: conflict.name, count: conflict.count })}</span>
+                ? t('"{name}" already exists on {count} book. Merge this tag into it?', { name: conflict.name, count: conflict.count })
+                : t('"{name}" already exists on {count} books. Merge this tag into it?', { name: conflict.name, count: conflict.count })}</span>
               <button type="button" className={styles.rowAction} disabled={rename.isPending}
                 onClick={() => submit(conflict.name, true)}
                 aria-label={t('Merge into {name}', { name: conflict.name })}>

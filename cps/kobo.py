@@ -680,7 +680,7 @@ def HandleSyncRequest():
                            .distinct())
     log.debug("Kobo Sync: changed entries: {}".format(changed_entries.count()))
 
-    reading_states_in_new_entitlements = []
+    reading_state_book_ids_emitted = []
     # Materialize the limited result set ONCE — the prior shape called .all()
     # twice (once for the debug log, once for the for-loop) which round-tripped
     # the joined-load query twice per sync request.
@@ -720,10 +720,24 @@ def HandleSyncRequest():
 
         if (kobo_reading_state is not None
                 and kobo_reading_state.last_modified > sync_token.reading_state_last_modified):
-            if not entitlement_is_unchanged:
-                entitlement["ReadingState"] = get_kobo_reading_state_response(book.Books, kobo_reading_state)
-                new_reading_state_last_modified = max(new_reading_state_last_modified, kobo_reading_state.last_modified)
-                reading_states_in_new_entitlements.append(book.Books.id)
+            reading_state = get_kobo_reading_state_response(
+                book.Books, kobo_reading_state)
+            new_reading_state_last_modified = max(
+                new_reading_state_last_modified,
+                kobo_reading_state.last_modified,
+            )
+            reading_state_book_ids_emitted.append(book.Books.id)
+            if entitlement_is_unchanged:
+                # Replay suppression applies only to the byte-identical base
+                # entitlement. Reading state has its own cursor and must still
+                # be delivered independently; relying on the paged scan below
+                # can withhold it behind a full page of older states and leave
+                # its cursor unadvanced.
+                sync_results.append({
+                    "ChangedReadingState": {"ReadingState": reading_state}
+                })
+            else:
+                entitlement["ReadingState"] = reading_state
 
         ts_created = get_kobo_created_ts(book)
 
@@ -884,7 +898,7 @@ def HandleSyncRequest():
 
     changed_reading_states = changed_reading_states.filter(
         and_(ub.KoboReadingState.user_id == current_user.id,
-             ub.KoboReadingState.book_id.notin_(reading_states_in_new_entitlements)))\
+             ub.KoboReadingState.book_id.notin_(reading_state_book_ids_emitted)))\
         .order_by(ub.KoboReadingState.last_modified)
     log.debug("Kobo Sync: changed states: {}".format(changed_reading_states.count()))
     # Do not set local continuation for a full reading-state page.  It has the

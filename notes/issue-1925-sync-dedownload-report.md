@@ -95,8 +95,19 @@ verification green; Clara hardware discrimination pending.
   already has ledger rows. Those deliveries refresh the ledger.
 - **OBSERVED:** a valid stale CWNG token plus an exact same-device fingerprint
   suppresses New/Changed entitlement replay while still advancing cursors.
-  Reading-state changes remain independently deliverable. A second device has
-  no matching row and receives its entitlement.
+  A second device has no matching row and receives its entitlement.
+- **OBSERVED — Layer 2 reading-state isolation:** the committed suppression
+  block skipped both the embedded `ReadingState` payload and local
+  `reading_state_last_modified` advancement when the base entitlement matched
+  the ledger. The later generic reading-state query rescued a simple one-book
+  response, but that rescue was page-dependent: a full page of older states
+  withheld the suppressed book's newer state and left the outgoing cursor
+  behind it. Reading-state serialization, emitted-ID bookkeeping, and cursor
+  advancement now happen before the base entitlement suppression branch. A
+  suppressed base emits its newer state as `ChangedReadingState`; an
+  unsuppressed base retains the existing embedded `ReadingState` shape. Both
+  paths exclude that book from the later generic scan, so the state appears
+  once and is not re-offered after the returned cursor is echoed.
 - **ASSUMED/unavoidable ambiguities:** an empty library that somehow retains a
   valid stale CWNG token is indistinguishable from an interrupted sync whose
   library is intact. Also, the ledger proves that the server generated a
@@ -186,6 +197,14 @@ controls that old code already handled.
 - generated-KEPUB assertion failed: response declared the source EPUB size;
 - real `last_modified` bump assertion already passed.
 
+**OBSERVED — Layer 2 reading-state red:** the exact new assertion
+`test_suppressed_entitlement_emits_newer_reading_state_once_and_advances_cursor`
+was run against the committed suppression block with the generic state page
+filled by one older state (the test pins `SYNC_ITEM_LIMIT=1`). The suppressed
+book's newer target state was absent: `assert len(target_states) == 1` failed
+with `0 == 1`. This distinguishes the direct-emission fix from the generic
+fallback that makes the unsaturated one-book case pass.
+
 ### Green after implementation
 
 **OBSERVED — focused two-layer, lifecycle, and adjacent KEPUB selection:**
@@ -201,18 +220,21 @@ python -m pytest -q \
   tests/unit/test_kobo_prefer_kepub.py
 ```
 
-Current result: **102 passed**. The #1925 module contributes 15 collected cases,
+Current result: **103 passed**. The #1925 module contributes 16 collected cases,
 including default-off/zero-ledger behavior, byte-identical tokenless replay,
 valid-stale-token suppression, absent/malformed/store-token factory-reset
 escapes, per-device isolation, real-change positive control, stable timestamps,
 truthful size behavior, schema creation, config migration/defaults, and strict
-suppression provenance atop permissive legacy token parsing. The D4 suite pins
-`PER_USER_BOOK_MODELS` registration and lifecycle cleanup.
+suppression provenance atop permissive legacy token parsing. The new case also
+pins that a suppressed base entitlement emits its newer reading state once,
+advances the outgoing reading-state cursor to that timestamp, and does not
+re-offer it on the next sync. The D4 suite pins `PER_USER_BOOK_MODELS`
+registration and lifecycle cleanup.
 
 **OBSERVED — final complete executable unit suite:** `tests/unit` collected
-**7,362** tests. With the 17 environment-blocked node IDs below explicitly
-deselected, the post-restructure result was **7,243 passed, 102 skipped, 17
-deselected**. No executable unit test failed.
+**7,363** tests. With the 17 environment-blocked node IDs below explicitly
+deselected, the post-reading-state-fix result was **7,244 passed, 102 skipped,
+17 deselected**. No executable unit test failed.
 
 The 17 deselections are existing tests whose required OS operation is denied by
 this managed sandbox:

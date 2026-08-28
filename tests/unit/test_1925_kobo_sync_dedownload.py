@@ -30,6 +30,14 @@ def _entitlements(response):
     ]
 
 
+def _changed_reading_states(response):
+    return [
+        item["ChangedReadingState"]["ReadingState"]
+        for item in response.get_json()
+        if "ChangedReadingState" in item
+    ]
+
+
 @pytest.fixture
 def sync_harness(monkeypatch):
     from cps import db, kobo, kobo_sync_status, ub
@@ -171,6 +179,126 @@ def test_interrupted_sync_token_loss_does_not_redeliver_unchanged_entitlement(
     assert "entitlements new=0 changed=0 suppressed_unchanged=1" in summaries[-1]
     assert "replay_suppression enabled=True eligible=True" in summaries[-1]
     assert "cursors in=" in summaries[-1] and " out=" in summaries[-1]
+
+
+def test_suppressed_entitlement_emits_newer_reading_state_once_and_advances_cursor(
+    sync_harness, monkeypatch,
+):
+    """Layer 2 suppression must not suppress or loop reading-state changes."""
+    from cps import db, kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    monkeypatch.setattr(kobo, "SYNC_ITEM_LIMIT", 1)
+
+    # Seed the per-device entitlement fingerprint without a reading state.
+    assert len(_entitlements(sync_harness.sync())) == 1
+
+    # Fill the (test-sized) independent reading-state page with an older,
+    # legitimate library state. Before the fix, the suppressed book relied on
+    # that later paged scan; its newer state was therefore withheld until
+    # another sync. Keeping this book out of Data makes it reading-state-only
+    # background, not an additional base entitlement in this regression.
+    background_modified = datetime(2026, 8, 28, 12, 15, 0)
+    background_book = db.Books(
+        "Background State",
+        "Background State",
+        "Author",
+        background_modified,
+        db.Books.DEFAULT_PUBDATE,
+        "1.0",
+        background_modified,
+        "background-state",
+        0,
+        [],
+        [],
+    )
+    background_book.uuid = "10000000-0000-0000-0000-000000000001"
+    sync_harness.session.add(background_book)
+    sync_harness.session.flush()
+    background_state = ub.KoboReadingState(
+        user_id=17,
+        book_id=background_book.id,
+        priority_timestamp=background_modified,
+    )
+    background_state.current_bookmark = ub.KoboBookmark(
+        last_modified=background_modified,
+        progress_percent=1.0,
+    )
+    background_state.statistics = ub.KoboStatistics(
+        last_modified=background_modified,
+    )
+    background_read = ub.ReadBook(
+        user_id=17,
+        book_id=background_book.id,
+        read_status=ub.ReadBook.STATUS_IN_PROGRESS,
+    )
+    background_read.kobo_reading_state = background_state
+    sync_harness.session.add(background_read)
+
+    state_modified = datetime(2026, 8, 28, 12, 30, 0)
+    read = ub.ReadBook(
+        user_id=17,
+        book_id=sync_harness.book.id,
+        read_status=ub.ReadBook.STATUS_IN_PROGRESS,
+    )
+    state = ub.KoboReadingState(
+        user_id=17,
+        book_id=sync_harness.book.id,
+        priority_timestamp=state_modified,
+    )
+    state.current_bookmark = ub.KoboBookmark(
+        last_modified=state_modified,
+        progress_percent=42.0,
+    )
+    state.statistics = ub.KoboStatistics(last_modified=state_modified)
+    read.kobo_reading_state = state
+    sync_harness.session.add(read)
+    sync_harness.session.commit()
+    # The before_flush hook deliberately stamps the parent when its bookmark
+    # changes. Pin the cursor carrier after the graph has been flushed.
+    sync_harness.session.query(ub.KoboReadingState).filter_by(
+        user_id=17,
+        book_id=sync_harness.book.id,
+    ).update({ub.KoboReadingState.last_modified: state_modified})
+    sync_harness.session.query(ub.KoboReadingState).filter(
+        ub.KoboReadingState.user_id == 17,
+        ub.KoboReadingState.book_id == background_book.id,
+    ).update(
+        {ub.KoboReadingState.last_modified: background_modified},
+        synchronize_session=False,
+    )
+    sync_harness.session.commit()
+    sync_harness.session.expire_all()
+
+    # A valid but stale CWNG token selects the unchanged base entitlement and
+    # the newer reading state together. Layer 2 may suppress only the former.
+    stale_cwng_token = kobo.SyncToken.SyncToken().build_sync_token()
+    changed = sync_harness.sync(stale_cwng_token)
+
+    assert _entitlements(changed) == []
+    target_states = [
+        state for state in _changed_reading_states(changed)
+        if state["EntitlementId"] == sync_harness.book.uuid
+    ]
+    assert len(target_states) == 1
+    assert target_states[0]["CurrentBookmark"]["ProgressPercent"] == 42
+
+    advanced_token = kobo.SyncToken.SyncToken.from_headers({
+        sync_harness.token_header: changed.headers[sync_harness.token_header],
+    })
+    assert advanced_token.reading_state_last_modified == state_modified
+
+    unchanged = sync_harness.sync(changed.headers[sync_harness.token_header])
+    target_states_again = [
+        state for state in _changed_reading_states(unchanged)
+        if state["EntitlementId"] == sync_harness.book.uuid
+    ]
+    assert target_states_again == [], (
+        "the advanced reading-state cursor must not re-offer the same state "
+        "on the next sync"
+    )
 
 
 def test_payload_stabilization_replays_byte_identically_with_layer2_off(

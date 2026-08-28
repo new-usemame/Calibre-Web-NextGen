@@ -2960,6 +2960,16 @@ def login_post():
                 # LDAP unavailable and no local fallback
                 log.info(error)
                 flash(_(u"Could not login: %(message)s", message=error), category="error")
+            elif login_result is False and user and user.password \
+                    and check_password_hash(str(user.password), form['password']) \
+                    and user.name != "Guest":
+                # LDAP rejected the credentials, try the stored local password
+                log.info("Local Fallback Login as: '{}' (LDAP rejected)".format(user.name))
+                return handle_login_user(user,
+                                         remember_me,
+                                         _(u"Local Login as: '%(nickname)s', "
+                                           u"LDAP authentication rejected", nickname=user.name),
+                                         "warning")
             else:
                 # LDAP authentication failed
                 # Use request.remote_addr (already corrected by ProxyFix) instead of raw header
@@ -2983,7 +2993,6 @@ def login_post():
                     log.debug(f"Failed to log failed login attempt: {e}")
                 
                 flash(_(u"Wrong Username or Password"), category="error")
-            flash(_(u"Wrong Username or Password"), category="error")
     else:
         # Use request.remote_addr (already corrected by ProxyFix) instead of raw header
         ip_address = request.remote_addr

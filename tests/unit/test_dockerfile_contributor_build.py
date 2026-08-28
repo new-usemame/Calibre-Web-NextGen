@@ -29,7 +29,9 @@ the default back to `ghcr` (locks contributors out again), or dropping
 `PBS_SOURCE=ghcr` from a CI build (silently returns that build to the flaky CDN).
 """
 
+import os
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -98,6 +100,142 @@ def _image_build_steps() -> list[tuple[str, str, dict]]:
                 if str(step.get("uses", "")).startswith("docker/build-push-action"):
                     found.append((path.name, job_name, step))
     return found
+
+
+def _fork_unreachable_through_classifier(
+    workflow: str,
+    job_name: str,
+    tmp_path: Path,
+) -> str | None:
+    """Return why a bare-mirror build is not proven unreachable from forks.
+
+    The proof has two halves: the build job must depend *only* on a classifier
+    output being true, and that output must evaluate false for a fork even when
+    the classifier says the changed path requires a build. Executing the
+    workflow's own classifier shell prevents a comment or familiar-looking
+    substring from satisfying a guard whose behavior was weakened (Class 9b).
+    """
+    import yaml
+
+    data = yaml.safe_load((WORKFLOWS / workflow).read_text()) or {}
+    jobs = data.get("jobs") or {}
+    job = jobs.get(job_name) or {}
+    condition = str(job.get("if") or "").strip()
+    match = re.fullmatch(
+        r"needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)\s*==\s*'true'",
+        condition,
+    )
+    if not match:
+        return f"job `if` is not an exclusive classifier-output gate: {condition!r}"
+    classifier_name, output_name = match.groups()
+
+    needs = job.get("needs") or []
+    if isinstance(needs, str):
+        needs = [needs]
+    if classifier_name not in needs:
+        return f"job does not declare `needs: {classifier_name}`"
+
+    classifier = jobs.get(classifier_name) or {}
+    output_expr = str((classifier.get("outputs") or {}).get(output_name) or "").strip()
+    output_match = re.fullmatch(
+        r"\$\{\{\s*steps\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)\s*}}",
+        output_expr,
+    )
+    if not output_match:
+        return f"classifier output is not wired to a step output: {output_expr!r}"
+    step_id, step_output = output_match.groups()
+    if step_output != output_name:
+        return (
+            f"classifier job exposes {output_name!r} from a differently named "
+            f"step output {step_output!r}"
+        )
+
+    classifier_step = next(
+        (
+            step
+            for step in classifier.get("steps") or []
+            if isinstance(step, dict) and step.get("id") == step_id
+        ),
+        None,
+    )
+    if classifier_step is None:
+        return f"classifier step {step_id!r} does not exist"
+    fork_expr = re.sub(
+        r"\s+", "", str((classifier_step.get("env") or {}).get("IS_FORK") or "")
+    )
+    if fork_expr != "${{github.event.pull_request.head.repo.fork==true}}":
+        return f"IS_FORK is not sourced from the PR head repository: {fork_expr!r}"
+
+    script = str(classifier_step.get("run") or "").replace(
+        "${{ github.event_name }}", "pull_request"
+    )
+    if "${{" in script:
+        return "classifier shell contains an unevaluated GitHub expression"
+
+    stub_dir = tmp_path / f"{workflow}-{job_name}"
+    stub_dir.mkdir()
+    (stub_dir / "git").write_text(
+        "#!/bin/sh\nprintf 'cps/ub.py\\n'\n", encoding="utf-8"
+    )
+    (stub_dir / "python3").write_text(
+        "#!/bin/sh\n"
+        "printf 'frontend=false\\nbuild=true\\nconcurrency=true\\nimage=true\\n' "
+        '>> "$GITHUB_OUTPUT"\n',
+        encoding="utf-8",
+    )
+    (stub_dir / "git").chmod(0o755)
+    (stub_dir / "python3").chmod(0o755)
+
+    def classify(is_fork: bool) -> tuple[int, str, str]:
+        output = stub_dir / ("fork.out" if is_fork else "same-repo.out")
+        env = {
+            **os.environ,
+            "PATH": f"{stub_dir}:/usr/bin:/bin",
+            "BASE_SHA": "base",
+            "HEAD_SHA": "head",
+            "IS_FORK": "true" if is_fork else "false",
+            "GITHUB_OUTPUT": str(output),
+        }
+        proc = subprocess.run(
+            ["/bin/bash", "-c", script],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return (
+            proc.returncode,
+            output.read_text(encoding="utf-8") if output.exists() else "",
+            proc.stderr,
+        )
+
+    fork_rc, fork_output, fork_stderr = classify(True)
+    same_rc, same_output, same_stderr = classify(False)
+    if fork_rc != 0 or same_rc != 0:
+        return (
+            "classifier shell could not be evaluated: "
+            f"fork rc={fork_rc} stderr={fork_stderr!r}; "
+            f"same-repo rc={same_rc} stderr={same_stderr!r}"
+        )
+
+    def last_output(text: str, name: str) -> str | None:
+        values = [
+            line.split("=", 1)[1]
+            for line in text.splitlines()
+            if line.startswith(f"{name}=")
+        ]
+        return values[-1] if values else None
+
+    fork_value = last_output(fork_output, output_name)
+    same_value = last_output(same_output, output_name)
+    if fork_value != "false" or same_value != "true":
+        return (
+            f"classifier must produce {output_name}=false for a fork and true "
+            "for the same concurrency-shaped PR; got "
+            f"fork={fork_value!r}, same-repo={same_value!r}"
+        )
+    return None
 
 
 @pytest.fixture(scope="module")
@@ -264,8 +402,10 @@ def test_every_ci_image_build_selects_a_pbs_source_explicitly() -> None:
     )
 
 
-def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror() -> None:
-    """A build reachable from `pull_request` must use the fork-aware selector (#1263).
+def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror(
+    tmp_path: Path,
+) -> None:
+    """A PR build must be fork-aware or proven unreachable from forks (#1263).
 
     A fork PR cannot pull the private mirror — the GHCR login succeeds and the
     manifest HEAD still 403s, because `packages: read` on a fork's read-only
@@ -275,7 +415,10 @@ def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror() -> Non
     read.
 
     Discovered from the workflow triggers, not from a job allowlist: a new
-    PR-triggered image build inherits this requirement automatically.
+    PR-triggered image build inherits this requirement automatically. A build
+    may keep the safer literal mirror pin only when its job is exclusively
+    gated by a classifier output whose actual shell behavior is false for a
+    fork and true for the same concurrency-shaped PR.
     """
     pr_builds = [
         (workflow, job, step)
@@ -287,15 +430,25 @@ def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror() -> Non
         "stopped running on PRs, community build PRs lost their only coverage"
     )
 
-    offenders = [
-        f"{workflow}:{job}: {selectors}"
-        for workflow, job, step in pr_builds
-        for selectors in [_pbs_source_selector(step)]
-        if selectors != [FORK_AWARE_PBS_SOURCE]
-    ]
+    offenders: list[str] = []
+    for workflow, job, step in pr_builds:
+        selectors = _pbs_source_selector(step)
+        if selectors == [FORK_AWARE_PBS_SOURCE]:
+            continue
+        if selectors != ["PBS_SOURCE=ghcr"]:
+            offenders.append(f"{workflow}:{job}: unapproved selector {selectors}")
+            continue
+        failure = _fork_unreachable_through_classifier(workflow, job, tmp_path)
+        if failure:
+            offenders.append(
+                f"{workflow}:{job}: bare mirror is fork-reachable: {failure}"
+            )
+
     assert not offenders, (
-        f"These PR-triggered image builds do not use the fork-aware PBS_SOURCE "
-        f"selector: {offenders}. Fork PRs will 403 on the private mirror (#1263)."
+        "These PR-triggered image builds neither use the fork-aware PBS_SOURCE "
+        "selector nor prove that their literal private-mirror build is "
+        f"unreachable from forks: {offenders}. Fork PRs will 403 on the private "
+        "mirror (#1263)."
     )
 
 

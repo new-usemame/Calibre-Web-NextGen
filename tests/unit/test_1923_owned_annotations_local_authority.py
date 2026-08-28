@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 from flask import Flask
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from cps import ub
@@ -237,3 +238,111 @@ def test_owned_get_returns_more_than_device_limit_as_one_honest_page(
     assert response.status_code == 200
     assert len(payload["annotations"]) == 101
     assert payload["nextPageOffsetToken"] is None
+
+
+def test_owned_get_survives_normalized_book_state_insert_integrity_error(
+    app, session, monkeypatch,
+):
+    _owned(monkeypatch)
+    session.add_all([
+        _annotation("state-race-a", highlighted_text="private state text A"),
+        _annotation("state-race-b", highlighted_text="private state text B"),
+    ])
+    session.commit()
+
+    original_flush = session.flush
+    inserted_content_ids = []
+
+    def fail_book_state_flush(*args, **kwargs):
+        pending = [
+            row for row in session.new
+            if isinstance(row, ub.KoboAnnotationBookState)
+        ]
+        if pending:
+            inserted_content_ids.extend(row.content_id for row in pending)
+            raise IntegrityError("simulated race", {}, RuntimeError("duplicate"))
+        return original_flush(*args, **kwargs)
+
+    monkeypatch.setattr(session, "flush", fail_book_state_flush)
+    errors = []
+    monkeypatch.setattr(rs.log, "error", lambda *args, **kwargs: errors.append(args))
+    decorated_entitlement = f" {{ {OWNED.upper()} }} "
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
+    ):
+        response = rs.handle_annotations.__wrapped__(decorated_entitlement)
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert [row["id"] for row in payload["annotations"]] == [
+        "state-race-a", "state-race-b",
+    ]
+    assert [row["highlightedText"] for row in payload["annotations"]] == [
+        "private state text A", "private state text B",
+    ]
+    assert re.fullmatch(
+        r'W/"CWNG:[0-9a-f-]{36}:[0-9]+:[0-9a-f]{16}"',
+        response.headers["ETag"],
+    )
+    first_etag = response.headers["ETag"]
+    first_body = response.get_data()
+    assert inserted_content_ids == [OWNED]
+    assert len(errors) == 1
+    assert errors[0][3] == 2
+    assert "book_state" in repr(errors[0])
+    assert "private state text" not in repr(errors[0])
+
+    errors.clear()
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
+    ):
+        repeated = rs.handle_annotations.__wrapped__(decorated_entitlement)
+
+    assert repeated.status_code == 200
+    assert repeated.get_data() == first_body
+    assert repeated.headers["ETag"] == first_etag
+    assert inserted_content_ids == [OWNED, OWNED]
+    assert len(errors) == 1
+    assert errors[0][3] == 2
+    assert "private state text" not in repr(errors[0])
+
+
+def test_owned_get_row_render_exception_keeps_every_identity_and_text(
+    app, session, monkeypatch,
+):
+    _owned(monkeypatch)
+    session.add_all([
+        _annotation("render-a", highlighted_text="private render text A"),
+        _annotation("render-b", highlighted_text="private render text B"),
+    ])
+    session.commit()
+
+    original_fallback = authority._fallback_object
+
+    def fail_one_row(annotation, entitlement_id):
+        if annotation.annotation_id == "render-a":
+            raise RuntimeError("must not log private render text A")
+        return original_fallback(annotation, entitlement_id)
+
+    monkeypatch.setattr(authority, "_fallback_object", fail_one_row)
+    errors = []
+    monkeypatch.setattr(rs.log, "error", lambda *args, **kwargs: errors.append(args))
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
+    ):
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert [row["id"] for row in payload["annotations"]] == [
+        "render-a", "render-b",
+    ]
+    assert [row["highlightedText"] for row in payload["annotations"]] == [
+        "private render text A", "private render text B",
+    ]
+    assert len(errors) == 1
+    assert errors[0][3] == 2
+    assert "row_render_RuntimeError" in repr(errors[0])
+    assert "private render text" not in repr(errors[0])

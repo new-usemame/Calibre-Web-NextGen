@@ -2415,7 +2415,8 @@ def main(filepath=None):
             print(f"\n[ingest-processor]: No conversion needed for {nbp.filename}, is audiobook, importing now...", flush=True)
             nbp.add_book_to_library(filepath, False, Path(nbp.filename).suffix)
         else:
-            if nbp.auto_convert_on and nbp.can_convert: # File can be converted to target format and Auto-Converter is on
+            fulfilment_ticket = not is_a_book_format(nbp.input_format)
+            if nbp.can_convert and (nbp.auto_convert_on or fulfilment_ticket): # File can be converted, or must be fulfilled because the original is not a book
 
                 # Tracks whether a conversion was actually run. The ignore-list
                 # branch below reports convert_successful=False having already
@@ -2423,14 +2424,18 @@ def main(filepath=None):
                 # it as a failed conversion and import a second copy.
                 conversion_attempted = False
 
-                if nbp.input_format in nbp.convert_ignored_formats: # File could be converted & the converter is activated but the user has specified files of this format should not be converted
-                    if is_a_book_format(nbp.input_format):
-                        print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
-                        nbp.add_book_to_library(filepath)
-                    else:
-                        _fail_not_a_book_input(nbp, filepath)
+                if fulfilment_ticket and not nbp.auto_convert_on:
+                    print(f"\n[ingest-processor]: {nbp.filename} is a {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though CWA Auto-Convert is deactivated...", flush=True)
+                elif fulfilment_ticket and nbp.input_format in nbp.convert_ignored_formats:
+                    print(f"\n[ingest-processor]: {nbp.filename} is a {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though this format is on the Auto-Convert ignore list...", flush=True)
+
+                if nbp.input_format in nbp.convert_ignored_formats and not fulfilment_ticket: # User has specified that this book format should not be converted
+                    print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
+                    nbp.add_book_to_library(filepath)
                     convert_successful = False
                 elif nbp.target_format == "kepub": # File is not in the convert ignore list and target is kepub, so we start the kepub conversion process
+                    # A ticket takes this route too: convert_to_kepub() first fulfils
+                    # non-EPUB input to an EPUB, then gives that book to kepubify.
                     conversion_attempted = True
                     convert_successful, converted_filepath = nbp.convert_to_kepub()
                 else: # File is not in the convert ignore list and target is not kepub, so we start the regular conversion process

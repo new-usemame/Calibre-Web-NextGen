@@ -2428,9 +2428,9 @@ def main(filepath=None):
                 conversion_attempted = False
 
                 if fulfilment_ticket and not nbp.auto_convert_on:
-                    print(f"\n[ingest-processor]: {nbp.filename} is a {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though CWA Auto-Convert is deactivated...", flush=True)
+                    print(f"\n[ingest-processor]: {nbp.filename} is an {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though CWA Auto-Convert is deactivated...", flush=True)
                 elif fulfilment_ticket and nbp.input_format in nbp.convert_ignored_formats:
-                    print(f"\n[ingest-processor]: {nbp.filename} is a {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though this format is on the Auto-Convert ignore list...", flush=True)
+                    print(f"\n[ingest-processor]: {nbp.filename} is an {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though this format is on the Auto-Convert ignore list...", flush=True)
 
                 if nbp.input_format in nbp.convert_ignored_formats and not fulfilment_ticket: # User has specified that this book format should not be converted
                     print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)

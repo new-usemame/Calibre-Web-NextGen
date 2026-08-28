@@ -31,6 +31,7 @@ the default back to `ghcr` (locks contributors out again), or dropping
 
 import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -73,6 +74,7 @@ FORK_AWARE_PBS_SOURCE = (
 PR_REACHABLE_TRIGGERS = {
     "pull_request",
     "pull_request_target",
+    "merge_group",
     "workflow_call",
     "workflow_run",
 }
@@ -92,24 +94,84 @@ def _workflow_triggers(workflow: str) -> set[str]:
     return set(on)
 
 
-def _image_build_steps() -> list[tuple[str, str, dict]]:
-    """Every `docker/build-push-action` step in every workflow.
+def _is_shell_image_build(step: dict) -> bool:
+    """Whether a shell step invokes a Docker image build."""
+    return bool(
+        re.search(
+            r"\bdocker\s+(?:buildx\s+build|build)\b",
+            str(step.get("run") or ""),
+        )
+    )
+
+
+def _local_composite_steps(step: dict, workflows: Path) -> tuple[Path, list[dict]] | None:
+    """Resolve a repository-local composite action used by ``step``."""
+    import yaml
+
+    uses = str(step.get("uses") or "")
+    if not uses.startswith("./"):
+        return None
+
+    repo_root = workflows.parent.parent
+    action_path = repo_root / uses[2:]
+    candidates = (
+        (action_path / "action.yml", action_path / "action.yaml")
+        if action_path.is_dir()
+        else (action_path,)
+    )
+    definition = next((path for path in candidates if path.is_file()), None)
+    if definition is None:
+        return None
+
+    data = yaml.safe_load(definition.read_text(encoding="utf-8")) or {}
+    runs = data.get("runs") or {}
+    if runs.get("using") != "composite":
+        return None
+    return definition.resolve(), [
+        child for child in runs.get("steps") or [] if isinstance(child, dict)
+    ]
+
+
+def _image_build_steps(workflows: Path = WORKFLOWS) -> list[tuple[str, str, dict]]:
+    """Every image-build step reachable from every workflow.
 
     Discovered, not listed: a hand-maintained allowlist is how the `tests.yml`
     image build was missed in the first place, which is exactly the regression
-    this module claims to prevent. Returns (workflow, job, step) triples.
+    this module claims to prevent. Both action-based builds and Docker shell
+    commands are included, including those hidden in repository-local composite
+    actions. Returns (workflow, job, leaf build step) triples.
     """
     import yaml
 
     found: list[tuple[str, str, dict]] = []
-    for path in sorted(WORKFLOWS.glob("*.yml")) + sorted(WORKFLOWS.glob("*.yaml")):
-        data = yaml.safe_load(path.read_text()) or {}
+
+    def visit_step(
+        workflow: str,
+        job_name: str,
+        step: dict,
+        action_stack: frozenset[Path] = frozenset(),
+    ) -> None:
+        uses = str(step.get("uses") or "")
+        if uses.startswith("docker/build-push-action") or _is_shell_image_build(step):
+            found.append((workflow, job_name, step))
+
+        composite = _local_composite_steps(step, workflows)
+        if composite is None:
+            return
+        definition, children = composite
+        if definition in action_stack:
+            return
+        next_stack = action_stack | {definition}
+        for child in children:
+            visit_step(workflow, job_name, child, next_stack)
+
+    for path in sorted(workflows.glob("*.yml")) + sorted(workflows.glob("*.yaml")):
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         for job_name, job in (data.get("jobs") or {}).items():
             for step in (job or {}).get("steps") or []:
                 if not isinstance(step, dict):
                     continue
-                if str(step.get("uses", "")).startswith("docker/build-push-action"):
-                    found.append((path.name, job_name, step))
+                visit_step(path.name, job_name, step)
     return found
 
 
@@ -376,15 +438,77 @@ def test_upstream_fallback_produces_what_downstream_copies(dockerfile_text: str)
 def _pbs_source_selector(step: dict) -> list[str]:
     """The `PBS_SOURCE=` lines a build step passes, verbatim."""
     build_args = str((step.get("with") or {}).get("build-args", ""))
-    return [
+    selectors = [
         line.strip()
         for line in build_args.splitlines()
         if line.strip().startswith("PBS_SOURCE=")
     ]
+    try:
+        words = shlex.split(str(step.get("run") or ""), comments=False, posix=True)
+    except ValueError:
+        return selectors
+    for index, word in enumerate(words):
+        if word == "--build-arg" and index + 1 < len(words):
+            candidate = words[index + 1]
+        elif word.startswith("--build-arg="):
+            candidate = word.removeprefix("--build-arg=")
+        else:
+            continue
+        if candidate.startswith("PBS_SOURCE="):
+            selectors.append(candidate)
+    return selectors
+
+
+def test_shell_and_local_composite_image_builds_are_discovered(tmp_path: Path) -> None:
+    workflows = tmp_path / ".github" / "workflows"
+    action = tmp_path / ".github" / "actions" / "image"
+    workflows.mkdir(parents=True)
+    action.mkdir(parents=True)
+    (workflows / "images.yml").write_text(
+        """
+name: images
+on: push
+jobs:
+  direct:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker buildx build --push --build-arg PBS_SOURCE=ghcr .
+  composite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/image
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (action / "action.yml").write_text(
+        """
+name: image
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: docker build --build-arg=PBS_SOURCE=ghcr .
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    builds = _image_build_steps(workflows)
+    assert [(workflow, job) for workflow, job, _step in builds] == [
+        ("images.yml", "direct"),
+        ("images.yml", "composite"),
+    ]
+    assert [_pbs_source_selector(step) for _workflow, _job, step in builds] == [
+        ["PBS_SOURCE=ghcr"],
+        ["PBS_SOURCE=ghcr"],
+    ]
+
+
+def test_merge_queue_is_treated_as_pull_request_reachable() -> None:
+    assert "merge_group" in PR_REACHABLE_TRIGGERS
 
 
 def test_every_ci_image_build_selects_a_pbs_source_explicitly() -> None:
-    """Every `docker/build-push-action` step must set `PBS_SOURCE` exactly once.
+    """Every discovered CI image build must set `PBS_SOURCE` exactly once.
 
     Omitting it does not fail anything — it silently sends that build back to
     the release CDN that 404d the Actions egress and broke every image build.
@@ -396,7 +520,7 @@ def test_every_ci_image_build_selects_a_pbs_source_explicitly() -> None:
     fails here and has to be reviewed rather than absorbed.
     """
     steps = _image_build_steps()
-    assert steps, "found no docker/build-push-action steps to check"
+    assert steps, "found no image-build steps to check"
 
     offenders: list[str] = []
     for workflow, job, step in steps:
@@ -501,7 +625,7 @@ def test_non_pull_request_image_builds_keep_the_bare_mirror_pin() -> None:
     offenders = [
         f"{workflow}:{job}: {selectors}"
         for workflow, job, step in _image_build_steps()
-        if "pull_request" not in _workflow_triggers(workflow)
+        if not (PR_REACHABLE_TRIGGERS & _workflow_triggers(workflow))
         for selectors in [_pbs_source_selector(step)]
         if selectors != ["PBS_SOURCE=ghcr"]
     ]

@@ -37,9 +37,13 @@ stated reason because the dev-image workflow currently produces push images for 
 
 The concurrency set is an intentionally bounded architectural approximation. Local imports are followed
 downward from explicit request/engine roots, including the high-write `cps/web.py` and `cps/kobo.py`
-surfaces; reverse dependents cannot be discovered by that traversal and must be added as roots. The
+surfaces; reverse dependents cannot be discovered by that traversal and must be added as roots or package
+prefixes. The whole `cps/api/` blueprint tree is therefore protected explicitly: its registration in
+`cps/main.py` points toward the handlers, opposite to the import direction walked by the classifier. The
 two-level cutoff only bounds each root's dependency fan-out—it is not what excludes reverse dependents.
-At this revision the derived set is 110 of 215 local Python modules.
+At this revision the derived set is 149 of 215 local Python modules. Measured at `origin/main`
+`e6298e0d560b`, the previous and expanded policies each fired on 26 of the latest 100 first-parent commits;
+protecting `cps/api/` added zero historical gate runs in that sample.
 
 ## What it covers (projects = matrix axes)
 

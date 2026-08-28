@@ -31,7 +31,7 @@ CONCURRENCY_ROOTS = {
 # same architectural contract.  Helpers imported by these roots are discovered
 # from the AST below instead of being copied into this list.
 CONCURRENCY_PREFIXES = (
-    "cps/api/annotations",
+    "cps/api/",
     "cps/gevent",
     "cps/services/annotation_sync/",
 )

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -33,6 +34,7 @@ ALIASER = REPO / "scripts" / "alias-e2e-image.sh"
         "cps/services/annotation_sync/hardcover.py",
         "cps/annotations.py",
         "cps/web.py",
+        "cps/api/shelves.py",
     ],
 )
 def test_named_engine_and_concurrency_surfaces_trigger_e2e(path):
@@ -40,8 +42,8 @@ def test_named_engine_and_concurrency_surfaces_trigger_e2e(path):
     assert result["concurrency"] is True, path
 
 
-def test_unrelated_backend_route_does_not_pay_for_concurrency_e2e():
-    result = classify_paths(["cps/api/books.py"], REPO)
+def test_unrelated_backend_module_does_not_pay_for_concurrency_e2e():
+    result = classify_paths(["cps/audio.py"], REPO)
     assert result["build"] is True
     assert result["concurrency"] is False
 
@@ -76,11 +78,11 @@ def test_documented_classifier_scope_matches_the_tree_and_names_the_real_limit()
 
 def test_concurrency_closure_is_independent_of_python_hash_order():
     command = (
-        "from pathlib import Path; "
+        "import json; from pathlib import Path; "
         "from scripts.ci_path_classification import concurrency_paths; "
-        "print(len(concurrency_paths(Path.cwd())))"
+        "print(json.dumps(sorted(concurrency_paths(Path.cwd()))))"
     )
-    counts = set()
+    path_sets = set()
     for seed in ("1", "2", "3", "42"):
         env = {**os.environ, "PYTHONHASHSEED": seed}
         proc = subprocess.run(
@@ -92,8 +94,8 @@ def test_concurrency_closure_is_independent_of_python_hash_order():
             text=True,
             timeout=10,
         )
-        counts.add(int(proc.stdout.strip()))
-    assert counts == {len(concurrency_paths(REPO))}
+        path_sets.add(frozenset(json.loads(proc.stdout)))
+    assert path_sets == {frozenset(concurrency_paths(REPO))}
 
 
 def test_workflows_wire_nonfork_concurrency_to_a_commit_image_and_hard_gate():

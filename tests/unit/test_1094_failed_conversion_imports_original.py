@@ -515,6 +515,34 @@ class TestKepubFailureAlwaysReturnsAPair:
         nbp.backup = lambda f, backup_type: nbp.backed_up.append((f, backup_type))
         return nbp
 
+    def test_failed_kepub_ticket_conversion_removes_import_sidecar(
+        self, tmp_path
+    ):
+        source = tmp_path / "Library Ticket.acsm"
+        source.write_text("ticket contents")
+        intermediate = tmp_path / "Library Ticket.epub"
+        intermediate.write_text("fulfilled epub")
+        import_manifest = Path(str(source) + ".cwa.json")
+        import_manifest.write_text('{"action": "import"}')
+
+        nbp = object.__new__(ingest_processor.NewBookProcessor)
+        nbp.filepath = str(source)
+        nbp.input_format = "acsm"
+        nbp.backed_up = []
+
+        def _backup(filepath, backup_type):
+            nbp.backed_up.append((filepath, backup_type))
+            return True
+
+        nbp.backup = _backup
+        nbp._backup_failed_kepub_inputs(str(intermediate))
+
+        assert nbp.backed_up == [
+            (str(source), "failed"),
+            (str(intermediate), "failed"),
+        ]
+        assert not import_manifest.exists()
+
     @pytest.mark.parametrize(
         "exc",
         [

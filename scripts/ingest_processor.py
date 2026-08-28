@@ -1525,7 +1525,11 @@ class NewBookProcessor:
         input the failed folder never held the file the user actually dropped
         in, which is the one they would retry (#1094).
         """
-        self.backup(self.filepath, backup_type="failed")
+        if (
+            self.backup(self.filepath, backup_type="failed")
+            and not is_a_book_format(self.input_format)
+        ):
+            _remove_completed_import_manifest(self.filepath)
         if converted_filepath and str(converted_filepath) != str(self.filepath):
             self.backup(str(converted_filepath), backup_type="failed")
 
@@ -2445,7 +2449,11 @@ def main(filepath=None):
                     nbp.add_book_to_library(converted_filepath) # type: ignore
 
                     # If the original format should be retained, also add it as an additional format
-                    if nbp.input_format in nbp.convert_retained_formats and nbp.input_format not in nbp.ingest_ignored_formats:
+                    if (
+                        is_a_book_format(nbp.input_format)
+                        and nbp.input_format in nbp.convert_retained_formats
+                        and nbp.input_format not in nbp.ingest_ignored_formats
+                    ):
                         print(f"[ingest-processor]: Retaining original format ({nbp.input_format}) for {nbp.filename}...", flush=True)
                         # Find the book that was just added to get its ID
                         try:
@@ -2481,7 +2489,10 @@ def main(filepath=None):
                 else:
                     _fail_not_a_book_input(nbp, filepath)
             else:
-                print(f"[ingest-processor]: Cannot convert {nbp.filepath}. {nbp.input_format} is currently unsupported / is not a known ebook format.", flush=True)
+                if is_a_book_format(nbp.input_format):
+                    print(f"[ingest-processor]: Cannot convert {nbp.filepath}. {nbp.input_format} is currently unsupported / is not a known ebook format.", flush=True)
+                else:
+                    _fail_not_a_book_input(nbp, filepath)
 
         return 0
 

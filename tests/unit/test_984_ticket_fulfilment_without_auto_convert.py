@@ -41,6 +41,9 @@ class _FakeProcessor:
         convert_result,
         target_format="epub",
         convert_ignored_formats=(),
+        convert_retained_formats=(),
+        can_convert=True,
+        last_added_book_id=None,
         use_real_converter=False,
     ):
         self.filepath = filepath
@@ -52,7 +55,7 @@ class _FakeProcessor:
         ) + os.sep
         self.ingest_ignored_formats = []
         self.convert_ignored_formats = list(convert_ignored_formats)
-        self.convert_retained_formats = []
+        self.convert_retained_formats = list(convert_retained_formats)
         self.cwa_settings = {
             "ingest_timeout_minutes": 15,
             "auto_backup_conversions": False,
@@ -60,14 +63,15 @@ class _FakeProcessor:
         self.calibre_env = os.environ.copy()
         self.is_target_format = False
         self.auto_convert_on = auto_convert_on
-        self.can_convert = True
-        self.last_added_book_id = None
+        self.can_convert = can_convert
+        self.last_added_book_id = last_added_book_id
         self._convert_result = convert_result
         self._use_real_converter = use_real_converter
         self.imported = []
         self.convert_book_calls = []
         self.convert_to_kepub_calls = 0
         self.backed_up = []
+        self.added_formats = []
 
     def is_file_in_use(self, timeout=None):
         return True
@@ -87,6 +91,9 @@ class _FakeProcessor:
 
     def add_book_to_library(self, filepath, *args, **kwargs):
         self.imported.append(filepath)
+
+    def add_format_to_book(self, book_id, filepath):
+        self.added_formats.append((book_id, filepath))
 
     def backup(self, filepath, backup_type):
         self.backed_up.append((filepath, backup_type))
@@ -108,10 +115,16 @@ def _run_main(
     convert_result,
     target_format="epub",
     convert_ignored_formats=(),
+    convert_retained_formats=(),
+    can_convert=True,
+    last_added_book_id=None,
+    create_import_manifest=False,
     use_real_converter=False,
 ):
     source = tmp_path / f"Library Ticket.{input_format}"
     source.write_text("ticket or book contents")
+    if create_import_manifest:
+        Path(str(source) + ".cwa.json").write_text('{"action": "import"}')
     holder = {}
 
     def _factory(filepath):
@@ -122,6 +135,9 @@ def _run_main(
             convert_result=convert_result,
             target_format=target_format,
             convert_ignored_formats=convert_ignored_formats,
+            convert_retained_formats=convert_retained_formats,
+            can_convert=can_convert,
+            last_added_book_id=last_added_book_id,
             use_real_converter=use_real_converter,
         )
         holder["fake"] = fake
@@ -192,6 +208,47 @@ def test_real_book_is_still_imported_as_is_when_auto_convert_is_off(
     assert fake.convert_book_calls == []
     assert fake.convert_to_kepub_calls == 0
     assert fake.imported == [source]
+
+
+def test_unconvertible_acsm_uses_ticket_failure_flow(
+    monkeypatch, tmp_path, capsys
+):
+    fake, source = _run_main(
+        monkeypatch,
+        tmp_path,
+        input_format="acsm",
+        auto_convert_on=False,
+        convert_result=(False, ""),
+        can_convert=False,
+        create_import_manifest=True,
+    )
+
+    output = capsys.readouterr().out
+    assert fake.convert_book_calls == []
+    assert fake.imported == []
+    assert fake.backed_up == [(source, "failed")]
+    assert not Path(source + ".cwa.json").exists()
+    assert "ACSM_NOTICE:" in output
+    assert "is currently unsupported / is not a known ebook format" not in output
+
+
+def test_successful_fulfilment_never_retains_raw_ticket_as_book_format(
+    monkeypatch, tmp_path
+):
+    converted = str(tmp_path / "Library Ticket.epub")
+    fake, source = _run_main(
+        monkeypatch,
+        tmp_path,
+        input_format="acsm",
+        auto_convert_on=True,
+        convert_result=(True, converted),
+        convert_retained_formats=("acsm",),
+        last_added_book_id=7,
+    )
+
+    assert fake.imported == [converted]
+    assert fake.added_formats == []
+    assert source not in fake.imported
 
 
 def test_failed_ticket_fulfilment_keeps_plugin_reason_and_preserves_original(

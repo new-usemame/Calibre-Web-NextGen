@@ -120,6 +120,7 @@ class SyncToken:
         books_last_id=-1,
         magic_shelf_last_id=-1,
         magic_shelf_membership_at=datetime.min,
+        is_cwng_token=False,
     ):  # nosec
         self.raw_kobo_store_token = raw_kobo_store_token
         self.books_last_created = books_last_created
@@ -130,6 +131,11 @@ class SyncToken:
         self.books_last_id = books_last_id
         self.magic_shelf_last_id = magic_shelf_last_id
         self.magic_shelf_membership_at = magic_shelf_membership_at
+        # Request provenance only; never serialized. True means from_headers
+        # successfully decoded and schema-validated a token produced by CWNG.
+        # Empty, malformed, and official-store tokens remain False so callers
+        # can preserve first-sync/factory-reset behavior.
+        self.is_cwng_token = is_cwng_token
 
     @staticmethod
     def from_headers(headers):
@@ -217,6 +223,20 @@ class SyncToken:
         if not isinstance(magic_shelf_last_id, int):
             magic_shelf_last_id = -1
 
+        # The historical schema intentionally accepts missing fields and
+        # degrades them to datetime.min for cursor compatibility. That is too
+        # permissive as proof that a request returned a token CWNG actually
+        # emitted. Layer 2 provenance therefore requires every original v1
+        # cursor while leaving the parser's existing fallback behavior intact.
+        core_cursor_fields = {
+            "books_last_modified",
+            "books_last_created",
+            "archive_last_modified",
+            "reading_state_last_modified",
+            "tags_last_modified",
+        }
+        is_cwng_token = core_cursor_fields.issubset(data_json)
+
         return SyncToken(
             raw_kobo_store_token=raw_kobo_store_token,
             books_last_created=books_last_created,
@@ -227,6 +247,7 @@ class SyncToken:
             books_last_id=books_last_id,
             magic_shelf_last_id=magic_shelf_last_id,
             magic_shelf_membership_at=magic_shelf_membership_at,
+            is_cwng_token=is_cwng_token,
         )
 
     def set_kobo_store_header(self, store_headers):

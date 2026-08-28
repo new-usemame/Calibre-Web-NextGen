@@ -1,0 +1,308 @@
+# Issue #1925 — Kobo sync de-download report
+
+Status: two-layer implementation complete; focused and complete executable-unit
+verification green; Clara hardware discrimination pending.
+
+## Mechanism
+
+- **OBSERVED — discriminating integration tests:** real `HandleSyncRequest`
+  calls with one user, one unchanged book, and real SQLAlchemy cursor queries
+  reproduce the replay. With Layer 2 off, two tokenless requests both contain
+  the same `NewEntitlement`, but Layer 1 makes the two payloads byte-identical.
+  With Layer 2 on, a successfully parsed CWNG token whose cursors are behind
+  selects the book but the matching per-device fingerprint suppresses it.
+- **OBSERVED — the token is the replay trigger:** a normal request that echoes
+  the first response's `x-kobo-synctoken` advances past the unchanged book.
+  A missing, malformed, truncated, or official-store-only token becomes a
+  `SyncToken` with local cursors at `datetime.min`, so the book query selects
+  the whole library again. The old handler retained no per-device record of the
+  payload already delivered and replayed every selected entitlement.
+- **OBSERVED — candidate (1), the empty `KoboSyncedBooks` reset, is sufficient
+  but not necessary:** the red test keeps the user's `KoboSyncedBooks` row
+  present before request two, so the line-349 full-reset branch does not fire.
+  Token loss alone reproduces the server response. If that table is also empty,
+  the branch explicitly discards a valid incoming local cursor and reaches the
+  same replay path.
+- **OBSERVED — candidate (3), cursor/token loss, is the root replay
+  mechanism:** the unchanged response is replayed when the local cursor is
+  absent or behind the payload already emitted. The already-landed #468 Magic Shelf fix preserves
+  `MagicShelfCache.created_at` when membership is unchanged, so an unchanged
+  cache rebuild is not the discriminator at this HEAD.
+- **OBSERVED — first/second response diff on old code:** the same UUID was
+  re-sent as `NewEntitlement`. For requests generated in different clock
+  seconds, the sole logically-unchanged entitlement field that mutated was
+  `BookEntitlement.ActivePeriod.From`; `DownloadUrls[].Size` stayed numerically
+  equal to the source `Data` row but did not describe the generated artifact.
+  Thus token loss selects the replay, wall-clock `ActivePeriod` makes its JSON
+  unstable, and `Size` can make the stable-looking declaration untruthful.
+- **OBSERVED — candidate (2), declared size, is a contributing payload defect,
+  not the replay trigger:** `build_download_url` declared
+  `book_data.uncompressed_size`. For deferred EPUB→KEPUB conversion that is the
+  EPUB's stored size; with download-time metadata embedding, even a stored
+  KEPUB is rewritten to fresh bytes. The declared value therefore does not
+  describe the artifact Nickel receives. The fix omits `Size` for generated
+  KEPUBs and every metadata-rewritten EPUB/KEPUB, retaining it only for exact
+  stored files.
+- **OBSERVED — another unstable entitlement field:** `ActivePeriod.From` used
+  response-generation wall-clock time. Two otherwise identical entitlement
+  builds therefore differed even with no library change. It now uses the
+  stable book-created timestamp, the same value as `Created`.
+- **OBSERVED on hardware (source dossier §6n/§6q):** the abnormal post-firmware
+  Clara sync and post-USB-interruption Libra sync re-stamped unchanged `content`
+  rows and changed downloaded books to `IsDownloaded='false'`; three of four
+  flipped books also changed `___FileSize`; server `metadata.db` had no
+  `last_modified` bump.
+- **ASSUMED — Nickel's exact decision predicate:** the combined hardware and
+  server evidence is consistent with Nickel treating a replayed entitlement,
+  especially one whose declared `Size` disagrees with its local artifact, as a
+  replacement and clearing `IsDownloaded`. Nickel is closed-source and the
+  Python integration test proves the server stimulus, not Nickel's private
+  branch condition. The Layer 1 Clara experiment below tests whether stable,
+  truthful payloads alone remove the harmful client outcome.
+
+## Layer 1 — ship first: payload stabilization, no suppression
+
+- **OBSERVED:** `ActivePeriod.From` is the stable book-created timestamp, equal
+  to `Created`; malformed legacy timestamps use a deterministic epoch rather
+  than response time.
+- **OBSERVED:** `DownloadUrls[].Size` is omitted for generated KEPUBs and every
+  metadata-rewritten EPUB/KEPUB. Exact stored artifacts retain their truthful
+  stored size.
+- **OBSERVED:** the permanent DEBUG summary reports New/Changed/suppressed
+  counts, Layer 2 enabled/eligible state, and in/out book, archive,
+  reading-state, tag, and Magic Shelf cursors without logging the opaque store
+  token.
+- **OBSERVED:** with the new flag at its default `false`, the sync path computes,
+  queries, and writes no fingerprint and suppresses no entitlement. A tokenless
+  unchanged-library replay is still emitted, now byte-identically. This is the
+  default production behavior until Clara evidence justifies Layer 2.
+- **OBSERVED:** real `Books.last_modified` changes still emit exactly one
+  `ChangedEntitlement`.
+
+## Layer 2 — experimental, default off
+
+- **OBSERVED:** `config_kobo_suppress_replayed_entitlements` is additive,
+  defaults false on upgrades and fresh installs, is exposed as an experimental
+  admin checkbox, and gates all ledger reads/writes and suppression behavior.
+- **OBSERVED:** when enabled, `kobo_device_book_entitlement` stores the SHA-256
+  of stable `BookEntitlement` + `BookMetadata` per `(device_id, book_id)`. The
+  HMAC-backed device registry resolves the physical device without storing its
+  raw hardware identifier.
+- **OBSERVED — factory-reset escape:** suppression is eligible only when the
+  request has a resolved device and `SyncToken.from_headers` successfully
+  decoded and schema-validated a CWNG token. Empty, malformed, truncated, and
+  official-store tokens always receive the full replay, even when the hardware
+  already has ledger rows. Those deliveries refresh the ledger.
+- **OBSERVED:** a valid stale CWNG token plus an exact same-device fingerprint
+  suppresses New/Changed entitlement replay while still advancing cursors.
+  Reading-state changes remain independently deliverable. A second device has
+  no matching row and receives its entitlement.
+- **ASSUMED/unavoidable ambiguities:** an empty library that somehow retains a
+  valid stale CWNG token is indistinguishable from an interrupted sync whose
+  library is intact. Also, the ledger proves that the server generated a
+  response, not that the device applied it: if transmission stops before the
+  device applies a newly offered book and it retries the same valid token,
+  Layer 2 may suppress a book the device never received. The escape covers the
+  normal factory-reset/re-setup signature (no valid CWNG token), not retained-
+  token database corruption, partial restores, or pre-application response
+  loss. These residual risks are why Layer 2 defaults off.
+- **OBSERVED:** explicit unsync/resend, full-sync, archive-removal, duplicate
+  merge, book purge, user purge, and database-swap paths clear the new ledger
+  at the same boundary as the legacy delivery marker. This prevents replay
+  suppression from masking an operator-requested resend or a book returning
+  from Archive.
+- **OBSERVED:** `KoboDeviceBookEntitlement` is registered in
+  `PER_USER_BOOK_MODELS`; because its user scope is indirect, purge resolves it
+  through `Device`, while duplicate/book purges filter by `book_id`.
+
+## Pre-existing flat-marker constraint
+
+- **OBSERVED:** `KoboSyncedBooks` remains keyed only by `(user_id, book_id)`,
+  not device. Its archive/reset logic can establish only that some Kobo for the
+  user was offered the book; it cannot establish that this requesting device
+  still has it. One device's delivery/removal therefore affects the user's
+  flat archive candidate set seen by other devices.
+- **OBSERVED:** this is why neither a present `KoboSyncedBooks` row nor the
+  physical-device HMAC is a safe non-empty-library discriminator. Layer 2 uses
+  its per-device ledger only after a valid returned CWNG token, and Layer 1
+  leaves the flat-marker behavior unchanged.
+- **ASSUMED/future work:** fully resolving the archive hazard requires making
+  delivery/archive state device-scoped or receiving authoritative device
+  library state; #1925 does not attempt that migration.
+
+## Dating
+
+- **OBSERVED — earliest payload instability in upstream history:** upstream
+  commit `8e1641dac9c9211ef324d5aeb8cfd399cc496bc0` (authored 2020-02-15,
+  committed 2020-03-01, “Add support for syncing Kobo reading state”) introduced
+  the wall-clock `ActivePeriod` shape. The current CWNG ancestry acquired that
+  code in the CWA in-repo “MAJOR REFACTOR” import
+  `73eecc175bf241c4410e7e220c7d2bfb426851ce` on 2025-08-02; the first tag
+  containing that import is `V3.1.2` (2025-08-03).
+- **OBSERVED — size field provenance:** upstream commit
+  `55c0bb6d34e009b5aed241037187d17357551432` (2019-12-08) introduced
+  `DownloadUrls[].Size` from the stored `Data` row. It was truthful for the
+  exact stored KEPUB path at that point.
+- **OBSERVED — download-time KEPUB byte instability:** upstream commit
+  `b8031cd53fe19ac37f1962f5010b2669e45875d2` (2024-01-13, “Add possibility to
+  replace kepub metadata on download”) introduced `updateEpub(...); zf.writestr`
+  for every metadata-embedded KEPUB download. Python supplies the new ZIP
+  member's current local time, so identical logical input can produce different
+  bytes/size. CWNG again acquired this in `73eecc175...` / first tag `V3.1.2`.
+- **OBSERVED — first CWNG PR that made the declared-size mismatch apply to
+  deferred conversions:** `27b334cc1877655c2086560148a00094582f6591`
+  (committed 2026-06-04, authored 2026-06-05), PR **#350**, “defer kepub
+  conversion”. It selected the EPUB `Data` row while declaring a KEPUB download
+  URL, so the EPUB size was guaranteed to name a different artifact. The first
+  release tag containing it is `v4.0.146` (2026-06-04).
+- **OBSERVED — cursor-loss replay provenance:** upstream commit
+  `25422b341142729fdc6f6d32b45e27986a3d535e` (2021-12-12, fix for upstream
+  #2195) added the empty-`KoboSyncedBooks` forced-reset branch. Malformed/foreign
+  token fallback has existed since the early SyncToken implementation; neither
+  path had per-device payload memory.
+- **OBSERVED — shipped scope:** the previous stable release `v4.1.41`
+  (`VERSION` = `4.1.41`, tagged 2026-08-25) contains the import, PR #350, token
+  reset, and download-time rewrite, so it carries the complete #1925 exposure.
+
+## Automated verification
+
+### Red on old code
+
+Command:
+
+```text
+python -m pytest -q tests/unit/test_1925_kobo_sync_dedownload.py
+```
+
+Manager-verified result against old code for the nine-test regression revision:
+**6 failed, 3 passed**. The failures discriminated replay suppression, unstable
+timestamps, and untruthful generated/rewritten download sizes from the positive
+controls that old code already handled.
+
+- replay assertion failed: second response contained one unchanged
+  `NewEntitlement`;
+- stable-field assertion failed: `ActivePeriod.From` was wall-clock time rather
+  than `Created`;
+- generated-KEPUB assertion failed: response declared the source EPUB size;
+- real `last_modified` bump assertion already passed.
+
+### Green after implementation
+
+**OBSERVED — focused two-layer, lifecycle, and adjacent KEPUB selection:**
+
+```text
+python -m pytest -q \
+  tests/unit/test_1925_kobo_sync_dedownload.py \
+  tests/unit/test_kobo_synctoken_validation.py \
+  tests/unit/test_kobo_synctoken_compression_331.py \
+  tests/unit/test_kobo_annotation_stage0.py \
+  tests/unit/test_user_book_data_d4.py \
+  tests/unit/test_kobo_admin_resend_book.py \
+  tests/unit/test_kobo_prefer_kepub.py
+```
+
+Current result: **102 passed**. The #1925 module contributes 15 collected cases,
+including default-off/zero-ledger behavior, byte-identical tokenless replay,
+valid-stale-token suppression, absent/malformed/store-token factory-reset
+escapes, per-device isolation, real-change positive control, stable timestamps,
+truthful size behavior, schema creation, config migration/defaults, and strict
+suppression provenance atop permissive legacy token parsing. The D4 suite pins
+`PER_USER_BOOK_MODELS` registration and lifecycle cleanup.
+
+**OBSERVED — final complete executable unit suite:** `tests/unit` collected
+**7,362** tests. With the 17 environment-blocked node IDs below explicitly
+deselected, the post-restructure result was **7,243 passed, 102 skipped, 17
+deselected**. No executable unit test failed.
+
+The 17 deselections are existing tests whose required OS operation is denied by
+this managed sandbox:
+
+- six real-server cases in `test_gevent_wsgi_format_request.py` — loopback
+  `bind(('127.0.0.1', 0))` raises `PermissionError(EPERM)`;
+- one case in `test_health_probe_responsiveness.py` — same loopback-bind denial;
+- three cases in `test_measure_kobo_patch_failure_is_safe.py` — same
+  loopback-bind denial;
+- seven cases in `test_s6_ingest_service_shutdown.py` — executing `/bin/ps` to
+  inspect the child session raises `PermissionError(EPERM)`.
+
+**OBSERVED — earlier literal repository-default command:** `python -m pytest` collected
+7,569 tests and reached **7,348 passed, 123 skipped, 18 failed, 80 setup
+errors** before the final test-precondition pin. Seventeen of the failures are
+the sandbox-denied unit cases above. The eighteenth was the existing stored-
+KEPUB size test relying on uninitialized-config order; it is now pinned to its
+actual precondition (`config_embed_metadata=False`) and passes both focused and
+in the complete executable unit run. The 80 setup errors are environment-backed
+Docker/ingest/KOReader integration suites with no Docker container or live
+service in this offline worktree, not product assertion failures. The literal
+default command was not rerun after that test-only precondition correction;
+the complete unit tree was.
+
+**OBSERVED — static hygiene:** `git diff --check` exits cleanly.
+
+## Clara hardware-verification recipe
+
+### Phase A — decide whether Layer 1 is sufficient
+
+Run this phase with `config_kobo_suppress_replayed_entitlements = false`.
+Layer 2 must remain off throughout the experiment.
+
+1. Deploy the fixed image, confirm the flag is off, and enable DEBUG logging.
+2. With the Clara idle and disconnected from USB, pull baseline
+   `KoboReader.sqlite` (`A0`). Export the `content` identity/state tuple for all
+   CWNG books:
+
+   ```sql
+   SELECT ContentID, IsDownloaded, ___SyncTime, ___FileSize
+   FROM content
+   WHERE ContentType = 6
+   ORDER BY ContentID;
+   ```
+
+   Also snapshot server `metadata.db` book id/uuid/`last_modified` for the same
+   set.
+3. Clear only the target Kobo user's `KoboSyncedBooks` rows. Do not clear books,
+   download files, reading state, or device records. This forces the existing
+   full-resync branch while Layer 2 is provably inactive.
+4. Run one completed sync. Preserve its DEBUG summary; it must show Layer 2
+   `enabled=False eligible=False`, `suppressed_unchanged=0`, and a full set of
+   local New entitlements. Pull `A1` after the device returns idle.
+5. Compare A0→A1 by `ContentID`. For every book whose server `last_modified`
+   stayed constant, record:
+
+   - zero `IsDownloaded: true → false` transitions;
+   - zero `___SyncTime` changes;
+   - zero `___FileSize` changes;
+   - the exact replayed entitlement envelope and DEBUG counts.
+
+**Decision gate:**
+
+- If A0→A1 has zero flips and zero row re-stamps, **OBSERVED hardware result:
+  Layer 1 is sufficient**. Ship with Layer 2 off; do not enable the experimental
+  ledger merely because it exists.
+- If a byte-stable replay still flips/re-stamps unchanged rows, **OBSERVED
+  hardware result: Layer 1 is insufficient**. Only then proceed to Phase B.
+
+### Phase B — optional Layer 2 verification after an adverse Phase A
+
+1. Enable `config_kobo_suppress_replayed_entitlements`.
+2. Force one tokenless/full delivery to seed the per-device ledger. Confirm the
+   request is `eligible=False`, all books are delivered, and ledger rows exist.
+3. Use **N = 5 completed syncs**, with one deliberately interrupted attempt
+   between completed syncs 2 and 3, preserving every DEBUG summary and database
+   snapshot B0–B5. The recovery must present a valid stale CWNG token to test
+   suppression; if it presents no valid CWNG token, full delivery is the
+   intentional factory-reset-safe behavior and does not test Layer 2.
+4. For a valid stale-token recovery, require `enabled=True eligible=True`,
+   `suppressed_unchanged > 0`, zero local New/Changed envelopes for those exact
+   matches, and zero `IsDownloaded`, `___SyncTime`, or `___FileSize` changes.
+5. Repeat one request without a CWNG token and require the opposite safety
+   behavior: `eligible=False`, no suppression, and a full replay.
+6. Positive control after B5: bump `last_modified` on one disposable downloaded
+   book, run one additional sync, and require exactly that UUID to appear as one
+   `ChangedEntitlement`. Its row is expected to re-stamp/de-download under the
+   existing real-change contract; every unchanged control row must remain
+   byte-identical. Restore or re-download the disposable control afterward.
+
+Hardware status: **ASSUMED pending manager run**. Phase A, not Layer 2, is the
+first decision point. Do not label either layer hardware/end-to-end verified
+until its corresponding database comparison has been completed.

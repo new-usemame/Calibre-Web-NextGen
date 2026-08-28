@@ -1427,6 +1427,11 @@ def ajax_pathchooser():
 
 
 def do_full_kobo_sync(userid):
+    device_ids = ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == userid).scalar_subquery()
+    ub.session.query(ub.KoboDeviceBookEntitlement).filter(
+        ub.KoboDeviceBookEntitlement.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
     count = ub.session.query(ub.KoboSyncedBooks).filter(userid == ub.KoboSyncedBooks.user_id).delete()
     message = _("{} sync entries deleted").format(count)
     ub.session_commit(message)
@@ -2841,6 +2846,7 @@ def _configuration_update_helper():
         _config_int(to_save, "config_external_port")
         _config_checkbox_int(to_save, "config_kobo_proxy")
         _config_checkbox(to_save, "config_kobo_prefer_kepub")
+        _config_checkbox_int(to_save, "config_kobo_suppress_replayed_entitlements")
 
         # Kobo cover aspect-ratio padding (server-side letterbox elimination)
         _config_checkbox_int(to_save, "config_kobo_cover_padding_enabled")

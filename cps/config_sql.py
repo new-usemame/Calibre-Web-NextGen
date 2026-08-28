@@ -160,6 +160,11 @@ class _Settings(_Base):
     config_kobo_cover_padding_fill_mode = Column(String, default="edge_mirror")
     config_kobo_cover_padding_color = Column(String, default="")
     config_kobo_prefer_kepub = Column(Boolean, default=True)
+    # Experimental issue #1925 Layer 2. Default off: Layer 1's byte-stable
+    # entitlement payload ships independently without suppressing replays.
+    config_kobo_suppress_replayed_entitlements = Column(
+        Boolean, nullable=False, default=False, server_default=text("0"),
+    )
     config_kobo_kepub_backfill_completed = Column(Boolean, default=False)
     # Legacy #1647 watermark retained only for schema/rollback compatibility.
     # It is deliberately not read: SQLite can reuse KoboSyncedBooks INTEGER

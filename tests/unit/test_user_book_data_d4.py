@@ -85,6 +85,13 @@ def _annotation(ub, book_id, annotation_id="ann-1", user_id=USER, **kw):
 
 
 @pytest.mark.unit
+def test_per_user_book_registry_includes_device_entitlement_ledger():
+    from cps.user_book_data import PER_USER_BOOK_MODELS
+
+    assert "KoboDeviceBookEntitlement" in PER_USER_BOOK_MODELS
+
+
+@pytest.mark.unit
 class TestMigrate:
     def test_annotation_moves_to_winner_with_sync_targets(self, session):
         from cps import ub
@@ -299,7 +306,18 @@ class TestMigrate:
     def test_kobo_synced_marker_dropped_not_migrated(self, session):
         from cps import ub
         from cps.user_book_data import migrate_user_book_data
-        session.add(ub.KoboSyncedBooks(user_id=USER, book_id=LOSER))
+        device = ub.Device(
+            user_id=USER, kind="kobo", display_name="D4 Kobo",
+            active=True, created_by="auto",
+        )
+        session.add(device)
+        session.flush()
+        session.add_all([
+            ub.KoboSyncedBooks(user_id=USER, book_id=LOSER),
+            ub.KoboDeviceBookEntitlement(
+                device_id=device.id, book_id=LOSER, fingerprint="a" * 64,
+            ),
+        ])
         session.commit()
 
         migrate_user_book_data(LOSER, WINNER, session=session)
@@ -308,6 +326,7 @@ class TestMigrate:
         # the marker means "this file was delivered" — the kept book is a
         # different file, so it must sync fresh, not inherit the marker.
         assert session.query(ub.KoboSyncedBooks).count() == 0
+        assert session.query(ub.KoboDeviceBookEntitlement).count() == 0
 
     def test_simple_flags_migrate_and_dedupe(self, session):
         from cps import ub
@@ -335,6 +354,12 @@ class TestPurge:
         state = ub.KoboReadingState(user_id=USER, book_id=LOSER)
         state.current_bookmark = ub.KoboBookmark(progress_percent=10.0)
         state.statistics = ub.KoboStatistics(spent_reading_minutes=5)
+        device = ub.Device(
+            user_id=USER, kind="kobo", display_name="D4 Kobo",
+            active=True, created_by="auto",
+        )
+        session.add(device)
+        session.flush()
         session.add_all([
             ann, state,
             ub.ReadBook(user_id=USER, book_id=LOSER, read_status=1),
@@ -342,6 +367,9 @@ class TestPurge:
             ub.ArchivedBook(user_id=USER, book_id=LOSER, is_archived=False),
             ub.Downloads(user_id=USER, book_id=LOSER),
             ub.KoboSyncedBooks(user_id=USER, book_id=LOSER),
+            ub.KoboDeviceBookEntitlement(
+                device_id=device.id, book_id=LOSER, fingerprint="b" * 64,
+            ),
         ])
         _shelf_link(session, ub, LOSER, 1, 1)
         session.commit()
@@ -356,7 +384,8 @@ class TestPurge:
 
         for model in (ub.Annotation, ub.AnnotationSyncTarget, ub.KoboReadingState,
                       ub.KoboBookmark, ub.KoboStatistics, ub.ReadBook, ub.Bookmark,
-                      ub.ArchivedBook, ub.Downloads, ub.BookShelf, ub.KoboSyncedBooks):
+                      ub.ArchivedBook, ub.Downloads, ub.BookShelf, ub.KoboSyncedBooks,
+                      ub.KoboDeviceBookEntitlement):
             assert session.query(model).count() == 0, model.__name__
 
     def test_purge_by_book_leaves_other_books_alone(self, session):

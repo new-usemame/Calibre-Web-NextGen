@@ -806,6 +806,38 @@ class KoboSyncedBooks(Base):
     )
 
 
+class KoboDeviceBookEntitlement(Base):
+    """Last stable entitlement delivered to one physical Kobo.
+
+    Kobo's opaque sync token is device-owned and can disappear after an
+    interrupted sync, firmware install, or USB interruption.  This server-side
+    ledger is deliberately per-device (not per-user): it lets a known device
+    suppress an identical entitlement replay without causing another Kobo on
+    the same account to miss its first delivery or a later real change.
+    """
+    __tablename__ = 'kobo_device_book_entitlement'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(
+        Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False,
+    )
+    # Cross-database identity: calibre's Books row lives in metadata.db, so
+    # this cannot be a foreign key in app.db.
+    book_id = Column(Integer, nullable=False)
+    fingerprint = Column(String(64), nullable=False)
+    updated_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            'device_id', 'book_id',
+            name='uq_kobo_device_book_entitlement_device_book',
+        ),
+        Index('ix_kobo_device_book_entitlement_book', 'book_id'),
+    )
+
+
 class NoticeEvent(Base):
     """Device-agnostic occurrence that may need to be shown to selected users.
 
@@ -1828,6 +1860,7 @@ def add_missing_tables(engine, _session):
         ("hidden_magic_shelf_templates", HiddenMagicShelfTemplate.__table__),
         ("kobo_annotation_backup", KoboAnnotationBackup.__table__),
         ("favorite_book", FavoriteBook.__table__),
+        ("kobo_device_book_entitlement", KoboDeviceBookEntitlement.__table__),
     )
     for table_name, table in tables:
         # Explicit transaction control means even schema inspection begins a

@@ -7,6 +7,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import base64
+import hashlib
 import logging
 from datetime import datetime, timezone
 from cps import cw_babel
@@ -63,6 +64,31 @@ kobo_auth.disable_failed_auth_redirect_for_blueprint(kobo)
 kobo_auth.register_url_value_preprocessor(kobo)
 
 log = logger.create()
+
+
+def _entitlement_fingerprint(entitlement):
+    """Stable hash of fields that can change Nickel's local book record."""
+    payload = json.dumps(
+        entitlement,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _sync_cursor_summary(sync_token):
+    """Compact cursor state for the one-line per-sync diagnostic."""
+    return (
+        sync_token.books_last_modified,
+        sync_token.books_last_id,
+        sync_token.books_last_created,
+        sync_token.archive_last_modified,
+        sync_token.reading_state_last_modified,
+        sync_token.tags_last_modified,
+        sync_token.magic_shelf_last_id,
+        sync_token.magic_shelf_membership_at,
+    )
 
 
 def normalized_books_last_modified(value):
@@ -216,7 +242,10 @@ def convert_to_kobo_timestamp_string(timestamp):
         return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
     except AttributeError as exc:
         log.debug("Timestamp not valid: {}".format(exc))
-        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # A response-generation timestamp makes an unchanged payload mutate
+        # from one sync to the next.  Epoch is a deterministic sentinel for
+        # malformed legacy rows and is accepted by the Kobo schema.
+        return "1970-01-01T00:00:00Z"
 
 
 def get_magic_shelf_book_ids_for_kobo(user_id):
@@ -340,6 +369,18 @@ def HandleSyncRequest():
         return abort(403)
 
     sync_token = SyncToken.SyncToken.from_headers(request.headers)
+    sync_cursor_in = _sync_cursor_summary(sync_token)
+    requesting_device_id = getattr(g, "annotation_origin_device_id", None)
+    replay_suppression_enabled = bool(getattr(
+        config, "config_kobo_suppress_replayed_entitlements", False))
+    # Layer 2 deliberately cannot suppress a tokenless request. A factory
+    # reset normally preserves the hardware id but clears both the library and
+    # CWNG token; treating that as a replay would strand the entire library.
+    replay_suppression_eligible = bool(
+        replay_suppression_enabled
+        and requesting_device_id
+        and sync_token.is_cwng_token
+    )
     log.info("Kobo library sync request received")
     log.debug("SyncToken: {}".format(sync_token))
     log.debug("Download link format {}".format(get_download_url_for_book('[bookid]', '[bookformat]')))
@@ -432,6 +473,13 @@ def HandleSyncRequest():
 
                 # Remove all books from the tracking table in one go
                 if books_to_delete_ids:
+                    user_device_ids = ub.session.query(ub.Device.id).filter(
+                        ub.Device.user_id == current_user.id,
+                    ).scalar_subquery()
+                    ub.session.query(ub.KoboDeviceBookEntitlement).filter(
+                        ub.KoboDeviceBookEntitlement.device_id.in_(user_device_ids),
+                        ub.KoboDeviceBookEntitlement.book_id.in_(books_to_delete_ids),
+                    ).delete(synchronize_session=False)
                     ub.session.query(ub.KoboSyncedBooks).filter(
                         ub.KoboSyncedBooks.user_id == current_user.id,
                         ub.KoboSyncedBooks.book_id.in_(books_to_delete_ids)
@@ -638,6 +686,15 @@ def HandleSyncRequest():
     # the joined-load query twice per sync request.
     books_list = changed_entries.limit(SYNC_ITEM_LIMIT).all()
     log.debug("Kobo Sync: selected to sync: {}".format(len(books_list)))
+    prior_entitlement_fingerprints = (
+        kobo_sync_status.get_device_entitlement_fingerprints(
+            requesting_device_id,
+            [book.Books.id for book in books_list],
+        )
+        if replay_suppression_eligible else {}
+    )
+    entitlement_fingerprint_updates = {}
+    suppressed_unchanged_entitlements = 0
     delivered_book_identities = []
     for book in books_list:
         kobo_reading_state = book.KoboReadingState  # None when no record exists yet
@@ -646,18 +703,39 @@ def HandleSyncRequest():
             "BookMetadata": get_metadata(book.Books),
         }
 
+        # A device may return a valid but stale CWNG cursor after an interrupted
+        # sync. The cursor then selects already-emitted books again. Layer 2
+        # suppresses only an exact payload replay to that physical device; a
+        # tokenless request is ineligible, another device has its own ledger,
+        # and any real metadata/last_modified/archive change alters this hash.
+        entitlement_fingerprint = (
+            _entitlement_fingerprint(entitlement)
+            if replay_suppression_enabled and requesting_device_id else None
+        )
+        entitlement_is_unchanged = bool(
+            replay_suppression_eligible
+            and prior_entitlement_fingerprints.get(book.Books.id)
+            == entitlement_fingerprint
+        )
+
         if (kobo_reading_state is not None
                 and kobo_reading_state.last_modified > sync_token.reading_state_last_modified):
-            entitlement["ReadingState"] = get_kobo_reading_state_response(book.Books, kobo_reading_state)
-            new_reading_state_last_modified = max(new_reading_state_last_modified, kobo_reading_state.last_modified)
-            reading_states_in_new_entitlements.append(book.Books.id)
+            if not entitlement_is_unchanged:
+                entitlement["ReadingState"] = get_kobo_reading_state_response(book.Books, kobo_reading_state)
+                new_reading_state_last_modified = max(new_reading_state_last_modified, kobo_reading_state.last_modified)
+                reading_states_in_new_entitlements.append(book.Books.id)
 
         ts_created = get_kobo_created_ts(book)
 
-        if ts_created > sync_token.books_last_created:
-            sync_results.append({"NewEntitlement": entitlement})
+        if entitlement_is_unchanged:
+            suppressed_unchanged_entitlements += 1
         else:
-            sync_results.append({"ChangedEntitlement": entitlement})
+            if ts_created > sync_token.books_last_created:
+                sync_results.append({"NewEntitlement": entitlement})
+            else:
+                sync_results.append({"ChangedEntitlement": entitlement})
+            if replay_suppression_enabled and requesting_device_id:
+                entitlement_fingerprint_updates[book.Books.id] = entitlement_fingerprint
 
         new_books_last_modified = max(
             books_cursor_datetime(book.Books.last_modified), new_books_last_modified
@@ -686,6 +764,8 @@ def HandleSyncRequest():
     # Persist the whole emitted page before response/token construction.  In
     # particular, the next request must not observe zero synced rows and reset
     # its token.  The batch helper also avoids one SQLite fsync per book.
+    kobo_sync_status.stage_device_entitlement_fingerprints(
+        requesting_device_id, entitlement_fingerprint_updates)
     kobo_sync_status.add_synced_books_batch(delivered_book_identities)
 
     # Magic-shelf sub-cursor: advance to the highest magic-shelf book id
@@ -939,6 +1019,22 @@ def HandleSyncRequest():
     sync_token.archive_last_modified = new_archived_last_modified
     sync_token.reading_state_last_modified = new_reading_state_last_modified
 
+    new_entitlement_count = sum("NewEntitlement" in item for item in sync_results)
+    changed_entitlement_count = sum("ChangedEntitlement" in item for item in sync_results)
+    log.debug(
+        "Kobo Sync summary: device=%s entitlements new=%d changed=%d "
+        "suppressed_unchanged=%d replay_suppression enabled=%s eligible=%s "
+        "cursors in=%s out=%s",
+        requesting_device_id,
+        new_entitlement_count,
+        changed_entitlement_count,
+        suppressed_unchanged_entitlements,
+        replay_suppression_enabled,
+        replay_suppression_eligible,
+        sync_cursor_in,
+        _sync_cursor_summary(sync_token),
+    )
+
     return generate_sync_response(sync_token, sync_results)
 
 
@@ -1053,10 +1149,13 @@ def get_download_url_for_book(book_id, book_format):
 
 def create_book_entitlement(book, archived):
     book_uuid = str(book.uuid)
+    created = convert_to_kobo_timestamp_string(book.timestamp)
     return {
         "Accessibility": "Full",
-        "ActivePeriod": {"From": convert_to_kobo_timestamp_string(datetime.now(timezone.utc))},
-        "Created": convert_to_kobo_timestamp_string(book.timestamp),
+        # ActivePeriod is entitlement data, not response-generation time.  A
+        # wall-clock value made the payload mutate on every replay (#1925).
+        "ActivePeriod": {"From": created},
+        "Created": created,
         "CrossRevisionId": book_uuid,
         "Id": book_uuid,
         "IsRemoved": archived,
@@ -1312,13 +1411,23 @@ def _get_cover_image_id(book):
         return base_id
 
 def build_download_url(book, book_data, download_format, declared_format):
-    return {
+    result = {
             "Format": declared_format,
-            "Size": book_data.uncompressed_size,
             "Url": get_download_url_for_book(book.id, download_format),
             "Platform": "Generic",
             "DrmType": "None",
         }
+    # A generated KEPUB is not the Data row named by ``book_data``: deferred
+    # conversion can start from EPUB. Metadata embedding can rewrite either an
+    # EPUB or a KEPUB at download time. Advertising the source/stored size then
+    # makes Nickel compare unlike artifacts and de-download the local copy on
+    # an entitlement replay. Kobo accepts an omitted Size; retain it only when
+    # the exact stored artifact is what the URL serves.
+    generated_kepub = download_format == "kepub" and book_data.format != "KEPUB"
+    rewritten_download = bool(getattr(config, "config_embed_metadata", False))
+    if not generated_kepub and not rewritten_download:
+        result["Size"] = book_data.uncompressed_size
+    return result
 
 def get_metadata(book):
     download_urls = []

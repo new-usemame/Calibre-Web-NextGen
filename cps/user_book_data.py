@@ -79,10 +79,11 @@ def _delete_annotation(session, annotation):
     ).delete(synchronize_session=False)
     session.delete(annotation)
 
-# Models keyed (user_id, book_id) handled by this module, with merge
-# semantics for migrate. BookShelf has no user_id (shelf-scoped) and
-# KoboBookmark/KoboStatistics/AnnotationSyncTarget are children reached
-# through their parents; all are still handled below.
+# Models tied to a user and book handled by this module, with merge semantics
+# for migrate. BookShelf has no user_id (shelf-scoped), the Kobo entitlement
+# ledger resolves user scope through Device, and KoboBookmark/KoboStatistics/
+# AnnotationSyncTarget are children reached through their parents; all are
+# still handled below.
 PER_USER_BOOK_MODELS = (
     "Annotation",            # + AnnotationSyncTarget children
     "Bookmark",
@@ -95,6 +96,7 @@ PER_USER_BOOK_MODELS = (
     "KoboSyncedBooks",
     "UserHiddenBook",
     "BookCoverPreview",
+    "KoboDeviceBookEntitlement",  # user scope resolves through Device
 )
 
 
@@ -219,11 +221,15 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
         ub.KoboAnnotationBackup.book_id == from_book_id).update(
         {ub.KoboAnnotationBackup.book_id: to_book_id}, synchronize_session=False)
 
-    # KoboSyncedBooks marks "this book's file already delivered to this
-    # device". The kept book's file is a different file, so the marker must
-    # NOT migrate — drop it and let the next sync deliver the kept copy.
+    # KoboSyncedBooks is a legacy flat (user, book) marker: it says the book
+    # was offered to at least one Kobo for this user, not which device still
+    # has it. The kept book is a different file, so neither this marker nor the
+    # newer per-device payload ledger may migrate; let the next sync deliver it.
     session.query(ub.KoboSyncedBooks).filter(
         ub.KoboSyncedBooks.book_id == from_book_id).delete(synchronize_session=False)
+    session.query(ub.KoboDeviceBookEntitlement).filter(
+        ub.KoboDeviceBookEntitlement.book_id == from_book_id,
+    ).delete(synchronize_session=False)
 
     session.flush()
     log.info("[user-book-data] migrated per-user data from book %s to book %s",
@@ -318,6 +324,19 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
     for model in (ub.Bookmark, ub.ReadBook, ub.ArchivedBook, ub.Downloads,
                   ub.KoboSyncedBooks, ub.UserHiddenBook, ub.BookCoverPreview):
         _scoped(session.query(model), model).delete(synchronize_session=False)
+
+    # Per-device entitlement state has no user_id of its own.  Scope a user
+    # purge through Device, while a book/full purge can filter directly.
+    entitlement_state = session.query(ub.KoboDeviceBookEntitlement)
+    if book_id is not None:
+        entitlement_state = entitlement_state.filter(
+            ub.KoboDeviceBookEntitlement.book_id == book_id)
+    if user_id is not None:
+        device_ids = session.query(ub.Device.id).filter(
+            ub.Device.user_id == user_id).scalar_subquery()
+        entitlement_state = entitlement_state.filter(
+            ub.KoboDeviceBookEntitlement.device_id.in_(device_ids))
+    entitlement_state.delete(synchronize_session=False)
 
     # BookShelf has no user_id — shelf membership is shelf-scoped, and the
     # user-delete path removes the user's shelves (with their links)

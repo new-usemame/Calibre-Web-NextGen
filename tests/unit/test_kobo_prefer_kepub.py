@@ -39,6 +39,9 @@ def test_download_selection_honours_off_but_keeps_existing_kepub(monkeypatch):
     monkeypatch.setattr(kobo, "get_subtitle", lambda book: None)
     monkeypatch.setattr(kobo.config, "config_kepubifypath", "/bin/kepubify", raising=False)
     monkeypatch.setattr(kobo.config, "config_kobo_prefer_kepub", False, raising=False)
+    # This assertion covers an exact stored KEPUB.  Metadata embedding rewrites
+    # the download and intentionally makes its stored Data-row size inexact.
+    monkeypatch.setattr(kobo.config, "config_embed_metadata", False, raising=False)
 
     epub = SimpleNamespace(format="EPUB", uncompressed_size=10)
     kepub = SimpleNamespace(format="KEPUB", uncompressed_size=12)

@@ -9,7 +9,7 @@ import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { DiscoverSection } from '../components/DiscoverSection';
-import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf } from '../lib/queries';
+import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary } from '../lib/queries';
 import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
@@ -309,6 +309,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // #1288: the role is only half the gate — classic also requires the admin's
   // "Enable Uploads" switch. See lib/permissions.ts.
   const canUpload = canUploadBooks(me);
+  const personalLibrary = me?.library_mode === 'personal_library';
+  const removalImpact = useMyLibraryRemovalImpact();
+  const removeFromLibrary = useRemoveFromMyLibrary();
 
   // Discover section visibility (persisted; toggled by the gear menu or its ×).
   const [discoverHidden, setDiscoverHidden] = usePersistentBool('cwng_discover_hidden_v1', false);
@@ -640,6 +643,34 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       : t('{count} books', { count: total })
     : '';
 
+  const removeBook = (book: Book) => {
+    if (removalImpact.isPending || removeFromLibrary.isPending) return;
+    removalImpact.mutate(book.id, {
+      onSuccess: (impact) => {
+        const lines = [
+          t('Remove "{title}" from your library?', { title: book.title }), '',
+          t('The next time your e-reader updates, this book disappears from it.'),
+        ];
+        if (impact.affected_shelves.length) {
+          lines.push(t('It also leaves these shelves: {shelves}.', { shelves: impact.affected_shelves.join(', ') }));
+        }
+        lines.push(t('Nothing is deleted: the book stays in the global library, and your highlights, notes and reading progress are kept.'));
+        lines.push(me?.role?.browse_global
+          ? t('You can add it back any time from the global library.')
+          : t('Only an administrator can add it back.'));
+        if (!window.confirm(lines.join('\n'))) return;
+        removeFromLibrary.mutate(book.id, {
+          onSuccess: () => {
+            setAllBooks((current) => current.filter((item) => item.id !== book.id));
+            announce(t('Removed from your library'));
+          },
+          onError: () => announce(t('Could not remove the book. Please try again.'), { assertive: true }),
+        });
+      },
+      onError: () => announce(t('Could not remove the book. Please try again.'), { assertive: true }),
+    });
+  };
+
   return (
     <main className={styles.container} data-testid="catalog-page">
       {filtered && (
@@ -926,7 +957,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         // element, and a CSS grid reports its tracks even with no cards in it —
         // so having it on the first paint is what lets the very first query use
         // the real column count instead of a guess (#1144).
-        <div ref={setGridNode} className={`${styles.grid} ${styles[`density_${density}`]}`}>
+        <div ref={setGridNode} data-testid="catalog-grid" className={`${styles.grid} ${styles[`density_${density}`]}`}>
           <div className={styles.gridLoading}>
             <SpinnerCentered size={36} />
           </div>
@@ -934,15 +965,28 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       ) : error ? (
         <EmptyState message={error instanceof Error ? error.message : t('Failed to load books.')} />
       ) : allBooks.length === 0 && !isFetching ? (
-        <EmptyState
+        <>{personalLibrary && isPlainLibrary && !search && !filterActive && readFilter === 'all' ? (
+          <EmptyState title={t('Your library is empty')}
+            message={me?.role?.browse_global
+              ? t('Nothing is missing — the whole library is still on the server. What you see here is your own selection. Add books from the global library; they appear here and on your e-reader.')
+              : t('Your administrator chooses which books are in your library. Ask them to add books, or to let you browse the global library.')}>
+            {me?.role?.browse_global && <Link href="/global" className={styles.uploadLink}>{t('Browse the global library')}</Link>}
+          </EmptyState>
+        ) : <EmptyState
           message={
             search && !filtered
               ? t('No results for "{q}".', { q: search })
               : readFilter !== 'all'
                 ? t('No {filter} books here.', { filter: readFilter })
                 : t('No books here.')
-          }
-        />
+          }>
+          {search && !filtered && personalLibrary && me?.role?.browse_global && (
+            <Link href={`/global?q=${encodeURIComponent(search)}`} className={styles.uploadLink}>
+              {t('Search the global library for "{query}" instead', { query: search })}
+            </Link>
+          )}
+        </EmptyState>
+        }</>
       ) : (
         <>
           {isSeries && seriesPresentation === 'list' && !selecting ? (
@@ -968,7 +1012,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
               ))}
             </ul>
           ) : (
-          <div ref={setGridNode} className={`${styles.grid} ${styles[`density_${density}`]}`}>
+          <div ref={setGridNode} data-testid="catalog-grid" className={`${styles.grid} ${styles[`density_${density}`]}`}>
             {allBooks.map((book, i) => (
               <BookCard
                 key={book.id}
@@ -987,6 +1031,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                     return next;
                   })
                 }
+                onRemove={personalLibrary && isPlainLibrary && !search && !filterActive && !selecting ? removeBook : undefined}
+                removeLabel={t('Remove {title} from my library', { title: book.title })}
               />
             ))}
           </div>

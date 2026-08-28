@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, Trash2, RefreshCw } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, Trash2, RefreshCw } from 'lucide-react';
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
+  useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
 } from '../lib/queries';
 import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
@@ -23,6 +24,7 @@ import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { BookUserNotices } from '../components/UserNotices';
 import { backTarget } from '../lib/backLink';
+import { useAnnouncer } from '../lib/a11y/announcer';
 
 /* `fetchpriority` is a plain DOM attribute. react-dom 18.3 has no knowledge of
    it, so the camelCase `fetchPriority` that @types/react declares would trip its
@@ -254,6 +256,7 @@ function TagEditor({ bookId, tags, canEdit }:
 export function BookDetail() {
   const [cardActionsHidden] = useCardActionsHidden();
   const t = useT();
+  const announce = useAnnouncer();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -265,6 +268,10 @@ export function BookDetail() {
   const sendToEreader = useSendToEreader(id);
   const deleteBook = useDeleteBook(id);
   const reloadMetadata = useReloadMetadata(id);
+  const addToLibrary = useAddToMyLibrary();
+  const removalImpact = useMyLibraryRemovalImpact();
+  const removeFromLibrary = useRemoveFromMyLibrary();
+  const [removedFromLibrary, setRemovedFromLibrary] = useState(false);
   const [location, navigate] = useLocation();
   const me = useMe().data;
   /* Stage 0 two-way sync state chip (read-only; manage it on Account). */
@@ -306,6 +313,26 @@ export function BookDetail() {
   // so every id here resolves to a name the caller is allowed to see.
   const onShelfIds = new Set(shelfMembership?.shelf_ids ?? []);
   const bookShelves = (visibleShelves?.items ?? []).filter((s) => onShelfIds.has(s.id));
+  const selectionMode = me?.library_mode === 'personal_library';
+  const inLibrary = !selectionMode || !removedFromLibrary;
+
+  const removeMembership = () => {
+    removalImpact.mutate(book.id, {
+      onSuccess: (impact) => {
+        const lines = [t('Remove "{title}" from your library?', { title: book.title }), '',
+          t('The next time your e-reader updates, this book disappears from it.')];
+        if (impact.affected_shelves.length) lines.push(t('It also leaves these shelves: {shelves}.', { shelves: impact.affected_shelves.join(', ') }));
+        lines.push(t('Nothing is deleted: the book stays in the global library, and your highlights, notes and reading progress are kept.'));
+        lines.push(me?.role?.browse_global ? t('You can add it back any time from the global library.') : t('Only an administrator can add it back.'));
+        if (!window.confirm(lines.join('\n'))) return;
+        removeFromLibrary.mutate(book.id, {
+          onSuccess: () => { setRemovedFromLibrary(true); announce(t('Removed from your library')); },
+          onError: () => announce(t('Could not remove the book. Please try again.'), { assertive: true }),
+        });
+      },
+      onError: () => announce(t('Could not remove the book. Please try again.'), { assertive: true }),
+    });
+  };
 
   return (
     <main className={styles.container}>
@@ -414,25 +441,46 @@ export function BookDetail() {
 
           {/* Actions */}
           <div className={styles.actions} data-testid="book-actions">
-            {primaryReadTarget ? (
+            {!inLibrary && selectionMode && me?.role?.browse_global && (
+              <button type="button" className={styles.actionPrimary} disabled={addToLibrary.isPending}
+                onClick={() => addToLibrary.mutate(book.id, {
+                  onSuccess: () => { setRemovedFromLibrary(false); announce(t('Added to your library')); },
+                  onError: () => announce(t('Could not add the book. Please try again.'), { assertive: true }),
+                })}>
+                <BookPlus size={15} aria-hidden="true" focusable={false} />
+                {addToLibrary.isPending ? t('Adding…') : t('Add to my library')}
+              </button>
+            )}
+            {inLibrary && primaryReadTarget ? (
               <Link href={primaryReadTarget} className={styles.actionPrimary}>
                 {t('Read now')}
               </Link>
             ) : null}
 
-            <button
+            {inLibrary && <button
               className={book.read ? styles.readToggleActive : styles.readToggleGhost}
               onClick={() => toggleRead.mutate(!book.read)}
               disabled={toggleRead.isPending}
               aria-label={book.read ? t('Mark as unread') : t('Mark as read')}
             >
               {book.read ? `${t('Read')} ✓` : t('Mark as read')}
-            </button>
+            </button>}
 
-            <AddToShelf bookId={book.id} />
+            {selectionMode && inLibrary && (
+              <button type="button" className={styles.readToggleGhost}
+                disabled={removalImpact.isPending || removeFromLibrary.isPending}
+                aria-label={t('Remove from my library')} onClick={removeMembership}>
+                <BookCheck size={14} aria-hidden="true" focusable={false} />
+                {removeFromLibrary.isPending ? t('Removing…') : t('In your library')}
+              </button>
+            )}
+
+            {(inLibrary || me?.role?.browse_global) && (
+              <AddToShelf bookId={book.id} inLibrary={inLibrary} />
+            )}
 
             {/* Star / favorite */}
-            <button
+            {inLibrary && <button
               className={book.favorited ? styles.readToggleActive : styles.readToggleGhost}
               onClick={() => toggleFavorite.mutate()}
               disabled={toggleFavorite.isPending}
@@ -440,10 +488,10 @@ export function BookDetail() {
             >
               <Star size={14} fill={book.favorited ? 'currentColor' : 'none'} />
               {book.favorited ? t('Favorited') : t('Favorite')}
-            </button>
+            </button>}
 
             {/* Archive (sync-pause) */}
-            <button
+            {inLibrary && <button
               data-testid="archive-book-toggle"
               className={book.archived ? styles.readToggleActive : styles.readToggleGhost}
               onClick={() => toggleArchived.mutate()}
@@ -452,9 +500,9 @@ export function BookDetail() {
             >
               <Archive size={14} />
               {book.archived ? t('Archived') : t('Archive')}
-            </button>
+            </button>}
 
-            {book.formats.map((fmt) => (
+            {inLibrary && book.formats.map((fmt) => (
               <a
                 key={fmt.format}
                 href={resourceUrl(fmt.download_url)}
@@ -483,7 +531,7 @@ export function BookDetail() {
             ))}
 
             {/* Send to e-reader — gated on mail being configured + download role */}
-            {me?.features?.mail_configured && me?.role?.download && book.formats.length > 0 && (
+            {inLibrary && me?.features?.mail_configured && me?.role?.download && book.formats.length > 0 && (
               <button
                 className={styles.downloadBtn}
                 onClick={() => { setSendOpen((v) => !v); setSendBanner(null); }}
@@ -528,16 +576,16 @@ export function BookDetail() {
             {/* Highlights/annotations — view + export + import (Kobo). Opens the
                 server annotations page; in-reader highlight creation is the
                 flagship reader phase-2 (tracked separately). */}
-            <Link href={`/book/${book.id}/annotations`} className={styles.downloadBtn}>
+            {inLibrary && <Link href={`/book/${book.id}/annotations`} className={styles.downloadBtn}>
               <Highlighter size={14} aria-hidden="true" focusable={false} />
               {t('Highlights')}
-            </Link>
+            </Link>}
 
             {/* Stage 0 per-book two-way state, when the user opted in and the
                 book has pipeline state. Read-only; manage it on Account. */}
             {(() => {
               const twoWayBook = selectKoboTwoWayBook(twoWay.data, book.id);
-              if (!twoWay.data?.enabled || !twoWayBook) return null;
+              if (!inLibrary || !twoWay.data?.enabled || !twoWayBook) return null;
               return (
                 <Link href="/account" className={styles.twoWayChip}>
                   {t('Kobo two-way sync: {state}', { state: authorityLabel(t, twoWayBook, twoWay.data.scope) })}
@@ -550,7 +598,7 @@ export function BookDetail() {
                 sits immediately beside Delete when Delete is available and is
                 still the final action for ordinary users. Guest sessions cannot
                 own hidden state, so never offer them a control that returns 401. */}
-            {!me?.role?.anonymous && (me?.features?.hide_books || book.hidden) && (
+            {inLibrary && !me?.role?.anonymous && (me?.features?.hide_books || book.hidden) && (
               <button
                 type="button"
                 data-testid="hide-book-toggle"
@@ -576,17 +624,17 @@ export function BookDetail() {
             <section className={styles.dangerZone} data-testid="book-destructive-actions"
               aria-labelledby={`delete-book-heading-${book.id}`}>
               <h2 id={`delete-book-heading-${book.id}`} className={styles.dangerZoneTitle}>
-                {t('Delete book')}
+                {t('Delete from the global library')}
               </h2>
               <button
                 type="button"
                 className={styles.actionDanger}
                 disabled={deleteBook.isPending}
-                aria-label={t('Delete book')}
+                aria-label={t('Delete from the global library')}
                 onClick={() => {
                   if (deleteBook.isPending) return;
                   if (!window.confirm(
-                    t('Delete "{title}"? This permanently removes the book and all its files from your library. This cannot be undone.', { title: book.title })
+                    t('Delete "{title}" from the global library? The book and all its files are permanently erased for every member. This cannot be undone.', { title: book.title })
                   )) return;
                   setDeleteError(null);
                   deleteBook.mutate(undefined, {

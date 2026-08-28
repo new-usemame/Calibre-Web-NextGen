@@ -35,6 +35,7 @@ _CARD_SURFACES = {
     ("pages", "MagicShelfView.tsx"): "hideActions={cardActionsHidden}",
     ("pages", "AdvancedSearch.tsx"): "hideActions={cardActionsHidden}",
     ("pages", "BookDetail.tsx"): "hideActions={cardActionsHidden}",
+    ("pages", "GlobalLibrary.tsx"): "hideActions={cardActionsHidden}",
     ("components", "DiscoverSection.tsx"): "hideActions={hideActions}",
     ("components", "MoreByAuthor.tsx"): "hideActions={hideActions}",
 }
@@ -74,7 +75,8 @@ def test_bookcard_removes_the_row_rather_than_hiding_it():
     invisible controls per card, so the row is not rendered at all."""
     src = (_FE / "components" / "BookCard.tsx").read_text()
     assert "hideActions" in src
-    assert "const hasActionRow = !hideActions && (Boolean(readTarget) || quickEdit);" in src
+    assert "const hasAddAction = membership === 'unowned' && !!onAddToLibrary;" in src
+    assert "const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));" in src
 
 
 def test_every_book_card_surface_passes_the_live_preference():

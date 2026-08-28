@@ -7,6 +7,7 @@ import {
   useResetAdminUserPassword,
   useAdminConfig, useUpdateAdminConfig, useMailConfig, useUpdateMailConfig,
   useSecurityConfig, useUpdateSecurityConfig,
+  useMigrateMyLibrary,
 } from '../lib/queries';
 import type { SecurityConfig, SecurityUpdate } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
@@ -58,6 +59,7 @@ const ROLE_FIELDS: { key: string; label: string }[] = [
   { key: 'edit_shelfs', label: 'Edit public shelves' },
   { key: 'passwd', label: 'Change password' },
   { key: 'viewer', label: 'Viewer' },
+  { key: 'browse_global', label: 'Browse global library' },
 ];
 
 export function Admin() {
@@ -67,6 +69,7 @@ export function Admin() {
   const deleteUser = useDeleteAdminUser();
   const createUser = useCreateAdminUser();
   const resetPassword = useResetAdminUserPassword();
+  const migrateLibraries = useMigrateMyLibrary();
   const me = useMe().data;
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -136,6 +139,35 @@ export function Admin() {
     });
   };
 
+  const setLibraryMode = (user: AdminUser, mode: 'monolibrary' | 'personal_library') => {
+    if (mode === user.library_mode || updateUser.isPending) return;
+    const message = mode === 'monolibrary'
+      ? t('Show {name} the whole library again? Their selection is kept but no longer used, and their e-reader syncs the whole library at the next update.', { name: user.name })
+      : user.my_library_seeded
+        ? t('Switch {name} back to their own selection? Their chosen books are restored.', { name: user.name })
+        : t('Give {name} their own selection? It starts as a copy of everything they can see now — nothing changes for them yet.', { name: user.name });
+    if (!window.confirm(message)) return;
+    setBanner(null);
+    updateUser.mutate({ id: user.id, library_mode: mode }, {
+      onSuccess: () => setBanner({ ok: true, text: mode === 'monolibrary'
+        ? t('{name} sees the whole library again.', { name: user.name })
+        : t('{name} now keeps their own selection.', { name: user.name }) }),
+      onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Update failed.') }),
+    });
+  };
+
+  const migrateAll = () => {
+    if (!window.confirm(t('Set up My Library for every user? Each account switches to its own selection after it is filled with everything that account can currently see. Accounts set up before are never reseeded.'))) return;
+    setBanner(null);
+    migrateLibraries.mutate(undefined, {
+      onSuccess: (result) => setBanner({ ok: result.errors === 0,
+        text: t('Set up {accounts} accounts with {books} books. {errors} errors.', {
+          accounts: result.accounts, books: result.seeded_books, errors: result.errors,
+        }) }),
+      onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Update failed.') }),
+    });
+  };
+
   return (
     <main className={styles.container}>
       <div className={styles.header}>
@@ -148,6 +180,8 @@ export function Admin() {
         >
           <UserPlus size={16} /> {t('New user')}
         </button>
+        <button type="button" className={styles.addBtn} onClick={migrateAll}
+          disabled={migrateLibraries.isPending}>{t('Set up My Library for all users')}</button>
       </div>
 
       <p className={banner ? (banner.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{banner?.text}</p>
@@ -236,6 +270,26 @@ export function Admin() {
                   </label>
                 ))}
               </div>
+              {!user.is_guest && (
+                <fieldset className={styles.libraryMode}>
+                  <legend>{t('Library contents')}</legend>
+                  <label className={styles.roleToggle}>
+                    <input type="radio" name={`library-mode-${user.id}`}
+                      checked={user.library_mode === 'monolibrary'} disabled={updateUser.isPending}
+                      onChange={() => setLibraryMode(user, 'monolibrary')} />
+                    <span><strong>{t('The whole library')}</strong><small>{t('Everything on the server, including every new book added to it.')}</small></span>
+                  </label>
+                  <label className={styles.roleToggle}>
+                    <input type="radio" name={`library-mode-${user.id}`}
+                      checked={user.library_mode === 'personal_library'} disabled={updateUser.isPending}
+                      onChange={() => setLibraryMode(user, 'personal_library')} />
+                    <span><strong>{t('Own selection')}</strong><small>{t('Only the books chosen for this account.')}</small></span>
+                  </label>
+                  <p className={styles.settingsHint}>{t('Switching a user to their own selection first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.')}</p>
+                  {user.library_mode === 'personal_library' && !user.roles.browse_global &&
+                    <p className={styles.modeWarning}>{t("Without the global-browse role, only an administrator can add books to this user's library.")}</p>}
+                </fieldset>
+              )}
             </section>
           );
         })}

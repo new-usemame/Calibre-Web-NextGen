@@ -6,6 +6,9 @@
     {% if entries|length < 1 %}
       <h2>{{_('No Results Found')}}</h2>
       <p>{{_('Search Term:')}} {{adv_searchterm}}</p>
+      {% if current_user.is_authenticated and not current_user.is_anonymous and current_user.library_mode() == 'personal_library' and current_user.role_browse_global() %}
+        <p><a href="{{ url_for('web.global_library', search=adv_searchterm) }}">{{ _('Search the global library for "%(query)s" instead', query=adv_searchterm) }}</a></p>
+      {% endif %}
     {% else %}
       <h2>{{result_count}} {{_('Results for:')}} {{adv_searchterm}}</h2>
       {% if current_user.is_authenticated %}

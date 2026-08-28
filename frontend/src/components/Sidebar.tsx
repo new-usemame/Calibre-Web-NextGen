@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
-  Library, BookCopy,
+  Library, Globe, BookCopy,
   Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X,
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
@@ -100,6 +100,8 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const canUpload = !!me?.role?.upload;
   const isAdmin = !!me?.role?.admin;
   const isAuthed = !!me?.id;
+  const personalLibrary = me?.library_mode === 'personal_library';
+  const showGlobalLibrary = personalLibrary && !!me?.role?.browse_global;
 
   const sidebarVis = me?.sidebar;
   const isVisible = (v?: string) => !v || sidebarVis?.[v] !== false;
@@ -278,9 +280,20 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   onClick={onNavigate}
                 >
                   <Library size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                  <span>{t('Library')}</span>
+                  <span>{t(personalLibrary ? 'My Library' : 'Library')}</span>
                 </Link>
               </li>
+              {showGlobalLibrary && (
+                <li>
+                  <Link href="/global"
+                    className={isActive(location, '/global') ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/global') ? 'page' : undefined}
+                    onClick={onNavigate}>
+                    <Globe size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Global Library')}</span>
+                  </Link>
+                </li>
+              )}
             </ul>
 
             {/* Customizable region (browse-by + discovery + Shelves), in saved order. */}

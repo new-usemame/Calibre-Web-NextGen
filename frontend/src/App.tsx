@@ -28,6 +28,7 @@ import { Annotations } from './pages/Annotations';
 import { WhatsNew } from './pages/WhatsNew';
 import { MagicShelf } from './pages/MagicShelf';
 import { MagicShelfView } from './pages/MagicShelfView';
+import { GlobalLibrary } from './pages/GlobalLibrary';
 import { AppShell } from './components/AppShell';
 import { RoutedErrorBoundary } from './components/ErrorBoundary';
 import { SpinnerCentered } from './components/Spinner';
@@ -241,6 +242,7 @@ export function App() {
 
           {/* Advanced search */}
           <Route path={SPA_ROUTES.search}>{() => <AdvancedSearch />}</Route>
+          <Route path={SPA_ROUTES.global}>{() => <GlobalLibrary />}</Route>
 
           {/* Account / settings */}
           <Route path={SPA_ROUTES.account}>{() => <Account />}</Route>

@@ -371,20 +371,22 @@
 
       {% if not content.role_anonymous() and not simple %}
       <div style="margin-top: 25px;">
-        <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('My Library')}}</label>
+        <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('Library contents')}}</label>
         <div style="background: #202c34a3; padding: 2rem;">
           <div>
             <input type="radio" name="library_mode" id="library_mode_monolibrary" value="monolibrary" {% if content.library_mode() == 'monolibrary' %}checked{% endif %} {% if profile and not content.role_browse_global() %}disabled{% endif %} style="accent-color: var(--color-secondary);">
-            <label for="library_mode_monolibrary">{{_('Monolibrary mode')}}</label>
-            <p class="help-block">{{_('This account continuously follows the global library, including books added later. Its saved personal selection remains dormant and is restored if personal library mode is chosen again.')}}</p>
+            <label for="library_mode_monolibrary">{{_('The whole library')}}</label>
+            <p class="help-block">{{_('Everything on the server, including every new book added to it.')}}</p>
           </div>
           <div style="margin-top: 12px;">
             <input type="radio" name="library_mode" id="library_mode_personal" value="personal_library" {% if content.library_mode() == 'personal_library' %}checked{% endif %} {% if profile and not content.role_browse_global() %}disabled{% endif %} style="accent-color: var(--color-secondary);">
-            <label for="library_mode_personal">{{_('Personal library mode')}}</label>
-            <p class="help-block">{{_('The first switch seeds every book currently visible. Later switches restore the saved selection without reseeding. Removing a book also removes it from this user’s shelves and from their Kobo on the next sync; reading data is preserved.')}}</p>
+            <label for="library_mode_personal">{{ profile and _('My selection') or _('Own selection') }}</label>
+            <p class="help-block">{{ profile and _('Only the books you choose. Add them from the global library; remove them any time.') or _('Switching a user to their own selection first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.') }}</p>
           </div>
           {% if profile and not content.role_browse_global() %}
-          <p class="settings-explanation">{{_('Your library mode is managed by an administrator because this account may not view the whole archive.')}}</p>
+          <p class="settings-explanation">{{_('Your library contents are managed by an administrator.')}}</p>
+          {% elif not profile and content.library_mode() == 'personal_library' and not content.role_browse_global() %}
+          <p class="settings-explanation">{{_("Without the global-browse role, only an administrator can add books to this user's library.")}}</p>
           {% endif %}
         </div>
       </div>
@@ -481,7 +483,7 @@
 
         <div>
           <input type="checkbox" name="browse_global_role" id="browse_global_role" {% if content.role_browse_global() %}checked{% endif %} style="accent-color: var(--color-secondary);">
-          <label for="browse_global_role">{{_('Allow browsing the global library')}}</label>
+          <label for="browse_global_role">{{_('Browse global library')}}</label>
         </div>
         
         {% if config.config_uploading %}

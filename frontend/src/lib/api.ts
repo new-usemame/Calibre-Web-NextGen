@@ -112,6 +112,13 @@ export interface Me {
   catalog?: {
     default_filter: AdvancedSearchParams | null;
   };
+  /** Named My Library mode. Older servers omit it and therefore behave as the
+   * whole-library mode that predates per-user selections. */
+  library_mode?: 'monolibrary' | 'personal_library';
+  my_library_seeded?: boolean;
+  show_my_library_intro?: boolean;
+  can_switch_library_mode?: boolean;
+  library_mode_managed?: boolean;
 }
 
 export interface Book {
@@ -133,6 +140,9 @@ export interface Book {
   archived?: boolean;
   /** Personal-library declutter state. Present on list items from current servers. */
   hidden?: boolean;
+  /** Global-library lists only. Absent means the server predates My Library and
+   * the book is treated as part of the whole library. */
+  in_my_library?: boolean;
 }
 
 export interface UserNotice {
@@ -324,6 +334,11 @@ export interface Account {
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
   app_passwords: AppPassword[];
+  library_mode: 'monolibrary' | 'personal_library';
+  my_library_seeded: boolean;
+  show_my_library_intro: boolean;
+  can_switch_library_mode: boolean;
+  library_mode_managed: boolean;
 }
 
 export interface ProfileUpdate {
@@ -434,6 +449,30 @@ export interface AdminUser {
   default_language: string;
   is_guest: boolean;
   roles: Record<string, boolean>;
+  library_mode: 'monolibrary' | 'personal_library';
+  my_library_seeded: boolean;
+  show_my_library_intro: boolean;
+  can_switch_library_mode: boolean;
+  library_mode_managed: boolean;
+}
+
+export interface LibraryModePayload {
+  library_mode: 'monolibrary' | 'personal_library';
+  my_library_seeded: boolean;
+  show_my_library_intro: boolean;
+  can_switch_library_mode: boolean;
+  library_mode_managed: boolean;
+}
+
+export interface GlobalLibraryPage extends BooksPage {
+  library_mode: 'monolibrary' | 'personal_library';
+  filter: 'all' | 'not_in_my_library';
+}
+
+export interface LibraryRemovalImpact {
+  affected_shelves: string[];
+  kobo_removal_on_next_sync: boolean;
+  reading_data_preserved: boolean;
 }
 
 export interface OAuthProvider {
@@ -742,6 +781,34 @@ export async function apiPost<T>(
   const text = await res.text();
   if (!text) return undefined as unknown as T;
   return JSON.parse(text) as T;
+}
+
+/** PUT with the same JSON, CSRF, mount-prefix and stale-token behaviour as
+ * apiPost. My Library add is deliberately idempotent and therefore uses PUT. */
+export async function apiPut<T>(path: string, body?: unknown, options?: ApiRequestOptions): Promise<T> {
+  const doPut = async (csrf: string): Promise<Response> =>
+    classifiedFetch(path, {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }, options);
+
+  let csrf = await getCsrf(options);
+  let res = await doPut(csrf);
+  const isJson400 = res.status === 400
+    && (res.headers.get('content-type') || '').includes('application/json');
+  if (res.status === 400 && !isJson400) {
+    clearCsrf();
+    csrf = await getCsrf(options);
+    res = await doPut(csrf);
+  }
+  if (!res.ok) {
+    const parsed = await readApiError(res);
+    throw new ApiError(res.status, parsed.message, parsed.detail);
+  }
+  if (res.status === 204) return undefined as unknown as T;
+  const text = await res.text();
+  return text ? JSON.parse(text) as T : undefined as T;
 }
 
 /** DELETE with the same CSRF/base-path handling as apiPost (#782 — the reader

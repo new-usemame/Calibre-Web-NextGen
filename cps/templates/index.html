@@ -28,6 +28,17 @@
 {% endblock %}
 {% block body %}
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% if page == 'root' and current_user.is_authenticated and not current_user.is_anonymous and current_user.library_mode() == 'personal_library' and not current_user.my_library_intro_dismissed %}
+<div id="my-library-intro" class="alert alert-info alert-dismissible" role="status">
+  <button type="button" class="close" id="dismiss-my-library-intro" aria-label="{{ _('Dismiss library introduction') }}"><span aria-hidden="true">&times;</span></button>
+  <strong>{{ _('New: your own library') }}</strong>
+  {% if current_user.role_browse_global() %}
+    {{ _('The library is shared and holds every book once — what you keep is your own selection. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.') }}
+  {% else %}
+    {{ _('The library is shared and holds every book once — what you keep is your own selection. Nothing you had is gone. Your administrator manages what enters your selection.') }}
+  {% endif %}
+</div>
+{% endif %}
 {% if current_user.show_detail_random() and page != "discover" %}
 <div class="discover random-books">
   <h2 class="random-books">{{_('Discover (Random Books)')}}</h2>
@@ -107,6 +118,18 @@
 
   {% set show_shelf_actions = page != 'discover' %}
   {% if show_shelf_actions %}<div class="shelf-actions">{% endif %}
+    {% if page == 'global_library' %}
+      <p class="text-muted">{{ _('The whole archive. Add books to your library from here.') }}</p>
+      <div class="btn-group" role="group" aria-label="{{ _('Library scope') }}">
+        <a class="btn btn-{{ 'default' if recent_missing else 'primary' }}" href="{{ url_for('web.global_library', search=global_search) }}">{{ _('All') }}</a>
+        <a class="btn btn-{{ 'primary' if recent_missing else 'default' }}" href="{{ url_for('web.global_library', sort_param='recent-missing', search=global_search) }}">{{ _('Not in your library') }}</a>
+      </div>
+      <form class="form-inline" action="{{ url_for('web.global_library', sort_param='recent-missing' if recent_missing else 'stored') }}" method="get" style="margin-top: 10px;">
+        <label class="sr-only" for="global-library-search">{{ _('Search the global library') }}</label>
+        <input id="global-library-search" class="form-control" type="search" name="search" value="{{ global_search }}" placeholder="{{ _('Search the global library') }}">
+        <button class="btn btn-default" type="submit">{{ _('Search') }}</button>
+      </form>
+    {% endif %}
     {% if page == 'magicshelf' %}
     <div class="magic-shelf-buttons">
         <a href="{{url_for('web.render_magic_shelf', shelf_id=id, sort_param=order, page=1, refresh=1)}}" 
@@ -178,21 +201,23 @@
     {% for entry in entries %}
     <div class="col-sm-3 col-lg-2 col-xs-6 book session" id="books">
       <div class="cover">
-          <a href="{{ url_for('web.show_book', book_id=entry.Books.id) }}" 
+          {% set in_my_library = not global_library or entry.Books.id in global_member_ids %}
+          {% if in_my_library %}<a href="{{ url_for('web.show_book', book_id=entry.Books.id) }}"
              {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}
              data-book-id="{{ entry.Books.id }}"
              data-book-formats="{% for format in entry.Books.data %}{{ format.format.lower() }}{% if not loop.last %},{% endif %}{% endfor %}"
-             class="book-cover-link">
+             class="book-cover-link">{% else %}<span class="book-cover-link">{% endif %}
             <span class="img" title="{{ entry.Books.title }}">
               {{ image.book_cover(entry.Books) }}
               {{ image.cover_badges(entry.Books, read_status=(entry[2] or 0)) }}
+              {% if global_library and in_my_library %}<span class="badge">{{ _('In your library') }}</span>{% endif %}
             </span>
-          </a>
+          {% if in_my_library %}</a>{% else %}</span>{% endif %}
       </div>
       <div class="meta">
-        <a href="{{ url_for('web.show_book', book_id=entry.Books.id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>
+        {% if in_my_library %}<a href="{{ url_for('web.show_book', book_id=entry.Books.id) }}" {% if simple==false %}data-toggle="modal" data-target="#bookDetailsModal" data-remote="false"{% endif %}>{% else %}<span>{% endif %}
           <p title="{{ entry.Books.title }}" class="title">{{entry.Books.title|shortentitle}}</p>
-        </a>
+        {% if in_my_library %}</a>{% else %}</span>{% endif %}
         <p class="author">
           {% for author in entry.Books.authors %}
             {% if loop.index > g.config_authors_max and g.config_authors_max != 0 %}
@@ -214,6 +239,9 @@
             <span class="glyphicon glyphicon-music"></span>
           {% endif %}
         </p>
+        {% if global_library and not in_my_library %}
+          <button type="button" class="btn btn-link add-to-my-library" data-book-id="{{ entry.Books.id }}" aria-label="{{ _('Add %(title)s to my library', title=entry.Books.title) }}">{{ _('Add to my library') }}</button>
+        {% endif %}
         {% if entry.Books.series.__len__() > 0 %}
         <p class="series">
         {% if page != "series" %}
@@ -241,12 +269,45 @@
       </div>
     </div>
     {% endfor %}
+    {% else %}
+      {% if page == 'root' and current_user.library_mode() == 'personal_library' %}
+        <div class="col-xs-12 text-center">
+          <h3>{{ _('Your library is empty') }}</h3>
+          {% if current_user.role_browse_global() %}
+            <p>{{ _('Nothing is missing — the whole library is still on the server. What you see here is your own selection. Add books from the global library; they appear here and on your e-reader.') }}</p>
+            <a class="btn btn-primary" href="{{ url_for('web.global_library') }}">{{ _('Browse the global library') }}</a>
+          {% else %}
+            <p>{{ _('Your administrator chooses which books are in your library. Ask them to add books, or to let you browse the global library.') }}</p>
+          {% endif %}
+        </div>
+      {% elif page == 'global_library' and recent_missing %}
+        <div class="col-xs-12 text-center"><p>{{ _('Every book here is already in your library.') }}</p></div>
+      {% else %}
+        <div class="col-xs-12 text-center"><p>{{ _('No books here.') }}</p></div>
+      {% endif %}
   {% endif %}
   </div>
 </div>
 {% endblock %}
 {% block js %}
 {{ super() }}
+<script>
+$(function () {
+  $('#dismiss-my-library-intro').on('click', function () {
+    $.ajax({url: '{{ url_for("api_v1.dismiss_my_library_intro") }}', method: 'POST',
+      headers: {'X-CSRFToken': $('input[name="csrf_token"]').val()}, contentType: 'application/json', data: '{}',
+      success: function () { $('#my-library-intro').remove(); }});
+  });
+  $('.add-to-my-library').on('click', function () {
+    var button = $(this); var id = button.data('book-id');
+    button.prop('disabled', true).text({{ _('Adding…')|tojson }});
+    $.ajax({url: '{{ url_for("web.add_to_my_library", book_id=0) }}'.replace('/0/', '/' + id + '/'), method: 'POST',
+      headers: {'X-CSRFToken': $('input[name="csrf_token"]').val()},
+      success: function () { location.reload(); },
+      error: function () { button.prop('disabled', false).text({{ _('Add to my library')|tojson }}); }});
+  });
+});
+</script>
 {% if page == 'magicshelf' %}
 <script>
 $(document).ready(function() {

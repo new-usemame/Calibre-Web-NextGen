@@ -1,4 +1,4 @@
-import { BookOpen, Check, EyeOff, X, Pencil } from 'lucide-react';
+import { BookOpen, BookCheck, BookPlus, Check, EyeOff, X, Pencil } from 'lucide-react';
 import { Link } from 'wouter';
 import type { Book } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -6,6 +6,7 @@ import { BookCover } from './BookCover';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { formatAuthors } from '../lib/authors';
 import styles from './BookCard.module.css';
+import { Spinner } from './Spinner';
 
 interface BookCardProps {
   book: Book;
@@ -34,6 +35,14 @@ interface BookCardProps {
    *  off would keep tabbing through two invisible controls per card. Both
    *  actions remain on the book's own page, which the cover already links to. */
   hideActions?: boolean;
+  /** Global-library surfaces only. The Add action stays visible even when the
+   * user hid ordinary card actions, because adding is this surface's purpose. */
+  membership?: 'owned' | 'unowned';
+  onAddToLibrary?: (book: Book) => void;
+  addPending?: boolean;
+  /** The membership-scoped backend does not expose detail for an unowned book.
+   * Global cards therefore become static until the user adds them. */
+  detailsEnabled?: boolean;
 }
 
 /** Format a Calibre series_index (a float, e.g. 1.0, 2.5) for display: whole
@@ -50,6 +59,10 @@ export function BookCard({
   showSeriesIndex = false,
   quickEdit = false,
   hideActions = false,
+  membership,
+  onAddToLibrary,
+  addPending = false,
+  detailsEnabled = true,
 }: BookCardProps) {
   const t = useT();
   const authorStr = formatAuthors(book.authors);
@@ -104,6 +117,12 @@ export function BookCard({
             data-testid="hidden-book-badge">
             <EyeOff size={12} aria-hidden="true" focusable={false} />
             {t('Hidden')}
+          </span>
+        )}
+        {membership === 'owned' && (
+          <span className={styles.libraryBadge} role="img" aria-label={t('In your library')}>
+            <BookCheck size={12} aria-hidden="true" focusable={false} />
+            {t('In your library')}
           </span>
         )}
         {seriesIndexLabel && (
@@ -179,14 +198,18 @@ export function BookCard({
   // width, density or locale — the same "impossible by construction" move the
   // badge row above makes. `.removeBtn` stays absolute: it belongs to the cover,
   // not to this row.
-  const hasActionRow = !hideActions && (Boolean(readTarget) || quickEdit);
+  const hasAddAction = membership === 'unowned' && !!onAddToLibrary;
+  const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));
 
   return (
     <div className={styles.wrap} style={style}>
-      <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
-        {cover}
-        {info}
-      </Link>
+      {detailsEnabled ? (
+        <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
+          {cover}{info}
+        </Link>
+      ) : (
+        <div className={styles.card} aria-label={book.title}>{cover}{info}</div>
+      )}
       {onRemove && (
         <button
           type="button"
@@ -199,7 +222,15 @@ export function BookCard({
       )}
       {hasActionRow && (
         <div className={quickEdit ? `${styles.actionRow} ${styles.actionRowEdit}` : styles.actionRow}>
-          {readTarget && (
+          {hasAddAction ? (
+            <button type="button" className={`${styles.readNow} ${styles.addToLibrary}`}
+              disabled={addPending}
+              aria-label={t('Add {title} to my library', { title: book.title })}
+              onClick={() => onAddToLibrary?.(book)}>
+              {addPending ? <Spinner size={13} /> : <BookPlus size={15} aria-hidden="true" focusable={false} />}
+              <span className={styles.readNowLabel}>{addPending ? t('Adding…') : t('Add')}</span>
+            </button>
+          ) : readTarget && !hideActions ? (
             <Link
               href={readTarget}
               className={styles.readNow}
@@ -211,8 +242,8 @@ export function BookCard({
                   aria-label above still names the action either way. */}
               <span className={styles.readNowLabel}>{t('Read now')}</span>
             </Link>
-          )}
-          {quickEdit && (
+          ) : null}
+          {quickEdit && !hideActions && (
             <Link
               href={`/book/${book.id}/edit`}
               className={styles.quickEditBtn}

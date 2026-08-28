@@ -14,7 +14,10 @@
   re-adds. The new introductory card has a durable per-account dismissal.
   Recently added global books absent from a personal set have a dedicated
   discovery filter, and a successful browser upload joins the uploader's own
-  library. SQLite builds without JSON functions use a compatible fallback.
+  library. The React and classic interfaces now expose the same mode controls,
+  global-library discovery, membership actions, introduction, confirmations,
+  and explanatory empty states. SQLite builds without JSON functions use a
+  compatible fallback.
   Existing and new accounts start in Monolibrary mode; upgrades do not switch
   anyone automatically. Implements
   [#1939](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1939).

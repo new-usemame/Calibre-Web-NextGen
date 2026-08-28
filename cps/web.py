@@ -1556,7 +1556,7 @@ def index(page):
     # SPA is sticky too. Only the web index does this; books_list, authors,
     # OPDS, Kobo and the API never touch the cookie.
     if request.args.get('cwng_feedback'):
-        response = make_response(render_books_list("newest", sort_param, 1, page))
+        response = make_response(render_books_list("root", sort_param, 1, page))
         spa.clear_prefer_spa_cookie(response)
         return response
 
@@ -1566,7 +1566,7 @@ def index(page):
     if spa.classic_index_redirects_to_spa():
         return redirect(spa.spa_shell_url())
 
-    return render_books_list("newest", sort_param, 1, page)
+    return render_books_list("root", sort_param, 1, page)
 
 
 @web.route('/global-library', defaults={'sort_param': 'stored', 'page': 1})
@@ -1575,15 +1575,23 @@ def index(page):
 @user_login_required
 def global_library(sort_param, page):
     if current_user.is_anonymous or not current_user.role_browse_global():
-        abort(403)
+        abort(403, description=_("You don't have permission to browse the global library."))
     recent_missing = sort_param == "recent-missing"
+    search_term = (request.args.get("search") or "").strip()
     order = get_sort_function(
         "new" if recent_missing else sort_param, "global_library"
     )
-    global_filter = (
-        user_library.global_missing_filter(current_user, cdb=calibre_db)
-        if recent_missing else True
-    )
+    filters = []
+    if recent_missing:
+        filters.append(user_library.global_missing_filter(current_user, cdb=calibre_db))
+    if search_term:
+        like = "%" + search_term + "%"
+        filters.append(or_(
+            func.lower(db.Books.title).ilike(func.lower(like)),
+            db.Books.authors.any(func.lower(db.Authors.name).ilike(func.lower(like))),
+            db.Books.series.any(func.lower(db.Series.name).ilike(func.lower(like))),
+        ))
+    global_filter = and_(*filters) if filters else True
     entries, random, pagination = calibre_db.fill_indexpage(
         page, 0, db.Books, global_filter, order[0],
         True, config.config_read_column,
@@ -1592,11 +1600,18 @@ def global_library(sort_param, page):
         db.Series,
         allow_show_global=True,
     )
+    page_ids = [int(getattr(entry, "Books", entry).id) for entry in entries]
+    global_member_ids = {int(row[0]) for row in (
+        ub.session.query(ub.UserLibraryBook.book_id)
+        .filter(ub.UserLibraryBook.user_id == int(current_user.id),
+                ub.UserLibraryBook.book_id.in_(page_ids)).all()
+    )}
     return render_title_template(
         'index.html', random=random, entries=entries, pagination=pagination,
         title=_("Global Library (%(count)s)", count=pagination.total_count),
         page="global_library", order=order[1], global_library=True,
-        recent_missing=recent_missing,
+        recent_missing=recent_missing, global_member_ids=global_member_ids,
+        global_search=search_term,
     )
 
 
@@ -3137,8 +3152,7 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
         if (desired_library_mode != user_library.mode_for_user(current_user)
                 and not current_user.role_browse_global()):
             raise user_library.UserLibraryError(
-                _("Library mode is managed by an administrator because this "
-                  "account may not view the whole archive."))
+                _("Your library contents are managed by an administrator."))
         if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
                 and not bool(current_user.user_library_seeded)):
             # This combined classic form edits many fields. Seed first so its

@@ -172,7 +172,7 @@ msgid "Edit Users"
 msgstr "Éditer les utilisateurs"
 
 #: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/list.html
+#: cps/templates/index.html cps/templates/list.html
 msgid "All"
 msgstr "Tout"
 
@@ -818,6 +818,10 @@ msgstr "Impossible de supprimer l’utilisateur Invité"
 #: cps/admin.py
 msgid "No admin user remaining, can't delete user"
 msgstr "Aucun utilisateur admin restant, impossible de supprimer l’utilisateur"
+
+#: cps/admin.py cps/web.py
+msgid "Invalid library mode"
+msgstr "Mode de bibliothèque non valide"
 
 #: cps/admin.py cps/web.py
 msgid "Email can't be empty and has to be a valid Email"
@@ -1602,7 +1606,7 @@ msgstr "Échec de la sauvegarde du fichier %(file)s."
 msgid "File format %(ext)s added to %(book)s"
 msgstr "Le format de fichier %(ext)s a été ajouté à %(book)s"
 
-#: cps/editbooks.py
+#: cps/editbooks.py cps/helper.py
 #, fuzzy
 msgid "Book not found"
 msgstr "Livre introuvable."
@@ -2268,7 +2272,7 @@ msgstr "{} Étoiles"
 
 #: cps/opds.py cps/search.py cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_epub_fixer.html cps/templates/feed.xml
-#: cps/templates/index.xml cps/templates/layout.html
+#: cps/templates/index.html cps/templates/index.xml cps/templates/layout.html
 #: cps/templates/search_form.html
 msgid "Search"
 msgstr "Chercher"
@@ -2297,8 +2301,12 @@ msgid ""
 msgstr ""
 
 #: cps/render_template.py cps/spa_strings.py
-msgid "Books"
-msgstr "Livres"
+msgid "My Library"
+msgstr "Ma bibliothèque"
+
+#: cps/render_template.py cps/spa_strings.py
+msgid "Library"
+msgstr "Bibliothèque"
 
 #: cps/render_template.py
 msgid "Show recent books"
@@ -2783,6 +2791,354 @@ msgstr "Impossible de charger cette page"
 #: cps/spa_strings.py
 msgid "Page not found"
 msgstr "Page introuvable"
+
+#: cps/spa_strings.py cps/templates/book_table.html
+#: cps/templates/email_edit.html cps/templates/shelf.html
+#: cps/templates/user_table.html
+msgid "Add"
+msgstr "Ajouter"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Add to my library"
+msgstr "Ajouter à ma bibliothèque"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Add {title} to my library"
+msgstr "Ajouter {title} à ma bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Added to your library"
+msgstr "Ajouté à votre bibliothèque"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Added to your library and to {shelf}"
+msgstr "Ajouté à votre bibliothèque et à {shelf}"
+
+#: cps/spa_strings.py
+msgid "Adding this book to a shelf also adds it to your library."
+msgstr ""
+"Ajouter ce livre à une étagère l’ajoute également à votre bibliothèque."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Adding…"
+msgstr "Ajout…"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+#: cps/templates/user_edit.html cps/templates/user_table.html
+msgid "Browse global library"
+msgstr "Parcourir la bibliothèque globale"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Browse the global library"
+msgstr "Parcourir la bibliothèque globale"
+
+#: cps/spa_strings.py
+msgid "Could not add the book. Please try again."
+msgstr "Impossible d’ajouter le livre. Veuillez réessayer."
+
+#: cps/spa_strings.py
+msgid "Could not remove the book. Please try again."
+msgstr "Impossible de retirer le livre. Veuillez réessayer."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Delete \"{title}\" from the global library? The book and all its files are "
+"permanently erased for every member. This cannot be undone."
+msgstr ""
+"Supprimer « {title} » de la bibliothèque globale ? Le livre et tous ses "
+"fichiers seront définitivement effacés pour chaque membre. Cette action est "
+"irréversible."
+
+#: cps/spa_strings.py
+msgid "Delete from the global library"
+msgstr "Supprimer de la bibliothèque globale"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Every book here is already in your library."
+msgstr "Tous les livres présentés ici sont déjà dans votre bibliothèque."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Everything on the server, including every new book added to it."
+msgstr ""
+"Tout ce qui se trouve sur le serveur, y compris chaque nouveau livre ajouté."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} their own selection? It starts as a copy of everything they can "
+"see now — nothing changes for them yet."
+msgstr ""
+"Donner sa propre sélection à {name} ? Elle commence comme une copie de tout "
+"ce que cette personne peut voir actuellement — rien ne change encore pour "
+"elle."
+
+#: cps/spa_strings.py cps/templates/layout.html
+msgid "Global Library"
+msgstr "Bibliothèque globale"
+
+#: cps/spa_strings.py cps/templates/detail.html cps/templates/index.html
+msgid "In your library"
+msgstr "Dans votre bibliothèque"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "It also leaves these shelves: {shelves}."
+msgstr "Il quitte également ces étagères : {shelves}."
+
+#: cps/spa_strings.py
+msgid ""
+"Keep your own selection again? Your library goes back to the books you had "
+"chosen — nothing was lost while you saw everything. At its next update, your "
+"e-reader returns to your selection."
+msgstr ""
+"Reprendre votre propre sélection ? Votre bibliothèque retrouve les livres "
+"que vous aviez choisis — rien n’a été perdu pendant que vous voyiez tout. "
+"Lors de sa prochaine mise à jour, votre liseuse revient à votre sélection."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Library contents"
+msgstr "Contenu de la bibliothèque"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Library scope"
+msgstr "Portée de la bibliothèque"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "My selection"
+msgstr "Ma sélection"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "New: your own library"
+msgstr "Nouveau : votre propre bibliothèque"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Not in your library"
+msgstr "Pas dans votre bibliothèque"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid ""
+"Nothing is deleted: the book stays in the global library, and your "
+"highlights, notes and reading progress are kept."
+msgstr ""
+"Rien n’est supprimé : le livre reste dans la bibliothèque globale, et vos "
+"surlignages, notes et votre progression de lecture sont conservés."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"Nothing is missing — the whole library is still on the server. What you see "
+"here is your own selection. Add books from the global library; they appear "
+"here and on your e-reader."
+msgstr ""
+"Rien ne manque — la bibliothèque entière se trouve toujours sur le serveur. "
+"Ce que vous voyez ici est votre propre sélection. Ajoutez des livres depuis "
+"la bibliothèque globale ; ils apparaîtront ici et sur votre liseuse."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Only an administrator can add it back."
+msgstr "Seul un administrateur peut le rajouter."
+
+#: cps/spa_strings.py
+msgid "Only the books chosen for this account."
+msgstr "Uniquement les livres choisis pour ce compte."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Only the books you choose. Add them from the global library; remove them any "
+"time."
+msgstr ""
+"Uniquement les livres que vous choisissez. Ajoutez-les depuis la "
+"bibliothèque globale ; retirez-les à tout moment."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+#: cps/templates/user_table.html
+msgid "Own selection"
+msgstr "Sélection propre"
+
+#: cps/spa_strings.py
+msgid "Recently added"
+msgstr "Ajoutés récemment"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove \"{title}\" from your library?"
+msgstr "Retirer « {title} » de votre bibliothèque ?"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from my library"
+msgstr "Retirer de ma bibliothèque"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove {title} from my library"
+msgstr "Retirer {title} de ma bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Removed from your library"
+msgstr "Retiré de votre bibliothèque"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removing…"
+msgstr "Retrait…"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Search the global library for \"{query}\" instead"
+msgstr "Rechercher plutôt « {query} » dans la bibliothèque globale"
+
+#: cps/spa_strings.py
+msgid "Set up My Library for all users"
+msgstr "Configurer Ma bibliothèque pour tous les utilisateurs"
+
+#: cps/spa_strings.py
+msgid ""
+"Set up My Library for every user? Each account switches to its own selection "
+"after it is filled with everything that account can currently see. Accounts "
+"set up before are never reseeded."
+msgstr ""
+"Configurer Ma bibliothèque pour chaque utilisateur ? Chaque compte passe à "
+"sa propre sélection après qu’elle a été remplie avec tout ce que ce compte "
+"peut voir actuellement. Les comptes déjà configurés ne sont jamais "
+"réinitialisés."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Set up {accounts} accounts with {books} books. {errors} errors."
+msgstr "{accounts} comptes configurés avec {books} livres. {errors} erreurs."
+
+#: cps/spa_strings.py
+msgid ""
+"Show the whole library again? Your selection is kept exactly as you left it "
+"— switch back any time and it is still there. At its next update, your e-"
+"reader syncs the whole library."
+msgstr ""
+"Afficher de nouveau la bibliothèque entière ? Votre sélection est conservée "
+"exactement comme vous l’avez laissée — revenez-y à tout moment, elle sera "
+"toujours là. Lors de sa prochaine mise à jour, votre liseuse synchronise la "
+"bibliothèque entière."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Show {name} the whole library again? Their selection is kept but no longer "
+"used, and their e-reader syncs the whole library at the next update."
+msgstr ""
+"Afficher de nouveau la bibliothèque entière à {name} ? Sa sélection est "
+"conservée mais n’est plus utilisée, et sa liseuse synchronise la "
+"bibliothèque entière lors de la prochaine mise à jour."
+
+#: cps/spa_strings.py
+msgid ""
+"Start your own selection? It begins as everything you can see now, so "
+"nothing changes until you remove books yourself. Your e-reader keeps the "
+"same books at its next update."
+msgstr ""
+"Commencer votre propre sélection ? Elle contient d’abord tout ce que vous "
+"pouvez voir actuellement, donc rien ne change jusqu’à ce que vous retiriez "
+"vous-même des livres. Votre liseuse conserve les mêmes livres lors de sa "
+"prochaine mise à jour."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Switch {name} back to their own selection? Their chosen books are restored."
+msgstr ""
+"Repasser {name} à sa propre sélection ? Les livres choisis sont restaurés."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Switching a user to their own selection first fills it with everything they "
+"can see now, so nothing changes for them until they remove books themselves. "
+"Switching back keeps the selection intact but unused."
+msgstr ""
+"Passer un utilisateur à sa propre sélection la remplit d’abord avec tout ce "
+"qu’il peut voir actuellement, donc rien ne change jusqu’à ce qu’il retire "
+"lui-même des livres. Revenir en arrière conserve la sélection intacte mais "
+"inutilisée."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The library is shared and holds every book once — what you keep is your own "
+"selection. Nothing you had is gone. Every book, new arrivals included, is "
+"under Global Library in the menu."
+msgstr ""
+"La bibliothèque est partagée et contient chaque livre une seule fois — ce "
+"que vous conservez est votre propre sélection. Rien de ce que vous aviez n’a "
+"disparu. Tous les livres, nouveautés comprises, se trouvent sous "
+"Bibliothèque globale dans le menu."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The library is shared and holds every book once — what you keep is your own "
+"selection. Nothing you had is gone. Your administrator manages what enters "
+"your selection."
+msgstr ""
+"La bibliothèque est partagée et contient chaque livre une seule fois — ce "
+"que vous conservez est votre propre sélection. Rien de ce que vous aviez n’a "
+"disparu. Votre administrateur gère ce qui entre dans votre sélection."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "The next time your e-reader updates, this book disappears from it."
+msgstr ""
+"Lors de la prochaine mise à jour de votre liseuse, ce livre en disparaîtra."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "The whole archive. Add books to your library from here."
+msgstr ""
+"L’archive entière. Ajoutez des livres à votre bibliothèque depuis cette page."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "The whole library"
+msgstr "La bibliothèque entière"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Without the global-browse role, only an administrator can add books to this "
+"user's library."
+msgstr ""
+"Sans le rôle de consultation globale, seul un administrateur peut ajouter "
+"des livres à la bibliothèque de cet utilisateur."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "You can add it back any time from the global library."
+msgstr "Vous pouvez le rajouter à tout moment depuis la bibliothèque globale."
+
+#: cps/spa_strings.py
+msgid ""
+"You don't have access to the global library. Ask an administrator to grant "
+"it."
+msgstr ""
+"Vous n’avez pas accès à la bibliothèque globale. Demandez à un "
+"administrateur de vous l’accorder."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"Your administrator chooses which books are in your library. Ask them to add "
+"books, or to let you browse the global library."
+msgstr ""
+"Votre administrateur choisit les livres présents dans votre bibliothèque. "
+"Demandez-lui d’ajouter des livres ou de vous autoriser à parcourir la "
+"bibliothèque globale."
+
+#: cps/spa_strings.py cps/templates/user_edit.html cps/web.py
+msgid "Your library contents are managed by an administrator."
+msgstr "Le contenu de votre bibliothèque est géré par un administrateur."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Your library is empty"
+msgstr "Votre bibliothèque est vide"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} now keeps their own selection."
+msgstr "{name} conserve maintenant sa propre sélection."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} sees the whole library again."
+msgstr "{name} voit de nouveau la bibliothèque entière."
 
 #: cps/spa_strings.py
 msgid "Clear rating"
@@ -3293,7 +3649,7 @@ msgstr ""
 msgid "New passwords do not match."
 msgstr "Les nouveaux mots de passe ne correspondent pas."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/index.html
 msgid "No books here."
 msgstr "Aucun livre ici."
 
@@ -3620,10 +3976,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Grid view"
 msgstr "Vue en grille"
-
-#: cps/spa_strings.py
-msgid "Library"
-msgstr "Bibliothèque"
 
 #: cps/spa_strings.py
 msgid "List view"
@@ -4269,6 +4621,10 @@ msgstr "Livre {id}"
 #, python-brace-format
 msgid "Book {number}"
 msgstr "Livre {number}"
+
+#: cps/spa_strings.py
+msgid "Books"
+msgstr "Livres"
 
 #: cps/spa_strings.py
 msgid "Books per page"
@@ -6998,6 +7354,15 @@ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
 msgstr "Étagère magique&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
 
 #: cps/web.py
+msgid "You don't have permission to browse the global library."
+msgstr "Vous n’avez pas l’autorisation de parcourir la bibliothèque globale."
+
+#: cps/web.py
+#, python-format
+msgid "Global Library (%(count)s)"
+msgstr "Bibliothèque globale (%(count)s)"
+
+#: cps/web.py
 msgid "No rules provided"
 msgstr "Aucune règle fournie"
 
@@ -8131,7 +8496,8 @@ msgstr "Type d'identifiant"
 msgid "Identifier Value"
 msgstr "Valeur d'identifiant"
 
-#: cps/templates/book_edit.html cps/templates/user_table.html
+#: cps/templates/book_edit.html cps/templates/detail.html
+#: cps/templates/user_table.html
 msgid "Remove"
 msgstr "Supprimer"
 
@@ -8387,11 +8753,6 @@ msgstr ""
 #: cps/templates/book_table.html
 msgid "-- Select a Shelf --"
 msgstr "--Sélectionner une étagère--"
-
-#: cps/templates/book_table.html cps/templates/email_edit.html
-#: cps/templates/shelf.html cps/templates/user_table.html
-msgid "Add"
-msgstr "Ajouter"
 
 #: cps/templates/broadcast_email.html
 #, fuzzy
@@ -9921,9 +10282,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -11137,6 +11498,16 @@ msgid "Unhidden"
 msgstr ""
 
 #: cps/templates/detail.html
+#, python-format
+msgid "Remove \"%(title)s\" from your library?"
+msgstr "Retirer « %(title)s » de votre bibliothèque ?"
+
+#: cps/templates/detail.html
+#, python-format
+msgid "It also leaves these shelves: %(shelves)s."
+msgstr "Il quitte également ces étagères : %(shelves)s."
+
+#: cps/templates/detail.html
 msgid "Rating updated"
 msgstr "Évaluation mise à jour"
 
@@ -11693,6 +12064,10 @@ msgid "Logout User"
 msgstr "Déconnecter l’utilisateur"
 
 #: cps/templates/index.html
+msgid "Dismiss library introduction"
+msgstr "Fermer la présentation de la bibliothèque"
+
+#: cps/templates/index.html
 msgid "Mobile Notice"
 msgstr "Avis mobile"
 
@@ -11701,6 +12076,10 @@ msgid "Magic shelf editing works best on desktop or tablet devices."
 msgstr ""
 "La modification de l'étagère magique fonctionne mieux sur les ordinateurs de "
 "bureau ou les tablettes."
+
+#: cps/templates/index.html
+msgid "Search the global library"
+msgstr "Rechercher dans la bibliothèque globale"
 
 #: cps/templates/index.html
 msgid "Refresh shelf to update with latest changes"
@@ -11730,6 +12109,11 @@ msgstr "Masquer l'étagère"
 #, fuzzy
 msgid "Add Series to Shelf"
 msgstr "Ajouter à l'étagère"
+
+#: cps/templates/index.html
+#, python-format
+msgid "Add %(title)s to my library"
+msgstr "Ajouter %(title)s à ma bibliothèque"
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
@@ -12232,6 +12616,10 @@ msgid ""
 msgstr ""
 
 #: cps/templates/modal_dialogs.html
+msgid "It disappears from every member's library and e-reader."
+msgstr "Il disparaît de la bibliothèque et de la liseuse de chaque membre."
+
+#: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
 msgstr "Choisir l’emplacement du fichier"
 
@@ -12512,6 +12900,11 @@ msgstr "Aucun résultat trouvé"
 #: cps/templates/search.html
 msgid "Search Term:"
 msgstr "Chercher le terme :"
+
+#: cps/templates/search.html
+#, python-format
+msgid "Search the global library for \"%(query)s\" instead"
+msgstr "Rechercher plutôt « %(query)s » dans la bibliothèque globale"
 
 #: cps/templates/search.html
 msgid "Results for:"

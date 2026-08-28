@@ -639,6 +639,11 @@
           <nav class="navigation">
             <ul class="list-unstyled" id="scnd-nav" intent in-standard-append="nav.navigation" in-mobile-after="#main-nav" in-mobile-class="nav navbar-nav">
               <li class="nav-head hidden-xs">{{_('Browse')}}</li>
+              {% if current_user.is_authenticated and not current_user.is_anonymous and current_user.library_mode() == 'personal_library' and current_user.role_browse_global() %}
+                <li id="nav_global_library" {% if page == 'global_library' %}class="active"{% endif %}>
+                  <a href="{{ url_for('web.global_library') }}"><span class="glyphicon glyphicon-globe"></span> {{ _('Global Library') }}</a>
+                </li>
+              {% endif %}
               {% for element in sidebar %}
                 {% if current_user.check_visibility(element['visibility']) and element['public'] %}
                     <li id="nav_{{element['id']}}" {% if page == element['page'] %}class="active"{% endif %} style="{% if element['id'] == 'duplicates' %}position: relative;{% endif %}">

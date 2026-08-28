@@ -12,8 +12,8 @@ msgstr ""
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
-"me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
+"proton.me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -154,7 +154,7 @@ msgid "Edit Users"
 msgstr "Bewerken Gebruikers"
 
 #: cps/admin.py cps/opds.py cps/spa_strings.py cps/templates/grid.html
-#: cps/templates/list.html
+#: cps/templates/index.html cps/templates/list.html
 msgid "All"
 msgstr "Alles"
 
@@ -779,6 +779,10 @@ msgstr "Kan Gast gebruiker niet verwijderen"
 #: cps/admin.py
 msgid "No admin user remaining, can't delete user"
 msgstr "Kan laatste systeembeheerder niet verwijderen"
+
+#: cps/admin.py cps/web.py
+msgid "Invalid library mode"
+msgstr "Ongeldige bibliotheekmodus"
 
 #: cps/admin.py cps/web.py
 msgid "Email can't be empty and has to be a valid Email"
@@ -1522,7 +1526,7 @@ msgstr "Kan %(file)s niet opslaan."
 msgid "File format %(ext)s added to %(book)s"
 msgstr "Bestandsformaat %(ext)s toegevoegd aan %(book)s"
 
-#: cps/editbooks.py
+#: cps/editbooks.py cps/helper.py
 #, fuzzy
 msgid "Book not found"
 msgstr "Boek niet gevonden"
@@ -2155,7 +2159,7 @@ msgstr "{} sterren"
 
 #: cps/opds.py cps/search.py cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_epub_fixer.html cps/templates/feed.xml
-#: cps/templates/index.xml cps/templates/layout.html
+#: cps/templates/index.html cps/templates/index.xml cps/templates/layout.html
 #: cps/templates/search_form.html
 msgid "Search"
 msgstr "Zoeken"
@@ -2184,8 +2188,12 @@ msgid ""
 msgstr ""
 
 #: cps/render_template.py cps/spa_strings.py
-msgid "Books"
-msgstr "Boeken"
+msgid "My Library"
+msgstr "Mijn bibliotheek"
+
+#: cps/render_template.py cps/spa_strings.py
+msgid "Library"
+msgstr "Bibliotheek"
 
 #: cps/render_template.py
 msgid "Show recent books"
@@ -2673,6 +2681,349 @@ msgstr "Kan deze pagina niet laden"
 #: cps/spa_strings.py
 msgid "Page not found"
 msgstr "Pagina niet gevonden"
+
+#: cps/spa_strings.py cps/templates/book_table.html
+#: cps/templates/email_edit.html cps/templates/shelf.html
+#: cps/templates/user_table.html
+msgid "Add"
+msgstr "Toevoegen"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Add to my library"
+msgstr "Aan mijn bibliotheek toevoegen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Add {title} to my library"
+msgstr "{title} aan mijn bibliotheek toevoegen"
+
+#: cps/spa_strings.py
+msgid "Added to your library"
+msgstr "Aan je bibliotheek toegevoegd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Added to your library and to {shelf}"
+msgstr "Aan je bibliotheek en aan {shelf} toegevoegd"
+
+#: cps/spa_strings.py
+msgid "Adding this book to a shelf also adds it to your library."
+msgstr ""
+"Als je dit boek aan een boekenplank toevoegt, wordt het ook aan je "
+"bibliotheek toegevoegd."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Adding…"
+msgstr "Toevoegen…"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+#: cps/templates/user_edit.html cps/templates/user_table.html
+msgid "Browse global library"
+msgstr "Door de globale bibliotheek bladeren"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Browse the global library"
+msgstr "Door de globale bibliotheek bladeren"
+
+#: cps/spa_strings.py
+msgid "Could not add the book. Please try again."
+msgstr "Het boek kon niet worden toegevoegd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Could not remove the book. Please try again."
+msgstr "Het boek kon niet worden verwijderd. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Delete \"{title}\" from the global library? The book and all its files are "
+"permanently erased for every member. This cannot be undone."
+msgstr ""
+"‘{title}’ uit de globale bibliotheek verwijderen? Het boek en alle bestanden "
+"worden voor ieder lid permanent gewist. Dit kan niet ongedaan worden gemaakt."
+
+#: cps/spa_strings.py
+msgid "Delete from the global library"
+msgstr "Uit de globale bibliotheek verwijderen"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Every book here is already in your library."
+msgstr "Elk boek hier staat al in je bibliotheek."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Everything on the server, including every new book added to it."
+msgstr ""
+"Alles op de server, inclusief elk nieuw boek dat eraan wordt toegevoegd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} their own selection? It starts as a copy of everything they can "
+"see now — nothing changes for them yet."
+msgstr ""
+"{name} een eigen selectie geven? Die begint als een kopie van alles wat deze "
+"persoon nu kan zien — er verandert nog niets."
+
+#: cps/spa_strings.py cps/templates/layout.html
+msgid "Global Library"
+msgstr "Globale bibliotheek"
+
+#: cps/spa_strings.py cps/templates/detail.html cps/templates/index.html
+msgid "In your library"
+msgstr "In je bibliotheek"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "It also leaves these shelves: {shelves}."
+msgstr "Het verdwijnt ook van deze boekenplanken: {shelves}."
+
+#: cps/spa_strings.py
+msgid ""
+"Keep your own selection again? Your library goes back to the books you had "
+"chosen — nothing was lost while you saw everything. At its next update, your "
+"e-reader returns to your selection."
+msgstr ""
+"Je eigen selectie weer gebruiken? Je bibliotheek keert terug naar de boeken "
+"die je had gekozen — er is niets verloren gegaan terwijl je alles zag. Bij "
+"de volgende update keert je e-reader terug naar je selectie."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Library contents"
+msgstr "Inhoud van de bibliotheek"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Library scope"
+msgstr "Bereik van de bibliotheek"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "My selection"
+msgstr "Mijn selectie"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "New: your own library"
+msgstr "Nieuw: je eigen bibliotheek"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Not in your library"
+msgstr "Niet in je bibliotheek"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid ""
+"Nothing is deleted: the book stays in the global library, and your "
+"highlights, notes and reading progress are kept."
+msgstr ""
+"Er wordt niets verwijderd: het boek blijft in de globale bibliotheek en je "
+"markeringen, notities en leesvoortgang worden bewaard."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"Nothing is missing — the whole library is still on the server. What you see "
+"here is your own selection. Add books from the global library; they appear "
+"here and on your e-reader."
+msgstr ""
+"Er ontbreekt niets — de hele bibliotheek staat nog op de server. Wat je hier "
+"ziet is je eigen selectie. Voeg boeken toe vanuit de globale bibliotheek; ze "
+"verschijnen hier en op je e-reader."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Only an administrator can add it back."
+msgstr "Alleen een beheerder kan het weer toevoegen."
+
+#: cps/spa_strings.py
+msgid "Only the books chosen for this account."
+msgstr "Alleen de boeken die voor dit account zijn gekozen."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Only the books you choose. Add them from the global library; remove them any "
+"time."
+msgstr ""
+"Alleen de boeken die je kiest. Voeg ze toe vanuit de globale bibliotheek en "
+"verwijder ze wanneer je wilt."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+#: cps/templates/user_table.html
+msgid "Own selection"
+msgstr "Eigen selectie"
+
+#: cps/spa_strings.py
+msgid "Recently added"
+msgstr "Onlangs toegevoegd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove \"{title}\" from your library?"
+msgstr "‘{title}’ uit je bibliotheek verwijderen?"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Remove from my library"
+msgstr "Uit mijn bibliotheek verwijderen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove {title} from my library"
+msgstr "{title} uit mijn bibliotheek verwijderen"
+
+#: cps/spa_strings.py
+msgid "Removed from your library"
+msgstr "Uit je bibliotheek verwijderd"
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Removing…"
+msgstr "Verwijderen…"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Search the global library for \"{query}\" instead"
+msgstr "In plaats daarvan in de globale bibliotheek naar ‘{query}’ zoeken"
+
+#: cps/spa_strings.py
+msgid "Set up My Library for all users"
+msgstr "Mijn bibliotheek voor alle gebruikers instellen"
+
+#: cps/spa_strings.py
+msgid ""
+"Set up My Library for every user? Each account switches to its own selection "
+"after it is filled with everything that account can currently see. Accounts "
+"set up before are never reseeded."
+msgstr ""
+"Mijn bibliotheek voor elke gebruiker instellen? Elk account schakelt over "
+"naar een eigen selectie nadat die is gevuld met alles wat het account nu kan "
+"zien. Eerder ingestelde accounts worden nooit opnieuw gevuld."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Set up {accounts} accounts with {books} books. {errors} errors."
+msgstr "{accounts} accounts ingesteld met {books} boeken. {errors} fouten."
+
+#: cps/spa_strings.py
+msgid ""
+"Show the whole library again? Your selection is kept exactly as you left it "
+"— switch back any time and it is still there. At its next update, your e-"
+"reader syncs the whole library."
+msgstr ""
+"De hele bibliotheek weer tonen? Je selectie blijft precies zoals je die hebt "
+"achtergelaten — schakel op elk moment terug en ze staat er nog. Bij de "
+"volgende update synchroniseert je e-reader de hele bibliotheek."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Show {name} the whole library again? Their selection is kept but no longer "
+"used, and their e-reader syncs the whole library at the next update."
+msgstr ""
+"{name} de hele bibliotheek weer tonen? De selectie blijft bewaard maar wordt "
+"niet meer gebruikt, en de e-reader synchroniseert bij de volgende update de "
+"hele bibliotheek."
+
+#: cps/spa_strings.py
+msgid ""
+"Start your own selection? It begins as everything you can see now, so "
+"nothing changes until you remove books yourself. Your e-reader keeps the "
+"same books at its next update."
+msgstr ""
+"Je eigen selectie starten? Die begint met alles wat je nu kunt zien, zodat "
+"er niets verandert totdat je zelf boeken verwijdert. Je e-reader behoudt bij "
+"de volgende update dezelfde boeken."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Switch {name} back to their own selection? Their chosen books are restored."
+msgstr ""
+"{name} terugschakelen naar een eigen selectie? De gekozen boeken worden "
+"hersteld."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Switching a user to their own selection first fills it with everything they "
+"can see now, so nothing changes for them until they remove books themselves. "
+"Switching back keeps the selection intact but unused."
+msgstr ""
+"Als je een gebruiker naar een eigen selectie overschakelt, wordt die eerst "
+"gevuld met alles wat die gebruiker nu kan zien. Er verandert dus niets "
+"totdat die zelf boeken verwijdert. Terugschakelen bewaart de selectie intact "
+"maar ongebruikt."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The library is shared and holds every book once — what you keep is your own "
+"selection. Nothing you had is gone. Every book, new arrivals included, is "
+"under Global Library in the menu."
+msgstr ""
+"De bibliotheek wordt gedeeld en bevat elk boek één keer — wat jij bewaart is "
+"je eigen selectie. Niets wat je had is verdwenen. Elk boek, ook nieuwe "
+"aanwinsten, staat onder Globale bibliotheek in het menu."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The library is shared and holds every book once — what you keep is your own "
+"selection. Nothing you had is gone. Your administrator manages what enters "
+"your selection."
+msgstr ""
+"De bibliotheek wordt gedeeld en bevat elk boek één keer — wat jij bewaart is "
+"je eigen selectie. Niets wat je had is verdwenen. Je beheerder bepaalt wat "
+"er in je selectie komt."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "The next time your e-reader updates, this book disappears from it."
+msgstr ""
+"De volgende keer dat je e-reader wordt bijgewerkt, verdwijnt dit boek ervan."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "The whole archive. Add books to your library from here."
+msgstr "Het hele archief. Voeg vanaf hier boeken aan je bibliotheek toe."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "The whole library"
+msgstr "De hele bibliotheek"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Without the global-browse role, only an administrator can add books to this "
+"user's library."
+msgstr ""
+"Zonder de rol voor globaal bladeren kan alleen een beheerder boeken aan de "
+"bibliotheek van deze gebruiker toevoegen."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "You can add it back any time from the global library."
+msgstr ""
+"Je kunt het op elk moment weer toevoegen vanuit de globale bibliotheek."
+
+#: cps/spa_strings.py
+msgid ""
+"You don't have access to the global library. Ask an administrator to grant "
+"it."
+msgstr ""
+"Je hebt geen toegang tot de globale bibliotheek. Vraag een beheerder om "
+"toegang."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"Your administrator chooses which books are in your library. Ask them to add "
+"books, or to let you browse the global library."
+msgstr ""
+"Je beheerder kiest welke boeken in je bibliotheek staan. Vraag om boeken toe "
+"te voegen of om je door de globale bibliotheek te laten bladeren."
+
+#: cps/spa_strings.py cps/templates/user_edit.html cps/web.py
+msgid "Your library contents are managed by an administrator."
+msgstr "De inhoud van je bibliotheek wordt door een beheerder beheerd."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Your library is empty"
+msgstr "Je bibliotheek is leeg"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} now keeps their own selection."
+msgstr "{name} gebruikt nu een eigen selectie."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} sees the whole library again."
+msgstr "{name} ziet de hele bibliotheek weer."
 
 #: cps/spa_strings.py
 msgid "Clear rating"
@@ -3183,7 +3534,7 @@ msgstr ""
 msgid "New passwords do not match."
 msgstr "De nieuwe wachtwoorden komen niet overeen."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/index.html
 msgid "No books here."
 msgstr "Geen boeken hier."
 
@@ -3507,10 +3858,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Grid view"
 msgstr "Rasterweergave"
-
-#: cps/spa_strings.py
-msgid "Library"
-msgstr "Bibliotheek"
 
 #: cps/spa_strings.py
 msgid "List view"
@@ -4149,6 +4496,10 @@ msgstr "Boek {id}"
 #, python-brace-format
 msgid "Book {number}"
 msgstr "Boek {number}"
+
+#: cps/spa_strings.py
+msgid "Books"
+msgstr "Boeken"
 
 #: cps/spa_strings.py
 msgid "Books per page"
@@ -6864,6 +7215,15 @@ msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
 msgstr ""
 
 #: cps/web.py
+msgid "You don't have permission to browse the global library."
+msgstr "Je hebt geen toestemming om door de globale bibliotheek te bladeren."
+
+#: cps/web.py
+#, python-format
+msgid "Global Library (%(count)s)"
+msgstr "Globale bibliotheek (%(count)s)"
+
+#: cps/web.py
 msgid "No rules provided"
 msgstr ""
 
@@ -7011,8 +7371,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
-"%(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
+"(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -8001,7 +8361,8 @@ msgstr "Identificatie type"
 msgid "Identifier Value"
 msgstr "Identificatie waarde"
 
-#: cps/templates/book_edit.html cps/templates/user_table.html
+#: cps/templates/book_edit.html cps/templates/detail.html
+#: cps/templates/user_table.html
 msgid "Remove"
 msgstr "Verwijderen"
 
@@ -8247,11 +8608,6 @@ msgstr ""
 #: cps/templates/book_table.html
 msgid "-- Select a Shelf --"
 msgstr "-- Selecteer een Boekenplank --"
-
-#: cps/templates/book_table.html cps/templates/email_edit.html
-#: cps/templates/shelf.html cps/templates/user_table.html
-msgid "Add"
-msgstr "Toevoegen"
 
 #: cps/templates/broadcast_email.html
 #, fuzzy
@@ -10833,6 +11189,16 @@ msgid "Unhidden"
 msgstr ""
 
 #: cps/templates/detail.html
+#, python-format
+msgid "Remove \"%(title)s\" from your library?"
+msgstr "‘%(title)s’ uit je bibliotheek verwijderen?"
+
+#: cps/templates/detail.html
+#, python-format
+msgid "It also leaves these shelves: %(shelves)s."
+msgstr "Het verdwijnt ook van deze boekenplanken: %(shelves)s."
+
+#: cps/templates/detail.html
 #, fuzzy
 msgid "Rating updated"
 msgstr "E-mailserver-instellingen bijgewerkt"
@@ -11386,12 +11752,20 @@ msgid "Logout User"
 msgstr "Gebruiker uitloggen"
 
 #: cps/templates/index.html
+msgid "Dismiss library introduction"
+msgstr "Introductie van de bibliotheek sluiten"
+
+#: cps/templates/index.html
 msgid "Mobile Notice"
 msgstr ""
 
 #: cps/templates/index.html
 msgid "Magic shelf editing works best on desktop or tablet devices."
 msgstr ""
+
+#: cps/templates/index.html
+msgid "Search the global library"
+msgstr "In de globale bibliotheek zoeken"
 
 #: cps/templates/index.html
 msgid "Refresh shelf to update with latest changes"
@@ -11425,6 +11799,11 @@ msgstr "Openbare boekenplank"
 #, fuzzy
 msgid "Add Series to Shelf"
 msgstr "Toevoegen aan boekenplank"
+
+#: cps/templates/index.html
+#, python-format
+msgid "Add %(title)s to my library"
+msgstr "%(title)s aan mijn bibliotheek toevoegen"
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
@@ -11925,6 +12304,10 @@ msgid ""
 msgstr ""
 
 #: cps/templates/modal_dialogs.html
+msgid "It disappears from every member's library and e-reader."
+msgstr "Het verdwijnt uit de bibliotheek en van de e-reader van ieder lid."
+
+#: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
 msgstr "Kies bestandslocatie"
 
@@ -12200,6 +12583,11 @@ msgstr "Geen resultaten gevonden"
 #: cps/templates/search.html
 msgid "Search Term:"
 msgstr "Zoekterm:"
+
+#: cps/templates/search.html
+#, python-format
+msgid "Search the global library for \"%(query)s\" instead"
+msgstr "In plaats daarvan in de globale bibliotheek naar ‘%(query)s’ zoeken"
 
 #: cps/templates/search.html
 msgid "Results for:"
@@ -13343,10 +13731,11 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
-#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
-#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
-#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
+#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
+#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
+#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
+#~ "bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

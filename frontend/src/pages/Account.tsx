@@ -6,6 +6,7 @@ import {
   useAccount, useMe, useUpdateProfile, useChangePassword,
   useCreateAppPassword, useRevokeAppPassword,
   useKoboTwoWayAnnotations, useUpdateKoboTwoWayAnnotations, useSetKoboTwoWayBook,
+  useUpdateLibraryMode,
 } from '../lib/queries';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
@@ -18,6 +19,7 @@ import { THEMES, resolveTheme } from '../lib/themes';
 import { useT } from '../lib/i18n';
 import { authorityLabel, authorityTone, opaqueLabel } from '../lib/koboTwoWay';
 import styles from './Account.module.css';
+import { useAnnouncer } from '../lib/a11y/announcer';
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin', upload: 'Upload', edit: 'Edit metadata', download: 'Download',
@@ -36,6 +38,7 @@ const STATE_TONE_CLASS: Record<string, string> = {
 
 export function Account() {
   const t = useT();
+  const announce = useAnnouncer();
   const { data: account, isLoading, error } = useAccount();
   const me = useMe().data;
   const avatar = me?.avatar;
@@ -46,6 +49,8 @@ export function Account() {
   const devices = useQuery<{ devices: { public_id: string; label: string; annotation_count: number }[] }>({
     queryKey: ['annotation-devices'], queryFn: () => apiGet('/api/annotations/devices?active=true'),
   });
+  const updateLibraryMode = useUpdateLibraryMode();
+  const [libraryModeError, setLibraryModeError] = useState('');
 
   // Kobo two-way annotation sync (Stage 0 — a preference surface over a
   // feature that is still inert; nothing here makes a book sync).
@@ -205,6 +210,22 @@ export function Account() {
     });
   };
 
+  const chooseLibraryMode = (mode: 'monolibrary' | 'personal_library') => {
+    if (mode === account.library_mode || updateLibraryMode.isPending) return;
+    const confirmText = mode === 'monolibrary'
+      ? t('Show the whole library again? Your selection is kept exactly as you left it — switch back any time and it is still there. At its next update, your e-reader syncs the whole library.')
+      : account.my_library_seeded
+        ? t('Keep your own selection again? Your library goes back to the books you had chosen — nothing was lost while you saw everything. At its next update, your e-reader returns to your selection.')
+        : t('Start your own selection? It begins as everything you can see now, so nothing changes until you remove books yourself. Your e-reader keeps the same books at its next update.');
+    if (!window.confirm(confirmText)) return;
+    setLibraryModeError('');
+    updateLibraryMode.mutate(mode, {
+      onSuccess: () => announce(t(mode === 'monolibrary'
+        ? 'You now see the whole library.' : 'Your library now shows your selection.')),
+      onError: (err) => setLibraryModeError(err instanceof ApiError ? err.message : t('Could not save.')),
+    });
+  };
+
   return (
     <main className={styles.container}>
       <h1 className={styles.title}>{t('Account')}</h1>
@@ -217,6 +238,31 @@ export function Account() {
           </ul>
         ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
         <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
+      </section>
+
+      <section className={styles.card} aria-labelledby="library-contents-title">
+        <fieldset className={styles.scopeGroup}>
+          <legend id="library-contents-title" className={styles.cardTitle}>{t('Library contents')}</legend>
+          {account.can_switch_library_mode ? (
+            <>
+              <label className={styles.scopeOption}>
+                <input type="radio" name="library-mode" value="monolibrary"
+                  checked={account.library_mode === 'monolibrary'} disabled={updateLibraryMode.isPending}
+                  onChange={() => chooseLibraryMode('monolibrary')} />
+                <span className={styles.scopeText}><strong>{t('The whole library')}</strong>
+                  <small>{t('Everything on the server, including every new book added to it.')}</small></span>
+              </label>
+              <label className={styles.scopeOption}>
+                <input type="radio" name="library-mode" value="personal_library"
+                  checked={account.library_mode === 'personal_library'} disabled={updateLibraryMode.isPending}
+                  onChange={() => chooseLibraryMode('personal_library')} />
+                <span className={styles.scopeText}><strong>{t('My selection')}</strong>
+                  <small>{t('Only the books you choose. Add them from the global library; remove them any time.')}</small></span>
+              </label>
+            </>
+          ) : <p className={styles.muted}>{t('Your library contents are managed by an administrator.')}</p>}
+        </fieldset>
+        <span className={libraryModeError ? styles.msgErr : undefined} role="alert">{libraryModeError}</span>
       </section>
 
       {/* Kobo two-way annotation sync — Stage 0 (BETA). Both server gates stay

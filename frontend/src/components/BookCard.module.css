@@ -201,7 +201,7 @@
 
 /* Personal-library state: quiet but explicit when Show hidden books is on.
    Sits in .badgeRow. */
-.hiddenBadge {
+.hiddenBadge, .libraryBadge {
   min-height: 24px;
   padding: 0 var(--sp-2);
   border-radius: var(--r-full);
@@ -216,6 +216,10 @@
   font-weight: var(--fw-semi);
   line-height: 1;
   pointer-events: none;
+}
+
+.libraryBadge {
+  white-space: nowrap;
 }
 
 /* Series position (#573). Sits in .badgeRow; shown only in a series view. */
@@ -385,13 +389,22 @@
 .readNow:hover,
 .readNow:focus-visible { background: var(--accent-soft); }
 
+.addToLibrary {
+  opacity: 1;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  cursor: pointer;
+}
+
+.addToLibrary:disabled { cursor: wait; opacity: .7; }
+
 /* `any-pointer` also covers hybrid devices (for example, an iPad with a
    trackpad): touch must not lose actions merely because a fine pointer exists. */
 @media (any-hover: none), (any-pointer: coarse) {
   .readNow { min-height: 44px; opacity: 1; }
   /* Bigger where legibility is worst — a phone held at arm's length is the
      case the reporter was describing. */
-  .readBadge, .readingBadge, .hiddenBadge {
+  .readBadge, .readingBadge, .hiddenBadge, .libraryBadge {
     min-height: 28px;
     font-size: var(--fs-sm);
   }

@@ -239,10 +239,12 @@ malformed file, a non-object document, or a null/blank value falls back to the
 compiled-in default. Existing hand-edited `dirs.json` files therefore remain
 supported.
 
-Runtime path values are trimmed and must be absolute paths without a `..`
-component. A non-blank environment or `dirs.json` value that violates that
-contract stops the affected startup service with an error instead of letting a
-relative path reach file watchers or recursive ownership operations.
+Runtime path values are trimmed and lexically normalized, and must be absolute,
+non-root paths without a `..` component. Repeated separators, `.` components,
+and trailing separators are collapsed without resolving symlinks. A non-blank
+environment or `dirs.json` value that violates that contract stops the affected
+startup service instead of letting an unsafe path reach file watchers or
+recursive ownership operations.
 
 For example, a systemd unit can load a packager-owned file:
 

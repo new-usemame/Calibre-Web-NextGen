@@ -176,7 +176,7 @@ if ! INGEST_DIR="$(python3 "${CWA_APP_PATHS}" ingest_folder)"; then
   exit 1
 fi
 case "$INGEST_DIR" in
-  ""|*$'\n'*|*$'\r'*|*/../*|*/..)
+  ""|"/"|*$'\n'*|*$'\r'*|*/../*|*/..)
     echo "[cwa-init] ERROR: runtime ingest path resolver returned an unsafe path; refusing to continue"
     exit 1 ;;
   /*) ;;

@@ -27,6 +27,7 @@ PATH_CASES = (
     ("tmp_conversion_dir", "CWA_TMP_CONVERSION_DIR", "/config/.cwa_conversion_tmp"),
 )
 PATH_ENV_VARS = tuple(case[1] for case in PATH_CASES)
+ROOT_EQUIVALENT_PATHS = ("/", "/./", "//", "///./")
 
 
 @pytest.fixture()
@@ -166,7 +167,10 @@ def test_cps_and_scripts_resolvers_agree_for_same_env_and_file(
 
 
 @pytest.mark.parametrize("key,env_name,default", PATH_CASES)
-@pytest.mark.parametrize("invalid", ("relative/path", "..", "/safe/../escape"))
+@pytest.mark.parametrize(
+    "invalid",
+    ("relative/path", "..", "/safe/../escape", *ROOT_EQUIVALENT_PATHS),
+)
 def test_nonblank_invalid_env_paths_fail_on_both_sides(
     resolvers, monkeypatch, key, env_name, default, invalid
 ):
@@ -180,11 +184,12 @@ def test_nonblank_invalid_env_paths_fail_on_both_sides(
 
 
 @pytest.mark.parametrize("key,env_name,default", PATH_CASES)
+@pytest.mark.parametrize("invalid", ("../escape", *ROOT_EQUIVALENT_PATHS))
 def test_nonblank_invalid_dirs_json_paths_fail_on_both_sides(
-    resolvers, monkeypatch, tmp_path, key, env_name, default
+    resolvers, monkeypatch, tmp_path, key, env_name, default, invalid
 ):
     app_paths, constants = resolvers
-    dirs_file = _write_dirs(tmp_path / "dirs.json", {key: "../escape"})
+    dirs_file = _write_dirs(tmp_path / "dirs.json", {key: invalid})
     monkeypatch.setenv("CWA_DIRS_JSON", str(dirs_file))
     monkeypatch.setattr(constants, "DIRS_JSON", str(dirs_file))
 
@@ -194,12 +199,15 @@ def test_nonblank_invalid_dirs_json_paths_fail_on_both_sides(
         getattr(constants, key)()
 
 
-def test_app_paths_cli_rejects_invalid_path_without_partial_stdout(tmp_path):
+@pytest.mark.parametrize("invalid", ("../escape", *ROOT_EQUIVALENT_PATHS))
+def test_app_paths_cli_rejects_invalid_path_without_partial_stdout(
+    tmp_path, invalid
+):
     dirs_file = _write_dirs(
         tmp_path / "dirs.json",
         {
             "ingest_folder": "/valid-ingest",
-            "calibre_library_dir": "../escape",
+            "calibre_library_dir": invalid,
             "tmp_conversion_dir": "/valid-tmp",
         },
     )
@@ -220,6 +228,25 @@ def test_app_paths_cli_rejects_invalid_path_without_partial_stdout(tmp_path):
     assert result.stdout == ""
     assert "ERROR" in result.stderr
     assert "calibre_library_dir" in result.stderr
+
+
+@pytest.mark.parametrize("key,env_name,default", PATH_CASES)
+@pytest.mark.parametrize(
+    "configured,normalised",
+    (
+        ("/safe//path/./", "/safe/path"),
+        ("///safe/path//", "/safe/path"),
+        ("  /safe/./path/  ", "/safe/path"),
+    ),
+)
+def test_safe_runtime_paths_are_lexically_normalised_on_both_sides(
+    resolvers, monkeypatch, key, env_name, default, configured, normalised
+):
+    app_paths, constants = resolvers
+    monkeypatch.setenv(env_name, configured)
+
+    assert getattr(app_paths, key)() == normalised
+    assert getattr(constants, key)() == normalised
 
 
 def test_read_site_trailing_separator_shapes_are_preserved(
@@ -397,6 +424,41 @@ def test_cwa_init_skips_custom_ingest_chown_in_network_share_mode(tmp_path):
     assert custom_ingest.is_dir()
     assert not chown_log.exists()
     assert f"skipping chown of {custom_ingest}" in result.stdout
+
+
+@pytest.mark.parametrize("root_equivalent", ROOT_EQUIVALENT_PATHS)
+def test_cwa_init_rejects_root_equivalent_ingest_before_chown(
+    tmp_path, root_equivalent
+):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    chown_log = tmp_path / "chown.log"
+    _write_executable(
+        bin_dir / "chown",
+        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CWA_TEST_CHOWN_LOG"\n',
+    )
+    env = _isolated_path_env(tmp_path)
+    env.update(
+        {
+            "CWA_APP_PATHS": str(SCRIPTS_DIR / "app_paths.py"),
+            "CWA_INGEST_FOLDER": root_equivalent,
+            "NETWORK_SHARE_MODE": "false",
+            "CWA_TEST_CHOWN_LOG": str(chown_log),
+            "PATH": f"{bin_dir}:{env['PATH']}",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(_cwa_init_ingest_block(tmp_path))],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode != 0
+    assert not chown_log.exists()
+    assert "ERROR" in result.stdout + result.stderr
 
 
 def test_ingest_service_resolves_whitespace_env_through_file_fallback(tmp_path):

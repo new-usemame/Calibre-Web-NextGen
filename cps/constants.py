@@ -8,6 +8,7 @@
 from importlib import metadata
 import json
 import logging
+import posixpath
 import sys
 import os
 import threading
@@ -67,6 +68,9 @@ def _validated_runtime_dir(value, source):
     """Mirror scripts/app_paths.py's runtime-directory safety contract."""
     configured = value.strip()
     path = Path(configured)
+    normalised = posixpath.normpath(
+        '/' + configured.lstrip('/') if path.is_absolute() else configured
+    )
     if (
         not configured
         or '\x00' in configured
@@ -74,12 +78,13 @@ def _validated_runtime_dir(value, source):
         or '\r' in configured
         or not path.is_absolute()
         or '..' in path.parts
+        or normalised == '/'
     ):
         raise RuntimePathError(
-            f"{source} must be an absolute path without '..' components; "
+            f"{source} must be a non-root absolute path without '..' components; "
             f"got {value!r}"
         )
-    return configured
+    return normalised
 
 
 def _configured_dir(key, env_name, default):

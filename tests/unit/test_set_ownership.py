@@ -41,6 +41,7 @@ pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SET_OWNERSHIP = REPO_ROOT / "scripts" / "set_ownership.sh"
+ROOT_EQUIVALENT_PATHS = ("/", "/./", "//", "///./")
 
 CHOWN_STUB = """#!/bin/sh
 # Records every invocation, one line per call, then succeeds.
@@ -330,11 +331,43 @@ def test_non_absolute_dirs_json_values_are_ignored(harness: Harness):
     assert "not-a-path" not in harness.chowned_paths()
 
 
-@pytest.mark.parametrize("invalid", ("..", "relative/path", "/safe/../escape"))
+@pytest.mark.parametrize(
+    "invalid",
+    ("..", "relative/path", "/safe/../escape", *ROOT_EQUIVALENT_PATHS),
+)
 def test_invalid_runtime_path_fails_before_any_recursive_chown(
     harness: Harness, invalid: str
 ):
     result = harness.run(CWA_INGEST_FOLDER=invalid)
+
+    assert result.returncode != 0
+    assert harness.chowned_paths() == []
+    assert "ERROR" in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("root_equivalent", ROOT_EQUIVALENT_PATHS)
+def test_root_equivalent_from_replacement_resolver_fails_before_chown(
+    harness: Harness, root_equivalent: str
+):
+    app_paths = harness.tmp / "root-app-paths.py"
+    app_paths.write_text(
+        f'print({root_equivalent!r})\n'
+        'print("/safe-library")\n'
+        'print("/safe-tmp")\n'
+    )
+
+    result = harness.run(CWA_APP_PATHS=app_paths)
+
+    assert result.returncode != 0
+    assert harness.chowned_paths() == []
+    assert "ERROR" in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("root_equivalent", ROOT_EQUIVALENT_PATHS)
+def test_root_equivalent_config_floor_fails_before_chown(
+    harness: Harness, root_equivalent: str
+):
+    result = harness.run(CWA_CONFIG_ROOT=root_equivalent)
 
     assert result.returncode != 0
     assert harness.chowned_paths() == []

@@ -14,7 +14,7 @@ if [ "${CWA_INGEST_FOLDER+x}" = "x" ] || [ -z "${WATCH_FOLDER:-}" ]; then
         fi
 fi
 case "$WATCH_FOLDER" in
-        ""|*$'\n'*|*$'\r'*|*/../*|*/..)
+        ""|"/"|*$'\n'*|*$'\r'*|*/../*|*/..)
                 echo "[cwa-ingest-service] ERROR: runtime ingest path resolver returned an unsafe path; refusing to start a watcher"
                 exit 1 ;;
         /*) ;;

@@ -99,20 +99,37 @@ read_configured_dirs() {
 # hand root's recursive chown an empty/relative/traversing path.
 valid_resolved_dir() {
   local p="$1"
+  p="$(normalise "$p")"
   [ -n "$p" ] || return 1
   case "$p" in
     /*) ;;
     *) return 1 ;;
   esac
   case "$p" in
-    *$'\n'*|*$'\r'*|*/../*|*/..) return 1 ;;
+    "/"|*$'\n'*|*$'\r'*|*/../*|*/..) return 1 ;;
   esac
   return 0
 }
 
-# Strip trailing slashes so /config/ and /config compare equal.
+# Lexically collapse separators and dot components without resolving symlinks.
+# Bash owns this final trust boundary because CWA_CONFIG_ROOT and a replacement
+# resolver can both supply values that did not pass through app_paths.py.
 normalise() {
   local p="$1"
+  local before
+  local double_slash="//"
+  local slash="/"
+  local dot_component="/./"
+
+  while :; do
+    before="$p"
+    p="${p//$double_slash/$slash}"
+    p="${p//$dot_component/$slash}"
+    if [ "$p" != "/" ] && [ "${#p}" -gt 1 ] && [ "${p: -2}" = "/." ]; then
+      p="${p%/.}"
+    fi
+    [ "$p" = "$before" ] && break
+  done
   while [ "${#p}" -gt 1 ] && [ "${p: -1}" = "/" ]; do p="${p%/}"; done
   printf '%s' "$p"
 }

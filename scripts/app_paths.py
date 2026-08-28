@@ -70,6 +70,7 @@ quietly relocate anybody's *databases*.
 
 import json
 import os
+import posixpath
 import sys
 import threading
 from pathlib import Path
@@ -119,16 +120,20 @@ class RuntimePathError(ValueError):
 
 
 def _validated_runtime_dir(value, source):
-    """Return a trimmed absolute directory or reject the launch configuration.
+    """Return a lexical absolute directory or reject launch configuration.
 
     These values eventually reach recursive ownership operations during
-    container startup.  In particular, resolving ``..`` relative to
-    ``/config`` can turn that operation into a walk of ``/``.  Keep the text
-    shape (including a caller-supplied trailing slash), but require one
-    absolute, single-line path with no parent traversal component.
+    container startup. Resolving ``..`` relative to ``/config`` or accepting a
+    root-equivalent spelling can turn that operation into a walk of ``/``.
+    Normalise repeated separators, ``.`` components, and trailing separators
+    without resolving symlinks, then require one non-root absolute, single-line
+    path with no parent traversal component.
     """
     configured = value.strip()
     path = Path(configured)
+    normalised = posixpath.normpath(
+        "/" + configured.lstrip("/") if path.is_absolute() else configured
+    )
     if (
         not configured
         or "\x00" in configured
@@ -136,12 +141,13 @@ def _validated_runtime_dir(value, source):
         or "\r" in configured
         or not path.is_absolute()
         or ".." in path.parts
+        or normalised == "/"
     ):
         raise RuntimePathError(
-            f"{source} must be an absolute path without '..' components; "
+            f"{source} must be a non-root absolute path without '..' components; "
             f"got {value!r}"
         )
-    return configured
+    return normalised
 
 
 def _env_path(name):

@@ -60,7 +60,10 @@ test('book-detail deletion remains absent without delete permission (#1862)', as
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByTestId('book-destructive-actions')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Delete book' })).toHaveCount(0);
+  // #1939 renamed the book-detail destructive control's accessible name. This
+  // absence assertion MUST track the rename: against the old name it would now
+  // pass whether or not the control is hidden, i.e. prove nothing.
+  await expect(page.getByRole('button', { name: 'Delete from the global library' })).toHaveCount(0);
 });
 
 test('dismissing book-detail deletion confirmation never calls the endpoint (#1862)', async ({ page }) => {

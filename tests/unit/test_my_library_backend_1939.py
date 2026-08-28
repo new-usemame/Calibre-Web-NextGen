@@ -119,6 +119,36 @@ def test_two_users_are_scoped_and_default_off_is_unchanged(
             .filter(cdb.common_filters()).order_by(db.Books.id)] == [1, 2, 3]
 
 
+def test_explicit_user_filter_delegates_and_duplicate_scan_stays_global(
+        app_session, calibre_session, monkeypatch):
+    import cps.duplicates as duplicates
+
+    user = _user(app_session, "duplicate-scope", True)
+    app_session.add(ub.UserLibraryBook(user_id=user.id, book_id=1))
+    app_session.commit()
+    cdb = _cdb(calibre_session)
+    monkeypatch.setattr(db.ub, "session", app_session)
+    monkeypatch.setattr(duplicates.ub, "session", app_session)
+    monkeypatch.setattr(duplicates, "calibre_db", cdb)
+
+    scoped = (calibre_session.query(db.Books.id)
+              .filter(duplicates.get_common_filters(
+                  user_id=user.id,
+                  strict=True,
+              ))
+              .order_by(db.Books.id).all())
+    global_scan = (calibre_session.query(db.Books.id)
+                   .filter(duplicates.get_common_filters(
+                       user_id=user.id,
+                       allow_show_global=True,
+                       strict=True,
+                   ))
+                   .order_by(db.Books.id).all())
+
+    assert [row[0] for row in scoped] == [1]
+    assert [row[0] for row in global_scan] == [1, 2, 3]
+
+
 def test_anonymous_browse_guest_uses_its_membership_set(
         app_session, calibre_session, monkeypatch):
     guest = _user(app_session, "Guest", True)
@@ -856,10 +886,10 @@ def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
         app_session=session, cdb=cdb, chunk_size=2,
     ) == constants.LIBRARY_MODE_PERSONAL
     first_enable_commits = len(commits)
-    # Read release + three bounded write chunks + durable seed fence + mode.
-    assert first_enable_commits == 6
+    # Read release + three bounded write chunks + atomic seed-fence/mode commit.
+    assert first_enable_commits == 5
     assert user.user_library_seeded is True
-    assert user_library.seed_user_library(
+    assert user_library.prepare_user_library_seed(
         user, chunk_size=2, app_session=session, cdb=cdb
     ) == 0
     assert user_library.membership_count(user.id, session) == 5
@@ -907,6 +937,54 @@ def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
     finally:
         session.close()
         engine.dispose()
+
+
+def test_rejected_post_seed_switch_keeps_fence_false_and_retry_seeds(
+        app_session, calibre_session, monkeypatch):
+    """The seed-once fence and mode must become durable in one commit."""
+    from cps import user_library
+
+    user = _user(app_session, "seed-retry", False)
+    cdb = _cdb(calibre_session)
+    monkeypatch.setattr(db.ub, "session", app_session)
+
+    real_membership_count = user_library.membership_count
+
+    def reject_after_seed(*_args, **_kwargs):
+        raise user_library.UserLibraryError("forced post-seed rejection")
+
+    monkeypatch.setattr(user_library, "membership_count", reject_after_seed)
+    with pytest.raises(user_library.UserLibraryError,
+                       match="forced post-seed rejection"):
+        user_library.set_library_mode(
+            user,
+            constants.LIBRARY_MODE_PERSONAL,
+            app_session=app_session,
+            cdb=cdb,
+            chunk_size=2,
+        )
+
+    app_session.rollback()
+    app_session.expire_all()
+    user = app_session.get(ub.User, user.id)
+    assert user.user_library_seeded is False
+    assert user.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+
+    monkeypatch.setattr(user_library, "membership_count", real_membership_count)
+    assert user_library.set_library_mode(
+        user,
+        constants.LIBRARY_MODE_PERSONAL,
+        app_session=app_session,
+        cdb=cdb,
+        chunk_size=2,
+    ) == constants.LIBRARY_MODE_PERSONAL
+    app_session.expire_all()
+    user = app_session.get(ub.User, user.id)
+    assert user.user_library_seeded is True
+    assert user.library_mode() == constants.LIBRARY_MODE_PERSONAL
+    assert [row.book_id for row in app_session.query(ub.UserLibraryBook)
+            .filter_by(user_id=user.id)
+            .order_by(ub.UserLibraryBook.book_id)] == [1, 2, 3]
 
 
 def test_user_and_global_book_delete_cleanup_membership_rows(app_session, monkeypatch):

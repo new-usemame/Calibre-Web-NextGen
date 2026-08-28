@@ -1101,10 +1101,10 @@ def export_progress():
             # non-empty key verbatim), so without the per-user visibility filter
             # a restricted account could seed ids 1..N and enumerate the title +
             # authors of books hidden from it by denied tags, hidden-book, the
-            # restricted custom column, or a language filter. get_common_filters
-            # is the same single-source-of-truth predicate the duplicate scanner
-            # uses off the request context (current_user is not populated on this
-            # Basic-auth path). strict=True makes it FAIL CLOSED — if the filter
+            # restricted custom column, a language filter, or personal-library
+            # membership. get_common_filters delegates to CalibreDB's canonical
+            # policy with this explicit user because current_user is not populated
+            # on the Basic-auth path. strict=True makes it FAIL CLOSED — if the filter
             # can't be built we want the enclosing except to return an error,
             # never a silently-unrestricted dump.
             visibility_filter = get_common_filters(user_id=user.id, strict=True)

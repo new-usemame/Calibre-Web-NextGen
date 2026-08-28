@@ -358,12 +358,14 @@ def admin_update_user(user_id):
             "library_mode must be 'monolibrary' or 'personal_library'",
             400,
         )
+    library_seed_prepared = False
     if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
             and not bool(user.user_library_seeded)):
         try:
             # Seed before applying the rest of this multi-field update so its
             # chunk commits cannot persist half-validated profile changes.
-            user_library.seed_user_library(user)
+            user_library.prepare_user_library_seed(user)
+            library_seed_prepared = True
         except Exception as ex:
             ub.session.rollback()
             return _err("library_seed_failed", str(ex), 400)
@@ -394,9 +396,13 @@ def admin_update_user(user_id):
         if "default_language" in data and data["default_language"]:
             user.default_language = data["default_language"]
         if "library_mode" in data:
-            user_library.set_library_mode(user, desired_library_mode)
+            user_library.set_library_mode(
+                user,
+                desired_library_mode,
+                seed_rows_prepared=library_seed_prepared,
+                commit=False,
+            )
             user_library.mark_response_user_specific()
-            return jsonify(_serialize_user(user))
     except Exception as ex:  # validators raise generic Exception with a message
         ub.session.rollback()
         code = ("library_mode_rejected"

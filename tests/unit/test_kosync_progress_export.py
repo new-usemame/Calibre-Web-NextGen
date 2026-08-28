@@ -24,7 +24,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import cps
-from cps import ub
+from cps import constants, db, ub
 from cps.progress_syncing.models import KOSyncProgress
 
 pytestmark = pytest.mark.unit
@@ -69,11 +69,16 @@ def env(monkeypatch):
     app_session = sessionmaker(bind=_app_engine())()
     calibre_session = sessionmaker(bind=_calibre_engine())()
 
+    cdb = object.__new__(db.CalibreDB)
+    cdb.session = calibre_session
+    cdb.config = SimpleNamespace(config_restricted_column=0)
+
     state = SimpleNamespace(
         user=SimpleNamespace(id=1, name="alice"),
         enabled=True,
         app_session=app_session,
         calibre_session=calibre_session,
+        cdb=cdb,
     )
 
     monkeypatch.setattr(module, "ub", SimpleNamespace(
@@ -82,7 +87,7 @@ def env(monkeypatch):
     monkeypatch.setattr(module, "is_koreader_sync_enabled", lambda: state.enabled)
     monkeypatch.setattr(module, "authenticate_user", lambda: state.user)
     # The export does `from ... import calibre_db`; that resolves cps.calibre_db.
-    monkeypatch.setattr(cps, "calibre_db", SimpleNamespace(session=calibre_session), raising=False)
+    monkeypatch.setattr(cps, "calibre_db", cdb, raising=False)
 
     # The export calls get_common_filters(user_id=..., strict=True), which reads
     # cps.duplicates' own ub/config globals off the request context. Wire them to
@@ -93,11 +98,14 @@ def env(monkeypatch):
         session=app_session, User=ub.User,
         ArchivedBook=ub.ArchivedBook, UserHiddenBook=ub.UserHiddenBook))
     monkeypatch.setattr(dup, "config", SimpleNamespace(config_restricted_column=0))
+    monkeypatch.setattr(dup, "calibre_db", cdb)
+    monkeypatch.setattr(db.ub, "session", app_session)
     real_user = ub.User()
     real_user.id = 1
     real_user.name = "alice"
     app_session.add(real_user)
     app_session.commit()
+    state.real_user = real_user
 
     flask_app = Flask(__name__)
     flask_app.register_blueprint(module.kosync)
@@ -367,6 +375,39 @@ def test_export_excludes_books_hidden_from_this_user(env):
     assert visible_row["identifiers"] == {"isbn": "9780000000002"}
     all_ident_values = {v for r in body for v in r["identifiers"].values()}
     assert "9780000000001" not in all_ident_values
+
+
+def test_export_excludes_books_outside_personal_library_membership(env):
+    """An attacker-controlled decimal document must not enumerate the archive."""
+    member = _seed_book(env.calibre_session, title="Selected", authors=["A"])
+    non_member = _seed_book(
+        env.calibre_session,
+        title="Outside selection",
+        authors=["B"],
+        identifiers={"isbn": "9780000000193"},
+    )
+    _seed_progress(env.app_session, document=str(member.id), percentage=10.0)
+    _seed_progress(env.app_session, document=str(non_member.id), percentage=20.0)
+
+    env.real_user.has_own_library = True
+    env.real_user.user_library_seeded = True
+    env.real_user.role = constants.ROLE_USER  # deliberately no ROLE_BROWSE_GLOBAL
+    env.app_session.add(ub.UserLibraryBook(
+        user_id=env.real_user.id,
+        book_id=member.id,
+    ))
+    env.app_session.commit()
+
+    response = env.client.get("/kosync/export")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert {row["calibre_book_id"] for row in body} == {member.id}
+    assert {row["title"] for row in body} == {"Selected"}
+    assert "9780000000193" not in {
+        value
+        for row in body
+        for value in row["identifiers"].values()
+    }
 
 
 def test_visibility_filter_fails_closed_not_open(env, monkeypatch):

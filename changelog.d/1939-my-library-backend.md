@@ -17,7 +17,9 @@
   library. The React and classic interfaces now expose the same mode controls,
   global-library discovery, membership actions, introduction, confirmations,
   and explanatory empty states. SQLite builds without JSON functions use a
-  compatible fallback.
+  compatible fallback. KOReader progress exports apply that same canonical
+  per-user visibility policy, and a rejected first switch can no longer leave
+  the durable seed marker ahead of the user's actual library state.
   Existing and new accounts start in Monolibrary mode; upgrades do not switch
   anyone automatically. Implements
   [#1939](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1939).

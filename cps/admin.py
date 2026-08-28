@@ -3194,6 +3194,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
     if desired_library_mode not in constants.LIBRARY_MODES:
         flash(_("Invalid library mode"), category="error")
         return "", 400
+    library_seed_prepared = False
     if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
             and not bool(content.user_library_seeded)):
         try:
@@ -3201,7 +3202,8 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             # bounded commits must never make unrelated half-validated edits
             # durable; the membership rows remain dormant if a later field
             # fails validation.
-            user_library.seed_user_library(content)
+            user_library.prepare_user_library_seed(content)
+            library_seed_prepared = True
         except Exception as ex:
             ub.session.rollback()
             flash(str(ex), category="error")
@@ -3416,7 +3418,13 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
                                      title=_("Edit User %(nick)s", nick=content.name),
                                      page="edituser")
     try:
-        user_library.set_library_mode(content, desired_library_mode)
+        user_library.set_library_mode(
+            content,
+            desired_library_mode,
+            seed_rows_prepared=library_seed_prepared,
+            commit=False,
+        )
+        ub.session.commit()
         flash(_("User '%(nick)s' updated", nick=content.name), category="success")
     except user_library.UserLibraryError as ex:
         ub.session.rollback()

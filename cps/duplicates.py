@@ -6,8 +6,8 @@
 
 from flask import Blueprint, jsonify, request, abort
 from flask_babel import gettext as _
-from sqlalchemy import func, and_, case, or_
-from sqlalchemy.sql.expression import true, false
+from sqlalchemy import func, case, or_
+from sqlalchemy.sql.expression import true
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timezone
 from functools import wraps
@@ -457,7 +457,14 @@ def _visible_duplicate_book_ids(book_ids, user_id):
         chunk = ids[start:start + 900]
         rows = (calibre_db.session.query(db.Books.id)
                 .filter(db.Books.id.in_(chunk))
-                .filter(get_common_filters(user_id=user_id))
+                # Duplicate discovery is deliberately global with respect to
+                # My Library membership: dormant/non-member books can still be
+                # true archive duplicates. All other per-user restrictions
+                # remain canonical through CalibreDB.common_filters().
+                .filter(get_common_filters(
+                    user_id=user_id,
+                    allow_show_global=True,
+                ))
                 .all())
         visible.update(int(row[0]) for row in rows)
     return visible
@@ -827,7 +834,12 @@ def find_duplicate_candidate_ids_sql(use_title, use_author, user_id=None, min_bo
                 max_id_field
             )
             .select_from(db.Books)
-            .filter(get_common_filters(user_id=user_id))
+            # Duplicate discovery deliberately spans the global archive; the
+            # helper still applies every other restriction for this user.
+            .filter(get_common_filters(
+                user_id=user_id,
+                allow_show_global=True,
+            ))
             .group_by(*group_by_fields)
             .having(func.count(func.distinct(db.Books.id)) > 1))
 
@@ -895,7 +907,12 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
     # Get all books with proper user filtering - this is much simpler and more reliable
     # than trying to do complex joins for duplicate detection
     books_query = (calibre_db.session.query(db.Books)
-                   .filter(get_common_filters(user_id=user_id))  # Respect user permissions and library filtering
+                   # Duplicate discovery deliberately spans My Library sets
+                   # while retaining the canonical non-membership policy.
+                   .filter(get_common_filters(
+                       user_id=user_id,
+                       allow_show_global=True,
+                   ))
                    .order_by(db.Books.title, db.Books.timestamp.desc(), db.Books.id.desc()))
 
     if candidate_ids is not None:
@@ -1052,10 +1069,14 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
 
 
 def get_common_filters(user_id=None, allow_show_archived=False, return_all_languages=False,
-                       allow_show_hidden=False, strict=False):
-    """Build common filters using either current_user or a specific user_id.
+                       allow_show_hidden=False, allow_show_global=False,
+                       strict=False):
+    """Delegate the one visibility policy for current or explicit users.
 
-    Falls back to no-op filters if user context is unavailable.
+    ``CalibreDB.common_filters`` is the single implementation. This adapter
+    exists only for jobs and Basic-auth routes that have a user id but no
+    Flask ``current_user``. Duplicate discovery explicitly opts into
+    ``allow_show_global``; authorization boundaries such as KOSync do not.
 
     ``strict`` changes that fallback for the ``user_id`` path: when the user
     cannot be reloaded or filter construction fails, raise instead of returning
@@ -1066,73 +1087,23 @@ def get_common_filters(user_id=None, allow_show_archived=False, return_all_langu
     permissive default unchanged.
     """
     try:
-        if user_id is None:
-            return calibre_db.common_filters(allow_show_archived=allow_show_archived,
-                                             return_all_languages=return_all_languages,
-                                             allow_show_hidden=allow_show_hidden)
-    except Exception:
-        # No request context; fall back to permissive filter
-        return true()
-
-    try:
-        user = ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first()
-        if not user:
-            if strict:
-                raise ValueError(f"get_common_filters(strict): user {user_id!r} not found")
-            return true()
-
-        if not allow_show_archived:
-            archived_books = (ub.session.query(ub.ArchivedBook)
-                              .filter(ub.ArchivedBook.user_id == int(user.id))
-                              .filter(ub.ArchivedBook.is_archived == True)
-                              .all())
-            archived_book_ids = [archived_book.book_id for archived_book in archived_books]
-            archived_filter = db.Books.id.notin_(archived_book_ids)
-        else:
-            archived_filter = true()
-
-        # D10: mirror calibre_db.common_filters' UserHiddenBook exclusion. The
-        # user explicitly hid these books; without this they reappeared in
-        # their duplicate scan and could be fed to destructive auto-resolve.
-        if not allow_show_hidden:
-            hidden_books = (ub.session.query(ub.UserHiddenBook)
-                            .filter(ub.UserHiddenBook.user_id == int(user.id))
-                            .all())
-            hidden_book_ids = [hidden.book_id for hidden in hidden_books]
-            hidden_filter = db.Books.id.notin_(hidden_book_ids)
-        else:
-            hidden_filter = true()
-
-        if user.filter_language() == "all" or return_all_languages:
-            lang_filter = true()
-        else:
-            lang_filter = db.Books.languages.any(db.Languages.lang_code == user.filter_language())
-
-        negtags_list = user.list_denied_tags()
-        postags_list = user.list_allowed_tags()
-        neg_content_tags_filter = false() if negtags_list == [''] else db.Books.tags.any(db.Tags.name.in_(negtags_list))
-        pos_content_tags_filter = true() if postags_list == [''] else db.Books.tags.any(db.Tags.name.in_(postags_list))
-
-        if config.config_restricted_column:
-            try:
-                pos_cc_list = (user.allowed_column_value or '').split(',')
-                pos_content_cc_filter = true() if pos_cc_list == [''] else \
-                    getattr(db.Books, 'custom_column_' + str(config.config_restricted_column)). \
-                    any(db.cc_classes[config.config_restricted_column].value.in_(pos_cc_list))
-                neg_cc_list = (user.denied_column_value or '').split(',')
-                neg_content_cc_filter = false() if neg_cc_list == [''] else \
-                    getattr(db.Books, 'custom_column_' + str(config.config_restricted_column)). \
-                    any(db.cc_classes[config.config_restricted_column].value.in_(neg_cc_list))
-            except Exception:
-                pos_content_cc_filter = false()
-                neg_content_cc_filter = true()
-        else:
-            pos_content_cc_filter = true()
-            neg_content_cc_filter = false()
-
-        return and_(lang_filter, pos_content_tags_filter, ~neg_content_tags_filter,
-                    pos_content_cc_filter, ~neg_content_cc_filter, archived_filter,
-                    hidden_filter)
+        user = None
+        if user_id is not None:
+            user = (ub.session.query(ub.User)
+                    .filter(ub.User.id == int(user_id)).first())
+            if not user:
+                if strict:
+                    raise ValueError(
+                        f"get_common_filters(strict): user {user_id!r} not found"
+                    )
+                return true()
+        return calibre_db.common_filters(
+            allow_show_archived=allow_show_archived,
+            return_all_languages=return_all_languages,
+            allow_show_hidden=allow_show_hidden,
+            allow_show_global=allow_show_global,
+            user=user,
+        )
     except Exception:
         if strict:
             # Fail closed for authorization callers: a construction error must

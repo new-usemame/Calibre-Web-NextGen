@@ -85,14 +85,16 @@ def membership_count(user_id, session=None):
             .filter(ub.UserLibraryBook.user_id == int(user_id)).count())
 
 
-def seed_user_library(user, *, chunk_size=SEED_CHUNK_SIZE,
-                      app_session=None, cdb=None):
-    """Idempotently seed ``user`` with every book they can currently see.
+def prepare_user_library_seed(user, *, chunk_size=SEED_CHUNK_SIZE,
+                              app_session=None, cdb=None):
+    """Idempotently insert every currently visible book in bounded chunks.
 
     Each chunk is its own app.db transaction. That bounds the BEGIN IMMEDIATE
-    write-lock window introduced by the contained-savepoint policy (#1936).
-    The enable flag is flipped only after every chunk succeeds, so a partial
-    failure retries safely without exposing an incomplete set.
+    write-lock window introduced by the contained-savepoint policy (#1936). It
+    deliberately does *not* set the durable seed-once fence: only an accepted
+    mode switch may commit ``user_library_seeded`` and ``has_own_library``
+    together. A partial or rejected attempt therefore retries safely through
+    ON CONFLICT DO NOTHING without claiming the seed completed.
     """
     app_session = _session(app_session)
     cdb = cdb or calibre_db
@@ -135,18 +137,14 @@ def seed_user_library(user, *, chunk_size=SEED_CHUNK_SIZE,
         app_session.commit()
         inserted += max(0, result.rowcount or 0)
 
-    # This commit is the durable seed-once fence. It occurs only after every
-    # bounded insert transaction succeeded; a partial failure leaves it false,
-    # so the next attempt safely resumes through ON CONFLICT DO NOTHING.
-    user.user_library_seeded = True
-    app_session.commit()
     invalidate_request_cache(user.id)
     return inserted
 
 
 def set_library_mode(user, mode, *, app_session=None, cdb=None,
-                     chunk_size=SEED_CHUNK_SIZE):
-    """Switch named modes without deleting any dormant membership state."""
+                     chunk_size=SEED_CHUNK_SIZE, seed_rows_prepared=False,
+                     commit=True):
+    """Switch modes; commit the seed fence and personal mode atomically."""
     app_session = _session(app_session)
     if mode not in constants.LIBRARY_MODES:
         raise UserLibraryError(
@@ -154,20 +152,27 @@ def set_library_mode(user, mode, *, app_session=None, cdb=None,
         )
     desired = mode == constants.LIBRARY_MODE_PERSONAL
     if desired and not bool(getattr(user, "user_library_seeded", False)):
-        seed_user_library(
-            user,
-            chunk_size=chunk_size,
-            app_session=app_session,
-            cdb=cdb,
-        )
+        if not seed_rows_prepared:
+            prepare_user_library_seed(
+                user,
+                chunk_size=chunk_size,
+                app_session=app_session,
+                cdb=cdb,
+            )
     if desired and membership_count(user.id, app_session) == 0 \
             and not user.role_browse_global():
         raise UserLibraryError(
             "My Library cannot be enabled with an empty set unless this "
             "user can browse the global library."
         )
+    if desired:
+        # This fence and the mode are one transaction. Membership rows were
+        # committed in bounded, idempotent chunks, but a rejected switch must
+        # leave this false so the next attempt cannot skip the seed.
+        user.user_library_seeded = True
     user.has_own_library = desired
-    app_session.commit()
+    if commit:
+        app_session.commit()
     invalidate_request_cache(user.id)
     return mode_for_user(user)
 
@@ -196,7 +201,7 @@ def migrate_users_to_personal_library(users, *, app_session=None, cdb=None,
         previous_mode = mode_for_user(user)
         try:
             if not was_seeded:
-                inserted_books = seed_user_library(
+                inserted_books = prepare_user_library_seed(
                     user,
                     chunk_size=chunk_size,
                     app_session=app_session,
@@ -208,6 +213,7 @@ def migrate_users_to_personal_library(users, *, app_session=None, cdb=None,
                 app_session=app_session,
                 cdb=cdb,
                 chunk_size=chunk_size,
+                seed_rows_prepared=not was_seeded,
             )
             final_membership_count = membership_count(user.id, app_session)
             report.append({

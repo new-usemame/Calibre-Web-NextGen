@@ -3146,6 +3146,7 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
     desired_library_mode = to_save.get(
         "library_mode", user_library.mode_for_user(current_user)
     )
+    library_seed_prepared = False
     try:
         if desired_library_mode not in constants.LIBRARY_MODES:
             raise ValueError(_("Invalid library mode"))
@@ -3157,7 +3158,8 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
                 and not bool(current_user.user_library_seeded)):
             # This combined classic form edits many fields. Seed first so its
             # bounded commits cannot persist unrelated half-validated input.
-            user_library.seed_user_library(current_user)
+            user_library.prepare_user_library_seed(current_user)
+            library_seed_prepared = True
         if current_user.role_passwd() or current_user.role_admin():
             if to_save.get("password", "") != "":
                 current_user.password = generate_password_hash(valid_password(to_save.get("password")))
@@ -3428,7 +3430,13 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
         current_user.sidebar_view += constants.DETAIL_RANDOM
 
     try:
-        user_library.set_library_mode(current_user, desired_library_mode)
+        user_library.set_library_mode(
+            current_user,
+            desired_library_mode,
+            seed_rows_prepared=library_seed_prepared,
+            commit=False,
+        )
+        ub.session.commit()
         flash(_("Success! Profile Updated"), category="success")
         log.debug("Profile updated")
         # Redirect to refresh sidebar with updated shelf visibility

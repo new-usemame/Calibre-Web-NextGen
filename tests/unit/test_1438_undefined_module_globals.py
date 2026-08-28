@@ -142,26 +142,27 @@ def _cps_python_files():
                 yield os.path.join(dirpath, filename)
 
 
-def test_web_module_resolves_dirs_json():
-    """The exact regression: ``DIRS_JSON`` is used in web.py, so it must be bound.
+def test_web_module_resolves_library_location_through_constants():
+    """The exact regression: web.py's library resolver must use a bound SSOT.
 
     Red against the #1438 tree, where the constant was referenced but never
     imported and ``cwa_get_library_location()`` raised ``NameError`` on call.
+    Since #1611, constants owns the guarded per-key resolver as well as the
+    dirs.json path, so web.py delegates instead of binding DIRS_JSON itself.
     """
     path = os.path.join(CPS_ROOT, "web.py")
     with open(path, encoding="utf-8") as handle:
         source = handle.read()
 
-    assert "DIRS_JSON" in source, (
-        "web.py no longer references DIRS_JSON — if the path lookup moved, move "
-        "this test with it rather than deleting the guard."
+    assert "constants.calibre_library_dir()" in source, (
+        "cwa_get_library_location() bypasses cps.constants; it must use the "
+        "shared guarded resolver so environment, dirs.json and default "
+        "precedence cannot diverge."
     )
-    assert "DIRS_JSON" not in _undefined_globals(path), (
-        "cps/web.py uses DIRS_JSON without binding it. cwa_get_library_location() "
-        "will raise NameError when called, and both callers swallow it — "
-        "/health reports 'degraded' 503 forever and the library count renders 0. "
-        "Add `from .constants import DIRS_JSON` (the import cps/cwa_functions.py "
-        "already uses)."
+    assert "constants" not in _undefined_globals(path), (
+        "cps/web.py calls constants.calibre_library_dir() without binding "
+        "constants. Its callers swallow the resulting NameError, so /health "
+        "reports degraded and the library count renders 0."
     )
 
 

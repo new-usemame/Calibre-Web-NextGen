@@ -436,25 +436,26 @@
   background: var(--surface-2);
 }
 
-/* Whole-book deletion is a separate, labelled region instead of one more chip
-   in the wrapping ordinary-actions row (#1046). */
+/* Whole-book deletion stays separate from the ordinary-actions row (#1046),
+   but the region itself is intentionally quiet; danger emphasis belongs to
+   the control that performs the destructive action (#1862). */
 .dangerZone {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
   flex-wrap: wrap;
-  padding: var(--sp-4);
-  border: 1px solid var(--danger);
-  border-radius: var(--r-lg);
-  background: var(--danger-soft);
+  padding: var(--sp-4) 0 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
 }
 
 .dangerZoneTitle {
   margin: 0;
-  color: var(--text);
-  font-family: var(--font-display);
-  font-size: var(--fs-lg);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
 }
 
 .actionDanger {

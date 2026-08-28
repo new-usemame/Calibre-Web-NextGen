@@ -2,7 +2,26 @@
 
 echo "========== STARTING CWA-INGEST SERVICE =========="
 
-WATCH_FOLDER=${WATCH_FOLDER:-$(grep -o '"ingest_folder": "[^"]*' /app/calibre-web-automated/dirs.json | grep -o '[^"]*$')}
+# CWA_INGEST_FOLDER is the public path override. WATCH_FOLDER remains a
+# backwards-compatible service-local override only when the public knob is
+# genuinely unset; unlike a command substitution it cannot hide a resolver
+# failure because the resolver is still mandatory on the normal path.
+CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
+if [ "${CWA_INGEST_FOLDER+x}" = "x" ] || [ -z "${WATCH_FOLDER:-}" ]; then
+        if ! WATCH_FOLDER="$(python3 "${CWA_APP_PATHS}" ingest_folder)"; then
+                echo "[cwa-ingest-service] ERROR: runtime ingest path resolver failed; refusing to start a watcher"
+                exit 1
+        fi
+fi
+case "$WATCH_FOLDER" in
+        ""|"/"|*$'\n'*|*$'\r'*|*/../*|*/..)
+                echo "[cwa-ingest-service] ERROR: runtime ingest path resolver returned an unsafe path; refusing to start a watcher"
+                exit 1 ;;
+        /*) ;;
+        *)
+                echo "[cwa-ingest-service] ERROR: runtime ingest path resolver returned a non-absolute path; refusing to start a watcher"
+                exit 1 ;;
+esac
 echo "[cwa-ingest-service] Watching folder: $WATCH_FOLDER"
 
 # Create queue file for retry processing (persistent across restarts)
@@ -343,7 +362,7 @@ run_post_batch_follow_up() {
         if [ -n "${CWA_INGEST_POST_BATCH_CMD:-}" ]; then
                 "$CWA_INGEST_POST_BATCH_CMD"
         else
-                python3 /app/calibre-web-automated/scripts/ingest_processor.py --post-batch-follow-up
+                cwa-as-abc python3 /app/calibre-web-automated/scripts/ingest_processor.py --post-batch-follow-up
         fi
 }
 

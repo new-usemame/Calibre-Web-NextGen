@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import tempfile
 import fcntl
+import errno
 
 from flask import Blueprint, current_app, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
 from markupsafe import Markup
@@ -3531,18 +3532,71 @@ def test_metadata():
         log.error("Metadata test failed: %s", e)
         return json.dumps({'success': False, 'message': _('An unknown error occurred.')}), 200
 
+def _acquire_restore_file_lock(lock_name):
+    """Acquire a persistent, non-truncating lock file or return None if held."""
+    lock_path = os.path.join(tempfile.gettempdir(), lock_name)
+    lock_handle = open(lock_path, "a+", encoding="utf-8")
+    try:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as error:
+        lock_handle.close()
+        if error.errno in (errno.EACCES, errno.EAGAIN):
+            return None
+        raise
+    except Exception:
+        lock_handle.close()
+        raise
+    return lock_handle
+
+
+def _release_restore_locks(lock_handles):
+    for handle in lock_handles:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except Exception:
+            pass
+        try:
+            handle.close()
+        except Exception:
+            pass
+
+
+def _acquire_restore_lock():
+    return _acquire_restore_file_lock("restore_calibre_db.lock")
+
+
+def _acquire_restore_service_locks():
+    """Pause restore-sensitive services, returning the blocker if one is active."""
+    lock_handles = []
+    try:
+        for lock_name, service_name in (
+            ("ingest_processor.lock", "ingest"),
+            ("cover_enforcer.lock", "cover_enforcer"),
+        ):
+            handle = _acquire_restore_file_lock(lock_name)
+            if handle is None:
+                _release_restore_locks(lock_handles)
+                return [], service_name
+            lock_handles.append(handle)
+    except Exception:
+        _release_restore_locks(lock_handles)
+        raise
+    return lock_handles, None
+
+
 # --- Last Resort Calibre DB Restore ---
 @admi.route("/admin/restore_calibre_db", methods=["POST"])
 @user_login_required
 @admin_required
 def restore_calibre_db():
     """Restore Calibre metadata.db and clean app.db book-linked tables (last resort recovery)."""
-    lock_path = "/tmp/restore_calibre_db.lock"
-    service_lock_handles = []
+    lock_handles = []
     try:
-        if os.path.exists(lock_path):
+        restore_lock = _acquire_restore_lock()
+        if restore_lock is None:
             flash(_("Restore already in progress."), category="error")
             return redirect(url_for("admin.db_configuration"))
+        lock_handles.append(restore_lock)
 
         if not config.config_calibre_dir:
             flash(_("Restore failed: Calibre library path is not configured."), category="error")
@@ -3558,9 +3612,14 @@ def restore_calibre_db():
             flash(_("Restore failed: app.db not found at %(path)s", path=app_db_path), category="error")
             return redirect(url_for("admin.db_configuration"))
 
-        # Create lock file
-        with open(lock_path, "w", encoding="utf-8") as lock_file:
-            lock_file.write(str(os.getpid()))
+        service_lock_handles, blocking_service = _acquire_restore_service_locks()
+        if blocking_service == "ingest":
+            flash(_("An ingest run is in progress; try again when it finishes."), category="error")
+            return redirect(url_for("admin.db_configuration"))
+        if blocking_service == "cover_enforcer":
+            flash(_("Cover enforcement is in progress; try again when it finishes."), category="error")
+            return redirect(url_for("admin.db_configuration"))
+        lock_handles.extend(service_lock_handles)
 
         # 1. Backup both DBs
         backup_dir = f"/config/backup/restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -3571,27 +3630,6 @@ def restore_calibre_db():
         log_path = os.path.join(backup_dir, "restore.log")
         with open(log_path, "a", encoding="utf-8") as log_file:
             log_file.write(f"Restore started at {datetime.now().isoformat()}\n")
-
-        # Pause background services and close active sessions to reduce lock contention
-        try:
-            ingest_lock_path = os.path.join(tempfile.gettempdir(), "ingest_processor.lock")
-            ingest_lock = open(ingest_lock_path, "w")
-            fcntl.flock(ingest_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            ingest_lock.write("restore_calibre_db")
-            ingest_lock.flush()
-            service_lock_handles.append(ingest_lock)
-        except Exception as e:
-            log.warning("Failed to lock ingest processor: %s", e)
-
-        try:
-            cover_lock_path = os.path.join(tempfile.gettempdir(), "cover_enforcer.lock")
-            cover_lock = open(cover_lock_path, "w")
-            fcntl.flock(cover_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            cover_lock.write("restore_calibre_db")
-            cover_lock.flush()
-            service_lock_handles.append(cover_lock)
-        except Exception as e:
-            log.warning("Failed to lock cover enforcer: %s", e)
 
         # Close active sessions to reduce lock contention
         try:
@@ -3673,20 +3711,4 @@ def restore_calibre_db():
         flash(_("Restore failed: %(err)s", err=str(e)), category="error")
         return redirect(url_for("admin.db_configuration"))
     finally:
-        try:
-            if os.path.exists(lock_path):
-                os.remove(lock_path)
-        except Exception:
-            pass
-        try:
-            for handle in service_lock_handles:
-                try:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-                except Exception:
-                    pass
-                try:
-                    handle.close()
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        _release_restore_locks(lock_handles)

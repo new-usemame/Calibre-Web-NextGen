@@ -1,6 +1,5 @@
 """Resolve the active Calibre library without creating database files."""
 
-import json
 import os
 import sqlite3
 from pathlib import Path
@@ -14,15 +13,7 @@ DEFAULT_LIBRARY_DIR = app_paths.DEFAULT_LIBRARY_DIR
 
 def get_calibre_library_dir(dirs_json_path=None):
     """Return the configured library directory, with the legacy root as fallback."""
-    config_path = dirs_json_path or str(app_paths.dirs_json())
-    try:
-        with open(config_path, "r", encoding="utf-8") as config_file:
-            configured = json.load(config_file).get("calibre_library_dir")
-        if isinstance(configured, str) and configured.strip():
-            return configured
-    except (OSError, ValueError, TypeError):
-        pass
-    return DEFAULT_LIBRARY_DIR
+    return app_paths.calibre_library_dir(dirs_json_path)
 
 
 def get_calibre_metadata_db_path(dirs_json_path=None):

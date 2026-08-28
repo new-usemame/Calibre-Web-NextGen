@@ -17,11 +17,15 @@ async function firstBook(page: Page): Promise<SeedBook | null> {
 }
 
 async function setDeletePermission(page: Page, allowed: boolean) {
+  const response = await page.context().request.get(new URL('/api/v1/auth/me', page.url()).href);
+  const status = response.status();
+  const headers = response.headers();
+  const me = await response.json();
+  await response.dispose();
+  me.role = { ...(me.role ?? {}), delete_books: allowed };
+
   await page.route('**/api/v1/auth/me', async (route) => {
-    const response = await route.fetch();
-    const me = await response.json();
-    me.role = { ...(me.role ?? {}), delete_books: allowed };
-    await route.fulfill({ response, json: me });
+    await route.fulfill({ status, headers, json: me });
   });
 }
 

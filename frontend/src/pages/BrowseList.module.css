@@ -82,6 +82,14 @@
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
+/* #1396 — non-editor tags view: the default 220px minimum fills 5-6 columns
+   at typical desktop widths, leaving tag names too narrow to display without
+   ellipsis. Raise the floor to 300px (~4 columns) so names have room to
+   breathe without collapsing other browse lists (authors, series, etc.). */
+.gridTags {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
 .grid > * {
   animation: fadeRise var(--dur-base) var(--ease-out) both;
 }

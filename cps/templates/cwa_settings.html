@@ -194,6 +194,16 @@
         {{_("Aggressive mode applies more invasive fixes and will attempt lower-confidence encoding conversions. Safe mode is recommended for most libraries.")}}
       </p>
 
+      {% if cwa_settings.get('comic_flatten_comicinfo') %}
+      <input type="checkbox" id="comic_flatten_comicinfo" name="comic_flatten_comicinfo" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% else %}
+      <input type="checkbox" id="comic_flatten_comicinfo" name="comic_flatten_comicinfo" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% endif %}
+      <label for="comic_flatten_comicinfo" style="padding-left: 10px;">{{_('Move a misplaced ComicInfo.xml to the archive root on ingest')}}</label><br>
+      <p class="cwa-settings-tooltip">
+        {{_("The ComicInfo.xml standard requires the file to sit at the root of the archive; comicapi (and every other reader we're aware of) only looks there. Some real-world .cbz releases package it one folder down instead, so their title/series/author/publisher never get picked up. When enabled, ingest rewrites a copy of the archive with ComicInfo.xml moved to the root before it's imported — only when it's present but misplaced, never touching an already-correct file. Zip-based archives (.cbz) only; .cbr/.cb7/.cbt are not zip containers and are left as-is. Your original download is never modified, only the copy that gets imported.")}}
+      </p>
+
       {% if cwa_settings['archived_cleanup_enabled'] %}
       <input type="checkbox" id="archived_cleanup_enabled" name="archived_cleanup_enabled" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Runs daily by default">
       {% else %}

@@ -82,31 +82,31 @@ def build_synthetic_kobo_db(
         ("bm-001", book_uuid, f"{book_uuid}!!chapter1.html",
          "span#kobo\\.1\\.1", -99, 0, "span#kobo\\.1\\.1", -99, 15,
          "All animals are equal.", None, 0, "... All animals are equal. But ...",
-         0.01, "2026-01-01T10:00:00Z", "2026-01-01T10:00:00Z", "false"),
+         0.01, "2026-01-01T10:00:00.000", "2026-01-01T10:00:00Z", "false"),
         ("bm-002", book_uuid, f"{book_uuid}!!chapter1.html",
          "span#kobo\\.1\\.2", -99, 0, "span#kobo\\.1\\.3", -99, 21,
          "Four legs good, two legs bad.", "my favorite line", 1,
-         "Four legs good, two legs bad.", 0.024, "2026-01-01T10:05:00Z",
+         "Four legs good, two legs bad.", 0.024, "2026-01-01T10:05:00.123",
          "2026-01-01T10:05:00Z", "false"),
         ("bm-003", book_uuid, f"{book_uuid}!!chapter2.html",
          "span#kobo\\.2\\.1", -99, 8, "span#kobo\\.2\\.1", -99, 17,
          "Comrade Napoleon", None, 2, "...Comrade Napoleon is always right...",
-         0.5, "2026-01-02T10:00:00Z", "2026-01-02T10:00:00Z", "false"),
+         0.5, "2026-01-02T10:00:00.000", "2026-01-02T10:00:00Z", "false"),
         # sideloaded — must be skipped
         ("bm-004", sideloaded_uri, "sideloaded!!ch1.html",
          "span#kobo\\.4\\.1", -99, 0, "span#kobo\\.4\\.1", -99, 10,
          "sideloaded text", None, 0, None, 0.1,
-         "2026-01-03T10:00:00Z", "2026-01-03T10:00:00Z", "false"),
+         "2026-01-03T10:00:00.000", "2026-01-03T10:00:00Z", "false"),
         # hidden — must be skipped
         ("bm-005", book_uuid, f"{book_uuid}!!chapter1.html",
          "span#kobo\\.1\\.4", -99, 0, "span#kobo\\.1\\.4", -99, 30,
          "deleted on device", None, 0, None, 0.05,
-         "2026-01-04T10:00:00Z", "2026-01-04T10:00:00Z", "true"),
+         "2026-01-04T10:00:00.000", "2026-01-04T10:00:00Z", "true"),
         # unrelated UUID — must be skipped (no CW book matches)
         ("bm-006", extra_book_uuid, f"{extra_book_uuid}!!intro.html",
          "span#kobo\\.5\\.1", -99, 0, "span#kobo\\.5\\.1", -99, 12,
          "orphan highlight", None, 3, None, 0.0,
-         "2026-01-05T10:00:00Z", "2026-01-05T10:00:00Z", "false"),
+         "2026-01-05T10:00:00.000", "2026-01-05T10:00:00Z", "false"),
         # malformed: empty BookmarkID — must be skipped silently
         ("", book_uuid, None, None, None, None, None, None, None,
          "malformed", None, 0, None, None, None, None, "false"),
@@ -114,7 +114,7 @@ def build_synthetic_kobo_db(
         ("bm-008", book_uuid, f"{book_uuid}!!chapter1.html",
          "span#kobo\\.1\\.7", -99, 0, "span#kobo\\.1\\.7", -99, 5,
          "", None, 0, None, 0.0,
-         "2026-01-06T10:00:00Z", "2026-01-06T10:00:00Z", "false"),
+         "2026-01-06T10:00:00.000", "2026-01-06T10:00:00Z", "false"),
     ]
 
     conn.executemany(
@@ -154,7 +154,7 @@ def build_kobo_db_with_colors(
             "span#kobo\\.1\\.{}".format(index), -99, 0,
             "span#kobo\\.1\\.{}".format(index), -99, 10,
             f"passage {index}", None, color, None, 0.1,
-            "2026-01-01T10:00:00Z", "2026-01-01T10:00:00Z", 0,
+            "2026-01-01T10:00:00.000", "2026-01-01T10:00:00Z", 0,
         ))
     conn.executemany(
         "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -208,16 +208,16 @@ def build_kobo_db_with_bookmark_type(
     rows = [
         ("bt-001", book_uuid, chapter1, "span#kobo\\.1\\.1", -99, 0,
          "span#kobo\\.1\\.2", -99, 5, "a highlight", None, 0, "ctx", 0.1,
-         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "highlight"),
+         "2026-01-01T00:00:00.000", "2026-01-01T00:00:00Z", 0, "highlight"),
         ("bt-002", book_uuid, chapter1, "span#kobo\\.2\\.1", -99, 0,
          "span#kobo\\.2\\.2", -99, 5, "with a note", "my note", 1, "ctx", 0.2,
-         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "highlight"),
+         "2026-01-01T00:00:00.000", "2026-01-01T00:00:00Z", 0, "highlight"),
         ("bt-003", book_uuid, chapter2, "span#kobo\\.3\\.1", -99, 0,
          "span#kobo\\.3\\.2", -99, 5, "a dogear with text", None, 4, "ctx", 0.3,
-         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, "dogear"),
+         "2026-01-01T00:00:00.000", "2026-01-01T00:00:00Z", 0, "dogear"),
         ("bt-004", book_uuid, chapter2, "span#kobo\\.4\\.1", -99, 0,
          "span#kobo\\.4\\.2", -99, 5, "type is empty", None, 0, "ctx", 0.4,
-         "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", 0, ""),
+         "2026-01-01T00:00:00.000", "2026-01-01T00:00:00Z", 0, ""),
     ]
     conn.executemany(
         "INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -252,19 +252,19 @@ def build_kobo_db_with_recovery_rows(
             "recover-dogear", book_uuid, chapter,
             "span#kobo\\.7\\.1", -99, 0, "span#kobo\\.7\\.1", -99, 0,
             "", None, None, None, 0.7,
-            "2026-08-18T12:00:00Z", "2026-08-18T12:00:00Z", 0, "dogear",
+            "2026-08-18T12:00:00.000", "2026-08-18T12:00:00Z", 0, "dogear",
         ),
         (
             "recover-note-only", book_uuid, chapter,
             "span#kobo\\.8\\.1", -99, 3, "span#kobo\\.8\\.1", -99, 3,
             "", "remember this", 4, "near the end", 0.8,
-            "2026-08-18T12:01:00Z", "2026-08-18T12:02:00Z", 0, "highlight",
+            "2026-08-18T12:01:00.000", "2026-08-18T12:02:00Z", 0, "highlight",
         ),
         (
             "recover-empty", book_uuid, chapter,
             None, None, None, None, None, None,
             "", None, None, None, None,
-            "2026-08-18T12:03:00Z", "2026-08-18T12:03:00Z", 0, None,
+            "2026-08-18T12:03:00.000", "2026-08-18T12:03:00Z", 0, None,
         ),
     ]
     conn.executemany(

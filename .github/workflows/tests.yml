@@ -476,7 +476,7 @@ jobs:
           #                      Tests (test_translations_compile.py), so
           #                      routing them through a full image build
           #                      would buy nothing and stall every locale PR.
-          if echo "$files" | grep -qE '^(Dockerfile$|[^/]*requirements[^/]*\.txt$|root/|cps/.*\.py$|tests/(docker|integration)/|\.github/workflows/tests\.yml$)'; then
+          if echo "$files" | grep -qE '^(Dockerfile$|[^/]*requirements[^/]*\.txt$|root/|cps/.*\.py$|scripts/.*\.py$|tests/(docker|integration)/|\.github/workflows/tests\.yml$)'; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
             echo "build=false" >> "$GITHUB_OUTPUT"

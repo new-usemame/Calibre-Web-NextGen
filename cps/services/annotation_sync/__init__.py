@@ -690,7 +690,7 @@ def dispatch_annotation_sync(payload_annotations, book, user, *, origin_device_i
     return all_persisted
 
 
-def dispatch_existing_annotation_sync(annotation, book, user) -> None:
+def dispatch_existing_annotation_sync(annotation, book, user) -> bool:
     """Push an already-persisted Annotation row to each enabled sync target.
 
     The Kobo PATCH path (``dispatch_annotation_sync``) upserts the row from a
@@ -698,23 +698,33 @@ def dispatch_existing_annotation_sync(annotation, book, user) -> None:
     exist, so this is their fan-out entry point. Same per-handler semantics:
     skip disabled handlers, never re-push a tombstoned target, record the
     result on the AnnotationSyncTarget row.
+
+    Returns ``False`` when the local commit fails and ``True`` otherwise.
     """
     from cps import ub
     if annotation is None:
-        return
+        return True
+    annotation_id = annotation.annotation_id
     jobs = []
     if _background_enqueue() is not None:
         if _mark_pending(ub.session, annotation, user):
             jobs.append({"op": "push", "annotation": annotation.id, "book": book.id})
     else:
         push_annotation_to_handlers(ub.session, annotation, book, user)
-    ub.session_commit()
+    if ub.session_commit() is False:
+        log.error(
+            "Annotation sync commit failed: user=%s annotation_id=%s job_count=%d; "
+            "remote enqueue skipped",
+            user.id, annotation_id, len(jobs),
+        )
+        return False
     _enqueue(user, jobs, book=book)
+    return True
 
 
 def dispatch_annotation_deletes(
     deleted_ids, user, book_id=None, *, deletable_sources,
-) -> None:
+) -> bool:
     """For each annotation_id, transition non-tombstone sync_targets via
     handler.delete AND soft-delete the local Annotation row by setting
     ``hidden=True``.
@@ -728,11 +738,14 @@ def dispatch_annotation_deletes(
     Once authorised, local soft-delete happens independently of any enabled
     sync target. Recovery is symmetric: a subsequent create/update PATCH for
     the same annotation_id un-hides it via ``_upsert_annotation``.
+
+    Returns ``False`` when the local commit fails and ``True`` otherwise.
     """
     from cps import ub
     if not deleted_ids:
-        return
+        return True
     jobs = []
+    affected_ids = []
     for annotation_id in deleted_ids:
         if not isinstance(annotation_id, str) or not annotation_id:
             # A malformed member has no addressable annotation identity. Skip
@@ -779,12 +792,20 @@ def dispatch_annotation_deletes(
         ann.hidden = True
         ann.content_revision = (ann.content_revision or 1) + 1
         ann.server_modified_at = _now()
+        affected_ids.append(annotation_id)
         log.info(
             "annotation_sync: soft-delete annotation_id=%s (hidden=True)",
             annotation_id,
         )
-    ub.session_commit()
+    if ub.session_commit() is False:
+        log.error(
+            "Annotation delete commit failed: user=%s annotation_ids=%s job_count=%d; "
+            "remote enqueue skipped",
+            user.id, affected_ids, len(jobs),
+        )
+        return False
     _enqueue(user, jobs)
+    return True
 
 
 # Auto-register Hardcover at import time.

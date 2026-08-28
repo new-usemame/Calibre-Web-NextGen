@@ -16,6 +16,16 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Local-only accounts can now sign in through the classic login form when
+  an LDAP directory rejects their credentials.** The fallback accepts only a
+  non-empty stored local password hash, so LDAP-imported accounts remain
+  passwordless locally. LDAP outages, account-creation failures, and successful
+  directory authentication also no longer show a misleading extra "Wrong
+  Username or Password" message. Reported by @justemu
+  ([#1903](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1903)).
+
 ## [v4.1.41] - 2026-08-25
 
 ### Added

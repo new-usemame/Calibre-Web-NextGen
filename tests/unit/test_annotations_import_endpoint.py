@@ -156,6 +156,24 @@ class TestIngestCounts:
         assert row.source == "kobo"
         assert row.chapter_progress == 0.024
 
+    def test_inserted_row_keeps_device_date_created(self, memory_db, synthetic_db):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        ingest_bookmarks(
+            synthetic_db,
+            user_id=7,
+            session=session,
+            book_lookup=_make_book_lookup({
+                "b3d1b38b-74fd-43b7-a796-996e5a6a8b04": 348,
+            }),
+            commit=session.commit,
+        )
+
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-002").one()
+        assert row.created_at == datetime(2026, 1, 1, 10, 5, 0, 123000)
+
     def test_color_round_trips(self, memory_db, synthetic_db):
         """Device integer -> what lands in the column -> what the reader is told.
 
@@ -343,6 +361,19 @@ class TestPreviouslyInvisibleDeviceRows:
 
 
 @pytest.mark.unit
+class TestKoboDeviceClockParsing:
+    def test_naive_clock_requires_explicit_date_created_opt_in(self):
+        from cps.annotations import _parse_kobo_datetime
+
+        clock = "2026-08-15T22:27:08.567"
+        assert _parse_kobo_datetime(clock) is None
+        assert _parse_kobo_datetime(
+            clock,
+            assume_naive_utc=True,
+        ) == datetime(2026, 8, 15, 22, 27, 8, 567000)
+
+
+@pytest.mark.unit
 class TestOutOfRangeDeviceClock:
     @pytest.mark.parametrize("clock", OVERFLOWING_KOBO_CLOCKS)
     def test_parser_rejects_both_utc_overflows(self, clock):
@@ -483,6 +514,46 @@ class TestNewerDeviceMerge:
         self._edit_fixture(
             synthetic_db, modified="2097-01-01T00:00:00Z",
             text="stale device passage", note="stale device note",
+        )
+
+        result = ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=lookup, commit=session.commit,
+        )
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-002").one()
+
+        assert result["updated"] == 0, result
+        assert result["skipped_newer_server"] == 1, result
+        assert _accounted(result) == result["total_seen"]
+        assert row.highlighted_text == "Four legs good, two legs bad."
+        assert row.note_text == "newer server note"
+        assert row.highlight_color == "#E8AFCF"
+
+    def test_naive_device_modified_clock_cannot_overwrite_server(
+        self, memory_db, synthetic_db,
+    ):
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        lookup = _make_book_lookup({self.BOOK_UUID: 348})
+        ingest_bookmarks(
+            synthetic_db, user_id=7, session=session,
+            book_lookup=lookup, commit=session.commit,
+        )
+        row = session.query(ub.Annotation).filter_by(annotation_id="bm-002").one()
+        row.note_text = "newer server note"
+        row.server_modified_at = datetime(2027, 6, 1, 11, 30)
+        session.commit()
+
+        # Without an offset, noon could be a local UTC+N clock representing an
+        # instant before the 11:30 UTC server edit. Treating it as noon UTC is a
+        # fail-open guess that lets this ambiguous device snapshot overwrite.
+        self._edit_fixture(
+            synthetic_db,
+            modified="2027-06-01T12:00:00.000",
+            text="ambiguous device passage",
+            note="ambiguous device note",
         )
 
         result = ingest_bookmarks(

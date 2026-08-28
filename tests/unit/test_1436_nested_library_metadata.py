@@ -99,6 +99,7 @@ def test_checksum_service_polls_and_backfills_nested_library(tmp_path):
     env = os.environ.copy()
     env.update({
         "CWA_DIRS_JSON": str(dirs_json),
+        "CWA_APP_PATHS": str(SCRIPTS_DIR / "app_paths.py"),
         "BACKFILL_ARGS": str(invocation),
         "SQLITE_ARGS": str(sqlite_invocation),
         "PATH": f"{bin_dir}:{env['PATH']}",

@@ -1973,7 +1973,16 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                         # not just 'merge'. A keep-newest resolution otherwise
                         # silently deletes highlights made on the older copy.
                         user_book_data.migrate_user_book_data(deleted_book_id, book_to_keep_id)
-                        ub.session_commit()
+                        # User data lives in app.db while the book row below lives
+                        # in metadata.db, so no transaction can make these writes
+                        # atomic. Fail closed at the database boundary: when the
+                        # migration rolls back, keep the loser (and its files) so
+                        # the unresolved group can be retried instead of deleting
+                        # the only row still carrying the user's annotations.
+                        if not ub.session_commit():
+                            raise RuntimeError(
+                                "user data migration commit failed; duplicate book was not deleted"
+                            )
 
                         print(f"[cwa-duplicates-auto] Cleaning up database for book {deleted_book_id}...", flush=True)
                         from cps.editbooks import delete_whole_book

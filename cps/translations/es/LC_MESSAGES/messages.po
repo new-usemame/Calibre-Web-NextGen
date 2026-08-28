@@ -940,6 +940,14 @@ msgid "Restore failed: app.db not found at %(path)s"
 msgstr "Restauración fallida: app.db no encontrado en %(path)s"
 
 #: cps/admin.py
+msgid "An ingest run is in progress; try again when it finishes."
+msgstr ""
+
+#: cps/admin.py
+msgid "Cover enforcement is in progress; try again when it finishes."
+msgstr ""
+
+#: cps/admin.py
 #, python-format
 msgid "Restore failed: %(err)s"
 msgstr "Error al restaurar: %(err)s"
@@ -7148,6 +7156,11 @@ msgid "Could not login: %(message)s"
 msgstr "No se pudo iniciar sesión: %(message)s"
 
 #: cps/web.py
+#, python-format
+msgid "Local Login as: '%(nickname)s', LDAP authentication rejected"
+msgstr ""
+
+#: cps/web.py
 msgid "Wrong Username or Password"
 msgstr "Usuario o contraseña incorrectos"
 
@@ -9967,6 +9980,23 @@ msgstr ""
 "El modo agresivo aplica correcciones más invasivas e intentará conversiones "
 "de codificación con menor confianza. El modo seguro se recomienda para la "
 "mayoría de bibliotecas."
+
+#: cps/templates/cwa_settings.html
+msgid "Move a misplaced ComicInfo.xml to the archive root on ingest"
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"The ComicInfo.xml standard requires the file to sit at the root of the "
+"archive; comicapi (and every other reader we're aware of) only looks there. "
+"Some real-world .cbz releases package it one folder down instead, so their "
+"title/series/author/publisher never get picked up. When enabled, ingest "
+"rewrites a copy of the archive with ComicInfo.xml moved to the root before "
+"it's imported — only when it's present but misplaced, never touching an "
+"already-correct file. Zip-based archives (.cbz) only; .cbr/.cb7/.cbt are not "
+"zip containers and are left as-is. Your original download is never modified, "
+"only the copy that gets imported."
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Archived Book Cleanup"

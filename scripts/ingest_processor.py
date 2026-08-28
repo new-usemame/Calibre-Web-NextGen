@@ -156,6 +156,7 @@ TaskAutoSend = None
 WorkerThread = None
 _ub = None
 _uploader = None
+comic = None
 CWA_DB = None
 EPUBFixer = None
 audiobook = None
@@ -169,7 +170,7 @@ DUPLICATE_FULL_SCAN_WAIT_INTERVAL_SECONDS = 2
 DUPLICATE_FULL_SCAN_WAIT_TIMEOUT_SECONDS = int(os.environ.get("CWA_DUPLICATE_FULL_SCAN_WAIT_TIMEOUT_SECONDS", "7200"))
 
 class ProcessLock:
-    """Robust process lock using both file locking and PID tracking"""
+    """Process lock using flock for ownership and the PID for diagnostics."""
 
     def __init__(self, lock_name="ingest_processor"):
         self.lock_name = lock_name
@@ -180,8 +181,22 @@ class ProcessLock:
     def acquire(self, timeout=5):
         """Acquire the lock with timeout. Returns True if successful, False if another process has it."""
         try:
-            # Try to open/create the lock file
-            self.lock_file = open(self.lock_path, 'w+')
+            # Keep one stable inode: truncating or unlinking a contended lock file
+            # would let another opener acquire a different inode.
+            lock_existed = os.path.exists(self.lock_path)
+            lock_writable = True
+            try:
+                lock_fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o666)
+            except PermissionError:
+                lock_fd = os.open(self.lock_path, os.O_RDONLY)
+                lock_writable = False
+            else:
+                if not lock_existed:
+                    try:
+                        os.fchmod(lock_fd, 0o666)
+                    except OSError:
+                        pass
+            self.lock_file = os.fdopen(lock_fd, 'r+' if lock_writable else 'r')
 
             # Try to acquire an exclusive lock with timeout
             start_time = time.time()
@@ -189,21 +204,21 @@ class ProcessLock:
                 try:
                     fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-                    # Successfully acquired lock, write our PID
-                    self.lock_file.seek(0)
-                    self.lock_file.write(str(os.getpid()))
-                    self.lock_file.flush()
-                    self.lock_file.truncate()  # Truncate at current position to remove any leftover data
+                    # Successfully acquired lock. Replace the diagnostic PID
+                    # only when this user can write the persistent inode.
+                    if lock_writable:
+                        self.lock_file.seek(0)
+                        self.lock_file.truncate()
+                        self.lock_file.write(str(os.getpid()))
+                        self.lock_file.flush()
 
                     self.acquired = True
                     print(f"[ingest-processor] Lock acquired successfully (PID: {os.getpid()})")
                     return True
 
                 except (IOError, OSError):
-                    # Lock is held by another process
-                    # Check if the holding process is still alive
-                    if self._check_stale_lock():
-                        continue  # Try again as we cleaned up a stale lock
+                    # The flock is authoritative. PID text is only diagnostic;
+                    # invalid text cannot make a contended lock stale.
                     time.sleep(0.1)  # Brief wait before retry
 
             # Timeout reached
@@ -228,59 +243,6 @@ class ProcessLock:
             pass
         return "unknown"
 
-    def _check_stale_lock(self):
-        """Check if the lock is stale (holding process no longer exists) and clean it up"""
-        try:
-            if not self.lock_file:
-                return False
-
-            self.lock_file.seek(0)
-            pid_str = self.lock_file.read().strip()
-
-            if not pid_str.isdigit():
-                print("[ingest-processor] Lock file contains invalid PID, treating as stale")
-                return self._cleanup_stale_lock()
-
-            holding_pid = int(pid_str)
-
-            # Check if process is still running
-            try:
-                os.kill(holding_pid, 0)  # Signal 0 just checks if process exists
-                return False  # Process is still running
-            except ProcessLookupError:
-                # Process doesn't exist, lock is stale
-                print(f"[ingest-processor] Detected stale lock from non-existent process {holding_pid}, cleaning up")
-                return self._cleanup_stale_lock()
-            except PermissionError:
-                # Process exists but we can't signal it (different user), assume it's running
-                return False
-
-        except Exception as e:
-            print(f"[ingest-processor] Error checking stale lock: {e}")
-            return False
-
-    def _cleanup_stale_lock(self):
-        """Clean up a stale lock file"""
-        try:
-            if self.lock_file:
-                try:
-                    fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
-                except (OSError, IOError):
-                    # We might not have had the lock in the first place
-                    pass
-                self.lock_file.close()
-                self.lock_file = None
-
-            # Remove the lock file
-            if os.path.exists(self.lock_path):
-                os.remove(self.lock_path)
-                print(f"[ingest-processor] Cleaned up stale lock file: {self.lock_path}")
-
-            return True
-        except Exception as e:
-            print(f"[ingest-processor] Error cleaning up stale lock: {e}")
-            return False
-
     def release(self):
         """Release the lock"""
         if self.acquired and self.lock_file:
@@ -288,10 +250,6 @@ class ProcessLock:
                 fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
                 self.lock_file.close()
                 self.lock_file = None
-
-                # Remove lock file
-                if os.path.exists(self.lock_path):
-                    os.remove(self.lock_path)
 
                 self.acquired = False
                 print(f"[ingest-processor] Lock released (PID: {os.getpid()})")
@@ -368,7 +326,7 @@ def _load_runtime_dependencies() -> None:
 
 def _load_optional_cps_modules() -> None:
     global _GDRIVE_AVAILABLE, _CPS_AVAILABLE
-    global _gdriveutils, _cps_config, fetch_and_apply_metadata, TaskAutoSend, WorkerThread, _ub, _uploader
+    global _gdriveutils, _cps_config, fetch_and_apply_metadata, TaskAutoSend, WorkerThread, _ub, _uploader, comic
 
     if _GDRIVE_AVAILABLE and _CPS_AVAILABLE:
         return
@@ -401,6 +359,7 @@ def _load_optional_cps_modules() -> None:
             from cps.services.worker import WorkerThread as LoadedWorkerThread
             from cps import ub as loaded_ub
             from cps import uploader as loaded_uploader
+            from cps import comic as loaded_comic
             from cps.calibre_init import init_calibre_db_from_app_db
             init_calibre_db_from_app_db(get_app_db_path())
             fetch_and_apply_metadata = loaded_fetch_and_apply_metadata
@@ -408,6 +367,7 @@ def _load_optional_cps_modules() -> None:
             WorkerThread = LoadedWorkerThread
             _ub = loaded_ub
             _uploader = loaded_uploader
+            comic = loaded_comic
             _CPS_AVAILABLE = True
             print("[ingest-processor] Auto-send and metadata functionality available", flush=True)
         except ImportError as e:
@@ -417,6 +377,7 @@ def _load_optional_cps_modules() -> None:
             WorkerThread = None
             _ub = None
             _uploader = None
+            comic = None
             _CPS_AVAILABLE = False
 
     except Exception as e:
@@ -1128,6 +1089,7 @@ class NewBookProcessor:
         self.convert_ignored_formats = _normalize_format_list(self.cwa_settings['auto_convert_ignored_formats'])
         self.convert_retained_formats = _normalize_format_list(self.cwa_settings.get('auto_convert_retained_formats', []))
         self.is_kindle_epub_fixer = self.cwa_settings['kindle_epub_fixer']
+        self.is_comic_flatten_comicinfo = self.cwa_settings.get('comic_flatten_comicinfo', 0)
 
         # Formats
         self.supported_book_formats = {
@@ -1390,13 +1352,9 @@ class NewBookProcessor:
 
 
     def get_dirs(self, dirs_json_path: str) -> tuple[str, str, str]:
-        dirs = {}
-        with open(dirs_json_path, 'r') as f:
-            dirs: dict[str, str] = json.load(f)
-
-        ingest_folder = f"{dirs['ingest_folder']}/"
-        library_dir = f"{dirs['calibre_library_dir']}/"
-        tmp_conversion_dir = f"{dirs['tmp_conversion_dir']}/"
+        ingest_folder = f"{app_paths.ingest_folder(dirs_json_path)}/"
+        library_dir = f"{app_paths.calibre_library_dir(dirs_json_path)}/"
+        tmp_conversion_dir = f"{app_paths.tmp_conversion_dir(dirs_json_path)}/"
 
         return ingest_folder, library_dir, tmp_conversion_dir
 
@@ -1537,7 +1495,8 @@ class NewBookProcessor:
                                                    converter_output=getattr(e, 'output', None))
             if guidance:
                 print(f"\n[ingest-processor]: {guidance}\n", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
         except subprocess.TimeoutExpired:
@@ -1550,14 +1509,16 @@ class NewBookProcessor:
                   f"the wait for the file to finish copying in, so a slow copy leaves less time to convert.\n"
                   f"A large or image-heavy book can legitimately need longer — raise 'Ingest Timeout' in CWA Settings "
                   f"to allow more time.", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
         except OSError as e:
             # ebook-convert missing or not executable. Still a conversion
             # failure, so it must not fall through as an unhandled exception.
             print(f"\n[ingest-processor]: CON_ERROR: could not run the converter for {self.filename}: {e}", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
 
@@ -1806,6 +1767,15 @@ class NewBookProcessor:
             print(f"[ingest-processor] ERROR: Failed to stage file for import: {e}", flush=True)
             self.backup(self.filepath, backup_type="failed")
             return
+
+        if getattr(self, "is_comic_flatten_comicinfo", False) and comic is not None and staged_path.suffix.lower() == ".cbz":
+            try:
+                if comic.flatten_comicinfo_to_root(str(staged_path)):
+                    print(f"[ingest-processor] Moved a misplaced ComicInfo.xml to the "
+                          f"archive root: {staged_path.name}", flush=True)
+            except Exception as e:
+                print(f"[ingest-processor] WARN: Could not flatten ComicInfo.xml for "
+                      f"{staged_path.name}, importing as-is: {e}", flush=True)
 
         try:
             mark_ingest_batch_active()
@@ -2458,7 +2428,8 @@ def main(filepath=None):
             print(f"\n[ingest-processor]: No conversion needed for {nbp.filename}, is audiobook, importing now...", flush=True)
             nbp.add_book_to_library(filepath, False, Path(nbp.filename).suffix)
         else:
-            if nbp.auto_convert_on and nbp.can_convert: # File can be converted to target format and Auto-Converter is on
+            fulfilment_ticket = not is_a_book_format(nbp.input_format)
+            if nbp.can_convert and (nbp.auto_convert_on or fulfilment_ticket): # File can be converted, or must be fulfilled because the original is not a book
 
                 # Tracks whether a conversion was actually run. The ignore-list
                 # branch below reports convert_successful=False having already
@@ -2466,14 +2437,18 @@ def main(filepath=None):
                 # it as a failed conversion and import a second copy.
                 conversion_attempted = False
 
-                if nbp.input_format in nbp.convert_ignored_formats: # File could be converted & the converter is activated but the user has specified files of this format should not be converted
-                    if is_a_book_format(nbp.input_format):
-                        print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
-                        nbp.add_book_to_library(filepath)
-                    else:
-                        _fail_not_a_book_input(nbp, filepath)
+                if fulfilment_ticket and not nbp.auto_convert_on:
+                    print(f"\n[ingest-processor]: {nbp.filename} is an {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though CWA Auto-Convert is deactivated...", flush=True)
+                elif fulfilment_ticket and nbp.input_format in nbp.convert_ignored_formats:
+                    print(f"\n[ingest-processor]: {nbp.filename} is an {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though this format is on the Auto-Convert ignore list...", flush=True)
+
+                if nbp.input_format in nbp.convert_ignored_formats and not fulfilment_ticket: # User has specified that this book format should not be converted
+                    print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
+                    nbp.add_book_to_library(filepath)
                     convert_successful = False
                 elif nbp.target_format == "kepub": # File is not in the convert ignore list and target is kepub, so we start the kepub conversion process
+                    # A ticket takes this route too: convert_to_kepub() first fulfils
+                    # non-EPUB input to an EPUB, then gives that book to kepubify.
                     conversion_attempted = True
                     convert_successful, converted_filepath = nbp.convert_to_kepub()
                 else: # File is not in the convert ignore list and target is not kepub, so we start the regular conversion process

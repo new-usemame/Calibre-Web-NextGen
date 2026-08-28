@@ -175,7 +175,13 @@ export function BrowseList({ plural, title }: BrowseListProps) {
   // #1396 — the per-row rename/delete buttons (#973) only render for an editor,
   // and they are what crowds the name out of the track, so the wider track is
   // scoped to the same condition rather than applied to every browse list.
-  const gridClass = canEditTags ? `${styles.grid} ${styles.gridWithActions}` : styles.grid;
+  // For non-editor tag views we apply gridTags (same 300px floor) so the grid
+  // stays at ~4 columns instead of the dense ~6-column default.
+  const gridClass = canEditTags
+    ? `${styles.grid} ${styles.gridWithActions}`
+    : plural === 'tags'
+    ? `${styles.grid} ${styles.gridTags}`
+    : styles.grid;
 
   const items = useMemo(() => {
     const all = data?.items ?? [];

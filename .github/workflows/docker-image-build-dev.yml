@@ -153,10 +153,17 @@ jobs:
       - name: Determine Docker Image Tag
         id: tag
         run: |
-          if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
+          # Use $BRANCH_NAME, never a GitHub expression here: an expression is
+          # substituted into the script TEXT before the shell parses it, so a
+          # branch name containing $( ) would execute. Reading it from the
+          # environment cannot execute. github.head_ref is attacker-controlled
+          # on a fork PR; the fork gate on this job is what makes that
+          # unreachable today, and this line is what keeps it unreachable if
+          # anyone ever relaxes the gate.
+          if [[ "$BRANCH_NAME" == "main" ]]; then
             echo "IMAGE_TAG=dev" >> $GITHUB_ENV
           else
-            sanitized_branch=$(echo "${{ env.BRANCH_NAME }}" | sed 's/[^a-zA-Z0-9.-]/-/g')
+            sanitized_branch=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9.-]/-/g')
             echo "IMAGE_TAG=dev-${sanitized_branch}" >> $GITHUB_ENV
           fi
 
@@ -298,10 +305,17 @@ jobs:
       - name: Determine Docker Image Tag
         id: tag
         run: |
-          if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
+          # Use $BRANCH_NAME, never a GitHub expression here: an expression is
+          # substituted into the script TEXT before the shell parses it, so a
+          # branch name containing $( ) would execute. Reading it from the
+          # environment cannot execute. github.head_ref is attacker-controlled
+          # on a fork PR; the fork gate on this job is what makes that
+          # unreachable today, and this line is what keeps it unreachable if
+          # anyone ever relaxes the gate.
+          if [[ "$BRANCH_NAME" == "main" ]]; then
             echo "IMAGE_TAG=dev" >> $GITHUB_ENV
           else
-            sanitized_branch=$(echo "${{ env.BRANCH_NAME }}" | sed 's/[^a-zA-Z0-9.-]/-/g')
+            sanitized_branch=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9.-]/-/g')
             echo "IMAGE_TAG=dev-${sanitized_branch}" >> $GITHUB_ENV
           fi
 
@@ -455,10 +469,17 @@ jobs:
         id: tag
         run: |
           # 1. Determine the "Floating" Tag (e.g., 'dev' or 'dev-featurebranch')
-          if [[ "${{ env.BRANCH_NAME }}" == "main" ]]; then
+          # Use $BRANCH_NAME, never a GitHub expression here: an expression is
+          # substituted into the script TEXT before the shell parses it, so a
+          # branch name containing $( ) would execute. Reading it from the
+          # environment cannot execute. github.head_ref is attacker-controlled
+          # on a fork PR; the fork gate on this job is what makes that
+          # unreachable today, and this line is what keeps it unreachable if
+          # anyone ever relaxes the gate.
+          if [[ "$BRANCH_NAME" == "main" ]]; then
             echo "FLOAT_TAG=dev" >> $GITHUB_ENV
           else
-            sanitized_branch=$(echo "${{ env.BRANCH_NAME }}" | sed 's/[^a-zA-Z0-9.-]/-/g')
+            sanitized_branch=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9.-]/-/g')
             echo "FLOAT_TAG=dev-${sanitized_branch}" >> $GITHUB_ENV
           fi
           

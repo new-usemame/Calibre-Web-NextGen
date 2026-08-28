@@ -1,3 +1,3 @@
 ### Fixed
 
-- **Kobo annotation downloads for books in your Calibre-Web library are now answered locally only after Calibre-Web has a complete authoritative set; unseeded, ineligible, and paginated collections continue through Kobo so partial local data cannot replace device highlights.**
+- **Kobo annotation uploads and downloads are answered locally only for books whose annotation set Calibre-Web has fully seeded; other books continue through Kobo so partial server data cannot replace device highlights.**

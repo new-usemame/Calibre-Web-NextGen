@@ -449,6 +449,30 @@ def _owned_annotation_patch_ack(capture_session, ownership, entitlement_id):
     return response
 
 
+def _owned_patch_is_local_authority(ownership, entitlement_id):
+    """Use the exact same complete-set proof as the owned GET."""
+    try:
+        from cps.services.kobo_annotation_authority import local_get_is_eligible
+        return local_get_is_eligible(
+            settings=config,
+            user=current_user,
+            book_id=ownership.id,
+            entitlement_id=entitlement_id,
+            page_limit=100,
+            device_id=getattr(g, "annotation_origin_device_id", None),
+            log=log,
+        )
+    except Exception:
+        # A gate failure must preserve the pre-authority PATCH path.  Proxying
+        # keeps feeding Kobo's copy; locally acknowledging would split the two
+        # verbs and could make the next replacement-set GET destructive.
+        log.exception(
+            "Kobo PATCH authority gate failed; proxying user_id=%s book_id=%s",
+            getattr(current_user, "id", None), getattr(ownership, "id", None),
+        )
+        return False
+
+
 def _owned_annotation_page_limit():
     """Return the requested one-page bound, or ``None`` to force the proxy."""
     try:
@@ -481,6 +505,7 @@ def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
             book_id=ownership.id,
             entitlement_id=entitlement_id,
             page_limit=page_limit,
+            device_id=getattr(g, "annotation_origin_device_id", None),
             log=log,
         ):
             return _proxy_annotation_request(
@@ -492,6 +517,7 @@ def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
             book_id=ownership.id,
             entitlement_id=entitlement_id,
             page_limit=page_limit,
+            device_id=getattr(g, "annotation_origin_device_id", None),
             log=log,
         )
         if rendered is None:
@@ -755,12 +781,13 @@ def _dispatch_kobo_annotation_deletes(annotation_sync, deleted, entitlement_id, 
 def handle_annotations(entitlement_id):
     """Handle annotation requests for a specific book.
 
-    GET: owned books are answered from CWNG's complete visible set; unowned
-    books retain the byte-transparent Kobo proxy.
-    PATCH: intercept — persist locally (source='kobo'), then dispatch through
+    GET: fully seeded owned books are answered from CWNG's complete visible
+    set; unseeded and unowned books retain the byte-transparent Kobo proxy.
+    PATCH: persist locally (source='kobo'), then dispatch through
     each registered + enabled annotation_sync handler (Hardcover today; future
     Readwise / Notion / etc.). All DB writes happen in the dispatcher; this
-    handler is a thin orchestrator.
+    handler is a thin orchestrator. Fully seeded owned books are acknowledged
+    locally; unseeded books continue upstream so Kobo's copy is not starved.
 
     The exact PATCH body is durably staged before parsing and dispatch so an
     interrupted local capture can be replayed server-side. Local persistence is
@@ -945,7 +972,7 @@ def handle_annotations(entitlement_id):
             )
         finally:
             _mark_patch_spool_outcome(patch_spool_ticket, patch_spool_outcome)
-    if book is not None:
+    if book is not None and _owned_patch_is_local_authority(book, entitlement_id):
         return _owned_annotation_patch_ack(capture_session, book, entitlement_id)
     return _proxy_annotation_request(capture_session, book, entitlement_id)
 

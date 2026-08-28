@@ -22,6 +22,14 @@ def app():
     return Flask(__name__)
 
 
+@pytest.fixture(autouse=True)
+def _pre_1923_patch_tests_use_seeded_authority(monkeypatch):
+    """Keep this module focused on capture/refusal, not the Stage-0 gate."""
+    monkeypatch.setattr(
+        rs, "_owned_patch_is_local_authority", lambda *_args, **_kwargs: True,
+    )
+
+
 def _request_entries(*content_ids):
     return [{"ContentId": content_id, "etag": f"etag-{content_id}"}
             for content_id in content_ids]

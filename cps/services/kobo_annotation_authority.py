@@ -21,10 +21,16 @@ containing every row's identity and text is safer than a 5xx that is perfectly
 honest about a rendering or state-persistence failure.  Book-state persistence
 is consequently advisory, and row rendering has a last-resort wire mapping.
 
-This renderer is used only when the complete current set fits in the requested
-page.  The route proxies larger sets to Kobo until CWNG implements the immutable
-snapshot + cursor contract; a local response can therefore honestly terminate
-with ``nextPageOffsetToken`` set to null.
+This renderer is used only after Stage 0 proves that the authenticated device's
+complete set was accepted and the book state is ``authoritative`` (the stored
+spelling of "fully seeded").  GET and PATCH use the same proof gate: until that
+proof exists, both continue through Kobo so a partial local set cannot replace
+the device set and new uploads continue feeding Kobo's more-complete copy.
+
+The complete current set must also fit in the requested page.  The route proxies
+larger sets to Kobo until CWNG implements the immutable snapshot + cursor
+contract; a local response can therefore honestly terminate with
+``nextPageOffsetToken`` set to null.
 """
 
 from __future__ import annotations
@@ -32,6 +38,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import threading
 import uuid
 from datetime import datetime, timezone
 
@@ -46,6 +53,9 @@ from cps.services.kobo_annotation_capture import project_exact_materialization
 _KOBO_WIRE_COLORS = frozenset(KOBO_BOOKMARK_COLOR_HEX.values())
 _EPOCH = "1970-01-01T00:00:00.000Z"
 _BOOK_STATE_CONTENT_ID_LIMIT = 64
+_LOCAL_PAGE_CAPACITY = 100
+_SKIP_LOGGED_BOOKS = set()
+_SKIP_LOG_LOCK = threading.Lock()
 
 
 def _blob(value):
@@ -331,55 +341,138 @@ def _state_for_content(user_id, normalized_content_id):
     )
 
 
-def local_get_is_eligible(*, settings, user, book_id, entitlement_id, page_limit, log):
-    """Fail closed unless CWNG can return one complete, authoritative page."""
+def _log_authority_skip_once(log, *, user_id, book_id, reason):
+    """Log one structural INFO per user/book for this process lifetime."""
+    key = (user_id, book_id)
+    with _SKIP_LOG_LOCK:
+        if key in _SKIP_LOGGED_BOOKS:
+            return
+        _SKIP_LOGGED_BOOKS.add(key)
+    try:
+        log.info(
+            "Kobo local annotation authority skipped user_id=%s book_id=%s "
+            "reason=%s",
+            user_id, book_id, reason,
+        )
+    except Exception:
+        pass
+
+
+def reset_skip_log_for_testing():
+    with _SKIP_LOG_LOCK:
+        _SKIP_LOGGED_BOOKS.clear()
+
+
+def _accepted_device_annotation_count(book_state_id, device_id):
+    """Return the latest accepted complete-seed count for this device/book."""
+    if not isinstance(device_id, int) or isinstance(device_id, bool):
+        return None
+    capture = (
+        ub.session.query(ub.KoboAnnotationSeedCapture)
+        .filter(
+            ub.KoboAnnotationSeedCapture.book_state_id == book_state_id,
+            ub.KoboAnnotationSeedCapture.device_id == device_id,
+            ub.KoboAnnotationSeedCapture.result == "accepted",
+            ub.KoboAnnotationSeedCapture.completed_at.isnot(None),
+            ub.KoboAnnotationSeedCapture.annotation_count.isnot(None),
+        )
+        .order_by(
+            ub.KoboAnnotationSeedCapture.completed_at.desc(),
+            ub.KoboAnnotationSeedCapture.id.desc(),
+        )
+        .first()
+    )
+    count = getattr(capture, "annotation_count", None)
+    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+        return None
+    return count
+
+
+def _visible_annotation_count(user_id, book_id):
+    return (
+        ub.session.query(ub.Annotation.id)
+        .filter(
+            ub.Annotation.user_id == user_id,
+            ub.Annotation.book_id == book_id,
+            (
+                ub.Annotation.hidden.is_(None)
+                | (ub.Annotation.hidden == False)  # noqa: E712
+            ),
+        )
+        .count()
+    )
+
+
+def local_get_is_eligible(*, settings, user, book_id, entitlement_id,
+                          page_limit, device_id, log):
+    """Gate both GET and PATCH on one proven, locally serveable seed.
+
+    ``authority_status='authoritative'`` is Stage 0's stored spelling for a
+    fully seeded book.  It is not sufficient by itself: an accepted complete
+    seed count must exist for this exact device/book, the local visible set may
+    not be smaller than that declaration, and the entire set must fit in the
+    one-page implementation.  PATCH uses the same function with a limit of 100
+    so it can never stop feeding Kobo while GET still needs Kobo as authority.
+    """
+    user_id = getattr(user, "id", None)
+    reason = None
     try:
         if not isinstance(page_limit, int) or isinstance(page_limit, bool):
-            return False
-        if page_limit < 1 or page_limit > 100:
-            return False
+            reason = "page_limit_invalid"
+        elif page_limit < 1 or page_limit > _LOCAL_PAGE_CAPACITY:
+            reason = "page_limit_unsupported"
 
         from cps.services import kobo_annotation_stage0
 
-        schema_ready = kobo_annotation_stage0.schema_capable(ub.session.get_bind())
-        state = _state_for_book(user.id, book_id)
-        if not kobo_annotation_stage0.gates_allow(
-            settings, user, state, schema_ready=schema_ready,
+        state = None
+        if reason is None:
+            schema_ready = kobo_annotation_stage0.schema_capable(
+                ub.session.get_bind(),
+            )
+            state = _state_for_book(user_id, book_id)
+            reason = kobo_annotation_stage0.gate_failure_reason(
+                settings, user, state, schema_ready=schema_ready,
+            )
+        if reason is None and (
+            _normalized_entitlement_id(state.content_id)
+            != _normalized_entitlement_id(entitlement_id)
         ):
-            return False
-        if _normalized_entitlement_id(state.content_id) != _normalized_entitlement_id(
-            entitlement_id,
-        ):
-            return False
+            reason = "content_id_mismatch"
 
-        # Cursor snapshots are deliberately outside this branch. Read at most
-        # one id beyond the requested page so an over-limit set fails closed to
-        # Kobo without loading or rendering the complete collection locally.
-        visible_ids = (
-            ub.session.query(ub.Annotation.id)
-            .filter(
-                ub.Annotation.user_id == user.id,
-                ub.Annotation.book_id == book_id,
-                (
-                    ub.Annotation.hidden.is_(None)
-                    | (ub.Annotation.hidden == False)  # noqa: E712
-                ),
-            )
-            .limit(page_limit + 1)
-            .all()
-        )
-        return len(visible_ids) <= page_limit
-    except Exception:
+        declared_count = None
+        if reason is None:
+            declared_count = _accepted_device_annotation_count(state.id, device_id)
+            if declared_count is None:
+                reason = "accepted_device_seed_count_missing"
+
+        visible_count = None
+        if reason is None:
+            visible_count = _visible_annotation_count(user_id, book_id)
+            if visible_count < declared_count:
+                reason = "local_count_below_device_seed"
+            elif visible_count > _LOCAL_PAGE_CAPACITY:
+                reason = "local_set_requires_pagination"
+            elif visible_count > page_limit:
+                reason = "requested_page_too_small"
+    except Exception as error:
         _safe_rollback()
-        try:
-            log.warning(
-                "Owned Kobo annotation GET eligibility failed; proxying "
-                "user_id=%s book_id=%s",
-                getattr(user, "id", None), book_id, exc_info=True,
-            )
-        except Exception:
-            pass
+        reason = _failure_reason("authority_gate", error)
+
+    if reason is not None:
+        _log_authority_skip_once(
+            log, user_id=user_id, book_id=book_id, reason=reason,
+        )
         return False
+    return True
+
+
+def _render_count_is_safe(*, user_id, book_id, device_id, row_count):
+    """Recheck the accepted count at render time to close the query race."""
+    state = _state_for_book(user_id, book_id)
+    if state is None or state.authority_status != "authoritative":
+        return False
+    declared_count = _accepted_device_annotation_count(state.id, device_id)
+    return declared_count is not None and row_count >= declared_count
 
 
 def _book_state(user_id, book_id, entitlement_id):
@@ -543,9 +636,15 @@ def _log_degraded(log, *, user_id, book_id, visible_count, reasons):
         pass
 
 
-def _emergency_render(*, user_id, book_id, entitlement_id, page_limit, log, reason):
+def _emergency_render(*, user_id, book_id, entitlement_id, page_limit,
+                      device_id, log, reason):
     rows, query_reason = _emergency_rows(user_id, book_id, page_limit)
     if len(rows) > page_limit:
+        return None
+    if not _render_count_is_safe(
+        user_id=user_id, book_id=book_id, device_id=device_id,
+        row_count=len(rows),
+    ):
         return None
     reasons = [reason]
     if query_reason is not None:
@@ -583,11 +682,17 @@ def _emergency_render(*, user_id, book_id, entitlement_id, page_limit, log, reas
     return body, etag
 
 
-def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit, log):
+def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit,
+                              device_id, log):
     objects = []
     reasons = []
     rows = _annotation_rows(user_id, book_id, page_limit)
     if len(rows) > page_limit:
+        return None
+    if not _render_count_is_safe(
+        user_id=user_id, book_id=book_id, device_id=device_id,
+        row_count=len(rows),
+    ):
         return None
     for annotation, materialization in rows:
         try:
@@ -649,7 +754,8 @@ def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit, l
     return body, etag
 
 
-def render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit, log):
+def render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit,
+                             device_id, log):
     """Return a complete local page, or ``None`` when the set is too large."""
     try:
         return _render_owned_annotations(
@@ -657,6 +763,7 @@ def render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit, lo
             book_id=book_id,
             entitlement_id=entitlement_id,
             page_limit=page_limit,
+            device_id=device_id,
             log=log,
         )
     except Exception as error:
@@ -669,6 +776,7 @@ def render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit, lo
             book_id=book_id,
             entitlement_id=entitlement_id,
             page_limit=page_limit,
+            device_id=device_id,
             log=log,
             reason=_failure_reason("render", error),
         )

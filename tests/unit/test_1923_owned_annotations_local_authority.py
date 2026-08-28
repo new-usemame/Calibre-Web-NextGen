@@ -7,11 +7,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
-from flask import Flask, make_response
+from flask import Flask, g, make_response
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -25,6 +25,7 @@ from cps.services.kobo_annotation_capture import extract_object_member_value
 OWNED = "9e5251ad-d530-4e58-9121-8b8336099fdd"
 BOOK_ID = 347
 USER_ID = 7
+DEVICE_ID = 91
 
 
 @pytest.fixture
@@ -57,6 +58,7 @@ def app(monkeypatch):
         lambda _engine: True,
     )
     monkeypatch.setattr(rs, "_begin_exchange_capture", lambda *_a, **_k: None)
+    authority.reset_skip_log_for_testing()
     return application
 
 
@@ -85,14 +87,14 @@ def _annotation(annotation_id, annotation_type="highlight", **overrides):
     return ub.Annotation(**values)
 
 
-def _owned(monkeypatch, session):
+def _owned(monkeypatch, session, annotation_count):
     book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
     monkeypatch.setattr(
         rs, "proxy_to_kobo_reading_services",
         lambda **_kwargs: pytest.fail("owned annotations request contacted Kobo"),
     )
-    session.add(ub.KoboAnnotationBookState(
+    state = ub.KoboAnnotationBookState(
         user_id=USER_ID,
         book_id=BOOK_ID,
         content_id=OWNED,
@@ -100,6 +102,17 @@ def _owned(monkeypatch, session):
         authority_revision=1,
         generation_id="00000000-0000-0000-0000-000000000001",
         opaque_content_status="absent",
+        seeded_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
+    )
+    session.add(state)
+    session.flush()
+    session.add(ub.KoboAnnotationSeedCapture(
+        book_state_id=state.id,
+        device_id=DEVICE_ID,
+        completed_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
+        annotation_count=annotation_count,
+        page_count=1,
+        result="accepted",
     ))
     return book
 
@@ -167,7 +180,7 @@ def test_owned_patch_ack_has_measured_response_shape(app):
 def test_owned_get_is_full_200_raw_exact_if_none_match_ignored_and_etag_moves(
     app, session, monkeypatch,
 ):
-    _owned(monkeypatch, session)
+    _owned(monkeypatch, session, 3)
     raw = (
         b'{ "type" : "highlight", "id" : "a-raw", '
         b'"clientLastModifiedUtc" : "2026-08-28T05:00:00Z", '
@@ -201,6 +214,7 @@ def test_owned_get_is_full_200_raw_exact_if_none_match_ignored_and_etag_moves(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
         headers={"If-None-Match": 'W/"CWNG:ignored:1:ignored"'},
     ):
+        g.annotation_origin_device_id = DEVICE_ID
         first = rs.handle_annotations.__wrapped__(OWNED)
 
     assert first.status_code == 200
@@ -220,6 +234,7 @@ def test_owned_get_is_full_200_raw_exact_if_none_match_ignored_and_etag_moves(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
         headers={"If-None-Match": first_etag},
     ):
+        g.annotation_origin_device_id = DEVICE_ID
         matched = rs.handle_annotations.__wrapped__(OWNED)
 
     assert matched.status_code == 200
@@ -232,6 +247,7 @@ def test_owned_get_is_full_200_raw_exact_if_none_match_ignored_and_etag_moves(
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
     ):
+        g.annotation_origin_device_id = DEVICE_ID
         changed = rs.handle_annotations.__wrapped__(OWNED)
 
     assert changed.status_code == 200
@@ -246,7 +262,7 @@ def test_owned_get_over_limit_proxies_instead_of_violating_page_contract(
 ):
     book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
-    session.add(ub.KoboAnnotationBookState(
+    state = ub.KoboAnnotationBookState(
         user_id=USER_ID,
         book_id=BOOK_ID,
         content_id=OWNED,
@@ -254,6 +270,13 @@ def test_owned_get_over_limit_proxies_instead_of_violating_page_contract(
         authority_revision=1,
         generation_id="00000000-0000-0000-0000-000000000001",
         opaque_content_status="absent",
+    )
+    session.add(state)
+    session.flush()
+    session.add(ub.KoboAnnotationSeedCapture(
+        book_state_id=state.id, device_id=DEVICE_ID,
+        completed_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
+        annotation_count=101, page_count=2, result="accepted",
     ))
     session.add_all([_annotation(f"row-{index:03d}") for index in range(101)])
     session.commit()
@@ -269,6 +292,7 @@ def test_owned_get_over_limit_proxies_instead_of_violating_page_contract(
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
     ):
+        g.annotation_origin_device_id = DEVICE_ID
         response = rs.handle_annotations.__wrapped__(OWNED)
 
     assert response.status_code == 206
@@ -281,6 +305,7 @@ def test_renderer_rechecks_limit_after_eligibility_probe(app, session, monkeypat
     book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
     monkeypatch.setattr(authority, "local_get_is_eligible", lambda **_kwargs: True)
+    monkeypatch.setattr(authority, "_render_count_is_safe", lambda **_kwargs: True)
     session.add_all([_annotation(f"race-row-{index:03d}") for index in range(101)])
     session.commit()
 
@@ -334,6 +359,189 @@ def test_owned_unseeded_get_proxies_without_serving_partial_local_set(
     assert response.status_code == 200
     assert response.get_data() == upstream_body
     assert response.headers["ETag"] == 'W/"kobo-cloud"'
+
+
+def test_owned_unseeded_patch_is_persisted_then_proxied(app, session, monkeypatch):
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    monkeypatch.setattr(rs, "_stage_patch_for_recovery", lambda *_a, **_k: None)
+    session.add(ub.KoboAnnotationBookState(
+        user_id=USER_ID, book_id=BOOK_ID, content_id=OWNED,
+        authority_status="unseeded", authority_revision=0,
+        generation_id="00000000-0000-0000-0000-000000000001",
+        opaque_content_status="unknown",
+    ))
+    session.commit()
+    dispatched = []
+    monkeypatch.setattr(
+        "cps.services.annotation_sync.dispatch_annotation_sync",
+        lambda rows, *_a, **_k: dispatched.extend(rows) or True,
+    )
+    upstream_body = b'{"upstream":"patch-preserved"}'
+    proxy_calls = []
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: proxy_calls.append(True) or make_response(upstream_body, 202),
+    )
+    payload = {"updatedAnnotations": [{
+        "id": "unseeded-upload", "type": "highlight",
+        "highlightedText": "must still reach Kobo", "location": {"span": {}},
+    }]}
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations", method="PATCH", json=payload,
+    ):
+        g.annotation_origin_device_id = DEVICE_ID
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
+    assert [row["id"] for row in dispatched] == ["unseeded-upload"]
+    assert proxy_calls == [True]
+    assert response.status_code == 202
+    assert response.get_data() == upstream_body
+
+
+def test_owned_seeded_patch_is_answered_locally(app, session, monkeypatch):
+    _owned(monkeypatch, session, 0)
+    monkeypatch.setattr(rs, "_stage_patch_for_recovery", lambda *_a, **_k: None)
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations", method="PATCH", json={},
+    ):
+        g.annotation_origin_device_id = DEVICE_ID
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
+    assert response.status_code == 204
+    assert response.get_data() == b""
+    assert response.headers["Content-Length"] == "0"
+
+
+def test_owned_unseeded_raw_materialization_still_proxies_get(
+    app, session, monkeypatch,
+):
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    state = ub.KoboAnnotationBookState(
+        user_id=USER_ID, book_id=BOOK_ID, content_id=OWNED,
+        authority_status="unseeded", authority_revision=0,
+        generation_id="00000000-0000-0000-0000-000000000001",
+        opaque_content_status="unknown",
+    )
+    row = _annotation("raw-but-unseeded")
+    session.add_all([state, row])
+    session.flush()
+    raw = b'{"id":"raw-but-unseeded","type":"highlight","highlightedText":"partial"}'
+    session.add(ub.KoboAnnotationMaterialization(
+        annotation_id=row.id, raw_annotation_json=raw,
+        raw_location_json=b"null",
+        raw_client_modified_utc="2026-08-28T05:00:00Z",
+        payload_sha256=hashlib.sha256(raw).hexdigest(),
+        materialization_revision=1, provenance="kobo_patch",
+        attachments_state="missing", serveable=False,
+    ))
+    session.commit()
+    upstream_body = b'{"annotations":[{"id":"cloud-complete"}]}'
+    proxy_calls = []
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: proxy_calls.append(True) or make_response(upstream_body, 200),
+    )
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
+    ):
+        g.annotation_origin_device_id = DEVICE_ID
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
+    assert proxy_calls == [True]
+    assert response.get_data() == upstream_body
+
+
+def test_device_seed_count_guard_keeps_both_verbs_upstream(
+    app, session, monkeypatch,
+):
+    _owned(monkeypatch, session, 3)
+    session.add_all([_annotation("only-a"), _annotation("only-b")])
+    session.commit()
+    monkeypatch.setattr(rs, "_stage_patch_for_recovery", lambda *_a, **_k: None)
+    proxy_methods = []
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: proxy_methods.append(rs.request.method)
+        or make_response(b'{"upstream":true}', 200),
+    )
+
+    for method in ("GET", "PATCH"):
+        with app.test_request_context(
+            f"/api/v3/content/{OWNED}/annotations?limit=100",
+            method=method, json={} if method == "PATCH" else None,
+        ):
+            g.annotation_origin_device_id = DEVICE_ID
+            response = rs.handle_annotations.__wrapped__(OWNED)
+        assert response.status_code == 200
+
+    assert proxy_methods == ["GET", "PATCH"]
+
+
+def test_authoritative_without_device_seed_count_keeps_both_verbs_upstream(
+    app, session, monkeypatch,
+):
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    monkeypatch.setattr(rs, "_stage_patch_for_recovery", lambda *_a, **_k: None)
+    session.add(ub.KoboAnnotationBookState(
+        user_id=USER_ID, book_id=BOOK_ID, content_id=OWNED,
+        authority_status="authoritative", authority_revision=1,
+        generation_id="00000000-0000-0000-0000-000000000001",
+        opaque_content_status="absent",
+        seeded_at=datetime(2026, 8, 28, tzinfo=timezone.utc),
+    ))
+    session.commit()
+    proxy_methods = []
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: proxy_methods.append(rs.request.method)
+        or make_response(b'{"upstream":true}', 200),
+    )
+
+    for method in ("GET", "PATCH"):
+        with app.test_request_context(
+            f"/api/v3/content/{OWNED}/annotations?limit=100",
+            method=method, json={} if method == "PATCH" else None,
+        ):
+            g.annotation_origin_device_id = DEVICE_ID
+            response = rs.handle_annotations.__wrapped__(OWNED)
+        assert response.status_code == 200
+
+    assert proxy_methods == ["GET", "PATCH"]
+
+
+def test_authority_skip_logs_once_per_book_with_structural_reason(
+    app, session, monkeypatch,
+):
+    state = ub.KoboAnnotationBookState(
+        user_id=USER_ID, book_id=BOOK_ID, content_id=OWNED,
+        authority_status="unseeded", authority_revision=0,
+        generation_id="00000000-0000-0000-0000-000000000001",
+        opaque_content_status="unknown",
+    )
+    session.add(state)
+    session.commit()
+    records = []
+    structural_log = SimpleNamespace(
+        info=lambda *args: records.append(args),
+    )
+    user = SimpleNamespace(id=USER_ID, kobo_two_way_annotation_sync=True)
+    settings = SimpleNamespace(config_kobo_two_way_annotation_sync=True)
+
+    for _attempt in range(2):
+        assert authority.local_get_is_eligible(
+            settings=settings, user=user, book_id=BOOK_ID,
+            entitlement_id=OWNED, page_limit=100, device_id=DEVICE_ID,
+            log=structural_log,
+        ) is False
+
+    assert len(records) == 1
+    assert records[0][-1] == "authority_status_unseeded"
 
 
 def test_owned_unseeded_get_forwards_upstream_failure_unchanged(
@@ -411,6 +619,7 @@ def test_owned_get_survives_normalized_book_state_insert_integrity_error(
         lambda **_kwargs: pytest.fail("renderer containment must not contact Kobo"),
     )
     monkeypatch.setattr(authority, "local_get_is_eligible", lambda **_kwargs: True)
+    monkeypatch.setattr(authority, "_render_count_is_safe", lambda **_kwargs: True)
     session.add_all([
         _annotation("state-race-a", highlighted_text="private state text A"),
         _annotation("state-race-b", highlighted_text="private state text B"),
@@ -478,7 +687,7 @@ def test_owned_get_survives_normalized_book_state_insert_integrity_error(
 def test_owned_get_row_render_exception_keeps_every_identity_and_text(
     app, session, monkeypatch,
 ):
-    _owned(monkeypatch, session)
+    _owned(monkeypatch, session, 2)
     session.add_all([
         _annotation("render-a", highlighted_text="private render text A"),
         _annotation("render-b", highlighted_text="private render text B"),
@@ -499,6 +708,7 @@ def test_owned_get_row_render_exception_keeps_every_identity_and_text(
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
     ):
+        g.annotation_origin_device_id = DEVICE_ID
         response = rs.handle_annotations.__wrapped__(OWNED)
 
     payload = response.get_json()

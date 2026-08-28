@@ -150,6 +150,9 @@ def _app(monkeypatch, *, dispatch):
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
     monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
+        rs, "_owned_patch_is_local_authority", lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(
         "cps.services.annotation_sync.dispatch_annotation_sync", dispatch,
     )
     monkeypatch.setattr(

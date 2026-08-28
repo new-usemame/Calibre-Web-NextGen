@@ -71,6 +71,10 @@ def test_live_patch_stores_the_highlight_without_the_rejected_clock(
     )
     monkeypatch.setattr(readingservices, "log_annotation_data", lambda *_args: None)
     monkeypatch.setattr(
+        readingservices, "_owned_patch_is_local_authority",
+        lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(
         readingservices,
         "proxy_to_kobo_reading_services",
         lambda: pytest.fail("owned PATCH must not contact Kobo"),

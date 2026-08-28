@@ -33,6 +33,16 @@ OLD_ANNOTATION_COLUMNS = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _stage0_route_tests_assume_completed_seed(monkeypatch):
+    """Stage-0 route tests predate and are orthogonal to the authority gate."""
+    import cps.readingservices as readingservices
+    monkeypatch.setattr(
+        readingservices, "_owned_patch_is_local_authority",
+        lambda *_args, **_kwargs: True,
+    )
+
+
 def _create_gate_tables(conn, *, user_gate=False, settings_gate=False):
     conn.execute(text(
         "CREATE TABLE user (id INTEGER PRIMARY KEY, name VARCHAR(64)"

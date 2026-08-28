@@ -449,24 +449,72 @@ def _owned_annotation_patch_ack(capture_session, ownership, entitlement_id):
     return response
 
 
-def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
-    """Always return the complete local set; If-None-Match never yields 304."""
-    from cps.services.kobo_annotation_authority import render_owned_annotations
+def _owned_annotation_page_limit():
+    """Return the requested one-page bound, or ``None`` to force the proxy."""
+    try:
+        values = request.args.getlist("limit")
+        if not values:
+            return 100
+        if len(values) != 1:
+            return None
+        page_limit = int(values[0])
+        if page_limit < 1 or page_limit > 100:
+            return None
+        return page_limit
+    except (TypeError, ValueError, OverflowError):
+        return None
 
-    body, etag = render_owned_annotations(
-        user_id=current_user.id,
-        book_id=ownership.id,
-        entitlement_id=entitlement_id,
-        log=log,
-    )
-    _record_annotation_decision(
-        capture_session, ownership, "answered_locally", entitlement_id,
-    )
-    response = make_response(body, 200)
-    response.headers["Content-Type"] = "application/json"
-    response.headers["Content-Length"] = str(len(body))
-    response.headers["ETag"] = etag
-    return response
+
+def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
+    """Return one complete eligible local page, otherwise proxy unchanged."""
+    try:
+        from cps.services.kobo_annotation_authority import (
+            local_get_is_eligible,
+            render_owned_annotations,
+        )
+
+        page_limit = _owned_annotation_page_limit()
+        has_cursor = request.args.get("pageOffsetToken") is not None
+        if has_cursor or not local_get_is_eligible(
+            settings=config,
+            user=current_user,
+            book_id=ownership.id,
+            entitlement_id=entitlement_id,
+            page_limit=page_limit,
+            log=log,
+        ):
+            return _proxy_annotation_request(
+                capture_session, ownership, entitlement_id,
+            )
+
+        rendered = render_owned_annotations(
+            user_id=current_user.id,
+            book_id=ownership.id,
+            entitlement_id=entitlement_id,
+            page_limit=page_limit,
+            log=log,
+        )
+        if rendered is None:
+            return _proxy_annotation_request(
+                capture_session, ownership, entitlement_id,
+            )
+        body, etag = rendered
+        _record_annotation_decision(
+            capture_session, ownership, "answered_locally", entitlement_id,
+        )
+        response = make_response(body, 200)
+        response.headers["Content-Type"] = "application/json"
+        response.headers["Content-Length"] = str(len(body))
+        response.headers["ETag"] = etag
+        return response
+    except Exception:
+        log.exception(
+            "Owned Kobo annotation GET local authority failed; proxying "
+            "entitlement=%s", entitlement_id,
+        )
+        return _proxy_annotation_request(
+            capture_session, ownership, entitlement_id,
+        )
 
 
 def _stage_patch_for_recovery(raw_body, entitlement_id):

@@ -1,3 +1,3 @@
 ### Fixed
 
-- **Kobo highlights for books owned by your Calibre-Web library now stay private and survive re-downloads because annotation uploads and downloads for those books are answered by Calibre-Web instead of being sent through Kobo's cloud.**
+- **Kobo annotation downloads for books in your Calibre-Web library are now answered locally only after Calibre-Web has a complete authoritative set; unseeded, ineligible, and paginated collections continue through Kobo so partial local data cannot replace device highlights.**

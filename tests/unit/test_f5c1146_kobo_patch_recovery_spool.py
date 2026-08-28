@@ -1192,6 +1192,13 @@ def test_unreadable_patch_body_still_refuses_but_unreadable_get_body_does_not(
     """
     _root(monkeypatch, tmp_path)
     app = _app(monkeypatch, dispatch=lambda *_a, **_k: None)
+    upstream_body = b'{"upstream":"preserved"}'
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: app.response_class(
+            upstream_body, status=207, headers={"X-Upstream": "same"},
+        ),
+    )
 
     def _unreadable(self, *args, **kwargs):
         del self, args, kwargs
@@ -1205,7 +1212,9 @@ def test_unreadable_patch_body_still_refuses_but_unreadable_get_body_does_not(
     assert patch_response.status_code == 503
 
     get_response = app.test_client().get(f"/annotations/{BOOK_UUID}")
-    assert get_response.status_code != 503
+    assert get_response.status_code == 207
+    assert get_response.get_data() == upstream_body
+    assert get_response.headers["X-Upstream"] == "same"
 
 
 @pytest.mark.unit

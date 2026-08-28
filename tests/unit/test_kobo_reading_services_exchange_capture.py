@@ -533,9 +533,13 @@ def test_owned_annotations_capture_records_local_answer_without_upstream_leg(
 
     monkeypatch.setattr(rs, "current_user", SimpleNamespace(id=7, is_authenticated=True))
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
-    monkeypatch.setattr(rs, "_capture_authority_status", lambda _ownership: "unseeded")
+    monkeypatch.setattr(rs, "_capture_authority_status", lambda _ownership: "authoritative")
     monkeypatch.setattr(rs, "_stage_patch_for_recovery", lambda *_args: None)
     monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "cps.services.kobo_annotation_authority.local_get_is_eligible",
+        lambda **_kwargs: True,
+    )
     monkeypatch.setattr(
         rs, "proxy_to_kobo_reading_services",
         lambda **_kwargs: pytest.fail("owned request must not create an upstream leg"),
@@ -563,7 +567,7 @@ def test_owned_annotations_capture_records_local_answer_without_upstream_leg(
         "index": 0,
         "content_id": OWNED,
         "ownership": "owned",
-        "authority_status": "unseeded",
+        "authority_status": "authoritative",
         "action": "answered_locally",
     }]
     assert record["device_response"]["status"] == expected_status

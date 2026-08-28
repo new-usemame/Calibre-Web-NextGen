@@ -121,7 +121,7 @@ def emergency_override_disables(environ=None) -> bool:
 
 
 def gates_allow(settings, user, book_state, *, schema_ready) -> bool:
-    """Evaluate the future route gate; Stage 0 does not call this from routes."""
+    """Evaluate the local Kobo annotation wire-authority gate."""
     if emergency_override_disables():
         return False
     if not schema_ready:

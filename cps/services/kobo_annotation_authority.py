@@ -21,9 +21,10 @@ containing every row's identity and text is safer than a 5xx that is perfectly
 honest about a rendering or state-persistence failure.  Book-state persistence
 is consequently advisory, and row rendering has a last-resort wire mapping.
 
-Pagination is deliberately unnecessary here.  The complete current set is
-returned in one response (therefore at least Nickel's measured ``limit=100``),
-and ``nextPageOffsetToken`` is always null.
+This renderer is used only when the complete current set fits in the requested
+page.  The route proxies larger sets to Kobo until CWNG implements the immutable
+snapshot + cursor contract; a local response can therefore honestly terminate
+with ``nextPageOffsetToken`` set to null.
 """
 
 from __future__ import annotations
@@ -223,7 +224,7 @@ def _fallback_object(annotation, entitlement_id):
     return result, not reasons, ",".join(reasons)
 
 
-def _annotation_rows(user_id, book_id):
+def _annotation_rows(user_id, book_id, page_limit):
     return (
         ub.session.query(ub.Annotation, ub.KoboAnnotationMaterialization)
         .outerjoin(
@@ -239,11 +240,12 @@ def _annotation_rows(user_id, book_id):
             ),
         )
         .order_by(ub.Annotation.annotation_id.collate("BINARY").asc())
+        .limit(page_limit + 1)
         .all()
     )
 
 
-def _simple_annotation_rows(user_id, book_id):
+def _simple_annotation_rows(user_id, book_id, page_limit):
     """Read visible rows without the optional materialization join."""
     return [
         (annotation, None)
@@ -258,6 +260,7 @@ def _simple_annotation_rows(user_id, book_id):
                 ),
             )
             .order_by(ub.Annotation.annotation_id.collate("BINARY").asc())
+            .limit(page_limit + 1)
             .all()
         )
     ]
@@ -326,6 +329,57 @@ def _state_for_content(user_id, normalized_content_id):
         )
         .first()
     )
+
+
+def local_get_is_eligible(*, settings, user, book_id, entitlement_id, page_limit, log):
+    """Fail closed unless CWNG can return one complete, authoritative page."""
+    try:
+        if not isinstance(page_limit, int) or isinstance(page_limit, bool):
+            return False
+        if page_limit < 1 or page_limit > 100:
+            return False
+
+        from cps.services import kobo_annotation_stage0
+
+        schema_ready = kobo_annotation_stage0.schema_capable(ub.session.get_bind())
+        state = _state_for_book(user.id, book_id)
+        if not kobo_annotation_stage0.gates_allow(
+            settings, user, state, schema_ready=schema_ready,
+        ):
+            return False
+        if _normalized_entitlement_id(state.content_id) != _normalized_entitlement_id(
+            entitlement_id,
+        ):
+            return False
+
+        # Cursor snapshots are deliberately outside this branch. Read at most
+        # one id beyond the requested page so an over-limit set fails closed to
+        # Kobo without loading or rendering the complete collection locally.
+        visible_ids = (
+            ub.session.query(ub.Annotation.id)
+            .filter(
+                ub.Annotation.user_id == user.id,
+                ub.Annotation.book_id == book_id,
+                (
+                    ub.Annotation.hidden.is_(None)
+                    | (ub.Annotation.hidden == False)  # noqa: E712
+                ),
+            )
+            .limit(page_limit + 1)
+            .all()
+        )
+        return len(visible_ids) <= page_limit
+    except Exception:
+        _safe_rollback()
+        try:
+            log.warning(
+                "Owned Kobo annotation GET eligibility failed; proxying "
+                "user_id=%s book_id=%s",
+                getattr(user, "id", None), book_id, exc_info=True,
+            )
+        except Exception:
+            pass
+        return False
 
 
 def _book_state(user_id, book_id, entitlement_id):
@@ -465,9 +519,9 @@ def _encode_object(value):
         ).encode("ascii")
 
 
-def _emergency_rows(user_id, book_id):
+def _emergency_rows(user_id, book_id, page_limit):
     try:
-        return _simple_annotation_rows(user_id, book_id), None
+        return _simple_annotation_rows(user_id, book_id, page_limit), None
     except Exception as error:
         _safe_rollback()
         return [], _failure_reason("emergency_row_query", error)
@@ -489,8 +543,10 @@ def _log_degraded(log, *, user_id, book_id, visible_count, reasons):
         pass
 
 
-def _emergency_render(*, user_id, book_id, entitlement_id, log, reason):
-    rows, query_reason = _emergency_rows(user_id, book_id)
+def _emergency_render(*, user_id, book_id, entitlement_id, page_limit, log, reason):
+    rows, query_reason = _emergency_rows(user_id, book_id, page_limit)
+    if len(rows) > page_limit:
+        return None
     reasons = [reason]
     if query_reason is not None:
         reasons.append(query_reason)
@@ -527,10 +583,12 @@ def _emergency_render(*, user_id, book_id, entitlement_id, log, reason):
     return body, etag
 
 
-def _render_owned_annotations(*, user_id, book_id, entitlement_id, log):
+def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit, log):
     objects = []
     reasons = []
-    rows = _annotation_rows(user_id, book_id)
+    rows = _annotation_rows(user_id, book_id, page_limit)
+    if len(rows) > page_limit:
+        return None
     for annotation, materialization in rows:
         try:
             raw = _exact_raw(annotation, materialization)
@@ -591,13 +649,14 @@ def _render_owned_annotations(*, user_id, book_id, entitlement_id, log):
     return body, etag
 
 
-def render_owned_annotations(*, user_id, book_id, entitlement_id, log):
-    """Return a complete 200 envelope and ETag, including after exceptions."""
+def render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit, log):
+    """Return a complete local page, or ``None`` when the set is too large."""
     try:
         return _render_owned_annotations(
             user_id=user_id,
             book_id=book_id,
             entitlement_id=entitlement_id,
+            page_limit=page_limit,
             log=log,
         )
     except Exception as error:
@@ -609,6 +668,7 @@ def render_owned_annotations(*, user_id, book_id, entitlement_id, log):
             user_id=user_id,
             book_id=book_id,
             entitlement_id=entitlement_id,
+            page_limit=page_limit,
             log=log,
             reason=_failure_reason("render", error),
         )

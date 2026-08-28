@@ -11,7 +11,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
-from flask import Flask
+from flask import Flask, make_response
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -44,7 +44,17 @@ def app(monkeypatch):
     application = Flask(__name__)
     monkeypatch.setattr(
         rs, "current_user",
-        SimpleNamespace(id=USER_ID, name="reader", is_authenticated=True),
+        SimpleNamespace(
+            id=USER_ID, name="reader", is_authenticated=True,
+            kobo_two_way_annotation_sync=True,
+        ),
+    )
+    monkeypatch.setattr(
+        rs.config, "config_kobo_two_way_annotation_sync", True, raising=False,
+    )
+    monkeypatch.setattr(
+        "cps.services.kobo_annotation_stage0.schema_capable",
+        lambda _engine: True,
     )
     monkeypatch.setattr(rs, "_begin_exchange_capture", lambda *_a, **_k: None)
     return application
@@ -75,13 +85,22 @@ def _annotation(annotation_id, annotation_type="highlight", **overrides):
     return ub.Annotation(**values)
 
 
-def _owned(monkeypatch):
+def _owned(monkeypatch, session):
     book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
     monkeypatch.setattr(
         rs, "proxy_to_kobo_reading_services",
         lambda **_kwargs: pytest.fail("owned annotations request contacted Kobo"),
     )
+    session.add(ub.KoboAnnotationBookState(
+        user_id=USER_ID,
+        book_id=BOOK_ID,
+        content_id=OWNED,
+        authority_status="authoritative",
+        authority_revision=1,
+        generation_id="00000000-0000-0000-0000-000000000001",
+        opaque_content_status="absent",
+    ))
     return book
 
 
@@ -148,7 +167,7 @@ def test_owned_patch_ack_has_measured_response_shape(app):
 def test_owned_get_is_full_200_raw_exact_if_none_match_ignored_and_etag_moves(
     app, session, monkeypatch,
 ):
-    _owned(monkeypatch)
+    _owned(monkeypatch, session)
     raw = (
         b'{ "type" : "highlight", "id" : "a-raw", '
         b'"clientLastModifiedUtc" : "2026-08-28T05:00:00Z", '
@@ -193,7 +212,7 @@ def test_owned_get_is_full_200_raw_exact_if_none_match_ignored_and_etag_moves(
     ]
     assert first_payload["nextPageOffsetToken"] is None
     assert re.fullmatch(
-        r'W/"CWNG:[0-9a-f-]{36}:1:[0-9a-f]{16}"', first.headers["ETag"],
+        r'W/"CWNG:[0-9a-f-]{36}:2:[0-9a-f]{16}"', first.headers["ETag"],
     )
     first_etag = first.headers["ETag"]
 
@@ -218,26 +237,139 @@ def test_owned_get_is_full_200_raw_exact_if_none_match_ignored_and_etag_moves(
     assert changed.status_code == 200
     assert changed.headers["ETag"] != first_etag
     assert re.fullmatch(
-        r'W/"CWNG:[0-9a-f-]{36}:2:[0-9a-f]{16}"', changed.headers["ETag"],
+        r'W/"CWNG:[0-9a-f-]{36}:3:[0-9a-f]{16}"', changed.headers["ETag"],
     )
 
 
-def test_owned_get_returns_more_than_device_limit_as_one_honest_page(
+def test_owned_get_over_limit_proxies_instead_of_violating_page_contract(
     app, session, monkeypatch,
 ):
-    _owned(monkeypatch)
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    session.add(ub.KoboAnnotationBookState(
+        user_id=USER_ID,
+        book_id=BOOK_ID,
+        content_id=OWNED,
+        authority_status="authoritative",
+        authority_revision=1,
+        generation_id="00000000-0000-0000-0000-000000000001",
+        opaque_content_status="absent",
+    ))
     session.add_all([_annotation(f"row-{index:03d}") for index in range(101)])
     session.commit()
+
+    upstream_body = b'{"upstream":"paginated"}'
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: make_response(
+            upstream_body, 206, {"X-Upstream-Pagination": "preserved"},
+        ),
+    )
 
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
     ):
         response = rs.handle_annotations.__wrapped__(OWNED)
 
-    payload = response.get_json()
+    assert response.status_code == 206
+    assert response.get_data() == upstream_body
+    assert response.headers["X-Upstream-Pagination"] == "preserved"
+
+
+def test_renderer_rechecks_limit_after_eligibility_probe(app, session, monkeypatch):
+    """A concurrent 101st row cannot slip between eligibility and rendering."""
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    monkeypatch.setattr(authority, "local_get_is_eligible", lambda **_kwargs: True)
+    session.add_all([_annotation(f"race-row-{index:03d}") for index in range(101)])
+    session.commit()
+
+    upstream_body = b'{"upstream":"race-safe"}'
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: make_response(upstream_body, 207),
+    )
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
+    ):
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
+    assert response.status_code == 207
+    assert response.get_data() == upstream_body
+
+
+def test_owned_unseeded_get_proxies_without_serving_partial_local_set(
+    app, session, monkeypatch,
+):
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    session.add_all([
+        ub.KoboAnnotationBookState(
+            user_id=USER_ID,
+            book_id=BOOK_ID,
+            content_id=OWNED,
+            authority_status="unseeded",
+            authority_revision=0,
+            generation_id="00000000-0000-0000-0000-000000000001",
+            opaque_content_status="unknown",
+        ),
+        _annotation("local-partial", highlighted_text="not a complete set"),
+    ])
+    session.commit()
+
+    upstream_body = b'{"annotations":[{"id":"cloud-complete"}]}'
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: make_response(
+            upstream_body, 200, {"ETag": 'W/"kobo-cloud"'},
+        ),
+    )
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
+    ):
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
     assert response.status_code == 200
-    assert len(payload["annotations"]) == 101
-    assert payload["nextPageOffsetToken"] is None
+    assert response.get_data() == upstream_body
+    assert response.headers["ETag"] == 'W/"kobo-cloud"'
+
+
+def test_owned_unseeded_get_forwards_upstream_failure_unchanged(
+    app, session, monkeypatch,
+):
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    session.add(ub.KoboAnnotationBookState(
+        user_id=USER_ID,
+        book_id=BOOK_ID,
+        content_id=OWNED,
+        authority_status="unseeded",
+        authority_revision=0,
+        generation_id="00000000-0000-0000-0000-000000000001",
+        opaque_content_status="unknown",
+    ))
+    session.commit()
+
+    upstream_body = b'{"error":"upstream unavailable"}'
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: make_response(
+            upstream_body, 503,
+            {"Retry-After": "17", "X-Upstream-Failure": "preserved"},
+        ),
+    )
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
+    ):
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
+    assert response.status_code == 503
+    assert response.get_data() == upstream_body
+    assert response.headers["Retry-After"] == "17"
+    assert response.headers["X-Upstream-Failure"] == "preserved"
 
 
 def test_book_state_insert_uses_contained_savepoint_on_active_session(
@@ -272,7 +404,13 @@ def test_book_state_insert_uses_contained_savepoint_on_active_session(
 def test_owned_get_survives_normalized_book_state_insert_integrity_error(
     app, session, monkeypatch,
 ):
-    _owned(monkeypatch)
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: pytest.fail("renderer containment must not contact Kobo"),
+    )
+    monkeypatch.setattr(authority, "local_get_is_eligible", lambda **_kwargs: True)
     session.add_all([
         _annotation("state-race-a", highlighted_text="private state text A"),
         _annotation("state-race-b", highlighted_text="private state text B"),
@@ -340,7 +478,7 @@ def test_owned_get_survives_normalized_book_state_insert_integrity_error(
 def test_owned_get_row_render_exception_keeps_every_identity_and_text(
     app, session, monkeypatch,
 ):
-    _owned(monkeypatch)
+    _owned(monkeypatch, session)
     session.add_all([
         _annotation("render-a", highlighted_text="private render text A"),
         _annotation("render-b", highlighted_text="private render text B"),

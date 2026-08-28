@@ -395,6 +395,15 @@ def _validate_uploaded_file(uploaded_file):
     return True
 
 # Helper to get a unique, prefixed path in the ingest directory
+def _get_ingest_owner_id(variable):
+    value = os.environ.get(variable, "1000")
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        log.warning("Invalid %s value %r; falling back to 1000", variable, value)
+        return 1000
+
+
 def _get_ingest_path(uploaded_file, prefix_parts=None):
     ingest_dir = get_ingest_dir()
     try:
@@ -407,8 +416,8 @@ def _get_ingest_path(uploaded_file, prefix_parts=None):
         nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
         if not (nsm and ingest_dir == "/cwa-book-ingest"):
             # Set ownership to abc:abc (uid=1000, gid=1000)
-            uid = int(os.environ.get("PUID", "1000"))
-            gid = int(os.environ.get("PGID", "1000"))
+            uid = _get_ingest_owner_id("PUID")
+            gid = _get_ingest_owner_id("PGID")
             os.chown(ingest_dir, uid, gid)
     except (OSError, PermissionError) as e:
         # Log warning but don't crash the upload process

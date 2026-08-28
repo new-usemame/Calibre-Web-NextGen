@@ -133,6 +133,18 @@ _MAGIC_SHELF_COUNTS_LOGGED = {}
 _ORPHANED_SYSTEM_SHELF_WARNED = set()
 
 
+def _ensure_user_profiles_json():
+    """Create the classic profile-picture map without making startup depend on it."""
+    json_path = constants.USER_PROFILES_JSON
+    if os.path.exists(json_path):
+        return
+    try:
+        with open(json_path, 'w+') as f:
+            f.write('{\n}')
+    except OSError as e:
+        log.warning("Could not create user profiles file %s: %s", json_path, e)
+
+
 def _log_magic_shelf_counts(user_id, total_shelves, visible_shelves,
                             hidden_templates=(), hidden_shelves=()):
     snapshot = (total_shelves, visible_shelves,
@@ -191,9 +203,7 @@ def create_app():
     lm.anonymous_user = ub.Anonymous
     lm.session_protection = 'strong' if config.config_session == 1 else "basic"
 
-    if not os.path.exists(constants.USER_PROFILES_JSON):
-        with open(constants.USER_PROFILES_JSON, 'w+') as f:
-            f.write('{\n}')
+    _ensure_user_profiles_json()
 
     from .calibre_init import init_calibre_db_from_config
     init_calibre_db_from_config(config, cli_param.settings_path)

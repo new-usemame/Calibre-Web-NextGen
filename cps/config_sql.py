@@ -120,6 +120,7 @@ class _Settings(_Base):
     config_hardcover_annotations_sync = Column(Boolean, default=False)
 
     config_default_role = Column(SmallInteger, default=0)
+    config_new_users_have_own_library = Column(Boolean, default=False)
     config_default_show = Column(SmallInteger, default=constants.ADMIN_USER_SIDEBAR)
     config_default_language = Column(String(3), default="all")
     config_default_locale = Column(String(2), default="en")
@@ -384,6 +385,9 @@ class ConfigSQL(object):
 
     def role_viewer(self):
         return self._has_role(constants.ROLE_VIEWER)
+
+    def role_browse_global(self):
+        return self._has_role(constants.ROLE_BROWSE_GLOBAL)
 
     def role_upload(self):
         return self._has_role(constants.ROLE_UPLOAD)

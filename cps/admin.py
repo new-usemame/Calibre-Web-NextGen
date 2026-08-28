@@ -917,6 +917,13 @@ def edit_list_user(param):
                         kobo_shelf_sync_users.append(user.id)
                 elif param == 'opds_only_shelves_sync':
                     user.opds_only_shelves_sync = int(vals['value'] == 'true')
+                elif param == 'has_own_library':
+                    from . import user_library
+                    user_library.set_enabled(
+                        user,
+                        vals['value'] == 'true',
+                        added_by=int(current_user.id),
+                    )
                 elif param == 'kindle_mail':
                     user.kindle_mail = valid_email(vals['value']) if vals['value'] else ""
                 elif param == 'kindle_mail_subject':
@@ -927,7 +934,7 @@ def edit_list_user(param):
                       [constants.ROLE_ADMIN, constants.ROLE_PASSWD, constants.ROLE_EDIT_SHELFS]:
                         raise Exception(_("Guest can't have this role"))
                     # check for valid value, last on checks for power of 2 value
-                    if value > 0 and value <= constants.ROLE_VIEWER and (value & value - 1 == 0 or value == 1):
+                    if value > 0 and value <= constants.ROLE_BROWSE_GLOBAL and (value & value - 1 == 0 or value == 1):
                         if vals['value'] == 'true':
                             user.role |= value
                         elif vals['value'] == 'false':
@@ -1066,6 +1073,7 @@ def update_view_configuration():
     _config_string(to_save, "config_default_language")
     _config_string(to_save, "config_default_locale")
     _config_string(to_save, "config_opds_default_locale")
+    _config_checkbox_int(to_save, "config_new_users_have_own_library")
 
     # Fork #463 (@Andrew-H2O): site-wide appearance settings live on the UI
     # Configuration page, not buried under Logfile Configuration on the Basic
@@ -3126,6 +3134,8 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
         ub.session.add(content)
         ub.session.commit()
+        from . import user_library
+        user_library.configure_new_user(content)
         flash(_("User '%(user)s' created", user=content.name), category="success")
         log.debug("User {} created".format(content.name))
         return redirect(url_for('admin.admin'))
@@ -3181,6 +3191,18 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         log.warning("No admin user remaining, can't remove admin role from {}".format(content.name))
         flash(_("No admin user remaining, can't remove admin role"), category="error")
         return redirect(url_for('admin.admin'))
+
+    from . import user_library
+    desired_own_library = to_save.get("has_own_library") == "on"
+    if desired_own_library and not bool(content.has_own_library):
+        try:
+            user_library.seed_user_library(
+                content, added_by=int(current_user.id)
+            )
+        except Exception as ex:
+            ub.session.rollback()
+            flash(str(ex), category="error")
+            return "", 400
 
     val = [int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_')]
     sidebar, __ = get_sidebar_config()
@@ -3349,6 +3371,14 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             content.role &= ~constants.ROLE_ANONYMOUS
             if to_save.get("password", ""):
                 content.password = generate_password_hash(helper.valid_password(to_save.get("password", "")))
+        content.has_own_library = desired_own_library
+        if (desired_own_library
+                and user_library.membership_count(content.id) == 0
+                and not content.role_browse_global()):
+            raise user_library.UserLibraryError(
+                "My Library cannot be enabled with an empty set unless this "
+                "user can browse the global library."
+            )
 
         new_email = valid_email(to_save.get("email", content.email))
         if not new_email:

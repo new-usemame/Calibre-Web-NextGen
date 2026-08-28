@@ -371,6 +371,15 @@
 
       {% if not content.role_anonymous() and not simple %}
       <div style="margin-top: 25px;">
+        <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('My Library')}}</label>
+        <div style="background: #202c34a3; padding: 2rem;">
+          <input type="checkbox" name="has_own_library" id="has_own_library" {% if content.has_own_library %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="has_own_library">{{_('Use a personal My Library membership set')}}</label>
+          <p class="help-block">{{_('Enabling this first seeds every book the user can currently see. Removing a book later also removes it from this user’s shelves and from their Kobo on the next sync; reading data is preserved.')}}</p>
+        </div>
+      </div>
+
+      <div style="margin-top: 25px;">
         <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('OPDS Shelf Exposure')}}</label>
         <div style="margin-top: 20px;
                     background: #202c34a3;
@@ -458,6 +467,11 @@
         <div>
           <input type="checkbox" name="viewer_role" id="viewer_role" {% if content.role_viewer() %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="viewer_role">{{_('Allow eBook Viewer')}}</label>
+        </div>
+
+        <div>
+          <input type="checkbox" name="browse_global_role" id="browse_global_role" {% if content.role_browse_global() %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="browse_global_role">{{_('Allow browsing the global library')}}</label>
         </div>
         
         {% if config.config_uploading %}

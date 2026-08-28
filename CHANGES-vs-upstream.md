@@ -59,6 +59,12 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ## Original fork patches (no upstream PR existed)
 
+### Features
+
+| Fork PR | Upstream | Description | SHA | Release |
+|---|---|---|---|---|
+| TBD | (fork issue [#1939](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1939)) | **Accounts can curate independent “My Library” sets over one global Calibre archive.** The opt-in, seed-before-enable model scopes web, OPDS, shelves, search, counts, covers, downloads, and Kobo library sync while preserving the shared book/file plus all per-user reading data. A global-browse role gates discovery and membership changes; existing accounts remain unchanged. The app.db migration and explicit rollback are idempotent, seeding commits bounded chunks, and large memberships use one JSON table-valued bind rather than a 20,000-literal `IN` clause. Fork-original. | `TBD` | `TBD` |
+
 ### Bug fixes
 
 - **Local-only accounts can now use the classic login form in an LDAP

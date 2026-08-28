@@ -45,6 +45,7 @@ ROLE_BITS = {
     "edit_shelfs": constants.ROLE_EDIT_SHELFS,
     "delete_books": constants.ROLE_DELETE_BOOKS,
     "viewer": constants.ROLE_VIEWER,
+    "browse_global": constants.ROLE_BROWSE_GLOBAL,
 }
 
 
@@ -70,6 +71,7 @@ def _serialize_user(u):
         "default_language": u.default_language,
         "is_guest": u.name == "Guest",
         "roles": {key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
+        "has_own_library": bool(getattr(u, "has_own_library", False)),
     }
 
 
@@ -133,6 +135,9 @@ def _ui_config_payload():
         "config_default_language": config.config_default_language,
         "config_default_locale": config.config_default_locale,
         "config_server_announcement": config.config_server_announcement or "",
+        "config_new_users_have_own_library": bool(
+            getattr(config, "config_new_users_have_own_library", False)
+        ),
         # Shared with the account form so the two settings pages can never
         # disagree about these options again (#886).
         "locales": locale_options(),
@@ -234,6 +239,10 @@ def admin_update_config():
     for key in _UI_CONFIG_STR:
         if key in data:
             setattr(config, key, str(data[key] or ""))
+    if "config_new_users_have_own_library" in data:
+        config.config_new_users_have_own_library = bool(
+            data["config_new_users_have_own_library"]
+        )
     try:
         config.save()
     except Exception as ex:
@@ -296,6 +305,8 @@ def admin_create_user():
     try:
         ub.session.add(new_user)
         ub.session.commit()
+        from .. import user_library
+        user_library.configure_new_user(new_user)
     except IntegrityError:
         ub.session.rollback()
         return _err("conflict", "An account already exists for this email or name", 409)
@@ -318,6 +329,19 @@ def admin_update_user(user_id):
 
     data = request.get_json(silent=True) or {}
 
+    desired_own_library = bool(data.get(
+        "has_own_library", getattr(user, "has_own_library", False)
+    ))
+    if desired_own_library and not bool(getattr(user, "has_own_library", False)):
+        try:
+            from .. import user_library
+            user_library.seed_user_library(
+                user, added_by=int(current_user.id)
+            )
+        except Exception as ex:
+            ub.session.rollback()
+            return _err("library_seed_failed", str(ex), 400)
+
     if "roles" in data and isinstance(data["roles"], dict):
         new_role = user.role
         for key, bit in ROLE_BITS.items():
@@ -331,6 +355,19 @@ def admin_update_user(user_id):
         if losing_admin and _other_admin_count(user.id) == 0:
             return _err("conflict", "Can't remove admin from the last administrator", 400)
         user.role = new_role
+
+    if "has_own_library" in data:
+        user.has_own_library = desired_own_library
+        from .. import user_library
+        if (desired_own_library
+                and user_library.membership_count(user.id) == 0
+                and not user.role_browse_global()):
+            ub.session.rollback()
+            return _err(
+                "empty_library_without_global_access",
+                "My Library cannot be enabled with an empty set unless this user can browse the global library.",
+                400,
+            )
 
     try:
         if "email" in data:

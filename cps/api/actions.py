@@ -11,7 +11,7 @@ state or send mail.
 from flask import jsonify, request
 
 from . import api_v1
-from .. import ub, config, calibre_db
+from .. import ub, config, calibre_db, user_library
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..helper import send_mail, valid_email
@@ -52,6 +52,59 @@ def toggle_book_favorite(book_id):
         favorited = True
     ub.session_commit("Book {} favorite bit toggled".format(book_id))
     return jsonify({"favorited": favorited})
+
+
+@api_v1.route("/books/<int:book_id>/my-library", methods=["PUT"])
+@login_required_if_no_ano
+def add_book_to_my_library(book_id):
+    """Idempotently add a global book to the current user's membership set."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    try:
+        user_library.add_book(
+            current_user, book_id, added_by=int(current_user.id)
+        )
+    except user_library.UserLibraryError as ex:
+        return _err("library_membership_rejected", str(ex), 403)
+    return jsonify({"in_my_library": True})
+
+
+@api_v1.route("/books/<int:book_id>/my-library", methods=["GET"])
+@login_required_if_no_ano
+def my_library_removal_impact(book_id):
+    """Describe shelf and Kobo effects before the SPA asks for confirmation."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    try:
+        impact = user_library.removal_impact(current_user, book_id)
+    except user_library.UserLibraryError as ex:
+        return _err("library_membership_rejected", str(ex), 409)
+    return jsonify(impact)
+
+
+@api_v1.route("/books/<int:book_id>/my-library", methods=["DELETE"])
+@login_required_if_no_ano
+def remove_book_from_my_library(book_id):
+    """Remove membership plus the user's ordinary shelf links.
+
+    The response is the confirm/result contract for the SPA lane: it names
+    affected shelves and makes the next-sync Kobo removal explicit.
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    try:
+        shelves = user_library.remove_book(current_user, book_id)
+    except user_library.UserLibraryError as ex:
+        return _err("library_membership_rejected", str(ex), 409)
+    return jsonify({
+        "in_my_library": False,
+        "affected_shelves": shelves,
+        "kobo_removal_on_next_sync": True,
+        "reading_data_preserved": True,
+    })
 
 
 @api_v1.route("/books/<int:book_id>/archived", methods=["POST"])

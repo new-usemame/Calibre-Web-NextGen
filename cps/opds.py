@@ -453,7 +453,10 @@ def authorize_opds_entity(entity, user=None, entity_type=None):
 
 
 def get_opds_restricted_common_filter(user=None):
-    return calibre_db.common_filters(extra_filter=get_opds_book_filter(user))
+    return calibre_db.common_filters(
+        user=user,
+        extra_filter=get_opds_book_filter(user),
+    )
 
 
 def fill_opds_indexpage(*args, **kwargs):
@@ -1049,7 +1052,9 @@ def opds_download_link(book_id, book_format):
 @opds.route("/ajax/book/<string:uuid>", defaults={'library': ""})
 @requires_basic_auth_if_no_ano
 def get_metadata_calibre_companion(uuid, library):
-    entry = calibre_db.session.query(db.Books).filter(db.Books.uuid.like("%" + uuid + "%")).first()
+    entry = (calibre_db.session.query(db.Books)
+             .filter(db.Books.uuid.like("%" + uuid + "%"))
+             .filter(get_opds_restricted_common_filter()).first())
     if entry is not None and is_opds_book_exposed(entry.id):
         js = render_template('json.txt', entry=entry)
         response = make_response(js)

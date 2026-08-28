@@ -77,7 +77,8 @@ def _book_titles(book_ids):
         return {}
     try:
         rows = (calibre_db.session.query(db.Books.id, db.Books.title)
-                .filter(db.Books.id.in_(book_ids)).all())
+                .filter(db.Books.id.in_(book_ids))
+                .filter(calibre_db.common_filters(allow_show_archived=True)).all())
         return {row.id: row.title for row in rows}
     except (SQLAlchemyError, AttributeError, KeyError, TypeError):
         log.warning("Book titles unavailable for Kobo two-way state list",

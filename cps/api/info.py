@@ -37,9 +37,19 @@ def about_info():
     as the single source of truth for whether to render the section.
     """
     is_admin = current_user.role_admin()
+    membership_enabled = getattr(current_user, "has_own_library", False)
+    membership_enabled = (
+        isinstance(membership_enabled, (bool, int))
+        and bool(membership_enabled)
+    )
+    books_query = calibre_db.session.query(db.Books)
+    visible_book_count = (
+        books_query.filter(calibre_db.common_filters()).count()
+        if membership_enabled else books_query.count()
+    )
     resp = jsonify({
         "counts": {
-            "books": calibre_db.session.query(db.Books).count(),
+            "books": visible_book_count,
             "authors": calibre_db.session.query(db.Authors).count(),
             "categories": calibre_db.session.query(db.Tags).count(),
             "series": calibre_db.session.query(db.Series).count(),

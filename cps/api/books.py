@@ -378,6 +378,63 @@ def list_books():
     })
 
 
+@api_v1.route("/library/global")
+@login_required_if_no_ano
+def list_global_library():
+    """List the visible global archive for users allowed to curate a set."""
+    if (not current_user.is_authenticated or current_user.is_anonymous
+            or not current_user.role_browse_global()):
+        return jsonify({
+            "error": {"code": "forbidden", "message": "Global library access required"}
+        }), 403
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = max(1, min(200, request.args.get(
+        "per_page", config.config_books_per_page, type=int
+    )))
+    sort = request.args.get("sort", "new")
+    order = SORT_MAP.get(sort, SORT_MAP["new"])
+    term = (request.args.get("search") or "").strip()
+    global_filter = True
+    if term:
+        like = "%" + term + "%"
+        global_filter = or_(
+            func.lower(db.Books.title).ilike(func.lower(like)),
+            db.Books.authors.any(func.lower(db.Authors.name).ilike(func.lower(like))),
+            db.Books.series.any(func.lower(db.Series.name).ilike(func.lower(like))),
+        )
+    series_join = (
+        db.books_series_link,
+        db.Books.id == db.books_series_link.c.book,
+        db.Series,
+    )
+    entries, _random, pagination = calibre_db.fill_indexpage(
+        page, per_page, db.Books, global_filter, order,
+        True, config.config_read_column, *series_join,
+        allow_show_global=True,
+    )
+    member_ids = set()
+    if bool(getattr(current_user, "has_own_library", False)):
+        page_ids = [int(getattr(entry, "Books", entry).id) for entry in entries]
+        member_ids = {int(row[0]) for row in (
+            ub.session.query(ub.UserLibraryBook.book_id)
+            .filter(ub.UserLibraryBook.user_id == int(current_user.id),
+                    ub.UserLibraryBook.book_id.in_(page_ids)).all()
+        )}
+    items = _rows_to_items(entries)
+    for item in items:
+        item["in_my_library"] = (
+            not bool(getattr(current_user, "has_own_library", False))
+            or item["id"] in member_ids
+        )
+    return jsonify({
+        "items": items,
+        "page": pagination.page,
+        "per_page": pagination.per_page,
+        "total": pagination.total_count,
+        "my_library_enabled": bool(getattr(current_user, "has_own_library", False)),
+    })
+
+
 @api_v1.route("/books/<int:book_id>")
 @login_required_if_no_ano
 def book_detail(book_id):

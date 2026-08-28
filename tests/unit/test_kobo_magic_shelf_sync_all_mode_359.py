@@ -31,12 +31,9 @@ The v4.0.151 fix:
    uses this filter instead of the bare `composite_keyset_books_only`,
    so magic-shelf-only books with old `Books.last_modified` get through
    the inner cursor when `cache.created_at > cursor.lm`.
-3. **Deletion-detection block stays gated on
-   ``kobo_only_shelves_sync``.** That logic is specifically for the
-   outer-membership-filter case (only_kobo_shelves) where the device
-   should have ONLY books on Kobo Sync shelves. In sync-all mode the
-   user wants every book on the device, so the deletion-detection
-   doesn't apply.
+3. **Deletion detection stays gated.** Legacy sync-all users still want every
+   global book, while shelf-only users and accounts with My Library enabled
+   reconcile the device against their respective sets.
 """
 
 import ast
@@ -184,31 +181,14 @@ class TestSyncAllBranchHasMagicShelfArm:
 
 @pytest.mark.unit
 class TestDeletionDetectionStaysGated:
-    def test_deletion_detection_block_still_inside_kobo_only_shelves_sync(self):
-        """The 'two-way-sync deletion logic' (synced_books minus
-        allowed_books) is specifically for kobo_only_shelves_sync=True
-        mode. In sync-all mode the user wants every book on the device,
-        so the deletion block must remain gated."""
+    def test_deletion_detection_is_gated_by_shelves_or_my_library(self):
+        """Reconciliation runs for shelf-only sync and for an enabled
+        My Library, but remains absent from legacy sync-all accounts."""
         src = _function_source(KOBO_PY, "HandleSyncRequest")
-        # The deletion block creates `synced_book_ids` and
-        # `books_to_delete_ids`. Both must live inside the
-        # `if current_user.kobo_only_shelves_sync` if-block.
-        tree = ast.parse(src)
-        deletion_inside_gate = False
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.If)
-                    and isinstance(node.test, ast.Attribute)
-                    and isinstance(node.test.value, ast.Name)
-                    and node.test.value.id == "current_user"
-                    and node.test.attr == "kobo_only_shelves_sync"):
-                body_src = "\n".join(ast.unparse(b) for b in node.body)
-                if "books_to_delete_ids" in body_src and "synced_book_ids" in body_src:
-                    deletion_inside_gate = True
-                    break
-        assert deletion_inside_gate, (
-            "The deletion-detection block (synced_book_ids / "
-            "books_to_delete_ids) must remain inside the "
-            "`if current_user.kobo_only_shelves_sync` block. In "
-            "sync-all mode the user wants every book on the device — "
-            "the outer-membership-deletion logic doesn't apply."
-        )
+        assert "membership_enabled = bool(getattr(current_user, 'has_own_library', False))" in src
+        assert "if current_user.kobo_only_shelves_sync or membership_enabled:" in src
+        gate = src.split(
+            "if current_user.kobo_only_shelves_sync or membership_enabled:", 1
+        )[1].split("only_kobo_shelves =", 1)[0]
+        assert "synced_book_ids" in gate and "books_to_delete_ids" in gate
+        assert "allowed_book_ids &= library_book_ids" in gate

@@ -22,7 +22,7 @@ import requests
 import unidecode
 from uuid import uuid4
 
-from flask import send_from_directory, make_response, abort, url_for, Response, after_this_request
+from flask import send_from_directory, make_response, abort, url_for, Response, after_this_request, has_request_context
 from flask_babel import gettext as _
 from flask_babel import lazy_gettext as N_
 from flask_babel import get_locale
@@ -498,9 +498,21 @@ def check_read_formats(entry):
 # 1: If epub file is existing, it's directly send to eReader email,
 # 2: If mobi file is existing, it's converted and send to eReader email,
 # 3: If Pdf file is existing, it's directly send to eReader email
-def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id, subject=None):
+def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
+              subject=None, user=None):
     """Send email with attachments"""
-    book = calibre_db.get_book(book_id)
+    # A direct send action is an access path, so it must use the same policy
+    # funnel as web/OPDS listings. Conversion helpers remain deliberately
+    # global because bulk-edit and rename workflows also call them.
+    filter_user = user if user is not None else (
+        current_user if has_request_context() else None
+    )
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True,
+        user=filter_user,
+    )
+    if not book:
+        return _("Book not found")
 
     if convert == 1:
         # returns None if success, otherwise errormessage
@@ -1580,7 +1592,9 @@ def get_book_cover(book_id, resolution=None):
 
 
 def get_book_cover_with_uuid(book_uuid, resolution=None):
-    book = calibre_db.get_book_by_uuid(book_uuid)
+    # Kobo cover delivery is part of the scoped sync set. Device-trailing
+    # ownership/state endpoints use enforce_policy=False elsewhere.
+    book = calibre_db.get_book_by_uuid_for_kobo(book_uuid, enforce_policy=True)
     if not book:
         return  # allows kobo.HandleCoverImageRequest to proxy request
     return get_book_cover_internal(book, resolution=resolution)
@@ -1756,7 +1770,9 @@ def get_kobo_cover_source_path(book_uuid, resolution):
     directly without going through the Response wrapper that
     get_book_cover_internal returns.
     """
-    book = calibre_db.get_book_by_uuid(book_uuid)
+    # This is the zero-copy version of get_book_cover_with_uuid and therefore
+    # has the same sync-set policy boundary.
+    book = calibre_db.get_book_by_uuid_for_kobo(book_uuid, enforce_policy=True)
     if not book or not book.has_cover:
         return None
     if config.config_use_google_drive:
@@ -1831,6 +1847,8 @@ def get_series_thumbnail_on_failure(series_id, resolution):
         .join(db.Series)
         .filter(db.Series.id == series_id)
         .filter(db.Books.has_cover == 1)
+        .filter(calibre_db.common_filters(allow_show_archived=True,
+                                          allow_show_hidden=True))
         .first())
     return get_book_cover_internal(book, resolution=resolution)
 

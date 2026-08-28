@@ -358,6 +358,46 @@ def toggle_favorite(book_id):
     return json.dumps({"favorited": favorited})
 
 
+@web.route("/ajax/mylibrary/<int:book_id>/add", methods=['POST'])
+@user_login_required
+def add_to_my_library(book_id):
+    from . import user_library
+    try:
+        user_library.add_book(
+            current_user, book_id, added_by=int(current_user.id)
+        )
+    except user_library.UserLibraryError as ex:
+        return json.dumps({"error": str(ex)}), 403
+    return json.dumps({"in_my_library": True})
+
+
+@web.route("/ajax/mylibrary/<int:book_id>/remove", methods=['POST'])
+@user_login_required
+def remove_from_my_library(book_id):
+    from . import user_library
+    try:
+        shelves = user_library.remove_book(current_user, book_id)
+    except user_library.UserLibraryError as ex:
+        return json.dumps({"error": str(ex)}), 409
+    return json.dumps({
+        "in_my_library": False,
+        "affected_shelves": shelves,
+        "kobo_removal_on_next_sync": True,
+        "reading_data_preserved": True,
+    })
+
+
+@web.route("/ajax/mylibrary/<int:book_id>/removal-impact", methods=['GET'])
+@user_login_required
+def my_library_removal_impact(book_id):
+    """Describe removal effects before the classic UI confirms the action."""
+    from . import user_library
+    try:
+        return json.dumps(user_library.removal_impact(current_user, book_id))
+    except user_library.UserLibraryError as ex:
+        return json.dumps({"error": str(ex)}), 409
+
+
 # --- Web-reader per-user display settings -----------------------------------
 # The epub reader's theme / font / font-size / column-spread / reflow / text
 # margin used to live only in the one browser's localStorage, so they never
@@ -1529,6 +1569,29 @@ def index(page):
         return redirect(spa.spa_shell_url())
 
     return render_books_list("newest", sort_param, 1, page)
+
+
+@web.route('/global-library', defaults={'sort_param': 'stored', 'page': 1})
+@web.route('/global-library/<sort_param>', defaults={'page': 1})
+@web.route('/global-library/<sort_param>/<int:page>')
+@user_login_required
+def global_library(sort_param, page):
+    if current_user.is_anonymous or not current_user.role_browse_global():
+        abort(403)
+    order = get_sort_function(sort_param, "global_library")
+    entries, random, pagination = calibre_db.fill_indexpage(
+        page, 0, db.Books, True, order[0],
+        True, config.config_read_column,
+        db.books_series_link,
+        db.Books.id == db.books_series_link.c.book,
+        db.Series,
+        allow_show_global=True,
+    )
+    return render_title_template(
+        'index.html', random=random, entries=entries, pagination=pagination,
+        title=_("Global Library (%(count)s)", count=pagination.total_count),
+        page="global_library", order=order[1], global_library=True,
+    )
 
 
 @web.route('/<data>/<sort_param>', defaults={'page': 1, 'book_id': 1})
@@ -2720,6 +2783,8 @@ def register_post():
         try:
             ub.session.add(content)
             ub.session.commit()
+            from . import user_library
+            user_library.configure_new_user(content)
             if feature_support['oauth']:
                 register_user_with_oauth(content)
             send_registration_mail(strip_whitespaces(to_save.get("email", "")), nickname, password)

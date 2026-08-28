@@ -90,6 +90,9 @@ def serialize_user(user):
             "delete_books": user.role_delete_books(),
             "edit_shelfs": user.role_edit_shelfs(),
             "viewer": user.role_viewer(),
+            "browse_global": bool(
+                getattr(user, "role_browse_global", lambda: False)()
+            ),
             "passwd": user.role_passwd(),
             "anonymous": user.role_anonymous(),
         },
@@ -102,6 +105,7 @@ def serialize_user(user):
         # flag — otherwise every shelf view would have to fetch the whole
         # account payload (app passwords, locale + language lists) for one bool.
         "kobo_only_shelves_sync": bool(getattr(user, "kobo_only_shelves_sync", False)),
+        "has_own_library": bool(getattr(user, "has_own_library", False)),
     }
 
 

@@ -200,6 +200,7 @@ ROLE_ANONYMOUS          = 1 << 5
 ROLE_EDIT_SHELFS        = 1 << 6
 ROLE_DELETE_BOOKS       = 1 << 7
 ROLE_VIEWER             = 1 << 8
+ROLE_BROWSE_GLOBAL      = 1 << 9
 
 ALL_ROLES = {
                 "admin_role": ROLE_ADMIN,
@@ -210,6 +211,7 @@ ALL_ROLES = {
                 "edit_shelf_role": ROLE_EDIT_SHELFS,
                 "delete_role": ROLE_DELETE_BOOKS,
                 "viewer_role": ROLE_VIEWER,
+                "browse_global_role": ROLE_BROWSE_GLOBAL,
             }
 
 DETAIL_RANDOM           = 1 <<  0

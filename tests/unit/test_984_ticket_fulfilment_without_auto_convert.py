@@ -197,6 +197,11 @@ def test_real_book_is_still_imported_as_is_when_auto_convert_is_off(
 def test_failed_ticket_fulfilment_keeps_plugin_reason_and_preserves_original(
     monkeypatch, tmp_path, capsys
 ):
+    source_path = tmp_path / "Library Ticket.acsm"
+    import_manifest = Path(str(source_path) + ".cwa.json")
+    import_manifest.write_text('{"action": "import"}')
+    failed_manifest = Path(str(source_path) + ".cwa.failed.json")
+    failed_manifest.write_text("preserve this")
     plugin_output = (
         "ValueError: No plugin to handle input format: acsm\n"
         "DeACSM v0.0.16: Trying to parse file Library Ticket.acsm\n"
@@ -220,6 +225,8 @@ def test_failed_ticket_fulfilment_keeps_plugin_reason_and_preserves_original(
     assert fake.convert_book_calls == [None]
     assert fake.imported == []
     assert fake.backed_up == [(source, "failed")]
+    assert not import_manifest.exists()
+    assert failed_manifest.read_text() == "preserve this"
     assert "ADE auth is missing or broken" in output
     assert "An ACSM-capable Calibre plugin is installed and did run" in output
     assert "place the ACSM Input plugin zip" not in output

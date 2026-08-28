@@ -1494,7 +1494,8 @@ class NewBookProcessor:
                                                    converter_output=getattr(e, 'output', None))
             if guidance:
                 print(f"\n[ingest-processor]: {guidance}\n", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
         except subprocess.TimeoutExpired:
@@ -1507,14 +1508,16 @@ class NewBookProcessor:
                   f"the wait for the file to finish copying in, so a slow copy leaves less time to convert.\n"
                   f"A large or image-heavy book can legitimately need longer — raise 'Ingest Timeout' in CWA Settings "
                   f"to allow more time.", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
         except OSError as e:
             # ebook-convert missing or not executable. Still a conversion
             # failure, so it must not fall through as an unhandled exception.
             print(f"\n[ingest-processor]: CON_ERROR: could not run the converter for {self.filename}: {e}", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
 

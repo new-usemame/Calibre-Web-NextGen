@@ -409,6 +409,8 @@ After Shelfmark starts, open it and pick **Settings → Security → Authenticat
 
 ### Network shares (NFS, SMB, ZFS)
 
+See [`examples/.env.example`](examples/.env.example) for the complete environment-variable reference and defaults.
+
 If `/config` or `/calibre-library` lives on a network share, set:
 
 ```yaml

@@ -6,6 +6,7 @@ services:
     image: ghcr.io/new-usemame/calibre-web-nextgen:latest
     container_name: calibre-web-nextgen
     environment:
+      # See examples/.env.example for the complete environment-variable reference and defaults.
       # Only change these if you know what you're doing
       - PUID=1000
       - PGID=1000

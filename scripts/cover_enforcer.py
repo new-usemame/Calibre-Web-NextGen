@@ -300,9 +300,7 @@ class Book:
 
     def get_calibre_library(self) -> str:
         """Gets Calibre-Library location from dirs.json"""
-        with open(dirs_json, 'r') as f:
-            dirs = json.load(f)
-        return dirs['calibre_library_dir'] # Returns without / on the end
+        return app_paths.calibre_library_dir(dirs_json) # Returns without / on the end
 
 
     def get_time(self) -> str:
@@ -471,9 +469,7 @@ class Enforcer:
 
 
     def get_calibre_library(self) -> str:
-        with open(dirs_json, 'r') as f:
-            dirs = json.load(f)
-        return dirs['calibre_library_dir'] # Returns without / on the end
+        return app_paths.calibre_library_dir(dirs_json) # Returns without / on the end
 
 
     def _restat_format_size_after_modification(self, book_id: str, file_format: str, file_path: str) -> None:

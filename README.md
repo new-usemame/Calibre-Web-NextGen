@@ -41,6 +41,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - [What's included](#whats-included)
 - [Quick start](#quick-start)
 - [Full Docker Compose setup](#full-docker-compose-setup)
+- [Runtime path overrides for packagers](#runtime-path-overrides-for-packagers)
 - [First run](#first-run)
 - [Migrating](#migrating)
   - [From upstream CWA](#from-upstream-cwa)
@@ -175,6 +176,12 @@ services:
       # limit. Free; sign up at https://comicvine.gamespot.com/api/
       # - COMICVINE_API_KEY=...
 
+      # Optional: override paths inside the container. The matching
+      # volume targets below must use the same paths.
+      # - CWA_INGEST_FOLDER=/cwa-book-ingest
+      # - CWA_CALIBRE_LIBRARY_DIR=/calibre-library
+      # - CWA_TMP_CONVERSION_DIR=/config/.cwa_conversion_tmp
+
     volumes:
       # Settings, user database, logs. Empty folder for new installs;
       # for existing CWA users, point at your existing /config.
@@ -212,6 +219,50 @@ services:
 | `/cwa-book-ingest` | Drop zone for new books | Files here are **deleted** after processing. Don't park books here long-term. |
 
 > Don't nest the binds. All three should be separate top-level folders. Putting `ingest` inside `library` produces recursive ingest behavior.
+
+---
+
+## Runtime path overrides for packagers
+
+Bare-metal and distro packages can configure all three runtime paths from the
+process environment instead of editing `dirs.json` inside the installation:
+
+| Environment variable | `dirs.json` fallback | Compiled-in default |
+|---|---|---|
+| `CWA_INGEST_FOLDER` | `ingest_folder` | `/cwa-book-ingest` |
+| `CWA_CALIBRE_LIBRARY_DIR` | `calibre_library_dir` | `/calibre-library` |
+| `CWA_TMP_CONVERSION_DIR` | `tmp_conversion_dir` | `/config/.cwa_conversion_tmp` |
+
+Each non-blank environment value wins for its key. If it is unset or blank,
+CWNG reads that key from the file selected by `CWA_DIRS_JSON`; a missing or
+malformed file, a non-object document, or a null/blank value falls back to the
+compiled-in default. Existing hand-edited `dirs.json` files therefore remain
+supported.
+
+Runtime path values are trimmed and lexically normalized, and must be absolute,
+non-root paths without a `..` component. Repeated separators, `.` components,
+and trailing separators are collapsed without resolving symlinks. A non-blank
+environment or `dirs.json` value that violates that contract stops the affected
+startup service instead of letting an unsafe path reach file watchers or
+recursive ownership operations.
+
+For example, a systemd unit can load a packager-owned file:
+
+```ini
+[Service]
+EnvironmentFile=/etc/calibre-web-nextgen/paths.env
+```
+
+```bash
+CWA_INGEST_FOLDER=/srv/calibre-web-nextgen/ingest
+CWA_CALIBRE_LIBRARY_DIR=/srv/calibre/library
+CWA_TMP_CONVERSION_DIR=/var/cache/calibre-web-nextgen/conversion
+```
+
+When `CWA_CALIBRE_LIBRARY_DIR` is set, it is authoritative. Automatic library
+discovery will leave `dirs.json` unchanged; if discovery finds a different
+library, startup stops and reports both paths so the environment file can be
+corrected.
 
 ---
 
@@ -680,34 +731,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `████████████████████` 100% | 2844/2844 | 0 |
-| Spanish (`es`) | `███████████████████░` 93% | 2638/2844 | 0 |
-| Polish (`pl`) | `██████████████████░░` 92% | 2602/2844 | 0 |
-| French (`fr`) | `████████████████░░░░` 82% | 2344/2844 | 127 |
-| German (`de`) | `███████████████░░░░░` 76% | 2172/2844 | 12 |
-| Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1888/2844 | 292 |
-| Hungarian (`hu`) | `████████████░░░░░░░░` 58% | 1644/2844 | 121 |
-| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 50% | 1407/2844 | 310 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████░░░░░░░░░░` 49% | 1382/2844 | 182 |
-| Japanese (`ja`) | `█████████░░░░░░░░░░░` 46% | 1318/2844 | 247 |
-| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 43% | 1212/2844 | 318 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████░░░░░░░░░░░░` 41% | 1174/2844 | 348 |
-| Italian (`it`) | `███████░░░░░░░░░░░░░` 34% | 955/2844 | 269 |
-| Korean (`ko`) | `███████░░░░░░░░░░░░░` 33% | 946/2844 | 269 |
-| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 28% | 788/2844 | 286 |
-| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 26% | 747/2844 | 313 |
-| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 25% | 699/2844 | 360 |
-| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 24% | 676/2844 | 362 |
-| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 24% | 675/2844 | 361 |
-| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 20% | 582/2844 | 388 |
-| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 504/2844 | 399 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 475/2844 | 408 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2844 | 372 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 15% | 431/2844 | 435 |
-| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2844 | 357 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 354/2844 | 388 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 10% | 289/2844 | 385 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 207/2844 | 343 |
+| Russian (`ru`) | `████████████████████` 100% | 2844/2847 | 0 |
+| Spanish (`es`) | `███████████████████░` 93% | 2638/2847 | 0 |
+| Polish (`pl`) | `██████████████████░░` 91% | 2602/2847 | 0 |
+| French (`fr`) | `████████████████░░░░` 82% | 2344/2847 | 127 |
+| German (`de`) | `███████████████░░░░░` 76% | 2172/2847 | 12 |
+| Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1888/2847 | 292 |
+| Hungarian (`hu`) | `████████████░░░░░░░░` 58% | 1644/2847 | 121 |
+| Portuguese (Brazil) (`pt_BR`) | `██████████░░░░░░░░░░` 49% | 1407/2847 | 310 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████░░░░░░░░░░` 48% | 1382/2847 | 182 |
+| Japanese (`ja`) | `█████████░░░░░░░░░░░` 46% | 1318/2847 | 247 |
+| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 43% | 1212/2847 | 318 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████░░░░░░░░░░░░` 41% | 1174/2847 | 348 |
+| Italian (`it`) | `███████░░░░░░░░░░░░░` 34% | 955/2847 | 269 |
+| Korean (`ko`) | `███████░░░░░░░░░░░░░` 33% | 946/2847 | 269 |
+| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 28% | 788/2847 | 286 |
+| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 26% | 747/2847 | 313 |
+| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 25% | 699/2847 | 360 |
+| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 24% | 675/2847 | 361 |
+| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 24% | 676/2847 | 362 |
+| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 20% | 582/2847 | 388 |
+| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 18% | 504/2847 | 399 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 17% | 475/2847 | 408 |
+| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 16% | 442/2847 | 372 |
+| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 15% | 431/2847 | 435 |
+| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 15% | 421/2847 | 357 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 354/2847 | 388 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 10% | 289/2847 | 385 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 207/2847 | 343 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

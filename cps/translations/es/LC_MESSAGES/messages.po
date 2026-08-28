@@ -940,6 +940,14 @@ msgid "Restore failed: app.db not found at %(path)s"
 msgstr "Restauración fallida: app.db no encontrado en %(path)s"
 
 #: cps/admin.py
+msgid "An ingest run is in progress; try again when it finishes."
+msgstr ""
+
+#: cps/admin.py
+msgid "Cover enforcement is in progress; try again when it finishes."
+msgstr ""
+
+#: cps/admin.py
 #, python-format
 msgid "Restore failed: %(err)s"
 msgstr "Error al restaurar: %(err)s"
@@ -7146,6 +7154,11 @@ msgstr ""
 #, python-format
 msgid "Could not login: %(message)s"
 msgstr "No se pudo iniciar sesión: %(message)s"
+
+#: cps/web.py
+#, python-format
+msgid "Local Login as: '%(nickname)s', LDAP authentication rejected"
+msgstr ""
 
 #: cps/web.py
 msgid "Wrong Username or Password"

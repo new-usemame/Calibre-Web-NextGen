@@ -41,6 +41,7 @@ pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SET_OWNERSHIP = REPO_ROOT / "scripts" / "set_ownership.sh"
+ROOT_EQUIVALENT_PATHS = ("/", "/./", "//", "///./")
 
 CHOWN_STUB = """#!/bin/sh
 # Records every invocation, one line per call, then succeeds.
@@ -116,7 +117,7 @@ class Harness:
         env.pop("NETWORK_SHARE_MODE", None)
         env.update({k: str(v) for k, v in env_overrides.items()})
         return subprocess.run(
-            ["bash", str(SET_OWNERSHIP)],
+            ["/bin/bash", str(SET_OWNERSHIP)],
             env=env,
             capture_output=True,
             text=True,
@@ -330,6 +331,66 @@ def test_non_absolute_dirs_json_values_are_ignored(harness: Harness):
     assert "not-a-path" not in harness.chowned_paths()
 
 
+@pytest.mark.parametrize(
+    "invalid",
+    ("..", "relative/path", "/safe/../escape", *ROOT_EQUIVALENT_PATHS),
+)
+def test_invalid_runtime_path_fails_before_any_recursive_chown(
+    harness: Harness, invalid: str
+):
+    result = harness.run(CWA_INGEST_FOLDER=invalid)
+
+    assert result.returncode != 0
+    assert harness.chowned_paths() == []
+    assert "ERROR" in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("root_equivalent", ROOT_EQUIVALENT_PATHS)
+def test_root_equivalent_from_replacement_resolver_fails_before_chown(
+    harness: Harness, root_equivalent: str
+):
+    app_paths = harness.tmp / "root-app-paths.py"
+    app_paths.write_text(
+        f'print({root_equivalent!r})\n'
+        'print("/safe-library")\n'
+        'print("/safe-tmp")\n'
+    )
+
+    result = harness.run(CWA_APP_PATHS=app_paths)
+
+    assert result.returncode != 0
+    assert harness.chowned_paths() == []
+    assert "ERROR" in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("root_equivalent", ROOT_EQUIVALENT_PATHS)
+def test_root_equivalent_config_floor_fails_before_chown(
+    harness: Harness, root_equivalent: str
+):
+    result = harness.run(CWA_CONFIG_ROOT=root_equivalent)
+
+    assert result.returncode != 0
+    assert harness.chowned_paths() == []
+    assert "ERROR" in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("resolver_mode", ("missing", "empty"))
+def test_unusable_path_resolver_fails_before_any_recursive_chown(
+    harness: Harness, resolver_mode: str
+):
+    if resolver_mode == "missing":
+        app_paths = harness.tmp / "missing-app-paths.py"
+    else:
+        app_paths = harness.tmp / "empty-app-paths.py"
+        app_paths.write_text("")
+
+    result = harness.run(CWA_APP_PATHS=app_paths)
+
+    assert result.returncode != 0
+    assert harness.chowned_paths() == []
+    assert "ERROR" in result.stdout + result.stderr
+
+
 def test_log_line_names_the_directories(harness: Harness):
     result = harness.run()
     assert "Preparing to set ownership of everything in" in result.stdout
@@ -363,6 +424,27 @@ def test_falsey_network_share_mode_walks_everything(harness: Harness):
     walked = harness.chowned_paths()
     assert str(harness.library) in walked
     assert str(harness.config_root) in walked
+
+
+def test_network_share_mode_skips_per_key_environment_paths(harness: Harness):
+    """#1611 custom bind targets receive the same no-chown protection."""
+    custom_library = harness.tmp / "custom-library"
+    custom_ingest = harness.tmp / "custom-ingest"
+    custom_tmp = harness.tmp / "custom-conversion"
+    for path in (custom_library, custom_ingest, custom_tmp):
+        path.mkdir()
+
+    harness.run(
+        NETWORK_SHARE_MODE="true",
+        CWA_CALIBRE_LIBRARY_DIR=custom_library,
+        CWA_INGEST_FOLDER=custom_ingest,
+        CWA_TMP_CONVERSION_DIR=custom_tmp,
+    )
+
+    walked = harness.chowned_paths()
+    assert str(custom_library) not in walked
+    assert str(custom_ingest) not in walked
+    assert str(custom_tmp) not in walked
 
 
 # --------------------------------------------------------------------------

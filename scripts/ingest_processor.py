@@ -182,7 +182,20 @@ class ProcessLock:
         try:
             # Keep one stable inode: truncating or unlinking a contended lock file
             # would let another opener acquire a different inode.
-            self.lock_file = open(self.lock_path, 'a+')
+            lock_existed = os.path.exists(self.lock_path)
+            lock_writable = True
+            try:
+                lock_fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o666)
+            except PermissionError:
+                lock_fd = os.open(self.lock_path, os.O_RDONLY)
+                lock_writable = False
+            else:
+                if not lock_existed:
+                    try:
+                        os.fchmod(lock_fd, 0o666)
+                    except OSError:
+                        pass
+            self.lock_file = os.fdopen(lock_fd, 'r+' if lock_writable else 'r')
 
             # Try to acquire an exclusive lock with timeout
             start_time = time.time()
@@ -190,11 +203,13 @@ class ProcessLock:
                 try:
                     fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-                    # Successfully acquired lock, replace the diagnostic PID.
-                    self.lock_file.seek(0)
-                    self.lock_file.truncate()
-                    self.lock_file.write(str(os.getpid()))
-                    self.lock_file.flush()
+                    # Successfully acquired lock. Replace the diagnostic PID
+                    # only when this user can write the persistent inode.
+                    if lock_writable:
+                        self.lock_file.seek(0)
+                        self.lock_file.truncate()
+                        self.lock_file.write(str(os.getpid()))
+                        self.lock_file.flush()
 
                     self.acquired = True
                     print(f"[ingest-processor] Lock acquired successfully (PID: {os.getpid()})")
@@ -1332,13 +1347,9 @@ class NewBookProcessor:
 
 
     def get_dirs(self, dirs_json_path: str) -> tuple[str, str, str]:
-        dirs = {}
-        with open(dirs_json_path, 'r') as f:
-            dirs: dict[str, str] = json.load(f)
-
-        ingest_folder = f"{dirs['ingest_folder']}/"
-        library_dir = f"{dirs['calibre_library_dir']}/"
-        tmp_conversion_dir = f"{dirs['tmp_conversion_dir']}/"
+        ingest_folder = f"{app_paths.ingest_folder(dirs_json_path)}/"
+        library_dir = f"{app_paths.calibre_library_dir(dirs_json_path)}/"
+        tmp_conversion_dir = f"{app_paths.tmp_conversion_dir(dirs_json_path)}/"
 
         return ingest_folder, library_dir, tmp_conversion_dir
 
@@ -1479,7 +1490,8 @@ class NewBookProcessor:
                                                    converter_output=getattr(e, 'output', None))
             if guidance:
                 print(f"\n[ingest-processor]: {guidance}\n", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
         except subprocess.TimeoutExpired:
@@ -1492,14 +1504,16 @@ class NewBookProcessor:
                   f"the wait for the file to finish copying in, so a slow copy leaves less time to convert.\n"
                   f"A large or image-heavy book can legitimately need longer — raise 'Ingest Timeout' in CWA Settings "
                   f"to allow more time.", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
         except OSError as e:
             # ebook-convert missing or not executable. Still a conversion
             # failure, so it must not fall through as an unhandled exception.
             print(f"\n[ingest-processor]: CON_ERROR: could not run the converter for {self.filename}: {e}", flush=True)
-            self.backup(self.filepath, backup_type="failed")
+            if self.backup(self.filepath, backup_type="failed") and not is_a_book_format(self.input_format):
+                _remove_completed_import_manifest(self.filepath)
             return False, ""
 
 
@@ -2400,7 +2414,8 @@ def main(filepath=None):
             print(f"\n[ingest-processor]: No conversion needed for {nbp.filename}, is audiobook, importing now...", flush=True)
             nbp.add_book_to_library(filepath, False, Path(nbp.filename).suffix)
         else:
-            if nbp.auto_convert_on and nbp.can_convert: # File can be converted to target format and Auto-Converter is on
+            fulfilment_ticket = not is_a_book_format(nbp.input_format)
+            if nbp.can_convert and (nbp.auto_convert_on or fulfilment_ticket): # File can be converted, or must be fulfilled because the original is not a book
 
                 # Tracks whether a conversion was actually run. The ignore-list
                 # branch below reports convert_successful=False having already
@@ -2408,14 +2423,18 @@ def main(filepath=None):
                 # it as a failed conversion and import a second copy.
                 conversion_attempted = False
 
-                if nbp.input_format in nbp.convert_ignored_formats: # File could be converted & the converter is activated but the user has specified files of this format should not be converted
-                    if is_a_book_format(nbp.input_format):
-                        print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
-                        nbp.add_book_to_library(filepath)
-                    else:
-                        _fail_not_a_book_input(nbp, filepath)
+                if fulfilment_ticket and not nbp.auto_convert_on:
+                    print(f"\n[ingest-processor]: {nbp.filename} is an {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though CWA Auto-Convert is deactivated...", flush=True)
+                elif fulfilment_ticket and nbp.input_format in nbp.convert_ignored_formats:
+                    print(f"\n[ingest-processor]: {nbp.filename} is an {nbp.input_format.upper()} fulfilment ticket, not a book; running its fulfilment plugin even though this format is on the Auto-Convert ignore list...", flush=True)
+
+                if nbp.input_format in nbp.convert_ignored_formats and not fulfilment_ticket: # User has specified that this book format should not be converted
+                    print(f"\n[ingest-processor]: {nbp.filename} not in target format but user has told CWA not to convert this format so importing the file anyway...", flush=True)
+                    nbp.add_book_to_library(filepath)
                     convert_successful = False
                 elif nbp.target_format == "kepub": # File is not in the convert ignore list and target is kepub, so we start the kepub conversion process
+                    # A ticket takes this route too: convert_to_kepub() first fulfils
+                    # non-EPUB input to an EPUB, then gives that book to kepubify.
                     conversion_attempted = True
                     convert_successful, converted_filepath = nbp.convert_to_kepub()
                 else: # File is not in the convert ignore list and target is not kepub, so we start the regular conversion process

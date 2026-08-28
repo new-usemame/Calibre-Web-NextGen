@@ -168,13 +168,9 @@ class LibraryConverter:
 
 
     def get_dirs(self, dirs_json_path: str) -> tuple[str, str, str]:
-        dirs = {}
-        with open(dirs_json_path, 'r') as f:
-            dirs: dict[str, str] = json.load(f)
-
-        ingest_folder = f"{dirs['ingest_folder']}/"
-        library_dir = f"{dirs['calibre_library_dir']}/"
-        tmp_conversion_dir = f"{dirs['tmp_conversion_dir']}/"
+        ingest_folder = f"{app_paths.ingest_folder(dirs_json_path)}/"
+        library_dir = f"{app_paths.calibre_library_dir(dirs_json_path)}/"
+        tmp_conversion_dir = f"{app_paths.tmp_conversion_dir(dirs_json_path)}/"
 
         return ingest_folder, library_dir, tmp_conversion_dir
 

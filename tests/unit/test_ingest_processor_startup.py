@@ -166,6 +166,31 @@ def test_process_lock_reclaims_dead_pid_file(monkeypatch, tmp_path):
         lock.release()
 
 
+def test_process_lock_read_only_file_remains_lockable(monkeypatch, tmp_path):
+    process_lock_class = _process_lock_class(monkeypatch, tmp_path)
+    lock_path = tmp_path / "read-only.lock"
+    original_contents = "previous-holder"
+    lock_path.write_text(original_contents)
+    lock_path.chmod(0o444)
+    holder = process_lock_class("read-only")
+    contender = process_lock_class("read-only")
+
+    try:
+        assert holder.acquire(timeout=0.1)
+        assert lock_path.exists()
+        assert lock_path.read_text() == original_contents
+
+        assert contender.acquire(timeout=0.1) is False
+        assert lock_path.exists()
+        assert lock_path.read_text() == original_contents
+    finally:
+        contender.release()
+        holder.release()
+
+    assert lock_path.exists()
+    assert lock_path.read_text() == original_contents
+
+
 def test_optional_cps_modules_retry_after_partial_load(monkeypatch, tmp_path):
     scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
     monkeypatch.syspath_prepend(str(scripts_dir))

@@ -61,6 +61,23 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Local-only accounts can now use the classic login form in an LDAP
+  deployment when the directory explicitly rejects their credentials** (fork
+  [#1903](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1903),
+  reported by @justemu) — the classic handler previously tried the stored local
+  password only when LDAP was unreachable, so mixed LDAP/local deployments
+  worked backwards: a local-only user could sign in during an outage but not
+  while the directory was healthy. An explicit LDAP rejection now falls back
+  only for an existing non-Guest user with a non-empty stored password hash;
+  LDAP-imported users retain their empty password and cannot pass locally.
+  Genuine failures retain the existing limiter and failed-login activity log.
+  The unconditional trailing error flash is also removed, so rejected
+  credentials produce one error and successful LDAP authentication or an LDAP
+  outage no longer gains a contradictory "Wrong Username or Password" message.
+  Six focused route tests cover valid, empty, wrong, and Guest local-password
+  cases, preserve the server-unreachable fallback, and cover successful LDAP
+  authentication with auto-creation disabled. | SHA `TBD` | release `TBD`.
+
 - **The book-detail page no longer presents infrequent whole-book deletion as
   a full-width danger banner** (fork #1862; reported via the in-app feedback
   form) — deletion stays role-gated, keyboard-visible, clearly labelled, and

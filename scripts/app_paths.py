@@ -25,20 +25,27 @@ What                 Environment override                  Default
 app root             ``CWA_APP_ROOT``                       parent of this file's dir
 config dir           ``CALIBRE_DBPATH``                     same as ``cps`` (app root)
 ``dirs.json``        ``CWA_DIRS_JSON``                      ``<app root>/dirs.json``
+ingest folder        ``CWA_INGEST_FOLDER``                  ``/cwa-book-ingest``
+library directory    ``CWA_CALIBRE_LIBRARY_DIR``            ``/calibre-library``
+conversion temp      ``CWA_TMP_CONVERSION_DIR``             ``/config/.cwa_conversion_tmp``
 ``app.db``           ``CWA_APP_DB_PATH``, ``CALIBRE_DBPATH`` ``<config dir>/app.db``
 ===================  ====================================  =========================
 
+The three runtime directories use their matching key in ``dirs.json`` between
+the environment override and the compiled-in default.
+
 Every default here has to match what ``cps`` resolves to, because the two
 halves of the install read and write the same files. Where they disagree, the
-disagreement is invisible in Docker — the image sets the environment variables
-explicitly — and silent everywhere else: scripts seed a database the app never
-opens. Both known cases were fixed together in the #1462 follow-up.
+disagreement is easy to miss in Docker — the image supplies its layout through
+environment values and the shipped ``dirs.json`` — and silent everywhere else:
+scripts seed a database the app never opens. Both known cases were fixed
+together in the #1462 follow-up.
 
 Deliberately dependency-free and free of any ``cps`` import: ``auto_library.py``
 runs before the Flask stack is usable, and ``cover_enforcer.py`` has to survive
 an environment where importing ``cps`` fails outright.
 
-**These four variables are trusted configuration, not user input.** They are read
+**These launch variables are trusted configuration, not user input.** They are read
 from the launch environment — the Dockerfile, the s6 service definitions, or a
 packager's systemd unit — and they were already trusted that way before this
 module existed. Centralising them does widen what one of them reaches:
@@ -49,14 +56,23 @@ launch environment already had (it picks the interpreter and the code), but do
 not plumb any of these through from a request, a config page, or anything a
 library user can influence.
 
+The three runtime directories are nevertheless validated before use because
+container startup passes them to recursive ownership operations. They must be
+absolute, single-line paths without a ``..`` component; an invalid non-blank
+configuration fails loudly instead of being interpreted relative to a service's
+working directory.
+
 The ``/config`` default is kept exactly as scripts/ already had it. The
 container sets ``CALIBRE_DBPATH=/config`` as a Docker ``ENV`` (the #1162 fix),
 so that default never fires there — and de-hardcoding the *app* root must not
 quietly relocate anybody's *databases*.
 """
 
+import json
 import os
+import posixpath
 import sys
+import threading
 from pathlib import Path
 
 __all__ = [
@@ -64,12 +80,18 @@ __all__ = [
     "config_dir",
     "stray_legacy_config_dir",
     "dirs_json",
+    "ingest_folder",
+    "calibre_library_dir",
+    "tmp_conversion_dir",
     "app_db_path",
     "scripts_dir",
     "script_path",
     "ensure_app_root_on_sys_path",
     "DEFAULT_CONFIG_DIR",
+    "DEFAULT_INGEST_FOLDER",
     "DEFAULT_LIBRARY_DIR",
+    "DEFAULT_TMP_CONVERSION_DIR",
+    "RuntimePathError",
 ]
 
 #: Where the *container* keeps the writable state. The Dockerfile sets
@@ -79,8 +101,53 @@ __all__ = [
 #: puts config here" is worth being able to reference.
 DEFAULT_CONFIG_DIR = "/config"
 
+#: Container ingest mount, used when neither the environment nor dirs.json
+#: supplies a usable path.
+DEFAULT_INGEST_FOLDER = "/cwa-book-ingest"
+
 #: Legacy library root, used as a last resort by :mod:`library_paths`.
 DEFAULT_LIBRARY_DIR = "/calibre-library"
+
+#: Container conversion scratch directory, used as the final fallback.
+DEFAULT_TMP_CONVERSION_DIR = "/config/.cwa_conversion_tmp"
+
+_DIRS_JSON_LOGGED_KEYS = set()
+_DIRS_JSON_LOG_LOCK = threading.Lock()
+
+
+class RuntimePathError(ValueError):
+    """A configured runtime directory is unsafe or cannot name one path."""
+
+
+def _validated_runtime_dir(value, source):
+    """Return a lexical absolute directory or reject launch configuration.
+
+    These values eventually reach recursive ownership operations during
+    container startup. Resolving ``..`` relative to ``/config`` or accepting a
+    root-equivalent spelling can turn that operation into a walk of ``/``.
+    Normalise repeated separators, ``.`` components, and trailing separators
+    without resolving symlinks, then require one non-root absolute, single-line
+    path with no parent traversal component.
+    """
+    configured = value.strip()
+    path = Path(configured)
+    normalised = posixpath.normpath(
+        "/" + configured.lstrip("/") if path.is_absolute() else configured
+    )
+    if (
+        not configured
+        or "\x00" in configured
+        or "\n" in configured
+        or "\r" in configured
+        or not path.is_absolute()
+        or ".." in path.parts
+        or normalised == "/"
+    ):
+        raise RuntimePathError(
+            f"{source} must be a non-root absolute path without '..' components; "
+            f"got {value!r}"
+        )
+    return normalised
 
 
 def _env_path(name):
@@ -243,6 +310,97 @@ def dirs_json():
     return app_root() / "dirs.json"
 
 
+def _configured_dir(key, env_name, default, dirs_json_path=None):
+    """Resolve one runtime directory through environment, file, then default."""
+    override = os.environ.get(env_name)
+    if override is not None and override.strip():
+        return _validated_runtime_dir(override, env_name)
+
+    config_path = Path(dirs_json_path) if dirs_json_path else dirs_json()
+    try:
+        with config_path.open("r", encoding="utf-8") as config_file:
+            configured_dirs = json.load(config_file)
+    except (OSError, ValueError, TypeError):
+        configured_dirs = {}
+
+    configured = configured_dirs.get(key) if isinstance(configured_dirs, dict) else None
+    if isinstance(configured, str) and configured.strip():
+        configured = _validated_runtime_dir(
+            configured, f"{key} in {config_path}"
+        )
+        with _DIRS_JSON_LOG_LOCK:
+            if key not in _DIRS_JSON_LOGGED_KEYS:
+                _DIRS_JSON_LOGGED_KEYS.add(key)
+                print(
+                    f"[cwa-paths] Using dirs.json fallback {key}={configured} "
+                    f"from {config_path}",
+                    file=sys.stderr,
+                )
+        return configured
+    return _validated_runtime_dir(default, f"compiled-in default for {key}")
+
+
+def ingest_folder(dirs_json_path=None):
+    """Configured ingest directory, without adding a trailing separator."""
+    return _configured_dir(
+        "ingest_folder",
+        "CWA_INGEST_FOLDER",
+        DEFAULT_INGEST_FOLDER,
+        dirs_json_path,
+    )
+
+
+def calibre_library_dir(dirs_json_path=None):
+    """Configured Calibre library directory, without a trailing separator."""
+    return _configured_dir(
+        "calibre_library_dir",
+        "CWA_CALIBRE_LIBRARY_DIR",
+        DEFAULT_LIBRARY_DIR,
+        dirs_json_path,
+    )
+
+
+def tmp_conversion_dir(dirs_json_path=None):
+    """Configured conversion scratch directory, without a trailing separator."""
+    return _configured_dir(
+        "tmp_conversion_dir",
+        "CWA_TMP_CONVERSION_DIR",
+        DEFAULT_TMP_CONVERSION_DIR,
+        dirs_json_path,
+    )
+
+
+def _main(argv=None):
+    """Expose the same resolver to shell-based s6 consumers."""
+    args = sys.argv[1:] if argv is None else argv
+    commands = {
+        "ingest_folder": ingest_folder,
+        "calibre_library_dir": calibre_library_dir,
+        "tmp_conversion_dir": tmp_conversion_dir,
+    }
+    if len(args) != 1 or args[0] not in {*commands, "all"}:
+        print(
+            "usage: app_paths.py "
+            "{ingest_folder|calibre_library_dir|tmp_conversion_dir|all}",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        if args[0] == "all":
+            # Resolve every value before printing any of them. Shell callers
+            # consume this as a three-line transaction and must never receive
+            # a valid-looking prefix followed by a failure.
+            resolved = [resolver() for resolver in commands.values()]
+            for value in resolved:
+                print(value)
+        else:
+            print(commands[args[0]]())
+    except RuntimePathError as error:
+        print(f"[cwa-paths] ERROR: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def ensure_app_root_on_sys_path():
     """Put the app root on ``sys.path`` so ``import cps...`` works.
 
@@ -253,3 +411,7 @@ def ensure_app_root_on_sys_path():
     if root not in sys.path:
         sys.path.insert(0, root)
     return root
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

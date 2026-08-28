@@ -15,6 +15,10 @@ RELEASE_HEADING = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]", re.MULTILINE)
 ENTRY_LEAD = re.compile(r"^- \*\*", re.MULTILINE)
 FRAGMENT_PATH = re.compile(r"^changelog\.d/[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
 NON_SHIPPING_PATH_PREFIXES = (
+    # Translation refreshes ship, but a .po/.pot-only diff is not a release-note
+    # event an outside translator should have to author (operator ruling
+    # 2026-08-27; #1896 was forced to invent a fragment).
+    "cps/translations/",
     "docs/",
     "findings/",
     "frontend/e2e/",
@@ -23,7 +27,7 @@ NON_SHIPPING_PATH_PREFIXES = (
     "wiki-src/",
 )
 NON_SHIPPING_PATHS = frozenset(
-    {"changelog.d/README.md", "scripts/check_changelog_diff.py"}
+    {"changelog.d/README.md", "messages.pot", "scripts/check_changelog_diff.py"}
 )
 
 

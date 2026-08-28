@@ -847,6 +847,14 @@ msgid "Restore failed: app.db not found at %(path)s"
 msgstr "復原失敗：在 %(path)s 找不到 app.db 檔案"
 
 #: cps/admin.py
+msgid "An ingest run is in progress; try again when it finishes."
+msgstr ""
+
+#: cps/admin.py
+msgid "Cover enforcement is in progress; try again when it finishes."
+msgstr ""
+
+#: cps/admin.py
 #, python-format
 msgid "Restore failed: %(err)s"
 msgstr "復原失敗：%(err)s"
@@ -6883,6 +6891,11 @@ msgstr "備援登入“%(nickname)s”：無法訪問LDAP伺服器，或用戶�
 #, fuzzy, python-format
 msgid "Could not login: %(message)s"
 msgstr "無法登入：%(message)s"
+
+#: cps/web.py
+#, python-format
+msgid "Local Login as: '%(nickname)s', LDAP authentication rejected"
+msgstr ""
 
 #: cps/web.py
 #, fuzzy

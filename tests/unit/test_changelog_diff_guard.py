@@ -169,6 +169,20 @@ def test_mixing_frontend_e2e_with_shipping_frontend_still_requires_an_entry():
     assert "shipping paths" in errors[0]
 
 
+def test_translation_only_pr_does_not_require_a_changelog_entry():
+    assert changelog_requirement_errors(
+        ["cps/translations/ru/LC_MESSAGES/messages.po", "messages.pot"]
+    ) == []
+
+
+def test_mixing_a_translation_with_shipping_code_requires_an_entry():
+    errors = changelog_requirement_errors(
+        ["cps/translations/ru/LC_MESSAGES/messages.po", "cps/web.py"]
+    )
+    assert len(errors) == 1
+    assert "shipping paths" in errors[0]
+
+
 def test_mixing_a_findings_ledger_with_shipping_code_requires_an_entry():
     errors = changelog_requirement_errors(
         ["findings/kobo/F-66edbc.md", "cps/readingservices.py"]

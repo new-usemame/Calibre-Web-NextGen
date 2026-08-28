@@ -8,7 +8,7 @@ from flask import Blueprint, redirect, flash, url_for, request, send_from_direct
 from flask_babel import gettext as _, lazy_gettext as _l
 
 from . import logger, config, constants, csrf, helper, ub, calibre_db
-from .constants import DIRS_JSON, LOG_ARCHIVE
+from .constants import LOG_ARCHIVE
 from .metadata_constants import DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON
 from .usermanagement import login_required_if_no_ano, user_login_required
 from .admin import admin_required
@@ -214,9 +214,7 @@ def cwa_switch_theme():
 ##————————————————————————————————————————————————————————————————————————————##
 
 def get_ingest_dir():
-    with open(DIRS_JSON, 'r') as f:
-        dirs = json.load(f)
-        return dirs['ingest_folder']
+    return constants.ingest_folder()
 
 def get_ingest_status():
     """Read the current ingest service status"""
@@ -1958,12 +1956,7 @@ def convert_library_start(queue):
     queue.put(cl_process)
 
 def get_tmp_conversion_dir() -> str:
-    dirs = {}
-    with open(DIRS_JSON, 'r') as f:
-        dirs: dict[str, str] = json.load(f)
-    tmp_conversion_dir = f"{dirs['tmp_conversion_dir']}/"
-
-    return tmp_conversion_dir
+    return f"{constants.tmp_conversion_dir()}/"
 
 def empty_tmp_con_dir(tmp_conversion_dir) -> None:
     try:
@@ -2694,17 +2687,27 @@ def get_status():
 
 # ################################### Profile Pictures ###################################################
 
+def _load_user_profiles():
+    """Return the profile-picture map, treating missing or unusable data as empty."""
+    json_path = constants.USER_PROFILES_JSON
+    try:
+        with open(json_path, "r") as file:
+            data = json.load(file)
+    except (OSError, ValueError) as e:
+        log.warning("Could not read user profiles from %s; using an empty map: %s",
+                    json_path, e)
+        return {}
+    if not isinstance(data, dict):
+        log.warning("User profiles file %s does not contain an object; using an empty map",
+                    json_path)
+        return {}
+    return data
+
+
 @profile_pictures.route("/user_profiles.json")
 @user_login_required
 def user_profiles_json():
-    try:
-        json_path = constants.USER_PROFILES_JSON
-        with open(json_path, "r") as file:
-            data = json.load(file)
-        return jsonify(data)
-    except Exception as e:
-        log.error(f"Error reading user_profiles.json: {str(e)}")
-        return jsonify({}), 500
+    return jsonify(_load_user_profiles())
 
 @profile_pictures.route("/me/profile-picture", methods=["GET", "POST"])
 @user_login_required
@@ -2778,13 +2781,12 @@ def set_profile_picture():
             json_path = constants.USER_PROFILES_JSON
             log.debug(f"Opening JSON file at: {json_path}")
 
-            # Read the existing data from the JSON file and update it
-            with open(json_path, "r+") as file:
-                user_data = json.load(file)
-                user_data[username] = image_data  # Add new or update existing entry
-                file.seek(0)  # Move to the start of the file for writing
+            # Read the existing data from the JSON file and update it. A missing,
+            # empty, or malformed file is repaired from an empty profile map.
+            user_data = _load_user_profiles()
+            user_data[username] = image_data  # Add new or update existing entry
+            with open(json_path, "w") as file:
                 json.dump(user_data, file, indent=4)  # Write back the updated data
-                file.truncate()  # Ensure there is no leftover content
 
             # Success feedback and logging
             flash(_("Profile picture updated successfully."), category="success")

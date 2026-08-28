@@ -32,7 +32,6 @@ from werkzeug.datastructures import Headers
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import constants, logger, isoLanguages, services, helper, spa, oauth_auto_redirect
-from .constants import DIRS_JSON
 from . import db, ub, config, app
 from . import calibre_db, kobo_sync_status
 from .services.ereader_send import send_includes_own_address
@@ -576,11 +575,7 @@ def get_sort_function(sort_param, data):
 
 
 def cwa_get_library_location() -> str:
-    dirs = {}
-    with open(DIRS_JSON, 'r') as f:
-        dirs: dict[str, str] = json.load(f)
-    library_dir = dirs['calibre_library_dir']
-    return library_dir
+    return constants.calibre_library_dir()
 
 def cwa_get_num_books_in_library() -> int:
     try:
@@ -2965,6 +2960,16 @@ def login_post():
                 # LDAP unavailable and no local fallback
                 log.info(error)
                 flash(_(u"Could not login: %(message)s", message=error), category="error")
+            elif login_result is False and user and user.password \
+                    and check_password_hash(str(user.password), form['password']) \
+                    and user.name != "Guest":
+                # LDAP rejected the credentials, try the stored local password
+                log.info("Local Fallback Login as: '{}' (LDAP rejected)".format(user.name))
+                return handle_login_user(user,
+                                         remember_me,
+                                         _(u"Local Login as: '%(nickname)s', "
+                                           u"LDAP authentication rejected", nickname=user.name),
+                                         "warning")
             else:
                 # LDAP authentication failed
                 # Use request.remote_addr (already corrected by ProxyFix) instead of raw header
@@ -2988,7 +2993,6 @@ def login_post():
                     log.debug(f"Failed to log failed login attempt: {e}")
                 
                 flash(_(u"Wrong Username or Password"), category="error")
-            flash(_(u"Wrong Username or Password"), category="error")
     else:
         # Use request.remote_addr (already corrected by ProxyFix) instead of raw header
         ip_address = request.remote_addr

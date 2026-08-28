@@ -6,9 +6,14 @@
 # See CONTRIBUTORS for full list of authors.
 
 from importlib import metadata
+import json
+import logging
+import posixpath
 import sys
 import os
+import threading
 from collections import namedtuple
+from pathlib import Path
 
 from flask_babel import gettext as _
 
@@ -44,6 +49,95 @@ SCRIPTS_DIR         = os.path.join(BASE_DIR, 'scripts')
 _dirs_json_override = (os.environ.get('CWA_DIRS_JSON') or '').strip()
 DIRS_JSON           = (os.path.join(BASE_DIR, _dirs_json_override) if _dirs_json_override
                        else os.path.join(BASE_DIR, 'dirs.json'))
+
+DEFAULT_INGEST_FOLDER = '/cwa-book-ingest'
+DEFAULT_LIBRARY_DIR = '/calibre-library'
+DEFAULT_TMP_CONVERSION_DIR = '/config/.cwa_conversion_tmp'
+
+_DIRS_JSON_LOGGED_KEYS = set()
+_DIRS_JSON_LOG_LOCK = threading.Lock()
+_dirs_logger = logging.getLogger(__name__)
+_dirs_environ = os.environ
+
+
+class RuntimePathError(ValueError):
+    """A configured runtime directory is unsafe or cannot name one path."""
+
+
+def _validated_runtime_dir(value, source):
+    """Mirror scripts/app_paths.py's runtime-directory safety contract."""
+    configured = value.strip()
+    path = Path(configured)
+    normalised = posixpath.normpath(
+        '/' + configured.lstrip('/') if path.is_absolute() else configured
+    )
+    if (
+        not configured
+        or '\x00' in configured
+        or '\n' in configured
+        or '\r' in configured
+        or not path.is_absolute()
+        or '..' in path.parts
+        or normalised == '/'
+    ):
+        raise RuntimePathError(
+            f"{source} must be a non-root absolute path without '..' components; "
+            f"got {value!r}"
+        )
+    return normalised
+
+
+def _configured_dir(key, env_name, default):
+    """Resolve one runtime directory through environment, file, then default."""
+    override = _dirs_environ.get(env_name)
+    if override is not None and override.strip():
+        return _validated_runtime_dir(override, env_name)
+
+    try:
+        with open(DIRS_JSON, 'r', encoding='utf-8') as config_file:
+            configured_dirs = json.load(config_file)
+    except (OSError, ValueError, TypeError):
+        configured_dirs = {}
+
+    configured = configured_dirs.get(key) if isinstance(configured_dirs, dict) else None
+    if isinstance(configured, str) and configured.strip():
+        configured = _validated_runtime_dir(
+            configured, f"{key} in {DIRS_JSON}"
+        )
+        with _DIRS_JSON_LOG_LOCK:
+            if key not in _DIRS_JSON_LOGGED_KEYS:
+                _DIRS_JSON_LOGGED_KEYS.add(key)
+                _dirs_logger.info(
+                    "Using dirs.json fallback %s=%s from %s",
+                    key,
+                    configured,
+                    DIRS_JSON,
+                )
+        return configured
+    return _validated_runtime_dir(default, f"compiled-in default for {key}")
+
+
+def ingest_folder():
+    """Configured ingest directory, without adding a trailing separator."""
+    return _configured_dir(
+        'ingest_folder', 'CWA_INGEST_FOLDER', DEFAULT_INGEST_FOLDER
+    )
+
+
+def calibre_library_dir():
+    """Configured Calibre library directory, without a trailing separator."""
+    return _configured_dir(
+        'calibre_library_dir', 'CWA_CALIBRE_LIBRARY_DIR', DEFAULT_LIBRARY_DIR
+    )
+
+
+def tmp_conversion_dir():
+    """Configured conversion scratch directory, without a trailing separator."""
+    return _configured_dir(
+        'tmp_conversion_dir',
+        'CWA_TMP_CONVERSION_DIR',
+        DEFAULT_TMP_CONVERSION_DIR,
+    )
 
 # Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache
 DEFAULT_CACHE_DIR   = os.path.join(BASE_DIR, 'cps', 'cache')

@@ -1,4 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 import { assertNoHorizontalOverflow, collectPageErrors, assertNoPageErrors } from './utils';
 
 test.describe.configure({ mode: 'serial' });
@@ -151,40 +152,21 @@ test('hidden+archived remains recoverable through Show hidden, while Archived ke
   }
 });
 
-test('hiding is per-user and a non-delete user still receives Hide', async ({ page, playwright, baseURL }) => {
+test('hiding is per-user and a non-delete user still receives Hide', async ({ page, secondaryUser }) => {
   await page.goto('/app');
   const book = await firstBook(page);
   test.skip(!book, 'seed has no books');
   const headers = await csrfHeaders(page);
-  const username = `hidden-e2e-${Date.now()}`;
-  const password = 'CWNG-hidden-E2E-42!';
-  const created = await page.request.post('/api/v1/admin/users', {
-    headers,
-    data: {
-      name: username,
-      email: `${username}@example.test`,
-      password,
-      roles: { viewer: true, download: true, delete_books: false },
-    },
-  });
-  expect(created.ok(), await created.text()).toBeTruthy();
-  const other = await playwright.request.newContext({ baseURL });
 
   try {
     await page.goto(`/app/book/${book!.id}`);
     await page.getByTestId('hide-book-toggle').click();
 
-    const otherCsrf = await other.get('/api/v1/auth/csrf').then((r) => r.json());
-    const login = await other.post('/api/v1/auth/login', {
-      headers: { 'X-CSRFToken': otherCsrf.csrf_token },
-      data: { username, password },
-    });
-    expect(login.ok(), await login.text()).toBe(true);
-    const me = await other.get('/api/v1/auth/me').then((r) => r.json());
+    const me = await secondaryUser.page.request.get('/api/v1/auth/me').then((r) => r.json());
     expect(me.role.delete_books).toBe(false);
-    const otherBooks = await other.get('/api/v1/books?per_page=60').then((r) => r.json());
+    const otherBooks = await secondaryUser.page.request.get('/api/v1/books?per_page=60').then((r) => r.json());
     expect(otherBooks.items.some((item: { id: number }) => item.id === book!.id)).toBe(true);
-    const otherDetail = await other.get(`/api/v1/books/${book!.id}`).then((r) => r.json());
+    const otherDetail = await secondaryUser.page.request.get(`/api/v1/books/${book!.id}`).then((r) => r.json());
     expect(otherDetail.hidden).toBe(false);
 
     // UI role gate: Hide is personal and must not inherit the destructive
@@ -205,7 +187,6 @@ test('hiding is per-user and a non-delete user still receives Hide', async ({ pa
       headers, data: { hidden: false },
     });
     expect(cleanup.ok()).toBe(true);
-    await other.dispose();
   }
 });
 

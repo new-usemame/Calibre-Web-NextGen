@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Stage 0 contract for Kobo two-way annotation sync.
 
-Stage 0 is deliberately passive: it adds durable evidence and opt-ins, while
-the existing reading-services proxy remains the only response owner.
+Stage 0 is deliberately passive: it adds durable evidence and opt-ins.  The
+later owned-book wire-authority route consumes that evidence independently.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
-from flask import Flask, make_response
+from flask import Flask
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
@@ -31,6 +31,16 @@ OLD_ANNOTATION_COLUMNS = (
     "client_modified_at", "origin_device_id", "assigned_device_id",
     "routing_revision", "last_synced",
 )
+
+
+@pytest.fixture(autouse=True)
+def _stage0_route_tests_assume_completed_seed(monkeypatch):
+    """Stage-0 route tests predate and are orthogonal to the authority gate."""
+    import cps.readingservices as readingservices
+    monkeypatch.setattr(
+        readingservices, "_owned_patch_is_local_authority",
+        lambda *_args, **_kwargs: True,
+    )
 
 
 def _create_gate_tables(conn, *, user_gate=False, settings_gate=False):
@@ -527,13 +537,12 @@ def test_dispatch_persists_raw_sidecar_without_rewriting_parsed_location(monkeyp
 
 
 @pytest.mark.unit
-def test_patch_raw_capture_failure_logs_but_keeps_proxy_bytes_and_response(caplog, monkeypatch):
+def test_patch_raw_capture_failure_logs_but_keeps_local_ack_and_dispatch(caplog, monkeypatch):
     import cps.readingservices as rs
 
     app = Flask(__name__)
     forwarded = []
     dispatched = []
-    response_body = b' {"upstream":"unchanged"} '
 
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: SimpleNamespace(id=348))
     monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
@@ -544,7 +553,7 @@ def test_patch_raw_capture_failure_logs_but_keeps_proxy_bytes_and_response(caplo
     monkeypatch.setattr(
         rs, "proxy_to_kobo_reading_services",
         lambda **_kwargs: forwarded.append(rs.request.get_data()) or
-        make_response(response_body, 207, {"X-Upstream": "same"}),
+        pytest.fail("owned PATCH must not contact Kobo"),
     )
     rejected_capture_bodies = (
         b'{"updatedAnnotations":[{"id":"ann-1","location":null}]}',
@@ -565,10 +574,9 @@ def test_patch_raw_capture_failure_logs_but_keeps_proxy_bytes_and_response(caplo
             response = rs.handle_annotations.__wrapped__("book")
 
         assert dispatched
-        assert forwarded == [rejected_body]
-        assert response.status_code == 207
-        assert response.get_data() == response_body
-        assert response.headers["X-Upstream"] == "same"
+        assert forwarded == []
+        assert response.status_code == 204
+        assert response.get_data() == b""
         assert "raw lexical capture failed" in caplog.text.lower()
 
     forwarded.clear()
@@ -578,10 +586,9 @@ def test_patch_raw_capture_failure_logs_but_keeps_proxy_bytes_and_response(caplo
         data=RAW_PATCH, content_type="application/json",
     ):
         response = rs.handle_annotations.__wrapped__("book")
-    assert forwarded == [RAW_PATCH]
-    assert response.status_code == 207
-    assert response.get_data() == response_body
-    assert response.headers["X-Upstream"] == "same"
+    assert forwarded == []
+    assert response.status_code == 204
+    assert response.get_data() == b""
     raw_records = dispatched[0][1]["raw_materializations"]
     assert raw_records[0].raw_annotation_json in RAW_PATCH
     assert raw_records[0].raw_location_json == RAW_LOCATION

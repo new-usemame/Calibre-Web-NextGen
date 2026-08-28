@@ -120,14 +120,26 @@ def emergency_override_disables(environ=None) -> bool:
     return value is not None and value.strip().lower() in {"0", "false", "off", "no"}
 
 
-def gates_allow(settings, user, book_state, *, schema_ready) -> bool:
-    """Evaluate the future route gate; Stage 0 does not call this from routes."""
+def gate_failure_reason(settings, user, book_state, *, schema_ready):
+    """Return a privacy-safe reason code, or ``None`` when gates pass."""
     if emergency_override_disables():
-        return False
+        return "emergency_override"
     if not schema_ready:
-        return False
+        return "schema_incomplete"
     if not bool(getattr(settings, "config_kobo_two_way_annotation_sync", False)):
-        return False
+        return "instance_gate_disabled"
     if not bool(getattr(user, "kobo_two_way_annotation_sync", False)):
-        return False
-    return getattr(book_state, "authority_status", None) == "authoritative"
+        return "user_gate_disabled"
+    status = getattr(book_state, "authority_status", None)
+    if status != "authoritative":
+        if status in {"unseeded", "seeding", "quarantined", "disabled"}:
+            return f"authority_status_{status}"
+        return "authority_state_missing_or_invalid"
+    return None
+
+
+def gates_allow(settings, user, book_state, *, schema_ready) -> bool:
+    """Evaluate the local Kobo annotation wire-authority gate."""
+    return gate_failure_reason(
+        settings, user, book_state, schema_ready=schema_ready,
+    ) is None

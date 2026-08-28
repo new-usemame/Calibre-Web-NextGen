@@ -29,7 +29,10 @@ the default back to `ghcr` (locks contributors out again), or dropping
 `PBS_SOURCE=ghcr` from a CI build (silently returns that build to the flaky CDN).
 """
 
+import os
 import re
+import shlex
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -64,6 +67,18 @@ FORK_AWARE_PBS_SOURCE = (
     "&& 'upstream' || 'ghcr' }}"
 )
 
+# These events can be reached from, or delegated by, a pull-request context.
+# Only ordinary `pull_request` is proven by the classifier shell below; the
+# privileged/callable variants require a separate threat model and therefore
+# fail closed if an image-building workflow acquires one.
+PR_REACHABLE_TRIGGERS = {
+    "pull_request",
+    "pull_request_target",
+    "merge_group",
+    "workflow_call",
+    "workflow_run",
+}
+
 
 def _workflow_triggers(workflow: str) -> set[str]:
     """The event names a workflow is registered for.
@@ -79,25 +94,224 @@ def _workflow_triggers(workflow: str) -> set[str]:
     return set(on)
 
 
-def _image_build_steps() -> list[tuple[str, str, dict]]:
-    """Every `docker/build-push-action` step in every workflow.
+def _is_shell_image_build(step: dict) -> bool:
+    """Whether a shell step invokes a Docker image build."""
+    return bool(
+        re.search(
+            r"\bdocker\s+(?:buildx\s+build|build)\b",
+            str(step.get("run") or ""),
+        )
+    )
+
+
+def _local_composite_steps(step: dict, workflows: Path) -> tuple[Path, list[dict]] | None:
+    """Resolve a repository-local composite action used by ``step``."""
+    import yaml
+
+    uses = str(step.get("uses") or "")
+    if not uses.startswith("./"):
+        return None
+
+    repo_root = workflows.parent.parent
+    action_path = repo_root / uses[2:]
+    candidates = (
+        (action_path / "action.yml", action_path / "action.yaml")
+        if action_path.is_dir()
+        else (action_path,)
+    )
+    definition = next((path for path in candidates if path.is_file()), None)
+    if definition is None:
+        return None
+
+    data = yaml.safe_load(definition.read_text(encoding="utf-8")) or {}
+    runs = data.get("runs") or {}
+    if runs.get("using") != "composite":
+        return None
+    return definition.resolve(), [
+        child for child in runs.get("steps") or [] if isinstance(child, dict)
+    ]
+
+
+def _image_build_steps(workflows: Path = WORKFLOWS) -> list[tuple[str, str, dict]]:
+    """Every image-build step reachable from every workflow.
 
     Discovered, not listed: a hand-maintained allowlist is how the `tests.yml`
     image build was missed in the first place, which is exactly the regression
-    this module claims to prevent. Returns (workflow, job, step) triples.
+    this module claims to prevent. Both action-based builds and Docker shell
+    commands are included, including those hidden in repository-local composite
+    actions. Returns (workflow, job, leaf build step) triples.
     """
     import yaml
 
     found: list[tuple[str, str, dict]] = []
-    for path in sorted(WORKFLOWS.glob("*.yml")) + sorted(WORKFLOWS.glob("*.yaml")):
-        data = yaml.safe_load(path.read_text()) or {}
+
+    def visit_step(
+        workflow: str,
+        job_name: str,
+        step: dict,
+        action_stack: frozenset[Path] = frozenset(),
+    ) -> None:
+        uses = str(step.get("uses") or "")
+        if uses.startswith("docker/build-push-action") or _is_shell_image_build(step):
+            found.append((workflow, job_name, step))
+
+        composite = _local_composite_steps(step, workflows)
+        if composite is None:
+            return
+        definition, children = composite
+        if definition in action_stack:
+            return
+        next_stack = action_stack | {definition}
+        for child in children:
+            visit_step(workflow, job_name, child, next_stack)
+
+    for path in sorted(workflows.glob("*.yml")) + sorted(workflows.glob("*.yaml")):
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         for job_name, job in (data.get("jobs") or {}).items():
             for step in (job or {}).get("steps") or []:
                 if not isinstance(step, dict):
                     continue
-                if str(step.get("uses", "")).startswith("docker/build-push-action"):
-                    found.append((path.name, job_name, step))
+                visit_step(path.name, job_name, step)
     return found
+
+
+def _fork_unreachable_through_classifier(
+    workflow: str,
+    job_name: str,
+    tmp_path: Path,
+) -> str | None:
+    """Return why a bare-mirror build is not proven unreachable from forks.
+
+    The proof has two halves: the build job must depend *only* on a classifier
+    output being true, and that output must evaluate false for a fork even when
+    the classifier says the changed path requires a build. Executing the
+    workflow's own classifier shell prevents a comment or familiar-looking
+    substring from satisfying a guard whose behavior was weakened (Class 9b).
+    """
+    import yaml
+
+    data = yaml.safe_load((WORKFLOWS / workflow).read_text()) or {}
+    jobs = data.get("jobs") or {}
+    job = jobs.get(job_name) or {}
+    condition = str(job.get("if") or "").strip()
+    match = re.fullmatch(
+        r"needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)\s*==\s*'true'",
+        condition,
+    )
+    if not match:
+        return f"job `if` is not an exclusive classifier-output gate: {condition!r}"
+    classifier_name, output_name = match.groups()
+
+    needs = job.get("needs") or []
+    if isinstance(needs, str):
+        needs = [needs]
+    if classifier_name not in needs:
+        return f"job does not declare `needs: {classifier_name}`"
+
+    classifier = jobs.get(classifier_name) or {}
+    output_expr = str((classifier.get("outputs") or {}).get(output_name) or "").strip()
+    output_match = re.fullmatch(
+        r"\$\{\{\s*steps\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)\s*}}",
+        output_expr,
+    )
+    if not output_match:
+        return f"classifier output is not wired to a step output: {output_expr!r}"
+    step_id, step_output = output_match.groups()
+    if step_output != output_name:
+        return (
+            f"classifier job exposes {output_name!r} from a differently named "
+            f"step output {step_output!r}"
+        )
+
+    classifier_step = next(
+        (
+            step
+            for step in classifier.get("steps") or []
+            if isinstance(step, dict) and step.get("id") == step_id
+        ),
+        None,
+    )
+    if classifier_step is None:
+        return f"classifier step {step_id!r} does not exist"
+    fork_expr = re.sub(
+        r"\s+", "", str((classifier_step.get("env") or {}).get("IS_FORK") or "")
+    )
+    if fork_expr != "${{github.event.pull_request.head.repo.fork==true}}":
+        return f"IS_FORK is not sourced from the PR head repository: {fork_expr!r}"
+
+    script = str(classifier_step.get("run") or "").replace(
+        "${{ github.event_name }}", "pull_request"
+    )
+    if "${{" in script:
+        return "classifier shell contains an unevaluated GitHub expression"
+
+    stub_dir = tmp_path / f"{workflow}-{job_name}"
+    stub_dir.mkdir()
+    (stub_dir / "git").write_text(
+        "#!/bin/sh\nprintf 'cps/ub.py\\n'\n", encoding="utf-8"
+    )
+    (stub_dir / "python3").write_text(
+        "#!/bin/sh\n"
+        "printf 'frontend=false\\nbuild=true\\nconcurrency=true\\nimage=true\\n' "
+        '>> "$GITHUB_OUTPUT"\n',
+        encoding="utf-8",
+    )
+    (stub_dir / "git").chmod(0o755)
+    (stub_dir / "python3").chmod(0o755)
+
+    def classify(is_fork: bool) -> tuple[int, str, str]:
+        output = stub_dir / ("fork.out" if is_fork else "same-repo.out")
+        env = {
+            **os.environ,
+            "PATH": f"{stub_dir}:/usr/bin:/bin",
+            "BASE_SHA": "base",
+            "CONCURRENCY": "true",
+            "GITHUB_EVENT_NAME": "pull_request",
+            "HEAD_SHA": "head",
+            "IMAGE": "true",
+            "IS_FORK": "true" if is_fork else "false",
+            "GITHUB_OUTPUT": str(output),
+        }
+        proc = subprocess.run(
+            ["/bin/bash", "-c", script],
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return (
+            proc.returncode,
+            output.read_text(encoding="utf-8") if output.exists() else "",
+            proc.stderr,
+        )
+
+    fork_rc, fork_output, fork_stderr = classify(True)
+    same_rc, same_output, same_stderr = classify(False)
+    if fork_rc != 0 or same_rc != 0:
+        return (
+            "classifier shell could not be evaluated: "
+            f"fork rc={fork_rc} stderr={fork_stderr!r}; "
+            f"same-repo rc={same_rc} stderr={same_stderr!r}"
+        )
+
+    def last_output(text: str, name: str) -> str | None:
+        values = [
+            line.split("=", 1)[1]
+            for line in text.splitlines()
+            if line.startswith(f"{name}=")
+        ]
+        return values[-1] if values else None
+
+    fork_value = last_output(fork_output, output_name)
+    same_value = last_output(same_output, output_name)
+    if fork_value != "false" or same_value != "true":
+        return (
+            f"classifier must produce {output_name}=false for a fork and true "
+            "for the same concurrency-shaped PR; got "
+            f"fork={fork_value!r}, same-repo={same_value!r}"
+        )
+    return None
 
 
 @pytest.fixture(scope="module")
@@ -224,15 +438,77 @@ def test_upstream_fallback_produces_what_downstream_copies(dockerfile_text: str)
 def _pbs_source_selector(step: dict) -> list[str]:
     """The `PBS_SOURCE=` lines a build step passes, verbatim."""
     build_args = str((step.get("with") or {}).get("build-args", ""))
-    return [
+    selectors = [
         line.strip()
         for line in build_args.splitlines()
         if line.strip().startswith("PBS_SOURCE=")
     ]
+    try:
+        words = shlex.split(str(step.get("run") or ""), comments=False, posix=True)
+    except ValueError:
+        return selectors
+    for index, word in enumerate(words):
+        if word == "--build-arg" and index + 1 < len(words):
+            candidate = words[index + 1]
+        elif word.startswith("--build-arg="):
+            candidate = word.removeprefix("--build-arg=")
+        else:
+            continue
+        if candidate.startswith("PBS_SOURCE="):
+            selectors.append(candidate)
+    return selectors
+
+
+def test_shell_and_local_composite_image_builds_are_discovered(tmp_path: Path) -> None:
+    workflows = tmp_path / ".github" / "workflows"
+    action = tmp_path / ".github" / "actions" / "image"
+    workflows.mkdir(parents=True)
+    action.mkdir(parents=True)
+    (workflows / "images.yml").write_text(
+        """
+name: images
+on: push
+jobs:
+  direct:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker buildx build --push --build-arg PBS_SOURCE=ghcr .
+  composite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/image
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (action / "action.yml").write_text(
+        """
+name: image
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: docker build --build-arg=PBS_SOURCE=ghcr .
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    builds = _image_build_steps(workflows)
+    assert [(workflow, job) for workflow, job, _step in builds] == [
+        ("images.yml", "direct"),
+        ("images.yml", "composite"),
+    ]
+    assert [_pbs_source_selector(step) for _workflow, _job, step in builds] == [
+        ["PBS_SOURCE=ghcr"],
+        ["PBS_SOURCE=ghcr"],
+    ]
+
+
+def test_merge_queue_is_treated_as_pull_request_reachable() -> None:
+    assert "merge_group" in PR_REACHABLE_TRIGGERS
 
 
 def test_every_ci_image_build_selects_a_pbs_source_explicitly() -> None:
-    """Every `docker/build-push-action` step must set `PBS_SOURCE` exactly once.
+    """Every discovered CI image build must set `PBS_SOURCE` exactly once.
 
     Omitting it does not fail anything — it silently sends that build back to
     the release CDN that 404d the Actions egress and broke every image build.
@@ -244,7 +520,7 @@ def test_every_ci_image_build_selects_a_pbs_source_explicitly() -> None:
     fails here and has to be reviewed rather than absorbed.
     """
     steps = _image_build_steps()
-    assert steps, "found no docker/build-push-action steps to check"
+    assert steps, "found no image-build steps to check"
 
     offenders: list[str] = []
     for workflow, job, step in steps:
@@ -264,8 +540,10 @@ def test_every_ci_image_build_selects_a_pbs_source_explicitly() -> None:
     )
 
 
-def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror() -> None:
-    """A build reachable from `pull_request` must use the fork-aware selector (#1263).
+def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror(
+    tmp_path: Path,
+) -> None:
+    """A PR build must be fork-aware or proven unreachable from forks (#1263).
 
     A fork PR cannot pull the private mirror — the GHCR login succeeds and the
     manifest HEAD still 403s, because `packages: read` on a fork's read-only
@@ -275,27 +553,64 @@ def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror() -> Non
     read.
 
     Discovered from the workflow triggers, not from a job allowlist: a new
-    PR-triggered image build inherits this requirement automatically.
+    PR-triggered image build inherits this requirement automatically. A build
+    may keep the safer literal mirror pin only when its job is exclusively
+    gated by a classifier output whose actual shell behavior is false for a
+    fork and true for the same concurrency-shaped PR.
     """
     pr_builds = [
         (workflow, job, step)
         for workflow, job, step in _image_build_steps()
-        if "pull_request" in _workflow_triggers(workflow)
+        if PR_REACHABLE_TRIGGERS & _workflow_triggers(workflow)
     ]
     assert pr_builds, (
         "found no pull_request-triggered image build; if the integration build "
         "stopped running on PRs, community build PRs lost their only coverage"
     )
 
-    offenders = [
-        f"{workflow}:{job}: {selectors}"
-        for workflow, job, step in pr_builds
-        for selectors in [_pbs_source_selector(step)]
-        if selectors != [FORK_AWARE_PBS_SOURCE]
-    ]
+    offenders: list[str] = []
+    for workflow, job, step in pr_builds:
+        triggers = _workflow_triggers(workflow)
+        unsupported = (triggers & PR_REACHABLE_TRIGGERS) - {"pull_request"}
+        if unsupported:
+            offenders.append(
+                f"{workflow}:{job}: image build has unsupported PR-reachable "
+                f"trigger(s) {sorted(unsupported)}"
+            )
+            continue
+        selectors = _pbs_source_selector(step)
+        if selectors == [FORK_AWARE_PBS_SOURCE]:
+            continue
+        if selectors != ["PBS_SOURCE=ghcr"]:
+            offenders.append(f"{workflow}:{job}: unapproved selector {selectors}")
+            continue
+        failure = _fork_unreachable_through_classifier(workflow, job, tmp_path)
+        if failure:
+            offenders.append(
+                f"{workflow}:{job}: bare mirror is fork-reachable: {failure}"
+            )
+
     assert not offenders, (
-        f"These PR-triggered image builds do not use the fork-aware PBS_SOURCE "
-        f"selector: {offenders}. Fork PRs will 403 on the private mirror (#1263)."
+        "These PR-triggered image builds neither use the fork-aware PBS_SOURCE "
+        "selector nor prove that their literal private-mirror build is "
+        f"unreachable from forks: {offenders}. Fork PRs will 403 on the private "
+        "mirror (#1263)."
+    )
+
+
+def test_dev_image_workflow_trigger_set_is_security_pinned() -> None:
+    """A privileged/callable trigger must not bypass the ordinary-PR fork gate.
+
+    In particular, `pull_request_target` would execute the workflow from the
+    base repository and its event name would skip the classifier's
+    `pull_request` branch. Pinning the complete trigger set catches that change
+    even when checkout is hidden behind BUILD_REF/GITHUB_ENV indirection.
+    """
+    triggers = _workflow_triggers("docker-image-build-dev.yml")
+    assert triggers == {"push", "pull_request", "workflow_dispatch"}, (
+        "docker-image-build-dev.yml trigger set changed. Image publication is "
+        "proven safe only for push, ordinary pull_request, and explicit "
+        f"workflow_dispatch; got {sorted(triggers)}"
     )
 
 
@@ -310,7 +625,7 @@ def test_non_pull_request_image_builds_keep_the_bare_mirror_pin() -> None:
     offenders = [
         f"{workflow}:{job}: {selectors}"
         for workflow, job, step in _image_build_steps()
-        if "pull_request" not in _workflow_triggers(workflow)
+        if not (PR_REACHABLE_TRIGGERS & _workflow_triggers(workflow))
         for selectors in [_pbs_source_selector(step)]
         if selectors != ["PBS_SOURCE=ghcr"]
     ]

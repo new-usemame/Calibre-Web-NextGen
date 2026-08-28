@@ -16,6 +16,44 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.42] - 2026-08-28
+
+### Added
+
+- **Runtime data paths can be configured without editing the installation.**
+  Packagers can set `CWA_INGEST_FOLDER`, `CWA_CALIBRE_LIBRARY_DIR`, and
+  `CWA_TMP_CONVERSION_DIR` from the process environment while existing
+  `dirs.json` values remain supported as fallbacks. Requested with
+  @chloeroform and @Thovi98 in #1611. Runtime values are normalized and
+  validated as non-root, absolute, traversal-free paths before startup services
+  use them.
+
+- **New ingest setting: move a misplaced `ComicInfo.xml` to the archive root.**
+  The ComicInfo.xml standard requires the file at the root of a `.cbz`; some
+  real scan-group releases package it one folder down instead, alongside the
+  pages, and every reader we checked (including ComicTagger and Komga) then
+  silently gets no metadata from it. Off by default — turn it on in CWA
+  Settings and ingest repackages a copy with the file moved to root before
+  import, only when it's present but misplaced. Your original download is
+  never touched.
+
+### Changed
+
+- **Environment settings now have one complete, drift-checked reference.**
+  `examples/.env.example` documents every supported application, service, and test
+  variable, and automated tests keep it synchronized with the code. Initiated by
+  @Thovi98.
+
+- **The "Delete book" control no longer looks like a page-wide warning.** It
+  remains visible to users with delete permission and separate from everyday
+  book actions, but now sits in a quiet, clearly labelled region instead of a
+  filled danger banner. The existing confirmation is unchanged. Reported via
+  the in-app feedback form.
+
+- **Russian translation updated.** 31 previously untranslated strings now have
+  Russian text — Kobo two-way sync settings, bulk-action results, and the
+  annotations import summary. Contributed by @standhaftsohnsergius.
+
 ### Fixed
 
 - **Local-only accounts can now sign in through the classic login form when
@@ -25,6 +63,66 @@ is for things you can see or feel when running the app.
   directory authentication also no longer show a misleading extra "Wrong
   Username or Password" message. Reported by @justemu
   ([#1903](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1903)).
+
+- **Tag view no longer crams 5–6 columns.** The tags browse list now uses the same 300px column floor as the editor view (~4 columns), so tag names have room instead of ellipsis. Contributed by @0x5t4l1n (#1693).
+
+- **An `.acsm` is fulfilled even when Auto-Convert is off.** An Adobe fulfilment ticket only
+  reached its Calibre plugin when Auto-Convert was enabled; with the setting off — or with `acsm`
+  on the Auto-Convert ignore list — ingest stopped short and printed guidance telling you to
+  install a plugin you already had. A ticket is not a book, so the plugin is the only path to one;
+  it now runs on every path. Books are unaffected: with Auto-Convert off, a book still imports in
+  its original format. Reported by @jakejoh, following @auspex's original report.
+
+- **Bare-metal startup and uploads survive unusable local configuration.** Read-only profile storage and invalid `PUID` or `PGID` values now warn and fall back instead of interrupting use.
+
+- **Remote annotation updates are no longer queued when the matching local database change could not be saved.**
+
+- **Two ingest runs can no longer run at once.**
+
+- **Ingest keeps working after the post-batch follow-up.**
+
+- **Database restores now recover from stale locks and refuse to run while ingest or cover enforcement is active.**
+
+- **Automatic duplicate resolution no longer deletes a book when its reading data could not be moved.** The duplicate remains available and the group is reported as unresolved so it can be retried safely.
+
+- **Annotations imported from a Kobo now retain their original creation time.** Kobo creation timestamps without an explicit offset are interpreted consistently with the device's paired UTC modification timestamps instead of being replaced by the import time.
+
+- **The container healthcheck can no longer freeze the app it is measuring.**
+  Database and service probes now run away from gevent's request thread, and a
+  normal short-lived `metadata.db` writer lock uses a strictly bounded recent
+  known-good result for that database object instead of parking every request;
+  using that fallback emits an operator-visible warning. A lock-free corrupt or
+  missing DB is degraded immediately; corruption behind a qualifying lock is
+  only detected once the lock clears. Stale health can be reused for at most a
+  five-minute grace; after that, the lock itself degrades the probe even though
+  the database contents remain unknown.
+  Longruns explicitly reported `down` are degraded, while the pre-existing
+  `unknown` state (no `s6-rc`, timeout, error, or nonzero exit) remains
+  non-degrading. Repeated checks retain at most one DB worker and one service
+  worker even if filesystem I/O wedges. On slow ARM and virtual-machine hosts,
+  HTTPS detection now has a one-second cap before curl's five-second cap, all
+  inside Docker's seven-second outer cap, so a dead app still fails fast.
+  Reported by
+  [@hayvan96](https://github.com/hayvan96) and corroborated by
+  [@chloeroform](https://github.com/chloeroform)
+  ([#1799](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1799)).
+
+- **Settings-database saves now keep their rollback boundaries without blocking
+  unrelated reads or startup work.** Live backups include committed WAL data, and
+  `NETWORK_SHARE_MODE=true` safely retains legacy behavior.
+
+- **Fix issues occurring on bare metal setups.** The `user_profiles.json` file
+  is now created by the Python application instead of rc script, and a `chown`
+  operation uses the environment variables `PUID` and `PGID` instead of
+  `1000:1000`.
+
+- **"Make public" is no longer offered on a shelf you are not allowed to
+  share.** Sharing a shelf needs the "Edit public shelves" permission, and the
+  server has always refused without it, but the New UI's shelf page showed the
+  button to every owner — so clicking it only ever produced *"you are not
+  allowed to edit shelves"*. The control is now hidden when the permission is
+  absent, matching the classic UI. "Make private" is unaffected. Reported by
+  @iroQuai.
 
 ## [v4.1.41] - 2026-08-25
 

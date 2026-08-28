@@ -1,4 +1,5 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
+import { requireRouteCapability } from './capabilities';
 
 /**
  * #973 — consolidating tags from the all-tags view.
@@ -30,11 +31,6 @@ async function tagsFromApi(page: Page): Promise<Entity[]> {
  * image, and :dev carries the routes once this lands, so both run for real —
  * the skip retires itself instead of silently hollowing out the gate.
  */
-async function serverHasTagMaintenance(page: Page): Promise<boolean> {
-  const res = await page.request.fetch('/api/v1/tags/1', { method: 'OPTIONS' });
-  return (res.headers()['allow'] ?? '').toUpperCase().includes('DELETE');
-}
-
 /**
  * Every test here destroys a tag, so none of them can borrow a seed row and put
  * it back the way tag-rename.spec.ts does — a merged or deleted tag cannot be
@@ -102,8 +98,12 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/app/tags');
-  test.skip(!(await serverHasTagMaintenance(page)),
-    'server predates #973 (the PR e2e leg runs the :dev API with this branch\'s SPA)');
+  await requireRouteCapability(page.request, {
+    method: 'DELETE',
+    path: '/api/v1/tags/1',
+    name: '#973 tag maintenance',
+    pinnedBy: 'tests/unit/test_973_tag_merge_delete.py::test_delete_route_is_registered_for_tags',
+  });
 });
 
 test('a rename collision offers to merge instead of dead-ending', async ({ page }, testInfo) => {

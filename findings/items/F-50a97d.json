@@ -1,0 +1,11 @@
+{
+  "area": "ci",
+  "body": "The commit-pinned E2E gate (#1927) waits up to 240 x 30s for the triggering commit's `sha-<commit>`\nimage tag. That budget is deliberately larger than the producer pipeline's configured critical path\n(95 minutes), so a slow build cannot red-light an innocent PR.\n\nThe gap: the resolver has no signal from the paired build run. If that run FAILS early, the resolver\nstill sleeps out its whole budget before refusing, so a broken build costs ~2 hours of wall-clock\nbefore the hard red appears. The verdict is correct - it refuses rather than testing the wrong image -\nbut the latency is bad enough that people will be tempted to bypass the gate, which is how a good gate\ngets switched off.\n\nFix shape: poll the paired dev-image run's conclusion alongside the tag, and abort early with a\ndistinct message when that run reaches a terminal failure. Keep the long budget for \"still building\";\nshorten only \"will never arrive\".\n\nDeliberately NOT done in the #1927 PR: it is a behaviour change with its own failure mode (a\nmis-identified paired run would abort a legitimate wait), and that PR was already large. Raised by the\nindependent pre-merge re-review of PR #1941.",
+  "created": "2026-08-28",
+  "id": "F-50a97d",
+  "refs": [],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "E2E resolver waits its full ~2h budget even when the paired dev-image build has already failed"
+}

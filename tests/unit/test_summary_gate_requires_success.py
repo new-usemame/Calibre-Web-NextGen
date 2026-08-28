@@ -46,7 +46,7 @@ def _summary_shell():
 
 def _render(shell, *, event, ref, fast, build, integration, e2e,
             is_frontend_pr="false", is_tier2="false", is_build_pr="false",
-            changed_paths="success"):
+            is_concurrency_pr="false", changed_paths="success"):
     subs = {
         "needs.fast-tests.result": fast,
         "needs.frontend-build.result": build,
@@ -65,6 +65,7 @@ def _render(shell, *, event, ref, fast, build, integration, e2e,
         f"IS_TIER2_PR={is_tier2}\n"
         f"IS_BUILD_PR={is_build_pr}\n"
         f"IS_FRONTEND_PR={is_frontend_pr}\n"
+        f"IS_CONCURRENCY_PR={is_concurrency_pr}\n"
         f"IS_MAIN_PUSH={is_main_push}\n"
     )
     return "set -o pipefail\n" + env + shell
@@ -178,3 +179,20 @@ def test_non_frontend_pr_still_passes_with_e2e_skipped():
                  fast="success", build="success", integration="skipped",
                  e2e="skipped", is_frontend_pr="false")
     assert rc == 0
+
+
+@pytest.mark.parametrize("result", ["failure", "skipped", "cancelled"])
+def test_concurrency_pr_requires_e2e_success(result):
+    rc, out = _run(
+        event="pull_request",
+        ref="refs/heads/topic",
+        fast="success",
+        build="success",
+        integration="success",
+        e2e=result,
+        is_concurrency_pr="true",
+    )
+    assert rc == 1, (
+        f"concurrency PR with e2e={result} must fail the summary; got rc=0\n{out}"
+    )
+    assert result in out

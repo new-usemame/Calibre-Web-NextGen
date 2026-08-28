@@ -56,6 +56,114 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.42',
+    date: '2026-08-28',
+    items: [
+      {
+        title: 'Choose runtime data folders without rewriting installation files',
+        body: 'Packagers can now set the ingest, Calibre library and temporary conversion folders through environment variables. Existing dirs.json settings still work as fallbacks, and unsafe paths are rejected before services start.',
+        category: 'Admin',
+      },
+      {
+        title: 'Recover comic metadata packaged one folder too deep',
+        body: 'A new, opt-in CWA setting repairs CBZ archives whose ComicInfo.xml sits beside the pages instead of at the archive root, where readers expect it. Ingest moves the file in the imported copy without touching your original download.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Find every supported environment setting in one place',
+        body: 'The example environment file now documents every application, service and test setting. Automated checks keep that reference aligned with the settings the software actually accepts.',
+        category: 'Admin',
+      },
+      {
+        title: 'Book deletion stays clear without dominating the page',
+        body: 'The Delete book control now sits in a quiet, clearly labelled area instead of looking like a page-wide emergency warning. Permissions and the confirmation step are unchanged.',
+        category: 'Library',
+      },
+      {
+        title: 'More of the interface is available in Russian',
+        body: 'Russian readers now have translations for 31 additional strings, including Kobo two-way sync settings, bulk-action results and annotation import summaries.',
+        category: 'Account',
+      },
+      {
+        title: 'Local accounts can still sign in when LDAP says no',
+        body: 'If LDAP rejects the credentials, the classic login form now safely tries a real local password for local-only accounts. Imported LDAP accounts remain passwordless locally, and directory errors no longer produce a second misleading password message.',
+        category: 'Account',
+      },
+      {
+        title: 'Read tag names without squeezing them into tiny columns',
+        body: 'The tag browser now uses a wider minimum column size, leaving room for names instead of cramming five or six narrow columns onto the page.',
+        category: 'Library',
+        link: { to: '/tags', label: 'Browse tags' },
+      },
+      {
+        title: 'Fulfil ACSM downloads even when Auto-Convert is off',
+        body: 'Adobe fulfilment tickets now always reach the Calibre plugin that turns them into books, even when Auto-Convert is disabled or ACSM is on its ignore list. Ordinary books still keep their original format when Auto-Convert is off.',
+        category: 'Library',
+      },
+      {
+        title: 'Bare-metal installs recover from unusable local settings',
+        body: 'Read-only profile storage and invalid PUID or PGID values now produce a warning and safe fallback instead of stopping startup or uploads.',
+        category: 'Admin',
+      },
+      {
+        title: 'Failed annotation saves no longer create phantom sync work',
+        body: 'When an annotation cannot be saved to the local database, CWNG no longer queues a remote update for a change that never landed.',
+        category: 'Reading',
+      },
+      {
+        title: 'Ingest jobs can no longer overlap',
+        body: 'CWNG now prevents two ingest runs from processing the library at the same time, avoiding conflicts between batches.',
+        category: 'Admin',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'Ingest continues after its post-batch follow-up',
+        body: 'Finishing the work that follows an ingest batch no longer leaves later imports unable to run.',
+        category: 'Admin',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'Database restores avoid active library maintenance',
+        body: 'Restore now recovers from stale locks but refuses to start while ingest or cover enforcement is actively changing the library, keeping the restored database consistent.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Duplicate cleanup keeps books whose reading data could not move',
+        body: 'Automatic duplicate resolution no longer deletes a copy when its reading progress or annotations fail to transfer. The group stays unresolved and available to retry.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Imported Kobo annotations keep their original dates',
+        body: 'Kobo annotations without an explicit timezone now use the device\'s paired UTC timestamp instead of appearing to have been created at import time.',
+        category: 'Sync',
+      },
+      {
+        title: 'Health checks stay responsive while the library database is busy',
+        body: 'Container health probes no longer freeze the app behind a short database writer lock or wedged filesystem call. Bounded recent results cover normal brief locks, while missing, corrupt, stale or explicitly down services still become unhealthy promptly.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Settings saves and live backups stay transaction-safe',
+        body: 'Settings-database writes keep their rollback boundaries without blocking unrelated reads or startup work, and live backups now include committed write-ahead-log data. Network Share Mode retains its established behaviour.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Bare-metal profiles use the configured service identity',
+        body: 'The application now creates user_profiles.json itself, and ownership changes use your configured PUID and PGID instead of assuming 1000:1000.',
+        category: 'Admin',
+      },
+      {
+        title: 'Shelf sharing appears only when you can use it',
+        body: 'The New UI now hides Make public when you own a shelf but lack permission to edit public shelves, instead of offering a button that can only fail. Making an existing public shelf private is unchanged.',
+        category: 'Library',
+        link: { to: '/shelves', label: 'Open your shelves' },
+      },
+    ],
+  },
+  {
     version: 'v4.1.41',
     date: '2026-08-25',
     items: [

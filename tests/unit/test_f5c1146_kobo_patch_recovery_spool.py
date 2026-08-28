@@ -150,13 +150,14 @@ def _app(monkeypatch, *, dispatch):
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
     monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
+        rs, "_owned_patch_is_local_authority", lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(
         "cps.services.annotation_sync.dispatch_annotation_sync", dispatch,
     )
     monkeypatch.setattr(
         rs, "proxy_to_kobo_reading_services",
-        lambda **_kwargs: app.response_class(
-            b'{"upstream":"accepted"}', status=207, headers={"X-Upstream": "same"},
-        ),
+        lambda **_kwargs: pytest.fail("owned PATCH must not contact Kobo"),
     )
     return app
 
@@ -178,8 +179,8 @@ def test_patch_spool_is_durable_before_parse_and_dispatch(monkeypatch, tmp_path)
         f"/annotations/{BOOK_UUID}", data=RAW_PATCH, content_type="application/json",
     )
 
-    assert response.status_code == 207
-    assert response.get_data() == b'{"upstream":"accepted"}'
+    assert response.status_code == 204
+    assert response.get_data() == b""
     [(path, record)] = _records(spool, root)
     assert record["body"] == RAW_PATCH
     assert record["body_sha256"] == spool.sha256_bytes(RAW_PATCH)
@@ -295,8 +296,8 @@ def test_spool_failure_cannot_change_patch_response_or_dispatch(monkeypatch, tmp
         f"/annotations/{BOOK_UUID}", data=RAW_PATCH, content_type="application/json",
     )
 
-    assert response.status_code == 207
-    assert response.get_data() == b'{"upstream":"accepted"}'
+    assert response.status_code == 204
+    assert response.get_data() == b""
     assert len(dispatched) == 1
 
 
@@ -1194,6 +1195,13 @@ def test_unreadable_patch_body_still_refuses_but_unreadable_get_body_does_not(
     """
     _root(monkeypatch, tmp_path)
     app = _app(monkeypatch, dispatch=lambda *_a, **_k: None)
+    upstream_body = b'{"upstream":"preserved"}'
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: app.response_class(
+            upstream_body, status=207, headers={"X-Upstream": "same"},
+        ),
+    )
 
     def _unreadable(self, *args, **kwargs):
         del self, args, kwargs
@@ -1207,7 +1215,9 @@ def test_unreadable_patch_body_still_refuses_but_unreadable_get_body_does_not(
     assert patch_response.status_code == 503
 
     get_response = app.test_client().get(f"/annotations/{BOOK_UUID}")
-    assert get_response.status_code != 503
+    assert get_response.status_code == 207
+    assert get_response.get_data() == upstream_body
+    assert get_response.headers["X-Upstream"] == "same"
 
 
 @pytest.mark.unit

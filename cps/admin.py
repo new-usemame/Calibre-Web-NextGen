@@ -61,7 +61,6 @@ from .ui_themes import config_theme_code
 from .cw_babel import get_available_translations, get_available_locale, get_user_locale_language
 from . import debug_info
 from .string_helper import strip_whitespaces
-from .sqlite_utils import copy_sqlite_database
 
 log = logger.create()
 
@@ -3625,8 +3624,8 @@ def restore_calibre_db():
         # 1. Backup both DBs
         backup_dir = f"/config/backup/restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         os.makedirs(backup_dir, exist_ok=True)
-        copy_sqlite_database(metadata_path, os.path.join(backup_dir, "metadata.db.bak"))
-        copy_sqlite_database(app_db_path, os.path.join(backup_dir, "app.db.bak"))
+        shutil.copy2(metadata_path, os.path.join(backup_dir, "metadata.db.bak"))
+        shutil.copy2(app_db_path, os.path.join(backup_dir, "app.db.bak"))
 
         log_path = os.path.join(backup_dir, "restore.log")
         with open(log_path, "a", encoding="utf-8") as log_file:

@@ -781,14 +781,10 @@ def _encrypt_fields(session, secret_key):
     try:
         session.query(exists().where(_Settings.mail_password_e)).scalar()
     except OperationalError:
-        # With explicit SQLite BEGIN handling, the failed inspection owns a
-        # real transaction. Release it before migrating on another connection,
-        # then use begin() so the DDL is committed rather than rolled back when
-        # the context exits.
-        session.rollback()
-        with session.bind.begin() as conn:
+        with session.bind.connect() as conn:
             conn.execute(text("ALTER TABLE settings ADD column 'mail_password_e' String"))
             conn.execute(text("ALTER TABLE settings ADD column 'config_ldap_serv_password_e' String"))
+        session.commit()
         crypter = Fernet(secret_key)
         settings = session.query(_Settings.mail_password, _Settings.config_ldap_serv_password).first()
         if settings.mail_password:
@@ -811,7 +807,6 @@ def _migrate_table(session, orm_class, secret_key=None):
                 session.query(column).first()
             except OperationalError as err:
                 log.debug("%s: %s", column_name, err.args[0])
-                session.rollback()
                 # Handle default values for new columns
                 if column.default is None:
                     # Use NULL for columns with None default (important for autodetection logic)
@@ -830,11 +825,7 @@ def _migrate_table(session, orm_class, secret_key=None):
                                                                              column_type,
                                                                              column_default))
                 log.debug(alter_table)
-                # Commit each missing column independently. A later failed
-                # inspection must not roll back an earlier ALTER in the same
-                # migration pass now that SQLite DDL is transactional.
-                with session.bind.begin() as conn:
-                    conn.execute(alter_table)
+                session.execute(alter_table)
                 changed = True
             except json.decoder.JSONDecodeError as e:
                 log.error("Database corrupt column: {}".format(column_name))

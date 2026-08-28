@@ -39,7 +39,6 @@ from .cwa_functions import get_ingest_dir
 from .services.calibre_db_lock import metadata_db_write_lock
 from .services.kepub_package_normalizer import normalize_kepub_package
 from .services.pubdate_parse import parse_partial_pubdate
-from .sqlite_utils import network_share_mode_enabled
 from .usermanagement import user_login_required, login_required_if_no_ano
 from .string_helper import strip_whitespaces
 from werkzeug.utils import secure_filename
@@ -405,7 +404,7 @@ def _get_ingest_path(uploaded_file, prefix_parts=None):
         raise
     # Ensure proper ownership of ingest directory (fix for issue #603)
     try:
-        nsm = network_share_mode_enabled()
+        nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
         if not (nsm and ingest_dir == "/cwa-book-ingest"):
             # Set ownership to abc:abc (uid=1000, gid=1000)
             uid = int(os.environ.get("PUID", "1000"))

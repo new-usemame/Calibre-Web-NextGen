@@ -10,6 +10,7 @@ import hashlib
 import json
 from uuid import uuid4
 from time import time
+from shutil import move, copyfile
 
 from flask import Blueprint, flash, request, redirect, url_for, abort
 from flask_babel import gettext as _
@@ -17,7 +18,6 @@ from flask_babel import gettext as _
 from . import logger, gdriveutils, config, ub, calibre_db, csrf
 from .admin import admin_required
 from .file_helper import get_temp_dir
-from .sqlite_utils import copy_sqlite_database
 from .usermanagement import user_login_required
 
 gdrive = Blueprint('gdrive', __name__, url_prefix='/gdrive')
@@ -129,18 +129,12 @@ try:
                     tmp_dir = get_temp_dir()
 
                     log.info('Database file updated')
-                    copy_sqlite_database(
-                        dbpath,
-                        os.path.join(tmp_dir, "metadata.db_" + str(current_milli_time())),
-                    )
+                    copyfile(dbpath, os.path.join(tmp_dir, "metadata.db_" + str(current_milli_time())))
                     log.info('Backing up existing and downloading updated metadata.db')
                     gdriveutils.downloadFile(None, "metadata.db", os.path.join(tmp_dir, "tmp_metadata.db"))
                     log.info('Setting up new DB')
-                    # Write through SQLite so a replacement cannot be poisoned by
-                    # committed pages in metadata.db-wal from the old database.
-                    copy_sqlite_database(
-                        os.path.join(tmp_dir, "tmp_metadata.db"), dbpath, restore=True
-                    )
+                    # prevent error on windows, as os.rename does on existing files, also allow cross hdd move
+                    move(os.path.join(tmp_dir, "tmp_metadata.db"), dbpath)
                     calibre_db.reconnect_db(config, ub.app_DB_path)
         except Exception as ex:
             log.error_or_exception(ex)

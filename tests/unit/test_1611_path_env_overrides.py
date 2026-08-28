@@ -8,7 +8,9 @@
 import importlib
 import json
 import logging
+import os
 from pathlib import Path
+import subprocess
 import sys
 
 import pytest
@@ -163,6 +165,63 @@ def test_cps_and_scripts_resolvers_agree_for_same_env_and_file(
     }
 
 
+@pytest.mark.parametrize("key,env_name,default", PATH_CASES)
+@pytest.mark.parametrize("invalid", ("relative/path", "..", "/safe/../escape"))
+def test_nonblank_invalid_env_paths_fail_on_both_sides(
+    resolvers, monkeypatch, key, env_name, default, invalid
+):
+    app_paths, constants = resolvers
+    monkeypatch.setenv(env_name, invalid)
+
+    with pytest.raises(ValueError, match=env_name):
+        getattr(app_paths, key)()
+    with pytest.raises(ValueError, match=env_name):
+        getattr(constants, key)()
+
+
+@pytest.mark.parametrize("key,env_name,default", PATH_CASES)
+def test_nonblank_invalid_dirs_json_paths_fail_on_both_sides(
+    resolvers, monkeypatch, tmp_path, key, env_name, default
+):
+    app_paths, constants = resolvers
+    dirs_file = _write_dirs(tmp_path / "dirs.json", {key: "../escape"})
+    monkeypatch.setenv("CWA_DIRS_JSON", str(dirs_file))
+    monkeypatch.setattr(constants, "DIRS_JSON", str(dirs_file))
+
+    with pytest.raises(ValueError, match=key):
+        getattr(app_paths, key)()
+    with pytest.raises(ValueError, match=key):
+        getattr(constants, key)()
+
+
+def test_app_paths_cli_rejects_invalid_path_without_partial_stdout(tmp_path):
+    dirs_file = _write_dirs(
+        tmp_path / "dirs.json",
+        {
+            "ingest_folder": "/valid-ingest",
+            "calibre_library_dir": "../escape",
+            "tmp_conversion_dir": "/valid-tmp",
+        },
+    )
+    env = os.environ.copy()
+    env.update({"CWA_DIRS_JSON": str(dirs_file)})
+    for name in PATH_ENV_VARS:
+        env.pop(name, None)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "app_paths.py"), "all"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "ERROR" in result.stderr
+    assert "calibre_library_dir" in result.stderr
+
+
 def test_read_site_trailing_separator_shapes_are_preserved(
     resolvers, monkeypatch, tmp_path
 ):
@@ -264,7 +323,7 @@ def test_auto_library_stops_on_discovery_conflicting_with_env_override(
     tmp_path, monkeypatch, capsys
 ):
     writer, original = _auto_library_writer(
-        tmp_path, monkeypatch, "/env-library", "/discovered-library"
+        tmp_path, monkeypatch, "/env-library", "/env-library/Books"
     )
 
     with pytest.raises(SystemExit) as excinfo:
@@ -275,7 +334,160 @@ def test_auto_library_stops_on_discovery_conflicting_with_env_override(
     output = capsys.readouterr().out
     assert "CWA_CALIBRE_LIBRARY_DIR" in output
     assert "/env-library" in output
-    assert "/discovered-library" in output
+    assert "/env-library/Books" in output
+
+
+def _write_executable(path, body):
+    path.write_text(body, encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
+def _isolated_path_env(tmp_path):
+    env = os.environ.copy()
+    for name in ("CWA_DIRS_JSON", "WATCH_FOLDER", *PATH_ENV_VARS):
+        env.pop(name, None)
+    env.update(
+        {
+            "CWA_INGEST_RETRY_QUEUE": str(tmp_path / "retry-queue"),
+            "CWA_INGEST_STATUS_FILE": str(tmp_path / "ingest-status"),
+            "CWA_INGEST_SERVICE_TEST_MODE": "1",
+        }
+    )
+    return env
+
+
+def _cwa_init_ingest_block(tmp_path):
+    source = (S6_DIR / "cwa-init/run").read_text(encoding="utf-8")
+    start = source.index("# Ensure the resolved ingest directory exists")
+    end = source.index("# For Calibre Plugins", start)
+    script = tmp_path / "cwa-init-ingest-block.sh"
+    return _write_executable(script, "#!/bin/bash\n" + source[start:end])
+
+
+def test_cwa_init_skips_custom_ingest_chown_in_network_share_mode(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    chown_log = tmp_path / "chown.log"
+    _write_executable(
+        bin_dir / "chown",
+        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CWA_TEST_CHOWN_LOG"\n',
+    )
+    custom_ingest = tmp_path / "custom-ingest"
+    env = _isolated_path_env(tmp_path)
+    env.update(
+        {
+            "CWA_APP_PATHS": str(SCRIPTS_DIR / "app_paths.py"),
+            "CWA_INGEST_FOLDER": str(custom_ingest),
+            "NETWORK_SHARE_MODE": "true",
+            "CWA_TEST_CHOWN_LOG": str(chown_log),
+            "PATH": f"{bin_dir}:{env['PATH']}",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(_cwa_init_ingest_block(tmp_path))],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert custom_ingest.is_dir()
+    assert not chown_log.exists()
+    assert f"skipping chown of {custom_ingest}" in result.stdout
+
+
+def test_ingest_service_resolves_whitespace_env_through_file_fallback(tmp_path):
+    ingest = tmp_path / "from-file"
+    dirs_file = _write_dirs(tmp_path / "dirs.json", {"ingest_folder": str(ingest)})
+    env = _isolated_path_env(tmp_path)
+    env.update(
+        {
+            "CWA_APP_PATHS": str(SCRIPTS_DIR / "app_paths.py"),
+            "CWA_DIRS_JSON": str(dirs_file),
+            "CWA_INGEST_FOLDER": "   ",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(S6_DIR / "cwa-ingest-service/run")],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f"Watching folder: {ingest}" in result.stdout
+
+
+@pytest.mark.parametrize("resolver_mode", ("missing", "empty"))
+def test_each_s6_path_caller_fails_closed_on_unusable_resolver_output(
+    tmp_path, resolver_mode
+):
+    if resolver_mode == "missing":
+        app_paths = tmp_path / "missing-app-paths.py"
+    else:
+        app_paths = tmp_path / "empty-app-paths.py"
+        app_paths.write_text("", encoding="utf-8")
+
+    env = _isolated_path_env(tmp_path)
+    env["CWA_APP_PATHS"] = str(app_paths)
+
+    init_result = subprocess.run(
+        ["bash", str(_cwa_init_ingest_block(tmp_path))],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    ingest_result = subprocess.run(
+        ["bash", str(S6_DIR / "cwa-ingest-service/run")],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    bin_dir = tmp_path / "checksum-bin"
+    bin_dir.mkdir()
+    _write_executable(bin_dir / "sleep", "#!/bin/sh\nexit 0\n")
+    _write_executable(bin_dir / "cwa-as-abc", "#!/bin/sh\nexit 0\n")
+    checksum_env = env.copy()
+    checksum_env["PATH"] = f"{bin_dir}:{checksum_env['PATH']}"
+    checksum_result = subprocess.run(
+        ["bash", str(S6_DIR / "cwa-checksum-backfill/run")],
+        env=checksum_env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    for result in (init_result, ingest_result, checksum_result):
+        assert result.returncode != 0, result.stdout
+        assert "ERROR" in result.stdout + result.stderr
+
+
+def test_auto_library_s6_wrapper_propagates_child_failure(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _write_executable(bin_dir / "python3", "#!/bin/sh\nexit 23\n")
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env.pop("DISABLE_LIBRARY_AUTOMOUNT", None)
+
+    result = subprocess.run(
+        ["bash", str(S6_DIR / "cwa-auto-library/run")],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 23
+    assert "exit code: 23" in result.stdout
 
 
 def test_shell_consumers_delegate_path_resolution_to_app_paths_cli():

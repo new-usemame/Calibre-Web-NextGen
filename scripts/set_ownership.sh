@@ -94,6 +94,22 @@ read_configured_dirs() {
     "${CWA_PYTHON}" "${CWA_APP_PATHS}" all
 }
 
+# Defence in depth for the CLI boundary. app_paths owns the validation
+# contract; this check makes a missing, replaced, or broken resolver unable to
+# hand root's recursive chown an empty/relative/traversing path.
+valid_resolved_dir() {
+  local p="$1"
+  [ -n "$p" ] || return 1
+  case "$p" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  case "$p" in
+    *$'\n'*|*$'\r'*|*/../*|*/..) return 1 ;;
+  esac
+  return 0
+}
+
 # Strip trailing slashes so /config/ and /config compare equal.
 normalise() {
   local p="$1"
@@ -132,7 +148,7 @@ dedupe_paths() {
 
 main() {
   local -a candidates=("${CWA_CONFIG_ROOT}")
-  local dir
+  local dir resolved_dirs resolved_count
 
   # Started as an arbitrary non-root user (`--user`, `--userns=keep-id`):
   # nothing below can succeed. LSIO's init-adduser is skipped on that path, so
@@ -148,12 +164,34 @@ main() {
     return 0
   fi
 
+  if ! valid_resolved_dir "${CWA_CONFIG_ROOT}"; then
+    log "ERROR: CWA_CONFIG_ROOT must be a non-empty absolute path without '..' components; refusing ownership pass"
+    return 1
+  fi
+
+  if ! resolved_dirs="$(read_configured_dirs)"; then
+    log "ERROR: runtime path resolver failed; refusing ownership pass"
+    return 1
+  fi
+  if [ -z "${resolved_dirs}" ]; then
+    log "ERROR: runtime path resolver returned no paths; refusing ownership pass"
+    return 1
+  fi
+
+  resolved_count=0
   while IFS= read -r dir; do
-    if [ -n "$dir" ]; then
-      CWA_RESOLVED_DIRS+=("$dir")
-      candidates+=("$dir")
+    if ! valid_resolved_dir "$dir"; then
+      log "ERROR: runtime path resolver returned unsafe path '${dir}'; refusing ownership pass"
+      return 1
     fi
-  done < <(read_configured_dirs)
+    CWA_RESOLVED_DIRS+=("$dir")
+    candidates+=("$dir")
+    resolved_count=$((resolved_count + 1))
+  done <<< "${resolved_dirs}"
+  if [ "${resolved_count}" -ne 3 ]; then
+    log "ERROR: runtime path resolver returned ${resolved_count} paths instead of 3; refusing ownership pass"
+    return 1
+  fi
 
   local -a requiredDirs=()
   while IFS= read -r dir; do

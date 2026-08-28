@@ -116,7 +116,7 @@ class Harness:
         env.pop("NETWORK_SHARE_MODE", None)
         env.update({k: str(v) for k, v in env_overrides.items()})
         return subprocess.run(
-            ["bash", str(SET_OWNERSHIP)],
+            ["/bin/bash", str(SET_OWNERSHIP)],
             env=env,
             capture_output=True,
             text=True,
@@ -328,6 +328,34 @@ def test_non_absolute_dirs_json_values_are_ignored(harness: Harness):
     )
     harness.run()
     assert "not-a-path" not in harness.chowned_paths()
+
+
+@pytest.mark.parametrize("invalid", ("..", "relative/path", "/safe/../escape"))
+def test_invalid_runtime_path_fails_before_any_recursive_chown(
+    harness: Harness, invalid: str
+):
+    result = harness.run(CWA_INGEST_FOLDER=invalid)
+
+    assert result.returncode != 0
+    assert harness.chowned_paths() == []
+    assert "ERROR" in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("resolver_mode", ("missing", "empty"))
+def test_unusable_path_resolver_fails_before_any_recursive_chown(
+    harness: Harness, resolver_mode: str
+):
+    if resolver_mode == "missing":
+        app_paths = harness.tmp / "missing-app-paths.py"
+    else:
+        app_paths = harness.tmp / "empty-app-paths.py"
+        app_paths.write_text("")
+
+    result = harness.run(CWA_APP_PATHS=app_paths)
+
+    assert result.returncode != 0
+    assert harness.chowned_paths() == []
+    assert "ERROR" in result.stdout + result.stderr
 
 
 def test_log_line_names_the_directories(harness: Harness):

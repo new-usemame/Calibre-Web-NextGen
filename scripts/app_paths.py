@@ -56,6 +56,12 @@ launch environment already had (it picks the interpreter and the code), but do
 not plumb any of these through from a request, a config page, or anything a
 library user can influence.
 
+The three runtime directories are nevertheless validated before use because
+container startup passes them to recursive ownership operations. They must be
+absolute, single-line paths without a ``..`` component; an invalid non-blank
+configuration fails loudly instead of being interpreted relative to a service's
+working directory.
+
 The ``/config`` default is kept exactly as scripts/ already had it. The
 container sets ``CALIBRE_DBPATH=/config`` as a Docker ``ENV`` (the #1162 fix),
 so that default never fires there — and de-hardcoding the *app* root must not
@@ -84,6 +90,7 @@ __all__ = [
     "DEFAULT_INGEST_FOLDER",
     "DEFAULT_LIBRARY_DIR",
     "DEFAULT_TMP_CONVERSION_DIR",
+    "RuntimePathError",
 ]
 
 #: Where the *container* keeps the writable state. The Dockerfile sets
@@ -105,6 +112,36 @@ DEFAULT_TMP_CONVERSION_DIR = "/config/.cwa_conversion_tmp"
 
 _DIRS_JSON_LOGGED_KEYS = set()
 _DIRS_JSON_LOG_LOCK = threading.Lock()
+
+
+class RuntimePathError(ValueError):
+    """A configured runtime directory is unsafe or cannot name one path."""
+
+
+def _validated_runtime_dir(value, source):
+    """Return a trimmed absolute directory or reject the launch configuration.
+
+    These values eventually reach recursive ownership operations during
+    container startup.  In particular, resolving ``..`` relative to
+    ``/config`` can turn that operation into a walk of ``/``.  Keep the text
+    shape (including a caller-supplied trailing slash), but require one
+    absolute, single-line path with no parent traversal component.
+    """
+    configured = value.strip()
+    path = Path(configured)
+    if (
+        not configured
+        or "\x00" in configured
+        or "\n" in configured
+        or "\r" in configured
+        or not path.is_absolute()
+        or ".." in path.parts
+    ):
+        raise RuntimePathError(
+            f"{source} must be an absolute path without '..' components; "
+            f"got {value!r}"
+        )
+    return configured
 
 
 def _env_path(name):
@@ -271,7 +308,7 @@ def _configured_dir(key, env_name, default, dirs_json_path=None):
     """Resolve one runtime directory through environment, file, then default."""
     override = os.environ.get(env_name)
     if override is not None and override.strip():
-        return override.strip()
+        return _validated_runtime_dir(override, env_name)
 
     config_path = Path(dirs_json_path) if dirs_json_path else dirs_json()
     try:
@@ -282,7 +319,9 @@ def _configured_dir(key, env_name, default, dirs_json_path=None):
 
     configured = configured_dirs.get(key) if isinstance(configured_dirs, dict) else None
     if isinstance(configured, str) and configured.strip():
-        configured = configured.strip()
+        configured = _validated_runtime_dir(
+            configured, f"{key} in {config_path}"
+        )
         with _DIRS_JSON_LOG_LOCK:
             if key not in _DIRS_JSON_LOGGED_KEYS:
                 _DIRS_JSON_LOGGED_KEYS.add(key)
@@ -292,7 +331,7 @@ def _configured_dir(key, env_name, default, dirs_json_path=None):
                     file=sys.stderr,
                 )
         return configured
-    return default
+    return _validated_runtime_dir(default, f"compiled-in default for {key}")
 
 
 def ingest_folder(dirs_json_path=None):
@@ -340,11 +379,19 @@ def _main(argv=None):
             file=sys.stderr,
         )
         return 2
-    if args[0] == "all":
-        for resolver in commands.values():
-            print(resolver())
-    else:
-        print(commands[args[0]]())
+    try:
+        if args[0] == "all":
+            # Resolve every value before printing any of them. Shell callers
+            # consume this as a three-line transaction and must never receive
+            # a valid-looking prefix followed by a failure.
+            resolved = [resolver() for resolver in commands.values()]
+            for value in resolved:
+                print(value)
+        else:
+            print(commands[args[0]]())
+    except RuntimePathError as error:
+        print(f"[cwa-paths] ERROR: {error}", file=sys.stderr)
+        return 1
     return 0
 
 

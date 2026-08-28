@@ -12,6 +12,7 @@ import sys
 import os
 import threading
 from collections import namedtuple
+from pathlib import Path
 
 from flask_babel import gettext as _
 
@@ -58,11 +59,34 @@ _dirs_logger = logging.getLogger(__name__)
 _dirs_environ = os.environ
 
 
+class RuntimePathError(ValueError):
+    """A configured runtime directory is unsafe or cannot name one path."""
+
+
+def _validated_runtime_dir(value, source):
+    """Mirror scripts/app_paths.py's runtime-directory safety contract."""
+    configured = value.strip()
+    path = Path(configured)
+    if (
+        not configured
+        or '\x00' in configured
+        or '\n' in configured
+        or '\r' in configured
+        or not path.is_absolute()
+        or '..' in path.parts
+    ):
+        raise RuntimePathError(
+            f"{source} must be an absolute path without '..' components; "
+            f"got {value!r}"
+        )
+    return configured
+
+
 def _configured_dir(key, env_name, default):
     """Resolve one runtime directory through environment, file, then default."""
     override = _dirs_environ.get(env_name)
     if override is not None and override.strip():
-        return override.strip()
+        return _validated_runtime_dir(override, env_name)
 
     try:
         with open(DIRS_JSON, 'r', encoding='utf-8') as config_file:
@@ -72,7 +96,9 @@ def _configured_dir(key, env_name, default):
 
     configured = configured_dirs.get(key) if isinstance(configured_dirs, dict) else None
     if isinstance(configured, str) and configured.strip():
-        configured = configured.strip()
+        configured = _validated_runtime_dir(
+            configured, f"{key} in {DIRS_JSON}"
+        )
         with _DIRS_JSON_LOG_LOCK:
             if key not in _DIRS_JSON_LOGGED_KEYS:
                 _DIRS_JSON_LOGGED_KEYS.add(key)
@@ -83,7 +109,7 @@ def _configured_dir(key, env_name, default):
                     DIRS_JSON,
                 )
         return configured
-    return default
+    return _validated_runtime_dir(default, f"compiled-in default for {key}")
 
 
 def ingest_folder():

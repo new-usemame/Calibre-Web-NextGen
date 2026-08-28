@@ -171,20 +171,28 @@ fi
 # Ensure the resolved ingest directory exists and is writable. app_paths keeps
 # the environment -> dirs.json -> default precedence identical to Python.
 CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
-INGEST_DIR=$(python3 "${CWA_APP_PATHS}" ingest_folder)
-if [ -n "$INGEST_DIR" ]; then
-  # Create directory if missing
-  mkdir -p "$INGEST_DIR" 2>/dev/null || true
-  # Set ownership unless network share mode (only skip for /cwa-book-ingest)
-  if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
-    if [ "$INGEST_DIR" = "/cwa-book-ingest" ]; then
-      echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping chown of $INGEST_DIR"
-    else
-      chown -R abc:abc "$INGEST_DIR" 2>/dev/null || true
-    fi
-  else
-    chown -R abc:abc "$INGEST_DIR" 2>/dev/null || true
-  fi
+if ! INGEST_DIR="$(python3 "${CWA_APP_PATHS}" ingest_folder)"; then
+  echo "[cwa-init] ERROR: runtime ingest path resolver failed; refusing to prepare an unknown path"
+  exit 1
+fi
+case "$INGEST_DIR" in
+  ""|*$'\n'*|*$'\r'*|*/../*|*/..)
+    echo "[cwa-init] ERROR: runtime ingest path resolver returned an unsafe path; refusing to continue"
+    exit 1 ;;
+  /*) ;;
+  *)
+    echo "[cwa-init] ERROR: runtime ingest path resolver returned a non-absolute path; refusing to continue"
+    exit 1 ;;
+esac
+
+# Create directory if missing
+mkdir -p "$INGEST_DIR" 2>/dev/null || true
+# A network share is exempt regardless of which supported configuration layer
+# supplied its mount point.
+if [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
+  echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping chown of $INGEST_DIR"
+else
+  chown -R abc:abc "$INGEST_DIR" 2>/dev/null || true
 fi
 
 # For Calibre Plugins

@@ -11,7 +11,19 @@
 echo "[cwa-checksum-backfill] Waiting for CWA service to be ready..."
 
 CWA_APP_PATHS="${CWA_APP_PATHS:-/app/calibre-web-automated/scripts/app_paths.py}"
-library_path="$(python3 "${CWA_APP_PATHS}" calibre_library_dir)"
+if ! library_path="$(python3 "${CWA_APP_PATHS}" calibre_library_dir)"; then
+  echo "[cwa-checksum-backfill] ERROR: runtime library path resolver failed; refusing to inspect an unknown database"
+  exit 1
+fi
+case "$library_path" in
+  ""|*$'\n'*|*$'\r'*|*/../*|*/..)
+    echo "[cwa-checksum-backfill] ERROR: runtime library path resolver returned an unsafe path; refusing to continue"
+    exit 1 ;;
+  /*) ;;
+  *)
+    echo "[cwa-checksum-backfill] ERROR: runtime library path resolver returned a non-absolute path; refusing to continue"
+    exit 1 ;;
+esac
 metadata_db="${library_path%/}/metadata.db"
 metadata_uri="$(python3 - "$metadata_db" <<'PY'
 import sys

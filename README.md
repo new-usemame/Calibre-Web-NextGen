@@ -234,9 +234,15 @@ process environment instead of editing `dirs.json` inside the installation:
 | `CWA_TMP_CONVERSION_DIR` | `tmp_conversion_dir` | `/config/.cwa_conversion_tmp` |
 
 Each non-blank environment value wins for its key. If it is unset or blank,
-CWNG reads that key from the file selected by `CWA_DIRS_JSON`; a missing,
-invalid, or blank file value falls back to the compiled-in default. Existing
-hand-edited `dirs.json` files therefore remain supported.
+CWNG reads that key from the file selected by `CWA_DIRS_JSON`; a missing or
+malformed file, a non-object document, or a null/blank value falls back to the
+compiled-in default. Existing hand-edited `dirs.json` files therefore remain
+supported.
+
+Runtime path values are trimmed and must be absolute paths without a `..`
+component. A non-blank environment or `dirs.json` value that violates that
+contract stops the affected startup service with an error instead of letting a
+relative path reach file watchers or recursive ownership operations.
 
 For example, a systemd unit can load a packager-owned file:
 

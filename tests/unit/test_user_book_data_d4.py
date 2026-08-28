@@ -434,6 +434,71 @@ class TestPurge:
 
         assert session.query(ub.BookShelf).count() == 1
 
+    def test_purge_by_user_scopes_deleted_entitlements_and_seed_markers(self, session):
+        from cps import ub
+        from cps.user_book_data import purge_user_book_data
+
+        target = ub.Device(
+            user_id=USER, kind="kobo", display_name="Target Kobo",
+            active=True, created_by="auto",
+        )
+        other = ub.Device(
+            user_id=USER + 1, kind="kobo", display_name="Other Kobo",
+            active=True, created_by="auto",
+        )
+        session.add_all([target, other])
+        session.flush()
+        for device, suffix in ((target, "target"), (other, "other")):
+            session.add_all([
+                ub.KoboDeviceDeletedEntitlement(
+                    device_id=device.id,
+                    book_uuid=f"deleted-{suffix}",
+                    fingerprint="d" * 64,
+                ),
+                ub.KoboDeviceEntitlementSeed(device_id=device.id),
+            ])
+        session.commit()
+
+        purge_user_book_data(user_id=USER, session=session)
+        session.commit()
+
+        assert [
+            row.device_id for row in
+            session.query(ub.KoboDeviceDeletedEntitlement).all()
+        ] == [other.id]
+        assert [
+            row.device_id for row in
+            session.query(ub.KoboDeviceEntitlementSeed).all()
+        ] == [other.id]
+
+    def test_complete_database_purge_clears_deleted_entitlements_and_seed_markers(
+        self, session,
+    ):
+        from cps import ub
+        from cps.user_book_data import purge_user_book_data
+
+        device = ub.Device(
+            user_id=USER, kind="kobo", display_name="Database Swap Kobo",
+            active=True, created_by="auto",
+        )
+        session.add(device)
+        session.flush()
+        session.add_all([
+            ub.KoboDeviceDeletedEntitlement(
+                device_id=device.id,
+                book_uuid="old-library-deleted",
+                fingerprint="e" * 64,
+            ),
+            ub.KoboDeviceEntitlementSeed(device_id=device.id),
+        ])
+        session.commit()
+
+        purge_user_book_data(session=session)
+        session.commit()
+
+        assert session.query(ub.KoboDeviceDeletedEntitlement).count() == 0
+        assert session.query(ub.KoboDeviceEntitlementSeed).count() == 0
+
     def test_stage0_evidence_is_purged_before_annotation_id_reuse(self, session):
         """Account erasure must not alias old raw bytes onto a recycled id."""
         from cps import ub

@@ -12,6 +12,7 @@ be delivered.
 
 from datetime import datetime, timedelta, timezone
 import logging
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -185,9 +186,12 @@ def sync_harness(monkeypatch):
     def sync(token=None, *, internal_device_id=None, raw_device_id=None):
         internal_device_id = internal_device_id or device.id
         raw_device_id = raw_device_id or ("a" * 64)
+        speaking_device = session.get(ub.Device, internal_device_id)
         headers = {
             "x-kobo-deviceid": raw_device_id,
-            "x-kobo-devicemodel": "Kobo Clara BW",
+            "x-kobo-devicemodel": (
+                speaking_device.model if speaking_device else "Kobo Clara BW"
+            ),
         }
         if token is not None:
             headers[kobo.SyncToken.SyncToken.SYNC_TOKEN_HEADER] = token
@@ -243,6 +247,169 @@ def test_interrupted_sync_token_loss_does_not_redeliver_unchanged_entitlement(
     assert "entitlements new=0 changed=0 suppressed_unchanged=1" in summaries[-1]
     assert "replay_suppression enabled=True eligible=True" in summaries[-1]
     assert "cursors in=" in summaries[-1] and " out=" in summaries[-1]
+
+
+def test_upgrade_seed_suppresses_first_218_book_replay_for_all_existing_devices(
+    sync_harness, caplog, monkeypatch,
+):
+    """The first post-upgrade 3-page replay is protected before delivery."""
+    from cps import db, kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_cover_padding_enabled", True, raising=False,
+    )
+    caplog.set_level(logging.DEBUG, logger="cps.kobo")
+
+    second_device = ub.Device(
+        user_id=sync_harness.user.id,
+        kind="kobo",
+        display_name="Existing Household Kobo",
+        model="Kobo Libra Colour",
+        active=True,
+        created_by="auto",
+    )
+    sync_harness.session.add(second_device)
+    sync_harness.session.flush()
+
+    delivered = [sync_harness.book]
+    modified = sync_harness.book.last_modified
+    for number in range(2, 219):
+        book = db.Books(
+            f"Upgrade Book {number}",
+            f"Upgrade Book {number}",
+            "Author",
+            modified,
+            db.Books.DEFAULT_PUBDATE,
+            "1.0",
+            modified,
+            f"upgrade-book-{number}",
+            0,
+            [],
+            [],
+        )
+        sync_harness.session.add(book)
+        sync_harness.session.flush()
+        book.uuid = f"00000000-0000-0000-0000-{number:012d}"
+        sync_harness.session.add(db.Data(
+            book.id, "EPUB", 1_000_000 + number, f"upgrade-book-{number}",
+        ))
+        delivered.append(book)
+    sync_harness.session.add_all([
+        ub.KoboSyncedBooks(
+            user_id=sync_harness.user.id,
+            book_id=book.id,
+            book_uuid=str(book.uuid),
+        )
+        for book in delivered
+    ])
+    sync_harness.session.commit()
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    responses = []
+    for _page in range(3):
+        response = sync_harness.sync(token)
+        responses.append(response)
+        token = response.headers[sync_harness.token_header]
+
+    assert all(_entitlements(response) == [] for response in responses)
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 436
+    assert sync_harness.session.query(ub.KoboDeviceEntitlementSeed).count() == 2
+    first_book_hashes = {
+        row.device_id: row.fingerprint
+        for row in sync_harness.session.query(
+            ub.KoboDeviceBookEntitlement,
+        ).filter(
+            ub.KoboDeviceBookEntitlement.book_id == sync_harness.book.id,
+        ).all()
+    }
+    assert first_book_hashes[sync_harness.device.id] != \
+        first_book_hashes[second_device.id], (
+            "upgrade seeding must reproduce device-specific cover metadata, "
+            "not copy the speaking Kobo's payload across the household"
+        )
+
+    summaries = [
+        record.getMessage() for record in caplog.records
+        if record.getMessage().startswith("Kobo Sync summary:")
+    ]
+    assert sum(
+        int(re.search(r"suppressed_unchanged=(\d+)", line).group(1))
+        for line in summaries
+    ) == 218
+    seed_lines = [
+        record.getMessage() for record in caplog.records
+        if record.getMessage().startswith("Kobo Sync ledger seed:")
+    ]
+    assert len(seed_lines) == 1
+    assert "devices=2 books=218 deleted=0 new_devices=0" in seed_lines[0]
+    assert float(re.search(r"elapsed_ms=([0-9.]+)", seed_lines[0]).group(1)) >= 0
+
+    # Even a device whose historical ledger was seeded gets a full initial
+    # library after factory reset because a tokenless request is ineligible.
+    factory_reset = sync_harness.sync(
+        internal_device_id=second_device.id,
+        raw_device_id="b" * 64,
+    )
+    assert len(_entitlements(factory_reset)) == 100
+
+
+def test_hard_delete_entitlements_emit_once_then_suppress_exact_stale_replay(
+    sync_harness, caplog, monkeypatch,
+):
+    """Two hard-delete probes cannot remain ChangedEntitlements forever."""
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    caplog.set_level(logging.DEBUG, logger="cps.kobo")
+
+    # Cross the upgrade boundary before these new tombstones exist, so their
+    # first delivery is real rather than migration-seeded.
+    assert len(_entitlements(sync_harness.sync())) == 1
+    deleted_at = datetime(2026, 8, 28, 13, 30, 0)
+    sync_harness.session.add_all([
+        ub.KoboDeletedBook(
+            user_id=sync_harness.user.id,
+            book_uuid="00000000-0000-0000-0000-deleted0001",
+            deleted_at=deleted_at,
+        ),
+        ub.KoboDeletedBook(
+            user_id=sync_harness.user.id,
+            book_uuid="00000000-0000-0000-0000-deleted0002",
+            deleted_at=deleted_at + timedelta(seconds=1),
+        ),
+    ])
+    sync_harness.session.commit()
+
+    stale_token = kobo.SyncToken.SyncToken().build_sync_token()
+    first_offer = sync_harness.sync(stale_token)
+    # Model request teardown. A staged-but-uncommitted deletion fingerprint
+    # disappears here and makes the exact replay re-offer both tombstones.
+    sync_harness.session.rollback()
+    exact_replay = sync_harness.sync(stale_token)
+
+    first_removed = [
+        item["ChangedEntitlement"]
+        for item in _entitlements(first_offer)
+        if item.get("ChangedEntitlement", {}).get(
+            "BookEntitlement", {},
+        ).get("IsRemoved") is True
+    ]
+    assert len(first_removed) == 2
+    assert _entitlements(exact_replay) == []
+    assert sync_harness.session.query(
+        ub.KoboDeviceDeletedEntitlement,
+    ).count() == 2
+    summaries = [
+        record.getMessage() for record in caplog.records
+        if record.getMessage().startswith("Kobo Sync summary:")
+    ]
+    assert "entitlements new=0 changed=0" in summaries[-1]
+    assert "suppressed_unchanged=3 suppressed_removed=2" in summaries[-1]
 
 
 def test_suppressed_entitlement_emits_newer_reading_state_once_and_advances_cursor(
@@ -619,7 +786,7 @@ def test_entitlement_replay_state_is_per_device(sync_harness, monkeypatch):
 
 
 def test_second_device_has_no_cross_device_state_when_layer2_is_off(sync_harness):
-    """The default-off layer writes no ledger and does not starve device two."""
+    """An explicit flag-off override writes no ledger or cross-device state."""
     from cps import kobo, ub
 
     first_device = sync_harness.sync()
@@ -713,8 +880,28 @@ def test_full_sync_clears_only_target_users_entitlement_ledger(
         kobo.config, "config_kobo_suppress_replayed_entitlements", True,
     )
     first = sync_harness.sync()
-    _seed_same_user_device_ledger(sync_harness)
+    second_target_device = _seed_same_user_device_ledger(sync_harness)
     other_device = _seed_other_user_ledger(sync_harness)
+    sync_harness.session.add_all([
+        ub.KoboDeviceDeletedEntitlement(
+            device_id=sync_harness.device.id,
+            book_uuid="target-deleted",
+            fingerprint="a" * 64,
+        ),
+        ub.KoboDeviceDeletedEntitlement(
+            device_id=second_target_device.id,
+            book_uuid="target-deleted",
+            fingerprint="b" * 64,
+        ),
+        ub.KoboDeviceDeletedEntitlement(
+            device_id=other_device.id,
+            book_uuid="other-deleted",
+            fingerprint="c" * 64,
+        ),
+        ub.KoboDeviceEntitlementSeed(device_id=second_target_device.id),
+        ub.KoboDeviceEntitlementSeed(device_id=other_device.id),
+    ])
+    sync_harness.session.commit()
     monkeypatch.setattr(admin, "_", lambda value: value)
 
     with sync_harness.app.test_request_context("/ajax/fullsync/17", method="POST"):
@@ -728,6 +915,14 @@ def test_full_sync_clears_only_target_users_entitlement_ledger(
     assert {
         row.user_id for row in sync_harness.session.query(ub.KoboSyncedBooks)
     } == {18}
+    assert {
+        row.device_id for row in
+        sync_harness.session.query(ub.KoboDeviceDeletedEntitlement)
+    } == {other_device.id}
+    assert {
+        row.device_id for row in
+        sync_harness.session.query(ub.KoboDeviceEntitlementSeed)
+    } == {other_device.id}
 
     replay = sync_harness.sync(first.headers[sync_harness.token_header])
     replay_envelopes = _entitlements(replay)
@@ -737,6 +932,10 @@ def test_full_sync_clears_only_target_users_entitlement_ledger(
         row.device_id
         for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
     } == {sync_harness.device.id, other_device.id}
+    assert {
+        row.device_id for row in
+        sync_harness.session.query(ub.KoboDeviceEntitlementSeed)
+    } == {sync_harness.device.id, second_target_device.id, other_device.id}
 
 
 def test_admin_resend_clears_target_users_entitlement_ledger(
@@ -906,8 +1105,8 @@ def test_invalid_legacy_timestamp_fallback_is_byte_stable():
     assert kobo.convert_to_kobo_timestamp_string(None) == "1970-01-01T00:00:00Z"
 
 
-def test_generated_kepub_does_not_declare_source_epub_size(sync_harness):
-    """A download-time generated KEPUB must not advertise the EPUB's size."""
+def test_generated_kepub_restores_stable_v4142_source_size(sync_harness):
+    """Generated KEPUB metadata retains v4.1.42's nonzero stable Size."""
     from cps import kobo
 
     app = Flask(__name__)
@@ -919,10 +1118,7 @@ def test_generated_kepub_does_not_declare_source_epub_size(sync_harness):
     assert download["Url"] == f"/download/{sync_harness.book.id}/kepub"
     assert download["Platform"] == "Generic"
     assert download["DrmType"] == "None"
-    assert "Size" not in download, (
-        "the source EPUB size is not the size of the KEPUB bytes served after "
-        "download-time conversion/metadata rewriting"
-    )
+    assert download["Size"] == 1_234_567
 
 
 def test_exact_stored_epub_keeps_truthful_declared_size(sync_harness, monkeypatch):
@@ -939,10 +1135,10 @@ def test_exact_stored_epub_keeps_truthful_declared_size(sync_harness, monkeypatc
     assert download["Size"] == 321
 
 
-def test_metadata_rewritten_epub_does_not_declare_stored_size(
+def test_metadata_rewritten_epub_restores_stable_stored_size(
     sync_harness, monkeypatch,
 ):
-    """Metadata embedding makes an EPUB Data-row size inexact as well."""
+    """Metadata embedding still declares the stable v4.1.42 Data-row size."""
     from cps import kobo
 
     monkeypatch.setattr(kobo.config, "config_embed_metadata", True, raising=False)
@@ -952,19 +1148,19 @@ def test_metadata_rewritten_epub_does_not_declare_stored_size(
             sync_harness.book, stored_epub, "epub", "EPUB3",
         )
 
-    assert "Size" not in download
     assert download == {
         "Format": "EPUB3",
         "Url": f"/download/{sync_harness.book.id}/epub",
         "Platform": "Generic",
         "DrmType": "None",
+        "Size": 321,
     }
 
 
-def test_rewritten_stored_epub_and_kepub_keep_complete_download_fields(
+def test_rewritten_stored_epub_and_kepub_keep_v4142_download_fields(
     sync_harness, monkeypatch,
 ):
-    """Omitting inexact Size must not damage any URL/format/DRM field."""
+    """Rewritten routes retain all URL/format/DRM/Size fields."""
     from cps import db, kobo
 
     monkeypatch.setattr(kobo.config, "config_embed_metadata", True, raising=False)
@@ -977,12 +1173,14 @@ def test_rewritten_stored_epub_and_kepub_keep_complete_download_fields(
             "Url": f"/download/{sync_harness.book.id}/epub",
             "Platform": "Generic",
             "DrmType": "None",
+            "Size": 1_234_567,
         },
         {
             "Format": "EPUB",
             "Url": f"/download/{sync_harness.book.id}/epub",
             "Platform": "Generic",
             "DrmType": "None",
+            "Size": 1_234_567,
         },
     ]
 
@@ -999,6 +1197,7 @@ def test_rewritten_stored_epub_and_kepub_keep_complete_download_fields(
         "Url": f"/download/{sync_harness.book.id}/kepub",
         "Platform": "Generic",
         "DrmType": "None",
+        "Size": 1_345_678,
     }]
 
 
@@ -1008,10 +1207,10 @@ def test_rewritten_stored_epub_and_kepub_keep_complete_download_fields(
     "rewritten_stored_epub",
     "rewritten_stored_kepub",
 ])
-def test_size_omission_paths_still_serve_the_kobo_download_route(
+def test_restored_size_paths_still_serve_the_kobo_download_route(
     tmp_path, monkeypatch, network_share_mode, download_case,
 ):
-    """Every artifact whose entitlement omits Size still reaches the wire."""
+    """Generated/rewritten artifacts retain their working download routes."""
     import inspect
 
     from cps import helper, kobo
@@ -1113,8 +1312,8 @@ def test_size_omission_paths_still_serve_the_kobo_download_route(
         assert ".kepub.epub" in response.headers["Content-Disposition"]
 
 
-def test_device_entitlement_table_is_created_by_app_db_migration_path():
-    """An existing app.db missing the new ledger receives it at startup."""
+def test_device_entitlement_tables_are_created_by_app_db_migration_path():
+    """An existing app.db receives every replay ledger table at startup."""
     from cps import ub
     from sqlalchemy import inspect as sa_inspect
 
@@ -1124,16 +1323,21 @@ def test_device_entitlement_table_is_created_by_app_db_migration_path():
         # Create the existing referenced table but deliberately omit the new
         # ledger, then exercise the same additive path migrate_Database calls.
         ub.Device.__table__.create(bind=engine)
-        assert "kobo_device_book_entitlement" not in sa_inspect(engine).get_table_names()
+        expected = {
+            "kobo_device_book_entitlement",
+            "kobo_device_deleted_entitlement",
+            "kobo_device_entitlement_seed",
+        }
+        assert expected.isdisjoint(sa_inspect(engine).get_table_names())
         ub.add_missing_tables(engine, session)
-        assert "kobo_device_book_entitlement" in sa_inspect(engine).get_table_names()
+        assert expected.issubset(sa_inspect(engine).get_table_names())
     finally:
         session.close()
         engine.dispose()
 
 
-def test_replay_suppression_config_migrates_and_defaults_off():
-    """Layer 2 must remain dormant on both upgrades and fresh installs."""
+def test_replay_suppression_config_migrates_and_defaults_on():
+    """Hardware-proven replay suppression defaults on for upgrades and fresh installs."""
     from cps import config_sql
     from sqlalchemy import text
 
@@ -1146,7 +1350,7 @@ def test_replay_suppression_config_migrates_and_defaults_off():
         config_sql._migrate_table(session, config_sql._Settings)
         assert session.execute(text(
             "SELECT config_kobo_suppress_replayed_entitlements FROM settings"
-        )).scalar() == 0
+        )).scalar() == 1
 
         fresh_engine = create_engine("sqlite:///:memory:")
         try:
@@ -1156,7 +1360,7 @@ def test_replay_suppression_config_migrates_and_defaults_off():
             fresh_session.commit()
             assert (
                 fresh_session.query(config_sql._Settings).one()
-                .config_kobo_suppress_replayed_entitlements is False
+                .config_kobo_suppress_replayed_entitlements is True
             )
             fresh_session.close()
         finally:

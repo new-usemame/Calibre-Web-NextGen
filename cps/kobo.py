@@ -14,7 +14,7 @@ from cps import cw_babel
 import os
 import uuid
 import zipfile
-from time import gmtime, strftime
+from time import gmtime, monotonic, strftime
 import json
 from urllib.parse import unquote
 
@@ -75,6 +75,181 @@ def _entitlement_fingerprint(entitlement):
         ensure_ascii=False,
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _seed_existing_device_entitlement_ledgers(user_id):
+    """Seed pre-#1925 delivery state once for every known Kobo of a user.
+
+    Existing installs already have the flat ``KoboSyncedBooks`` record but no
+    per-device fingerprints.  Waiting to learn fingerprints from replayed
+    responses leaves the first post-upgrade token-loss replay harmful.  On the
+    first sync after upgrade, build the exact current base payload for every
+    previously delivered book and every known physical Kobo. Payloads are
+    device-specific because cover aspect settings can change ``CoverImageId``.
+
+    A durable per-device completion marker prevents later missing rows from
+    being mistaken for migration work: resend, unsync, archive, purge and
+    duplicate-merge paths deliberately clear individual ledger rows so the
+    next sync can deliver them.
+    """
+    device_ids = kobo_sync_status.get_unseeded_kobo_device_ids(user_id)
+    if not device_ids:
+        return True
+
+    started = monotonic()
+    try:
+        # Once any device crossed the upgrade boundary, an unmarked device is
+        # newly registered rather than an old device awaiting migration. Do
+        # not copy the user's flat historical delivery state onto it: that
+        # would make one Kobo's history suppress another Kobo's first copy.
+        # Mark it complete and let its own response build its ledger.
+        existing_user_seed = \
+            kobo_sync_status.user_has_completed_entitlement_seed(user_id)
+        if existing_user_seed:
+            kobo_sync_status.mark_device_entitlement_ledgers_seeded(device_ids)
+            if ub.session_commit() is False:
+                return False
+            elapsed_ms = round((monotonic() - started) * 1000, 1)
+            log.debug(
+                "Kobo Sync ledger seed: user=%s devices=%d books=0 deleted=0 "
+                "new_devices=%d elapsed_ms=%.1f",
+                user_id, len(device_ids), len(device_ids), elapsed_ms,
+            )
+            return True
+
+        synced_book_ids = sorted({
+            row.book_id for row in ub.session.query(
+                ub.KoboSyncedBooks.book_id,
+            ).filter(
+                ub.KoboSyncedBooks.user_id == int(user_id),
+            ).all()
+        })
+        archived = {
+            row.book_id: bool(row.is_archived)
+            for row in ub.session.query(ub.ArchivedBook).filter(
+                ub.ArchivedBook.user_id == int(user_id),
+            ).all()
+        }
+
+        seed_books = []
+        for offset in range(0, len(synced_book_ids), 250):
+            chunk = synced_book_ids[offset:offset + 250]
+            seed_books.extend(
+                calibre_db.session.query(db.Books)
+                .filter(db.Books.id.in_(chunk))
+                .options(
+                    joinedload(db.Books.authors),
+                    joinedload(db.Books.publishers),
+                    joinedload(db.Books.series),
+                    joinedload(db.Books.languages),
+                    joinedload(db.Books.comments),
+                    joinedload(db.Books.data),
+                )
+                .all()
+            )
+        seed_books.sort(key=lambda book: book.id)
+
+        # get_metadata() contains per-device cover selection. Build each
+        # device's ledger under that device's request identity instead of
+        # copying the requesting Kobo's hash across the household.
+        device_models = dict(ub.session.query(
+            ub.Device.id, ub.Device.model,
+        ).filter(ub.Device.id.in_(device_ids)).all())
+        original_device_id = getattr(g, "annotation_origin_device_id", None)
+        aspect_cache_present = hasattr(g, _REQUESTING_DEVICE_ASPECT_G_KEY)
+        original_aspect_cache = getattr(
+            g, _REQUESTING_DEVICE_ASPECT_G_KEY, None,
+        )
+        book_fingerprints_by_device = {}
+        try:
+            # Download metadata and every non-cover field are device-neutral;
+            # build them once so a network-share library is not walked once
+            # per household Kobo. CoverImageId is the sole per-device field.
+            common_payloads = {}
+            for book in seed_books:
+                common_payloads[book.id] = (
+                    create_book_entitlement(
+                        book, archived=archived.get(book.id, False),
+                    ),
+                    get_metadata(book),
+                )
+            for device_id in device_ids:
+                g.annotation_origin_device_id = device_id
+                # The live request header describes only the speaking device;
+                # seed other household Kobos from their recorded model.
+                setattr(
+                    g,
+                    _REQUESTING_DEVICE_ASPECT_G_KEY,
+                    cover_preview.preset_for_device_model(
+                        device_models.get(device_id),
+                    ),
+                )
+                book_fingerprints = {}
+                for book in seed_books:
+                    book_entitlement, common_metadata = common_payloads[book.id]
+                    metadata = dict(common_metadata)
+                    metadata["CoverImageId"] = _get_cover_image_id(book)
+                    payload = {
+                        "BookEntitlement": book_entitlement,
+                        "BookMetadata": metadata,
+                    }
+                    book_fingerprints[book.id] = \
+                        _entitlement_fingerprint(payload)
+                book_fingerprints_by_device[device_id] = book_fingerprints
+        finally:
+            g.annotation_origin_device_id = original_device_id
+            if aspect_cache_present:
+                setattr(
+                    g, _REQUESTING_DEVICE_ASPECT_G_KEY, original_aspect_cache,
+                )
+            else:
+                g.pop(_REQUESTING_DEVICE_ASPECT_G_KEY, None)
+
+        deleted_fingerprints = {}
+        for tombstone in ub.session.query(ub.KoboDeletedBook).filter(
+            ub.KoboDeletedBook.user_id == int(user_id),
+        ).all():
+            payload = {
+                "BookEntitlement": create_deleted_book_entitlement(
+                    tombstone.book_uuid, tombstone.deleted_at,
+                ),
+                "BookMetadata": create_deleted_book_metadata(tombstone.book_uuid),
+            }
+            deleted_fingerprints[str(tombstone.book_uuid)] = \
+                _entitlement_fingerprint(payload)
+
+        for device_id in device_ids:
+            kobo_sync_status.stage_device_entitlement_fingerprints(
+                device_id, book_fingerprints_by_device[device_id],
+            )
+            kobo_sync_status.stage_device_deleted_entitlement_fingerprints(
+                device_id, deleted_fingerprints,
+            )
+        kobo_sync_status.mark_device_entitlement_ledgers_seeded(device_ids)
+        # Legacy tests and a few downstream integrations replace this helper
+        # with a commit callable that returns None. Only the real helper's
+        # explicit False means the transaction was rolled back.
+        if ub.session_commit() is False:
+            return False
+    except Exception:
+        ub.session.rollback()
+        log.exception(
+            "Kobo Sync: failed to seed existing entitlement ledger for user %s",
+            user_id,
+        )
+        return False
+
+    elapsed_ms = round((monotonic() - started) * 1000, 1)
+    log.debug(
+        "Kobo Sync ledger seed: user=%s devices=%d books=%d deleted=%d "
+        "new_devices=0 elapsed_ms=%.1f",
+        user_id,
+        len(device_ids),
+        len(seed_books),
+        len(deleted_fingerprints),
+        elapsed_ms,
+    )
+    return True
 
 
 def _sync_cursor_summary(sync_token):
@@ -372,7 +547,7 @@ def HandleSyncRequest():
     sync_cursor_in = _sync_cursor_summary(sync_token)
     requesting_device_id = getattr(g, "annotation_origin_device_id", None)
     replay_suppression_enabled = bool(getattr(
-        config, "config_kobo_suppress_replayed_entitlements", False))
+        config, "config_kobo_suppress_replayed_entitlements", True))
     # Layer 2 deliberately cannot suppress a tokenless request. A factory
     # reset normally preserves the hardware id but clears both the library and
     # CWNG token; treating that as a replay would strand the entire library.
@@ -414,6 +589,14 @@ def HandleSyncRequest():
     sync_results = []
 
     calibre_db.reconnect_db(config, ub.app_DB_path)
+
+    # Upgrade bridge: existing devices already have flat delivery markers but
+    # no per-device hashes. Seed before selecting any replay so the FIRST
+    # valid-token replay after upgrade is suppressible, not merely later ones.
+    # A failed seed must not fall through to the harmful full replay.
+    if (replay_suppression_enabled and requesting_device_id
+            and not _seed_existing_device_entitlement_ledgers(current_user.id)):
+        return abort(503)
 
 
     # Magic-shelf book IDs + membership timestamp are computed for BOTH sync
@@ -695,6 +878,7 @@ def HandleSyncRequest():
     )
     entitlement_fingerprint_updates = {}
     suppressed_unchanged_entitlements = 0
+    suppressed_deleted_entitlements = 0
     delivered_book_identities = []
     for book in books_list:
         kobo_reading_state = book.KoboReadingState  # None when no record exists yet
@@ -1000,18 +1184,49 @@ def HandleSyncRequest():
         .limit(SYNC_ITEM_LIMIT)
         .all()
     )
+    prior_deleted_fingerprints = (
+        kobo_sync_status.get_device_deleted_entitlement_fingerprints(
+            requesting_device_id,
+            [str(tombstone.book_uuid) for tombstone in pending_deletions],
+        )
+        if replay_suppression_eligible else {}
+    )
+    deleted_fingerprint_updates = {}
     for tombstone in pending_deletions:
-        sync_results.append({
-            "ChangedEntitlement": {
-                "BookEntitlement": create_deleted_book_entitlement(
-                    tombstone.book_uuid, tombstone.deleted_at),
-                "BookMetadata": create_deleted_book_metadata(tombstone.book_uuid),
-            }
-        })
+        book_uuid = str(tombstone.book_uuid)
+        entitlement = {
+            "BookEntitlement": create_deleted_book_entitlement(
+                book_uuid, tombstone.deleted_at),
+            "BookMetadata": create_deleted_book_metadata(book_uuid),
+        }
+        fingerprint = (
+            _entitlement_fingerprint(entitlement)
+            if replay_suppression_enabled and requesting_device_id else None
+        )
+        entitlement_is_unchanged = bool(
+            replay_suppression_eligible
+            and prior_deleted_fingerprints.get(book_uuid) == fingerprint
+        )
+        if entitlement_is_unchanged:
+            suppressed_unchanged_entitlements += 1
+            suppressed_deleted_entitlements += 1
+        else:
+            sync_results.append({"ChangedEntitlement": entitlement})
+            if replay_suppression_enabled and requesting_device_id:
+                deleted_fingerprint_updates[book_uuid] = fingerprint
         ta = tombstone.deleted_at
         if hasattr(ta, "replace") and getattr(ta, "tzinfo", None) is not None:
             ta = ta.replace(tzinfo=None)
         new_archived_last_modified = max(ta, new_archived_last_modified)
+    kobo_sync_status.stage_device_deleted_entitlement_fingerprints(
+        requesting_device_id, deleted_fingerprint_updates,
+    )
+    if (deleted_fingerprint_updates
+            and ub.session_commit() is False):
+        # Do not claim a deletion was delivered when its replay guard rolled
+        # back; returning the payload anyway recreates the every-sync loop on
+        # the next stale archive cursor.
+        return abort(503)
 
     # Likewise, never set local continuation for deletion pages.  The returned
     # archive cursor must be persisted before the next page can be selected;
@@ -1037,12 +1252,14 @@ def HandleSyncRequest():
     changed_entitlement_count = sum("ChangedEntitlement" in item for item in sync_results)
     log.debug(
         "Kobo Sync summary: device=%s entitlements new=%d changed=%d "
-        "suppressed_unchanged=%d replay_suppression enabled=%s eligible=%s "
+        "suppressed_unchanged=%d suppressed_removed=%d "
+        "replay_suppression enabled=%s eligible=%s "
         "cursors in=%s out=%s",
         requesting_device_id,
         new_entitlement_count,
         changed_entitlement_count,
         suppressed_unchanged_entitlements,
+        suppressed_deleted_entitlements,
         replay_suppression_enabled,
         replay_suppression_eligible,
         sync_cursor_in,
@@ -1425,23 +1642,18 @@ def _get_cover_image_id(book):
         return base_id
 
 def build_download_url(book, book_data, download_format, declared_format):
-    result = {
-            "Format": declared_format,
-            "Url": get_download_url_for_book(book.id, download_format),
-            "Platform": "Generic",
-            "DrmType": "None",
-        }
-    # A generated KEPUB is not the Data row named by ``book_data``: deferred
-    # conversion can start from EPUB. Metadata embedding can rewrite either an
-    # EPUB or a KEPUB at download time. Advertising the source/stored size then
-    # makes Nickel compare unlike artifacts and de-download the local copy on
-    # an entitlement replay. Kobo accepts an omitted Size; retain it only when
-    # the exact stored artifact is what the URL serves.
-    generated_kepub = download_format == "kepub" and book_data.format != "KEPUB"
-    rewritten_download = bool(getattr(config, "config_embed_metadata", False))
-    if not generated_kepub and not rewritten_download:
-        result["Size"] = book_data.uncompressed_size
-    return result
+    # Preserve the v4.1.42 wire contract. Clara hardware recorded
+    # ``___FileSize=0`` when Size was omitted, a visible regression affecting
+    # 100 books. The value is the stable stored Data size even when the route
+    # later generates or rewrites the delivered artifact; replay suppression,
+    # not Size omission, is the proven de-download fix (#1925).
+    return {
+        "Format": declared_format,
+        "Url": get_download_url_for_book(book.id, download_format),
+        "Platform": "Generic",
+        "DrmType": "None",
+        "Size": book_data.uncompressed_size,
+    }
 
 def get_metadata(book):
     download_urls = []

@@ -338,6 +338,28 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
             ub.KoboDeviceBookEntitlement.device_id.in_(device_ids))
     entitlement_state.delete(synchronize_session=False)
 
+    # Hard-delete replay state and the one-time upgrade marker are scoped to a
+    # device rather than a current book id. A user/privacy purge or a complete
+    # database swap must remove them; a single live-book purge must not erase
+    # unrelated deletion history or re-arm migration seeding.
+    if user_id is not None or book_id is None:
+        deleted_entitlement_state = session.query(
+            ub.KoboDeviceDeletedEntitlement,
+        )
+        entitlement_seed_state = session.query(ub.KoboDeviceEntitlementSeed)
+        if user_id is not None:
+            device_ids = session.query(ub.Device.id).filter(
+                ub.Device.user_id == user_id,
+            ).scalar_subquery()
+            deleted_entitlement_state = deleted_entitlement_state.filter(
+                ub.KoboDeviceDeletedEntitlement.device_id.in_(device_ids),
+            )
+            entitlement_seed_state = entitlement_seed_state.filter(
+                ub.KoboDeviceEntitlementSeed.device_id.in_(device_ids),
+            )
+        deleted_entitlement_state.delete(synchronize_session=False)
+        entitlement_seed_state.delete(synchronize_session=False)
+
     # BookShelf has no user_id — shelf membership is shelf-scoped, and the
     # user-delete path removes the user's shelves (with their links)
     # separately. Only book-scoped (and full) purges touch it.

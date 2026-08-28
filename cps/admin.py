@@ -1432,6 +1432,12 @@ def do_full_kobo_sync(userid):
     ub.session.query(ub.KoboDeviceBookEntitlement).filter(
         ub.KoboDeviceBookEntitlement.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
+    ub.session.query(ub.KoboDeviceDeletedEntitlement).filter(
+        ub.KoboDeviceDeletedEntitlement.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
+    ub.session.query(ub.KoboDeviceEntitlementSeed).filter(
+        ub.KoboDeviceEntitlementSeed.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
     count = ub.session.query(ub.KoboSyncedBooks).filter(userid == ub.KoboSyncedBooks.user_id).delete()
     message = _("{} sync entries deleted").format(count)
     ub.session_commit(message)

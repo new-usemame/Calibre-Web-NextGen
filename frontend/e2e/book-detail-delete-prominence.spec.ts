@@ -100,17 +100,72 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
     await page.locator('html').evaluate((html, value) => html.setAttribute('data-theme', value), theme);
     const appearance = await region.evaluate((element) => {
       const style = getComputedStyle(element);
+      const label = element.querySelector('h2');
+      const button = element.querySelector('button');
+      const pageTitle = document.querySelector('h1');
+      if (!(label instanceof HTMLElement)
+        || !(button instanceof HTMLElement)
+        || !(pageTitle instanceof HTMLElement)) {
+        throw new Error('destructive region and page title must retain their semantic structure');
+      }
+
+      const dangerProbe = document.createElement('span');
+      dangerProbe.style.cssText = 'position:absolute;visibility:hidden;color:var(--danger)';
+      element.append(dangerProbe);
+      const dangerColor = getComputedStyle(dangerProbe).color;
+      dangerProbe.remove();
+
+      const labelStyle = getComputedStyle(label);
+      const buttonStyle = getComputedStyle(button);
+      const pageTitleStyle = getComputedStyle(pageTitle);
       return {
         backgroundColor: style.backgroundColor,
         borderLeftStyle: style.borderLeftStyle,
         borderRightStyle: style.borderRightStyle,
         borderBottomStyle: style.borderBottomStyle,
+        borderTopStyle: style.borderTopStyle,
+        borderTopWidth: style.borderTopWidth,
+        borderTopColor: style.borderTopColor,
         outlineStyle: style.outlineStyle,
         boxShadow: style.boxShadow,
+        dangerColor,
+        labelColor: labelStyle.color,
+        labelFontSize: labelStyle.fontSize,
+        labelFontWeight: labelStyle.fontWeight,
+        pageTitleFontSize: pageTitleStyle.fontSize,
+        buttonColor: buttonStyle.color,
+        buttonBorderColor: buttonStyle.borderColor,
+        buttonFontWeight: buttonStyle.fontWeight,
       };
     });
 
-    expect(appearance, `${theme} theme must not render a filled, boxed danger banner`).toEqual({
+    expect.soft({
+      hasTopDivider: appearance.borderTopStyle !== 'none'
+        && Number.parseFloat(appearance.borderTopWidth) > 0,
+      usesDangerColor: appearance.borderTopColor === appearance.dangerColor,
+    }, `${theme} theme must retain a neutral top divider`).toEqual({
+      hasTopDivider: true,
+      usesDangerColor: false,
+    });
+    expect.soft({
+      isPageTitleSized: Number.parseFloat(appearance.labelFontSize)
+        >= Number.parseFloat(appearance.pageTitleFontSize),
+      isAtLeastButtonWeight: Number.parseFloat(appearance.labelFontWeight)
+        >= Number.parseFloat(appearance.buttonFontWeight),
+      usesDangerColor: appearance.labelColor === appearance.dangerColor,
+    }, `${theme} theme must keep the region label subdued`).toEqual({
+      isPageTitleSized: false,
+      isAtLeastButtonWeight: false,
+      usesDangerColor: false,
+    });
+    expect.soft({
+      foreground: appearance.buttonColor,
+      border: appearance.buttonBorderColor,
+    }, `${theme} theme must retain danger emphasis on the delete button`).toEqual({
+      foreground: appearance.dangerColor,
+      border: appearance.dangerColor,
+    });
+    expect.soft(appearance, `${theme} theme must not render a filled, boxed danger banner`).toMatchObject({
       backgroundColor: 'rgba(0, 0, 0, 0)',
       borderLeftStyle: 'none',
       borderRightStyle: 'none',

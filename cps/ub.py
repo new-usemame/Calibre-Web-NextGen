@@ -1906,11 +1906,13 @@ def add_missing_tables(engine, _session):
         ("hidden_magic_shelf_templates", HiddenMagicShelfTemplate.__table__),
         ("kobo_annotation_backup", KoboAnnotationBackup.__table__),
         ("favorite_book", FavoriteBook.__table__),
+    )
+    kobo_entitlement_tables = (
         ("kobo_device_book_entitlement", KoboDeviceBookEntitlement.__table__),
         ("kobo_device_deleted_entitlement", KoboDeviceDeletedEntitlement.__table__),
         ("kobo_device_entitlement_seed", KoboDeviceEntitlementSeed.__table__),
     )
-    for table_name, table in tables:
+    for table_name, table in tables + kobo_entitlement_tables:
         # Explicit transaction control means even schema inspection begins a
         # real read transaction. Close it before opening the separate DDL
         # transaction or the inspection connection can block its commit.

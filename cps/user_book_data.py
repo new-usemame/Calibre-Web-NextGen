@@ -96,8 +96,12 @@ PER_USER_BOOK_MODELS = (
     "KoboSyncedBooks",
     "UserHiddenBook",
     "BookCoverPreview",
-    "KoboDeviceBookEntitlement",  # user scope resolves through Device
 )
+# This ledger is user-scoped through Device rather than a user_id column.
+# Keep the device-scoped registry extension separate from the flat-model tuple
+# so independently added flat per-user models merge without competing for the
+# tuple's final insertion point.
+PER_USER_BOOK_MODELS += ("KoboDeviceBookEntitlement",)
 
 
 def migrate_user_book_data(from_book_id, to_book_id, session=None):

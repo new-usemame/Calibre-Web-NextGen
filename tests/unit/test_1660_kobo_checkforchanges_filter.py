@@ -269,12 +269,9 @@ def test_upstream_auth_failure_with_json_list_is_propagated(app, monkeypatch, st
     assert response.get_json() == [OWNED]
 
 
-def test_annotation_get_proxies_even_for_owned_content(app, monkeypatch):
+def test_annotation_get_for_unowned_content_still_proxies(app, monkeypatch):
     sentinel = object()
-    monkeypatch.setattr(
-        rs, "resolve_entitlement_ownership",
-        lambda _content_id: pytest.fail("annotation GET must not expose ownership"),
-    )
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: None)
     monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
@@ -336,10 +333,9 @@ def test_empty_patch_for_unowned_content_still_proxies(app, monkeypatch):
         assert _view(rs.handle_annotations)(OWNED) is sentinel
 
 
-def test_patch_captures_updated_annotations_before_proxying(app, monkeypatch):
+def test_owned_patch_captures_updated_annotations_then_answers_locally(app, monkeypatch):
     from cps.services import annotation_sync
 
-    sentinel = object()
     book = SimpleNamespace(id=347, title="Flatland", identifiers=[])
     user = SimpleNamespace(id=7, name="test-user", is_authenticated=True)
     dispatched = []
@@ -351,13 +347,19 @@ def test_patch_captures_updated_annotations_before_proxying(app, monkeypatch):
         annotation_sync, "dispatch_annotation_sync",
         lambda *args, **kwargs: dispatched.append((args, kwargs)),
     )
-    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("owned PATCH must not contact Kobo"),
+    )
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations", method="PATCH",
         json={"updatedAnnotations": [annotation]},
     ):
-        assert _view(rs.handle_annotations)(OWNED) is sentinel
+        response = _view(rs.handle_annotations)(OWNED)
 
+    assert response.status_code == 204
+    assert response.get_data() == b""
+    assert response.headers["Content-Length"] == "0"
     assert dispatched == [(([annotation], book, user), {"origin_device_id": None})]
 
 
@@ -388,10 +390,9 @@ def test_patch_persistence_failure_is_not_acknowledged_upstream(
     assert "not fully persisted" in caplog.text
 
 
-def test_patch_declares_kobo_delete_authority_before_proxying(app, monkeypatch):
+def test_owned_patch_declares_kobo_delete_authority_then_answers_locally(app, monkeypatch):
     from cps.services import annotation_sync
 
-    sentinel = object()
     book = SimpleNamespace(id=347, title="Flatland", identifiers=[])
     user = SimpleNamespace(id=7, name="test-user", is_authenticated=True)
     dispatched = []
@@ -402,18 +403,52 @@ def test_patch_declares_kobo_delete_authority_before_proxying(app, monkeypatch):
         annotation_sync, "dispatch_annotation_deletes",
         lambda *args, **kwargs: dispatched.append((args, kwargs)),
     )
-    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("owned PATCH must not contact Kobo"),
+    )
 
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations", method="PATCH",
         json={"deletedAnnotationIds": ["annotation-1"]},
     ):
-        assert _view(rs.handle_annotations)(OWNED) is sentinel
+        response = _view(rs.handle_annotations)(OWNED)
 
+    assert response.status_code == 204
     assert dispatched == [(
         (["annotation-1"], user),
         {"book_id": book.id, "deletable_sources": {"kobo"}},
     )]
+
+
+def test_owned_patch_delete_commit_failure_is_refused_not_proxied(app, monkeypatch):
+    from cps.services import annotation_sync
+
+    book = SimpleNamespace(id=347, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(rs, "_stage_patch_for_recovery", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        rs, "current_user", SimpleNamespace(id=7, name="reader", is_authenticated=True),
+    )
+    monkeypatch.setattr(
+        annotation_sync, "dispatch_annotation_deletes", lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("failed local delete must not be acknowledged upstream"),
+    )
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations", method="PATCH",
+        json={"deletedAnnotationIds": ["annotation-1"]},
+    ):
+        response = _view(rs.handle_annotations)(OWNED)
+
+    assert response.status_code == 503
+    assert response.get_json() == {
+        "error": "Annotation capture temporarily unavailable",
+    }
 
 
 def test_patch_ownership_unknown_is_visible_and_not_proxied(app, monkeypatch, caplog):
@@ -521,7 +556,7 @@ def test_patch_non_list_annotation_batch_reaches_dispatcher_and_is_refused(
     assert "not fully persisted" in caplog.text
 
 
-def test_null_update_batch_preserves_deletes_and_upstream_proxy(
+def test_owned_null_update_batch_preserves_deletes_and_answers_locally(
     app, monkeypatch,
 ):
     from cps.services import annotation_sync
@@ -546,9 +581,8 @@ def test_null_update_batch_preserves_deletes_and_upstream_proxy(
         lambda *args, **kwargs: deleted.append((args, kwargs)),
     )
     monkeypatch.setattr(
-        rs,
-        "proxy_to_kobo_reading_services",
-        lambda: make_response(jsonify({"upstream": "accepted"}), 207),
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("owned PATCH must not contact Kobo"),
     )
 
     with app.test_request_context(
@@ -562,7 +596,7 @@ def test_null_update_batch_preserves_deletes_and_upstream_proxy(
     ):
         response = _view(rs.handle_annotations)(OWNED)
 
-    assert response.status_code == 207
+    assert response.status_code == 204
     assert deleted == [(
         (["ghost-annotation-1"], user),
         {"book_id": book.id, "deletable_sources": {"kobo"}},
@@ -574,7 +608,6 @@ def test_valid_json_annotation_batch_is_parsed_without_json_content_type(
 ):
     from cps.services import annotation_sync
 
-    sentinel = object()
     book = SimpleNamespace(id=347, title="Flatland", identifiers=[])
     user = SimpleNamespace(id=7, name="test-user", is_authenticated=True)
     annotation = {"id": "annotation-1", "type": "highlight"}
@@ -588,7 +621,10 @@ def test_valid_json_annotation_batch_is_parsed_without_json_content_type(
         "dispatch_annotation_sync",
         lambda *args, **kwargs: dispatched.append((args, kwargs)) or True,
     )
-    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("owned PATCH must not contact Kobo"),
+    )
 
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations",
@@ -596,8 +632,9 @@ def test_valid_json_annotation_batch_is_parsed_without_json_content_type(
         data=json.dumps({"updatedAnnotations": [annotation]}).encode(),
         content_type="text/plain",
     ):
-        assert _view(rs.handle_annotations)(OWNED) is sentinel
+        response = _view(rs.handle_annotations)(OWNED)
 
+    assert response.status_code == 204
     [(args, kwargs)] = dispatched
     assert args == ([annotation], book, user)
     assert kwargs["origin_device_id"] is None
@@ -606,7 +643,6 @@ def test_valid_json_annotation_batch_is_parsed_without_json_content_type(
 def test_valid_update_and_delete_batch_preserves_dispatch_order(app, monkeypatch):
     from cps.services import annotation_sync
 
-    sentinel = object()
     book = SimpleNamespace(id=347, title="Flatland", identifiers=[])
     events = []
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
@@ -625,7 +661,10 @@ def test_valid_update_and_delete_batch_preserves_dispatch_order(app, monkeypatch
         "dispatch_annotation_deletes",
         lambda *_args, **_kwargs: events.append("delete"),
     )
-    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("owned PATCH must not contact Kobo"),
+    )
 
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations",
@@ -635,8 +674,9 @@ def test_valid_update_and_delete_batch_preserves_dispatch_order(app, monkeypatch
             "deletedAnnotationIds": ["annotation-1"],
         },
     ):
-        assert _view(rs.handle_annotations)(OWNED) is sentinel
+        response = _view(rs.handle_annotations)(OWNED)
 
+    assert response.status_code == 204
     assert events == ["update", "delete"]
 
 
@@ -762,17 +802,19 @@ def test_registered_annotation_patch_route_returns_retryable_refusal(
         b'{"updatedAnnotations":[],"deletedAnnotationIds":[]}',
     ],
 )
-def test_empty_and_object_noop_patch_bodies_still_proxy(
+def test_owned_empty_and_object_noop_patch_bodies_answer_locally(
     app, monkeypatch, raw_body,
 ):
-    sentinel = object()
     monkeypatch.setattr(
         rs, "resolve_entitlement_ownership",
         lambda _content_id: SimpleNamespace(id=347, title="Flatland", identifiers=[]),
     )
     monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(rs, "_stage_patch_for_recovery", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("owned PATCH must not contact Kobo"),
+    )
     monkeypatch.setattr(
         rs, "current_user", SimpleNamespace(id=7, name="test-user", is_authenticated=True),
     )
@@ -781,4 +823,7 @@ def test_empty_and_object_noop_patch_bodies_still_proxy(
         f"/api/v3/content/{OWNED}/annotations", method="PATCH",
         data=raw_body, content_type="application/json",
     ):
-        assert _view(rs.handle_annotations)(OWNED) is sentinel
+        response = _view(rs.handle_annotations)(OWNED)
+
+    assert response.status_code == 204
+    assert response.get_data() == b""

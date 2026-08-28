@@ -154,9 +154,7 @@ def _app(monkeypatch, *, dispatch):
     )
     monkeypatch.setattr(
         rs, "proxy_to_kobo_reading_services",
-        lambda **_kwargs: app.response_class(
-            b'{"upstream":"accepted"}', status=207, headers={"X-Upstream": "same"},
-        ),
+        lambda **_kwargs: pytest.fail("owned PATCH must not contact Kobo"),
     )
     return app
 
@@ -178,8 +176,8 @@ def test_patch_spool_is_durable_before_parse_and_dispatch(monkeypatch, tmp_path)
         f"/annotations/{BOOK_UUID}", data=RAW_PATCH, content_type="application/json",
     )
 
-    assert response.status_code == 207
-    assert response.get_data() == b'{"upstream":"accepted"}'
+    assert response.status_code == 204
+    assert response.get_data() == b""
     [(path, record)] = _records(spool, root)
     assert record["body"] == RAW_PATCH
     assert record["body_sha256"] == spool.sha256_bytes(RAW_PATCH)
@@ -295,8 +293,8 @@ def test_spool_failure_cannot_change_patch_response_or_dispatch(monkeypatch, tmp
         f"/annotations/{BOOK_UUID}", data=RAW_PATCH, content_type="application/json",
     )
 
-    assert response.status_code == 207
-    assert response.get_data() == b'{"upstream":"accepted"}'
+    assert response.status_code == 204
+    assert response.get_data() == b""
     assert len(dispatched) == 1
 
 

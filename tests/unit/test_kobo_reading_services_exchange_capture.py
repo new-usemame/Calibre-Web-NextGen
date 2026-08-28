@@ -510,3 +510,60 @@ def test_annotations_get_and_patch_capture_both_proxy_legs_and_device_response(
     assert record["upstream_response"]["body"]["data"].encode() == upstream_body
     assert record["device_response"]["body"]["data"].encode() == upstream_body
     assert "secret" not in json.dumps(record).lower()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("method", "request_body", "expected_status"),
+    [
+        ("GET", b"", 200),
+        ("PATCH", b"{}", 204),
+    ],
+)
+def test_owned_annotations_capture_records_local_answer_without_upstream_leg(
+    monkeypatch, tmp_path, method, request_body, expected_status,
+):
+    _capture, root = _enable(monkeypatch, tmp_path)
+    app = Flask(__name__)
+    book = SimpleNamespace(id=347, title="Flatland", identifiers=[])
+
+    @app.route("/annotations/<content_id>", methods=["GET", "PATCH"])
+    def annotations(content_id):
+        return rs.handle_annotations.__wrapped__(content_id)
+
+    monkeypatch.setattr(rs, "current_user", SimpleNamespace(id=7, is_authenticated=True))
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    monkeypatch.setattr(rs, "_capture_authority_status", lambda _ownership: "unseeded")
+    monkeypatch.setattr(rs, "_stage_patch_for_recovery", lambda *_args: None)
+    monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_kwargs: pytest.fail("owned request must not create an upstream leg"),
+    )
+    monkeypatch.setattr(
+        "cps.services.kobo_annotation_authority.render_owned_annotations",
+        lambda **_kwargs: (
+            b'{"annotations":[],"nextPageOffsetToken":null}',
+            'W/"CWNG:00000000-0000-0000-0000-000000000000:1:0000000000000000"',
+        ),
+    )
+
+    response = app.test_client().open(
+        f"/annotations/{OWNED}?limit=100", method=method, data=request_body,
+        content_type="application/json",
+    )
+
+    assert response.status_code == expected_status
+    [record] = _records(root)
+    assert record["upstream_request"] is None
+    assert record["upstream_response"] is None
+    assert record["upstream_error"] is None
+    assert record["decisions"] == [{
+        "stage": "local_authority",
+        "index": 0,
+        "content_id": OWNED,
+        "ownership": "owned",
+        "authority_status": "unseeded",
+        "action": "answered_locally",
+    }]
+    assert record["device_response"]["status"] == expected_status

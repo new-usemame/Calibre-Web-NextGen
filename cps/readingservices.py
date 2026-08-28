@@ -415,6 +415,60 @@ def _capture_ownership_label(ownership):
     return "owned"
 
 
+def _record_annotation_decision(capture_session, ownership, action, entitlement_id):
+    """Best-effort exchange-capture decision for one annotation request."""
+    if capture_session is None:
+        return
+    capture_session.add_decision(
+        stage="local_authority",
+        index=0,
+        content_id=entitlement_id,
+        ownership=_capture_ownership_label(ownership),
+        authority_status=_capture_authority_status(ownership),
+        action=action,
+    )
+
+
+def _proxy_annotation_request(capture_session, ownership, entitlement_id):
+    _record_annotation_decision(
+        capture_session, ownership, "proxied", entitlement_id,
+    )
+    if capture_session is None:
+        return proxy_to_kobo_reading_services()
+    return proxy_to_kobo_reading_services(capture_session=capture_session)
+
+
+def _owned_annotation_patch_ack(capture_session, ownership, entitlement_id):
+    """The bare 204 shape Nickel receives from Kobo on a successful PATCH."""
+    _record_annotation_decision(
+        capture_session, ownership, "answered_locally", entitlement_id,
+    )
+    response = make_response(b"", 204)
+    response.headers["Content-Type"] = "text/html"
+    response.headers["Content-Length"] = "0"
+    return response
+
+
+def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
+    """Always return the complete local set; If-None-Match never yields 304."""
+    from cps.services.kobo_annotation_authority import render_owned_annotations
+
+    body, etag = render_owned_annotations(
+        user_id=current_user.id,
+        book_id=ownership.id,
+        entitlement_id=entitlement_id,
+        log=log,
+    )
+    _record_annotation_decision(
+        capture_session, ownership, "answered_locally", entitlement_id,
+    )
+    response = make_response(body, 200)
+    response.headers["Content-Type"] = "application/json"
+    response.headers["Content-Length"] = str(len(body))
+    response.headers["ETag"] = etag
+    return response
+
+
 def _stage_patch_for_recovery(raw_body, entitlement_id):
     """Bounded off-hub durable stage; never change route success."""
     try:
@@ -635,14 +689,16 @@ def _dispatch_kobo_annotation_deletes(annotation_sync, deleted, entitlement_id, 
             "Ignoring deletedAnnotationIds for entitlement %s: expected a list",
             entitlement_id,
         )
+        return True
     elif deleted:
         # Nickel can only name annotations Kobo created: CWNG has no annotation
         # writeback to Kobo. If F-3b565b implements writeback, this provenance
         # authority must be revisited.
-        annotation_sync.dispatch_annotation_deletes(
+        return annotation_sync.dispatch_annotation_deletes(
             deleted, current_user, book_id=book.id,
             deletable_sources={"kobo"},
         )
+    return True
 
 
 @csrf.exempt
@@ -651,7 +707,8 @@ def _dispatch_kobo_annotation_deletes(annotation_sync, deleted, entitlement_id, 
 def handle_annotations(entitlement_id):
     """Handle annotation requests for a specific book.
 
-    GET: proxied directly to Kobo.
+    GET: owned books are answered from CWNG's complete visible set; unowned
+    books retain the byte-transparent Kobo proxy.
     PATCH: intercept — persist locally (source='kobo'), then dispatch through
     each registered + enabled annotation_sync handler (Hardcover today; future
     Readwise / Notion / etc.). All DB writes happen in the dispatcher; this
@@ -669,7 +726,8 @@ def handle_annotations(entitlement_id):
         # The capture needs the bytes earlier than that, so the guard has to
         # move with it -- but it must NOT become a blanket 503: a 503 on the
         # annotations GET is one of the three measured answers that makes Nickel
-        # empty the book's local annotation set. Refuse the PATCH, proxy the GET.
+        # empty the book's local annotation set. Refuse the PATCH, proxy the GET
+        # only when ownership is not known locally.
         log.exception(
             "Could not read the annotation request body for entitlement %s",
             entitlement_id,
@@ -678,6 +736,9 @@ def handle_annotations(entitlement_id):
             return make_response(
                 jsonify({"error": "Annotation capture temporarily unavailable"}), 503,
             )
+        ownership = resolve_entitlement_ownership(entitlement_id)
+        if ownership is not None and ownership is not OWNERSHIP_UNKNOWN:
+            return _owned_annotation_get_response(None, ownership, entitlement_id)
         return proxy_to_kobo_reading_services()
     capture_session = _begin_exchange_capture(
         "annotations_patch" if request.method == "PATCH" else "annotations_get",
@@ -685,6 +746,15 @@ def handle_annotations(entitlement_id):
         authentication="authenticated",
         user_id=getattr(current_user, "id", None),
     )
+    if request.method == "GET":
+        ownership = resolve_entitlement_ownership(entitlement_id)
+        if ownership is not None and ownership is not OWNERSHIP_UNKNOWN:
+            return _owned_annotation_get_response(
+                capture_session, ownership, entitlement_id,
+            )
+        return _proxy_annotation_request(capture_session, ownership, entitlement_id)
+
+    book = None
     if request.method == "PATCH":
         patch_spool_ticket = _stage_patch_for_recovery(raw_body, entitlement_id)
         # The conservative default is replayable. Every post-stage exit crosses
@@ -805,9 +875,20 @@ def handle_annotations(entitlement_id):
                             503,
                         )
                 if not deterministic_update_rejection:
-                    _dispatch_kobo_annotation_deletes(
+                    deletes_persisted = _dispatch_kobo_annotation_deletes(
                         annotation_sync, deleted, entitlement_id, book,
                     )
+                    if deletes_persisted is False:
+                        log.error(
+                            "Kobo annotation deletes were not fully persisted for "
+                            "user_id=%s book_id=%s; refusing to acknowledge them",
+                            getattr(current_user, "id", None), book.id,
+                        )
+                        patch_spool_outcome = "dispatch_refused"
+                        return make_response(
+                            jsonify({"error": "Annotation capture temporarily unavailable"}),
+                            503,
+                        )
             patch_spool_outcome = "dispatch_completed"
         except Exception:
             log.exception("Error processing PATCH annotations")
@@ -816,12 +897,9 @@ def handle_annotations(entitlement_id):
             )
         finally:
             _mark_patch_spool_outcome(patch_spool_ticket, patch_spool_outcome)
-    # Proxy both GET + PATCH. Do not refuse GET: hardware testing showed that a
-    # 503 (or a hung request) makes Nickel empty its local annotations. The safe
-    # containment point is checkforchanges, before Nickel decides to GET.
-    if capture_session is None:
-        return proxy_to_kobo_reading_services()
-    return proxy_to_kobo_reading_services(capture_session=capture_session)
+    if book is not None:
+        return _owned_annotation_patch_ack(capture_session, book, entitlement_id)
+    return _proxy_annotation_request(capture_session, book, entitlement_id)
 
 
 @csrf.exempt

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
-from flask import Flask, make_response
+from flask import Flask
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -57,13 +57,12 @@ def test_kobo_reading_state_clock_parser_rejects_both_utc_overflows(clock):
 def test_live_patch_stores_the_highlight_without_the_rejected_clock(
     annotation_session, monkeypatch, clock
 ):
-    """The upstream-success response must correspond to a durable local row."""
+    """The local-success response must correspond to a durable local row."""
     from cps import readingservices
 
     session, user = annotation_session
     book = SimpleNamespace(id=347, title="The Clock", uuid=BOOK_UUID)
     app = Flask(__name__)
-    upstream_body = b'{"upstream":"accepted"}'
     monkeypatch.setattr(readingservices, "current_user", user)
     monkeypatch.setattr(
         readingservices,
@@ -74,7 +73,7 @@ def test_live_patch_stores_the_highlight_without_the_rejected_clock(
     monkeypatch.setattr(
         readingservices,
         "proxy_to_kobo_reading_services",
-        lambda: make_response(upstream_body, 207),
+        lambda: pytest.fail("owned PATCH must not contact Kobo"),
     )
     payload = {
         "updatedAnnotations": [{
@@ -94,8 +93,8 @@ def test_live_patch_stores_the_highlight_without_the_rejected_clock(
     ):
         response = readingservices.handle_annotations.__wrapped__(BOOK_UUID)
 
-    assert response.status_code == 207
-    assert response.get_data() == upstream_body
+    assert response.status_code == 204
+    assert response.get_data() == b""
     row = session.query(ub.Annotation).one()
     assert row.highlighted_text == "This highlight must survive the rejected clock."
     assert row.client_modified_at is None

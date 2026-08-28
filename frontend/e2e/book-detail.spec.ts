@@ -131,7 +131,11 @@ test('a permitted user gets a delete action that confirms, calls the delete endp
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
 
-  const del = page.getByRole('button', { name: 'Delete book' });
+  // #1939 renamed the accessible name to disambiguate irreversible global
+  // deletion from "remove from my library". The flow this test guards (#803) -
+  // confirm dialog, whole-book delete endpoint, return to the library - is
+  // unchanged.
+  const del = page.getByRole('button', { name: 'Delete from the global library' });
   await expect(del).toBeVisible({ timeout: 10_000 });
 
   // Clicking fires the confirm dialog, then a POST to the whole-book delete

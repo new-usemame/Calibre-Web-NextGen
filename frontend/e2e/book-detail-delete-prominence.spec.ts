@@ -37,11 +37,18 @@ test('book-detail deletion remains visible and accessible with delete permission
   await setDeletePermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
+  // #1939 renamed this region's heading and the button's accessible name from
+  // "Delete book" to "Delete from the global library". The rename is the point:
+  // once a user can also *remove a book from their own library*, "Delete book"
+  // no longer says which of the two you are about to do, and only one of them is
+  // irreversible for everyone. What #1862 guards is unchanged and still asserted
+  // below - the region is present, has an accessible name, and exposes a
+  // reachable delete control - so this is a re-expression, not a relaxation.
   const region = page.getByTestId('book-destructive-actions');
   await expect(region).toBeVisible();
-  await expect(region).toHaveAccessibleName('Delete book');
-  await expect(region.getByRole('heading', { name: 'Delete book' })).toBeVisible();
-  await expect(region.getByRole('button', { name: 'Delete book' })).toBeVisible();
+  await expect(region).toHaveAccessibleName('Delete from the global library');
+  await expect(region.getByRole('heading', { name: 'Delete from the global library' })).toBeVisible();
+  await expect(region.getByRole('button', { name: 'Delete from the global library' })).toBeVisible();
 });
 
 test('book-detail deletion remains absent without delete permission (#1862)', async ({ page }) => {
@@ -69,8 +76,10 @@ test('dismissing book-detail deletion confirmation never calls the endpoint (#18
   });
 
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
+  // Accessible name, not visible text: the button reads "Delete" and carries
+  // aria-label "Delete from the global library" (#1939).
   const deleteButton = page.getByTestId('book-destructive-actions')
-    .getByRole('button', { name: 'Delete book' });
+    .getByRole('button', { name: 'Delete from the global library' });
   await expect(deleteButton).toBeVisible();
 
   let declinedPrompt = '';

@@ -12,6 +12,6 @@
   "severity": "data-integrity",
   "source": "audit",
   "status": "open",
-  "title": "A Kobo deletion CAN sit un-uploaded, but the 'needs a same-book carrier' explanation is REFUTED - a plain sync uploads it",
+  "title": "A Kobo deletion uploads on BOOK CLOSE, not on the library sync - a deletion made while the book stays open sits un-uploaded indefinitely",
   "updated": "2026-08-28"
 }

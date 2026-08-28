@@ -75,7 +75,7 @@ def serialize_sidebar_order(user):
 
 
 def serialize_user(user):
-    return {
+    payload = {
         "id": user.id,
         "name": user.name,
         "locale": user.locale,
@@ -105,8 +105,24 @@ def serialize_user(user):
         # flag — otherwise every shelf view would have to fetch the whole
         # account payload (app passwords, locale + language lists) for one bool.
         "kobo_only_shelves_sync": bool(getattr(user, "kobo_only_shelves_sync", False)),
-        "has_own_library": bool(getattr(user, "has_own_library", False)),
     }
+    mode = getattr(user, "library_mode", None)
+    payload.update({
+        "library_mode": (
+            mode() if callable(mode)
+            else (constants.LIBRARY_MODE_PERSONAL
+                  if bool(getattr(user, "has_own_library", False))
+                  else constants.LIBRARY_MODE_MONOLIBRARY)
+        ),
+        "my_library_seeded": bool(
+            getattr(user, "user_library_seeded", False)
+        ),
+        "show_my_library_intro": (
+            not user.role_anonymous()
+            and not bool(getattr(user, "my_library_intro_dismissed", False))
+        ),
+    })
+    return payload
 
 
 def serialize_shelf(shelf, count, is_owner):

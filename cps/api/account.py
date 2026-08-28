@@ -14,7 +14,7 @@ from flask import jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
-from .. import config, logger, ub
+from .. import config, constants, logger, ub, user_library
 from ..cw_login import current_user
 from .options import locale_options, book_language_options
 from ..helper import valid_password, valid_email, check_email
@@ -67,7 +67,7 @@ def _serialize_account():
     # Shared with the admin form (#886) — same two selects, one builder.
     locales = locale_options()
     lang_options = book_language_options()
-    return {
+    payload = {
         "name": current_user.name,
         "email": current_user.email or "",
         "kindle_mail": current_user.kindle_mail or "",
@@ -98,6 +98,8 @@ def _serialize_account():
         "languages": lang_options,
         "app_passwords": _app_passwords(),
     }
+    payload.update(user_library.mode_payload(current_user))
+    return payload
 
 
 @api_v1.route("/account")
@@ -105,7 +107,41 @@ def get_account():
     guard = _require_real_user()
     if guard:
         return guard
+    user_library.mark_response_user_specific()
     return jsonify(_serialize_account())
+
+
+@api_v1.route("/account/library-mode", methods=["POST"])
+def update_library_mode():
+    """Switch this account between monolibrary and personal-library modes."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    data = request.get_json(silent=True) or {}
+    mode = data.get("mode")
+    if mode not in constants.LIBRARY_MODES:
+        return _err(
+            "invalid_library_mode",
+            "mode must be 'monolibrary' or 'personal_library'",
+            400,
+        )
+    try:
+        user_library.set_library_mode(current_user, mode)
+    except user_library.UserLibraryError as ex:
+        ub.session.rollback()
+        return _err("library_mode_rejected", str(ex), 409)
+    user_library.mark_response_user_specific()
+    return jsonify(user_library.mode_payload(current_user))
+
+
+@api_v1.route("/account/my-library-intro/dismiss", methods=["POST"])
+def dismiss_my_library_intro():
+    """Persist this account's introductory-card dismissal."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.dismiss_intro(current_user)
+    return jsonify(user_library.mode_payload(current_user))
 
 
 @api_v1.route("/account/profile", methods=["POST"])

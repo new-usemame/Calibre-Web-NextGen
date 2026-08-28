@@ -32,7 +32,7 @@ from werkzeug.datastructures import Headers
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import constants, logger, isoLanguages, services, helper, spa, oauth_auto_redirect
-from . import db, ub, config, app
+from . import db, ub, config, app, user_library
 from . import calibre_db, kobo_sync_status
 from .services.ereader_send import send_includes_own_address
 from .services import reading_position
@@ -363,9 +363,7 @@ def toggle_favorite(book_id):
 def add_to_my_library(book_id):
     from . import user_library
     try:
-        user_library.add_book(
-            current_user, book_id, added_by=int(current_user.id)
-        )
+        user_library.add_book(current_user, book_id)
     except user_library.UserLibraryError as ex:
         return json.dumps({"error": str(ex)}), 403
     return json.dumps({"in_my_library": True})
@@ -3124,7 +3122,17 @@ def logout():
 def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_status, translations, languages):
     to_save = request.form.to_dict()
     current_user.random_books = 0
+    desired_library_mode = to_save.get(
+        "library_mode", user_library.mode_for_user(current_user)
+    )
     try:
+        if desired_library_mode not in constants.LIBRARY_MODES:
+            raise ValueError(_("Invalid library mode"))
+        if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
+                and not bool(current_user.user_library_seeded)):
+            # This combined classic form edits many fields. Seed first so its
+            # bounded commits cannot persist unrelated half-validated input.
+            user_library.seed_user_library(current_user)
         if current_user.role_passwd() or current_user.role_admin():
             if to_save.get("password", "") != "":
                 current_user.password = generate_password_hash(valid_password(to_save.get("password")))
@@ -3395,11 +3403,14 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
         current_user.sidebar_view += constants.DETAIL_RANDOM
 
     try:
-        ub.session.commit()
+        user_library.set_library_mode(current_user, desired_library_mode)
         flash(_("Success! Profile Updated"), category="success")
         log.debug("Profile updated")
         # Redirect to refresh sidebar with updated shelf visibility
         return redirect(url_for('web.profile'))
+    except user_library.UserLibraryError as ex:
+        ub.session.rollback()
+        flash(str(ex), category="error")
     except IntegrityError:
         ub.session.rollback()
         flash(_("Oops! An account already exists for this Email."), category="error")

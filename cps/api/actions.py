@@ -62,9 +62,7 @@ def add_book_to_my_library(book_id):
     if guard:
         return guard
     try:
-        user_library.add_book(
-            current_user, book_id, added_by=int(current_user.id)
-        )
+        user_library.add_book(current_user, book_id)
     except user_library.UserLibraryError as ex:
         return _err("library_membership_rejected", str(ex), 403)
     return jsonify({"in_my_library": True})
@@ -77,6 +75,7 @@ def my_library_removal_impact(book_id):
     guard = _require_real_user()
     if guard:
         return guard
+    user_library.mark_response_user_specific()
     try:
         impact = user_library.removal_impact(current_user, book_id)
     except user_library.UserLibraryError as ex:

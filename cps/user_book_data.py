@@ -95,6 +95,7 @@ PER_USER_BOOK_MODELS = (
     "KoboSyncedBooks",
     "UserHiddenBook",
     "BookCoverPreview",
+    "UserLibraryBook",
 )
 
 
@@ -202,7 +203,7 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
 
     # Simple UNIQUE(user, book) flags: keep the kept book's row on clash.
     for model in (ub.ArchivedBook, ub.Downloads, ub.UserHiddenBook,
-                  ub.BookCoverPreview):
+                  ub.BookCoverPreview, ub.UserLibraryBook):
         for row in session.query(model).filter(model.book_id == from_book_id).all():
             clash = session.query(model).filter(
                 model.user_id == row.user_id,
@@ -316,7 +317,8 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
         synchronize_session=False)
 
     for model in (ub.Bookmark, ub.ReadBook, ub.ArchivedBook, ub.Downloads,
-                  ub.KoboSyncedBooks, ub.UserHiddenBook, ub.BookCoverPreview):
+                  ub.KoboSyncedBooks, ub.UserHiddenBook, ub.BookCoverPreview,
+                  ub.UserLibraryBook):
         _scoped(session.query(model), model).delete(synchronize_session=False)
 
     # BookShelf has no user_id — shelf membership is shelf-scoped, and the

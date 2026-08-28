@@ -147,8 +147,8 @@
         </div>
 
         <div>
-          <input type="checkbox" name="config_new_users_have_own_library" id="config_new_users_have_own_library" {% if conf.config_new_users_have_own_library %}checked{% endif %} style="accent-color: var(--color-secondary);">
-          <label for="config_new_users_have_own_library">{{_('Enable My Library for new users')}}</label>
+          <input type="checkbox" name="config_new_users_personal_library" id="config_new_users_personal_library" {% if conf.config_new_users_personal_library %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="config_new_users_personal_library">{{_('Start new accounts in personal library mode')}}</label>
         </div>
         
         {% if conf.config_uploading %}

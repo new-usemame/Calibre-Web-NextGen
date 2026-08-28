@@ -202,6 +202,13 @@ ROLE_DELETE_BOOKS       = 1 << 7
 ROLE_VIEWER             = 1 << 8
 ROLE_BROWSE_GLOBAL      = 1 << 9
 
+# #1939 user-facing library modes. ``has_own_library`` is the persisted
+# selector, but false is not "feature disabled": it is the named monolibrary
+# mode where the account continuously follows the global Calibre library.
+LIBRARY_MODE_MONOLIBRARY = "monolibrary"
+LIBRARY_MODE_PERSONAL = "personal_library"
+LIBRARY_MODES = frozenset((LIBRARY_MODE_MONOLIBRARY, LIBRARY_MODE_PERSONAL))
+
 ALL_ROLES = {
                 "admin_role": ROLE_ADMIN,
                 "download_role": ROLE_DOWNLOAD,

@@ -11,7 +11,9 @@ from sqlalchemy.sql.functions import coalesce
 
 from . import api_v1
 from .serializers import serialize_book_list_item, serialize_book_detail
-from .. import calibre_db, config, db, ub, isoLanguages, logger
+from .. import (
+    calibre_db, config, constants, db, ub, isoLanguages, logger, user_library,
+)
 from ..cw_login import current_user
 from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
     get_convert_options, get_kosync_progress_display, \
@@ -413,7 +415,11 @@ def list_global_library():
         allow_show_global=True,
     )
     member_ids = set()
-    if bool(getattr(current_user, "has_own_library", False)):
+    personal_library_mode = (
+        user_library.mode_for_user(current_user)
+        == constants.LIBRARY_MODE_PERSONAL
+    )
+    if personal_library_mode:
         page_ids = [int(getattr(entry, "Books", entry).id) for entry in entries]
         member_ids = {int(row[0]) for row in (
             ub.session.query(ub.UserLibraryBook.book_id)
@@ -423,7 +429,7 @@ def list_global_library():
     items = _rows_to_items(entries)
     for item in items:
         item["in_my_library"] = (
-            not bool(getattr(current_user, "has_own_library", False))
+            not personal_library_mode
             or item["id"] in member_ids
         )
     return jsonify({
@@ -431,7 +437,7 @@ def list_global_library():
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total_count,
-        "my_library_enabled": bool(getattr(current_user, "has_own_library", False)),
+        "library_mode": user_library.mode_for_user(current_user),
     })
 
 

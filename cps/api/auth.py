@@ -162,6 +162,8 @@ def _user_avatar(name):
 def _me_payload(user):
     """Single source of truth for the /me-shaped payload the SPA consumes across
     login, magic-link, and /auth/me. Keeps the three sites from drifting."""
+    from .. import user_library
+    user_library.mark_response_user_specific()
     payload = serialize_user(user)
     payload["features"] = _server_features()
     payload["instance_name"] = _instance_name()

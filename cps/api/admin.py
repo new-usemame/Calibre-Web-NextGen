@@ -12,7 +12,7 @@ from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from . import api_v1
-from .. import ub, constants, config
+from .. import ub, constants, config, user_library
 from ..cw_login import current_user
 from .options import locale_options, book_language_options
 from ..usermanagement import login_required_if_no_ano
@@ -62,7 +62,7 @@ def _require_admin():
 
 
 def _serialize_user(u):
-    return {
+    payload = {
         "id": u.id,
         "name": u.name,
         "email": u.email or "",
@@ -71,8 +71,9 @@ def _serialize_user(u):
         "default_language": u.default_language,
         "is_guest": u.name == "Guest",
         "roles": {key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
-        "has_own_library": bool(getattr(u, "has_own_library", False)),
     }
+    payload.update(user_library.mode_payload(u))
+    return payload
 
 
 def _other_admin_count(exclude_id):
@@ -135,8 +136,8 @@ def _ui_config_payload():
         "config_default_language": config.config_default_language,
         "config_default_locale": config.config_default_locale,
         "config_server_announcement": config.config_server_announcement or "",
-        "config_new_users_have_own_library": bool(
-            getattr(config, "config_new_users_have_own_library", False)
+        "config_new_users_personal_library": bool(
+            getattr(config, "config_new_users_personal_library", False)
         ),
         # Shared with the account form so the two settings pages can never
         # disagree about these options again (#886).
@@ -239,9 +240,9 @@ def admin_update_config():
     for key in _UI_CONFIG_STR:
         if key in data:
             setattr(config, key, str(data[key] or ""))
-    if "config_new_users_have_own_library" in data:
-        config.config_new_users_have_own_library = bool(
-            data["config_new_users_have_own_library"]
+    if "config_new_users_personal_library" in data:
+        config.config_new_users_personal_library = bool(
+            data["config_new_users_personal_library"]
         )
     try:
         config.save()
@@ -329,15 +330,21 @@ def admin_update_user(user_id):
 
     data = request.get_json(silent=True) or {}
 
-    desired_own_library = bool(data.get(
-        "has_own_library", getattr(user, "has_own_library", False)
-    ))
-    if desired_own_library and not bool(getattr(user, "has_own_library", False)):
+    desired_library_mode = data.get(
+        "library_mode", user_library.mode_for_user(user)
+    )
+    if desired_library_mode not in constants.LIBRARY_MODES:
+        return _err(
+            "invalid_library_mode",
+            "library_mode must be 'monolibrary' or 'personal_library'",
+            400,
+        )
+    if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
+            and not bool(user.user_library_seeded)):
         try:
-            from .. import user_library
-            user_library.seed_user_library(
-                user, added_by=int(current_user.id)
-            )
+            # Seed before applying the rest of this multi-field update so its
+            # chunk commits cannot persist half-validated profile changes.
+            user_library.seed_user_library(user)
         except Exception as ex:
             ub.session.rollback()
             return _err("library_seed_failed", str(ex), 400)
@@ -356,19 +363,6 @@ def admin_update_user(user_id):
             return _err("conflict", "Can't remove admin from the last administrator", 400)
         user.role = new_role
 
-    if "has_own_library" in data:
-        user.has_own_library = desired_own_library
-        from .. import user_library
-        if (desired_own_library
-                and user_library.membership_count(user.id) == 0
-                and not user.role_browse_global()):
-            ub.session.rollback()
-            return _err(
-                "empty_library_without_global_access",
-                "My Library cannot be enabled with an empty set unless this user can browse the global library.",
-                400,
-            )
-
     try:
         if "email" in data:
             new_email = valid_email(data.get("email") or "")
@@ -380,9 +374,16 @@ def admin_update_user(user_id):
             user.locale = data["locale"]
         if "default_language" in data and data["default_language"]:
             user.default_language = data["default_language"]
+        if "library_mode" in data:
+            user_library.set_library_mode(user, desired_library_mode)
+            user_library.mark_response_user_specific()
+            return jsonify(_serialize_user(user))
     except Exception as ex:  # validators raise generic Exception with a message
         ub.session.rollback()
-        return _err("invalid_request", str(ex), 400)
+        code = ("library_mode_rejected"
+                if isinstance(ex, user_library.UserLibraryError)
+                else "invalid_request")
+        return _err(code, str(ex), 400)
 
     try:
         ub.session.commit()

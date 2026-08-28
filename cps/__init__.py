@@ -81,6 +81,21 @@ app.config.update(
     REMEMBER_COOKIE_NAME=os.environ.get('COOKIE_PREFIX', "") + "remember_token"
 )
 
+
+@app.after_request
+def protect_user_specific_catalog_responses(response):
+    """Prevent a shared cache from crossing account-specific catalog views."""
+    if not getattr(g, "_common_filters_user_specific", False):
+        return response
+    response.headers["Cache-Control"] = "private, no-store"
+    response.vary.add("Cookie")
+    response.vary.add("Authorization")
+    if getattr(config, "config_allow_reverse_proxy_header_login", False):
+        header_name = getattr(config, "config_reverse_proxy_login_header_name", "")
+        if header_name:
+            response.vary.add(header_name)
+    return response
+
 # Fix for running behind reverse proxy (e.g. nginx, apache, caddy, ...)
 # Without it, url_for will generate http:// urls even if https:// is used
 # Set TRUSTED_PROXY_COUNT to the number of proxies in your chain (default: 1)

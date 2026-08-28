@@ -40,7 +40,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import select
 import requests
 
-from . import config, logger, kobo_auth, db, calibre_db, helper, shelf as shelf_lib, ub, csrf, kobo_sync_status, magic_shelf
+from . import config, constants, logger, kobo_auth, db, calibre_db, helper, shelf as shelf_lib, ub, csrf, kobo_sync_status, magic_shelf, user_library
 from . import isoLanguages
 from .epub import get_epub_layout
 from .constants import COVER_THUMBNAIL_SMALL, COVER_THUMBNAIL_MEDIUM, COVER_THUMBNAIL_LARGE, CACHE_TYPE_THUMBNAILS
@@ -391,7 +391,14 @@ def HandleSyncRequest():
     # the user's Kobo shelves; sync-all mode now means My Library when that
     # feature is enabled. The membership set is intersected with shelves so a
     # stale shelf link can never keep a removed book on the device.
-    membership_enabled = bool(getattr(current_user, "has_own_library", False))
+    # Keep this compatibility input explicit: older integrations and tests
+    # construct user-shaped objects without the named-mode helper.
+    membership_enabled = bool(getattr(current_user, 'has_own_library', False))
+    personal_library_mode = (
+        membership_enabled
+        or user_library.mode_for_user(current_user)
+        == constants.LIBRARY_MODE_PERSONAL
+    )
     if current_user.kobo_only_shelves_sync or membership_enabled:
         try:
             # Check all books that are on Kobo according to the database
@@ -403,14 +410,14 @@ def HandleSyncRequest():
                 allowed_books_query = (ub.session.query(ub.BookShelf.book_id)
                                        .join(ub.Shelf, ub.BookShelf.shelf == ub.Shelf.id)
                                        .filter(ub.Shelf.user_id == current_user.id,
-                                               ub.Shelf.kobo_sync == True))
+                                               ub.Shelf.kobo_sync.is_(True)))
                 allowed_book_ids = {item.book_id for item in allowed_books_query}
                 if magic_shelf_book_ids:
                     allowed_book_ids |= magic_shelf_book_ids
             else:
                 allowed_book_ids = set(synced_book_ids)
 
-            if membership_enabled:
+            if personal_library_mode:
                 library_book_ids = {
                     row.book_id for row in
                     ub.session.query(ub.UserLibraryBook.book_id)

@@ -199,6 +199,12 @@ class UserBase:
     def role_browse_global(self):
         return self._has_role(constants.ROLE_BROWSE_GLOBAL)
 
+    def library_mode(self):
+        """Return the named #1939 mode; false is deliberate monolibrary."""
+        if bool(getattr(self, "has_own_library", False)):
+            return constants.LIBRARY_MODE_PERSONAL
+        return constants.LIBRARY_MODE_MONOLIBRARY
+
     @property
     def is_active(self):
         return True
@@ -295,10 +301,20 @@ class User(UserBase, Base):
     view_settings = Column(JSON, default={})
     kobo_only_shelves_sync = Column(Integer, default=0)
     opds_only_shelves_sync = Column(Integer, default=0)
-    # Off preserves the historical global-library behavior. When enabled,
-    # CalibreDB.common_filters limits user-visible book sets to
-    # UserLibraryBook rows for this account.
+    # Named library-mode selector. False is monolibrary mode: this account's
+    # library continuously mirrors the global archive. True is personal mode:
+    # CalibreDB.common_filters limits it to UserLibraryBook rows.
     has_own_library = Column(
+        Boolean, nullable=False, default=False, server_default=text("0"),
+    )
+    # Durable seed-once marker, intentionally separate from membership count.
+    # A user may curate a personal library to zero rows; a later mode toggle
+    # must restore that empty set, not mistake it for never-initialized state.
+    user_library_seeded = Column(
+        Boolean, nullable=False, default=False, server_default=text("0"),
+    )
+    # The My Library introductory card is account state, not browser storage.
+    my_library_intro_dismissed = Column(
         Boolean, nullable=False, default=False, server_default=text("0"),
     )
     # Stage 0 Kobo two-way annotation opt-in.  No route consumes this flag
@@ -379,6 +395,8 @@ class Anonymous(AnonymousUserMixin, UserBase):
         self.kobo_only_shelves_sync = None
         self.opds_only_shelves_sync = None
         self.has_own_library = False
+        self.user_library_seeded = False
+        self.my_library_intro_dismissed = False
         self.kobo_two_way_annotation_sync = False
         self.kobo_two_way_annotation_scope = 'all'
         self.view_settings = {}
@@ -415,6 +433,8 @@ class Anonymous(AnonymousUserMixin, UserBase):
         self.kobo_only_shelves_sync = data.kobo_only_shelves_sync
         self.opds_only_shelves_sync = data.opds_only_shelves_sync
         self.has_own_library = data.has_own_library
+        self.user_library_seeded = data.user_library_seeded
+        self.my_library_intro_dismissed = data.my_library_intro_dismissed
         self.kobo_two_way_annotation_sync = data.kobo_two_way_annotation_sync
         self.kobo_two_way_annotation_scope = data.kobo_two_way_annotation_scope
         self.hardcover_token = data.hardcover_token
@@ -819,7 +839,6 @@ class UserLibraryBook(Base):
                      nullable=False, index=True)
     book_id = Column(Integer, nullable=False, index=True)
     added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    added_by = Column(Integer, nullable=True)
 
     __table_args__ = (
         UniqueConstraint('user_id', 'book_id', name='uq_user_library_book'),
@@ -2232,8 +2251,8 @@ def migrate_user_table(engine, _session):
         _safe_session_rollback(_session, "user.ui_font_display")
         _run_ddl_with_retry(engine, "ALTER TABLE user ADD column 'ui_font_display' String DEFAULT ''")
 
-    # #1939 — opt-in membership scope. Existing rows must remain off so an
-    # upgrade is byte-for-byte equivalent until an administrator enables it.
+    # #1939 — named per-user library mode. Existing rows remain in monolibrary
+    # mode, which is byte-for-byte the historical global-library behavior.
     try:
         _session.query(exists().where(User.has_own_library)).scalar()
         _session.commit()
@@ -2242,6 +2261,38 @@ def migrate_user_table(engine, _session):
         _run_ddl_with_retry(
             engine,
             "ALTER TABLE user ADD column 'has_own_library' Boolean "
+            "NOT NULL DEFAULT 0",
+        )
+
+    # Seed completion is durable and independent of membership row count. If
+    # this column is being added over the first #1939 implementation, enabled
+    # users were already seeded before their flag could be committed, so mark
+    # precisely those existing users initialized. A fresh schema already has
+    # the column and does not take this compatibility backfill.
+    try:
+        _session.query(exists().where(User.user_library_seeded)).scalar()
+        _session.commit()
+    except exc.OperationalError:
+        _safe_session_rollback(_session, "user.user_library_seeded")
+        _run_ddl_with_retry(
+            engine,
+            "ALTER TABLE user ADD column 'user_library_seeded' Boolean "
+            "NOT NULL DEFAULT 0",
+        )
+        _run_ddl_with_retry(
+            engine,
+            "UPDATE user SET user_library_seeded = 1 "
+            "WHERE has_own_library = 1",
+        )
+
+    try:
+        _session.query(exists().where(User.my_library_intro_dismissed)).scalar()
+        _session.commit()
+    except exc.OperationalError:
+        _safe_session_rollback(_session, "user.my_library_intro_dismissed")
+        _run_ddl_with_retry(
+            engine,
+            "ALTER TABLE user ADD column 'my_library_intro_dismissed' Boolean "
             "NOT NULL DEFAULT 0",
         )
 
@@ -2266,8 +2317,15 @@ def rollback_user_library_schema(engine):
             "UPDATE user SET role = role & -513 WHERE role & 512 = 512",
         )
         user_columns = {column["name"] for column in inspector.get_columns("user")}
-        if "has_own_library" in user_columns:
-            _run_ddl_with_retry(engine, "ALTER TABLE user DROP COLUMN has_own_library")
+        for column_name in (
+            "my_library_intro_dismissed",
+            "user_library_seeded",
+            "has_own_library",
+        ):
+            if column_name in user_columns:
+                _run_ddl_with_retry(
+                    engine, "ALTER TABLE user DROP COLUMN %s" % column_name
+                )
     if "user_library_book" in tables:
         _run_ddl_with_retry(engine, "DROP TABLE user_library_book")
     if "settings" in tables:
@@ -2275,10 +2333,10 @@ def rollback_user_library_schema(engine):
         settings_columns = {
             column["name"] for column in inspector.get_columns("settings")
         }
-        if "config_new_users_have_own_library" in settings_columns:
+        if "config_new_users_personal_library" in settings_columns:
             _run_ddl_with_retry(
                 engine,
-                "ALTER TABLE settings DROP COLUMN config_new_users_have_own_library",
+                "ALTER TABLE settings DROP COLUMN config_new_users_personal_library",
             )
 
 def migrate_oauth_provider_table(engine, _session):
@@ -2334,6 +2392,21 @@ def migrate_oauth_provider_table(engine, _session):
 def migrate_config_table(engine, _session):
     """Migrate configuration table to add new authentication columns"""
     _ensure_kobo_two_way_gate_columns(engine)
+    # #1939: add the named new-account mode default for existing databases.
+    from sqlalchemy import inspect as sa_inspect
+    settings_columns = {
+        column["name"]
+        for column in sa_inspect(engine).get_columns("settings")
+    }
+    if "config_new_users_personal_library" not in settings_columns:
+        _safe_session_rollback(
+            _session, "settings.config_new_users_personal_library"
+        )
+        _run_ddl_with_retry(
+            engine,
+            "ALTER TABLE settings ADD column "
+            "'config_new_users_personal_library' Boolean DEFAULT 0",
+        )
     if not engine or not _session:
             _safe_session_rollback(_session, "settings.config_reverse_proxy_auto_create_users")
             _run_ddl_with_retry(

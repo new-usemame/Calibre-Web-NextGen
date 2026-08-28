@@ -1,11 +1,20 @@
 # My Library backend policy audit (#1939)
 
-`CalibreDB.common_filters()` is the membership policy funnel. It remains a
-no-op when `User.has_own_library` is false. An enabled account gets a
-request-cached SQLite `json_each` membership predicate; the one JSON bind avoids
-expanding a whole library into SQL literals. `allow_show_global=True` is the
-explicit bypass used only by the permission-gated global catalog and the
-pre-enable seed.
+`CalibreDB.common_filters()` is the membership policy funnel. Each account is
+always in one named mode:
+
+- `monolibrary`: `User.has_own_library == 0`; the membership predicate is
+  inactive and the account continuously follows the global archive, including
+  later ingests.
+- `personal_library`: `User.has_own_library == 1`; a request-cached SQLite
+  `json_each` predicate selects the account's durable membership rows.
+
+The one JSON bind avoids expanding a whole library into SQL literals.
+`allow_show_global=True` is the explicit bypass used only by the
+permission-gated global catalog and first seed. `User.user_library_seeded` is
+the independent durable seed-once fence: row count is never used as an
+initialization signal, because an initialized user may curate down to zero.
+Mode switches never delete membership rows.
 
 ## Direct `Books` query assignments
 
@@ -15,8 +24,9 @@ pre-enable seed.
 | `kobo.py` changed-reading-state hydration | Deliberately global | Device-trailing per-user state must remain resolvable after removal. |
 | `opds.py` feeds, stats, metadata, covers, and downloads | Membership-aware | OPDS is a user-facing catalog and already funnels through the OPDS common filter. |
 | `shelf.py` and `api/shelves.py` add, series-add, browse, reorder, and picker paths | Membership-aware | A visible shelf cannot introduce or reveal a book outside the viewer's set. Activity-log title hydration is deliberately global and non-authoritative. |
-| `api/info.py` book count | Membership-aware | The count describes the caller's visible catalog. |
-| `web.py` listings, facets, searches, matching tags, details, and covers | Membership-aware | These are user-visible browse paths already using the common filter. |
+| `api/info.py` book and author/tag/series counts | Membership-aware | Every visible count describes the caller's catalog; monolibrary retains the historical global payload. |
+| `web.py` listings, author/series/tag/publisher/language facets, searches, matching tags, details, and covers | Membership-aware | These are user-visible browse paths already using the common filter. |
+| `api/browse.py` author/series/tag/publisher/language facets | Membership-aware | Each entity and its displayed book count are built from filtered Books, so opening a facet cannot produce a smaller set than its label promised. |
 | `magic_shelf.py` rule evaluation | Membership-aware | Rules select from the user's library. The raw page hydration is safe because its IDs come from the filtered rule query. |
 | `helper.py` e-mail/send-to-device, download, book/series covers | Membership-aware | These user-facing content paths must agree with listing visibility. The documented admin download fallback remains a deliberate curation-only bypass. |
 | `helper.py` conversion, upload/rename, and edit helpers | Deliberately global | Role-gated metadata edits change the one global record and file. |
@@ -33,6 +43,32 @@ entitlement ownership plus annotation authority remain based on existence in
 the global Calibre library. This is required so a removed book's annotations
 and ownership survive and can resume when the membership row returns.
 
+Public shelf visibility does not grant membership. A viewer sees the
+intersection of the public shelf's links and that viewer's current library;
+therefore a public shelf may be partially populated or empty for different
+viewers. The shelf owner does not confer their personal membership on anyone
+else.
+
+## Mode-switch preservation contract
+
+| State | Switch behavior |
+|---|---|
+| Membership | Rows remain dormant in monolibrary and return unchanged in personal mode, including a deliberate zero-row set. |
+| Shelves | No shelf or `book_shelf_link` row is touched by a mode switch. A separate explicit book removal still drops that user's affected shelf links. |
+| `kobo_synced_books` | Untouched; the first personal-mode seed prevents spurious ChangedEntitlement removals. |
+| Reading state | `book_read_link` and `kobo_reading_state` are untouched. |
+| Annotations | Annotation rows and their sync/authority children are untouched. |
+| Hidden/archived | `user_hidden_book` and `archived_book` are untouched. |
+| Sync settings | Kobo shelf mode, OPDS shelf mode, two-way annotation settings, and Hardcover token remain unchanged. |
+| Roles | The role mask, including global browse, remains unchanged. |
+
+A global book deletion is different from a mode switch. The authoritative
+per-user/book purge removes every `user_library_book` row for the deleted
+Calibre id, including dormant rows held by monolibrary users. Thus dormant rows
+never point at a globally deleted book. User deletion goes through the same
+enumerator rather than relying on SQLite foreign-key cascades, which are not
+enabled by this application.
+
 ## Backend route contract
 
 | Method | Route | Purpose |
@@ -41,15 +77,30 @@ and ownership survive and can resume when the membership row returns.
 | `PUT` | `/api/v1/books/<book_id>/my-library` | Idempotently add a globally visible book. |
 | `GET` | `/api/v1/books/<book_id>/my-library` | Return removal impact for confirmation. |
 | `DELETE` | `/api/v1/books/<book_id>/my-library` | Remove membership and the user's ordinary shelf links only. |
+| `POST` | `/api/v1/account/library-mode` | Switch the current account using `{"mode":"monolibrary"}` or `{"mode":"personal_library"}`. |
+| `POST` | `/api/v1/account/my-library-intro/dismiss` | Durably dismiss the current account's introductory card. |
+| `POST` | `/api/v1/admin/users/<user_id>` | Admin update; accepts the named `library_mode` for the target user. |
 | `GET` | `/global-library[/<sort>[/<page>]]` | Classic global listing. |
 | `POST` | `/ajax/mylibrary/<book_id>/add` | Classic add action. |
 | `GET` | `/ajax/mylibrary/<book_id>/removal-impact` | Classic confirmation impact. |
 | `POST` | `/ajax/mylibrary/<book_id>/remove` | Classic remove action. |
+| `GET, POST` | `/me` | Classic account page; both named modes are selectable by the user. |
+| `GET, POST` | `/admin/user/<user_id>` | Classic admin user editor; both named modes are selectable for the target. |
 
-The `/api/v1/me` payload exposes `has_own_library` and
-`role.browse_global`. The global listing remains available when the account's
-set is empty, so the separate SPA lane can render the required explanatory
-empty state with a recovery action rather than a blank grid.
+The `/api/v1/auth/me` and `/api/v1/account` payloads expose `library_mode`,
+`my_library_seeded`, `show_my_library_intro`, and `role.browse_global`. They do
+not expose the implementation-shaped `has_own_library` boolean. The intro
+dismissal lives on the User row and survives process restarts. The global
+listing remains available when an authorized account's set is empty, so the
+separate SPA lane can render the required explanatory empty state with a
+recovery action rather than a blank grid.
+
+Any response that calls `common_filters` is marked user-specific and leaves
+the app with `Cache-Control: private, no-store` plus `Vary: Cookie,
+Authorization` and the configured reverse-proxy login header. `/auth/me`,
+`/account`, About counts, and removal impact set the same marker explicitly.
+This prevents a shared cache from crossing users even when header login never
+touches Flask's session.
 
 ## Performance evidence
 
@@ -59,11 +110,11 @@ sorted 60-book listing over 15 cold request contexts after warm-up:
 
 | Mode | Median | Mean | p95 |
 |---|---:|---:|---:|
-| `has_own_library=0` | 0.414 ms | 0.460 ms | 0.634 ms |
-| `has_own_library=1`, 20k members | 4.573 ms | 4.516 ms | 4.854 ms |
+| `monolibrary` | 2.383 ms | 2.420 ms | 2.770 ms |
+| `personal_library`, 20k members | 5.754 ms | 5.775 ms | 6.169 ms |
 
-The measured median delta is 4.158 ms. Within one request, rebuilding the
-membership expression measured 1.528 ms on the first call and 0.262 ms from
+The measured median delta is 3.371 ms. Within one request, rebuilding the
+membership expression measured 1.213 ms on the first call and 0.238 ms from
 the request cache on the second. An earlier ORM-row materialization prototype
 measured 42.309 ms median for the enabled case; aggregating membership IDs to
 JSON inside app.db removed that Python object cost.

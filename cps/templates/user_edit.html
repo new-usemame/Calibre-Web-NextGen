@@ -373,9 +373,16 @@
       <div style="margin-top: 25px;">
         <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('My Library')}}</label>
         <div style="background: #202c34a3; padding: 2rem;">
-          <input type="checkbox" name="has_own_library" id="has_own_library" {% if content.has_own_library %}checked{% endif %} style="accent-color: var(--color-secondary);">
-          <label for="has_own_library">{{_('Use a personal My Library membership set')}}</label>
-          <p class="help-block">{{_('Enabling this first seeds every book the user can currently see. Removing a book later also removes it from this user’s shelves and from their Kobo on the next sync; reading data is preserved.')}}</p>
+          <div>
+            <input type="radio" name="library_mode" id="library_mode_monolibrary" value="monolibrary" {% if content.library_mode() == 'monolibrary' %}checked{% endif %} style="accent-color: var(--color-secondary);">
+            <label for="library_mode_monolibrary">{{_('Monolibrary mode')}}</label>
+            <p class="help-block">{{_('This account continuously follows the global library, including books added later. Its saved personal selection remains dormant and is restored if personal library mode is chosen again.')}}</p>
+          </div>
+          <div style="margin-top: 12px;">
+            <input type="radio" name="library_mode" id="library_mode_personal" value="personal_library" {% if content.library_mode() == 'personal_library' %}checked{% endif %} style="accent-color: var(--color-secondary);">
+            <label for="library_mode_personal">{{_('Personal library mode')}}</label>
+            <p class="help-block">{{_('The first switch seeds every book currently visible. Later switches restore the saved selection without reseeding. Removing a book also removes it from this user’s shelves and from their Kobo on the next sync; reading data is preserved.')}}</p>
+          </div>
         </div>
       </div>
 

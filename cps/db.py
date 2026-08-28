@@ -1559,6 +1559,13 @@ class CalibreDB:
         user=None,
     ):
         filter_user = user or current_user
+        if has_request_context():
+            # Every result built through this funnel can vary by account
+            # (language, tag rules, archived/hidden state, and library mode).
+            # The app-wide after_request hook turns this marker into explicit
+            # private/no-store + Vary headers, including header-login requests
+            # that never touch Flask's session cookie.
+            g._common_filters_user_specific = True
         if not allow_show_archived:
             archived_books = (ub.session.query(ub.ArchivedBook)
                               .filter(ub.ArchivedBook.user_id==int(filter_user.id))
@@ -1620,21 +1627,27 @@ class CalibreDB:
             pos_content_cc_filter = true()
             neg_content_cc_filter = false()
 
-        # #1939: keep this predicate inside the canonical policy funnel. The
+        # #1939: keep this predicate inside the canonical policy funnel. It
+        # must remain a raw book-id lookup over UserLibraryBook. Never derive
+        # membership by calling magic-shelf rules or common_filters here: magic
+        # shelves already re-enter common_filters, which would recurse forever.
+        # The
         # app and Calibre databases use separate engines, so a cross-engine
         # join is unavailable. A single JSON bind consumed by SQLite json_each
         # avoids expanding an entire 20k-book library into SQL parameters.
         # Cache the expression per request because common_filters is often
         # called several times for counts, random books, and the page itself.
         membership_filter = true()
-        membership_enabled = getattr(filter_user, "has_own_library", False)
-        membership_enabled = (
-            isinstance(membership_enabled, (bool, int))
-            and bool(membership_enabled)
+        # The persisted boolean is the mode selector: false is intentionally
+        # Monolibrary mode, not an unspecified or disabled feature state.
+        membership_mode_value = getattr(
+            filter_user, "has_own_library", False
         )
-        if (not allow_show_global
-                and not filter_user.is_anonymous
-                and membership_enabled):
+        membership_enabled = (
+            isinstance(membership_mode_value, (bool, int))
+            and bool(membership_mode_value)
+        )
+        if not allow_show_global and membership_enabled:
             user_id = int(filter_user.id)
             cache = None
             if has_request_context():

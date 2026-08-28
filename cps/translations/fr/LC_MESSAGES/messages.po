@@ -2977,7 +2977,7 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/user_edit.html
 #: cps/templates/user_table.html
 msgid "Own selection"
-msgstr "Sélection propre"
+msgstr "Sélection personnelle"
 
 #: cps/spa_strings.py
 msgid "Recently added"

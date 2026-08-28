@@ -2762,7 +2762,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Delete from the global library"
-msgstr "Uit de globale bibliotheek verwijderen"
+msgstr "Definitief uit de globale bibliotheek verwijderen"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Every book here is already in your library."

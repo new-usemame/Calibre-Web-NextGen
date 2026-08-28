@@ -1261,7 +1261,9 @@
                 url: {{ url_for('web.remove_from_my_library', book_id=entry.id)|tojson }},
                 method: 'POST',
                 headers: {'X-CSRFToken': '{{ csrf_token() }}'},
-                success: function () { window.location.href = {{ url_for('web.global_library')|tojson }}; },
+                success: function () {
+                    window.location.href = {{ (url_for('web.global_library') if current_user.role_browse_global() else url_for('web.index'))|tojson }};
+                },
                 error: function () { button.prop('disabled', false).text({{ _('Remove')|tojson }}); }
             });
         });

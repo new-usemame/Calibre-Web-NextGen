@@ -8,6 +8,7 @@ import {
   useAdminConfig, useUpdateAdminConfig, useMailConfig, useUpdateMailConfig,
   useSecurityConfig, useUpdateSecurityConfig,
   useMigrateMyLibrary,
+  useAdminAddBookToLibrary,
 } from '../lib/queries';
 import type { SecurityConfig, SecurityUpdate } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
@@ -70,10 +71,13 @@ export function Admin() {
   const createUser = useCreateAdminUser();
   const resetPassword = useResetAdminUserPassword();
   const migrateLibraries = useMigrateMyLibrary();
+  const addBookToLibrary = useAdminAddBookToLibrary();
   const me = useMe().data;
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({ name: '', password: '', email: '', upload: false });
+  const [libraryBookIds, setLibraryBookIds] = useState<Record<number, string>>({});
+  const [libraryBookErrors, setLibraryBookErrors] = useState<Record<number, string>>({});
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !data) {
@@ -165,6 +169,34 @@ export function Admin() {
           accounts: result.accounts, books: result.seeded_books, errors: result.errors,
         }) }),
       onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Update failed.') }),
+    });
+  };
+
+  const addBookForUser = (e: React.FormEvent, user: AdminUser) => {
+    e.preventDefault();
+    const bookId = Number(libraryBookIds[user.id]);
+    if (!Number.isInteger(bookId) || bookId < 1) {
+      setBanner(null);
+      setLibraryBookErrors((errors) => ({
+        ...errors, [user.id]: t('Enter a valid book ID.'),
+      }));
+      return;
+    }
+    setLibraryBookErrors((errors) => ({ ...errors, [user.id]: '' }));
+    setBanner(null);
+    addBookToLibrary.mutate({ userId: user.id, bookId }, {
+      onSuccess: (result) => {
+        setLibraryBookIds((values) => ({ ...values, [user.id]: '' }));
+        setBanner({ ok: true, text: t('Added book {book} to {name}.', {
+          book: result.book_title, name: user.name,
+        }) });
+      },
+      onError: (err) => {
+        setLibraryBookErrors((errors) => ({
+          ...errors,
+          [user.id]: err instanceof ApiError ? err.message : t('Could not add the book.'),
+        }));
+      },
     });
   };
 
@@ -287,7 +319,36 @@ export function Admin() {
                   </label>
                   <p className={styles.settingsHint}>{t('Switching a user to their own selection first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.')}</p>
                   {user.library_mode === 'personal_library' && !user.roles.browse_global &&
-                    <p className={styles.modeWarning}>{t("Without the global-browse role, only an administrator can add books to this user's library.")}</p>}
+                    <>
+                      <p className={styles.modeWarning}>{t("Without the global-browse role, only an administrator can add books to this user's library.")}</p>
+                      <form className={styles.libraryAddForm} onSubmit={(e) => addBookForUser(e, user)}>
+                        <label className={styles.field}>
+                          <span>{t('Book ID')}</span>
+                          <input type="number" min="1" inputMode="numeric"
+                            value={libraryBookIds[user.id] ?? ''}
+                            aria-invalid={libraryBookErrors[user.id] ? true : undefined}
+                            aria-describedby={libraryBookErrors[user.id]
+                              ? `library-book-error-${user.id}` : undefined}
+                            onChange={(e) => {
+                              setLibraryBookIds((values) => ({
+                                ...values, [user.id]: e.target.value,
+                              }));
+                              if (libraryBookErrors[user.id]) {
+                                setLibraryBookErrors((errors) => ({
+                                  ...errors, [user.id]: '',
+                                }));
+                              }
+                            }} />
+                        </label>
+                        <button type="submit" className={styles.submitBtn}
+                          disabled={addBookToLibrary.isPending}>
+                          {t('Add book to this library')}
+                        </button>
+                        {libraryBookErrors[user.id] &&
+                          <span id={`library-book-error-${user.id}`} className={styles.fieldError}
+                            role="alert">{libraryBookErrors[user.id]}</span>}
+                      </form>
+                    </>}
                 </fieldset>
               )}
             </section>

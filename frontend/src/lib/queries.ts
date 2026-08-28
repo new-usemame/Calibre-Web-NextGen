@@ -288,18 +288,33 @@ function setGlobalMembership(qc: QueryClient, bookId: number, owned: boolean) {
   } : page);
 }
 
+function setBookMembership(qc: QueryClient, bookId: number, owned: boolean) {
+  qc.setQueryData<BookDetail>(['book', String(bookId)], (book) => book ? {
+    ...book,
+    in_my_library: owned,
+  } : book);
+}
+
 export function useAddToMyLibrary() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (bookId: number) => apiPut<{ in_my_library: true }>(`/api/v1/books/${bookId}/my-library`),
     onMutate: async (bookId) => {
-      await qc.cancelQueries({ queryKey: ['global-library'] });
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ['global-library'] }),
+        qc.cancelQueries({ queryKey: ['book', String(bookId)] }),
+      ]);
       const previous = qc.getQueriesData<GlobalLibraryPage>({ queryKey: ['global-library'] });
+      const previousDetail = qc.getQueryData<BookDetail>(['book', String(bookId)]);
       setGlobalMembership(qc, bookId, true);
-      return { previous };
+      setBookMembership(qc, bookId, true);
+      return { previous, previousDetail };
     },
-    onError: (_error, _bookId, context) => {
+    onError: (_error, bookId, context) => {
       context?.previous.forEach(([key, value]) => qc.setQueryData(key, value));
+      if (context?.previousDetail !== undefined) {
+        qc.setQueryData(['book', String(bookId)], context.previousDetail);
+      }
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['global-library'] });
@@ -320,17 +335,25 @@ export function useRemoveFromMyLibrary() {
     mutationFn: (bookId: number) => apiDelete<LibraryRemovalImpact & { in_my_library: false }>(
       `/api/v1/books/${bookId}/my-library`),
     onMutate: async (bookId) => {
-      await qc.cancelQueries({ queryKey: ['books'] });
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ['books'] }),
+        qc.cancelQueries({ queryKey: ['book', String(bookId)] }),
+      ]);
       const previous = qc.getQueriesData<BooksPage>({ queryKey: ['books'] });
+      const previousDetail = qc.getQueryData<BookDetail>(['book', String(bookId)]);
       qc.setQueriesData<BooksPage>({ queryKey: ['books'] }, (page) => page ? {
         ...page, items: page.items.filter((book) => book.id !== bookId),
         total: Math.max(0, page.total - 1),
       } : page);
       setGlobalMembership(qc, bookId, false);
-      return { previous };
+      setBookMembership(qc, bookId, false);
+      return { previous, previousDetail };
     },
-    onError: (_error, _bookId, context) => {
+    onError: (_error, bookId, context) => {
       context?.previous.forEach(([key, value]) => qc.setQueryData(key, value));
+      if (context?.previousDetail !== undefined) {
+        qc.setQueryData(['book', String(bookId)], context.previousDetail);
+      }
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['books'] });
@@ -754,6 +777,17 @@ export function useMigrateMyLibrary() {
     mutationFn: (userId?: number) => apiPost<{
       results: MyLibraryMigrationRow[]; accounts: number; seeded_books: number; errors: number;
     }>('/api/v1/admin/my-library/migrate', userId === undefined ? {} : { user_id: userId }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  });
+}
+
+export function useAdminAddBookToLibrary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, bookId }: { userId: number; bookId: number }) =>
+      apiPut<{ in_my_library: true; user_id: number; book_id: number; book_title: string; membership_count: number }>(
+        `/api/v1/admin/users/${userId}/my-library/${bookId}`,
+      ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });
 }

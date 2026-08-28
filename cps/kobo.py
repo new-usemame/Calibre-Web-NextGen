@@ -113,6 +113,15 @@ def books_keyset_after_cursor(cursor_lm, cursor_id):
     )
 
 
+def delivery_keyset_after_cursor(normalized_stored, cursor_lm, cursor_id):
+    """Build a composite Kobo keyset for an already-normalized time key."""
+    normalized_cursor = normalized_books_last_modified(cursor_lm)
+    return or_(
+        normalized_stored > normalized_cursor,
+        and_(normalized_stored == normalized_cursor, db.Books.id > cursor_id),
+    )
+
+
 def books_cursor_datetime(value):
     """Put a dialect-parsed datetime on the cursor's UTC-naive basis."""
     if value.tzinfo is not None:
@@ -565,16 +574,27 @@ def HandleSyncRequest():
             composite_keyset_books_only,
         )
 
-    # else branch does not join BookShelf — drop the date_added arm but keep
-    # the composite keyset + magic-shelf arm (when active). This is what
-    # closes the @recruiterguy gap: in sync-all mode, magic-shelf-only books
-    # with old Books.last_modified still get through the inner cursor via
-    # the third arm.
+    # The sync-all branch does not join BookShelf, but personal-library mode
+    # has its own membership timestamp. A book selected from the global
+    # archive is commonly older than the device cursor, so its delivery key is
+    # max(Books.last_modified, UserLibraryBook.added_at). Filtering AND ordering
+    # on that same composite key is load-bearing: folding added_at into a cursor
+    # while ordering only by Books.last_modified skips later membership rows
+    # when a page is capped.
+    library_delivery_key = func.max(
+        normalized_books_last_modified(db.Books.last_modified),
+        normalized_books_last_modified(ub.UserLibraryBook.added_at),
+    )
+    library_composite_keyset = delivery_keyset_after_cursor(
+        library_delivery_key, cursor_lm, cursor_id)
     if magic_shelf_arm_active:
         inner_cursor_filter_sync_all = or_(
-            composite_keyset_books_only,
+            (library_composite_keyset if personal_library_mode
+             else composite_keyset_books_only),
             magic_shelf_arm,
         )
+    elif personal_library_mode:
+        inner_cursor_filter_sync_all = library_composite_keyset
     else:
         inner_cursor_filter_sync_all = composite_keyset_books_only
 
@@ -633,6 +653,17 @@ def HandleSyncRequest():
         # magic-shelf arm DOES participate (when active), letting magic-shelf
         # books with old Books.last_modified deliver in 'sync-all' mode too —
         # fixing the @recruiterguy regression in v4.0.147.
+        if personal_library_mode:
+            changed_entries = (changed_entries
+                               .add_columns(
+                                   ub.UserLibraryBook.added_at.label(
+                                       "library_added_at"))
+                               .join(
+                                   ub.UserLibraryBook,
+                                   and_(
+                                       db.Books.id == ub.UserLibraryBook.book_id,
+                                       ub.UserLibraryBook.user_id == current_user.id,
+                                   )))
         changed_entries = (changed_entries
                            .join(db.Data).outerjoin(ub.ArchivedBook, and_(db.Books.id == ub.ArchivedBook.book_id,
                                                                           ub.ArchivedBook.user_id == current_user.id))
@@ -640,7 +671,10 @@ def HandleSyncRequest():
                            .filter(inner_cursor_filter_sync_all)
                            .filter(calibre_db.common_filters(allow_show_archived=True))
                            .filter(db.Data.format.in_(KOBO_FORMATS))
-                           .order_by(normalized_books_last_modified(db.Books.last_modified))
+                           .order_by(
+                               library_delivery_key if personal_library_mode
+                               else normalized_books_last_modified(
+                                   db.Books.last_modified))
                            .order_by(db.Books.id)
                            .options(joinedload(db.Books.authors),
                                     joinedload(db.Books.publishers),
@@ -720,6 +754,18 @@ def HandleSyncRequest():
                 date_added = date_added.replace(tzinfo=None)
             new_books_last_modified = max(date_added, new_books_last_modified)
 
+        # Personal-library membership is a second delivery clock in sync-all
+        # mode. Fold it into the same device cursor that admitted the row so
+        # an old book selected from the global archive arrives once, then the
+        # added_at arm closes on the following request.
+        library_added_at = getattr(book, "library_added_at", None)
+        if library_added_at is not None:
+            if (hasattr(library_added_at, "replace")
+                    and getattr(library_added_at, "tzinfo", None) is not None):
+                library_added_at = library_added_at.replace(tzinfo=None)
+            new_books_last_modified = max(
+                library_added_at, new_books_last_modified)
+
         new_books_last_created = max(ts_created, new_books_last_created)
         delivered_book_identities.append((book.Books.id, str(book.Books.uuid)))
 
@@ -752,11 +798,12 @@ def HandleSyncRequest():
     else:
         new_magic_shelf_last_id = magic_shelf_last_id
 
-    # Composite-keyset cursor: keep books_last_id aligned with new_books_last_modified.
-    # The query ORDER BY (last_modified, id) means books_list iteration is sorted, so
-    # the last emitted row is the highest (last_modified, id) tuple in the batch.
-    #   - If new_books_last_modified == that row's last_modified, store the row's id so
-    #     the next sync's keyset arm `id > books_last_id` walks past it.
+    # Composite-keyset cursor: keep books_last_id aligned with
+    # new_books_last_modified. The query order is (delivery time, id), where
+    # delivery time is Books.last_modified normally and the maximum of book
+    # modification/membership addition in personal sync-all mode.
+    #   - If new_books_last_modified == the last row's delivery time, store the
+    #     row id so the next sync walks past ties without dropping a capped page.
     #   - If new_books_last_modified got pushed past the batch's max ts (via the
     #     date_added fold from fork #220 or via the magic-shelf cache fold below),
     #     reset id to -1 — there are no books at the new ts in this batch, so any
@@ -765,6 +812,11 @@ def HandleSyncRequest():
     if books_list:
         last_book = books_list[-1]
         last_book_lm = books_cursor_datetime(last_book.Books.last_modified)
+        last_library_added_at = getattr(last_book, "library_added_at", None)
+        if last_library_added_at is not None:
+            last_library_added_at = books_cursor_datetime(
+                last_library_added_at)
+            last_book_lm = max(last_book_lm, last_library_added_at)
         if new_books_last_modified == last_book_lm:
             new_books_last_id = last_book.Books.id
         else:

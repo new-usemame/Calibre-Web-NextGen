@@ -1514,7 +1514,14 @@ class CalibreDB:
                 ))
                 .first())
 
-    def get_book_read_archived(self, book_id, read_column, allow_show_archived=False, allow_show_hidden=False):
+    def get_book_read_archived(
+        self,
+        book_id,
+        read_column,
+        allow_show_archived=False,
+        allow_show_hidden=False,
+        allow_show_global=False,
+    ):
         self.ensure_session()
         if not read_column:
             bd = (self.session.query(Books, ub.ReadBook.read_status, ub.ArchivedBook.is_archived).select_from(Books)
@@ -1535,7 +1542,11 @@ class CalibreDB:
         return (bd.filter(Books.id == book_id)
                 .join(ub.ArchivedBook, and_(Books.id == ub.ArchivedBook.book_id,
                                             int(current_user.id) == ub.ArchivedBook.user_id), isouter=True)
-                .filter(self.common_filters(allow_show_archived, allow_show_hidden=allow_show_hidden)).first())
+                .filter(self.common_filters(
+                    allow_show_archived,
+                    allow_show_hidden=allow_show_hidden,
+                    allow_show_global=allow_show_global,
+                )).first())
 
     def get_book_by_uuid(self, book_uuid):
         self.ensure_session()

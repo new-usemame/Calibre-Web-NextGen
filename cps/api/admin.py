@@ -125,6 +125,32 @@ def admin_migrate_my_library():
     })
 
 
+@api_v1.route(
+    "/admin/users/<int:user_id>/my-library/<int:book_id>",
+    methods=["PUT"],
+)
+@login_required_if_no_ano
+def admin_add_book_to_user_library(user_id, book_id):
+    """Add one visible global book to a named managed account."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    target = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
+    if target is None:
+        return _err("not_found", "User not found", 404)
+    try:
+        book = user_library.admin_add_book(target, book_id)
+    except user_library.UserLibraryError as ex:
+        return _err("library_membership_rejected", str(ex), 409)
+    return jsonify({
+        "in_my_library": True,
+        "user_id": int(target.id),
+        "book_id": int(book_id),
+        "book_title": book.title,
+        "membership_count": user_library.membership_count(target.id),
+    })
+
+
 @api_v1.route("/admin/users/<int:user_id>/reset-password", methods=["POST"])
 @login_required_if_no_ano
 def admin_reset_user_password(user_id):

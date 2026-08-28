@@ -824,6 +824,9 @@ def test_http_route_contract_is_registered():
     assert routes["/api/v1/account/my-library-intro/dismiss"] >= {"POST"}
     assert routes["/api/v1/admin/users/<int:user_id>"] >= {"POST"}
     assert routes["/api/v1/admin/my-library/migrate"] >= {"POST"}
+    assert routes[
+        "/api/v1/admin/users/<int:user_id>/my-library/<int:book_id>"
+    ] >= {"PUT"}
     assert routes["/global-library"] >= {"GET"}
     assert routes["/me"] >= {"GET", "POST"}
     assert routes["/ajax/mylibrary/<int:book_id>/add"] >= {"POST"}
@@ -869,6 +872,12 @@ def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
                            book_uuid=book.uuid)
         for book in books
     ])
+    # Legacy sync-all kept both user-hidden and user-archived entitlements on
+    # the device. Entering personal mode must seed them too or reconciliation
+    # interprets the mode switch as an intentional removal.
+    session.add(ub.UserHiddenBook(user_id=user.id, book_id=1))
+    session.add(ub.ArchivedBook(user_id=user.id, book_id=2,
+                                is_archived=True, last_modified=now))
     session.commit()
 
     cdb = object.__new__(db.CalibreDB)
@@ -924,7 +933,16 @@ def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
     app = Flask(__name__)
     app.wsgi_app = SimpleNamespace(is_proxied=True)
     try:
-        with app.test_request_context("/v1/library/sync"):
+        token = kobo_module.SyncToken.SyncToken(
+            books_last_created=now,
+            books_last_modified=now,
+            archive_last_modified=now,
+            books_last_id=max(book.id for book in books),
+        ).build_sync_token()
+        with app.test_request_context(
+            "/v1/library/sync",
+            headers={kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER: token},
+        ):
             response = kobo_module.HandleSyncRequest.__wrapped__()
         archived = [
             item for item in response.get_json()
@@ -932,7 +950,8 @@ def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
             .get("BookEntitlement", {}).get("IsRemoved") is True
         ]
         assert archived == []
-        assert session.query(ub.ArchivedBook).filter_by(user_id=user.id).count() == 0
+        assert session.query(ub.ArchivedBook).filter_by(user_id=user.id).count() == 1
+        assert session.query(ub.UserHiddenBook).filter_by(user_id=user.id).count() == 1
         assert session.query(ub.KoboSyncedBooks).filter_by(user_id=user.id).count() == 5
     finally:
         session.close()

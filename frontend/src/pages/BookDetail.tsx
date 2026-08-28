@@ -271,7 +271,6 @@ export function BookDetail() {
   const addToLibrary = useAddToMyLibrary();
   const removalImpact = useMyLibraryRemovalImpact();
   const removeFromLibrary = useRemoveFromMyLibrary();
-  const [removedFromLibrary, setRemovedFromLibrary] = useState(false);
   const [location, navigate] = useLocation();
   const me = useMe().data;
   /* Stage 0 two-way sync state chip (read-only; manage it on Account). */
@@ -314,7 +313,7 @@ export function BookDetail() {
   const onShelfIds = new Set(shelfMembership?.shelf_ids ?? []);
   const bookShelves = (visibleShelves?.items ?? []).filter((s) => onShelfIds.has(s.id));
   const selectionMode = me?.library_mode === 'personal_library';
-  const inLibrary = !selectionMode || !removedFromLibrary;
+  const inLibrary = !selectionMode || book.in_my_library !== false;
 
   const removeMembership = () => {
     removalImpact.mutate(book.id, {
@@ -326,7 +325,7 @@ export function BookDetail() {
         lines.push(me?.role?.browse_global ? t('You can add it back any time from the global library.') : t('Only an administrator can add it back.'));
         if (!window.confirm(lines.join('\n'))) return;
         removeFromLibrary.mutate(book.id, {
-          onSuccess: () => { setRemovedFromLibrary(true); announce(t('Removed from your library')); },
+          onSuccess: () => announce(t('Removed from your library')),
           onError: () => announce(t('Could not remove the book. Please try again.'), { assertive: true }),
         });
       },
@@ -444,7 +443,7 @@ export function BookDetail() {
             {!inLibrary && selectionMode && me?.role?.browse_global && (
               <button type="button" className={styles.actionPrimary} disabled={addToLibrary.isPending}
                 onClick={() => addToLibrary.mutate(book.id, {
-                  onSuccess: () => { setRemovedFromLibrary(false); announce(t('Added to your library')); },
+                  onSuccess: () => announce(t('Added to your library')),
                   onError: () => announce(t('Could not add the book. Please try again.'), { assertive: true }),
                 })}>
                 <BookPlus size={15} aria-hidden="true" focusable={false} />

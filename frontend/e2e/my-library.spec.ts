@@ -175,6 +175,97 @@ test.describe('My Library', () => {
     await freshPage.close();
   });
 
+  test('adding an unowned book to a shelf establishes membership first', async ({
+    page: adminPage,
+    secondaryUser,
+  }: { page: Page; secondaryUser: SecondaryUserSession }) => {
+    await setManagedMode(adminPage, secondaryUser.id, 'personal_library');
+    const page = secondaryUser.page;
+    const books = await firstGlobalBooks(page);
+    test.skip(books.length < 1, 'seed library needs at least one book');
+    const book = books[0];
+    const shelfName = `e2e-my-library-${Date.now()}`;
+    const created = await page.request.post('/api/v1/shelves', {
+      headers: await csrfHeaders(page),
+      data: { name: shelfName },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const shelfId = ((await created.json()) as { id: number }).id;
+    await removeMembership(page, book.id);
+
+    try {
+      await page.goto(`/app/book/${book.id}`);
+      await expect(page.getByRole('button', { name: 'Add to my library' })).toBeVisible();
+      const shelfTrigger = page.getByRole('button', { name: 'Add to shelf' });
+      await shelfTrigger.click();
+      await expect(page.getByText(
+        'Adding this book to a shelf also adds it to your library.',
+      )).toBeVisible();
+
+      // The disclosure follows the shared popover keyboard contract.
+      await page.keyboard.press('Escape');
+      await expect(shelfTrigger).toBeFocused();
+      await shelfTrigger.click();
+      await page.getByRole('button', { name: shelfName }).click();
+      await expect(page.getByText(
+        `Added to your library and to ${shelfName}`,
+        { exact: true },
+      )).toBeAttached();
+
+      const library = (await page.request.get('/api/v1/books?per_page=200').then((r) => r.json())) as {
+        items: Array<{ id: number }>;
+      };
+      expect(library.items.map((item) => item.id)).toContain(book.id);
+      const shelves = (await page.request.get(`/api/v1/books/${book.id}/shelves`).then((r) => r.json())) as {
+        shelf_ids: number[];
+      };
+      expect(shelves.shelf_ids).toContain(shelfId);
+      await expectNoSeriousAxeViolations(page);
+    } finally {
+      await page.request.post(`/api/v1/shelves/${shelfId}/delete`, {
+        headers: await csrfHeaders(page),
+      }).catch(() => undefined);
+      await addMembership(page, book.id).catch(() => undefined);
+    }
+  });
+
+  test('an administrator can add a specific book to a managed selection', async ({
+    page: adminPage,
+    secondaryUser,
+  }: { page: Page; secondaryUser: SecondaryUserSession }) => {
+    await setManagedMode(adminPage, secondaryUser.id, 'personal_library', false);
+    const books = ((await secondaryUser.page.request.get(
+      '/api/v1/books?per_page=1',
+    ).then((r) => r.json())) as { items: GlobalBook[] }).items;
+    test.skip(books.length < 1, 'seed library needs at least one book');
+    const book = books[0];
+    await removeMembership(secondaryUser.page, book.id);
+
+    try {
+      await adminPage.goto('/app/admin');
+      const card = adminPage.locator('section').filter({
+        has: adminPage.getByText(secondaryUser.username, { exact: true }),
+      }).first();
+      await expect(card.getByText(
+        "Without the global-browse role, only an administrator can add books to this user's library.",
+      )).toBeVisible();
+      await card.getByRole('spinbutton', { name: 'Book ID' }).fill(String(book.id));
+      await card.getByRole('button', { name: 'Add book to this library' }).click();
+      await expect(adminPage.getByText(
+        `Added book ${book.title} to ${secondaryUser.username}.`,
+        { exact: true },
+      )).toBeVisible();
+
+      const library = (await secondaryUser.page.request.get(
+        '/api/v1/books?per_page=200',
+      ).then((r) => r.json())) as { items: Array<{ id: number }> };
+      expect(library.items.map((item) => item.id)).toContain(book.id);
+      await expectNoSeriousAxeViolations(adminPage);
+    } finally {
+      await addMembership(secondaryUser.page, book.id).catch(() => undefined);
+    }
+  });
+
   test('classic theme exposes the same library, global, add, and remove surfaces', async ({
     page: adminPage,
     secondaryUser,

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Per-user membership over the one global Calibre library (#1939)."""
 
+from datetime import datetime
+
 from sqlalchemy import false
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -103,6 +105,8 @@ def prepare_user_library_seed(user, *, chunk_size=SEED_CHUNK_SIZE,
     visible_query = (cdb.session.query(db.Books.id)
                      .filter(cdb.common_filters(
                          allow_show_global=True,
+                         allow_show_archived=True,
+                         allow_show_hidden=True,
                          user=user,
                      ))
                      .order_by(db.Books.id))
@@ -116,6 +120,11 @@ def prepare_user_library_seed(user, *, chunk_size=SEED_CHUNK_SIZE,
         chunk.append({
             "user_id": int(user.id),
             "book_id": int(book_id),
+            # Initial enable is deliberately a wire no-op. These books were
+            # already eligible before personal mode, so they are baseline
+            # membership rather than new selection events for Kobo's
+            # UserLibraryBook.added_at cursor arm.
+            "added_at": datetime.min,
         })
         if len(chunk) >= chunk_size:
             result = app_session.execute(
@@ -281,19 +290,23 @@ def _require_global_browse(user):
         )
 
 
-def add_book(user, book_id, *, app_session=None, cdb=None):
-    """Idempotently add a globally visible book to ``user``'s set."""
-    _require_global_browse(user)
+def _add_visible_book(user, book_id, *, require_global_browse,
+                      app_session=None, cdb=None):
+    """Insert one membership after applying the target user's visibility."""
+    if require_global_browse:
+        _require_global_browse(user)
+    else:
+        _require_enabled_library(user)
     app_session = _session(app_session)
     cdb = cdb or calibre_db
     book_id = int(book_id)
-    exists = (cdb.session.query(db.Books.id)
+    book = (cdb.session.query(db.Books)
               .filter(db.Books.id == book_id)
               .filter(cdb.common_filters(
                   allow_show_global=True,
                   user=user,
               )).first())
-    if not exists:
+    if not book:
         raise UserLibraryError("Book not found in the visible global library.")
     app_session.execute(
         sqlite_insert(ub.UserLibraryBook)
@@ -302,7 +315,29 @@ def add_book(user, book_id, *, app_session=None, cdb=None):
     )
     app_session.commit()
     invalidate_request_cache(user.id)
-    return True
+    return book
+
+
+def add_book(user, book_id, *, app_session=None, cdb=None):
+    """Idempotently add a globally visible book to the caller's own set."""
+    return bool(_add_visible_book(
+        user, book_id, require_global_browse=True,
+        app_session=app_session, cdb=cdb,
+    ))
+
+
+def admin_add_book(user, book_id, *, app_session=None, cdb=None):
+    """Admin-managed addition for a target that cannot browse the archive.
+
+    The administrator supplies the book, but the target user's ordinary
+    language/tag/custom-column policy still decides whether it is a visible
+    global book for that account. The browse-global role is intentionally not
+    required: this is the recovery path promised to managed users.
+    """
+    return _add_visible_book(
+        user, book_id, require_global_browse=False,
+        app_session=app_session, cdb=cdb,
+    )
 
 
 def remove_book(user, book_id, *, app_session=None):

@@ -14059,3 +14059,19 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+msgid "Add book to this library"
+msgstr "Boek aan deze bibliotheek toevoegen"
+
+#, python-brace-format
+msgid "Added book {book} to {name}."
+msgstr "Boek {book} toegevoegd aan de bibliotheek van {name}."
+
+msgid "Could not add the book."
+msgstr "Kon het boek niet toevoegen."
+
+msgid "Could not add this book to the shelf."
+msgstr "Kon dit boek niet aan de plank toevoegen."
+
+msgid "Enter a valid book ID."
+msgstr "Voer een geldig boek-ID in."

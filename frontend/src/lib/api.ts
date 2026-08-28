@@ -218,6 +218,9 @@ export interface BookDetail {
   archived: boolean;
   favorited: boolean;
   hidden: boolean;
+  /** Membership for personal-library detail deep links. Older servers omit it,
+   *  which preserves the historical whole-library behavior. */
+  in_my_library?: boolean;
   /** Sync-driven "currently reading" tri-state (fork #634) — true when KOReader/
    *  Kobo reports the book as in progress (read_status IN_PROGRESS) and it isn't
    *  marked read. Distinct from `read`; matches the classic detail page marker. */

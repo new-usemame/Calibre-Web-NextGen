@@ -1103,9 +1103,9 @@ msgid "Timestamp"
 msgstr ""
 
 #: cps/cwa_functions.py cps/templates/tasks.html cps/templates/user_edit.html
-#, fuzzy
 msgid "Book ID"
-msgstr "Knihy"
+msgstr ""
+
 
 #: cps/cwa_functions.py cps/templates/book_edit.html
 #: cps/templates/search_form.html

@@ -472,9 +472,14 @@ def order_shelf(shelf_id):
 
         result = list()
         if shelf:
+            # Keep the legacy KeyedTuple contract consumed by
+            # shelf_order.html. Visibility is a labelled presentation bit:
+            # filtered rows render as "Hidden Book" placeholders instead of
+            # changing the stored shelf or crashing the template on bare
+            # Books entities.
             result = calibre_db.session.query(db.Books) \
+                .add_columns(calibre_db.common_filters().label("visible")) \
                 .join(ub.BookShelf, ub.BookShelf.book_id == db.Books.id, isouter=True) \
-                .filter(calibre_db.common_filters()) \
                 .filter(ub.BookShelf.shelf == shelf_id).order_by(ub.BookShelf.order.asc()).all()
         return render_title_template('shelf_order.html', entries=result,
                                      title=_("Change order of Shelf: '%(name)s'", name=shelf.name),
@@ -605,11 +610,14 @@ def delete_shelf_helper(cur_shelf):
 
 
 def change_shelf_order(shelf_id, order):
+    # This mutates the shelf owner's stored order, so it is deliberately
+    # global. Applying the current viewer's hidden/archive/library predicate
+    # here renumbers only an intersection and leaves duplicate order values.
     result = calibre_db.session.query(db.Books).outerjoin(db.books_series_link,
                                                           db.Books.id == db.books_series_link.c.book)\
         .outerjoin(db.Series).join(ub.BookShelf, ub.BookShelf.book_id == db.Books.id) \
         .filter(ub.BookShelf.shelf == shelf_id) \
-        .filter(calibre_db.common_filters()).order_by(*order).all()
+        .order_by(*order).all()
     for index, entry in enumerate(result):
         book = ub.session.query(ub.BookShelf).filter(ub.BookShelf.shelf == shelf_id) \
             .filter(ub.BookShelf.book_id == entry.id).first()

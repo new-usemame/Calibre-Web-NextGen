@@ -86,6 +86,16 @@ def _real_user_id():
         return None
 
 
+def _can_browse_global():
+    """Role gate that stays safe in stripped-decorator unit contexts."""
+    if _real_user_id() is None:
+        return False
+    try:
+        return bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        return False
+
+
 def _hidden_book_ids():
     """Current user's hidden ids, once per list request (never for Guest)."""
     user_id = _real_user_id()
@@ -462,9 +472,14 @@ def list_global_library():
 @api_v1.route("/books/<int:book_id>")
 @login_required_if_no_ano
 def book_detail(book_id):
+    # A global-library card is a valid deep link for a curator even when the
+    # book is outside their selection. Bypass only the membership predicate;
+    # language/content restrictions still flow through common_filters().
+    allow_show_global = _can_browse_global()
     result = calibre_db.get_book_read_archived(
         book_id, config.config_read_column,
         allow_show_archived=True, allow_show_hidden=True,
+        allow_show_global=allow_show_global,
     )
     if not result:
         return jsonify({"error": {"code": "not_found", "message": "Book not found"}}), 404
@@ -522,6 +537,14 @@ def book_detail(book_id):
         in_progress=in_progress,
         custom_column_definitions=_detail_custom_columns(),
         original_filename=_original_filename(book_id),
+    )
+    body["in_my_library"] = (
+        user_library.mode_for_user(current_user)
+        != constants.LIBRARY_MODE_PERSONAL
+        or ub.session.query(ub.UserLibraryBook.id).filter(
+            ub.UserLibraryBook.user_id == int(current_user.id),
+            ub.UserLibraryBook.book_id == int(book_id),
+        ).first() is not None
     )
     source_formats, target_formats = get_convert_options(book)
     body["convert_options"] = {

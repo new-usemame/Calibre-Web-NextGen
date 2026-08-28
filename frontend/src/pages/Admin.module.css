@@ -123,6 +123,18 @@
 .libraryMode label span { display: flex; flex-direction: column; gap: 2px; }
 .libraryMode small { color: var(--text-muted); }
 .modeWarning { color: var(--warning, var(--accent-text)); font-size: var(--fs-sm); margin-top: var(--sp-2); }
+.libraryAddForm {
+  display: flex;
+  align-items: end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+.libraryAddForm .field { max-width: 10rem; }
+.fieldError { color: var(--danger); font-size: var(--fs-sm); }
+
+@media (max-width: 520px) {
+  .libraryAddForm { align-items: stretch; flex-direction: column; }
+}
 
 .cardHead {
   display: flex;

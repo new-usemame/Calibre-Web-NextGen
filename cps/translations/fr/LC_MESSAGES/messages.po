@@ -14537,3 +14537,19 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+msgid "Add book to this library"
+msgstr "Ajouter un livre à cette bibliothèque"
+
+#, python-brace-format
+msgid "Added book {book} to {name}."
+msgstr "Livre {book} ajouté à la bibliothèque de {name}."
+
+msgid "Could not add the book."
+msgstr "Impossible d'ajouter le livre."
+
+msgid "Could not add this book to the shelf."
+msgstr "Impossible d'ajouter ce livre à l'étagère."
+
+msgid "Enter a valid book ID."
+msgstr "Saisissez un identifiant de livre valide."

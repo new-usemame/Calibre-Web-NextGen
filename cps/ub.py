@@ -2137,66 +2137,6 @@ def migrate_user_table(engine, _session):
         _safe_session_rollback(_session, "user.kindle_mail_subject")
         _run_ddl_with_retry(engine, "ALTER TABLE user ADD column 'kindle_mail_subject' String DEFAULT ''")
 
-    # Migration to enable duplicates sidebar for existing admin users (one-time)
-    try:
-        from . import constants
-        SIDEBAR_DUPLICATES = constants.SIDEBAR_DUPLICATES
-
-        migration_dir = os.path.join(constants.CONFIG_DIR, ".cwa_migrations")
-        migration_marker = os.path.join(migration_dir, "duplicates_sidebar_v1")
-
-        if not os.path.isfile(migration_marker):
-            # Check if any admin users don't have duplicates enabled
-            admin_users = _session.query(User).filter(
-                User.role.op('&')(constants.ROLE_ADMIN) == constants.ROLE_ADMIN
-            ).all()
-            for user in admin_users:
-                if not (user.sidebar_view & SIDEBAR_DUPLICATES):
-                    user.sidebar_view |= SIDEBAR_DUPLICATES
-                    print(f"[Migration] Enabled duplicates sidebar for admin user: {user.name}")
-
-            _session.commit()
-            try:
-                os.makedirs(migration_dir, exist_ok=True)
-                with open(migration_marker, "w", encoding="utf-8") as marker:
-                    marker.write(datetime.now(timezone.utc).isoformat())
-            except Exception as marker_error:
-                print(
-                    f"[Migration] Warning: Could not persist duplicates sidebar migration marker: {marker_error}",
-                    flush=True,
-                )
-    except Exception as e:
-        print(f"[Migration] Warning: Could not update duplicates sidebar setting: {e}")
-
-    # Migration to enable favorites sidebar for existing users (one-time) — fork #27
-    try:
-        from . import constants
-        SIDEBAR_FAVORITES = constants.SIDEBAR_FAVORITES
-
-        migration_dir = os.path.join(constants.CONFIG_DIR, ".cwa_migrations")
-        migration_marker = os.path.join(migration_dir, "favorites_sidebar_v1")
-
-        if not os.path.isfile(migration_marker):
-            # Favorites is a general per-user feature, so enable it for every
-            # existing user (not just admins) — otherwise the new sidebar bit
-            # would be off for accounts created before this release.
-            for user in _session.query(User).all():
-                if not (user.sidebar_view & SIDEBAR_FAVORITES):
-                    user.sidebar_view |= SIDEBAR_FAVORITES
-            _session.commit()
-            try:
-                os.makedirs(migration_dir, exist_ok=True)
-                with open(migration_marker, "w", encoding="utf-8") as marker:
-                    marker.write(datetime.now(timezone.utc).isoformat())
-            except Exception as marker_error:
-                print(
-                    f"[Migration] Warning: Could not persist favorites sidebar migration marker: {marker_error}",
-                    flush=True,
-                )
-    except Exception as e:
-        print(f"[Migration] Warning: Could not update favorites sidebar setting: {e}")
-        _session.rollback()
-
     # Migration for cover-preview per-user preference columns (Phase 2 of
     # cover-normalization — see notes/COVER-NORMALIZATION-DESIGN.md).
     # Existing users default to False on upgrade so the rollout is silent;
@@ -2288,6 +2228,71 @@ def migrate_user_table(engine, _session):
             "ALTER TABLE user ADD column 'my_library_intro_dismissed' Boolean "
             "NOT NULL DEFAULT 0",
         )
+
+    # Keep full User entity loads below every additive User-column migration.
+    # SQLAlchemy selects every mapped column for query(User), so loading rows
+    # before a later ALTER makes populated older schemas fail on undeclared
+    # physical columns even when the migration only reads role/sidebar_view.
+
+    # Migration to enable duplicates sidebar for existing admin users (one-time)
+    try:
+        from . import constants
+        SIDEBAR_DUPLICATES = constants.SIDEBAR_DUPLICATES
+
+        migration_dir = os.path.join(constants.CONFIG_DIR, ".cwa_migrations")
+        migration_marker = os.path.join(migration_dir, "duplicates_sidebar_v1")
+
+        if not os.path.isfile(migration_marker):
+            # Check if any admin users don't have duplicates enabled
+            admin_users = _session.query(User).filter(
+                User.role.op('&')(constants.ROLE_ADMIN) == constants.ROLE_ADMIN
+            ).all()
+            for user in admin_users:
+                if not (user.sidebar_view & SIDEBAR_DUPLICATES):
+                    user.sidebar_view |= SIDEBAR_DUPLICATES
+                    print(f"[Migration] Enabled duplicates sidebar for admin user: {user.name}")
+
+            _session.commit()
+            try:
+                os.makedirs(migration_dir, exist_ok=True)
+                with open(migration_marker, "w", encoding="utf-8") as marker:
+                    marker.write(datetime.now(timezone.utc).isoformat())
+            except Exception as marker_error:
+                print(
+                    f"[Migration] Warning: Could not persist duplicates sidebar migration marker: {marker_error}",
+                    flush=True,
+                )
+    except Exception as e:
+        print(f"[Migration] Warning: Could not update duplicates sidebar setting: {e}")
+
+    # Migration to enable favorites sidebar for existing users (one-time) — fork #27
+    try:
+        from . import constants
+        SIDEBAR_FAVORITES = constants.SIDEBAR_FAVORITES
+
+        migration_dir = os.path.join(constants.CONFIG_DIR, ".cwa_migrations")
+        migration_marker = os.path.join(migration_dir, "favorites_sidebar_v1")
+
+        if not os.path.isfile(migration_marker):
+            # Favorites is a general per-user feature, so enable it for every
+            # existing user (not just admins) — otherwise the new sidebar bit
+            # would be off for accounts created before this release.
+            for user in _session.query(User).all():
+                if not (user.sidebar_view & SIDEBAR_FAVORITES):
+                    user.sidebar_view |= SIDEBAR_FAVORITES
+            _session.commit()
+            try:
+                os.makedirs(migration_dir, exist_ok=True)
+                with open(migration_marker, "w", encoding="utf-8") as marker:
+                    marker.write(datetime.now(timezone.utc).isoformat())
+            except Exception as marker_error:
+                print(
+                    f"[Migration] Warning: Could not persist favorites sidebar migration marker: {marker_error}",
+                    flush=True,
+                )
+    except Exception as e:
+        print(f"[Migration] Warning: Could not update favorites sidebar setting: {e}")
+        _session.rollback()
 
 
 def rollback_user_library_schema(engine):

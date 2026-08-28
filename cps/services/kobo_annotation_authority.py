@@ -363,7 +363,7 @@ def _book_state(user_id, book_id, entitlement_id):
             try:
                 # The SAVEPOINT confines a losing concurrent INSERT.  A bare
                 # rollback here could discard unrelated request state.
-                with ub.session.begin_nested():
+                with ub.begin_contained_nested(ub.session):
                     ub.session.add(candidate)
                     ub.session.flush()
             except IntegrityError:

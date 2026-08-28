@@ -240,6 +240,35 @@ def test_owned_get_returns_more_than_device_limit_as_one_honest_page(
     assert payload["nextPageOffsetToken"] is None
 
 
+def test_book_state_insert_uses_contained_savepoint_on_active_session(
+    session, monkeypatch,
+):
+    active_connection = session.connection()
+    original_begin_contained_nested = ub.begin_contained_nested
+    containment_calls = []
+
+    def track_contained_nested(db_session):
+        connection = db_session.connection()
+        nested = original_begin_contained_nested(db_session)
+        containment_calls.append((
+            db_session is session,
+            connection is active_connection,
+            connection.connection.driver_connection.in_transaction,
+        ))
+        return nested
+
+    monkeypatch.setattr(ub, "begin_contained_nested", track_contained_nested)
+
+    state, normalized_content_id, failure = authority._book_state(
+        USER_ID, BOOK_ID, OWNED,
+    )
+
+    assert failure is None
+    assert normalized_content_id == OWNED
+    assert state in session
+    assert containment_calls == [(True, True, True)]
+
+
 def test_owned_get_survives_normalized_book_state_insert_integrity_error(
     app, session, monkeypatch,
 ):

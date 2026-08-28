@@ -191,7 +191,11 @@ def upload():
                 tmp_path, final_path = _save_to_ingest_atomic_rename(requested_file, final_path)
                 with open(final_path + ".cwa.json", 'w', encoding='utf-8') as mf:
                     json.dump({"action": "import",
-                               "original_filename": requested_file.filename},
+                               "original_filename": requested_file.filename,
+                               "uploader_user_id": int(current_user.id),
+                               "uploader_personal_library": bool(
+                                   current_user.has_own_library
+                               )},
                               mf, ensure_ascii=False)
                 os.replace(tmp_path, final_path)
                 upload_text = N_("Upload done, processing, please wait...")

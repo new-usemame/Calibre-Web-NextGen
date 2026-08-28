@@ -1125,6 +1125,10 @@ class NewBookProcessor:
         # touch it — recorded into app.db after a successful add so users can
         # recognize misidentified auto-matches (fork #346).
         self.original_filename = Path(filepath).name
+        # Browser/API imports set this from the sidecar. Watch-folder imports
+        # remain global-only because they have no authenticated uploader.
+        self.uploader_user_id = None
+        self.uploader_was_personal_library = False
         # True when last_added_book_id(s) came from the most-recently-modified
         # fallback guess rather than parsed calibredb output.
         self.last_added_ids_are_fallback = False
@@ -1397,7 +1401,7 @@ class NewBookProcessor:
         book_ids = getattr(self, 'last_added_book_ids', None) or (
             [self.last_added_book_id]
             if getattr(self, 'last_added_book_id', None) else [])
-        if not book_ids or not getattr(self, 'original_filename', None):
+        if not book_ids:
             return
         if getattr(self, 'last_added_ids_are_fallback', False):
             # The id is a most-recently-modified guess (calibredb output
@@ -1410,13 +1414,29 @@ class NewBookProcessor:
         try:
             with sqlite3.connect(get_app_db_path(), timeout=30) as con:
                 for bid in book_ids:
-                    con.execute(
-                        "INSERT INTO book_original_filename "
-                        "(book_id, filename, created_at) "
-                        "VALUES (?, ?, datetime('now')) "
-                        "ON CONFLICT(book_id) DO NOTHING",
-                        (int(bid), self.original_filename),
-                    )
+                    if getattr(self, 'original_filename', None):
+                        con.execute(
+                            "INSERT INTO book_original_filename "
+                            "(book_id, filename, created_at) "
+                            "VALUES (?, ?, datetime('now')) "
+                            "ON CONFLICT(book_id) DO NOTHING",
+                            (int(bid), self.original_filename),
+                        )
+                    uploader_id = getattr(self, 'uploader_user_id', None)
+                    if uploader_id is not None:
+                        # A personal-library uploader must see a successful
+                        # import. Whole-library accounts already see it, and
+                        # therefore do not need a dormant membership row.
+                        con.execute(
+                            "INSERT INTO user_library_book "
+                            "(user_id, book_id, added_at) "
+                            "SELECT id, ?, datetime('now') FROM user "
+                            "WHERE id = ? AND (? = 1 OR has_own_library = 1) "
+                            "ON CONFLICT(user_id, book_id) DO NOTHING",
+                            (int(bid), int(uploader_id), int(bool(getattr(
+                                self, 'uploader_was_personal_library', False
+                            )))),
+                        )
         except (sqlite3.Error, ValueError, TypeError) as e:
             print(f"[ingest-processor] WARN: could not record original "
                   f"filename for {book_ids}: {e}", flush=True)
@@ -2369,6 +2389,15 @@ def main(filepath=None):
                     original_filename = manifest.get("original_filename")
                     if isinstance(original_filename, str) and original_filename:
                         nbp.original_filename = Path(original_filename).name
+                    try:
+                        uploader_user_id = int(manifest.get("uploader_user_id"))
+                    except (TypeError, ValueError):
+                        uploader_user_id = 0
+                    if uploader_user_id > 0:
+                        nbp.uploader_user_id = uploader_user_id
+                        nbp.uploader_was_personal_library = bool(
+                            manifest.get("uploader_personal_library", False)
+                        )
                 if action == "add_format":
                     success = False
                     try:

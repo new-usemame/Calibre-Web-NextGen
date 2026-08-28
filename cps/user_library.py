@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Per-user membership over the one global Calibre library (#1939)."""
 
+from sqlalchemy import false
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from . import calibre_db, constants, db, ub, config
+from . import calibre_db, constants, db, ub
 
 SEED_CHUNK_SIZE = 500
 
@@ -58,8 +59,16 @@ def mode_for_user(user):
 
 def mode_payload(user):
     """Stable named-mode contract shared by self-service and admin APIs."""
+    may_see_whole_archive = bool(
+        getattr(user, "role_browse_global", lambda: False)()
+    )
     return {
         "library_mode": mode_for_user(user),
+        # ROLE_BROWSE_GLOBAL is deliberately the one capability behind both
+        # whole-archive discovery and self-service mode switching. Without it,
+        # an administrator manages this account's mode.
+        "can_switch_library_mode": may_see_whole_archive,
+        "library_mode_managed": not may_see_whole_archive,
         "my_library_seeded": bool(
             getattr(user, "user_library_seeded", False)
         ),
@@ -170,17 +179,77 @@ def set_enabled(user, enabled, **kwargs):
     return set_library_mode(user, mode, **kwargs)
 
 
-def configure_new_user(user, *, app_session=None, cdb=None):
-    """Apply the server default after a new user has received an id."""
-    if not bool(getattr(config, "config_new_users_personal_library", False)):
-        return False
-    set_library_mode(
-        user,
-        constants.LIBRARY_MODE_PERSONAL,
-        app_session=app_session,
-        cdb=cdb,
+def migrate_users_to_personal_library(users, *, app_session=None, cdb=None,
+                                      chunk_size=SEED_CHUNK_SIZE):
+    """Explicitly seed-once and switch administrator-selected accounts.
+
+    The durable ``user_library_seeded`` fence, rather than membership row
+    count, decides whether seeding may run. That preserves a deliberately
+    curated empty set and makes retries safe after partial failures.
+    """
+    app_session = _session(app_session)
+    cdb = cdb or calibre_db
+    report = []
+    for user in users:
+        inserted_books = 0
+        was_seeded = bool(getattr(user, "user_library_seeded", False))
+        previous_mode = mode_for_user(user)
+        try:
+            if not was_seeded:
+                inserted_books = seed_user_library(
+                    user,
+                    chunk_size=chunk_size,
+                    app_session=app_session,
+                    cdb=cdb,
+                )
+            set_library_mode(
+                user,
+                constants.LIBRARY_MODE_PERSONAL,
+                app_session=app_session,
+                cdb=cdb,
+                chunk_size=chunk_size,
+            )
+            final_membership_count = membership_count(user.id, app_session)
+            report.append({
+                "user_id": int(user.id),
+                "name": user.name,
+                "status": (
+                    "already_personal"
+                    if previous_mode == constants.LIBRARY_MODE_PERSONAL
+                    else "switched"
+                ),
+                # Number in the completed first seed, not merely rows inserted
+                # by this attempt after a partial retry.
+                "seeded_books": (
+                    final_membership_count if not was_seeded else 0
+                ),
+                "inserted_books": inserted_books,
+                "membership_count": final_membership_count,
+                "library_mode": mode_for_user(user),
+            })
+        except Exception as ex:  # report one account without aborting the batch
+            app_session.rollback()
+            report.append({
+                "user_id": int(user.id),
+                "name": user.name,
+                "status": "error",
+                "seeded_books": 0,
+                "inserted_books": inserted_books,
+                "library_mode": mode_for_user(user),
+                "error": str(ex),
+            })
+    return report
+
+
+def global_missing_filter(user, *, app_session=None, cdb=None):
+    """Metadata-db predicate for global books absent from a personal set."""
+    if mode_for_user(user) != constants.LIBRARY_MODE_PERSONAL:
+        return false()
+    app_session = _session(app_session)
+    cdb = cdb or calibre_db
+    return db.user_library_membership_filter(
+        app_session, cdb.session, user.id, include=False
     )
-    return True
 
 
 def dismiss_intro(user, *, app_session=None):

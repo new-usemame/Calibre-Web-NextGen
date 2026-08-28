@@ -1576,9 +1576,16 @@ def index(page):
 def global_library(sort_param, page):
     if current_user.is_anonymous or not current_user.role_browse_global():
         abort(403)
-    order = get_sort_function(sort_param, "global_library")
+    recent_missing = sort_param == "recent-missing"
+    order = get_sort_function(
+        "new" if recent_missing else sort_param, "global_library"
+    )
+    global_filter = (
+        user_library.global_missing_filter(current_user, cdb=calibre_db)
+        if recent_missing else True
+    )
     entries, random, pagination = calibre_db.fill_indexpage(
-        page, 0, db.Books, True, order[0],
+        page, 0, db.Books, global_filter, order[0],
         True, config.config_read_column,
         db.books_series_link,
         db.Books.id == db.books_series_link.c.book,
@@ -1589,6 +1596,7 @@ def global_library(sort_param, page):
         'index.html', random=random, entries=entries, pagination=pagination,
         title=_("Global Library (%(count)s)", count=pagination.total_count),
         page="global_library", order=order[1], global_library=True,
+        recent_missing=recent_missing,
     )
 
 
@@ -2781,8 +2789,6 @@ def register_post():
         try:
             ub.session.add(content)
             ub.session.commit()
-            from . import user_library
-            user_library.configure_new_user(content)
             if feature_support['oauth']:
                 register_user_with_oauth(content)
             send_registration_mail(strip_whitespaces(to_save.get("email", "")), nickname, password)
@@ -3128,6 +3134,11 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
     try:
         if desired_library_mode not in constants.LIBRARY_MODES:
             raise ValueError(_("Invalid library mode"))
+        if (desired_library_mode != user_library.mode_for_user(current_user)
+                and not current_user.role_browse_global()):
+            raise user_library.UserLibraryError(
+                _("Library mode is managed by an administrator because this "
+                  "account may not view the whole archive."))
         if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
                 and not bool(current_user.user_library_seeded)):
             # This combined classic form edits many fields. Seed first so its

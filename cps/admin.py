@@ -1069,7 +1069,6 @@ def update_view_configuration():
     _config_string(to_save, "config_default_language")
     _config_string(to_save, "config_default_locale")
     _config_string(to_save, "config_opds_default_locale")
-    _config_checkbox_int(to_save, "config_new_users_personal_library")
 
     # Fork #463 (@Andrew-H2O): site-wide appearance settings live on the UI
     # Configuration page, not buried under Logfile Configuration on the Basic
@@ -3130,8 +3129,6 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
         ub.session.add(content)
         ub.session.commit()
-        from . import user_library
-        user_library.configure_new_user(content)
         flash(_("User '%(user)s' created", user=content.name), category="success")
         log.debug("User {} created".format(content.name))
         return redirect(url_for('admin.admin'))

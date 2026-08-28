@@ -125,6 +125,13 @@ def update_library_mode():
             "mode must be 'monolibrary' or 'personal_library'",
             400,
         )
+    if not current_user.role_browse_global():
+        return _err(
+            "library_mode_managed",
+            "Library mode is managed by an administrator because this "
+            "account may not view the whole archive.",
+            403,
+        )
     try:
         user_library.set_library_mode(current_user, mode)
     except user_library.UserLibraryError as ex:

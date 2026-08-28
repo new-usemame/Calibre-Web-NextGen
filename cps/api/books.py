@@ -383,7 +383,11 @@ def list_books():
 @api_v1.route("/library/global")
 @login_required_if_no_ano
 def list_global_library():
-    """List the visible global archive for users allowed to curate a set."""
+    """List the global archive, including recent books absent from My Library.
+
+    ``filter=not_in_my_library&sort=new`` is the discovery view for curated
+    accounts. It never auto-adds a book.
+    """
     if (not current_user.is_authenticated or current_user.is_anonymous
             or not current_user.role_browse_global()):
         return jsonify({
@@ -396,14 +400,27 @@ def list_global_library():
     sort = request.args.get("sort", "new")
     order = SORT_MAP.get(sort, SORT_MAP["new"])
     term = (request.args.get("search") or "").strip()
-    global_filter = True
+    filter_name = request.args.get("filter", "all")
+    if filter_name not in ("all", "not_in_my_library"):
+        return jsonify({
+            "error": {
+                "code": "invalid_filter",
+                "message": "filter must be 'all' or 'not_in_my_library'",
+            }
+        }), 400
+    filters = []
+    if filter_name == "not_in_my_library":
+        filters.append(user_library.global_missing_filter(
+            current_user, cdb=calibre_db
+        ))
     if term:
         like = "%" + term + "%"
-        global_filter = or_(
+        filters.append(or_(
             func.lower(db.Books.title).ilike(func.lower(like)),
             db.Books.authors.any(func.lower(db.Authors.name).ilike(func.lower(like))),
             db.Books.series.any(func.lower(db.Series.name).ilike(func.lower(like))),
-        )
+        ))
+    global_filter = and_(*filters) if filters else True
     series_join = (
         db.books_series_link,
         db.Books.id == db.books_series_link.c.book,
@@ -438,6 +455,7 @@ def list_global_library():
         "per_page": pagination.per_page,
         "total": pagination.total_count,
         "library_mode": user_library.mode_for_user(current_user),
+        "filter": filter_name,
     })
 
 

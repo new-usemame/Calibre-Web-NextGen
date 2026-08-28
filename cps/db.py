@@ -59,6 +59,61 @@ log = logger.create()
 # fires from every page render. Module-level set so we warn once per process
 # per drifted sort string. See fork issue #108.
 _AUTHOR_SORT_DRIFT_WARNED: set = set()
+_SQLITE_JSON_CAPABILITY = None
+_SQLITE_JSON_CAPABILITY_LOCK = threading.Lock()
+
+
+def _sqlite_json_available(app_session, metadata_session):
+    """Detect JSON SQL functions once; bare-metal SQLite may omit them."""
+    global _SQLITE_JSON_CAPABILITY
+    if _SQLITE_JSON_CAPABILITY is not None:
+        return _SQLITE_JSON_CAPABILITY
+    with _SQLITE_JSON_CAPABILITY_LOCK:
+        if _SQLITE_JSON_CAPABILITY is not None:
+            return _SQLITE_JSON_CAPABILITY
+        try:
+            for session in (app_session, metadata_session):
+                with session.get_bind().connect() as connection:
+                    connection.exec_driver_sql(
+                        "SELECT json_array(1), json_group_array(1)"
+                    ).one()
+            _SQLITE_JSON_CAPABILITY = True
+        except (SQLAlchemyError, AttributeError):
+            _SQLITE_JSON_CAPABILITY = False
+            log.warning(
+                "SQLite JSON functions are unavailable; My Library will use "
+                "the compatible expanded-id predicate"
+            )
+    return _SQLITE_JSON_CAPABILITY
+
+
+def user_library_membership_filter(app_session, metadata_session, user_id,
+                                   include=True):
+    """Build the cross-database membership predicate without a join."""
+    user_id = int(user_id)
+    if _sqlite_json_available(app_session, metadata_session):
+        member_ids_json = (app_session.query(
+            func.json_group_array(ub.UserLibraryBook.book_id)
+        ).filter(
+            ub.UserLibraryBook.user_id == user_id
+        ).scalar() or "[]")
+        membership_values = (
+            func.json_each(member_ids_json)
+            .table_valued("value")
+            .alias("my_library_membership")
+        )
+        membership_ids = select(membership_values.c.value)
+    else:
+        # Correct portability fallback for SQLite builds without JSON1. It is
+        # slower for very large sets but never turns a supported bare-metal
+        # installation into listing 500s.
+        membership_ids = [int(row.book_id) for row in (
+            app_session.query(ub.UserLibraryBook.book_id)
+            .filter(ub.UserLibraryBook.user_id == user_id).all()
+        )]
+    if include:
+        return Books.id.in_(membership_ids)
+    return Books.id.notin_(membership_ids)
 
 
 def _register_sqlite_udfs(dbapi_connection, _connection_record):
@@ -1657,22 +1712,10 @@ class CalibreDB:
                     g._user_library_filter_cache = cache
                 membership_filter = cache.get(user_id)
             if membership_filter is None or cache is None:
-                # Let SQLite aggregate directly into the one JSON bind. Pulling
-                # 20k ORM rows into Python cost roughly 40 ms before the actual
-                # listing query; json_group_array does the same indexed scan in
-                # the app database without object/tuple materialization.
-                member_ids_json = (ub.session.query(
-                    func.json_group_array(ub.UserLibraryBook.book_id)
-                ).filter(
-                    ub.UserLibraryBook.user_id == user_id
-                ).scalar() or "[]")
-                membership_values = (
-                    func.json_each(member_ids_json)
-                    .table_valued("value")
-                    .alias("my_library_membership")
-                )
-                membership_filter = Books.id.in_(
-                    select(membership_values.c.value)
+                # SQLite aggregates directly into one JSON bind when possible;
+                # the helper falls back to an expanded predicate without JSON.
+                membership_filter = user_library_membership_filter(
+                    ub.session, self.session, user_id
                 )
                 if cache is not None:
                     cache[user_id] = membership_filter

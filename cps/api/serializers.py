@@ -117,6 +117,12 @@ def serialize_user(user):
         "my_library_seeded": bool(
             getattr(user, "user_library_seeded", False)
         ),
+        "can_switch_library_mode": bool(
+            getattr(user, "role_browse_global", lambda: False)()
+        ),
+        "library_mode_managed": not bool(
+            getattr(user, "role_browse_global", lambda: False)()
+        ),
         "show_my_library_intro": (
             not user.role_anonymous()
             and not bool(getattr(user, "my_library_intro_dismissed", False))

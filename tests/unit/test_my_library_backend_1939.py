@@ -4,6 +4,7 @@
 
 from datetime import datetime, timezone
 import inspect as pyinspect
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
@@ -74,23 +75,22 @@ def test_schema_and_role_contract(app_session):
     assert user.role_browse_global()
 
 
-def test_migration_adds_named_new_user_mode_setting():
-    from cps import config_sql
-
+def test_migration_keeps_existing_accounts_in_whole_library_mode():
     engine = create_engine("sqlite:///:memory:")
-    ub.Base.metadata.create_all(engine)
-    config_sql._Base.metadata.create_all(engine)
-    session = sessionmaker(bind=engine)()
     with engine.begin() as connection:
         connection.exec_driver_sql(
-            "ALTER TABLE settings DROP COLUMN "
-            "config_new_users_personal_library"
+            "CREATE TABLE user (id INTEGER PRIMARY KEY, name TEXT, role INTEGER)"
         )
-    ub.migrate_config_table(engine, session)
-    columns = {
-        column["name"] for column in inspect(engine).get_columns("settings")
-    }
-    assert "config_new_users_personal_library" in columns
+        connection.exec_driver_sql(
+            "INSERT INTO user (id, name, role) VALUES (1, 'existing', 0)"
+        )
+    session = sessionmaker(bind=engine)()
+    ub.migrate_user_table(engine, session)
+    with engine.connect() as connection:
+        row = connection.exec_driver_sql(
+            "SELECT has_own_library, user_library_seeded FROM user WHERE id = 1"
+        ).one()
+    assert tuple(row) == (0, 0)
     session.close()
     engine.dispose()
 
@@ -283,6 +283,27 @@ def test_intro_dismissal_is_durable_and_serialized(app_session):
     payload = serialize_user(reloaded)
     assert payload["show_my_library_intro"] is False
     assert payload["library_mode"] == constants.LIBRARY_MODE_PERSONAL
+    assert payload["can_switch_library_mode"] is True
+    assert payload["library_mode_managed"] is False
+
+
+def test_mode_round_trip_preserves_intro_dismissal(app_session):
+    user = _mode_user(app_session, "intro-mode")
+    user.my_library_intro_dismissed = True
+    app_session.commit()
+    _mode_round_trip(user, app_session)
+    app_session.expire_all()
+    assert app_session.get(ub.User, user.id).my_library_intro_dismissed is True
+
+
+def test_whole_library_is_the_unmigrated_new_account_default():
+    from cps import config_sql
+
+    user = ub.User(name="default-mode", password="", default_language="all")
+    assert user.has_own_library is None or user.has_own_library is False
+    assert "config_new_users_personal_library" not in {
+        column.name for column in config_sql._Settings.__table__.columns
+    }
 
 
 def test_self_service_mode_and_intro_api_mutate_only_current_user(
@@ -312,6 +333,103 @@ def test_self_service_mode_and_intro_api_mutate_only_current_user(
     assert other.library_mode() == constants.LIBRARY_MODE_PERSONAL
     assert other.my_library_intro_dismissed is False
 
+
+def test_self_service_mode_is_managed_without_global_browse_role(
+        app_session, monkeypatch):
+    from cps import user_library
+    from cps.api import account
+
+    user = _user(app_session, "managed-mode", False)
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(account, "current_user", user)
+    payload = user_library.mode_payload(user)
+    assert payload["can_switch_library_mode"] is False
+    assert payload["library_mode_managed"] is True
+    app = Flask(__name__)
+    with app.test_request_context(
+            "/api/v1/account/library-mode", method="POST",
+            json={"mode": constants.LIBRARY_MODE_PERSONAL}):
+        response, status = account.update_library_mode()
+    assert status == 403
+    assert response.get_json()["error"]["code"] == "library_mode_managed"
+    user.has_own_library = True
+    user.user_library_seeded = True
+    app_session.commit()
+    with app.test_request_context(
+            "/api/v1/account/library-mode", method="POST",
+            json={"mode": constants.LIBRARY_MODE_MONOLIBRARY}):
+        response, status = account.update_library_mode()
+    assert status == 403
+    assert response.get_json()["error"]["code"] == "library_mode_managed"
+
+
+def test_admin_seed_once_migration_reports_each_account(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+
+    first = _user(app_session, "migration-first", False)
+    second = _user(app_session, "migration-second", False)
+    second.user_library_seeded = True
+    app_session.add(ub.UserLibraryBook(user_id=second.id, book_id=2))
+    app_session.commit()
+    monkeypatch.setattr(db.ub, "session", app_session)
+
+    report = user_library.migrate_users_to_personal_library(
+        [first, second], app_session=app_session, cdb=_cdb(calibre_session),
+    )
+    assert [(row["user_id"], row["seeded_books"]) for row in report] == [
+        (first.id, 3), (second.id, 0),
+    ]
+    assert all(row["library_mode"] == "personal_library" for row in report)
+    assert user_library.membership_count(first.id, app_session) == 3
+    assert user_library.membership_count(second.id, app_session) == 1
+    again = user_library.migrate_users_to_personal_library(
+        [first, second], app_session=app_session, cdb=_cdb(calibre_session),
+    )
+    assert [row["seeded_books"] for row in again] == [0, 0]
+    assert user_library.membership_count(first.id, app_session) == 3
+    assert user_library.membership_count(second.id, app_session) == 1
+
+
+def test_admin_migration_api_can_target_one_account(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+    from cps.api import admin as api_admin
+
+    administrator = ub.User(
+        name="migration-admin", email="migration-admin@example.invalid",
+        password="", role=constants.ROLE_ADMIN, default_language="all",
+    )
+    target = _user(app_session, "migration-target", False)
+    untouched = _user(app_session, "migration-untouched", False)
+    app_session.add(administrator)
+    app_session.commit()
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(api_admin, "current_user", administrator)
+    app = Flask(__name__)
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST",
+            json={"user_id": target.id}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    payload = response.get_json()
+    assert payload["errors"] == 0
+    assert payload["accounts"] == 1
+    assert payload["results"][0]["seeded_books"] == 3
+    assert target.library_mode() == constants.LIBRARY_MODE_PERSONAL
+    assert untouched.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST", json={}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    payload = response.get_json()
+    assert payload["accounts"] == 3
+    assert payload["errors"] == 0
+    target_result = next(
+        row for row in payload["results"] if row["user_id"] == target.id
+    )
+    assert target_result["seeded_books"] == 0
+    assert untouched.library_mode() == constants.LIBRARY_MODE_PERSONAL
 
 def test_admin_api_switches_named_mode_for_target_user(app_session, monkeypatch):
     from cps.api import admin as api_admin
@@ -395,6 +513,179 @@ def test_membership_filter_is_built_once_per_request(
         if "json_group_array" in statement and "user_library_book" in statement
     ]
     assert len(membership_reads) == 1
+
+
+def test_membership_filter_falls_back_when_sqlite_json_is_unavailable(
+        app_session, calibre_session, monkeypatch):
+    user = _user(app_session, "no-json", True)
+    app_session.add_all([
+        ub.UserLibraryBook(user_id=user.id, book_id=1),
+        ub.UserLibraryBook(user_id=user.id, book_id=3),
+    ])
+    app_session.commit()
+    monkeypatch.setattr(db.ub, "session", app_session)
+    monkeypatch.setattr(db, "current_user", user)
+    monkeypatch.setattr(db, "_sqlite_json_available", lambda *_args: False)
+    expression = _cdb(calibre_session).common_filters()
+    assert "json_each" not in str(expression.compile())
+    visible = (calibre_session.query(db.Books.id).filter(expression)
+               .order_by(db.Books.id).all())
+    assert [row.id for row in visible] == [1, 3]
+
+
+def test_membership_mutations_invalidate_cached_filter_in_same_request(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+
+    user = _mode_user(app_session, "cache-mutation")
+    app_session.add(ub.UserLibraryBook(user_id=user.id, book_id=1))
+    app_session.commit()
+    monkeypatch.setattr(db.ub, "session", app_session)
+    monkeypatch.setattr(db, "current_user", user)
+    cdb = _cdb(calibre_session)
+    app = Flask(__name__)
+    with app.test_request_context("/mutate-and-list"):
+        before = cdb.common_filters()
+        assert [row.id for row in calibre_session.query(db.Books.id)
+                .filter(before).all()] == [1]
+        user_library.add_book(user, 2, app_session=app_session, cdb=cdb)
+        after_add = cdb.common_filters()
+        assert [row.id for row in calibre_session.query(db.Books.id)
+                .filter(after_add).order_by(db.Books.id)] == [1, 2]
+        user_library.remove_book(user, 1, app_session=app_session)
+        after_remove = cdb.common_filters()
+        assert [row.id for row in calibre_session.query(db.Books.id)
+                .filter(after_remove).all()] == [2]
+
+
+def test_recent_global_discovery_excludes_existing_membership(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+
+    user = _mode_user(app_session, "discovery")
+    app_session.add_all([
+        ub.UserLibraryBook(user_id=user.id, book_id=1),
+        ub.UserLibraryBook(user_id=user.id, book_id=3),
+    ])
+    app_session.commit()
+    monkeypatch.setattr(db.ub, "session", app_session)
+    expression = user_library.global_missing_filter(
+        user, app_session=app_session, cdb=_cdb(calibre_session)
+    )
+    ids = [row.id for row in calibre_session.query(db.Books.id)
+           .filter(expression).order_by(db.Books.timestamp.desc())]
+    assert ids == [2]
+
+
+def test_recent_global_discovery_is_a_first_class_api_filter(
+        app_session, calibre_session, monkeypatch):
+    from cps.api import books as api_books
+
+    user = _mode_user(app_session, "discovery-api")
+    app_session.add(ub.UserLibraryBook(user_id=user.id, book_id=1))
+    app_session.commit()
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(api_books, "current_user", user)
+    captured = {}
+
+    class Catalog:
+        session = calibre_session
+
+        def fill_indexpage(self, *args, **kwargs):
+            captured["filter"] = args[3]
+            return ([_book(2, "Two")], None,
+                    SimpleNamespace(page=1, per_page=60, total_count=1))
+
+    monkeypatch.setattr(api_books, "calibre_db", Catalog())
+    monkeypatch.setattr(
+        api_books, "config",
+        SimpleNamespace(config_books_per_page=60, config_read_column=0),
+    )
+    monkeypatch.setattr(
+        api_books, "_rows_to_items",
+        lambda rows: [{"id": row.id} for row in rows],
+    )
+    app = Flask(__name__)
+    with app.test_request_context(
+            "/api/v1/library/global?filter=not_in_my_library&sort=new"):
+        response = pyinspect.unwrap(api_books.list_global_library)()
+    assert response.get_json()["filter"] == "not_in_my_library"
+    ids = [row.id for row in calibre_session.query(db.Books.id)
+           .filter(captured["filter"]).order_by(db.Books.id)]
+    assert ids == [2, 3]
+
+
+def test_sqlite_json_capability_is_detected_only_once(
+        app_session, calibre_session, monkeypatch):
+    statements = []
+    for engine in (app_session.bind, calibre_session.bind):
+        event.listen(
+            engine,
+            "after_cursor_execute",
+            lambda _conn, _cursor, statement, _params, _ctx, _many:
+                statements.append(statement),
+        )
+    monkeypatch.setattr(db, "_SQLITE_JSON_CAPABILITY", None)
+    assert db._sqlite_json_available(app_session, calibre_session) is True
+    assert db._sqlite_json_available(app_session, calibre_session) is True
+    assert sum("json_array(1)" in statement for statement in statements) == 2
+
+
+def test_kobo_membership_removal_does_not_depend_on_magic_shelf_reliability():
+    from cps import kobo
+
+    assert kobo.archive_membership_reliable(False, False) is True
+    assert kobo.compute_kobo_books_to_archive(
+        {1, 2}, {1}, kobo.archive_membership_reliable(False, False)
+    ) == {2}
+    assert kobo.archive_membership_reliable(True, False) is False
+    assert kobo.compute_kobo_books_to_archive(
+        {1, 2}, {1}, kobo.archive_membership_reliable(True, False)
+    ) == set()
+
+
+def test_successful_upload_is_added_only_to_personal_uploader(
+        tmp_path, monkeypatch):
+    from scripts import ingest_processor
+
+    app_db = tmp_path / "app.db"
+    with sqlite3.connect(app_db) as connection:
+        connection.executescript(
+            "CREATE TABLE user (id INTEGER PRIMARY KEY, "
+            "has_own_library BOOLEAN NOT NULL);"
+            "CREATE TABLE user_library_book ("
+            "user_id INTEGER NOT NULL, book_id INTEGER NOT NULL, "
+            "added_at DATETIME, UNIQUE(user_id, book_id));"
+            "CREATE TABLE book_original_filename ("
+            "book_id INTEGER PRIMARY KEY, filename TEXT, created_at DATETIME);"
+            "INSERT INTO user VALUES (1, 1);"
+            "INSERT INTO user VALUES (2, 0);"
+        )
+    monkeypatch.setattr(ingest_processor, "get_app_db_path", lambda: str(app_db))
+
+    processor = object.__new__(ingest_processor.NewBookProcessor)
+    processor.last_added_book_ids = [41]
+    processor.last_added_ids_are_fallback = False
+    processor.original_filename = "uploaded.epub"
+    processor.uploader_user_id = 1
+    processor.uploader_was_personal_library = True
+    processor.filepath = str(tmp_path / "uploaded.epub")
+    processor.record_original_filename()
+
+    processor.last_added_book_ids = [42]
+    processor.uploader_user_id = 2
+    processor.uploader_was_personal_library = False
+    processor.record_original_filename()
+    # The queued manifest remembers personal mode, so switching temporarily to
+    # whole-library mode before ingest completes cannot lose the uploaded book.
+    processor.last_added_book_ids = [43]
+    processor.uploader_was_personal_library = True
+    processor.record_original_filename()
+    with sqlite3.connect(app_db) as connection:
+        memberships = connection.execute(
+            "SELECT user_id, book_id FROM user_library_book ORDER BY book_id"
+        ).fetchall()
+    assert memberships == [(1, 41), (2, 43)]
 
 
 def test_membership_rows_do_not_cascade_into_kobo_or_reading_data(app_session):
@@ -502,6 +793,7 @@ def test_http_route_contract_is_registered():
     assert routes["/api/v1/account/library-mode"] >= {"POST"}
     assert routes["/api/v1/account/my-library-intro/dismiss"] >= {"POST"}
     assert routes["/api/v1/admin/users/<int:user_id>"] >= {"POST"}
+    assert routes["/api/v1/admin/my-library/migrate"] >= {"POST"}
     assert routes["/global-library"] >= {"GET"}
     assert routes["/me"] >= {"GET", "POST"}
     assert routes["/ajax/mylibrary/<int:book_id>/add"] >= {"POST"}
@@ -827,7 +1119,7 @@ def test_schema_rollback_is_idempotent_and_leaves_user_data_tables_intact():
         "has_own_library", "user_library_seeded",
         "my_library_intro_dismissed",
     } <= migrated_user_columns
-    assert "config_new_users_personal_library" in {
+    assert "config_new_users_personal_library" not in {
         column["name"] for column in migrated_schema.get_columns("settings")
     }
     migrated_session.close()

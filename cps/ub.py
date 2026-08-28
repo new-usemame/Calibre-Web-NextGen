@@ -2264,11 +2264,9 @@ def migrate_user_table(engine, _session):
             "NOT NULL DEFAULT 0",
         )
 
-    # Seed completion is durable and independent of membership row count. If
-    # this column is being added over the first #1939 implementation, enabled
-    # users were already seeded before their flag could be committed, so mark
-    # precisely those existing users initialized. A fresh schema already has
-    # the column and does not take this compatibility backfill.
+    # Seed completion is durable and independent of membership row count.
+    # Adding this column never changes an account's mode: upgrades remain in
+    # whole-library mode until an administrator or permitted user opts in.
     try:
         _session.query(exists().where(User.user_library_seeded)).scalar()
         _session.commit()
@@ -2278,11 +2276,6 @@ def migrate_user_table(engine, _session):
             engine,
             "ALTER TABLE user ADD column 'user_library_seeded' Boolean "
             "NOT NULL DEFAULT 0",
-        )
-        _run_ddl_with_retry(
-            engine,
-            "UPDATE user SET user_library_seeded = 1 "
-            "WHERE has_own_library = 1",
         )
 
     try:
@@ -2328,16 +2321,6 @@ def rollback_user_library_schema(engine):
                 )
     if "user_library_book" in tables:
         _run_ddl_with_retry(engine, "DROP TABLE user_library_book")
-    if "settings" in tables:
-        inspector = sa_inspect(engine)
-        settings_columns = {
-            column["name"] for column in inspector.get_columns("settings")
-        }
-        if "config_new_users_personal_library" in settings_columns:
-            _run_ddl_with_retry(
-                engine,
-                "ALTER TABLE settings DROP COLUMN config_new_users_personal_library",
-            )
 
 def migrate_oauth_provider_table(engine, _session):
     """Ensure every migration-managed column on oauthProvider exists.
@@ -2392,21 +2375,6 @@ def migrate_oauth_provider_table(engine, _session):
 def migrate_config_table(engine, _session):
     """Migrate configuration table to add new authentication columns"""
     _ensure_kobo_two_way_gate_columns(engine)
-    # #1939: add the named new-account mode default for existing databases.
-    from sqlalchemy import inspect as sa_inspect
-    settings_columns = {
-        column["name"]
-        for column in sa_inspect(engine).get_columns("settings")
-    }
-    if "config_new_users_personal_library" not in settings_columns:
-        _safe_session_rollback(
-            _session, "settings.config_new_users_personal_library"
-        )
-        _run_ddl_with_retry(
-            engine,
-            "ALTER TABLE settings ADD column "
-            "'config_new_users_personal_library' Boolean DEFAULT 0",
-        )
     if not engine or not _session:
             _safe_session_rollback(_session, "settings.config_reverse_proxy_auto_create_users")
             _run_ddl_with_retry(

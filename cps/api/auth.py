@@ -385,8 +385,6 @@ def auth_register():
     try:
         ub.session.add(content)
         ub.session.commit()
-        from .. import user_library
-        user_library.configure_new_user(content)
         try:
             from ..oauth_bb import register_user_with_oauth
             register_user_with_oauth(content)

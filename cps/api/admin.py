@@ -97,6 +97,34 @@ def admin_list_users():
     return jsonify({"items": items})
 
 
+@api_v1.route("/admin/my-library/migrate", methods=["POST"])
+@login_required_if_no_ano
+def admin_migrate_my_library():
+    """Explicit seed-once migration for one account or every account."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    query = ub.session.query(ub.User)
+    if user_id is not None:
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            return _err("invalid_request", "user_id must be an integer", 400)
+        query = query.filter(ub.User.id == user_id)
+    users = query.order_by(ub.User.id.asc()).all()
+    if user_id is not None and not users:
+        return _err("not_found", "User not found", 404)
+    results = user_library.migrate_users_to_personal_library(users)
+    return jsonify({
+        "results": results,
+        "accounts": len(results),
+        "seeded_books": sum(row["seeded_books"] for row in results),
+        "errors": sum(row["status"] == "error" for row in results),
+    })
+
+
 @api_v1.route("/admin/users/<int:user_id>/reset-password", methods=["POST"])
 @login_required_if_no_ano
 def admin_reset_user_password(user_id):
@@ -136,9 +164,6 @@ def _ui_config_payload():
         "config_default_language": config.config_default_language,
         "config_default_locale": config.config_default_locale,
         "config_server_announcement": config.config_server_announcement or "",
-        "config_new_users_personal_library": bool(
-            getattr(config, "config_new_users_personal_library", False)
-        ),
         # Shared with the account form so the two settings pages can never
         # disagree about these options again (#886).
         "locales": locale_options(),
@@ -240,10 +265,6 @@ def admin_update_config():
     for key in _UI_CONFIG_STR:
         if key in data:
             setattr(config, key, str(data[key] or ""))
-    if "config_new_users_personal_library" in data:
-        config.config_new_users_personal_library = bool(
-            data["config_new_users_personal_library"]
-        )
     try:
         config.save()
     except Exception as ex:
@@ -306,8 +327,6 @@ def admin_create_user():
     try:
         ub.session.add(new_user)
         ub.session.commit()
-        from .. import user_library
-        user_library.configure_new_user(new_user)
     except IntegrityError:
         ub.session.rollback()
         return _err("conflict", "An account already exists for this email or name", 409)

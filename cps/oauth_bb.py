@@ -490,8 +490,6 @@ def register_user_from_generic_oauth(token=None):
         try:    
             ub.session.add(user)
             ub.session_commit()
-            from . import user_library
-            user_library.configure_new_user(user)
             log.info("OAuth auto-created user: '%s' from provider: %s", provider_username, generic.get('provider_name', 'unknown'))
         except Exception as ex:
             log.error("Failed to create OAuth user '%s': %s", provider_username, ex)

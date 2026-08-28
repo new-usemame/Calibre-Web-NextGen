@@ -691,20 +691,12 @@ def test_changed_paths_treats_tests_yml_as_frontend_relevant():
     fixture could not be validated by the e2e job — the fix for a red gate
     would not run the gate.
     """
-    wf = _load(WF_DIR / "tests.yml")
-    detect = next(
-        (
-            s
-            for s in ((wf.get("jobs") or {}).get("changed_paths") or {}).get("steps", [])
-            if isinstance(s, dict) and s.get("id") == "detect"
-        ),
-        None,
-    )
-    assert detect is not None, "changed_paths has no `detect` step"
-    run = detect.get("run") or ""
-    assert "workflows/tests" in run.replace("\\", ""), (
-        "changed_paths does not treat .github/workflows/tests.yml as frontend-relevant, "
-        "so a PR that changes the e2e seed/setup will skip the e2e job that it changes."
+    from scripts.ci_path_classification import classify_paths
+
+    result = classify_paths([".github/workflows/tests.yml"], REPO_ROOT)
+    assert result["frontend"] is True, (
+        "the shared classifier does not treat .github/workflows/tests.yml as "
+        "frontend-relevant, so a PR changing the e2e seed/setup would skip the gate"
     )
 
 
@@ -801,7 +793,11 @@ def _repo_touching(repo: Path, paths: list[str]) -> tuple[str, str]:
     """Build a git repo whose PR branch changes exactly `paths`."""
     _git(repo, "init", "-b", "main")
     (repo / "seed.txt").write_text("base\n")
+    classifier = repo / "scripts" / "ci_path_classification.py"
+    classifier.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO_ROOT / "scripts" / "ci_path_classification.py", classifier)
     _git(repo, "add", "seed.txt")
+    _git(repo, "add", "scripts/ci_path_classification.py")
     _git(repo, "commit", "-m", "base")
     base = _git(repo, "rev-parse", "HEAD").stdout.strip()
 
@@ -1306,10 +1302,13 @@ def test_fork_prs_run_e2e_but_do_not_hard_gate_on_it_yet():
     wf = _load(WF_DIR / "tests.yml")
     job = (wf.get("jobs") or {}).get("e2e-tests")
 
-    condition = str(job.get("if") or "")
-    assert "fork" not in condition, (
-        "e2e-tests must still RUN on fork frontend PRs — surfacing the result "
-        "is the point; only the hard gate is deferred"
+    condition = re.sub(r"\s+", " ", str(job.get("if") or ""))
+    assert "outputs.frontend == 'true' ||" in condition, (
+        "frontend PRs must enter E2E before the concurrency-specific fork carve-out"
+    )
+    assert "outputs.concurrency == 'true'" in condition and "fork != true" in condition, (
+        "only concurrency-triggered image builds exclude forks; frontend fork PRs "
+        "must still run the existing digest-pinned overlay lane"
     )
 
     coe = str(job.get("continue-on-error", ""))

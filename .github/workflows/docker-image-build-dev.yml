@@ -15,11 +15,11 @@ on:
   # tests-only changes skip the build — they can't change the image behavior.
   push:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'tests/**'
-      - '.github/**'
+  # A cheap classifier runs on every PR, but only same-repository PRs whose
+  # architectural concurrency closure changed build. Forks never receive a
+  # package-write job, and ordinary PRs pay only for checkout + classification.
+  pull_request:
+    branches: [main, dev]
   workflow_dispatch:
     inputs:
       ref:
@@ -31,6 +31,10 @@ on:
         required: false
         type: string
 
+concurrency:
+  group: dev-image-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 # GITHUB_TOKEN is read-only on packages by default. Builds push to
 # ghcr.io/new-usemame/calibre-web-nextgen, so packages:write is
 # required. Without it the build silently failed at the GHCR push step
@@ -41,6 +45,52 @@ permissions:
   contents: read
   packages: write
 jobs:
+  classify:
+    name: Classify image work
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      full_build: ${{ steps.classify.outputs.full_build }}
+      alias_image: ${{ steps.classify.outputs.alias_image }}
+    steps:
+      - name: Checkout subject
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.ref }}
+
+      - name: Classify
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork == true }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "full_build=true" >> "$GITHUB_OUTPUT"
+            echo "alias_image=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          files="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" 2>/dev/null \
+            || git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
+          printf '%s\n' "$files"
+          printf '%s\n' "$files" \
+            | python3 scripts/ci_path_classification.py --github-output "$GITHUB_OUTPUT"
+          concurrency="$(awk -F= '$1 == "concurrency" { value=$2 } END { print value }' "$GITHUB_OUTPUT")"
+          image="$(awk -F= '$1 == "image" { value=$2 } END { print value }' "$GITHUB_OUTPUT")"
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            [[ "$concurrency" == "true" && "$IS_FORK" != "true" ]] \
+              && full_build=true || full_build=false
+            echo "full_build=$full_build" >> "$GITHUB_OUTPUT"
+            echo "alias_image=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "full_build=$image" >> "$GITHUB_OUTPUT"
+            [[ "$image" == "true" ]] && alias=false || alias=true
+            echo "alias_image=$alias" >> "$GITHUB_OUTPUT"
+          fi
+
   # --------------------------------------------------------------------------------
   # JOB 0: Ensure the python-build-standalone GHCR mirror exists before building.
   # The image build COPYs Python from ghcr.io/new-usemame/pbs-cache instead of the
@@ -50,12 +100,14 @@ jobs:
   # --------------------------------------------------------------------------------
   ensure-mirror:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 15
+    needs: classify
+    if: needs.classify.outputs.full_build == 'true'
     steps:
       - name: Checkout (read Python pin from Dockerfile)
         uses: actions/checkout@v7
         with:
-          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || github.ref }}
+          ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.ref }}
       - name: Ensure python-build-standalone mirror exists
         env:
           GHCR_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
@@ -66,21 +118,27 @@ jobs:
   # --------------------------------------------------------------------------------
   build-amd64:
     runs-on: ubuntu-latest
-    needs: ensure-mirror
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 60
+    needs: [classify, ensure-mirror]
+    if: needs.classify.outputs.full_build == 'true'
     steps:
       - name: Set build ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.ref }}
+          INPUT_BRANCH: ${{ inputs.branch }}
+          SUBJECT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.ref }}" ]; then
-            echo "BUILD_REF=${{ inputs.ref }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_REF" ]; then
+            echo "BUILD_REF=$INPUT_REF" >> "$GITHUB_ENV"
           else
-            echo "BUILD_REF=${{ github.ref }}" >> $GITHUB_ENV
+            echo "BUILD_REF=$SUBJECT_REF" >> "$GITHUB_ENV"
           fi
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.branch }}" ]; then
-            echo "BRANCH_NAME=${{ inputs.branch }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_BRANCH" ]; then
+            echo "BRANCH_NAME=$INPUT_BRANCH" >> "$GITHUB_ENV"
           else
-            echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "BRANCH_NAME=$SUBJECT_BRANCH" >> "$GITHUB_ENV"
           fi
 
       - name: Checkout correct ref
@@ -106,7 +164,7 @@ jobs:
       - name: DockerHub Login
         # Skipped on the standalone fork where DOCKERHUB secrets aren't set.
         # Operator opts in by setting repo variable DOCKERHUB_PUSH_ENABLED='true'.
-        if: vars.DOCKERHUB_PUSH_ENABLED == 'true'
+        if: vars.DOCKERHUB_PUSH_ENABLED == 'true' && github.event_name != 'pull_request'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -148,7 +206,7 @@ jobs:
       - name: Compose docker outputs (GHCR always; DockerHub when opted-in)
         run: |
           GHCR_LINE="type=image,name=ghcr.io/${{ github.repository_owner }}/${{ env.LOWER_REPO_NAME }},push-by-digest=true,name-canonical=true,push=true"
-          if [ "${{ vars.DOCKERHUB_PUSH_ENABLED }}" = "true" ]; then
+          if [ "${{ vars.DOCKERHUB_PUSH_ENABLED }}" = "true" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
             DH_LINE="type=image,name=${{ secrets.DOCKERHUB_USERNAME }}/calibre-web-automated,push-by-digest=true,name-canonical=true,push=true"
             printf 'DOCKER_BUILD_OUTPUTS<<EOF\n%s\n%s\nEOF\n' "$DH_LINE" "$GHCR_LINE" >> "$GITHUB_ENV"
           else
@@ -205,21 +263,27 @@ jobs:
     # repo is also a meaningful attack surface (any PR can execute on
     # operator hardware), so GitHub-hosted is the safer default.
     runs-on: ubuntu-24.04-arm
-    needs: ensure-mirror
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 60
+    needs: [classify, ensure-mirror]
+    if: needs.classify.outputs.full_build == 'true'
     steps:
       - name: Set build ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.ref }}
+          INPUT_BRANCH: ${{ inputs.branch }}
+          SUBJECT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.ref }}" ]; then
-            echo "BUILD_REF=${{ inputs.ref }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_REF" ]; then
+            echo "BUILD_REF=$INPUT_REF" >> "$GITHUB_ENV"
           else
-            echo "BUILD_REF=${{ github.ref }}" >> $GITHUB_ENV
+            echo "BUILD_REF=$SUBJECT_REF" >> "$GITHUB_ENV"
           fi
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.branch }}" ]; then
-            echo "BRANCH_NAME=${{ inputs.branch }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_BRANCH" ]; then
+            echo "BRANCH_NAME=$INPUT_BRANCH" >> "$GITHUB_ENV"
           else
-            echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "BRANCH_NAME=$SUBJECT_BRANCH" >> "$GITHUB_ENV"
           fi
 
       - name: Checkout correct ref
@@ -245,7 +309,7 @@ jobs:
       - name: DockerHub Login
         # Skipped on the standalone fork where DOCKERHUB secrets aren't set.
         # Operator opts in by setting repo variable DOCKERHUB_PUSH_ENABLED='true'.
-        if: vars.DOCKERHUB_PUSH_ENABLED == 'true'
+        if: vars.DOCKERHUB_PUSH_ENABLED == 'true' && github.event_name != 'pull_request'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -287,7 +351,7 @@ jobs:
       - name: Compose docker outputs (GHCR always; DockerHub when opted-in)
         run: |
           GHCR_LINE="type=image,name=ghcr.io/${{ github.repository_owner }}/${{ env.LOWER_REPO_NAME }},push-by-digest=true,name-canonical=true,push=true"
-          if [ "${{ vars.DOCKERHUB_PUSH_ENABLED }}" = "true" ]; then
+          if [ "${{ vars.DOCKERHUB_PUSH_ENABLED }}" = "true" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
             DH_LINE="type=image,name=${{ secrets.DOCKERHUB_USERNAME }}/calibre-web-automated,push-by-digest=true,name-canonical=true,push=true"
             printf 'DOCKER_BUILD_OUTPUTS<<EOF\n%s\n%s\nEOF\n' "$DH_LINE" "$GHCR_LINE" >> "$GITHUB_ENV"
           else
@@ -355,22 +419,28 @@ jobs:
   # --------------------------------------------------------------------------------
   merge:
     runs-on: ubuntu-latest
-    needs: [build-amd64, build-arm]
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 15
+    needs: [classify, build-amd64, build-arm]
+    if: needs.classify.outputs.full_build == 'true'
     steps:
       # --- 1. Calculate Variables ---
       - name: Set build ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.ref }}
+          INPUT_BRANCH: ${{ inputs.branch }}
+          SUBJECT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.ref }}" ]; then
-            echo "BUILD_REF=${{ inputs.ref }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_REF" ]; then
+            echo "BUILD_REF=$INPUT_REF" >> "$GITHUB_ENV"
           else
-            echo "BUILD_REF=${{ github.ref }}" >> $GITHUB_ENV
+            echo "BUILD_REF=$SUBJECT_REF" >> "$GITHUB_ENV"
           fi
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.branch }}" ]; then
-            echo "BRANCH_NAME=${{ inputs.branch }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_BRANCH" ]; then
+            echo "BRANCH_NAME=$INPUT_BRANCH" >> "$GITHUB_ENV"
           else
-            echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "BRANCH_NAME=$SUBJECT_BRANCH" >> "$GITHUB_ENV"
           fi
 
       - name: Checkout correct ref
@@ -396,12 +466,13 @@ jobs:
           # We use the build number that was passed to the build jobs
           # Note: We append the build number to the 'dev' prefix to keep them grouped
           echo "UNIQUE_TAG=dev-${{ vars.CURRENT_DEV_BUILD_NUM }}" >> $GITHUB_ENV
+          echo "COMMIT_TAG=sha-$(git rev-parse HEAD)" >> $GITHUB_ENV
 
       # --- 2. Logins ---
       - name: DockerHub Login
         # Skipped on the standalone fork where DOCKERHUB secrets aren't set.
         # Operator opts in by setting repo variable DOCKERHUB_PUSH_ENABLED='true'.
-        if: vars.DOCKERHUB_PUSH_ENABLED == 'true'
+        if: vars.DOCKERHUB_PUSH_ENABLED == 'true' && github.event_name != 'pull_request'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -440,7 +511,7 @@ jobs:
         working-directory: /tmp/digests
         run: |
           # 1. Push to DockerHub (only when DOCKERHUB_PUSH_ENABLED) — both tags
-          if [ "${{ vars.DOCKERHUB_PUSH_ENABLED }}" = "true" ]; then
+          if [ "${{ vars.DOCKERHUB_PUSH_ENABLED }}" = "true" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
             docker buildx imagetools create \
               -t ${{ secrets.DOCKERHUB_USERNAME }}/calibre-web-automated:${{ env.FLOAT_TAG }} \
               -t ${{ secrets.DOCKERHUB_USERNAME }}/calibre-web-automated:${{ env.UNIQUE_TAG }} \
@@ -449,11 +520,15 @@ jobs:
             echo "DOCKERHUB_PUSH_ENABLED is not 'true' — skipping DockerHub manifest push (GHCR-only mode)."
           fi
 
-          # 2. Push to GHCR (Both Tags) — always
-          docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository_owner }}/${{ env.LOWER_REPO_NAME }}:${{ env.FLOAT_TAG }} \
-            -t ghcr.io/${{ github.repository_owner }}/${{ env.LOWER_REPO_NAME }}:${{ env.UNIQUE_TAG }} \
-            $(printf 'ghcr.io/${{ github.repository_owner }}/${{ env.LOWER_REPO_NAME }}@sha256:%s ' *)
+          # 2. GHCR always gets an immutable commit tag. Main/manual builds also
+          # advance the delivery-channel tags; PR verification builds must not.
+          base="ghcr.io/${{ github.repository_owner }}/${{ env.LOWER_REPO_NAME }}"
+          tags=(-t "$base:${{ env.COMMIT_TAG }}")
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            tags+=(-t "$base:${{ env.FLOAT_TAG }}" -t "$base:${{ env.UNIQUE_TAG }}")
+          fi
+          docker buildx imagetools create "${tags[@]}" \
+            $(printf "$base@sha256:%s " *)
 
       # --- 4. Increment Build Number (Last Step) ---
       # Inherited from upstream CWA. Bumps repo variable CURRENT_DEV_BUILD_NUM
@@ -464,9 +539,40 @@ jobs:
       # secret, and fail-soft: a hiccup in this purely-bookkeeping step must
       # never mark an otherwise-successful build red.
       - name: Increment dev build number
+        if: github.event_name != 'pull_request'
         uses: action-pack/increment@v2
         id: increment
         continue-on-error: true
         with:
           name: 'CURRENT_DEV_BUILD_NUM'
           token: ${{ secrets.GH_PAT || secrets.DEV_BUILD_NUM_INCREMENTOR_TOKEN }}
+
+  # Image-neutral main commits (docs/tests/workflow policy) deliberately do not
+  # rebuild or advance :dev. They still need an immutable subject identifier so
+  # Test Suite can prove which backend it exercised. Copying the existing
+  # manifest to sha-<commit> is registry-only and does not restart the canary.
+  alias-image-neutral-commit:
+    name: Alias unchanged image to commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: classify
+    if: needs.classify.outputs.alias_image == 'true'
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx (registry-only)
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
+
+      - name: Publish immutable commit alias
+        run: |
+          base="ghcr.io/${{ github.repository_owner }}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
+          docker buildx imagetools create \
+            -t "$base:sha-${{ github.sha }}" \
+            "$base:dev"

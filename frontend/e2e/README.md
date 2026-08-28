@@ -23,6 +23,13 @@ Env knobs: `E2E_BASE_URL` (default `http://localhost:8086`), `E2E_USER`/`E2E_PAS
 `admin`/`admin123`), `E2E_SUBPATH_URL` (set to the `cwn-nginx-571` rig `http://localhost:8087` to run the
 reverse-proxy project).
 
+In CI, a same-repository PR whose concurrency/engine dependency closure changed runs this suite as a
+hard gate against `sha-<PR head>` — the dev-image workflow builds that exact commit and the test workflow
+waits for, then pins, its manifest digest. Frontend-only PRs retain the cheaper SPA-overlay route. To run
+the lane outside its automatic path classes, use **Actions → Test Suite → Run workflow** with `run_e2e`
+enabled. If that ref has no `sha-<commit>` dev image, dispatch **Build & Push - Dev - Split Strategy** for
+the same ref first; the test job fails rather than falling back to a different backend.
+
 ## What it covers (projects = matrix axes)
 
 | Project | Axis | Guards |
@@ -48,3 +55,52 @@ Grow the a11y gate via the `CWNG_a11y` skill.
   allowlist, not a growing one. A quarantined violation is a named debt, never a silenced red.
 - **Theme axis** is not live yet (the SPA ships a single dark theme). Add a theme project when `tokens.css`
   gains a light/other `:root` block.
+
+### Backend capability probes
+
+A frontend/full-stack PR can run on a frontend-only or fork lane whose digest-pinned backend predates a
+new route. Use `requireRouteCapability` from `e2e/capabilities.ts` in `beforeEach` to probe route presence
+with Flask's automatic `OPTIONS` response and skip with an explicit, self-retiring reason:
+
+```ts
+await requireRouteCapability(page.request, {
+  method: 'DELETE',
+  path: '/api/v1/widgets/1',
+  name: 'widget deletion',
+  pinnedBy: 'tests/unit/test_widgets.py::test_delete_route_is_registered',
+});
+```
+
+The probe is presence-only: never send a real payload or interpret a handler body in the helper. A present
+but incorrect route must run and fail the real spec. Every probe must name an independent Fast Tests test
+that pins route registration on every PR; otherwise the skip would create a silent coverage hole.
+Use a feature-specific mutation method (`POST`, `PUT`, `PATCH`, or `DELETE`), not `GET`/`HEAD`: the classic
+UI catch-all advertises read methods for unknown paths, so treating those as a presence signal would be a
+false positive. The helper rejects that ambiguous probe shape loudly.
+
+### A second user in one spec
+
+Import `test` and `expect` from `e2e/fixtures.ts` only in a spec that needs multiple users. Requesting the
+`secondaryUser` fixture creates a unique non-admin viewer through the running container's real admin API,
+logs it into a separate browser context through the production auth endpoint, confirms that session in the
+SPA, and deletes it after the test:
+
+```ts
+import { test, expect } from './fixtures';
+
+test('personal state is isolated', async ({ page, secondaryUser }) => {
+  // `page` is the unchanged primary admin session; each request context owns
+  // its browser context's independent cookie jar.
+  const adminMe = await page.request.get('/api/v1/auth/me').then((r) => r.json());
+  const otherMe = await secondaryUser.page.request.get('/api/v1/auth/me').then((r) => r.json());
+  expect(adminMe.name).not.toBe(otherMe.name);
+  expect(adminMe.role.admin).toBe(true);
+  expect(otherMe.role.admin).toBe(false);
+});
+```
+
+The fixture is test-scoped and lazy, so the existing suite creates no extra users and keeps using
+`e2e/.auth/state.json` unchanged. Parallel workers receive different usernames and contexts. Multi-user
+specs must mutate only per-user resources (personal shelves, hidden/read state, annotations) or use an
+already-dedicated book lane and restore it; creating a second account does not make shared catalog writes
+safe while the suite is `fullyParallel` with two CI workers.

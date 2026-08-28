@@ -70,6 +70,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts.ci_path_classification import classify_paths
+
 try:
     import yaml
 except ImportError:  # pragma: no cover - yaml ships with most distros
@@ -152,10 +154,8 @@ def _dev_push_trigger() -> dict:
 
 
 def _dev_push_fires(changed_paths: list) -> bool:
-    """The dev build's push trigger fires unless EVERY changed path is
-    covered by paths-ignore."""
-    ignores = _dev_push_trigger().get("paths-ignore") or []
-    return any(not _matches_any(p, ignores) for p in changed_paths)
+    """The workflow runs on every main push; only image-relevant paths build."""
+    return classify_paths(changed_paths, REPO_ROOT)["image"]
 
 
 def _translations_runs(changed_paths: list) -> bool:
@@ -374,17 +374,16 @@ def test_translation_commit_push_self_triggers_ci_premise():
     )
 
 
-def test_dev_workflow_keeps_its_push_trigger_and_paths_ignore():
-    """Architecture pin for the matrix: the push trigger on main is the
-    intended single build path. Deleting it and keeping only the dispatch
-    would also produce 'one build per merge' on code pushes — while breaking
-    paths-ignore, non-main dev builds, and the docs-only skip. The count
-    alone must not bless that rewrite."""
-    push = _dev_push_trigger()
-    ignores = push.get("paths-ignore") or []
-    assert ignores, (
-        "docker-image-build-dev.yml lost its paths-ignore list — docs-only "
-        "merges would pay for a full image build again"
-    )
-    for pattern in ("**.md", "docs/**", "tests/**", ".github/**"):
-        assert pattern in ignores, f"paths-ignore lost {pattern!r}"
+def test_dev_workflow_keeps_push_trigger_and_aliases_image_neutral_commits():
+    """Docs/tests commits get a sha identity without rebuilding or moving dev."""
+    _dev_push_trigger()
+    wf = _load(DEV_WF)
+    jobs = wf.get("jobs") or {}
+    classifier = jobs.get("classify") or {}
+    alias = jobs.get("alias-image-neutral-commit") or {}
+    assert classifier, "dev workflow lost its path-classification job"
+    assert alias, "image-neutral commits no longer get an immutable sha alias"
+    assert "alias_image" in str(alias.get("if") or "")
+    assert classify_paths(["docs/usage.md"], REPO_ROOT)["image"] is False
+    assert classify_paths(["tests/unit/test_example.py"], REPO_ROOT)["image"] is False
+    assert classify_paths(["cps/web.py"], REPO_ROOT)["image"] is True

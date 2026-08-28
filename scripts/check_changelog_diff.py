@@ -29,7 +29,18 @@ NON_SHIPPING_PATH_PREFIXES = (
     "wiki-src/",
 )
 NON_SHIPPING_PATHS = frozenset(
-    {"changelog.d/README.md", "messages.pot", "scripts/check_changelog_diff.py"}
+    {
+        # The upstream-comparison ledger records changes that have ALREADY
+        # shipped, with their squash SHA and containing release tag. A
+        # post-release backfill of those fields is bookkeeping about the past,
+        # so demanding a release-note fragment for it can only be satisfied by
+        # inventing a duplicate entry for a change the changelog already
+        # carries (OBSERVED 2026-08-28: the v4.1.42 backfill PR went red here).
+        "CHANGES-vs-upstream.md",
+        "changelog.d/README.md",
+        "messages.pot",
+        "scripts/check_changelog_diff.py",
+    }
 )
 
 

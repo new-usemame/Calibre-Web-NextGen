@@ -200,8 +200,24 @@ def test_other_allowlisted_non_shipping_paths_do_not_require_an_entry():
         "tests/unit/test_changelog_diff_guard.py",
         "changelog.d/README.md",
         "scripts/check_changelog_diff.py",
+        "CHANGES-vs-upstream.md",
     ):
         assert changelog_requirement_errors([path]) == []
+
+
+def test_upstream_comparison_ledger_alone_needs_no_fragment():
+    """A post-release SHA/tag backfill documents changes that already shipped.
+
+    Requiring a fragment there can only be satisfied by inventing a second
+    release-note entry for a change the changelog already announced.
+    """
+    assert changelog_requirement_errors(["CHANGES-vs-upstream.md"]) == []
+
+
+def test_the_ledger_mixed_with_shipping_code_still_requires_an_entry():
+    errors = changelog_requirement_errors(["CHANGES-vs-upstream.md", "cps/web.py"])
+    assert len(errors) == 1
+    assert "shipping paths" in errors[0]
 
 
 def test_github_paths_and_top_level_dotfiles_are_not_blanket_exempt():

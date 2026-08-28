@@ -1448,12 +1448,16 @@ def ajax_kobo_resend(userid, bookid):
 def do_kobo_resend(userid, bookid):
     # Force re-delivery of one book to one user's Kobo on the next sync.
     #
-    # Two writes, and only the second does what it says on its own:
+    # Three writes across the two databases, and only the timestamp bump does
+    # what it says on its own:
     #
     #   * bump Books.last_modified, so the sync filter
     #     (Books.last_modified > sync_token.books_last_modified) picks the book
     #     up regardless of where the device's cursor sits;
-    #   * clear the (user_id, book_id) row from kobo_synced_books.
+    #   * clear the (user_id, book_id) row from kobo_synced_books;
+    #   * clear every per-device entitlement fingerprint for this user/book,
+    #     otherwise Layer 2 can suppress the admin-requested replay as an exact
+    #     match even though last_modified selected it for delivery.
     #
     # ⚠️ This comment used to say the deletion is what makes the sync emit
     # NewEntitlement. It is not, and believing so is what made the only
@@ -1483,13 +1487,20 @@ def do_kobo_resend(userid, bookid):
         message = _("Book {} not found").format(bookid)
         return Response(json.dumps([{"type": "danger", "message": message}]),
                         mimetype='application/json')
+    device_ids = ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == userid,
+    ).scalar_subquery()
+    ledger_deleted = ub.session.query(ub.KoboDeviceBookEntitlement).filter(
+        ub.KoboDeviceBookEntitlement.device_id.in_(device_ids),
+        ub.KoboDeviceBookEntitlement.book_id == bookid,
+    ).delete(synchronize_session=False)
     deleted = ub.session.query(ub.KoboSyncedBooks).filter(
         ub.KoboSyncedBooks.user_id == userid,
         ub.KoboSyncedBooks.book_id == bookid,
     ).delete()
     book.last_modified = datetime.now(timezone.utc)
     calibre_db.session.commit()
-    if deleted:
+    if deleted or ledger_deleted:
         message = _("Cleared sync state for book {0} (user {1}); the device "
                     "will re-receive the book on next sync").format(bookid, userid)
     else:

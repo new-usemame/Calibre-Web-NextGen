@@ -1,6 +1,7 @@
 # Issue #1925 — Kobo sync de-download report
 
-Status: two-layer implementation complete; focused and complete executable-unit
+Status: two-layer implementation complete; regression-loop round 1 found and
+fixed one admin-resend lifecycle defect; focused and complete executable-unit
 verification green; Clara hardware discrimination pending.
 
 ## Mechanism
@@ -207,7 +208,8 @@ fallback that makes the unsaturated one-book case pass.
 
 ### Green after implementation
 
-**OBSERVED — focused two-layer, lifecycle, and adjacent KEPUB selection:**
+**OBSERVED — original focused two-layer, lifecycle, and adjacent KEPUB
+selection:**
 
 ```text
 python -m pytest -q \
@@ -260,6 +262,64 @@ default command was not rerun after that test-only precondition correction;
 the complete unit tree was.
 
 **OBSERVED — static hygiene:** `git diff --check` exits cleanly.
+
+## Regression loop round 1 — 2026-08-28
+
+This round adversarially exercised every surface named in the manager handoff,
+including the shelf-only reader's request shapes. The new tests are regression
+guards: each asserts an externally relevant invariant that would fail if the
+Layer 1/Layer 2 diff disturbed that surface. Where an old-code comparison was
+meaningful, it was run explicitly; unchanged-behavior guards are expected to
+pass the old implementation and are positive controls, not false red tests.
+
+| Surface | OBSERVED finding and discriminator | Fixed? / verdict |
+| --- | --- | --- |
+| Shelf-only sync, membership, remove/archive, #468 fail-safe | Real `HandleSyncRequest` tests run two unchanged shelf-only syncs, add a membership and require exactly one delivery, remove it and require the existing `ChangedEntitlement`/`IsRemoved=true` plus marker cleanup, then make Magic Shelf membership unreliable and require no removal and no marker loss. Any replay loop, lost shelf cursor, altered removal command, or fail-safe regression fails these assertions. | No defect found. All guards green. |
+| Deferred and rewritten downloads, including `NETWORK_SHARE_MODE` | Entitlement assertions require `Format`, `Url`, `Platform`, and `DrmType` to remain complete while `Size` is omitted only for generated/rewritten artifacts. Six real Flask download-route cases cover deferred EPUB→KEPUB, rewritten stored EPUB, and rewritten stored KEPUB with network-share mode both off and on; each requires HTTP 200, expected bytes, and filename. | No product defect found. The test harness initially lacked `config_unicode_filename` and attempted to read a direct-passthrough response; both were test-fixture corrections, not application changes. All six route shapes green. |
+| Legacy, partial, and store-only tokens | Parser tests omit the additive #1925 fields, omit core fields selectively, pass an official-store-only token, and run an actual store-token sync. They require preserved supplied cursors, sane `datetime.min` defaults, correct `is_cwng_token` provenance, no exception, and a valid outgoing response. | No defect found. All guards green. |
+| Second physical device, Layer 2 off/on | With Layer 2 off, two devices on one account each get an initial entitlement, subsequent cursors terminate, and no ledger row is written. With Layer 2 on, a fingerprint for device A cannot suppress device B's initial entitlement. | No cross-device defect found. All guards green. |
+| Reading state, unsuppressed and suppressed | The unsuppressed positive control requires the pre-change shape: one embedded `ReadingState`, the exact outgoing reading cursor, then no repeat. The suppressed shelf-only discriminator fills the generic-state page with an older state and requires the suppressed book's newer `ChangedReadingState` once with cursor advancement. Temporarily restoring the old suppression block made exactly this test fail (`0` target states instead of `1`); the other **37/38** #1925 cases passed. | Previously identified reading-state defect remains fixed; no new regression. |
+| Magic Shelf, sync-all and shelf-only | Parameterized real-sync tests require a Magic Shelf membership change to emit once in both modes and then terminate. The full adjacent Magic Shelf suite covers cache reset, large-shelf sub-cursors, local cursor reuse, full-page deferral, and ID-list membership. | No defect found. All guards green. |
+| Permanent DEBUG sync summary | A store-token/min-cursor request and direct nullable-cursor formatting exercise the log path. Assertions require a 200 response, one summary record, stable count fields, and no exception for `None`/minimum cursor shapes. | No defect found. All guards green. |
+| Full sync, resend, unsync, purge, duplicate merge | Full sync and unsync were correctly scoped; D4 purge/merge/registry tests remained green. A new behavioral resend test seeded two target-user devices plus another account, invoked admin resend, then synced: before the repair, both target ledger rows remained and the test failed. | **Finding R1-1 fixed:** `do_kobo_resend` now clears the requested book's fingerprints for every device belonging to the target user, preserves other users/books, validates the book before mutating either database, and allows the next speaking device to receive and re-seed the entitlement. |
+
+### Round-1 red/green evidence
+
+- **OBSERVED — R1-1 red before repair:** the lifecycle subset reported **1
+  failed, 2 passed**. `test_admin_resend_clears_target_users_entitlement_ledger`
+  expected only the unrelated account's row but observed all seeded rows still
+  present. After the repair, the expanded lifecycle subset reported **4
+  passed**, including the nonexistent-book no-mutation guard.
+- **OBSERVED — reading-state old-block comparison:** with only the committed
+  pre-fix suppression block restored temporarily, the complete expanded #1925
+  module reported **1 failed, 37 passed**. The sole failure was
+  `test_suppressed_entitlement_emits_newer_reading_state_once_and_advances_cursor`;
+  after restoring the fix, the module reported **38 passed**.
+- **OBSERVED — old-code applicability:** the 37 passing old-block cases are
+  positive controls for unchanged behavior. Reverting all of Layer 1/Layer 2
+  is not meaningful for ledger lifecycle guards because the model and config
+  gate do not exist there; the earlier implementation red remains the manager-
+  verified **6 failed, 3 passed** result documented above.
+
+### Round-1 green counts
+
+- **OBSERVED — touched-surface focused matrix:** **243 passed**. It includes the
+  38-case #1925 module plus the pre-existing resend, D4 lifecycle, book-modified,
+  #468, shelf-only archive, Magic Shelf, SyncToken, prefer-KEPUB, real download-
+  route, and metadata-rewrite suites.
+- **OBSERVED — complete unit tree:** `tests/unit` collected **7,418** tests;
+  with the same 17 managed-sandbox node IDs explicitly deselected, **7,299
+  passed, 102 skipped, 17 deselected** in 209.83 seconds. The sandbox-blocked
+  list remains six gevent loopback binds, one health-probe loopback bind, three
+  Kobo measurement loopback binds, and seven `s6` process-tree inspections
+  requiring `/bin/ps`.
+- **OBSERVED — final clean pass, `Regression-loop round 1 / clean pass 2`:**
+  the complete 243-test touched-surface matrix was rerun after the repair and
+  report audit; **243 passed** in 5.55 seconds with **zero new findings**.
+
+**ASSUMED:** these executable tests cover the server contracts and route bytes,
+not Nickel's closed-source response to the payload. The Clara database-snapshot
+procedure remains the hardware discriminator.
 
 ## Clara hardware-verification recipe
 

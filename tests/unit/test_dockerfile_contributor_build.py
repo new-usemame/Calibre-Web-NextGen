@@ -66,6 +66,17 @@ FORK_AWARE_PBS_SOURCE = (
     "&& 'upstream' || 'ghcr' }}"
 )
 
+# These events can be reached from, or delegated by, a pull-request context.
+# Only ordinary `pull_request` is proven by the classifier shell below; the
+# privileged/callable variants require a separate threat model and therefore
+# fail closed if an image-building workflow acquires one.
+PR_REACHABLE_TRIGGERS = {
+    "pull_request",
+    "pull_request_target",
+    "workflow_call",
+    "workflow_run",
+}
+
 
 def _workflow_triggers(workflow: str) -> set[str]:
     """The event names a workflow is registered for.
@@ -192,7 +203,10 @@ def _fork_unreachable_through_classifier(
             **os.environ,
             "PATH": f"{stub_dir}:/usr/bin:/bin",
             "BASE_SHA": "base",
+            "CONCURRENCY": "true",
+            "GITHUB_EVENT_NAME": "pull_request",
             "HEAD_SHA": "head",
+            "IMAGE": "true",
             "IS_FORK": "true" if is_fork else "false",
             "GITHUB_OUTPUT": str(output),
         }
@@ -423,7 +437,7 @@ def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror(
     pr_builds = [
         (workflow, job, step)
         for workflow, job, step in _image_build_steps()
-        if "pull_request" in _workflow_triggers(workflow)
+        if PR_REACHABLE_TRIGGERS & _workflow_triggers(workflow)
     ]
     assert pr_builds, (
         "found no pull_request-triggered image build; if the integration build "
@@ -432,6 +446,14 @@ def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror(
 
     offenders: list[str] = []
     for workflow, job, step in pr_builds:
+        triggers = _workflow_triggers(workflow)
+        unsupported = (triggers & PR_REACHABLE_TRIGGERS) - {"pull_request"}
+        if unsupported:
+            offenders.append(
+                f"{workflow}:{job}: image build has unsupported PR-reachable "
+                f"trigger(s) {sorted(unsupported)}"
+            )
+            continue
         selectors = _pbs_source_selector(step)
         if selectors == [FORK_AWARE_PBS_SOURCE]:
             continue
@@ -449,6 +471,22 @@ def test_pull_request_image_builds_do_not_hand_forks_the_private_mirror(
         "selector nor prove that their literal private-mirror build is "
         f"unreachable from forks: {offenders}. Fork PRs will 403 on the private "
         "mirror (#1263)."
+    )
+
+
+def test_dev_image_workflow_trigger_set_is_security_pinned() -> None:
+    """A privileged/callable trigger must not bypass the ordinary-PR fork gate.
+
+    In particular, `pull_request_target` would execute the workflow from the
+    base repository and its event name would skip the classifier's
+    `pull_request` branch. Pinning the complete trigger set catches that change
+    even when checkout is hidden behind BUILD_REF/GITHUB_ENV indirection.
+    """
+    triggers = _workflow_triggers("docker-image-build-dev.yml")
+    assert triggers == {"push", "pull_request", "workflow_dispatch"}, (
+        "docker-image-build-dev.yml trigger set changed. Image publication is "
+        "proven safe only for push, ordinary pull_request, and explicit "
+        f"workflow_dispatch; got {sorted(triggers)}"
     )
 
 

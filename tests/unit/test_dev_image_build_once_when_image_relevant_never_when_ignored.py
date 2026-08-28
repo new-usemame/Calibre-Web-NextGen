@@ -375,7 +375,7 @@ def test_translation_commit_push_self_triggers_ci_premise():
 
 
 def test_dev_workflow_keeps_push_trigger_and_aliases_image_neutral_commits():
-    """Docs/tests commits get a sha identity without rebuilding or moving dev."""
+    """Neutral commits alias only from the classifier-proven source commit."""
     _dev_push_trigger()
     wf = _load(DEV_WF)
     jobs = wf.get("jobs") or {}
@@ -384,6 +384,25 @@ def test_dev_workflow_keeps_push_trigger_and_aliases_image_neutral_commits():
     assert classifier, "dev workflow lost its path-classification job"
     assert alias, "image-neutral commits no longer get an immutable sha alias"
     assert "alias_image" in str(alias.get("if") or "")
+    outputs = classifier.get("outputs") or {}
+    assert "image_source" in outputs
+    publish = next(
+        step for step in alias.get("steps") or [] if step.get("name") == "Publish immutable commit alias"
+    )
+    assert "needs.classify.outputs.image_source" in str((publish.get("env") or {}).get("IMAGE_SOURCE"))
+    assert "alias-e2e-image.sh" in str(publish.get("run") or "")
     assert classify_paths(["docs/usage.md"], REPO_ROOT)["image"] is False
     assert classify_paths(["tests/unit/test_example.py"], REPO_ROOT)["image"] is False
     assert classify_paths(["cps/web.py"], REPO_ROOT)["image"] is True
+
+
+def test_main_image_runs_serialize_while_pr_verification_can_cancel() -> None:
+    """A later neutral main push must not cancel its image-relevant ancestor."""
+    wf = _load(DEV_WF)
+    concurrency = wf.get("concurrency") or {}
+    cancel = str(concurrency.get("cancel-in-progress") or "")
+    assert "github.event_name == 'pull_request'" in cancel, (
+        "cancel-in-progress must be true only for superseded PR verification; "
+        "main/manual artifact publication must serialize"
+    )
+    assert "github.ref" in str(concurrency.get("group") or "")

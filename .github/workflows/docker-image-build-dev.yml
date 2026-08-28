@@ -33,7 +33,10 @@ on:
 
 concurrency:
   group: dev-image-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Superseded PR heads may cancel their own unpublished verification build.
+  # Main/manual runs publish load-bearing artifacts and must serialize: a
+  # later neutral commit cannot cancel the relevant build it needs to alias.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # GITHUB_TOKEN is read-only on packages by default. Builds push to
 # ghcr.io/new-usemame/calibre-web-nextgen, so packages:write is
@@ -50,45 +53,87 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      full_build: ${{ steps.classify.outputs.full_build }}
-      alias_image: ${{ steps.classify.outputs.alias_image }}
+      full_build: ${{ steps.gate.outputs.full_build }}
+      alias_image: ${{ steps.gate.outputs.alias_image }}
+      image_source: ${{ steps.gate.outputs.image_source }}
     steps:
       - name: Checkout subject
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.ref }}
+          ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.sha }}
 
-      - name: Classify
-        id: classify
+      - name: Classify paths with the trusted base implementation
+        id: detect
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          IS_FORK: ${{ github.event.pull_request.head.repo.fork == true }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "full_build=true" >> "$GITHUB_OUTPUT"
-            echo "alias_image=false" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            printf 'frontend=false\nbuild=true\nconcurrency=true\nimage=true\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           files="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" 2>/dev/null \
             || git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
           printf '%s\n' "$files"
-          printf '%s\n' "$files" \
-            | python3 scripts/ci_path_classification.py --github-output "$GITHUB_OUTPUT"
-          concurrency="$(awk -F= '$1 == "concurrency" { value=$2 } END { print value }' "$GITHUB_OUTPUT")"
-          image="$(awk -F= '$1 == "image" { value=$2 } END { print value }' "$GITHUB_OUTPUT")"
 
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            [[ "$concurrency" == "true" && "$IS_FORK" != "true" ]] \
+          classifier_root="$GITHUB_WORKSPACE"
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            # A PR must not edit the policy that decides whether its own hard
+            # gate runs. Execute the base commit's classifier against the base
+            # tree. This classifier's introducing PR fails closed into every
+            # lane because its base has no trusted implementation yet.
+            classifier_ref="$BASE_SHA"
+            if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py"; then
+              echo "::warning::Base has no path classifier; enabling every image gate"
+              printf 'frontend=true\nbuild=true\nconcurrency=true\nimage=true\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            classifier_root="$RUNNER_TEMP/base-path-classifier"
+            mkdir -p "$classifier_root"
+            git archive "$classifier_ref" cps scripts/ci_path_classification.py \
+              | tar -x -C "$classifier_root"
+          fi
+          printf '%s\n' "$files" \
+            | python3 "$classifier_root/scripts/ci_path_classification.py" \
+                --repo-root "$classifier_root" --github-output "$GITHUB_OUTPUT"
+
+      - name: Decide build and alias work
+        id: gate
+        env:
+          CONCURRENCY: ${{ steps.detect.outputs.concurrency }}
+          IMAGE: ${{ steps.detect.outputs.image }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork == true }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            {
+              echo "full_build=true"
+              echo "alias_image=false"
+              echo "image_source="
+            } >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            [[ "$CONCURRENCY" == "true" && "$IS_FORK" != "true" ]] \
               && full_build=true || full_build=false
-            echo "full_build=$full_build" >> "$GITHUB_OUTPUT"
-            echo "alias_image=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "full_build=$full_build"
+              echo "alias_image=false"
+              echo "image_source="
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "full_build=$image" >> "$GITHUB_OUTPUT"
-            [[ "$image" == "true" ]] && alias=false || alias=true
-            echo "alias_image=$alias" >> "$GITHUB_OUTPUT"
+            [[ "$IMAGE" == "true" ]] && alias=false || alias=true
+            if [[ "$alias" == "true" ]]; then
+              source="$(python3 scripts/ci_path_classification.py \
+                --latest-image-commit "$HEAD_SHA")"
+            else
+              source=""
+            fi
+            {
+              echo "full_build=$IMAGE"
+              echo "alias_image=$alias"
+              echo "image_source=$source"
+            } >> "$GITHUB_OUTPUT"
           fi
 
   # --------------------------------------------------------------------------------
@@ -125,7 +170,7 @@ jobs:
       - name: Set build ref
         env:
           INPUT_REF: ${{ inputs.ref }}
-          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.ref }}
+          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
           INPUT_BRANCH: ${{ inputs.branch }}
           SUBJECT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
@@ -277,7 +322,7 @@ jobs:
       - name: Set build ref
         env:
           INPUT_REF: ${{ inputs.ref }}
-          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.ref }}
+          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
           INPUT_BRANCH: ${{ inputs.branch }}
           SUBJECT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
@@ -441,7 +486,7 @@ jobs:
       - name: Set build ref
         env:
           INPUT_REF: ${{ inputs.ref }}
-          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.ref }}
+          SUBJECT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
           INPUT_BRANCH: ${{ inputs.branch }}
           SUBJECT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
@@ -579,6 +624,12 @@ jobs:
     needs: classify
     if: needs.classify.outputs.alias_image == 'true'
     steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
@@ -592,8 +643,9 @@ jobs:
           driver: docker
 
       - name: Publish immutable commit alias
+        env:
+          IMAGE_SOURCE: ${{ needs.classify.outputs.image_source }}
+          SUBJECT_SHA: ${{ github.sha }}
         run: |
           base="ghcr.io/${{ github.repository_owner }}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
-          docker buildx imagetools create \
-            -t "$base:sha-${{ github.sha }}" \
-            "$base:dev"
+          bash scripts/alias-e2e-image.sh "$base" "$IMAGE_SOURCE" "$SUBJECT_SHA"

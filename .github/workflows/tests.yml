@@ -428,12 +428,23 @@ jobs:
           # busy main does not make every PR look like it touched everything.
           files="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" || git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
           echo "$files"
-          # One implementation serves this job and the dev-image workflow.
-          # Concurrency classification starts from engine/request entry points
-          # and follows their Python imports, so extracting a new helper cannot
-          # silently remove it from the gate (Class 9b).
+          # A PR cannot certify that its own gate is unnecessary by narrowing
+          # this script. Execute the base commit's classifier against the base
+          # tree. The introducing PR has no trusted base implementation, so it
+          # fails closed into every expensive gate instead of self-certifying.
+          classifier_ref="$BASE_SHA"
+          if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py"; then
+            echo "::warning::Base has no path classifier; enabling every path-derived gate"
+            printf 'frontend=true\nbuild=true\nconcurrency=true\nimage=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          classifier_root="$RUNNER_TEMP/base-path-classifier"
+          mkdir -p "$classifier_root"
+          git archive "$classifier_ref" cps scripts/ci_path_classification.py \
+            | tar -x -C "$classifier_root"
           printf '%s\n' "$files" \
-            | python3 scripts/ci_path_classification.py --github-output "$GITHUB_OUTPUT"
+            | python3 "$classifier_root/scripts/ci_path_classification.py" \
+                --repo-root "$classifier_root" --github-output "$GITHUB_OUTPUT"
 
   # ============================================================================
   # JOB 3: E2E Tests (Full Stack)
@@ -454,9 +465,10 @@ jobs:
     # verification system, frontend/e2e/) is the "earn the release" gate;
     # /CWNG_verify runs the same harness on-demand in dev. Tag runs test the
     # tag's own GHCR image (requires `on.push.tags` above — a `branches:`-only
-    # push trigger never delivers tag events). The dev-branch condition is
-    # forward wiring: no dev branch exists today, so per-merge canary coverage
-    # is a follow-up (workflow_run after the :dev image build).
+    # push trigger never delivers tag events). The dev-branch condition is an
+    # explicit fail-fast tripwire: the dev-image workflow does not build dev
+    # pushes, so this job names that unsupported pairing instead of waiting for
+    # a sha tag no producer will publish.
     # GATING (promoted 2026-07-31, #1130). This was advisory on every PR, and
     # the promotion condition written here — "once several tag runs are green"
     # — has been met: the harness step is green on 9 consecutive runs that
@@ -490,8 +502,11 @@ jobs:
         (needs.changed_paths.outputs.concurrency == 'true' && github.event.pull_request.head.repo.fork != true)
       ))
       )
-    # Tag runs may wait up to ~40 min for the GHCR release build to publish
-    # the image (see the pull loop below) before the ~15 min harness run.
+    # Awaited builds may consume their full 15m mirror + 60m architecture +
+    # 15m manifest budgets. Main image runs also serialize, so a neutral commit
+    # can wait behind the relevant build whose manifest it will honestly alias.
+    # Leave 60m after the 120m resolver budget for setup and Playwright's two
+    # retries of a roughly 15m suite.
     #
     # Advisory ONLY for fork PRs now. A fork's runner gets no repo secrets, and
     # the resolve/pull/overlay path above has never been exercised from one —
@@ -502,7 +517,7 @@ jobs:
     # result is still surfaced; only the block is deferred. Promote (drop the
     # fork clause) once a real fork run shows the path works.
     continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
-    timeout-minutes: 75
+    timeout-minutes: 180
     permissions:
       contents: read
       packages: read   # pull the private pbs-cache mirror images the Dockerfile COPYs from
@@ -511,6 +526,13 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Refuse unsupported dev-branch image wait
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: |
+          echo "::error::Automatic dev-branch E2E has no matching dev-image producer."
+          echo "Run the dev-image workflow for this commit, then dispatch Test Suite with run_e2e=true."
+          exit 1
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -534,7 +556,7 @@ jobs:
           image="ghcr.io/new-usemame/calibre-web-nextgen"
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             tag="$GITHUB_REF_NAME"
-            attempts=80
+            attempts=240
           elif [[ "${{ github.event_name }}" == "pull_request" \
                   && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
             # Frontend-only PRs (including forks) still overlay their own SPA on
@@ -542,12 +564,18 @@ jobs:
             # immediately; capability probes own routes it may not have.
             tag=dev
             attempts=1
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual runs are an assertion that the operator has already
+            # dispatched the dev build for this ref. Waiting two hours cannot
+            # create a tag whose producer was never started.
+            tag="sha-$SUBJECT_SHA"
+            attempts=1
           else
             # Main pushes and concurrency-shaped same-repo PRs are paired with
             # docker-image-build-dev.yml. Wait for this exact commit tag. No
             # :dev fallback is allowed: an absent subject cannot earn a verdict.
             tag="sha-$SUBJECT_SHA"
-            attempts=80
+            attempts=240
           fi
           resolved="$(bash scripts/resolve-e2e-image.sh "$image" "$tag" "$attempts" 30)"
           echo "image=$resolved" >> "$GITHUB_OUTPUT"

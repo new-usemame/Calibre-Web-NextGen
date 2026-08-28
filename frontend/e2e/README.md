@@ -27,8 +27,19 @@ In CI, a same-repository PR whose concurrency/engine dependency closure changed 
 hard gate against `sha-<PR head>` — the dev-image workflow builds that exact commit and the test workflow
 waits for, then pins, its manifest digest. Frontend-only PRs retain the cheaper SPA-overlay route. To run
 the lane outside its automatic path classes, use **Actions → Test Suite → Run workflow** with `run_e2e`
-enabled. If that ref has no `sha-<commit>` dev image, dispatch **Build & Push - Dev - Split Strategy** for
-the same ref first; the test job fails rather than falling back to a different backend.
+enabled. This is a two-dispatch escape hatch for an old ref: first dispatch **Build & Push - Dev - Split
+Strategy** with both `ref=<old ref>` and a non-main `branch=` value, then dispatch **Test Suite** for the
+same ref with `run_e2e` enabled. Omitting `branch=` while dispatching from `main` advances the floating
+`:dev` channel to that old build; the immutable `sha-<commit>` tag needed by E2E is published either way.
+Manual E2E fails immediately when that tag was not prepared, rather than waiting for a producer that was
+never started or falling back to another backend. Automatic `dev`-branch E2E likewise fails fast with a
+stated reason because the dev-image workflow currently produces push images for `main`, not `dev`.
+
+The concurrency set is an intentionally bounded architectural approximation. Local imports are followed
+downward from explicit request/engine roots, including the high-write `cps/web.py` and `cps/kobo.py`
+surfaces; reverse dependents cannot be discovered by that traversal and must be added as roots. The
+two-level cutoff only bounds each root's dependency fan-out—it is not what excludes reverse dependents.
+At this revision the derived set is 110 of 215 local Python modules.
 
 ## What it covers (projects = matrix axes)
 

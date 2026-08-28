@@ -7,7 +7,7 @@ set -euo pipefail
 
 image="${1:?usage: resolve-e2e-image.sh IMAGE TAG [ATTEMPTS] [DELAY_SECONDS]}"
 tag="${2:?usage: resolve-e2e-image.sh IMAGE TAG [ATTEMPTS] [DELAY_SECONDS]}"
-attempts="${3:-80}"
+attempts="${3:-240}"
 delay_seconds="${4:-30}"
 
 if ! [[ "$attempts" =~ ^[1-9][0-9]*$ && "$delay_seconds" =~ ^[0-9]+$ ]]; then

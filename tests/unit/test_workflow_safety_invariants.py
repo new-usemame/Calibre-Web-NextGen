@@ -762,12 +762,15 @@ def _run_detect(repo: Path, base: str, head: str) -> dict[str, str]:
     script = _detect_step().get("run") or ""
     out_file = repo / "_gh_output"
     out_file.write_text("")
+    runner_temp = repo / "runner-temp"
+    runner_temp.mkdir()
     env = dict(os.environ)
     env.update(
         {
             "BASE_SHA": base,
             "HEAD_SHA": head,
             "GITHUB_OUTPUT": str(out_file),
+            "RUNNER_TEMP": str(runner_temp),
             "GIT_CONFIG_NOSYSTEM": "1",
             "HOME": str(repo),
         }
@@ -796,7 +799,11 @@ def _repo_touching(repo: Path, paths: list[str]) -> tuple[str, str]:
     classifier = repo / "scripts" / "ci_path_classification.py"
     classifier.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(REPO_ROOT / "scripts" / "ci_path_classification.py", classifier)
+    package = repo / "cps" / "__init__.py"
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text("", encoding="utf-8")
     _git(repo, "add", "seed.txt")
+    _git(repo, "add", "cps/__init__.py")
     _git(repo, "add", "scripts/ci_path_classification.py")
     _git(repo, "commit", "-m", "base")
     base = _git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -890,6 +897,23 @@ def test_changed_paths_classifies_build_definition_edits(changed, want_build, wa
     assert out["frontend"] == want_frontend, (
         f"changed={changed} → frontend={out['frontend']!r}, expected {want_frontend!r}"
     )
+
+
+def test_pr_cannot_disable_its_gate_by_replacing_its_classifier():
+    """Execute the real detect shell with a deliberately broken PR copy."""
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        base, head = _repo_touching(
+            repo,
+            ["cps/web.py", "scripts/ci_path_classification.py"],
+        )
+        # _repo_touching replaces both files with non-Python text on the PR
+        # branch. The base classifier remains valid and must still identify
+        # web.py as a concurrency root.
+        out = _run_detect(repo, base, head)
+
+    assert out["concurrency"] == "true"
+    assert out["build"] == "true"
 
 
 def test_integration_tests_gate_keys_on_changed_paths():

@@ -5,6 +5,7 @@
 from datetime import datetime, timezone
 import inspect as pyinspect
 import sqlite3
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -1200,6 +1201,163 @@ def test_http_route_contract_is_registered():
     assert routes["/ajax/mylibrary/<int:book_id>/add"] >= {"POST"}
     assert routes["/ajax/mylibrary/<int:book_id>/removal-impact"] >= {"GET"}
     assert routes["/ajax/mylibrary/<int:book_id>/remove"] >= {"POST"}
+
+
+def test_network_share_seed_releases_writer_lock_between_chunks(
+        tmp_path, monkeypatch):
+    """A rollback-journal seed must release its database-wide writer lock.
+
+    The WAL test rig cannot express this production-only cost: in rollback
+    journal mode, the first membership INSERT reserves app.db against every
+    other writer.  Hold that real first INSERT open, prove the competing write
+    is locked, then require the configured busy timeout to carry it across the
+    chunk commit before the seed is allowed to issue chunk two.
+    """
+    from cps import user_library
+
+    monkeypatch.setenv("NETWORK_SHARE_MODE", "true")
+    app_db_path = tmp_path / "app.db"
+    calibre_db_path = tmp_path / "metadata.db"
+    app_engine = ub._create_app_db_engine(app_db_path)
+    calibre_engine = create_engine(
+        "sqlite:///{}".format(calibre_db_path),
+        execution_options={"schema_translate_map": {"calibre": None}},
+    )
+    ub.Base.metadata.create_all(app_engine)
+    db.Base.metadata.create_all(calibre_engine)
+
+    with app_engine.begin() as connection:
+        assert connection.exec_driver_sql("PRAGMA journal_mode").scalar_one() == "delete"
+        assert connection.exec_driver_sql("PRAGMA busy_timeout").scalar_one() == 30_000
+        connection.exec_driver_sql(
+            "CREATE TABLE competing_writer (value TEXT NOT NULL)"
+        )
+    with sessionmaker(bind=app_engine)() as setup_session:
+        user = _user(setup_session, "network-share-seed", False)
+        user_id = user.id
+    with sessionmaker(bind=calibre_engine)() as setup_session:
+        setup_session.add_all([
+            _book(book_id, "Network share %d" % book_id)
+            for book_id in range(1, 5)
+        ])
+        setup_session.commit()
+
+    first_chunk_written = threading.Event()
+    release_first_chunk = threading.Event()
+    competing_execute_started = threading.Event()
+    competing_done = threading.Event()
+    seed_errors = []
+    competing_errors = []
+    membership_inserts = 0
+
+    def gate_seed_chunks(
+            _connection, _cursor, statement, _parameters, _context, _many):
+        nonlocal membership_inserts
+        normalized = statement.lstrip().lower()
+        if normalized.startswith("insert into user_library_book"):
+            membership_inserts += 1
+            if membership_inserts == 2 and not competing_done.wait(timeout=5):
+                raise AssertionError(
+                    "the competing app.db writer did not complete at the first "
+                    "seed chunk boundary"
+                )
+        elif normalized.startswith("insert into competing_writer"):
+            competing_execute_started.set()
+
+    def hold_first_seed_chunk(
+            _connection, _cursor, statement, _parameters, _context, _many):
+        if (
+                statement.lstrip().lower().startswith(
+                    "insert into user_library_book"
+                )
+                and membership_inserts == 1
+        ):
+            first_chunk_written.set()
+            if not release_first_chunk.wait(timeout=5):
+                raise AssertionError("the test did not release seed chunk one")
+
+    event.listen(app_engine, "before_cursor_execute", gate_seed_chunks)
+    event.listen(app_engine, "after_cursor_execute", hold_first_seed_chunk)
+
+    def seed_library():
+        app_session = sessionmaker(bind=app_engine)()
+        calibre_session = sessionmaker(bind=calibre_engine)()
+        try:
+            user = app_session.get(ub.User, user_id)
+            user_library.prepare_user_library_seed(
+                user,
+                chunk_size=2,
+                app_session=app_session,
+                cdb=_cdb(calibre_session),
+            )
+        except BaseException as error:  # surfaced after both threads join
+            seed_errors.append(error)
+        finally:
+            calibre_session.close()
+            app_session.close()
+
+    def competing_writer():
+        try:
+            with app_engine.begin() as connection:
+                assert (
+                    connection.exec_driver_sql("PRAGMA busy_timeout").scalar_one()
+                    == 30_000
+                )
+                connection.exec_driver_sql(
+                    "INSERT INTO competing_writer VALUES ('completed')"
+                )
+        except BaseException as error:  # surfaced after both threads join
+            competing_errors.append(error)
+        finally:
+            competing_done.set()
+
+    seed_thread = threading.Thread(target=seed_library)
+    writer_thread = threading.Thread(target=competing_writer)
+    try:
+        seed_thread.start()
+        assert first_chunk_written.wait(timeout=5), "seed chunk one never wrote"
+
+        # A zero-timeout probe observes the lock directly, without timing how
+        # long an arbitrary INSERT happens to take on this machine.
+        with sqlite3.connect(app_db_path, timeout=0) as lock_probe:
+            with pytest.raises(sqlite3.OperationalError, match="database is locked"):
+                lock_probe.execute(
+                    "INSERT INTO competing_writer VALUES ('must-block')"
+                )
+
+        writer_thread.start()
+        assert competing_execute_started.wait(timeout=5), (
+            "the competing writer never reached SQLite"
+        )
+        release_first_chunk.set()
+        assert competing_done.wait(timeout=5), (
+            "the competing writer did not cross the seed chunk boundary"
+        )
+    finally:
+        release_first_chunk.set()
+        seed_thread.join(timeout=10)
+        if writer_thread.ident is not None:
+            writer_thread.join(timeout=10)
+        event.remove(app_engine, "before_cursor_execute", gate_seed_chunks)
+        event.remove(app_engine, "after_cursor_execute", hold_first_seed_chunk)
+
+    assert not seed_thread.is_alive(), "seed thread did not terminate"
+    assert not writer_thread.is_alive(), "competing writer thread did not terminate"
+    assert seed_errors == []
+    assert competing_errors == []
+    assert membership_inserts == 2
+    with sqlite3.connect(app_db_path) as observer:
+        assert observer.execute(
+            "SELECT book_id FROM user_library_book "
+            "WHERE user_id = ? ORDER BY book_id",
+            (user_id,),
+        ).fetchall() == [(1,), (2,), (3,), (4,)]
+        assert observer.execute(
+            "SELECT value FROM competing_writer"
+        ).fetchall() == [("completed",)]
+
+    calibre_engine.dispose()
+    app_engine.dispose()
 
 
 def _exercise_seed_on_enable_kobo_sync(monkeypatch, *, wire_contract):

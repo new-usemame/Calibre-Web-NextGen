@@ -129,6 +129,25 @@ def test_kindle_fixer_backup_uses_resolved_processed_books_root(
     )]
 
 
+def test_kindle_fixer_creates_missing_backup_directory(script_config_root):
+    _app_paths, config_root = script_config_root
+    kindle_epub_fixer = importlib.import_module("kindle_epub_fixer")
+    source = config_root / "book.epub"
+    source.write_bytes(b"original book")
+    (config_root / "processed_books").mkdir()
+    backup_dir = config_root / "processed_books" / "fixed_originals"
+
+    assert not backup_dir.exists()
+
+    fixer = object.__new__(kindle_epub_fixer.EPUBFixer)
+    fixer.cwa_settings = {"auto_backup_epub_fixes": True}
+    fixer.manually_triggered = False
+    fixer.backup_original_file(str(source))
+
+    assert backup_dir.is_dir()
+    assert (backup_dir / source.name).read_bytes() == b"original book"
+
+
 def test_cps_call_sites_follow_resolved_config_root(monkeypatch, tmp_path):
     from cps import constants, cwa_functions, duplicates
     from cps.tasks import ops

@@ -433,6 +433,7 @@ class EPUBFixer:
                 output_path = str(
                     app_paths.processed_books_dir() / "fixed_originals"
                 )
+                os.makedirs(output_path, exist_ok=True)
                 shutil.copy2(epub_path, output_path)
             except Exception as e:
                 print_and_log(f"[cwa-kindle-epub-fixer] ERROR - Error occurred when backing up {epub_path} to {output_path}:\n{e}", log=self.manually_triggered)

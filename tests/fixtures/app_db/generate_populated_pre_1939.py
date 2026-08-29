@@ -47,18 +47,44 @@ def _build_product_database(db_path: Path) -> None:
         users = []
         for index in range(9):
             is_admin = index < 5
+            # Real accounts accumulate permission bits over years of use.  A
+            # fixture whose roles are only {ROLE_ADMIN, 0} cannot catch role
+            # arithmetic that is right for a bare mask and wrong for a real one.
+            role = constants.ROLE_ADMIN if is_admin else constants.ROLE_USER
+            if index in (1, 6):
+                role |= constants.ROLE_EDIT | constants.ROLE_UPLOAD
+            if index == 7:
+                role |= constants.ROLE_DELETE_BOOKS | constants.ROLE_VIEWER
             user = ub.User(
                 name=("migration-admin-{}" if is_admin else "migration-user-{}").format(index),
                 email="migration-{}@example.invalid".format(index),
                 password="x",
-                role=constants.ROLE_ADMIN if is_admin else constants.ROLE_USER,
+                role=role,
                 sidebar_view=0,
-                locale="en",
+                # A non-English locale keeps locale-sensitive migrations honest.
+                locale="de" if index == 8 else "en",
                 default_language="all",
                 view_settings={},
             )
             session.add(user)
             users.append(user)
+
+        # Every real install has one of these, and at least one migration
+        # (system magic shelves) filters on it.  Without a Guest row that
+        # filter is exercised against zero anonymous users, so a regression
+        # that dropped the filter would look identical to correct behaviour.
+        anonymous = ub.User(
+            name="Guest",
+            email="guest@example.invalid",
+            password="",
+            role=constants.ROLE_ANONYMOUS,
+            sidebar_view=0,
+            locale="en",
+            default_language="all",
+            view_settings={},
+        )
+        session.add(anonymous)
+        users.append(anonymous)
 
         session.add(ub.Registration(domain="%.%", allow=1))
         session.add(
@@ -102,7 +128,13 @@ def _build_product_database(db_path: Path) -> None:
     # DML is intentional here: the current User mapping can no longer load the
     # downgraded table after the product rollback removed mapped columns.
     with engine.begin() as connection:
+        # Legacy sidebar masks, deliberately excluding the two bits the
+        # sidebar migrations are supposed to set: pre-setting those would make
+        # the gate's "did the migration run" assertions pass without it.
         connection.execute(text("UPDATE user SET sidebar_view = 0"))
+        connection.execute(
+            text("UPDATE user SET sidebar_view = 530 WHERE id IN (2, 4, 7)")
+        )
         connection.execute(text("UPDATE user SET view_settings = NULL WHERE id <= 3"))
         connection.execute(
             text("UPDATE settings SET config_kobo_sync_magic_shelves = 0")

@@ -841,7 +841,8 @@
                           <div class="modal-dialog"><div class="modal-content">
                             <div class="modal-header bg-info text-center"><h4 id="removeFromMyLibraryLabel">{{ _('Remove "%(title)s" from your library?', title=entry.title) }}</h4></div>
                             <div class="modal-body text-center">
-                              <p>{{ _('The next time your e-reader updates, this book disappears from it.') }}</p>
+                              <p>{{ _("It leaves your library and your OPDS feed.") }}</p>
+                              <p>{{ _("If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. Other e-readers keep downloaded copies, and KOReader progress sync keeps working.") }}</p>
                               {% set shelf_names = [] %}
                               {% for shelf in g.shelves_access if shelf.id in books_shelfs %}{% if shelf_names.append(shelf.name) %}{% endif %}{% endfor %}
                               {% if shelf_names %}<p>{{ _('It also leaves these shelves: %(shelves)s.', shelves=shelf_names|join(', ')) }}</p>{% endif %}

@@ -3114,9 +3114,19 @@ msgstr ""
 "disparu. Votre administrateur gère ce qui entre dans votre sélection."
 
 #: cps/spa_strings.py cps/templates/detail.html
-msgid "The next time your e-reader updates, this book disappears from it."
+msgid "It leaves your library and your OPDS feed."
+msgstr "Il disparaît de votre bibliothèque et de votre flux OPDS."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid ""
+"If you use Kobo's built-in sync, it also leaves your Kobo at its next "
+"sync. Other e-readers keep downloaded copies, and KOReader progress sync "
+"keeps working."
 msgstr ""
-"Lors de la prochaine mise à jour de votre liseuse, ce livre en disparaîtra."
+"Si vous utilisez la synchronisation intégrée de Kobo, il disparaît également "
+"de votre Kobo lors de la prochaine synchronisation. Les autres liseuses "
+"conservent les exemplaires téléchargés et la synchronisation de la progression "
+"KOReader continue de fonctionner."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "The whole archive. Add books to your library from here."

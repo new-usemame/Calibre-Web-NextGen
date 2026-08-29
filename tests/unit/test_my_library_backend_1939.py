@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.orm import sessionmaker
 
 from cps import constants, db, ub
+from cps.progress_syncing.models import KOSyncProgress
 
 pytestmark = pytest.mark.unit
 
@@ -803,6 +804,266 @@ def test_add_remove_contract_is_idempotent_shelf_aware_and_role_gated(
         user_library.set_enabled(
             user, True, app_session=app_session, cdb=cdb
         )
+
+
+def test_opds_and_kosync_effects_after_membership_removal(
+        app_session, calibre_session, monkeypatch):
+    """OPDS loses the book while file-local KOReader state remains usable."""
+    import importlib
+
+    from cps import opds, user_library
+
+    kosync = importlib.import_module("cps.progress_syncing.protocols.kosync")
+
+    user = _mode_user(app_session, "opds-kosync")
+    shelf = ub.Shelf(name="On device", user_id=user.id, is_public=0)
+    app_session.add_all([
+        shelf,
+        ub.UserLibraryBook(user_id=user.id, book_id=1),
+    ])
+    app_session.flush()
+    link = ub.BookShelf(shelf=shelf.id, book_id=1, order=1)
+    link.ub_shelf = shelf
+    device = ub.Device(
+        user_id=user.id, kind="koreader", display_name="Local reader",
+    )
+    app_session.add_all([
+        link,
+        device,
+        KOSyncProgress(
+            user_id=user.id,
+            document="0123456789abcdef0123456789abcdef",
+            progress="/body/DocFragment[4]",
+            percentage=37.0,
+            device="KOReader",
+            device_id="reader-1",
+        ),
+    ])
+    app_session.flush()
+    report = ub.DeviceInventoryReport(
+        device_id=device.id, item_count=1, matched_count=1,
+    )
+    app_session.add(report)
+    app_session.flush()
+    inventory = ub.DeviceInventoryItem(
+        device_id=device.id,
+        lpath="Books/One.epub",
+        checksum="0123456789abcdef0123456789abcdef",
+        book_id=1,
+        size=123,
+        mtime=456,
+        last_report_id=report.id,
+    )
+    app_session.add(inventory)
+    app_session.commit()
+
+    cdb = _cdb(calibre_session)
+    monkeypatch.setattr(db.ub, "session", app_session)
+    monkeypatch.setattr(db, "current_user", user)
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(opds, "calibre_db", cdb)
+    monkeypatch.setattr(opds.auth, "current_user", lambda: user)
+
+    app = Flask(__name__)
+    with app.test_request_context("/opds/books"):
+        before = calibre_session.query(db.Books.id).filter(
+            opds.get_opds_restricted_common_filter(user)
+        ).order_by(db.Books.id).all()
+        assert [row.id for row in before] == [1]
+
+        assert user_library.remove_book(
+            user, 1, app_session=app_session
+        ) == ["On device"]
+
+        after = calibre_session.query(db.Books.id).filter(
+            opds.get_opds_restricted_common_filter(user)
+        ).order_by(db.Books.id).all()
+        assert [row.id for row in after] == []
+        # The direct OPDS acquisition route delegates to this same filtered
+        # lookup. A non-admin cannot reuse a cached acquisition URL.
+        assert cdb.get_filtered_book(
+            1, allow_show_archived=True, allow_show_hidden=True
+        ) is None
+        # The global archive remains intact and can be used to add the book
+        # back by an account with the browse-global role.
+        global_ids = calibre_session.query(db.Books.id).filter(
+            cdb.common_filters(allow_show_global=True, user=user)
+        ).order_by(db.Books.id).all()
+        assert [row.id for row in global_ids] == [1, 2, 3]
+
+    progress = kosync.get_progress_record(
+        user.id, "0123456789abcdef0123456789abcdef", None
+    )
+    assert progress is not None
+    assert progress.percentage == 37.0
+    assert app_session.get(ub.DeviceInventoryItem, inventory.id) is not None
+    assert app_session.query(ub.DeviceBookDeletion).count() == 0
+
+
+def test_account_without_an_ereader_only_loses_membership_and_shelf_link(
+        app_session, calibre_session):
+    from cps import user_library
+
+    user = _mode_user(app_session, "browser-only")
+    shelf = ub.Shelf(name="Browser shelf", user_id=user.id, is_public=0)
+    app_session.add_all([
+        shelf,
+        ub.UserLibraryBook(user_id=user.id, book_id=1),
+    ])
+    app_session.flush()
+    link = ub.BookShelf(shelf=shelf.id, book_id=1, order=1)
+    link.ub_shelf = shelf
+    app_session.add(link)
+    app_session.commit()
+
+    assert user_library.remove_book(user, 1, app_session=app_session) == [
+        "Browser shelf"
+    ]
+    assert app_session.query(ub.UserLibraryBook).filter_by(
+        user_id=user.id, book_id=1
+    ).count() == 0
+    assert app_session.query(ub.BookShelf).filter_by(book_id=1).count() == 0
+    assert calibre_session.get(db.Books, 1) is not None
+    assert app_session.query(ub.Device).filter_by(user_id=user.id).count() == 0
+    assert app_session.query(ub.DeviceBookDeletion).count() == 0
+
+
+def test_personal_library_removal_archives_book_in_kobo_shelf_sync(
+        monkeypatch):
+    """Drive the real Kobo sync handler with shelf-only sync enabled."""
+    from cps import kobo as kobo_module, kobo_sync_status, user_library
+
+    engine = create_engine("sqlite://")
+    event.listen(
+        engine,
+        "connect",
+        lambda connection, _record: connection.execute(
+            "ATTACH DATABASE ':memory:' AS calibre"
+        ),
+    )
+    ub.Base.metadata.create_all(engine)
+    db.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    now = datetime(2026, 8, 29, 12, 0, 0)
+    book = _book(1, "Shelf-synced book")
+    book.last_modified = now
+    book.timestamp = now
+    book.uuid = "shelf-sync-book-uuid"
+    session.add(book)
+    session.add(db.Data(book.id, "EPUB", 1, "shelf-sync-book"))
+    user = ub.User(
+        name="kobo-shelf-reader",
+        email="kobo-shelf-reader@example.invalid",
+        password="",
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+        role=(constants.ROLE_USER | constants.ROLE_DOWNLOAD
+              | constants.ROLE_BROWSE_GLOBAL),
+        kobo_only_shelves_sync=1,
+    )
+    session.add(user)
+    session.flush()
+    shelf = ub.Shelf(
+        name="Kobo shelf", user_id=user.id, is_public=0, kobo_sync=True,
+    )
+    session.add_all([
+        shelf,
+        ub.UserLibraryBook(user_id=user.id, book_id=book.id),
+        ub.KoboSyncedBooks(
+            user_id=user.id, book_id=book.id, book_uuid=book.uuid,
+        ),
+    ])
+    session.flush()
+    link = ub.BookShelf(shelf=shelf.id, book_id=book.id, order=1)
+    link.ub_shelf = shelf
+    session.add(link)
+    session.commit()
+
+    cdb = object.__new__(db.CalibreDB)
+    cdb.session = session
+    cdb.config = SimpleNamespace(config_restricted_column=0)
+    cdb.reconnect_db = lambda *_args, **_kwargs: None
+    monkeypatch.setattr(db.ub, "session", session)
+    monkeypatch.setattr(db, "current_user", user)
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(
+        ub, "session_commit", lambda *_args, **_kwargs: session.commit()
+    )
+    monkeypatch.setattr(kobo_module, "calibre_db", cdb)
+    monkeypatch.setattr(kobo_module, "current_user", user)
+    monkeypatch.setattr(kobo_sync_status, "current_user", user)
+    monkeypatch.setattr(
+        kobo_module.config, "config_kobo_proxy", False, raising=False
+    )
+    monkeypatch.setattr(
+        kobo_module.config,
+        "config_kobo_sync_magic_shelves",
+        False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        kobo_module, "get_download_url_for_book", lambda *_args: "/download"
+    )
+    monkeypatch.setattr(
+        kobo_module,
+        "get_magic_shelf_book_ids_for_kobo",
+        lambda _user_id: (set(), True),
+    )
+    monkeypatch.setattr(
+        kobo_module,
+        "get_magic_shelf_membership_added_at",
+        lambda _user_id: None,
+    )
+    monkeypatch.setattr(
+        kobo_module, "sync_shelves", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        kobo_module,
+        "create_book_entitlement",
+        lambda item, archived=False: {
+            "Id": str(item.id), "IsRemoved": archived,
+        },
+    )
+    monkeypatch.setattr(
+        kobo_module, "get_metadata", lambda item: {"Id": str(item.id)}
+    )
+
+    assert user_library.remove_book(
+        user, book.id, app_session=session
+    ) == ["Kobo shelf"]
+
+    app = Flask(__name__)
+    app.wsgi_app = SimpleNamespace(is_proxied=True)
+    token = kobo_module.SyncToken.SyncToken(
+        books_last_created=now,
+        books_last_modified=now,
+        archive_last_modified=now,
+        books_last_id=book.id,
+    ).build_sync_token()
+    try:
+        with app.test_request_context(
+            "/v1/library/sync",
+            headers={
+                kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER: token,
+            },
+        ):
+            response = kobo_module.HandleSyncRequest.__wrapped__()
+
+        removals = [
+            item["ChangedEntitlement"]["BookEntitlement"]
+            for item in response.get_json()
+            if item.get("ChangedEntitlement", {})
+            .get("BookEntitlement", {})
+            .get("IsRemoved") is True
+        ]
+        assert removals == [{"Id": str(book.id), "IsRemoved": True}]
+        assert session.query(ub.KoboSyncedBooks).filter_by(
+            user_id=user.id, book_id=book.id
+        ).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
 
 
 def test_http_route_contract_is_registered():

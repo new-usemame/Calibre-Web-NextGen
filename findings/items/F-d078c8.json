@@ -1,0 +1,21 @@
+{
+  "area": "my-library",
+  "body": "The personal-library removal confirmation unconditionally said the next e-reader update removes the book. OBSERVED on origin/main: Kobo native sync emits a removed entitlement, including shelf-only sync; OPDS drops the catalog/acquisition path; KOReader/KOSync keeps the local file and progress row; an account with no reader only loses membership and ordinary shelf links. Fix replaces the generic device claim with client-specific Classic/SPA copy and compiled fr/nl translations.",
+  "created": "2026-08-29",
+  "id": "F-d078c8",
+  "refs": [
+    "cps/templates/detail.html",
+    "frontend/src/pages/Catalog.tsx",
+    "frontend/src/pages/BookDetail.tsx"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-29",
+    "note": "Fixed on fix/personal-library-removal-copy with per-client Classic/SPA copy, behavioral coverage, and compiled fr/nl translations.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "My Library removal dialog falsely says every e-reader deletes the book"
+}

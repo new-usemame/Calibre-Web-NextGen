@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from . import api_v1
 from .. import ub, constants, config, user_library
 from ..cw_login import current_user
+from ..cw_babel import sanitize_locale_for_write
 from .options import locale_options, book_language_options
 from ..usermanagement import login_required_if_no_ano
 from ..helper import (valid_email, check_email, check_username, valid_password,
@@ -338,7 +339,13 @@ def admin_create_user():
     else:
         new_user.role = config.config_default_role
 
-    new_user.locale = data.get("locale") or config.config_default_locale or "en"
+    # Hygiene: refuse a request locale we do not ship, and do not let an
+    # unvalidated config_default_locale seed a new account either. Read-time
+    # coercion in get_locale() is the actual boundary (F-011141).
+    new_user.locale = (
+        sanitize_locale_for_write(data.get("locale"))
+        or sanitize_locale_for_write(config.config_default_locale)
+        or "en")
     new_user.default_language = data.get("default_language") or config.config_default_language or "all"
     # Inherit the instance's content-visibility defaults + sidebar, like legacy.
     new_user.allowed_tags = config.config_allowed_tags
@@ -418,7 +425,10 @@ def admin_update_user(user_id):
         if "kindle_mail" in data:
             user.kindle_mail = valid_email(data.get("kindle_mail") or "")
         if "locale" in data and data["locale"]:
-            user.locale = data["locale"]
+            validated_locale = sanitize_locale_for_write(data["locale"])
+            if not validated_locale:
+                return _err("invalid_request", "Unsupported locale", 400)
+            user.locale = validated_locale
         if "default_language" in data and data["default_language"]:
             user.default_language = data["default_language"]
         if "library_mode" in data:

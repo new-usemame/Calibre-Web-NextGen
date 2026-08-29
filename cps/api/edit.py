@@ -24,7 +24,7 @@ import time
 from ..editbooks import edit_book_param, delete_book_from_table, modify_identifiers
 from ..helper import (convert_book_format, save_cover, save_cover_from_url, tags_filters,
                      get_convert_options, mark_book_modified, log_metadata_change,
-                     replace_cover_thumbnail_cache)
+                     replace_cover_thumbnail_cache, book_cover_is_locked)
 
 # Fields the SPA edit form can change, applied in this order. Title/authors come
 # first because they may restructure the book's directory; the rest follow.
@@ -482,9 +482,26 @@ def set_cover(book_id):
     guard = _require_edit()
     if guard:
         return guard
-    book = calibre_db.get_filtered_book(book_id)
+    # Match the sibling endpoints in this module (and the detail endpoint the
+    # edit page is opened from): a user may edit their OWN hidden or archived
+    # book, so resolving with strict defaults 404s a page that opened fine.
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True
+    )
     if not book:
         return _err("not_found", "Book not found", 404)
+
+    # The per-book cover lock is a deliberate user decision, and every other
+    # write path honours it -- the cover picker refuses with 409, the classic
+    # editor skips the cover, and so does the ingest metadata fetch. Checked
+    # BEFORE any bytes are written, so a refusal cannot leave a replaced file
+    # on disk behind an error response.
+    if book_cover_is_locked(book_id):
+        return _err(
+            "locked",
+            "This book's cover is locked. Unlock it first.",
+            409,
+        )
 
     if request.files.get("file"):
         ok, message = save_cover(request.files["file"], book.path)

@@ -144,6 +144,44 @@ class TestNoLegacyBypass:
     get_book_by_uuid (the unfiltered helper). All five known sites
     must go through get_book_by_uuid_for_kobo with an explicit policy."""
 
+    def test_the_two_kobo_cover_helpers_enforce_policy(self):
+        """F-277165: both UUID cover helpers must stay policy-aware.
+
+        These live in ``cps/helper.py``, not ``cps/kobo.py``, so the audit
+        below never looked at them -- and that is exactly how the finding
+        happened: a numbered ``/cover/<id>`` request went through
+        ``common_filters`` while the Kobo UUID path resolved the book with the
+        raw lookup, so a request naming a restricted book's UUID was answered
+        from that book instead of refused.
+
+        #1947 fixed it by routing both through
+        ``get_book_by_uuid_for_kobo(..., enforce_policy=True)``, which now also
+        carries the per-user library predicate.  Nothing pinned that, so
+        reverting either line reintroduced a security bug with a green suite.
+        """
+        import cps.helper as helper_module
+
+        for name in ("get_book_cover_with_uuid", "get_kobo_cover_source_path"):
+            src = inspect.getsource(getattr(helper_module, name))
+            assert "calibre_db.get_book_by_uuid_for_kobo(" in src, (
+                "{}() must resolve the book through the policy-aware "
+                "lookup, not the raw one (F-277165)".format(name)
+            )
+            assert "enforce_policy=True" in src, (
+                "{}() must pass enforce_policy=True: a cover is a policy "
+                "boundary, not a device-trailing state endpoint "
+                "(F-277165)".format(name)
+            )
+            unfiltered = [
+                ln for ln in src.splitlines()
+                if "calibre_db.get_book_by_uuid(" in ln
+                and "get_book_by_uuid_for_kobo" not in ln
+            ]
+            assert not unfiltered, (
+                "{}() still calls the unfiltered lookup:\n  {}".format(
+                    name, "\n  ".join(unfiltered))
+            )
+
     def test_no_unfiltered_get_book_by_uuid_in_kobo(self):
         import cps.kobo as kobo_module
         src = inspect.getsource(kobo_module)

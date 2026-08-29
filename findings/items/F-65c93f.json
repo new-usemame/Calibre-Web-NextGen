@@ -8,6 +8,12 @@
   ],
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
-  "title": "SPA cover endpoint ignores the cover lock and 404s on the user's own hidden or archived book"
+  "status": "resolved",
+  "title": "SPA cover endpoint ignores the cover lock and 404s on the user's own hidden or archived book",
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-29",
+    "release": "",
+    "note": "Both gaps fixed in cps/api/edit.py::set_cover. (1) The book is now resolved with allow_show_archived=True, allow_show_hidden=True, matching the two sibling endpoints in the same module (:421, :439) and the detail endpoint the edit page is opened from. (2) The per-book cover lock is consulted BEFORE any bytes are written and refused with 409, matching cover_picker.cover_picker_apply. Red/green: 3 tests red on the parent, green after; mutation-tested 3 ways (strict lookup restored, lock check removed, and the lock guard written as helper.<name> when the module imports names rather than the module). That third mutant is not hypothetical - it is the bug I wrote first: it satisfied every source-level assertion and would have raised NameError on the first real request, so a runtime-reachability test was added alongside. Behaviour change on (2) carries a changelog fragment because it newly refuses writes that previously succeeded."
+  }
 }

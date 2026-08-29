@@ -1,0 +1,11 @@
+{
+  "area": "test",
+  "body": "Observed in one session, 2026-08-29, doing mutation testing with `cp` and `sed`:\n\n1. A stale anchor left the mutant UNAPPLIED. pytest printed a green summary, which is\n   indistinguishable from \"the suite caught nothing\". Caught only because a stray traceback\n   happened to print.\n2. `cp cps/admin.py /tmp/$(basename $f)` and `cp cps/api/admin.py /tmp/$(basename $f)` both wrote\n   `/tmp/admin.py`. The restore put a 476-line SPA module on top of a 3,788-line one; the tree only\n   failed at import.\n3. A restore was assumed rather than verified, and a `git checkout --` on a file whose fix was\n   uncommitted silently discarded that fix.\n\nAll three produce a plausible result. None of them announce themselves.\n\nADDRESSED by tests/mutation/mutate.py, which refuses to report a verdict it cannot stand behind:\nthe anchor must match exactly once or the run is an ERROR and not a verdict; backups are\npath-derived so same-basename modules cannot collide; the restore is hash-verified against the\npre-mutation digest and a mismatch is loud; and a SURVIVING mutant exits non-zero, because a gap in\nthe suite is a finding rather than a pass. tests/unit/test_mutation_harness.py pins all four\nbehaviours.\n\nFiled rather than closed silently because the finding is the failure mode, not the tool: anyone\nmutating by hand still hits all three.",
+  "created": "2026-08-29",
+  "id": "F-a114f8",
+  "refs": [],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "Mutation testing by hand has three failure modes that all report as a PASS"
+}

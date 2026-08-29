@@ -4,6 +4,7 @@ from datetime import datetime
 import pytest
 import flask
 from unittest.mock import patch, MagicMock
+from werkzeug.exceptions import BadRequest
 
 import cps.api.auth
 import cps.logout
@@ -197,6 +198,162 @@ def test_auth_login_enforces_declared_per_minute_limit():
             "message": "Too many requests: limit is 3 per 1 minute. Try again after that window resets.",
         }
     }
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("path", "config_attr", "disabled_value"),
+    [
+        ("/api/v1/auth/login", "config_disable_standard_login", True),
+        ("/api/v1/auth/magic-link/start", "config_remote_login", False),
+        ("/api/v1/auth/magic-link/poll", "config_remote_login", False),
+        ("/api/v1/auth/register", "config_public_reg", False),
+    ],
+)
+def test_disabled_auth_routes_check_limit_before_returning(path, config_attr, disabled_value):
+    """Feature gates cannot become an unmetered path around a decorated endpoint."""
+    app = _app()
+    with patch.object(cps.api.auth.config, config_attr, disabled_value, create=True), \
+         patch("cps.api.auth._check_rate_limit") as check:
+        check.side_effect = lambda: cps.api.auth._err(
+            "rate_limit_exceeded", "Too many requests", 429
+        )
+        response = app.test_client().post(path, json={})
+
+    assert response.status_code == 429
+    assert response.get_json()["error"]["code"] == "rate_limit_exceeded"
+    check.assert_called_once_with()
+
+
+@pytest.mark.unit
+def test_auth_login_malformed_username_is_counted_by_ip_bucket():
+    """A request-controlled JSON type cannot raise in the key function and fail open."""
+    app = _app(rate_limits=True)
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+
+    with patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True):
+        client = app.test_client()
+        responses = [
+            client.post("/api/v1/auth/login", json={"username": ["admin"]})
+            for _ in range(4)
+        ]
+
+    assert [response.status_code for response in responses] == [401, 401, 401, 429]
+
+
+@pytest.mark.unit
+def test_auth_login_missing_username_variants_share_one_client_bucket():
+    """Missing, blank, and malformed usernames cannot mint fresh limiter keys."""
+    app = _app(rate_limits=True)
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+
+    with patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True):
+        client = app.test_client()
+        responses = [
+            client.post("/api/v1/auth/login", json=payload)
+            for payload in ({}, {"username": None}, {"username": "   "}, {"username": {}})
+        ]
+
+    assert [response.status_code for response in responses] == [401, 401, 401, 429]
+
+
+@pytest.mark.unit
+def test_rate_limit_payload_is_account_agnostic_and_secret_free():
+    """The 429 envelope must not reveal account existence or submitted secrets."""
+    app = _app(rate_limits=True)
+    from cps import ub, constants
+    existing_user = ub.User()
+    existing_user.name, existing_user.password = "KnownUser", "hash"
+    existing_user.role = constants.ROLE_USER
+    mock_session = MagicMock()
+    first = mock_session.query.return_value.filter.return_value.first
+    first.return_value = existing_user
+
+    def exhaust(username, password, remote_addr):
+        client = app.test_client()
+        return [
+            client.post(
+                "/api/v1/auth/login",
+                json={"username": username, "password": password},
+                environ_overrides={"REMOTE_ADDR": remote_addr},
+            )
+            for _ in range(4)
+        ][-1]
+
+    with patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.check_password_hash", return_value=False), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True):
+        known = exhaust("KnownUser", "known-secret", "192.0.2.30")
+        first.return_value = None
+        unknown = exhaust("MissingUser", "missing-secret", "198.51.100.40")
+
+    assert known.status_code == unknown.status_code == 429
+    assert known.get_json() == unknown.get_json()
+    response_text = known.get_data(as_text=True) + unknown.get_data(as_text=True)
+    for secret in ("KnownUser", "MissingUser", "known-secret", "missing-secret"):
+        assert secret not in response_text
+
+
+@pytest.mark.unit
+def test_auth_login_bucket_is_scoped_to_client_and_normalized_username():
+    """One remote client cannot fill or clear another client's username bucket."""
+    app = _app(rate_limits=True)
+    from cps import limiter, ub, constants
+    user = ub.User()
+    user.id, user.name, user.password, user.locale, user.theme = 1, "victim", "hash", "en", 1
+    user.role = constants.ROLE_USER
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = user
+
+    def post(client, remote_addr, username, password):
+        return client.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": password},
+            environ_overrides={"REMOTE_ADDR": remote_addr},
+        )
+
+    with patch.object(limiter.limiter.storage, "clear",
+                      wraps=limiter.limiter.storage.clear) as storage_clear, \
+         patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.check_password_hash",
+               side_effect=lambda _stored, supplied: supplied == "correct"), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True), \
+         patch("cps.api.auth.login_user"):
+        attacker = app.test_client()
+        victim = app.test_client()
+        attacker_responses = [
+            post(attacker, "192.0.2.10", username, "bad")
+            for username in (" Victim ", "VICTIM", "victim")
+        ]
+        victim_response = post(victim, "198.51.100.20", "victim", "correct")
+        attacker_limited = post(attacker, "192.0.2.10", "vIcTiM", "bad")
+
+    assert [response.status_code for response in attacker_responses] == [401, 401, 401]
+    assert victim_response.status_code == 200
+    assert attacker_limited.status_code == 429
+    assert storage_clear.call_count == 2
+
+
+@pytest.mark.unit
+def test_auth_login_reraises_non_rate_limit_http_exceptions():
+    """Fail-open storage handling must not swallow Werkzeug control-flow errors."""
+    app = _app()
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+
+    with patch.object(cps.api.auth.limiter, "check", side_effect=BadRequest("bad limiter request")), \
+         patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True):
+        response = app.test_client().post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "bad"}
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "bad_request"
 
 
 @pytest.mark.unit
@@ -543,8 +700,8 @@ def test_magic_link_poll_not_verified():
 
 
 @pytest.mark.unit
-def test_magic_link_poll_allows_four_full_sessions_at_client_cadence():
-    """Four 10-minute sessions at the SPA's 3-second cadence fit one IP bucket."""
+def test_magic_link_poll_allows_four_sessions_and_enforces_hourly_ceiling():
+    """Four full sessions fit, but request 1001 from the same IP is throttled."""
     app = _app(rate_limits=True)
     polls_per_session = (10 * 60) // 3
     sessions_per_shared_address = 4
@@ -554,15 +711,27 @@ def test_magic_link_poll_allows_four_full_sessions_at_client_cadence():
         cfg.config_remote_login = True
         ub.session.query.return_value.filter.return_value.first.return_value = None
         client = app.test_client()
-        for poll_number in range(1, polls_per_session * sessions_per_shared_address + 1):
-            response = client.post(
+
+        def poll():
+            return client.post(
                 "/api/v1/auth/magic-link/poll",
                 json={"token": "unknown-token"},
+                environ_overrides={"REMOTE_ADDR": "203.0.113.50"},
             )
+
+        for poll_number in range(1, polls_per_session * sessions_per_shared_address + 1):
+            response = poll()
             assert response.status_code == 200, (
                 f"shared-IP magic-link poll {poll_number} was throttled: "
                 f"{response.get_json()}"
             )
+        for poll_number in range(801, 1001):
+            response = poll()
+            assert response.status_code == 200, f"poll {poll_number} was throttled early"
+
+        response = poll()
+        assert response.status_code == 429
+        assert response.get_json()["error"]["code"] == "rate_limit_exceeded"
 
 
 @pytest.mark.unit

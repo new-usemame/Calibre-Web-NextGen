@@ -9,6 +9,6 @@ export function classifyMagicLinkPollError(error: unknown): MagicLinkPollErrorAc
   const status = error && typeof error === 'object' && 'status' in error
     ? (error as { status?: unknown }).status
     : undefined;
-  if (typeof status !== 'number' || status >= 500) return 'retry';
+  if (typeof status !== 'number' || status >= 500 || status === 408 || status === 425) return 'retry';
   return status === 429 ? 'rate_limited' : 'fatal';
 }

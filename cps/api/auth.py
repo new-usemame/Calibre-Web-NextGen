@@ -6,6 +6,7 @@ from datetime import datetime
 
 from flask import jsonify, request, url_for
 from sqlalchemy import func
+from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
@@ -95,11 +96,28 @@ except ImportError:  # flask_limiter is optional/container-only
     get_remote_address = lambda: "127.0.0.1"  # noqa: E731
 
 
+def _request_data():
+    """Return a mapping for auth payloads; non-object JSON is an empty form."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else request.form
+
+
+def _normalized_username(data):
+    """Canonical username for lookup and limiter keys; invalid types are missing."""
+    username = data.get("username")
+    return username.strip().lower() if isinstance(username, str) else ""
+
+
 def _login_key_func():
-    """Rate-limit key: posted username (lower-stripped), falling back to remote IP."""
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip().lower()
-    return username or get_remote_address()
+    """Rate-limit one normalized username from one remote client address."""
+    # Username-only buckets let anyone lock out any named account. Include the
+    # client address while retaining a per-account bound for this client; JSON
+    # encoding makes the two components unambiguous even if either contains a
+    # delimiter. Missing/malformed usernames stay in a stable per-client bucket.
+    return json.dumps(
+        [get_remote_address() or "", _normalized_username(_request_data())],
+        separators=(",", ":"),
+    )
 
 
 def _check_rate_limit():
@@ -123,8 +141,12 @@ def _check_rate_limit():
             "Too many requests: limit is {}. Try again after that window resets.".format(window),
             429,
         )
-    except (ConnectionError, Exception) as ex:
-        log.error("Connection error to limiter backend: %s", ex)
+    except HTTPException:
+        # RateLimitExceeded is handled above. Other Werkzeug control-flow
+        # exceptions are application responses, not storage outages.
+        raise
+    except Exception as ex:
+        log.error("Rate limiter backend error: %s", ex)
     return None
 
 
@@ -249,18 +271,18 @@ def auth_me():
 @limiter.limit("40/day", key_func=_login_key_func)
 @limiter.limit("3/minute", key_func=_login_key_func)
 def auth_login():
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
+
     # I2: Honour config_disable_standard_login.
     # LDAP/OAuth login routing is deferred to the auth-bridge sub-project (sub-project 2).
     if config.config_disable_standard_login:
         return jsonify({"error": {"code": "standard_login_disabled",
                                   "message": "Standard login is disabled"}}), 403
 
-    rate_limit_error = _check_rate_limit()
-    if rate_limit_error is not None:
-        return rate_limit_error
-
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip().lower()
+    data = _request_data()
+    username = _normalized_username(data)
     password = data.get("password") or ""
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
     if user and not user.role_anonymous() and check_password_hash(str(user.password), password):
@@ -332,11 +354,11 @@ def auth_magic_link_start():
     polls /auth/magic-link/poll while an already-signed-in device authorises the
     token by visiting verify_url (/verify/<token>, login-gated). Same mechanism
     the classic /remote/login page uses; gated on the same config_remote_login."""
-    if not bool(getattr(config, "config_remote_login", False)):
-        return _err("magic_link_disabled", "Magic-link login is disabled", 403)
     rate_limit_error = _check_rate_limit()
     if rate_limit_error is not None:
         return rate_limit_error
+    if not bool(getattr(config, "config_remote_login", False)):
+        return _err("magic_link_disabled", "Magic-link login is disabled", 403)
     if current_user.is_authenticated:
         return _err("already_authenticated", "You're already signed in", 400)
     auth_token = ub.RemoteAuthToken()
@@ -365,11 +387,11 @@ def auth_magic_link_poll():
     not_found. On success the waiting device is logged in (session cookie set) and
     the token is consumed. Mirrors remotelogin.token_verified, JSON-shaped for the
     SPA (serialized user instead of a flash + redirect)."""
-    if not bool(getattr(config, "config_remote_login", False)):
-        return _err("magic_link_disabled", "Magic-link login is disabled", 403)
     rate_limit_error = _check_rate_limit()
     if rate_limit_error is not None:
         return rate_limit_error
+    if not bool(getattr(config, "config_remote_login", False)):
+        return _err("magic_link_disabled", "Magic-link login is disabled", 403)
     data = request.get_json(silent=True) or request.form
     token = (data.get("token") or "").strip()
     if not token:
@@ -404,11 +426,11 @@ def auth_register():
     """Public self-registration. Mirrors web.register_post: gated on
     config_public_reg, requires a configured mail server, validates the
     username/email + allowed-domain, then emails the generated password."""
-    if not config.config_public_reg:
-        return _err("registration_disabled", "Public registration is disabled", 403)
     rate_limit_error = _check_rate_limit()
     if rate_limit_error is not None:
         return rate_limit_error
+    if not config.config_public_reg:
+        return _err("registration_disabled", "Public registration is disabled", 403)
     if not config.get_mail_server_configured():
         return _err("mail_not_configured", "The server's email settings aren't configured", 400)
     if current_user.is_authenticated:
@@ -468,8 +490,8 @@ def auth_forgot():
     rate_limit_error = _check_rate_limit()
     if rate_limit_error is not None:
         return rate_limit_error
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip().lower()
+    data = _request_data()
+    username = _normalized_username(data)
     if username:
         user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
         if user is not None and user.name != "Guest":

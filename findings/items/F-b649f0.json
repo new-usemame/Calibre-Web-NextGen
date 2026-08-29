@@ -6,8 +6,14 @@
   "refs": [
     "#1939"
   ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-29",
+    "note": "API and classic user shelf-add routes now establish eligible My Library membership before the shelf row; managed accounts receive an actionable 403, genuine missing books remain 404, and non-user core callers receive an explicit membership-required refusal.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Shelving a book you do not own is a server-side 'invalid Book Id'; the documented add-to-library-first rule lives only in the SPA client"
 }

@@ -10,7 +10,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
 from .serializers import serialize_user
-from .. import ub, config, constants, limiter
+from .. import ub, config, constants, limiter, logger
 from ..config_sql import uploads_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
@@ -23,6 +23,9 @@ from ..helper import (
 
 def _err(code, message, status):
     return jsonify({"error": {"code": code, "message": message}}), status
+
+
+log = logger.create()
 
 
 # Display labels for the fixed GitHub/Google providers, mirroring the strings the
@@ -83,8 +86,12 @@ except ImportError:  # flask_wtf is optional/container-only
     generate_csrf = None
 
 try:
+    from flask_limiter import RateLimitExceeded
     from flask_limiter.util import get_remote_address
 except ImportError:  # flask_limiter is optional/container-only
+    class RateLimitExceeded(Exception):
+        pass
+
     get_remote_address = lambda: "127.0.0.1"  # noqa: E731
 
 
@@ -93,6 +100,43 @@ def _login_key_func():
     data = request.get_json(silent=True) or request.form
     username = (data.get("username") or "").strip().lower()
     return username or get_remote_address()
+
+
+def _check_rate_limit():
+    """Evaluate this endpoint's decorators and return a JSON 429 when breached.
+
+    The application-wide limiter deliberately uses ``auto_check=False`` because
+    other blueprints explicitly decide where checks belong. Keep that model here:
+    each decorated public auth view calls this helper before doing useful work.
+    Backend failures are logged for the administrator and fail open so a broken
+    limiter store cannot lock everyone out of the instance.
+    """
+    if limiter is None:
+        return None
+    try:
+        limiter.check()
+    except RateLimitExceeded as ex:
+        breached_limit = getattr(getattr(ex, "limit", None), "limit", None)
+        window = str(breached_limit) if breached_limit is not None else "the current limit"
+        return _err(
+            "rate_limit_exceeded",
+            "Too many requests: limit is {}. Try again after that window resets.".format(window),
+            429,
+        )
+    except (ConnectionError, Exception) as ex:
+        log.error("Connection error to limiter backend: %s", ex)
+    return None
+
+
+def _clear_current_rate_limits():
+    """Clear every bucket evaluated for the successful request, best-effort."""
+    if limiter is None:
+        return
+    try:
+        for request_limit in limiter.current_limits:
+            limiter.limiter.storage.clear(request_limit.key)
+    except Exception as ex:
+        log.error("Connection error clearing limiter backend after login: %s", ex)
 
 
 @api_v1.route("/auth/csrf")
@@ -211,12 +255,17 @@ def auth_login():
         return jsonify({"error": {"code": "standard_login_disabled",
                                   "message": "Standard login is disabled"}}), 403
 
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
+
     data = request.get_json(silent=True) or request.form
     username = (data.get("username") or "").strip().lower()
     password = data.get("password") or ""
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
     if user and not user.role_anonymous() and check_password_hash(str(user.password), password):
         login_user(user, remember=bool(data.get("remember")))
+        _clear_current_rate_limits()
         return jsonify(_me_payload(user))
     return jsonify({"error": {"code": "invalid_credentials",
                               "message": "Invalid username or password"}}), 401
@@ -285,6 +334,9 @@ def auth_magic_link_start():
     the classic /remote/login page uses; gated on the same config_remote_login."""
     if not bool(getattr(config, "config_remote_login", False)):
         return _err("magic_link_disabled", "Magic-link login is disabled", 403)
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
     if current_user.is_authenticated:
         return _err("already_authenticated", "You're already signed in", 400)
     auth_token = ub.RemoteAuthToken()
@@ -311,6 +363,9 @@ def auth_magic_link_poll():
     SPA (serialized user instead of a flash + redirect)."""
     if not bool(getattr(config, "config_remote_login", False)):
         return _err("magic_link_disabled", "Magic-link login is disabled", 403)
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
     data = request.get_json(silent=True) or request.form
     token = (data.get("token") or "").strip()
     if not token:
@@ -347,6 +402,9 @@ def auth_register():
     username/email + allowed-domain, then emails the generated password."""
     if not config.config_public_reg:
         return _err("registration_disabled", "Public registration is disabled", 403)
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
     if not config.get_mail_server_configured():
         return _err("mail_not_configured", "The server's email settings aren't configured", 400)
     if current_user.is_authenticated:
@@ -403,6 +461,9 @@ def auth_register():
 def auth_forgot():
     """Email a reset password. Always returns ok (never reveals whether the
     account exists) — an improvement over the legacy flash that leaked it."""
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
     data = request.get_json(silent=True) or request.form
     username = (data.get("username") or "").strip().lower()
     if username:

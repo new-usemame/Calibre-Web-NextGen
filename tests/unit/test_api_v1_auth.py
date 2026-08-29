@@ -9,13 +9,18 @@ import cps.api.auth
 import cps.logout
 
 
-def _app():
+def _app(*, rate_limits=False):
     from cps.api import api_v1
     app = flask.Flask(__name__)
     app.testing = True
     app.config["WTF_CSRF_ENABLED"] = False
     app.config["SECRET_KEY"] = "test"
-    app.config["RATELIMIT_ENABLED"] = False  # disable rate-limiting in unit tests
+    app.config["RATELIMIT_ENABLED"] = rate_limits
+    if rate_limits:
+        from cps import limiter
+        app.config["RATELIMIT_STORAGE_URI"] = "memory://"
+        limiter.init_app(app)
+        limiter.reset()
     app.register_blueprint(api_v1)
     return app
 
@@ -157,13 +162,130 @@ def test_auth_login_has_rate_limit_decorator():
     to confirm both limit strings are present.  This will fail if the @limiter.limit
     decorators are removed.
     """
-    src = inspect.getsource(cps.api.auth.auth_login)
     # The decorator stacks are on auth_login's own source lines.
     # Since limiter.limit wraps it, getsource returns the inner function; check the module.
     module_src = inspect.getsource(cps.api.auth)
     assert "40/day" in module_src, "40/day rate limit missing from cps.api.auth"
     assert "3/minute" in module_src, "3/minute rate limit missing from cps.api.auth"
     assert "_login_key_func" in module_src, "key_func helper missing from cps.api.auth"
+
+
+@pytest.mark.unit
+def test_auth_login_enforces_declared_per_minute_limit():
+    """The fourth bad password for one username is a JSON 429, not another 401."""
+    app = _app(rate_limits=True)
+    from cps import ub, constants
+    user = ub.User()
+    user.name, user.password = "admin", "hash"
+    user.role = constants.ROLE_ADMIN
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = user
+
+    with patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.check_password_hash", return_value=False), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True):
+        client = app.test_client()
+        responses = [
+            client.post("/api/v1/auth/login", json={"username": "admin", "password": "bad"})
+            for _ in range(4)
+        ]
+
+    assert [response.status_code for response in responses] == [401, 401, 401, 429]
+    assert responses[-1].get_json() == {
+        "error": {
+            "code": "rate_limit_exceeded",
+            "message": "Too many requests: limit is 3 per 1 minute. Try again after that window resets.",
+        }
+    }
+
+
+@pytest.mark.unit
+def test_auth_forgot_enforces_declared_per_minute_limit():
+    """Explicit checks enforce decorated limits beyond the password-login route."""
+    app = _app(rate_limits=True)
+    client = app.test_client()
+    responses = [client.post("/api/v1/auth/forgot", json={}) for _ in range(4)]
+
+    assert [response.status_code for response in responses] == [200, 200, 200, 429]
+    assert responses[-1].get_json()["error"]["code"] == "rate_limit_exceeded"
+
+
+@pytest.mark.unit
+def test_auth_login_success_clears_current_login_buckets():
+    """A successful third request clears both login windows for the next attempt."""
+    app = _app(rate_limits=True)
+    from cps import limiter, ub, constants
+    user = ub.User()
+    user.id, user.name, user.password, user.locale, user.theme = 1, "admin", "hash", "en", 1
+    user.role = constants.ROLE_ADMIN
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = user
+
+    with patch.object(limiter.limiter.storage, "clear",
+                      wraps=limiter.limiter.storage.clear) as storage_clear, \
+         patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.check_password_hash", side_effect=[False, False, True, False]), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True), \
+         patch("cps.api.auth.login_user"):
+        client = app.test_client()
+        responses = [
+            client.post("/api/v1/auth/login", json={"username": "admin", "password": password})
+            for password in ("bad-1", "bad-2", "correct", "bad-3")
+        ]
+
+    assert [response.status_code for response in responses] == [401, 401, 200, 401]
+    assert storage_clear.call_count == 2
+    assert len({call.args[0] for call in storage_clear.call_args_list}) == 2
+
+
+@pytest.mark.unit
+def test_auth_login_fails_open_when_limiter_storage_raises():
+    """An unavailable limiter backend cannot block a correct SPA login."""
+    app = _app(rate_limits=True)
+    from cps import limiter, ub, constants
+    user = ub.User()
+    user.id, user.name, user.password, user.locale, user.theme = 1, "admin", "hash", "en", 1
+    user.role = constants.ROLE_ADMIN
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = user
+
+    with patch.object(limiter.limiter.storage, "incr",
+                      side_effect=ConnectionError("limiter storage unavailable")) as storage_incr, \
+         patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.check_password_hash", return_value=True), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True), \
+         patch("cps.api.auth.login_user") as login:
+        response = app.test_client().post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "correct"}
+        )
+
+    assert response.status_code == 200
+    storage_incr.assert_called()
+    login.assert_called_once_with(user, remember=False)
+
+
+@pytest.mark.unit
+def test_auth_login_fails_open_when_limiter_extension_is_unavailable():
+    """The optional limiter guard leaves password login usable without the extension."""
+    app = _app()
+    from cps import ub, constants
+    user = ub.User()
+    user.id, user.name, user.password, user.locale, user.theme = 1, "admin", "hash", "en", 1
+    user.role = constants.ROLE_ADMIN
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = user
+
+    with patch("cps.api.auth.limiter", None), \
+         patch("cps.api.auth.ub.session", mock_session), \
+         patch("cps.api.auth.check_password_hash", return_value=True), \
+         patch("cps.api.auth.config.config_disable_standard_login", False, create=True), \
+         patch("cps.api.auth.login_user") as login:
+        response = app.test_client().post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "correct"}
+        )
+
+    assert response.status_code == 200
+    login.assert_called_once_with(user, remember=False)
 
 
 # ── Regression: I2 — standard_login_disabled returns 403 ────────────────────

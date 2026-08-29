@@ -178,6 +178,19 @@ def test_startup_sweep_ingests_preexisting_file(harness):
     )
 
 
+def test_startup_sweep_ingests_uppercase_extension(harness):
+    """Fork #1740: Calibre format extensions are case-insensitive on disk;
+    the startup sweep must not silently strand ``Book.EPUB``."""
+    book = harness.watch / "Book.EPUB"
+    book.write_text("a whole book")
+
+    processed = harness("startup_ingest_sweep >/dev/null 2>&1 || true")
+
+    assert str(book) in processed, (
+        "startup sweep silently ignored a supported uppercase extension (#1740)"
+    )
+
+
 def test_startup_sweep_recurses_into_subfolders(harness):
     """The watcher is recursive (`inotifywait -r`) and download clients drop
     books into per-author subfolders, so the sweep must recurse too."""

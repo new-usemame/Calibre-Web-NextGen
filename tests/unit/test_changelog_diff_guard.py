@@ -169,6 +169,23 @@ def test_mixing_frontend_e2e_with_shipping_frontend_still_requires_an_entry():
     assert "shipping paths" in errors[0]
 
 
+def test_frontend_unit_tests_only_pr_does_not_require_a_changelog_entry():
+    assert changelog_requirement_errors(
+        ["frontend/tests/unit/libModuleResolution.test.ts"]
+    ) == []
+
+
+def test_mixing_frontend_tests_with_shipping_frontend_still_requires_an_entry():
+    errors = changelog_requirement_errors(
+        [
+            "frontend/tests/unit/libModuleResolution.test.ts",
+            "frontend/src/lib/api.ts",
+        ]
+    )
+    assert len(errors) == 1
+    assert "shipping paths" in errors[0]
+
+
 def test_translation_only_pr_does_not_require_a_changelog_entry():
     assert changelog_requirement_errors(
         ["cps/translations/ru/LC_MESSAGES/messages.po", "messages.pot"]

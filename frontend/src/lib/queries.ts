@@ -8,6 +8,7 @@ import {
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { settleById } from './bulkResults';
 import { createEntityListQueryOptions } from './entityListQueryOptions';
+import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse } from './api';
 import type {
   Me, Book, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
@@ -834,8 +835,8 @@ export function useBulkActions() {
       refresh();
     },
   });
-  // Bulk metadata: apply the same partial field set to every selected book via
-  // the per-book metadata endpoint (replace semantics for the filled fields).
+  // Bulk metadata: apply the same partial field set and explicit relationship
+  // mode to every selected book via the per-book metadata endpoint.
   const setMetadata = useMutation({
     mutationFn: (v: { ids: number[]; fields: MetadataUpdate }) =>
       settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/metadata`, v.fields)),
@@ -937,10 +938,15 @@ export function useUpdateMetadata(id: string | number) {
  *  every cached catalog snapshot so a later scroll-restore can't resurrect it
  *  as a ghost card (#578), then refreshes the library + shelves. Callers redirect
  *  away from the now-deleted book's detail page on success. */
+export interface DeleteResult {
+  deleted: true;
+  warning?: { code: string; message: string };
+}
+
 export function useDeleteBook(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => apiPost(`/api/v1/books/${id}/delete`),
+    mutationFn: () => apiPost<DeleteResult | undefined>(`/api/v1/books/${id}/delete`),
     onSuccess: () => {
       removeBookFromCache(Number(id));
       // Drop the deleted book's own detail cache, and refetch every surface that
@@ -980,7 +986,7 @@ export function useDeleteFormat(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fmt: string) =>
-      apiPost(`/api/v1/books/${id}/formats/${encodeURIComponent(fmt)}/delete`),
+      apiPost<DeleteResult | undefined>(`/api/v1/books/${id}/formats/${encodeURIComponent(fmt)}/delete`),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['book', String(id)] });
       void qc.invalidateQueries({ queryKey: ['books'] });
@@ -1132,7 +1138,7 @@ export function useSaveBookmark(bookId: string | number) {
     // it to the shared Kobo/KOReader carrier so browser reading reaches the
     // user's devices. Omitted until epub.js has generated locations.
     mutationFn: (vars: { format: string; bookmark: string; percentage?: number }) =>
-      apiPost(`/api/v1/books/${bookId}/bookmark`, vars),
+      apiPost(`/api/v1/books/${bookId}/bookmark`, vars, { webreaderDevice: true }),
     // #1318: deliberately NO react-query `retry` here. The route now answers
     // 5xx when the write did not land, which is worth re-sending — but a
     // built-in retry re-sends the SAME variables, and the reader fires a save
@@ -1469,10 +1475,13 @@ export function useDismissNotices() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (noticeIds: number[]) =>
-      apiPost<{ dismissed: number; remaining: number }>('/api/v1/notices/dismiss', {
-        notice_ids: noticeIds,
-      }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['notices'] }),
+      dismissNoticeIdsInBatches(noticeIds, (batch) =>
+        apiPost<{ dismissed: number; remaining: number }>('/api/v1/notices/dismiss', {
+          notice_ids: batch,
+        })),
+    // A later batch can fail after an earlier one committed. Refresh on either
+    // outcome so the banner reflects the server's actual remaining notices.
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['notices'] }),
   });
 }
 

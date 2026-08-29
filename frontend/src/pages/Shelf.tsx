@@ -332,6 +332,7 @@ export function Shelf({ id }: { id: string }) {
                 style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }}
                 onRemove={canEdit ? onRemoveBook : undefined}
                 removeLabel={t('Remove from shelf')}
+                canRead={!!me?.role?.viewer}
                 hideActions={cardActionsHidden}
               />
             ))}

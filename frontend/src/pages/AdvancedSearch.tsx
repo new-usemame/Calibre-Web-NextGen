@@ -252,7 +252,7 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
               </p>
               <div className={styles.resultsGrid}>
                 {results.map((book, i) => (
-                  <BookCard key={book.id} book={book} quickEdit={canEdit}
+                  <BookCard key={book.id} book={book} quickEdit={canEdit} canRead={!!me?.role?.viewer}
                     hideActions={cardActionsHidden}
                     style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }} />
                 ))}

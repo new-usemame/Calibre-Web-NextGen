@@ -308,17 +308,27 @@ def test_api_v1_save_bookmark_records_progress():
     ctx = app.test_request_context(
         "/api/v1/books/5/bookmark", method="POST",
         json={"format": "epub", "bookmark": "epubcfi(/6/8)", "percentage": 61},
+        headers={"X-CWNG-Webreader-Installation-Id":
+                 "33333333-3333-4333-8333-333333333333"},
         content_type="application/json")
     recorder = MagicMock()
+    resolver = MagicMock(return_value=73)
     with ctx:
         with patch.object(mod, "current_user",
                           SimpleNamespace(is_authenticated=True, is_anonymous=False, id=1)), \
              patch.object(mod, "ub", MagicMock()), \
+             patch("cps.services.device_registry.ensure_webreader_device_best_effort", resolver), \
              patch("cps.services.reading_position.record_web_reader_progress", recorder):
             inspect.unwrap(mod.save_bookmark)(5)
+            assert flask.g.annotation_origin_device_id == 73
     assert recorder.called, "SPA bookmark save must write progress through"
     assert recorder.call_args[0][1] == 5
     assert recorder.call_args[0][2] == 61.0
+    assert recorder.call_args.kwargs["origin_device_id"] == 73
+    assert resolver.call_args.kwargs == {
+        "user_id": 1,
+        "installation_id": "33333333-3333-4333-8333-333333333333",
+    }
 
 
 @pytest.mark.unit
@@ -369,15 +379,25 @@ def test_classic_set_bookmark_records_progress():
     app.config["WTF_CSRF_ENABLED"] = False
     ctx = app.test_request_context(
         "/ajax/bookmark/5/epub", method="POST",
-        data={"bookmark": "epubcfi(/6/8)", "percentage": "61"})
+        data={"bookmark": "epubcfi(/6/8)", "percentage": "61"},
+        headers={"X-CWNG-Webreader-Installation-Id":
+                 "44444444-4444-4444-8444-444444444444"})
     recorder = MagicMock()
+    resolver = MagicMock(return_value=74)
     with ctx:
         with patch.object(mod, "current_user", SimpleNamespace(id=1)), \
              patch.object(mod, "ub", MagicMock()), \
+             patch("cps.services.device_registry.ensure_webreader_device_best_effort", resolver), \
              patch("cps.services.reading_position.record_web_reader_progress", recorder):
             inspect.unwrap(mod.set_bookmark)(5, "epub")
+            assert flask.g.annotation_origin_device_id == 74
     assert recorder.called, "classic bookmark save must write progress through"
     assert recorder.call_args[0][2] == 61.0
+    assert recorder.call_args.kwargs["origin_device_id"] == 74
+    assert resolver.call_args.kwargs == {
+        "user_id": 1,
+        "installation_id": "44444444-4444-4444-8444-444444444444",
+    }
 
 
 @pytest.mark.unit

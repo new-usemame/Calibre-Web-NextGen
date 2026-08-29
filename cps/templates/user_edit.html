@@ -335,7 +335,7 @@
         <div>
           <div class="btn btn-default" id="kobo_full_sync" data-value="{% if current_user.role_admin() %}{{ content.id }}{% else %}0{% endif %}" {% if not content.remote_auth_token.first() %} style="display: none;" {% endif %}>{{_('Force full kobo sync')}}</div>
         </div>
-        {% if current_user.role_admin() %}
+        {% if current_user.role_admin() or current_user.id == content.id %}
         <div id="kobo_resend_book_block" style="margin-top: 10px;{% if not content.remote_auth_token.first() %} display: none;{% endif %}">
           <label for="kobo_resend_book_id" style="display: block; margin-bottom: 4px;">{{_('Resend one book to this Kobo')}}</label>
           <div style="display: flex; gap: 6px; align-items: center;">
@@ -345,6 +345,8 @@
           </div>
           <small class="help-block">{{_('Clears the sync record for one book so the device re-downloads it on next sync. Find the book ID in the book detail page URL.')}}</small>
         </div>
+        {% endif %}
+        {% if current_user.role_admin() %}
         <div style="margin-top: 10px;">
           <a class="btn btn-default" href="{{ url_for('admin.kobo_reconcile', user_id=content.id) }}">
             {{ _('Reconcile books deleted before Kobo archival tracking') }}

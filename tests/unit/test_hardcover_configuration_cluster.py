@@ -509,10 +509,9 @@ def test_applying_cwa_defaults_restores_the_rollback_mirror():
     ]
 
     source = (REPO_ROOT / "cps/cwa_functions.py").read_text(encoding="utf-8")
-    defaults_branch = source.split(
-        'elif request.form[\'submit_button\'] == "Apply Default Settings":', 1
-    )[1]
-    assert "_mirror_hardcover_sync_for_rollback(cwa_db)" in defaults_branch
+    defaults_call = source.index("cwa_db.set_default_settings(force=True)")
+    mirror_call = source.index("_mirror_hardcover_sync_for_rollback(cwa_db)", defaults_call)
+    assert mirror_call > defaults_call
 
 
 def test_scheduler_logs_disabled_and_missing_token_as_distinct_states(

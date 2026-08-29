@@ -1,4 +1,4 @@
-import { useMemo, type MouseEvent } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { Link } from 'wouter';
 import type { UserNotice } from '../lib/api';
@@ -52,6 +52,7 @@ export function UserNoticeBanner() {
   const announce = useAnnouncer();
   const { data } = useNotices();
   const dismissMany = useDismissNotices();
+  const [dismissError, setDismissError] = useState<string | null>(null);
   const notices = data?.notices ?? [];
   const group = useMemo(() => {
     if (!notices.length) return [];
@@ -66,9 +67,10 @@ export function UserNoticeBanner() {
   ).size;
   const dismiss = (event: MouseEvent<HTMLButtonElement>) => {
     const count = group.length;
+    setDismissError(null);
     dismissMany.mutate(group.map((notice) => notice.id), {
       onSuccess: () => announce(t('{count} notices dismissed permanently.', { count })),
-      onError: () => announce(t('Could not dismiss the notices. Please try again.'), { assertive: true }),
+      onError: () => setDismissError(t('Could not dismiss the notices. Please try again.')),
     });
     restoreFocusIfKeyboard(event);
   };
@@ -86,6 +88,7 @@ export function UserNoticeBanner() {
           <p>{typeof first.payload.message === 'string' ? first.payload.message : t('There is new information about your library.')}</p>
         )}
         <BookLinks notices={group} />
+        <p className={dismissError ? styles.error : undefined} role="alert">{dismissError}</p>
       </div>
       <button type="button" className={styles.dismiss} onClick={dismiss}
         disabled={dismissMany.isPending}
@@ -104,6 +107,7 @@ export function BookUserNotices({ bookId }: { bookId: number }) {
   const announce = useAnnouncer();
   const { data } = useNotices(bookId);
   const dismissOne = useDismissNotice();
+  const [dismissErrors, setDismissErrors] = useState<Record<number, string>>({});
   const notices = data?.notices ?? [];
   if (!notices.length) return null;
 
@@ -118,13 +122,20 @@ export function BookUserNotices({ bookId }: { bookId: number }) {
               ? t('We repaired this book for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove the book from your Kobo and let it download again. If you read it some other way, download it again to get the repaired copy.')
               : (typeof notice.payload.message === 'string'
                 ? notice.payload.message : t('There is new information about this book.'))}</p>
+            <p className={dismissErrors[notice.id] ? styles.error : undefined} role="alert">
+              {dismissErrors[notice.id]}
+            </p>
           </div>
           <button type="button" className={styles.dismissBook}
             disabled={dismissOne.isPending}
             onClick={(event) => {
+              setDismissErrors((current) => ({ ...current, [notice.id]: '' }));
               dismissOne.mutate(notice.id, {
                 onSuccess: () => announce(t('Notice dismissed permanently.')),
-                onError: () => announce(t('Could not dismiss the notice. Please try again.'), { assertive: true }),
+                onError: () => setDismissErrors((current) => ({
+                  ...current,
+                  [notice.id]: t('Could not dismiss the notice. Please try again.'),
+                })),
               });
               restoreFocusIfKeyboard(event);
             }}>

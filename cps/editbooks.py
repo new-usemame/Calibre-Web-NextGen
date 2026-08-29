@@ -1697,7 +1697,7 @@ def delete_book_from_table(book_id, book_format, json_response, location="", ski
                     return json.dumps([{"location": url_for("edit-book.show_edit_book", book_id=book_id),
                                         "type": "danger",
                                         "format": "",
-                                        "message": ex}])
+                                        "message": str(ex)}])
                 else:
                     flash(str(ex), category="error")
                     return redirect(url_for('edit-book.show_edit_book', book_id=book_id))

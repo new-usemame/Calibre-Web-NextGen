@@ -151,7 +151,10 @@
 .gridTitle { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: var(--fw-semi); color: var(--text); margin: 0; }
 .provSummary { color: var(--text-faint); font-size: var(--fs-xs); margin-right: auto; }
 .gridLoading { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-muted); font-size: var(--fs-sm); padding: var(--sp-8) 0; justify-content: center; }
-.spin { animation: cpspin 1s linear infinite; }
+/* wrapper span, not the glyph -- an SVG target does not get a compositor layer
+   in Chrome, so the animation falls back to the main thread. See
+   HelpBanner.module.css `.arrow` for the measurement. */
+.spin { display: inline-flex; animation: cpspin 1s linear infinite; }
 @keyframes cpspin { to { transform: rotate(360deg); } }
 
 /* ---- candidate grid ---- */

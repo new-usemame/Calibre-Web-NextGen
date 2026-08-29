@@ -6,6 +6,7 @@ import { useDiscover, useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './DiscoverSection.module.css';
+import { canReadBooks } from '../lib/permissions';
 
 const STRIP_COUNT = 12;
 
@@ -58,7 +59,9 @@ export function DiscoverSection({ onClose, hideActions = false }:
             title={t('Shuffle picks')}
             aria-label={t('Shuffle picks')}
           >
-            <Shuffle size={16} className={isFetching ? styles.spin : undefined} aria-hidden="true" focusable={false} />
+            <span className={isFetching ? styles.spin : undefined}>
+              <Shuffle size={16} aria-hidden="true" focusable={false} />
+            </span>
           </button>
           <button
             type="button"
@@ -78,7 +81,7 @@ export function DiscoverSection({ onClose, hideActions = false }:
         <div className={styles.strip}>
           {books.map((b) => (
             <div className={styles.item} key={b.id}>
-              <BookCard book={b} hideActions={hideActions} />
+              <BookCard book={b} hideActions={hideActions} canRead={canReadBooks(me)} />
             </div>
           ))}
         </div>

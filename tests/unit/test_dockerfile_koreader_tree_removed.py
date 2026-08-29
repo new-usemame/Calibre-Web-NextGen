@@ -4,13 +4,13 @@
 
 """Pin the ordering that lets the Dockerfile delete the `koreader/` tree.
 
-The image builds `koplugin.zip` from `koreader/plugins/cwasync.koplugin/`
+The image builds `koplugin.zip` from `koreader/plugins/cwngsync.koplugin/`
 and copies it into `cps/static/`, which is the only copy the running
 container reads: `cps/templates/kosync_plugin.html` links it as
 ``url_for('static', filename='koplugin.zip')``. The source tree left
 behind is a second copy of the same plugin, so #1478 removes it — one
 copy in the image instead of two, and nobody edits
-`koreader/plugins/cwasync.koplugin/` inside a container and wonders why
+`koreader/plugins/cwngsync.koplugin/` inside a container and wonders why
 the download is unchanged.
 
 That is only safe while the copy happens *before* the delete. Both live
@@ -19,7 +19,7 @@ edit with no local symptom: the build still succeeds, the tests still
 pass, and the plugin download 404s at runtime for everyone. This file is
 the pin that makes that reorder go red.
 
-`scripts/publish-cwasync-plugin.sh` also reads `koreader/plugins/`, but
+`scripts/publish-cwngsync-plugin.sh` also reads `koreader/plugins/`, but
 it resolves its ROOT from its own location in a repo checkout and runs
 on CI, never inside the image, so the delete does not affect it.
 """

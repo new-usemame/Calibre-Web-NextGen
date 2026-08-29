@@ -117,7 +117,7 @@ Progress stored in `kosync_progress` table (app.db). Updates `ReadBook` and `Kob
 
 Two encodings travel on `GET /kosync/syncs/progress/<document>`, and a client
 has to say which it can act on. This section is the reference for third-party
-clients; the stock KOReader plugin and our `cwasync.koplugin` already comply.
+clients; the stock KOReader plugin and our `cwngsync.koplugin` already comply.
 
 **`locator`** — the original encoding. `progress` is an engine-private crengine
 xpointer, or a page number for a paged document. The reader seeks to it exactly.
@@ -238,4 +238,4 @@ Database supports multiple algorithm versions per book automatically.
 
 - [KOReader partialMD5](https://github.com/koreader/koreader/blob/master/frontend/util.lua#L1107)
 - [KOSync protocol](https://github.com/koreader/koreader-sync-server)
-- CWA plugin: `koreader/plugins/cwasync.koplugin/`
+- CWA plugin: `koreader/plugins/cwngsync.koplugin/`

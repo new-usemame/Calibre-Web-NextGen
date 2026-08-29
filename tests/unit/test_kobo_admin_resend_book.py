@@ -3,7 +3,7 @@
 # Copyright (C) 2024-2026 Calibre-Web Automated contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Regression tests for A2 — per-book "Resend to Kobo" admin action.
+"""Regression tests for A2 — per-book "Resend to Kobo" action.
 
 Goal:
     Admin clicks "Resend" on user_edit.html, the (user_id, book_id)
@@ -31,25 +31,18 @@ import pytest
 
 @pytest.mark.unit
 class TestRouteRegistered:
-    def test_kobo_resend_endpoint_is_admin_only(self):
+    def test_kobo_resend_endpoint_is_self_or_admin(self):
         from cps import admin as admin_mod
         src = inspect.getsource(admin_mod)
-        # The route must require admin (admin_required decorator).
-        # Pinning the exact route + decorator stack catches refactors
-        # that accidentally drop the admin gate, which would let any
-        # logged-in user resend books to any other user's Kobo.
         assert "/ajax/kobo_resend/" in src, (
             "admin module must register /ajax/kobo_resend/<userid>/<bookid> "
             "route for the per-book resend action."
         )
-        # Find the route registration and verify decorator stack
         idx = src.index("/ajax/kobo_resend/")
-        # Look at the ~400 chars around the route for the decorator stack.
         window = src[idx:idx + 400]
-        assert "@admin_required" in window, (
-            "/ajax/kobo_resend/<userid>/<bookid> must be @admin_required. "
-            "Without this gate any logged-in user could clear another "
-            "user's Kobo sync state."
+        assert "current_user.id != userid and not current_user.role_admin()" in window, (
+            "/ajax/kobo_resend/<userid>/<bookid> must reject a non-admin "
+            "targeting another user's Kobo sync state."
         )
         assert "methods=[\"POST\"]" in window, (
             "/ajax/kobo_resend/<userid>/<bookid> must be POST-only."
@@ -150,8 +143,8 @@ class TestDoKoboResendShape:
 
 @pytest.mark.unit
 class TestSecurityShape:
-    """Defensive: the route accepts integer IDs, requires admin auth,
-    and doesn't expose either user or book IDs to non-admins."""
+    """Defensive: the route accepts integer IDs, requires login, and lets a
+    non-admin act only on their own user ID."""
 
     def test_route_uses_int_converters(self):
         from cps import admin as admin_mod
@@ -167,7 +160,7 @@ class TestSecurityShape:
             "routing layer."
         )
 
-    def test_route_is_user_login_required_and_admin_required(self):
+    def test_route_is_user_login_required_and_self_or_admin_guarded(self):
         from cps import admin as admin_mod
         src = inspect.getsource(admin_mod)
         idx = src.index("/ajax/kobo_resend/")
@@ -175,9 +168,29 @@ class TestSecurityShape:
         assert "@user_login_required" in window, (
             "/ajax/kobo_resend route must require login."
         )
-        assert "@admin_required" in window, (
-            "/ajax/kobo_resend route must require admin."
+        assert "current_user.id != userid and not current_user.role_admin()" in window, (
+            "/ajax/kobo_resend route must allow self while rejecting other users."
         )
+
+
+@pytest.mark.unit
+def test_resend_block_is_visible_for_self_but_reconcile_stays_admin_only():
+    from pathlib import Path
+
+    template = (Path(__file__).resolve().parents[2] / "cps/templates/user_edit.html").read_text()
+    resend = template.index('id="kobo_resend_book_block"')
+    self_or_admin = template.rfind("{% if", 0, resend)
+    assert (
+        template[self_or_admin:resend]
+        .strip()
+        .startswith("{% if current_user.role_admin() or current_user.id == content.id %}")
+    )
+
+    reconcile = template.index("admin.kobo_reconcile", resend)
+    admin_only = template.rfind("{% if", resend, reconcile)
+    assert template[admin_only:reconcile].strip().startswith(
+        "{% if current_user.role_admin() %}"
+    ), "self-service resend must not expose the separate admin reconciliation tool"
 
 
 @pytest.mark.unit

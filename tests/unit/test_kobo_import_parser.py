@@ -181,7 +181,7 @@ class TestBookmarkTypeIsRecovered:
     The value is taken from `Bookmark.Type` verbatim rather than derived. That is
     not a guess about the device's vocabulary: the KOReader plugin both writes
     `Type = "highlight"` and selects `WHERE Type = 'highlight'`
-    (koreader/plugins/cwasync.koplugin/kobo_sqlite_provider.lua), and the wire
+    (koreader/plugins/cwngsync.koplugin/kobo_sqlite_provider.lua), and the wire
     payload uses the same word. Deriving one instead would have invented a third
     vocabulary for this column — exactly what cps/services/annotation_colors.py
     exists to undo for highlight_color.

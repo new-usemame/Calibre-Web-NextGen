@@ -231,3 +231,63 @@ body.blur .btn-secondary:focus,
 body.blur .btn-secondary:active {
     background-color: #ffffff;
 }
+
+/* CWA Settings deliberately does not use btn-default / btn-primary for its
+   reset and save pair. caliBlur assigns those two classes the opposite visual
+   hierarchy from Bootstrap, so action-specific colors are resolved here,
+   after both theme stylesheets. */
+.cwa-settings-actions {
+    --cwa-settings-reset-bg: #ffffff;
+    --cwa-settings-reset-bg-interactive: #e6e6e6;
+    --cwa-settings-reset-color: #333333;
+    --cwa-settings-reset-border: #cccccc;
+    --cwa-settings-reset-border-interactive: #adadad;
+    --cwa-settings-save-bg: #337ab7;
+    --cwa-settings-save-bg-interactive: #1c5484;
+    --cwa-settings-save-color: #ffffff;
+    --cwa-settings-save-border: #2e6da4;
+    --cwa-settings-save-border-interactive: #204d74;
+}
+
+body.blur .cwa-settings-actions {
+    --cwa-settings-reset-bg: rgba(22, 31, 39, 0.7);
+    --cwa-settings-reset-bg-interactive: rgba(255, 255, 255, 0.3);
+    --cwa-settings-reset-color: #ffffff;
+    --cwa-settings-reset-border: rgba(255, 255, 255, 0.25);
+    --cwa-settings-reset-border-interactive: rgba(255, 255, 255, 0.3);
+    --cwa-settings-save-bg: #cc7b19;
+    --cwa-settings-save-bg-interactive: #e59029;
+    --cwa-settings-save-color: #ffffff;
+    --cwa-settings-save-border: #cc7b19;
+    --cwa-settings-save-border-interactive: #e59029;
+}
+
+.cwa-settings-actions .cwa-settings-reset-action {
+    order: 1;
+    color: var(--cwa-settings-reset-color);
+    background-color: var(--cwa-settings-reset-bg);
+    border: 1px solid var(--cwa-settings-reset-border);
+}
+
+.cwa-settings-actions .cwa-settings-reset-action:hover,
+.cwa-settings-actions .cwa-settings-reset-action:focus,
+.cwa-settings-actions .cwa-settings-reset-action:active {
+    color: var(--cwa-settings-reset-color);
+    background-color: var(--cwa-settings-reset-bg-interactive);
+    border-color: var(--cwa-settings-reset-border-interactive);
+}
+
+.cwa-settings-actions .cwa-settings-save-action {
+    order: 2;
+    color: var(--cwa-settings-save-color);
+    background-color: var(--cwa-settings-save-bg);
+    border: 1px solid var(--cwa-settings-save-border);
+}
+
+.cwa-settings-actions .cwa-settings-save-action:hover,
+.cwa-settings-actions .cwa-settings-save-action:focus,
+.cwa-settings-actions .cwa-settings-save-action:active {
+    color: var(--cwa-settings-save-color);
+    background-color: var(--cwa-settings-save-bg-interactive);
+    border-color: var(--cwa-settings-save-border-interactive);
+}

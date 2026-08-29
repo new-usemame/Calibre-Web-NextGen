@@ -1,0 +1,3 @@
+### Changed
+
+- **The KOReader companion plugin is now `cwngsync.koplugin`, renamed from `cwasync.koplugin`.** KOReader identifies a plugin by its directory name, so this is a real identity change rather than a label: on first start the new plugin copies your existing sync settings over, and your server-side device registration is untouched. Because two copies would both push position and highlight updates for the same book, `cwngsync` refuses to start while a `cwasync.koplugin` is still present — installed, enabled or disabled — and says so, rather than syncing twice. Remove the old directory and restart KOReader.

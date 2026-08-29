@@ -163,3 +163,23 @@ if [ "$(wc -l < "$post_batch_log" | tr -d ' ')" != "1" ]; then
         cat "$post_batch_log" >&2
         exit 1
 fi
+
+sidecar_path="$tmpdir/watch/metadata.cwa.json"
+output=$(handle_event "$sidecar_path" 2>&1)
+assert_contains "$output" "not a standalone ingest candidate"
+assert_processor_invocations 4
+
+# Fork #1740: the live event path must accept Calibre formats regardless of
+# extension case without changing Bash matching rules for the rest of the
+# long-running watcher.
+export PROCESSOR_EXIT_CODE=0
+uppercase_path="$tmpdir/watch/Book.EPUB"
+printf 'uppercase extension\n' > "$uppercase_path"
+output=$(handle_event "$uppercase_path" 2>&1)
+assert_contains "$output" "Starting Ingest Processor"
+assert_processor_invocations 5
+if ! grep -Fxq "$uppercase_path" "$processor_log"; then
+        printf 'Expected uppercase-extension path to reach processor stub\n' >&2
+        cat "$processor_log" >&2
+        exit 1
+fi

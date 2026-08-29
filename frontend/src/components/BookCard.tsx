@@ -43,6 +43,9 @@ interface BookCardProps {
   /** The membership-scoped backend does not expose detail for an unowned book.
    * Global cards therefore become static until the user adds them. */
   detailsEnabled?: boolean;
+  /** The authenticated account's viewer role. Kept explicit so a catalog card
+   *  can never infer file access from the formats it happens to receive. */
+  canRead?: boolean;
 }
 
 /** Format a Calibre series_index (a float, e.g. 1.0, 2.5) for display: whole
@@ -63,11 +66,12 @@ export function BookCard({
   onAddToLibrary,
   addPending = false,
   detailsEnabled = true,
+  canRead = false,
 }: BookCardProps) {
   const t = useT();
   const authorStr = formatAuthors(book.authors);
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
-  const readTarget = getPrimaryReadTarget(book.id, book.formats);
+  const readTarget = getPrimaryReadTarget(book.id, book.formats, canRead);
 
   // Series name + position under the cover (fork #657, #673, #855). Series-heavy
   // libraries navigate by series and want it visible without clicking into each

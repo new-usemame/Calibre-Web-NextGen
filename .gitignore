@@ -303,3 +303,10 @@ wiki-generated/
 # a bare source run falls back to the repository root, so make the entire
 # private-observability parent structurally uncommittable.
 .cwng-private-observability/
+
+# KOReader emulator state. docker-compose.koreader.yml defaults KOEMU_HOME to
+# ./koreader-emulator/data, so running the emulator without setting it writes a
+# KOReader home and book library straight into the working tree. This was only
+# excluded in .git/info/exclude, which is local to one clone and protects
+# nobody else -- including CI and anyone who checks the repo out fresh.
+local-dev/koreader-emulator/data/

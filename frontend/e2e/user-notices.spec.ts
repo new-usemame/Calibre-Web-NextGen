@@ -86,6 +86,61 @@ test('aggregates repaired books and permanently bulk-dismisses explicit occurren
   expect(dismissedIds).toEqual([101, 102]);
 });
 
+test('chunks the reported 872-notice dismissal at the API cap', async ({ page }) => {
+  await serveCurrentSpaBuild(page);
+  const repaired = Array.from({ length: 872 }, (_, index) =>
+    notice(index + 1, index + 1, `Repaired book ${index + 1}`));
+  let active = true;
+  const dismissedBatches: number[][] = [];
+  await page.route(/\/api\/v1\/notices(?:\/[^?]*)?(?:\?.*)?$/, async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'POST' && url.pathname.endsWith('/notices/dismiss')) {
+      const ids = request.postDataJSON().notice_ids as number[];
+      dismissedBatches.push(ids);
+      active = dismissedBatches.flat().length < repaired.length;
+      return json(route, {
+        dismissed: ids.length,
+        remaining: repaired.length - dismissedBatches.flat().length,
+      });
+    }
+    return json(route, {
+      notices: active ? repaired : [],
+      summary: { count: active ? repaired.length : 0 },
+    });
+  });
+
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Dismiss all 872 notices permanently' }).click();
+
+  await expect(page.getByText('Kobo book compatibility repaired')).toHaveCount(0);
+  expect(dismissedBatches.map((ids) => ids.length)).toEqual([500, 372]);
+  expect(dismissedBatches.every((ids) => ids.length <= 500)).toBe(true);
+  expect(dismissedBatches.flat()).toEqual(repaired.map((item) => item.id));
+});
+
+test('shows a visible error when bulk dismissal fails', async ({ page }) => {
+  await serveCurrentSpaBuild(page);
+  const repaired = [notice(301, 1, 'Still active')];
+  await page.route(/\/api\/v1\/notices(?:\/[^?]*)?(?:\?.*)?$/, async (route) => {
+    if (route.request().method() === 'POST') {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'dismiss_failed', message: 'Nope' } }),
+      });
+    }
+    return json(route, { notices: repaired, summary: { count: repaired.length } });
+  });
+
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Dismiss permanently' }).click();
+
+  const noticeBanner = page.locator('section[aria-labelledby="user-notice-title"]');
+  await expect(noticeBanner.getByRole('alert')).toHaveText('Could not dismiss the notices. Please try again.');
+  await expect(page.getByText('Kobo book compatibility repaired')).toBeVisible();
+});
+
 test('book detail presents and independently dismisses its book-scoped occurrence', async ({ page }) => {
   await serveCurrentSpaBuild(page);
   await page.goto('/app');

@@ -244,6 +244,12 @@ def classify_paths(paths: Iterable[str], repo_root: Path) -> dict[str, bool]:
             or path.endswith(".py")
         )
         or path == ".github/workflows/tests.yml"
+        # tests/conftest.py decides whether the Docker integration tests can
+        # authenticate at all, so a change to it can silently disable the whole
+        # lane while every individual test file is untouched. Changing one
+        # integration test already runs the lane; changing the fixture all of
+        # them depend on must too.
+        or path == "tests/conftest.py"
         for path in changed
     )
     concurrency_touched = any(

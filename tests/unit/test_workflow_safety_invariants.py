@@ -623,6 +623,72 @@ def _e2e_steps() -> list[dict]:
     return [s for s in (job.get("steps") or []) if isinstance(s, dict)]
 
 
+def test_e2e_uses_head_backend_only_for_backend_prs():
+    """Backend PRs need their Python code; frontend-only PRs keep the overlay."""
+    wf = _load(WF_DIR / "tests.yml")
+    jobs = wf.get("jobs") or {}
+    integration = jobs.get("integration-tests") or {}
+    e2e = jobs.get("e2e-tests") or {}
+
+    integration_needs = integration.get("needs") or []
+    integration_needs = [integration_needs] if isinstance(integration_needs, str) else integration_needs
+    assert "integration-tests" not in integration_needs, (
+        "integration-tests depends on itself, creating an invalid workflow cycle"
+    )
+
+    e2e_needs = e2e.get("needs") or []
+    e2e_needs = [e2e_needs] if isinstance(e2e_needs, str) else e2e_needs
+    assert {"changed_paths", "integration-tests"}.issubset(set(e2e_needs)), (
+        "e2e must read the build classification and wait for integration's GHA image cache"
+    )
+
+    steps = [step for step in (e2e.get("steps") or []) if isinstance(step, dict)]
+    full_build = next((step for step in steps if step.get("name") == "Build full-stack PR image"), None)
+    assert full_build is not None, "backend PR e2e no longer builds the checked-out full stack"
+    assert full_build.get("uses") == "docker/build-push-action@v7"
+    assert "needs.changed_paths.outputs.build == 'true'" in str(full_build.get("if") or "")
+    assert "needs.changed_paths.outputs.concurrency != 'true'" in str(full_build.get("if") or ""), (
+        "concurrency-shaped PRs use the exact-sha producer and must not also build a local image"
+    )
+    build_with = full_build.get("with") or {}
+    assert build_with.get("load") is True, "the HEAD image must be loaded for the following docker run"
+    assert str(build_with.get("cache-from") or "").startswith("type=gha")
+    assert str(build_with.get("cache-to") or "").startswith("type=gha")
+
+    ghcr_login = next(
+        (step for step in steps if step.get("uses") == "docker/login-action@v4"),
+        None,
+    )
+    assert ghcr_login is not None, "the e2e full build cannot authenticate to the private pbs-cache mirror"
+    login_with = ghcr_login.get("with") or {}
+    assert "github.repository_owner" in str(login_with.get("username") or "")
+    assert "secrets.GH_PAT || secrets.GITHUB_TOKEN" in str(login_with.get("password") or ""), (
+        "e2e must use the integration job's proven private-mirror credential fallback"
+    )
+
+    resolver = next((step for step in steps if step.get("name") == "Resolve image to test"), None)
+    assert resolver is not None
+    resolver_run = str(resolver.get("run") or "")
+    assert "needs.changed_paths.outputs.build" in resolver_run
+    assert "needs.changed_paths.outputs.concurrency" in resolver_run
+    assert "cwng-e2e-head:local" in resolver_run
+
+    start = next((step for step in steps if step.get("name") == "Start container (SPA enabled)"), None)
+    assert start is not None
+    start_run = str(start.get("run") or "")
+    assert 'docker image inspect "$IMAGE"' in start_run, (
+        "the locally loaded full-stack PR image must not be rejected for being unpullable"
+    )
+
+    overlay = next((step for step in steps if step.get("name") == "Overlay the SPA bundle under test into the container"), None)
+    assert overlay is not None
+    overlay_if = str(overlay.get("if") or "")
+    assert "needs.changed_paths.outputs.build != 'true'" in overlay_if, (
+        "frontend-only PRs must keep the fast :dev + static-overlay path"
+    )
+    assert "needs.changed_paths.outputs.concurrency != 'true'" in overlay_if
+
+
 def test_e2e_job_enables_remote_login_before_running_the_harness():
     steps = _e2e_steps()
     assert steps, "tests.yml has no e2e-tests steps — did the job get renamed?"

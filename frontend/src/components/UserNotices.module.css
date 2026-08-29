@@ -14,6 +14,7 @@
 .details summary { cursor: pointer; font-weight: var(--fw-medium); }
 .bookList { margin: var(--sp-2) 0 0; padding-left: var(--sp-5); }
 .bookList a { color: var(--accent-text); }
+.error { color: var(--danger); font-weight: var(--fw-medium); }
 
 .dismiss,
 .dismissBook {

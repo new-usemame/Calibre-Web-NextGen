@@ -1,0 +1,13 @@
+{
+  "area": "spa",
+  "body": "OBSERVED, confirmed independently (Opus).\n\nClassic requires the CONJUNCTION of both role bits before it will even render the\ndelete control: `cps/templates/detail.html:1202` \u2014\n`delete_book(current_user.role_delete_books() and current_user.role_edit())`.\n\nThe SPA requires only one: `frontend/src/pages/BookDetail.tsx:557` \u2014\n`me?.role?.delete_books && (...)`. The API agrees with the SPA, not with classic:\n`cps/api/edit.py:409-425` checks `current_user.role_delete_books()` alone.\n\n`edit` and `delete_books` are independently assignable bits (`cps/constants.py`),\nand the SPA's own admin UI exposes them as separate toggles\n(`frontend/src/pages/Admin.tsx:51-60`, mapped at `cps/api/admin.py:37-48`).\n\nSo an account provisioned as delete-but-not-edit is denied whole-book deletion in the\nclassic UI and granted it in the new one. Note the code comment at BookDetail.tsx:554-556\nsays \"The server still re-checks the role\" \u2014 true, but the server re-checks the WEAKER\ncondition, so the comment reads as reassurance while describing the gap.\n\nThis needs a policy decision before the SPA becomes the only UI: either classic's\nconjunction is the intended rule (then fix the API and the SPA), or the single bit is\n(then classic is over-restrictive and the intent should be written down). Do not resolve\nit by aligning the UI to the current API without deciding which is correct.",
+  "created": "2026-08-23",
+  "id": "F-f6a8bf",
+  "refs": [
+    "#1832"
+  ],
+  "severity": "security",
+  "source": "audit",
+  "status": "open",
+  "title": "New UI grants whole-book delete to delete-without-edit users; classic requires both roles"
+}

@@ -32,6 +32,7 @@ pytestmark = pytest.mark.unit
 REPO = Path(__file__).resolve().parents[2]
 SUITE_DIR = REPO / "frontend" / "tests" / "unit"
 NODE_MODULES = REPO / "frontend" / "node_modules"
+TYPESCRIPT_RESOLUTION_REGISTER = SUITE_DIR / "registerTypeScriptResolution.mjs"
 # Explicit file paths, never the directory. `node --test <dir>` fails to apply
 # type stripping to the .ts files it discovers and reports a bare "test failed"
 # with no assertion behind it, while `node --test <file>` on the same suite
@@ -74,14 +75,22 @@ def test_frontend_unit_suite_passes(suite: Path):
             "the frontend Node unit suites"
         )
 
-    # Type stripping is unflagged only from Node 23.6 and CI pins 22, so the
-    # flag has to be supplied -- but it must go through NODE_OPTIONS, not argv.
-    # `node --test` runs each file in a CHILD process, and a flag passed on the
-    # parent's command line is not inherited: on real Node 22.22 that yields
-    # "tests 0, pass 0, fail 0" and exit code 0. Measured both ways rather than
-    # reasoned about, after CI produced exactly that empty run.
+    # Type stripping is unflagged only from Node 23.6 and CI pins 22. The
+    # resolution register gives Node the same extensionless relative-import
+    # convention that Vite/tsc apply inside frontend/src. Both have to be
+    # supplied through NODE_OPTIONS, not argv: `node --test` runs each file in
+    # a CHILD process, and a flag passed on the parent's command line is not
+    # inherited. On real Node 22.22, argv-only type stripping yields "tests 0,
+    # pass 0, fail 0" and exit code 0. Measured both ways rather than reasoned
+    # about, after CI produced exactly that empty run.
     env = dict(os.environ)
-    env["NODE_OPTIONS"] = (env.get("NODE_OPTIONS", "") + " --experimental-strip-types").strip()
+    required_node_options = (
+        f"--import={TYPESCRIPT_RESOLUTION_REGISTER.as_uri()} "
+        "--experimental-strip-types"
+    )
+    env["NODE_OPTIONS"] = (
+        env.get("NODE_OPTIONS", "") + " " + required_node_options
+    ).strip()
     result = subprocess.run(
         [node, "--test", str(suite)],
         cwd=REPO,

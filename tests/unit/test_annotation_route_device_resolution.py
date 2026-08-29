@@ -63,6 +63,7 @@ def attributed_row(session):
         user_id=1, book_id=223, annotation_id="cwn-web-probe",
         source="webreader", highlighted_text="probe",
         origin_device_id=device.id, assigned_device_id=device.id,
+        last_editor_device_id=device.id,
         routing_revision=1,
     )
     session.add(row)
@@ -165,11 +166,82 @@ def test_every_annotation_constructor_in_create_annotation_sets_origin():
         name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
         if name != "Annotation":
             continue
-        if "origin_device_id" not in {kw.arg for kw in node.keywords if kw.arg}:
+        keyword_names = {kw.arg for kw in node.keywords if kw.arg}
+        if not {"origin_device_id", "last_editor_device_id"}.issubset(keyword_names):
             missing.append(node.lineno)
 
     assert not missing, (
-        "ub.Annotation(...) built without origin_device_id in create_annotation at "
+        "ub.Annotation(...) built without origin_device_id/last_editor_device_id "
+        "in create_annotation at "
         f"line(s) {missing} (relative to the function). Every construction path must "
         "attribute the row, or that path's annotations are silently unattributed."
     )
+
+
+def test_create_route_resolves_the_browser_installation_header(
+    app, monkeypatch, attributed_row,
+):
+    from cps import annotations as ann
+    from cps.services import device_registry
+
+    captured = {}
+
+    def ensure(**kwargs):
+        captured.update(kwargs)
+        return attributed_row.origin_device_id
+
+    def create(*args, **kwargs):
+        captured["create_origin_device_id"] = kwargs["origin_device_id"]
+        return attributed_row
+
+    monkeypatch.setattr(ann, "current_user", SimpleNamespace(id=1), raising=False)
+    monkeypatch.setattr(ann, "_resolve_book_or_404", lambda book_id: SimpleNamespace(id=book_id, uuid="u"))
+    monkeypatch.setattr(ann, "_fanout_to_sync_targets", lambda *a, **k: None)
+    monkeypatch.setattr(ann, "create_annotation", create)
+    monkeypatch.setattr(device_registry, "ensure_webreader_device_best_effort", ensure)
+    view = app.view_functions["annotations.annotations_create"]
+    fn = getattr(view, "__wrapped__", view)
+    installation_id = "33333333-3333-4333-8333-333333333333"
+    with app.test_request_context(
+        json={},
+        headers={device_registry.WEBREADER_INSTALLATION_ID_HEADER: installation_id},
+    ):
+        response, status = fn(book_id=223)
+        assert flask.g.annotation_origin_device_id == attributed_row.origin_device_id
+
+    assert status == 201
+    assert response.get_json()["origin_device_id"] == "pub-device-1"
+    assert captured["user_id"] == 1
+    assert captured["installation_id"] == installation_id
+    assert captured["create_origin_device_id"] == attributed_row.origin_device_id
+
+
+def test_edit_and_delete_record_the_browser_as_last_editor(session, attributed_row):
+    from cps.annotations import delete_annotation, edit_annotation
+
+    editor_id = attributed_row.origin_device_id
+    attributed_row.last_editor_device_id = None
+    session.commit()
+    edited = edit_annotation(
+        attributed_row.annotation_id,
+        user_id=1,
+        book_id=223,
+        session=session,
+        commit=session.commit,
+        note="changed",
+        editor_device_id=editor_id,
+    )
+    assert edited.last_editor_device_id == editor_id
+
+    attributed_row.last_editor_device_id = None
+    session.commit()
+    deleted = delete_annotation(
+        attributed_row.annotation_id,
+        user_id=1,
+        book_id=223,
+        session=session,
+        commit=session.commit,
+        editor_device_id=editor_id,
+    )
+    assert deleted.hidden is True
+    assert deleted.last_editor_device_id == editor_id

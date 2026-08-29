@@ -334,6 +334,7 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
             "size_bytes": d.uncompressed_size,
             "download_url": f"/download/{bid}/{fmt.lower()}/{d.name}",
             "read_url": f"/read/{bid}/{fmt.lower()}",
+            "content_url": f"/show/{bid}/{fmt.lower()}",
         })
 
     return {

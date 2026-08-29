@@ -1,0 +1,42 @@
+# KOReader emulator wired to the local CWNG dev instance.
+#
+#   docker compose -f docker-compose.koreader.yml up -d --build
+#   open http://localhost:6080/vnc.html
+#
+# KOEMU_HOME defaults to a local dir; on this fleet point it at the external
+# drive so KOReader's settings/cache never land on the small boot volume:
+#   export KOEMU_HOME="/Volumes/Crucial X8/koreader-emulator"
+# Compose derives its project name from the BASENAME of this file's directory,
+# and every git worktree of this repo contains a directory called local-dev --
+# as does the untracked local-dev/ beside the repo, which holds the shared CWNG
+# dev stack. Without an explicit name, bringing this up from any worktree joins
+# THAT project: compose then reports the shared container as an orphan, and a
+# --remove-orphans or a `down` takes it with us. Naming the project is what
+# keeps the emulator's lifecycle from reaching anything else.
+name: cwng-koreader-emu
+
+services:
+  koreader:
+    build:
+      context: ./koreader-emulator
+    container_name: koreader-emu
+    ports:
+      - "6080:6080"
+    environment:
+      SCREEN_W: "1072"
+      SCREEN_H: "1448"
+    volumes:
+      # Persistent KOReader settings + library, kept off the boot volume.
+      - ${KOEMU_HOME:-./koreader-emulator/data}/home:/koreader-home
+      - ${KOEMU_HOME:-./koreader-emulator/data}/books:/books
+      # Live-mount the plugin under development: edit in the repo, restart the
+      # container, and the emulator picks it up. This is the whole point.
+      - ../koreader/plugins/cwngsync.koplugin:/opt/koreader/lib/koreader/plugins/cwngsync.koplugin:ro
+    networks:
+      - local-dev_default
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  local-dev_default:
+    external: true

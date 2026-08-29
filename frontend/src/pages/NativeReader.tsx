@@ -8,7 +8,7 @@ import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useT } from '../lib/i18n';
 import styles from './NativeReader.module.css';
 
-const AUDIO = new Set(['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav', 'aac']);
+const AUDIO = new Set(['mp3', 'mp4', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav', 'aac']);
 const COMIC = new Set(['cbz', 'cbr', 'cbt']);
 
 /** Native in-browser reader for non-EPUB formats. PDF renders through the
@@ -50,7 +50,18 @@ export function NativeReader({ id, format }: { id: string; format: string }) {
         <span className={styles.fmt}>{fmt.toUpperCase()}</span>
       </div>
 
-      <div className={styles.body}>
+      {/* The reader shell is position:fixed, so THIS div is the scroll container,
+          not the document. A scrollable div with no tabindex and no focusable
+          children is keyboard-unreachable in engines that don't implement
+          keyboard-focusable scrollers -- Safari, i.e. every browser on iPadOS,
+          the platform the PDF path was fixed for in #1584. TXT is the only
+          branch with nothing focusable inside it (PDF has the iframe, audio has
+          <audio controls>, comics have prev/next), so it is the only one that
+          needs the container itself to take focus. F-f8fdc9. */}
+      <div
+        className={styles.body}
+        {...(fmt === 'txt' ? { tabIndex: 0, role: 'region', 'aria-label': t('Book content') } : {})}
+      >
         {fmt === 'pdf' && (
           <iframe className={styles.pdf} src={pdfSrc} title={t('PDF reader')} />
         )}

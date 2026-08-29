@@ -1,0 +1,3 @@
+### Fixed
+
+- **The Docker integration suite no longer reports success while skipping 48 of its tests.** The shared API-client fixture signed in without a CSRF token, which the login form rejects, and it treated that rejection as "no test environment available" — so every test needing an authenticated session was quietly skipped while the lane still passed, including the whole KOSync authentication and validation set. The fixture now signs in properly, verifies the session really is authenticated rather than trusting a redirect, and fails loudly when a reachable server refuses the test credentials.

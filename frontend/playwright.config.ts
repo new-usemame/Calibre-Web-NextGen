@@ -19,6 +19,7 @@ const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:8086';
 const SUBPATH_URL = process.env.E2E_SUBPATH_URL;
 const STORAGE = 'e2e/.auth/state.json';
 const isCI = !!process.env.CI;
+const WEBKIT_READER_SPEC = /native-reader-keyboard-scroll\.spec\.ts/;
 
 export default defineConfig({
   testDir: './e2e',
@@ -47,7 +48,7 @@ export default defineConfig({
       name: 'desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
       dependencies: ['setup'],
-      testIgnore: [/subpath\.spec\.ts/, /mobile\.spec\.ts/],
+      testIgnore: [/subpath\.spec\.ts/, /mobile\.spec\.ts/, WEBKIT_READER_SPEC],
     },
 
     // 3. Mobile 375×667 (chromium mobile emulation — no webkit dep) — where every
@@ -67,7 +68,7 @@ export default defineConfig({
       // desktop makes each project clobber the other's writes — a race, not a
       // defect. Desktop owns it until the harness can hand each project its own
       // account; it passes standalone at 375px.
-      testIgnore: [/subpath\.spec\.ts/, /default-library-view\.spec\.ts/],
+      testIgnore: [/subpath\.spec\.ts/, /default-library-view\.spec\.ts/, WEBKIT_READER_SPEC],
     },
 
     // 4. iPad-class touch viewport — #863 was reported at this width, where
@@ -85,7 +86,20 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
-    // 5. Sub-path reverse proxy (opt-in: set E2E_SUBPATH_URL to the nginx rig).
+    // 5. Focused WebKit coverage for Safari's non-focusable-scroller behavior.
+    //    Keep this project narrow: the broad suite remains Chromium-backed.
+    {
+      name: 'webkit-reader',
+      testMatch: WEBKIT_READER_SPEC,
+      use: {
+        ...devices['Desktop Safari'],
+        viewport: { width: 1280, height: 800 },
+        storageState: STORAGE,
+      },
+      dependencies: ['setup'],
+    },
+
+    // 6. Sub-path reverse proxy (opt-in: set E2E_SUBPATH_URL to the nginx rig).
     //    Guards Class 1 subpath breakage (v4.1.1 reader 404, #571 white page).
     ...(SUBPATH_URL
       ? [{

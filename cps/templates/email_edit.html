@@ -21,7 +21,7 @@
         {% if content.mail_gmail_token == {} %}
         <button type="submit" id="gmail_server" name="gmail" value="submit" class="btn btn-default">{{_('Setup Gmail Account')}}</button>
         {% else %}
-        <button type="submit" id="invalidate_server" name="invalidate" value="submit" class="btn btn-danger">{{_('Revoke Gmail Access')}}</button>
+        <button type="submit" id="invalidate_server" name="invalidate" value="submit" class="btn btn-danger" data-confirm="{{ _('Revoke Gmail access? You will need to authorize Gmail again to use it.') }}" onclick="return confirm(this.dataset.confirm);">{{_('Revoke Gmail Access')}}</button>
         {% endif %}
       </div>
     </div>

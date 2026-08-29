@@ -6,7 +6,7 @@ There are two copies of Kobo's `Bookmark.Color` table in this repository, in two
 languages, and they are the same fact:
 
     cps/services/annotation_colors.py                     (Python, canonical)
-    koreader/plugins/cwasync.koplugin/kobo_sqlite_provider.lua   (Lua)
+    koreader/plugins/cwngsync.koplugin/kobo_sqlite_provider.lua   (Lua)
 
 They drifted, and the drift was invisible because each side had its own tests
 agreeing with itself. The Lua copy called 1 "red" (a Kobo has no red), had 2 and
@@ -34,7 +34,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN_LUA = REPO / "koreader" / "plugins" / "cwasync.koplugin" / "kobo_sqlite_provider.lua"
+PLUGIN_LUA = REPO / "koreader" / "plugins" / "cwngsync.koplugin" / "kobo_sqlite_provider.lua"
 
 
 def _lua_table(body: str, name: str) -> str:

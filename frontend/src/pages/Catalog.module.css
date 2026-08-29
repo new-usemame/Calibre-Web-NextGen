@@ -449,7 +449,11 @@
 
 /* Spin the RefreshCw glyph while a scan is in flight (same cadence as the
    CoverPicker refresh spinner). */
+/* wrapper span, not the glyph -- an SVG target does not get a compositor layer
+   in Chrome, so the animation falls back to the main thread. See
+   HelpBanner.module.css `.arrow` for the measurement. */
 .refreshIconSpin {
+  display: inline-flex;
   animation: cpspin 1s linear infinite;
 }
 @keyframes cpspin {

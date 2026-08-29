@@ -31,7 +31,7 @@ pulls from ``KOSyncProgress`` and never looks at the Kobo bookmark.  What we
 must **not** do is write a CFI into that table's ``progress`` column: KOReader
 consumes it as an engine-private crengine xpointer (numeric values become a
 page number, anything else is applied as an xpointer —
-``koreader/plugins/cwasync.koplugin/main.lua``), so a CFI there is an
+``koreader/plugins/cwngsync.koplugin/main.lua``), so a CFI there is an
 unresolvable position.  Instead the row is written with an explicit
 percentage-only sentinel and served as ``position_kind: "percentage"``, which
 the plugin acts on with ``GotoPercent`` — an event both of KOReader's engines
@@ -85,11 +85,14 @@ def coerce_percentage(raw) -> Optional[float]:
     return value
 
 
-def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
+def record_web_reader_progress(user, book_id: int, percentage: float,
+                               *, origin_device_id=None) -> bool:
     """Advance the shared progress carrier from a web-reader position.
 
     Returns ``True`` when the carrier was advanced.  The caller is responsible
-    for committing the session — both bookmark routes already do.
+    for committing the session — both bookmark routes already do. M1 carries
+    ``origin_device_id`` through this write boundary; M3 adds the per-device
+    position row that can persist it without changing the resolved carrier.
 
     Skipped without a write when:
       * ``percentage`` is not a positive number.  A 0% sample is what the
@@ -104,6 +107,28 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
         user_id = int(user.id)
     except (AttributeError, TypeError, ValueError):
         return False
+
+    # Direct service callers inside a browser request get the same identity as
+    # both routes. Non-request unit callers deliberately stay side-effect free.
+    if origin_device_id is None:
+        try:
+            from flask import g, has_request_context, request
+            if has_request_context():
+                from .device_registry import (
+                    WEBREADER_INSTALLATION_ID_HEADER,
+                    ensure_webreader_device_best_effort,
+                )
+                origin_device_id = getattr(g, "annotation_origin_device_id", None)
+                if origin_device_id is None:
+                    origin_device_id = ensure_webreader_device_best_effort(
+                        user_id=user_id,
+                        installation_id=request.headers.get(
+                            WEBREADER_INSTALLATION_ID_HEADER,
+                        ),
+                    )
+                    g.annotation_origin_device_id = origin_device_id
+        except Exception:
+            log.warning("Best-effort web-reader device observation failed", exc_info=True)
 
     # ``ub.session`` is a single long-lived Session shared across requests
     # (``init_db`` builds it once), so a plain query can answer from the identity

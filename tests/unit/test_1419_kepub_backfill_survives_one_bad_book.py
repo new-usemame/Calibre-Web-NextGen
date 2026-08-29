@@ -17,8 +17,9 @@ Three defects made that dangerous, all found by the pre-release refuter loop:
    which is *not* an ``OSError`` and so was not caught in ``cps/epub.py``
    either. One corrupt EPUB anywhere in the synced set therefore aborted the
    whole loop, converted **zero** books, and — because the exception escaped
-   before the completed flag was set — re-queued the identical doomed run on
-   every boot, forever, on a ``hidden=True`` task with no UI trace.
+   before later books could run. The task now scans idempotently on every
+   eligible boot, so partial failures deliberately leave the compatibility
+   completion marker false while still containing archive trouble per book.
 
 2. A task cancelled while still queued never runs, so the ``finally`` in
    ``run()`` that clears ``_pending`` never fired. The latch then made
@@ -26,9 +27,8 @@ Three defects made that dangerous, all found by the pre-release refuter loop:
    silently downgraded every Kobo KEPUB download to EPUB while still telling the
    device the format was KEPUB.
 
-3. The completed flag was set before ``self.failed`` was consulted, so a run
-   where *everything* failed (read-only books volume, a mount that arrived late)
-   was checked off as a finished migration and never retried.
+3. The completed flag was set before ``self.failed`` was consulted, so failed
+   runs could be reported as failed while still persisting completion.
 """
 
 import zipfile
@@ -64,7 +64,7 @@ def _app_session(rows):
 def _calibre_db(get_book=None):
     class CalibreDB:
         def __init__(self, **_):
-            self.session = SimpleNamespace(close=lambda: None)
+            self.session = SimpleNamespace(close=lambda: None, rollback=lambda: None)
 
         def get_book(self, book_id):
             if get_book is not None:
@@ -88,7 +88,13 @@ def _wire(monkeypatch, kepub_backfill, rows, conversion, layout, get_book=None):
     monkeypatch.setattr(
         kepub_backfill.config, "config_kobo_kepub_backfill_completed", False, raising=False)
     monkeypatch.setattr(kepub_backfill.config, "get_book_path", lambda: "/books", raising=False)
-    monkeypatch.setattr(kepub_backfill.config, "save", lambda: saved.append(True), raising=False)
+    monkeypatch.setattr(
+        kepub_backfill.config,
+        "save",
+        lambda: saved.append(
+            kepub_backfill.config.config_kobo_kepub_backfill_completed),
+        raising=False,
+    )
     return saved
 
 
@@ -128,9 +134,8 @@ def test_corrupt_epub_does_not_abort_the_whole_migration(monkeypatch):
     assert attempted == [2, 3]
     assert task.converted == 2
     assert task.failed == 1
-    # Pre-fix this stayed False, so every boot re-queued the same doomed run.
-    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is True
-    assert saved == [True]
+    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is False
+    assert saved == [False]
 
 
 def test_unreadable_book_row_does_not_abort_the_whole_migration(monkeypatch):
@@ -138,9 +143,12 @@ def test_unreadable_book_row_does_not_abort_the_whole_migration(monkeypatch):
     from cps.tasks import kepub_backfill
 
     attempted = []
+    first_lookup = True
 
     def get_book(book_id):
-        if book_id == 1:
+        nonlocal first_lookup
+        if book_id == 1 and first_lookup:
+            first_lookup = False
             raise RuntimeError("database is locked")
         return SimpleNamespace(id=book_id, path=str(book_id), title=str(book_id))
 
@@ -153,7 +161,7 @@ def test_unreadable_book_row_does_not_abort_the_whole_migration(monkeypatch):
     assert attempted == [2]
     assert task.converted == 1
     assert task.failed == 1
-    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is True
+    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is False
 
 
 def test_a_run_that_converts_nothing_is_not_marked_completed(monkeypatch):
@@ -173,8 +181,8 @@ def test_a_run_that_converts_nothing_is_not_marked_completed(monkeypatch):
     assert kepub_backfill.config.config_kobo_kepub_backfill_completed is False
 
 
-def test_partial_failure_still_marks_completed(monkeypatch):
-    """Preserved behaviour: some progress means the migration ran."""
+def test_partial_failure_keeps_completion_false(monkeypatch):
+    """Terminal STAT_FAIL and the persisted completion marker cannot disagree."""
     from cps.tasks import kepub_backfill
 
     attempted = []
@@ -185,7 +193,7 @@ def test_partial_failure_still_marks_completed(monkeypatch):
     task.run(None)
 
     assert task.converted == 1 and task.failed == 1
-    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is True
+    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is False
 
 
 def test_cancel_while_queued_clears_the_pending_latch(monkeypatch):
@@ -307,7 +315,7 @@ def test_an_unclosable_session_does_not_destroy_the_diagnosis(monkeypatch):
     task.run(None)  # must not raise AttributeError about 'close'
 
     assert task.failed == 1
-    assert saved == []
+    assert saved == [False]
 
 
 def test_get_epub_layout_returns_none_for_a_corrupt_archive(monkeypatch, tmp_path):

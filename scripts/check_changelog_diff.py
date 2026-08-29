@@ -24,6 +24,10 @@ NON_SHIPPING_PATH_PREFIXES = (
     "examples/",
     "findings/",
     "frontend/e2e/",
+    # The runtime image deletes frontend/ and copies only the Vite-built bundle
+    # from cps/static/app, so frontend test sources never ship (Dockerfile
+    # steps 6 and 6.1).
+    "frontend/tests/",
     "notes/",
     "tests/",
     "wiki-src/",

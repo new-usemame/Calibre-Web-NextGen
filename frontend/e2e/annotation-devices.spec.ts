@@ -70,6 +70,46 @@ test('device manager is axe-clean and has no 390px overflow', async ({ page }, t
   await assertNoHorizontalOverflow(page);
 });
 
+test('device inventory renders one bounded window and reports the true total', async ({ page }) => {
+  let inventoryRequestUrl: URL | null = null;
+  await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
+    devices: [{ ...device, inventory_count: 5000, inventory_observed: '2026-08-09T12:00:00' }],
+  } }));
+  await page.route('**/api/annotations/devices/device-1/inventory?*', (route) => {
+    inventoryRequestUrl = new URL(route.request().url());
+    return route.fulfill({ json: {
+      observed_at: '2026-08-09T12:00:00',
+      limit: 200,
+      offset: 0,
+      total: 5000,
+      books: Array.from({ length: 5000 }, (_, index) => ({
+        book_id: index + 1,
+        lpath: `Books/${String(index).padStart(4, '0')}.epub`,
+        checksum: index.toString(16).padStart(32, '0'),
+        size: index,
+        mtime: index,
+      })),
+    } });
+  });
+
+  await page.goto('/app/account/devices');
+  await page.getByRole('button', { name: 'View device library' }).click();
+  const inventory = page.locator('#device-inventory-device-1');
+  await expect(inventory.getByRole('status')).toHaveText(
+    'Showing 200 of 5000 books from the latest device inventory.',
+  );
+  await expect(inventory.getByRole('listitem')).toHaveCount(200);
+  await expect(inventory.getByRole('link')).toHaveCount(200);
+  expect(inventoryRequestUrl?.searchParams.get('limit')).toBe('200');
+  expect(inventoryRequestUrl?.searchParams.get('offset')).toBe('0');
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+    .analyze();
+  expect(results.violations.filter((violation) => (
+    ['critical', 'serious'].includes(violation.impact || '')
+  ))).toEqual([]);
+});
+
 test('account summary makes the e-reader manager discoverable', async ({ page }) => {
   await stubDevices(page);
   await page.goto('/app/account');

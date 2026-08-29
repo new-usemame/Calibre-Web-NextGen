@@ -30,7 +30,12 @@ on:
 # Cancel in-progress runs when new commit pushed
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # On a PR branch only the newest head matters, so a new push cancels the
+  # running verification. On main every landed commit must be verified:
+  # cancelling there let ~80% of main's runs die before dispatch under a high
+  # merge rate while Build & Push - Dev published those same commits
+  # (F-493b49). Runs on main queue behind each other instead.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # ============================================================================
@@ -89,7 +94,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          # lua5.4 runs the cwasync KOReader plugin's own test suites. They are
+          # lua5.4 runs the cwngsync KOReader plugin's own test suites. They are
           # pure logic with no KOReader imports and had no CI runner until now,
           # so the plugin's sync-safety logic was gated by nothing (#920).
           sudo apt-get install -y libldap2-dev libsasl2-dev libssl-dev gettext lua5.4
@@ -345,8 +350,8 @@ jobs:
 
       - name: Set test UID/GID
         run: |
-          echo "CWA_TEST_PUID=$(id -u)" >> $GITHUB_ENV
-          echo "CWA_TEST_PGID=$(id -g)" >> $GITHUB_ENV
+          echo "CWA_TEST_PUID=$(id -u)" >> "$GITHUB_ENV"
+          echo "CWA_TEST_PGID=$(id -g)" >> "$GITHUB_ENV"
       
       - name: Run Docker integration tests
         run: |
@@ -460,7 +465,7 @@ jobs:
     # skipped dependency would drag the tag and dispatch runs down with it —
     # silently turning the release gate off, which is the exact class of
     # failure this whole change exists to remove.
-    needs: [changed_paths]
+    needs: [changed_paths, integration-tests]
     # Release gate + manual dispatch. The SPA e2e matrix (Layer 2 of the
     # verification system, frontend/e2e/) is the "earn the release" gate;
     # /CWNG_verify runs the same harness on-demand in dev. Tag runs test the
@@ -484,13 +489,10 @@ jobs:
     # regardless of what the PR did to the SPA — green either way, and worse
     # than skipping because it would look like a gate.
     #
-    # So PR runs take the API from :dev and overlay the PR's OWN SPA bundle
-    # into the container. The specs here assert frontend behaviour and the SPA
-    # is a static bundle under cps/static/app, so this gates exactly what they
-    # cover, with no from-source image build (the resolver comment explains why
-    # that path is avoided). Limit, stated rather than glossed: it will not
-    # catch a regression that needs the PR's BACKEND changes. It is an SPA
-    # gate, not a full-stack one — and the alternative today is no gate at all.
+    # Frontend-only PRs take the API from :dev and overlay the PR's OWN SPA
+    # bundle into the container. Backend/build PRs wait for integration-tests,
+    # then load their own full image from the same GHA layer cache; otherwise a
+    # branch API change would be tested against main's Python code.
     if: |
       always() && (
       startsWith(github.ref, 'refs/tags/v') ||
@@ -541,12 +543,42 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Log in to GHCR (to pull the app image)
+      - name: Set up Docker Buildx
+        if: >-
+          github.event_name == 'pull_request' &&
+          needs.changed_paths.outputs.build == 'true' &&
+          needs.changed_paths.outputs.concurrency != 'true'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR (app image and pbs-cache mirror)
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # Backend PRs COPY from the same private pbs-cache package as the
+          # integration build. Use its proven read:packages credential path;
+          # GITHUB_TOKEN remains the fallback when GH_PAT is out of scope.
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      # A static SPA overlay is sound only when the PR did not change the API.
+      # For backend/build PRs, changed_paths already made integration-tests build
+      # this exact tree; reuse its GHA cache and load a full-stack image so e2e
+      # cannot silently exercise main's Python code under the branch's UI.
+      - name: Build full-stack PR image
+        if: >-
+          github.event_name == 'pull_request' &&
+          needs.changed_paths.outputs.build == 'true' &&
+          needs.changed_paths.outputs.concurrency != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: cwng-e2e-head:local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true && 'upstream' || 'ghcr' }}
 
       - name: Resolve image to test
         id: img
@@ -554,7 +586,15 @@ jobs:
           SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           image="ghcr.io/new-usemame/calibre-web-nextgen"
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" \
+                  && "${{ needs.changed_paths.outputs.build }}" == "true" \
+                  && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
+            # Non-concurrency backend PRs already built their checked-out full
+            # stack above. Do not replace it with :dev or wait for a sha tag
+            # whose producer only owns the concurrency-shaped lane.
+            echo "image=cwng-e2e-head:local" >> "$GITHUB_OUTPUT"
+            exit 0
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             tag="$GITHUB_REF_NAME"
             attempts=240
           elif [[ "${{ github.event_name }}" == "pull_request" \
@@ -585,7 +625,9 @@ jobs:
           IMAGE: ${{ steps.img.outputs.image }}
         run: |
           echo "Testing immutable image: $IMAGE"
-          if ! docker pull "$IMAGE"; then
+          # Backend PR images are built and loaded locally in this job. Registry
+          # artifacts remain digest-pinned by the resolver and must be pulled.
+          if ! docker image inspect "$IMAGE" >/dev/null 2>&1 && ! docker pull "$IMAGE"; then
             echo "::error::$IMAGE resolved but could not be pulled"
             exit 1
           fi
@@ -680,7 +722,7 @@ jobs:
             exit 1
           fi
 
-      - name: Seed a multi-page PDF book (spec fixture)
+      - name: Seed PDF and comic books (spec fixtures)
         run: |
           # reader-pdf-viewer.spec.ts needs a book with a PDF format, and the
           # ingest seed above is EPUB-only — so the spec found no PDF and failed
@@ -709,6 +751,21 @@ jobs:
           docker exec cwn-e2e calibredb set_metadata \
             --field timestamp:2001-01-01T00:00:00+00:00 "$added" \
             --with-library /calibre-library >/dev/null
+
+          # viewer-download-roles.spec.ts exercises the real comic metadata and
+          # page-byte endpoints. A hardcoded id once hid that the harness did not
+          # seed any comic at all; add a deterministic one-page CBZ and let the
+          # spec discover its generated id through the API.
+          docker cp tests/fixtures/sample_books/role_matrix_comic.cbz \
+            cwn-e2e:/tmp/role_matrix_comic.cbz
+          comic_added=$(docker exec cwn-e2e calibredb add /tmp/role_matrix_comic.cbz \
+            --with-library /calibre-library | tee /dev/stderr \
+            | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
+          [ -n "$comic_added" ] || { echo "::error::calibredb add reported no comic book id"; exit 1; }
+          docker exec cwn-e2e calibredb set_metadata \
+            --field timestamp:2001-01-02T00:00:00+00:00 "$comic_added" \
+            --with-library /calibre-library >/dev/null
+
           jar=$(mktemp)
           csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf \
             | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
@@ -721,6 +778,10 @@ jobs:
             | python3 -c 'import sys,json;d=json.load(sys.stdin);print(sum(1 for b in d.get("items",[]) if any(str(f).lower()=="pdf" for f in b.get("formats",[]))))')
           echo "books with a PDF format: $pdfs"
           [ "${pdfs:-0}" -ge 1 ] || { echo "::error::no PDF-format book after seeding"; exit 1; }
+          comics=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?per_page=200' \
+            | python3 -c 'import sys,json;d=json.load(sys.stdin);print(sum(1 for b in d.get("items",[]) if any(str(f).lower() in ("cbz","cbr","cbt") for f in b.get("formats",[]))))')
+          echo "books with a comic format: $comics"
+          [ "${comics:-0}" -ge 1 ] || { echo "::error::no comic-format book after seeding"; exit 1; }
 
       - name: Seed shelves and series
         run: |
@@ -840,7 +901,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
 
       # Frontend-only PRs intentionally reuse a digest-pinned :dev backend to
       # avoid a full multi-arch build for a static-bundle change. Overlay their
@@ -850,6 +911,7 @@ jobs:
       - name: Overlay the SPA bundle under test into the container
         if: >-
           github.event_name == 'pull_request' &&
+          needs.changed_paths.outputs.build != 'true' &&
           needs.changed_paths.outputs.concurrency != 'true'
         working-directory: frontend
         run: |

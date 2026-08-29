@@ -90,3 +90,9 @@ app.db
 .claude
 .coverage
 calibre-web.log
+
+# Local development stacks and the KOReader emulator. Nothing here is COPY'd
+# into the image, and the emulator's default KOEMU_HOME writes a KOReader home
+# and book library under local-dev/ -- which would otherwise be uploaded as
+# build context on every local image build.
+local-dev/

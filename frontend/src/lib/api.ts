@@ -1,5 +1,7 @@
 /* Typed fetch helpers — same-origin, credentials included. */
 
+import { webreaderDeviceHeaders } from './deviceIdentity';
+
 declare global {
   interface Window { __CWNG_PREFIX__?: string; }
 }
@@ -164,6 +166,9 @@ export interface BookFormat {
   size_bytes: number;
   download_url: string;
   read_url: string;
+  /** Raw book bytes served inline under viewer_required (used by epub.js).
+   *  Optional while a newly-deployed SPA can still meet an older API worker. */
+  content_url?: string;
 }
 
 /** A linked entity (author, series, tag, publisher, language). id is numeric
@@ -434,7 +439,12 @@ export interface EditableCustomColumn {
 
 /** Custom columns are sent flat, keyed as the server expects (`custom_column_7`),
  *  not as the definition list the GET returns. */
+export type MetadataListMode = 'add' | 'replace';
+
 export type MetadataUpdate = Partial<Omit<BookMetadata, 'id' | 'errors' | 'custom_columns'>> & {
+  /** Request-level behavior for authors/tags/publishers/languages. Omission is
+   *  the API's backwards-compatible replace behavior. */
+  list_mode?: MetadataListMode;
   [key: `custom_column_${number}`]: string;
 };
 
@@ -563,6 +573,8 @@ export function navigateToLogout(): void {
 
 export interface ApiRequestOptions {
   auth?: 'protected' | 'public';
+  /** Attribute a reading-data mutation to this browser installation. */
+  webreaderDevice?: boolean;
 }
 
 function isProtected(options?: ApiRequestOptions): boolean {
@@ -745,11 +757,14 @@ export async function apiPost<T>(
   requestOptions?: Pick<RequestInit, 'keepalive'> & ApiRequestOptions,
 ): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> => {
-    const { auth: _auth, ...fetchOptions } = requestOptions ?? {};
+    const { auth: _auth, webreaderDevice: _device, ...fetchOptions } = requestOptions ?? {};
     return classifiedFetch(path, {
       method: 'POST',
       credentials: 'include',
-      headers: {
+      headers: requestOptions?.webreaderDevice ? webreaderDeviceHeaders({
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf,
+      }) : {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrf,
       },
@@ -822,7 +837,9 @@ export async function apiDelete<T>(path: string, options?: ApiRequestOptions): P
     classifiedFetch(path, {
       method: 'DELETE',
       credentials: 'include',
-      headers: { 'X-CSRFToken': csrf },
+      headers: options?.webreaderDevice
+        ? webreaderDeviceHeaders({ 'X-CSRFToken': csrf })
+        : { 'X-CSRFToken': csrf },
     }, options);
 
   let csrf = await getCsrf(options);
@@ -860,7 +877,10 @@ export async function apiPatch<T>(path: string, body?: unknown, options?: ApiReq
     classifiedFetch(path, {
       method: 'PATCH',
       credentials: 'include',
-      headers: {
+      headers: options?.webreaderDevice ? webreaderDeviceHeaders({
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf,
+      }) : {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrf,
       },

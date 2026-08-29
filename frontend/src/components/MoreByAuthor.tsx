@@ -10,8 +10,8 @@ const MAX = 12;
  *  and turns a dead end into a browse surface. Renders nothing when the author
  *  has no other books, so it never leaves an empty heading. Reuses the library's
  *  author-filtered books query — no new endpoint. */
-export function MoreByAuthor({ authorId, authorName, excludeBookId, hideActions = false }:
-  { authorId: number | string; authorName: string; excludeBookId: number; hideActions?: boolean }) {
+export function MoreByAuthor({ authorId, authorName, excludeBookId, hideActions = false, canRead = false }:
+  { authorId: number | string; authorName: string; excludeBookId: number; hideActions?: boolean; canRead?: boolean }) {
   const t = useT();
   const { data } = useBooks({ page: 1, entityKind: 'author', entityId: authorId, sort: 'new' });
   const books = (data?.items ?? []).filter((b) => b.id !== excludeBookId).slice(0, MAX);
@@ -25,7 +25,7 @@ export function MoreByAuthor({ authorId, authorName, excludeBookId, hideActions 
       <div className={styles.strip}>
         {books.map((b) => (
           <div className={styles.item} key={b.id}>
-            <BookCard book={b} hideActions={hideActions} />
+            <BookCard book={b} hideActions={hideActions} canRead={canRead} />
           </div>
         ))}
       </div>

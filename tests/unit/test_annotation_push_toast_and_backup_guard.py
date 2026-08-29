@@ -24,7 +24,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwasync.koplugin"
+PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwngsync.koplugin"
 MAIN_LUA = PLUGIN_DIR / "main.lua"
 PROVIDER_LUA = PLUGIN_DIR / "kobo_sqlite_provider.lua"
 
@@ -76,7 +76,7 @@ def test_sync_client_reports_a_reason_and_logs_where_users_can_see_it():
     call that hand-rolls `logger.dbg` is invisible again, and only on that one
     path — the hardest kind of gap to notice.
     """
-    body = _read(PLUGIN_DIR / "CWASyncClient.lua")
+    body = _read(PLUGIN_DIR / "CWNGSyncClient.lua")
     assert "logger.dbg(" not in body, (
         "no sync failure may log at dbg — KOReader suppresses it unless the user "
         "turned on debug logging, which is how #920 lost its only device-side trace"

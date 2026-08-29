@@ -15,6 +15,7 @@ from flask import jsonify, send_file, abort
 
 from . import api_v1
 from .. import calibre_db, config, logger
+from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
@@ -69,6 +70,8 @@ def _read_entry(path, fmt, name):
 @login_required_if_no_ano
 def comic_info(book_id):
     """Page count for the native comic reader."""
+    if not current_user.role_viewer():
+        abort(403)
     path, fmt = _comic_file(book_id)
     if not path or not os.path.isfile(path):
         return jsonify({"error": {"code": "not_found", "message": "No comic file for this book"}}), 404
@@ -84,6 +87,8 @@ def comic_info(book_id):
 @login_required_if_no_ano
 def comic_page(book_id, page):
     """Serve a single comic page as an image."""
+    if not current_user.role_viewer():
+        abort(403)
     path, fmt = _comic_file(book_id)
     if not path or not os.path.isfile(path):
         abort(404)

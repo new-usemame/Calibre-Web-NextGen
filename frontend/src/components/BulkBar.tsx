@@ -4,7 +4,7 @@ import { useBulkActions, useShelves, useMe, useMergeBooks } from '../lib/queries
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { Spinner } from './Spinner';
-import type { MetadataUpdate } from '../lib/api';
+import type { MetadataListMode, MetadataUpdate } from '../lib/api';
 import styles from './BulkBar.module.css';
 
 interface BulkBarProps {
@@ -43,6 +43,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
   const [shelfOpen, setShelfOpen] = useState(false);
   const shelfRef = useRef<HTMLDivElement>(null);
   const [metaOpen, setMetaOpen] = useState(false);
+  const [listMode, setListMode] = useState<MetadataListMode>('add');
   const [meta, setMeta] = useState({ tags: '', series: '', publishers: '', languages: '', authors: '' });
 
   useEffect(() => {
@@ -118,7 +119,8 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
 
   const canEdit = !!me?.role?.edit;
   const applyMeta = () => {
-    // Only send the fields the admin actually filled (replace semantics).
+    // Only send the fields the editor actually filled. list_mode is attached
+    // after this check so selecting a mode alone cannot issue empty writes.
     const fields: MetadataUpdate = {};
     if (meta.tags.trim()) fields.tags = meta.tags.trim();
     if (meta.series.trim()) fields.series = meta.series.trim();
@@ -126,6 +128,11 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
     if (meta.languages.trim()) fields.languages = meta.languages.trim();
     if (meta.authors.trim()) fields.authors = meta.authors.trim();
     if (Object.keys(fields).length === 0) return;
+    if (listMode === 'replace' && !window.confirm(t(
+      'Replace metadata for {n} selected book(s)? Those books will lose their existing values in every filled field.',
+      { n: count },
+    ))) return;
+    fields.list_mode = listMode;
     setMetadata.mutate({ ids, fields }, {
       onSuccess: (result) => {
         const succeeded = result.succeededIds.length;
@@ -136,6 +143,7 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
         if (succeeded) onChanged?.();
         if (!failed) {
           setMetaOpen(false);
+          setListMode('add');
           setMeta({ tags: '', series: '', publishers: '', languages: '', authors: '' });
         }
       },
@@ -143,10 +151,29 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
   };
 
   return (
-    <>
+    <div className={styles.bulkStack}>
     {metaOpen && (
-      <div className={styles.metaPanel}>
-        <p className={styles.metaHint}>{t('Apply to all selected (only filled fields change; replaces existing values):')}</p>
+      <div className={styles.metaPanel} role="region" aria-label={t('Apply metadata')}>
+        <fieldset className={styles.modeGroup}>
+          <legend>{t('How should multi-value fields be applied?')}</legend>
+          <div className={styles.modeChoices}>
+            <label className={listMode === 'add' ? styles.modeActive : styles.modeChoice}>
+              <input type="radio" name="bulk-list-mode" value="add"
+                checked={listMode === 'add'} onChange={() => setListMode('add')} />
+              {t('Add to existing')}
+            </label>
+            <label className={listMode === 'replace' ? styles.modeActive : styles.modeChoice}>
+              <input type="radio" name="bulk-list-mode" value="replace"
+                checked={listMode === 'replace'} onChange={() => setListMode('replace')} />
+              {t('Replace existing')}
+            </label>
+          </div>
+        </fieldset>
+        <p className={styles.metaHint} aria-live="polite">
+          {listMode === 'add'
+            ? t("New authors, tags, publishers, and languages will be added after each book's existing values. Filled single-value fields will be replaced.")
+            : t("Every filled field will replace each book's existing values.")}
+        </p>
         <div className={styles.metaGrid}>
           <input placeholder={t('Authors (separate with &)')} aria-label={t('Authors (separate with &)')} value={meta.authors}
             onChange={(e) => setMeta({ ...meta, authors: e.target.value })} />
@@ -195,7 +222,10 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
 
         {canEdit && (
           <button className={styles.action} disabled={busy} aria-expanded={metaOpen}
-            onClick={() => setMetaOpen((o) => !o)}>
+            onClick={() => {
+              if (metaOpen) setListMode('add');
+              setMetaOpen((open) => !open);
+            }}>
             <Pencil size={15} aria-hidden="true" focusable={false} /> {t('Edit metadata')}
           </button>
         )}
@@ -214,6 +244,6 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
 
         {busy && <Spinner size={16} />}
     </BulkSelectionBar>
-    </>
+    </div>
   );
 }

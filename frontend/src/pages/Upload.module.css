@@ -64,7 +64,10 @@
   border: 0;
 }
 
-.spin { animation: spin 0.9s linear infinite; color: var(--accent); }
+/* wrapper span, not the glyph -- an SVG target does not get a compositor layer
+   in Chrome, so the animation falls back to the main thread. See
+   HelpBanner.module.css `.arrow` for the measurement. */
+.spin { display: inline-flex; animation: spin 0.9s linear infinite; color: var(--accent); }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 

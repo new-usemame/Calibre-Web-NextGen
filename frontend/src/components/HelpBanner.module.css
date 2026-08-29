@@ -116,7 +116,21 @@
   text-decoration-color: currentColor;
 }
 
+/* Lives on a WRAPPER element, never on the icon itself. A keyframe animation
+   whose target is an SVG element does not get a compositor layer (measured in
+   Chrome), so it falls back to the main thread for as long as it is mounted --
+   style recalc,
+   prepaint, layerize and commit every frame, on every route, whether or not
+   anything is on screen. Measured on this nudge, mobile 390x844@3 at 20x CPU
+   throttle over one identical 20s scroll: 1,169 style recalcs and 22 dropped
+   frames with it running, and 0 recalcs / 1 dropped frame with it cancelled.
+   A separate control ran the SAME keyframes on a plain <div>: Chrome reported
+   has_compositor_animation on 809/809 frames and 1 main-thread frame in 13.5s.
+   `display: inline-flex` is what makes this box shrink-wrap the glyph, so the
+   rendered geometry is unchanged. */
 .arrow {
+  display: inline-flex;
+  align-items: center;
   color: var(--hb-icon);
   flex: none;
   animation: hbNudge 1.8s var(--ease) infinite;

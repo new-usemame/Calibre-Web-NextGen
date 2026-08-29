@@ -1207,6 +1207,47 @@ class DeviceIdentity(Base):
     )
 
 
+class DeviceInventoryReport(Base):
+    """One complete inventory observation submitted by a registered device."""
+    __tablename__ = 'device_inventory_report'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False)
+    observed_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    item_count = Column(Integer, nullable=False)
+    matched_count = Column(Integer, nullable=False)
+    device = relationship("Device")
+    __table_args__ = (
+        Index('ix_device_inventory_report_device_observed', 'device_id', 'observed_at'),
+    )
+
+
+class DeviceInventoryItem(Base):
+    """A book observed on a device; absence from a later report is not deletion."""
+    __tablename__ = 'device_inventory_item'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False)
+    lpath = Column(String(1024), nullable=False)
+    checksum = Column(String(32), nullable=False)
+    book_id = Column(Integer, nullable=True)
+    size = Column(Integer, nullable=False)
+    mtime = Column(Integer, nullable=False)
+    first_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_seen_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_report_id = Column(
+        Integer, ForeignKey('device_inventory_report.id', ondelete='CASCADE'), nullable=False,
+    )
+    device = relationship("Device")
+    last_report = relationship("DeviceInventoryReport")
+    __table_args__ = (
+        UniqueConstraint('device_id', 'lpath', 'checksum',
+                         name='uq_device_inventory_item_observation'),
+        Index('ix_device_inventory_item_device_report', 'device_id', 'last_report_id'),
+        Index('ix_device_inventory_item_book_device', 'book_id', 'device_id'),
+    )
+
+
 class AnnotationContentIdMigration(Base):
     """Exact undo journal for conservative content-id backfills."""
     __tablename__ = 'annotation_content_id_migration'
@@ -1311,6 +1352,7 @@ class Annotation(Base):
     __table_args__ = (
         Index('ix_annotation_user_annotation', 'user_id', 'annotation_id'),
         Index('ix_annotation_user_book', 'user_id', 'book_id'),
+        Index('ix_annotation_user_book_origin', 'user_id', 'book_id', 'origin_device_id'),
         UniqueConstraint(
             'user_id', 'book_id', 'annotation_id',
             name='uq_annotation_user_book_annotation',
@@ -1971,6 +2013,8 @@ def add_missing_tables(engine, _session):
         ("kobo_annotation_backup", KoboAnnotationBackup.__table__),
         ("favorite_book", FavoriteBook.__table__),
         ("user_library_book", UserLibraryBook.__table__),
+        ("device_inventory_report", DeviceInventoryReport.__table__),
+        ("device_inventory_item", DeviceInventoryItem.__table__),
     )
     kobo_entitlement_tables = (
         ("kobo_device_book_entitlement", KoboDeviceBookEntitlement.__table__),
@@ -3641,6 +3685,19 @@ def migrate_device_management_slice(engine, _session):
         ))
 
 
+def migrate_webreader_device_identity_slice(engine, _session):
+    """Add the M1 composite origin lookup without loading ORM rows."""
+    with engine.begin() as conn:
+        if not conn.execute(text(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='annotation'"
+        )).first():
+            return
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_annotation_user_book_origin "
+            "ON annotation(user_id, book_id, origin_device_id)"
+        ))
+
+
 _KOBO_TWO_WAY_TABLES = (
     KoboAnnotationMaterialization.__table__,
     KoboAnnotationBookState.__table__,
@@ -4321,6 +4378,7 @@ def migrate_Database(_session):
     migrate_annotation_koreader_identity(engine, _session)
     migrate_multi_device_annotation_safe_slice(engine, _session)
     migrate_device_management_slice(engine, _session)
+    migrate_webreader_device_identity_slice(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_book_cover_preview_table(engine, _session)
     migrate_notice_tables(engine, _session)

@@ -22,6 +22,43 @@
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* Catalog bulk controls share one bottom-anchored flow container. The metadata
+   panel therefore sits above the bar's ACTUAL wrapped height instead of
+   guessing it; constrained viewports scroll the panel, never overlap it.
+   Reserve the persistent top bar's strip because this region is non-modal and
+   must not block global navigation. */
+.bulkStack {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sp-5);
+  transform: translateX(-50%);
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--sp-4));
+  max-height: calc(100vh - var(--topbar-h) - 2 * var(--sp-5));
+  max-height: calc(100dvh - var(--topbar-h) - 2 * var(--sp-5));
+}
+
+.bulkStack .bar {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  z-index: auto;
+  flex: none;
+  max-width: 100%;
+  animation: riseInStack var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes riseInStack {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .count {
   font-size: var(--fs-sm);
   font-weight: var(--fw-semi);
@@ -99,15 +136,39 @@
 
 @media (max-width: 600px) {
   .bar { padding-left: var(--sp-3); gap: var(--sp-2); }
-  .action span, .actionDanger span { display: none; }
+  /* The action labels are text nodes, not nested spans. Keep that text in the
+     accessibility tree while collapsing it visually so a wrapped toolbar can
+     fit inside short landscape/split-screen viewports. */
+  .action, .actionDanger { gap: 0; font-size: 0; }
 }
 
 .metaPanel {
-  position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(var(--sp-6) + 56px); z-index: 60;
   background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg);
   padding: var(--sp-4); box-shadow: var(--shadow-lg, 0 12px 40px rgba(0,0,0,.4));
-  width: min(680px, 92vw); display: flex; flex-direction: column; gap: var(--sp-3);
+  width: min(680px, 92vw); max-width: 100%; min-height: 0; overflow-y: auto;
+  display: flex; flex: 0 1 auto; flex-direction: column; gap: var(--sp-3);
+}
+.modeGroup { border: 0; padding: 0; margin: 0; min-width: 0; }
+.modeGroup legend {
+  color: var(--text); font-size: var(--fs-sm); font-weight: var(--fw-semi);
+  margin-bottom: var(--sp-2);
+}
+.modeChoices {
+  display: inline-flex; flex-wrap: wrap; gap: var(--sp-1); padding: 3px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg);
+}
+.modeChoice, .modeActive {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 40px;
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); cursor: pointer;
+  color: var(--text-muted); font-size: var(--fs-sm); font-weight: var(--fw-semi);
+}
+.modeActive { color: var(--on-accent); background: var(--accent); }
+.modeChoice input, .modeActive input {
+  position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+.modeChoice:focus-within, .modeActive:focus-within {
+  outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px;
 }
 .metaHint { color: var(--text-muted); font-size: var(--fs-xs); }
 .metaGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-2); }

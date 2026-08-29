@@ -15,7 +15,15 @@ from sqlalchemy.orm import sessionmaker
 log = logging.getLogger(__name__)
 SCHEME = "kobo-header-hmac-sha256-v1"
 KOREADER_SCHEME = "koreader-client-hmac-sha256-v1"
+WEBREADER_SCHEME = "webreader-cookie-hmac-sha256-v2"
+WEBREADER_SCHEME_PREFIX = "webreader-cookie-hmac-sha256-"
+WEBREADER_INSTALLATION_ID_HEADER = "X-CWNG-Webreader-Installation-Id"
 LAST_SEEN_WRITE_INTERVAL = timedelta(minutes=5)
+# A hard cap over identity-backed browser rows (including retired rows) is
+# deliberately stronger than an active-only cap: soft-delete/recreate churn
+# must not turn a client-controlled header into unbounded persistent rows.
+MAX_WEBREADER_DEVICES_PER_USER = 20
+_webreader_cap_logged_users = set()
 
 
 def _bounded_header(value, limit):
@@ -43,6 +51,90 @@ def _opaque_fingerprint(raw_id, secret_key, *, namespace):
     if not raw_id or not key:
         return None
     return hmac.new(key, namespace + b"\0" + raw_id.encode(), hashlib.sha256).hexdigest()
+
+
+def _webreader_fingerprint(user_id, installation_id, secret_key):
+    """Key a browser-held installation id without retaining the raw value."""
+    installation_id = _bounded_header(installation_id, 100)
+    key = secret_key.encode() if isinstance(secret_key, str) else secret_key
+    try:
+        user_id_bytes = str(int(user_id)).encode("ascii")
+    except (TypeError, ValueError):
+        return None
+    if not installation_id or not key:
+        return None
+    # The namespace stays v1 because it identifies the message format; the
+    # DeviceIdentity scheme is v2 because user-domain separation changed the
+    # preimage. v1 rows existed only on the unreleased #1942 feature branch.
+    message = (
+        b"cwng-device:webreader:v1\0"
+        + user_id_bytes
+        + b"\0"
+        + installation_id.encode()
+    )
+    return hmac.new(key, message, hashlib.sha256).hexdigest()
+
+
+def _log_webreader_cap_once(user_id):
+    """Emit one privacy-safe process-lifetime diagnostic for each capped user."""
+    if user_id in _webreader_cap_logged_users:
+        return
+    _webreader_cap_logged_users.add(user_id)
+    log.info("Web-reader device limit reached; using the legacy device bucket")
+
+
+def _webreader_identity_count(session, ub, *, user_id):
+    """Count all browser identities, active or retired, to bound stored rows."""
+    return (
+        session.query(ub.Device.id)
+        .join(ub.DeviceIdentity, ub.DeviceIdentity.device_id == ub.Device.id)
+        .filter(
+            ub.Device.user_id == user_id,
+            ub.Device.kind == "webreader",
+            ub.DeviceIdentity.scheme.like(f"{WEBREADER_SCHEME_PREFIX}%"),
+        )
+        .distinct()
+        .count()
+    )
+
+
+def _ensure_legacy_webreader_device(session, ub, *, user_id, seen_at=None):
+    """Return the bounded historical fallback, reactivating it if retired."""
+    device = (
+        session.query(ub.Device)
+        .filter_by(user_id=user_id, kind="webreader", created_by="auto")
+        .filter(~ub.Device.identities.any(
+            ub.DeviceIdentity.scheme.like(f"{WEBREADER_SCHEME_PREFIX}%"),
+        ))
+        .order_by(ub.Device.id.asc())
+        .first()
+    )
+    now = seen_at or datetime.now(timezone.utc)
+    if device is None:
+        device = ub.Device(
+            user_id=user_id,
+            kind="webreader",
+            display_name=_deduplicated_label(
+                session, ub, user_id=user_id, base="Web reader",
+            ),
+            model="CWNG web reader",
+            platform="epub.js",
+            first_seen_at=now,
+            last_seen_at=now,
+            last_metadata_at=now,
+            active=True,
+            created_by="auto",
+        )
+        session.add(device)
+        session.flush()
+    elif not device.active:
+        # This row is the logical fallback bucket, not a physical browser.
+        # Reactivating the same singleton prevents delete/recreate cycles from
+        # becoming another persistent-row growth path.
+        device.active = True
+        device.last_seen_at = now
+        session.flush()
+    return device
 
 
 def _deduplicated_label(session, ub, *, user_id, base):
@@ -139,27 +231,107 @@ def register_kobo_device_best_effort(*, user_id, headers, secret_key=None, retur
                 pass
 
 
-def ensure_webreader_device_best_effort(*, user_id):
-    """Return the logical web-reader device id without risking the save session."""
+def upsert_webreader_device(session, *, user_id, installation_id, secret_key, seen_at=None):
+    """Resolve one browser installation to one Device without storing its id."""
+    from cps import ub
+
+    fingerprint = _webreader_fingerprint(user_id, installation_id, secret_key)
+    if not fingerprint:
+        return None
+    identity = session.query(ub.DeviceIdentity).filter_by(
+        scheme=WEBREADER_SCHEME,
+        key_version=1,
+        fingerprint=fingerprint,
+    ).first()
+    if identity and identity.device.user_id != user_id:
+        # Defensive only: v2 fingerprints are user-domain-separated.
+        log.warning("Ignoring web-reader device identity with inconsistent ownership")
+        return None
+
+    now = seen_at or datetime.now(timezone.utc)
+    if identity is not None and not identity.device.active:
+        # Device deletion is explicit in the management UI. Do not silently
+        # undo it; the write uses the legacy bucket until the user restores the
+        # browser, at which point this identity resolves normally again.
+        return None
+
+    if identity is None:
+        if _webreader_identity_count(session, ub, user_id=user_id) >= MAX_WEBREADER_DEVICES_PER_USER:
+            _log_webreader_cap_once(user_id)
+            return None
+        device = ub.Device(
+            user_id=user_id,
+            kind="webreader",
+            display_name=_deduplicated_label(
+                session, ub, user_id=user_id, base="Web reader",
+            ),
+            model="CWNG web reader",
+            platform="epub.js",
+            first_seen_at=now,
+            last_seen_at=now,
+            last_metadata_at=now,
+            active=True,
+            created_by="auto",
+        )
+        identity = ub.DeviceIdentity(
+            device=device,
+            scheme=WEBREADER_SCHEME,
+            key_version=1,
+            fingerprint=fingerprint,
+            first_seen_at=now,
+            last_seen_at=now,
+        )
+        session.add(device)
+    else:
+        device = identity.device
+        observed_is_newer = (
+            device.last_seen_at is None
+            or now >= device.last_seen_at.replace(tzinfo=now.tzinfo)
+        )
+        last_seen_due = (
+            device.last_seen_at is None
+            or now - device.last_seen_at.replace(tzinfo=now.tzinfo)
+            >= LAST_SEEN_WRITE_INTERVAL
+        )
+        # Browser position writes can arrive every 800ms. Keep the identity
+        # observation read-only until the same coarse heartbeat Kobo uses is
+        # due, so those saves do not add another SQLite writer-lock contender.
+        if observed_is_newer and last_seen_due:
+            device.last_seen_at = now
+            identity.last_seen_at = now
+    session.flush()
+    return device
+
+
+def ensure_webreader_device_best_effort(*, user_id, installation_id=None,
+                                        secret_key=None):
+    """Return a per-browser device id, or the historical singleton fallback."""
     owned = None
     try:
+        from flask import current_app
         from cps import ub
+        key = secret_key if secret_key is not None else current_app.secret_key
         owned = sessionmaker(bind=ub.session.get_bind())()
-        device = owned.query(ub.Device).filter_by(
-            user_id=user_id, kind="webreader", created_by="auto",
-        ).order_by(ub.Device.id.asc()).first()
-        if device is None:
-            now = datetime.now(timezone.utc)
-            device = ub.Device(
-                user_id=user_id, kind="webreader",
-                display_name=_deduplicated_label(owned, ub, user_id=user_id, base="Web reader"),
-                model="CWNG web reader", platform="epub.js",
-                first_seen_at=now, last_seen_at=now, last_metadata_at=now,
-                active=True, created_by="auto",
+        if installation_id:
+            device = upsert_webreader_device(
+                owned,
+                user_id=user_id,
+                installation_id=installation_id,
+                secret_key=key,
             )
-            owned.add(device)
+            if device is None:
+                device = _ensure_legacy_webreader_device(
+                    owned, ub, user_id=user_id,
+                )
+        else:
+            device = _ensure_legacy_webreader_device(
+                owned, ub, user_id=user_id,
+            )
+        if device is None:
+            return None
+        device_id = device.id
         owned.commit()
-        return device.id
+        return device_id
     except Exception:
         if owned is not None:
             try:

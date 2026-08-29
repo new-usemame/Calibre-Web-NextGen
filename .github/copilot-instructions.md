@@ -159,7 +159,7 @@ Enhanced OAuth 2.0/OIDC in `cps/oauth_bb.py`:
 ### Kobo Sync Integration
 `cps/kobo.py` + `cps/kosync.py`:
 - **Kobo device sync**: Native Calibre-Web functionality, syncs reading positions
-- **KOReader sync**: Custom CWA feature, RFC 7617 auth, plugin in `koreader/plugins/cwasync.koplugin/`
+- **KOReader sync**: Custom CWA feature, RFC 7617 auth, plugin in `koreader/plugins/cwngsync.koplugin/`
 - **Plugin delivery**: `koplugin.zip` built during Docker image creation, served at `/kosync` endpoint
 
 ### Metadata Provider System

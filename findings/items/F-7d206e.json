@@ -1,0 +1,17 @@
+{
+  "area": "spa",
+  "body": "Found while auditing every compositor-property animation in `frontend/src/`\n(the SVG-target compositing sweep, PR fix/spa-svg-animation-main-thread).\n\nCOUNTED FROM THE FILES, 2026-08-18, by matching every class whose rule carries\n`animation: … infinite` and then checking whether a\n`@media (prefers-reduced-motion: reduce)` block in the same module sets\n`animation: none` for it. Eight modules carry an infinite animation.\n\nSeven of them are LOADING SPINNERS. Four switch off under reduced motion:\n\n- `frontend/src/components/DiscoverSection.module.css` — `.spin`\n- `frontend/src/pages/Catalog.module.css` — `.refreshIconSpin`\n- `frontend/src/pages/CoverPicker.module.css` — `.spin`\n- `frontend/src/pages/Duplicates.module.css` — `.spinning`\n\nThree do NOT:\n\n- `frontend/src/components/Spinner.module.css` — `.ring`\n  (`spin 0.7s linear infinite`). This is the SHARED `<Spinner>` / `<SpinnerCentered>`\n  component — the most widely used loading indicator in the SPA — so it is the\n  biggest of the three, not a corner case.\n- `frontend/src/pages/Reader.module.css` — `.spin` (`spin 0.9s linear infinite`)\n- `frontend/src/pages/Upload.module.css` — `.spin` (`spin 0.9s linear infinite`)\n\nThe eighth module is `frontend/src/components/HelpBanner.module.css` — `.arrow`,\nthe announcement-banner nudge. It is NOT a loading spinner and it DOES honour\nreduced motion; it is listed here only so the count above is reproducible.\n\nAn earlier version of this entry said \"six modules, four honour, two do not\".\nThat was wrong twice: it counted HelpBanner as a spinner module, and it missed\n`components/Spinner.module.css` entirely — i.e. it missed the single most-used\nspinner in the app. Corrected 2026-08-18 by deriving the lists from the files\nrather than from memory of the sweep.\n\nNot fixed in that PR on purpose: whether a *loading* spinner should stop under\nreduced-motion is a product call, not a mechanical one (a still spinner conveys\nless state), and that PR is a perf change that must not smuggle in a behaviour\nchange. But the fork is currently inconsistent with itself in both directions,\nwhich is the part that is certainly wrong. Pick one rule and apply it to all\nseven.\n",
+  "created": "2026-08-18",
+  "id": "F-7d206e",
+  "refs": [],
+  "resolution": {
+    "commit": "202b88422",
+    "date": "2026-08-19",
+    "note": "",
+    "release": ""
+  },
+  "severity": "ux",
+  "source": "audit",
+  "status": "resolved",
+  "title": "SPA loading spinners: 4 of 7 honour prefers-reduced-motion, 3 do not (incl. the shared Spinner)"
+}

@@ -75,7 +75,7 @@
       {% endfor %}
     </tbody>
   </table>
-    <button class="btn btn-danger" type="submit">
+    <button class="btn btn-danger" type="submit" data-confirm="{{ _('Archive the selected books on the next Kobo sync?') }}" onclick="return confirm(this.dataset.confirm);">
       {{ _('Archive selected books on the next Kobo sync') }}
     </button>
   </form>

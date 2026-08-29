@@ -117,6 +117,7 @@ export function GlobalLibrary() {
               const owned = book.in_my_library !== false;
               return <BookCard key={book.id} book={book} membership={owned ? 'owned' : 'unowned'}
                 detailsEnabled={owned}
+                canRead={owned && !!me?.role?.viewer}
                 hideActions={cardActionsHidden}
                 onAddToLibrary={owned ? undefined : addBook}
                 addPending={add.isPending && add.variables === book.id} />;

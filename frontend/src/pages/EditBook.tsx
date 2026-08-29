@@ -12,12 +12,13 @@ import { MetadataTypeahead } from '../components/MetadataTypeahead';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { StarRating } from '../components/StarRating';
+import { RichTextEditor } from '../components/RichTextEditor';
 import type { MetadataUpdate, MetaResult, EditableCustomColumn } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './EditBook.module.css';
-import { canUploadBooks } from '../lib/permissions';
+import { canDownloadBooks, canUploadBooks } from '../lib/permissions';
 
 interface Ident { type: string; val: string }
 
@@ -307,10 +308,18 @@ export function EditBook({ id }: { id: string }) {
           </Field>
         </div>
 
-        <Field label={t('Description')} error={fieldErrors.comments}>
-          <textarea className={styles.textarea} rows={8} value={form.comments}
-            onChange={(e) => set('comments', e.target.value)} />
-          <span className={styles.hint}>{t('HTML is allowed and sanitized on display.')}</span>
+        {/* #919 — the classic edit page has a formatting editor here (TinyMCE on
+            #comments); the New UI shipped a bare textarea, so descriptions read
+            as raw HTML with no preview. */}
+        {/* composite: the editor owns its own buttons, and a wrapping <label>
+            forwards clicks to its first labellable descendant — the same
+            destructive activation that made the rating widget look dead in
+            #1061. It also polluted the toolbar buttons' accessible names with
+            the whole field's text. */}
+        <Field label={t('Description')} error={fieldErrors.comments} composite>
+          <RichTextEditor value={form.comments} onChange={(html) => set('comments', html)}
+            ariaLabel={t('Description')} />
+          <span className={styles.hint}>{t('Formatting is kept where the book page supports it.')}</span>
         </Field>
 
         {/* Identifiers table (ISBN/ASIN/…) — fork #580. */}
@@ -792,6 +801,8 @@ function FormatsManager({ id }: { id: string }) {
   const targets = convertOptions?.targets ?? [];
   if (!book) return null;
   const canDelete = !!me?.role?.delete_books;
+  const isLastFormat = book!.formats.length === 1;
+  const lastFormatReasonId = `last-format-delete-reason-${id}`;
   // #1288: "Add a format" POSTs to /api/v1/books/<id>/formats, which requires
   // role_upload and now honours the admin's "Enable Uploads" switch. Gate the
   // control on the same pair, or the switch turns a hidden button into a 403.
@@ -835,22 +846,39 @@ function FormatsManager({ id }: { id: string }) {
         {book!.formats.map((f) => (
           <li key={f.format} className={styles.formatItem}>
             <span className={styles.formatName}>{f.format}</span>
-            <a className={styles.formatDownload} href={resourceUrl(f.download_url)} download target="_blank" rel="noopener">{t('Download')}</a>
+            {canDownloadBooks(me) && (
+              <a className={styles.formatDownload} href={resourceUrl(f.download_url)} download target="_blank" rel="noopener">{t('Download')}</a>
+            )}
             {canDelete && (
               <button className={styles.formatDelete}
                 onClick={() => {
                   if (window.confirm(t('Delete the {fmt} file? The book stays; only this format is removed.', { fmt: f.format }))) {
-                    deleteFormat.mutate(f.format);
+                    setMsg(null);
+                    deleteFormat.mutate(f.format, {
+                      onSuccess: (result) => setMsg(result?.warning
+                        ? { ok: false, text: result.warning.message }
+                        : { ok: true, text: t('Format deleted.') }),
+                      onError: (err) => setMsg({
+                        ok: false,
+                        text: err instanceof ApiError ? err.message : t('Could not delete this format.'),
+                      }),
+                    });
                   }
                 }}
-                disabled={deleteFormat.isPending}
+                disabled={deleteFormat.isPending || isLastFormat}
+                aria-describedby={isLastFormat ? lastFormatReasonId : undefined}
                 aria-label={t('Delete {fmt}', { fmt: f.format })}>
-                <Trash2 size={14} />
+                <Trash2 size={14} aria-hidden="true" focusable={false} />
               </button>
             )}
           </li>
         ))}
       </ul>
+      {canDelete && isLastFormat && (
+        <p id={lastFormatReasonId} className={styles.formatDeleteReason}>
+          {t('A book must keep at least one format.')}
+        </p>
+      )}
 
       {sources.length > 0 && availableTargets.length > 0 && (
         <form className={styles.convertForm} onSubmit={onConvert}>

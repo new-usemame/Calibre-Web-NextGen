@@ -21,6 +21,8 @@ import {
   DEFAULT_HIT_CAP, MIN_QUERY_LENGTH, searchBook, type SearchHit,
 } from '../lib/reader/searchBook';
 import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
+import { getReaderContentUrl } from '../lib/readerTarget';
 import styles from './Reader.module.css';
 
 // Highlight colors as ARIA/label keys (SC 1.4.1: a color must never be conveyed
@@ -171,7 +173,7 @@ const FONT_FAMILY: Record<ReaderSettings['font'], string> = {
 };
 
 function loadTheme(): ReaderTheme {
-  const v = localStorage.getItem(LS_THEME);
+  const v = safeLocalStorageGet(LS_THEME);
   if (v === 'light' || v === 'sepia' || v === 'dark' || v === 'black') return v;
   // First reader visit follows the already-resolved per-user app palette.
   // Thereafter the reader's explicit page-theme choice remains independent.
@@ -181,7 +183,7 @@ function loadTheme(): ReaderTheme {
   return 'dark';
 }
 function loadFont(): number {
-  const v = Number(localStorage.getItem(LS_FONT));
+  const v = Number(safeLocalStorageGet(LS_FONT));
   return v >= FONT_MIN && v <= FONT_MAX ? v : 100;
 }
 
@@ -337,6 +339,9 @@ export function Reader({ id }: { id: string }) {
   } | null>(null);
 
   const epubFormat = book?.formats.find((f) => f.format.toLowerCase() === 'epub');
+  const epubContentUrl = epubFormat
+    ? getReaderContentUrl(id, epubFormat.format, epubFormat.content_url)
+    : null;
 
   // C10: the TOC drawer and highlight popovers are overlays — trap focus while
   // open, restore on close, Escape closes (hooks run unconditionally every render).
@@ -558,7 +563,7 @@ export function Reader({ id }: { id: string }) {
       const created = await apiPost<Partial<AnnRow>>(`/annotations/${id}`, {
         cfi_range: cfiRange, highlighted_text: text, highlight_color: color,
         ...(note ? { note_text: note } : {}),
-      });
+      }, { webreaderDevice: true });
       const newId = created?.annotation_id ?? '';
       if (note && newId) notesRef.current.set(newId, note);
       setAnnList((rows) => [...rows, {
@@ -640,7 +645,7 @@ export function Reader({ id }: { id: string }) {
       try {
         const created = await apiPost<Partial<AnnRow>>(`/annotations/${id}`, {
           position_type: 'unanchored', note_text: note,
-        });
+        }, { webreaderDevice: true });
         setAnnList((rows) => [...rows, {
           annotation_id: created?.annotation_id ?? '',
           cfi_range: null,
@@ -661,7 +666,8 @@ export function Reader({ id }: { id: string }) {
     }
     if (!c.annotationId) return;
     try {
-      await apiPatch(`/annotations/${id}/${c.annotationId}`, { note_text: note });
+      await apiPatch(`/annotations/${id}/${c.annotationId}`, { note_text: note },
+        { webreaderDevice: true });
       if (note) notesRef.current.set(c.annotationId, note);
       else notesRef.current.delete(c.annotationId);
       setAnnList((rows) => rows.map((r) =>
@@ -774,7 +780,7 @@ export function Reader({ id }: { id: string }) {
     if (!hl) return;
     setActiveHl(null);
     try {
-      await apiDelete(`/annotations/${id}/${hl.id}`);
+      await apiDelete(`/annotations/${id}/${hl.id}`, { webreaderDevice: true });
       notesRef.current.delete(hl.id);
       setAnnList((rows) => rows.filter((r) => r.annotation_id !== hl.id));
       try { renditionRef.current?.annotations?.remove(hl.cfiRange, 'highlight'); } catch { /* noop */ }
@@ -791,7 +797,8 @@ export function Reader({ id }: { id: string }) {
     setActiveHl(null);
     if (hl.color === color) return;
     try {
-      await apiPatch(`/annotations/${id}/${hl.id}`, { highlight_color: color });
+      await apiPatch(`/annotations/${id}/${hl.id}`, { highlight_color: color },
+        { webreaderDevice: true });
       setAnnList((rows) => rows.map((r) =>
         r.annotation_id === hl.id ? { ...r, highlight_color: color } : r));
       // Recolouring must not silently drop the note marker.
@@ -987,7 +994,7 @@ export function Reader({ id }: { id: string }) {
 
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
-    if (!epubFormat || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
+    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
     let cancelled = false;
     setRendered(false);
     setRenderError(null);
@@ -999,7 +1006,7 @@ export function Reader({ id }: { id: string }) {
       try {
         // Fetch the .epub ourselves (same-origin cookie auth) and hand epub.js
         // an ArrayBuffer — reliable archive open regardless of the URL extension.
-        const res = await fetch(resourceUrl(epubFormat.download_url), { credentials: 'include' });
+        const res = await fetch(resourceUrl(epubContentUrl), { credentials: 'include' });
         if (!res.ok) throw new Error(t('Could not load the book file ({status})', { status: res.status }));
         const buf = await res.arrayBuffer();
         if (cancelled) return;
@@ -1131,7 +1138,7 @@ export function Reader({ id }: { id: string }) {
             `/api/v1/books/${id}/bookmark`,
             pct != null ? { format: 'epub', bookmark: cfi, percentage: pct }
                         : { format: 'epub', bookmark: cfi },
-            { keepalive: true },
+            { keepalive: true, webreaderDevice: true },
           );
         }
       }
@@ -1142,16 +1149,16 @@ export function Reader({ id }: { id: string }) {
     };
     // Re-render only when the source changes; theme/font are applied imperatively.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epubFormat?.download_url, isBookmarkFetched, isSettingsFetched, settingsHydrated]);
+  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, settingsHydrated]);
 
   // Apply theme / font changes to a live rendition without rebuilding it, and
   // remember the preference across sessions.
   useEffect(() => {
-    localStorage.setItem(LS_THEME, theme);
+    safeLocalStorageSet(LS_THEME, theme);
     applyTheme(theme);
   }, [theme, applyTheme]);
   useEffect(() => {
-    localStorage.setItem(LS_FONT, String(fontPct));
+    safeLocalStorageSet(LS_FONT, String(fontPct));
     applyTypography();
   }, [fontPct, fontFamily, margin, lineHeight, applyTypography]);
 
@@ -1197,7 +1204,7 @@ export function Reader({ id }: { id: string }) {
   if (isLoading) {
     return (
       <div className={styles.fullCenter}>
-        <Loader2 className={styles.spin} size={36} />
+        <span className={styles.spin}><Loader2 size={36} /></span>
       </div>
     );
   }
@@ -1317,7 +1324,7 @@ export function Reader({ id }: { id: string }) {
             </label>
             <p className={styles.searchStatus} role="status">
               {searching ? (
-                <><Loader2 className={styles.spin} size={16} aria-hidden="true" focusable={false} />
+                <><span className={styles.spin}><Loader2 size={16} aria-hidden="true" focusable={false} /></span>
                   {t('Searching this book…')}</>
               ) : searchError ? searchError
                 : searchComplete && searchTruncated
@@ -1540,7 +1547,7 @@ export function Reader({ id }: { id: string }) {
 
         {!rendered && !renderError && (
           <div className={styles.viewerOverlay}>
-            <Loader2 className={styles.spin} size={32} />
+            <span className={styles.spin}><Loader2 size={32} /></span>
           </div>
         )}
         {renderError && (

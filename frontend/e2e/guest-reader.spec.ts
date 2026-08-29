@@ -67,6 +67,7 @@ const BOOK = {
     size_bytes: 437148,
     download_url: '/download/2/epub/The Picture of Dorian Gray - Oscar Wilde',
     read_url: '/read/2/epub',
+    content_url: '/show/2/epub',
   }],
   read: false,
   archived: false,
@@ -107,7 +108,7 @@ async function browseAsGuest(page: Page) {
   // Serve the book itself from a fixture: the assertion is about the reader
   // starting, and a download that depends on the container's library contents
   // would fail for reasons that have nothing to do with #1074.
-  await page.route('**/download/**', (route) => route.fulfill({
+  await page.route('**/show/**', (route) => route.fulfill({
     status: 200, contentType: 'application/epub+zip', path: EPUB_FIXTURE }));
 }
 

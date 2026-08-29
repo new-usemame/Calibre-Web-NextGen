@@ -804,7 +804,16 @@ def set_cwa_settings():
         string_settings.append(f"convert_retained_{format}")
 
     if request.method == 'POST':
-        if request.form['submit_button'] == "Submit":
+        action = request.form.get('settings_action')
+        if action is None:
+            # Compatibility for forms rendered before the action values were
+            # decoupled from their English display labels (#1694).
+            action = {
+                "Submit": "save",
+                "Apply Default Settings": "reset",
+            }.get(request.form.get('submit_button'))
+
+        if action == "save":
             result = {"auto_convert_ignored_formats":[], "auto_ingest_ignored_formats":[], "auto_convert_retained_formats":[]}
             # set boolean_settings
             for setting in boolean_settings:
@@ -1068,7 +1077,7 @@ def set_cwa_settings():
                     "KOReader sync disabled: checksum backfill will stop after container restart."
                 )
 
-        elif request.form['submit_button'] == "Apply Default Settings":
+        elif action == "reset":
             cwa_db = CWA_DB()
             duplicate_criteria_changed = False
             try:

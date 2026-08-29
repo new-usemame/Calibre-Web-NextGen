@@ -192,7 +192,7 @@ def test_mark_unread_removes_all_kosync_keys_and_get_has_no_stale_progress(
 @pytest.mark.unit
 def test_plugin_classifies_higher_remote_percentage_as_forward_progress():
     """A device clock must not turn a higher remote percentage into 'backward'."""
-    source = (REPO_ROOT / "koreader" / "plugins" / "cwasync.koplugin"
+    source = (REPO_ROOT / "koreader" / "plugins" / "cwngsync.koplugin"
               / "main.lua").read_text(encoding="utf-8")
     expected = """if body.percentage > percentage then
                 self_older = true

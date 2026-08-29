@@ -168,6 +168,8 @@ def test_backfill_is_composite_idempotent_preserves_sync_rows_and_skips_gdrive(m
 def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
     from cps.tasks import kepub_backfill
 
+    database_instances = []
+
     class Query:
         def distinct(self): return self
         def all(self): return [(1,), (2,)]
@@ -177,7 +179,9 @@ def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
         def close(self): pass
 
     class CalibreDB:
-        def __init__(self, **_): self.session = SimpleNamespace(close=lambda: None)
+        def __init__(self, **_):
+            self.session = SimpleNamespace(close=lambda: None)
+            database_instances.append(self)
         def get_book(self, book_id): return SimpleNamespace(id=book_id, path=str(book_id), title=str(book_id))
         def get_book_format(self, book_id, fmt):
             return SimpleNamespace(format=fmt, name="book") if fmt == "EPUB" else None
@@ -201,16 +205,23 @@ def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
     monkeypatch.setattr(kepub_backfill.config, "config_kepubifypath", "/bin/kepubify", raising=False)
     monkeypatch.setattr(kepub_backfill.config, "config_kobo_kepub_backfill_completed", False, raising=False)
     monkeypatch.setattr(kepub_backfill.config, "get_book_path", lambda: "/books", raising=False)
-    monkeypatch.setattr(kepub_backfill.config, "save", lambda: saved.append(True), raising=False)
+    monkeypatch.setattr(
+        kepub_backfill.config,
+        "save",
+        lambda: saved.append(
+            kepub_backfill.config.config_kobo_kepub_backfill_completed),
+        raising=False,
+    )
 
     task = kepub_backfill.TaskKepubBackfill()
     task.run(None)
 
     assert attempted == [1, 2]
+    assert len(database_instances) == 1
     assert task.failed == 1
     assert task.converted == 1
-    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is True
-    assert saved == [True]
+    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is False
+    assert saved == [False]
 
 
 def test_conversion_advances_modified_without_touching_synced_rows(monkeypatch):

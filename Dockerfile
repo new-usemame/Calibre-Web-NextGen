@@ -374,21 +374,21 @@ RUN \
   /app/calibre-web-automated/scripts/setup-cwa.sh && \
   # STEP 7.3 - Create koplugin.zip from KOReader plugin folder
   echo "~~~~ Creating koplugin.zip from KOReader plugin folder... ~~~~" && \
-  if [ -d "/app/calibre-web-automated/koreader/plugins/cwasync.koplugin" ]; then \
+  if [ -d "/app/calibre-web-automated/koreader/plugins/cwngsync.koplugin" ]; then \
   cd /app/calibre-web-automated/koreader/plugins && \
   # Calculate digest of all files in the plugin for debugging purposes
   echo "Calculating digest of plugin files..." && \
-  PLUGIN_DIGEST=$(find cwasync.koplugin -type f -name "*.lua" -o -name "*.json" | sort | xargs sha256sum | sha256sum | cut -d' ' -f1) && \
+  PLUGIN_DIGEST=$(find cwngsync.koplugin -type f -name "*.lua" -o -name "*.json" | sort | xargs sha256sum | sha256sum | cut -d' ' -f1) && \
   echo "Plugin digest: $PLUGIN_DIGEST" && \
   # Create a file named after the digest inside the plugin folder
-  echo "Plugin files digest: $PLUGIN_DIGEST" > cwasync.koplugin/${PLUGIN_DIGEST}.digest && \
-  echo "Build date: $(date)" >> cwasync.koplugin/${PLUGIN_DIGEST}.digest && \
-  echo "Files included:" >> cwasync.koplugin/${PLUGIN_DIGEST}.digest && \
-  find cwasync.koplugin -type f -name "*.lua" -o -name "*.json" | sort >> cwasync.koplugin/${PLUGIN_DIGEST}.digest && \
-  zip -r koplugin.zip cwasync.koplugin/ && \
-  echo "Created koplugin.zip from cwasync.koplugin folder with digest file: ${PLUGIN_DIGEST}.digest"; \
+  echo "Plugin files digest: $PLUGIN_DIGEST" > cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  echo "Build date: $(date)" >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  echo "Files included:" >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  find cwngsync.koplugin -type f -name "*.lua" -o -name "*.json" | sort >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  zip -r koplugin.zip cwngsync.koplugin/ && \
+  echo "Created koplugin.zip from cwngsync.koplugin folder with digest file: ${PLUGIN_DIGEST}.digest"; \
   else \
-  echo "Warning: cwasync.koplugin folder not found, skipping zip creation"; \
+  echo "Warning: cwngsync.koplugin folder not found, skipping zip creation"; \
   fi && \
   # STEP 7.4 - Move koplugin.zip to static directory
   if [ -f "/app/calibre-web-automated/koreader/plugins/koplugin.zip" ]; then \

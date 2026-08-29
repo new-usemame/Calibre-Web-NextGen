@@ -30,7 +30,7 @@ THE VOCABULARY, AND WHERE EACH WORD COMES FROM
 ``highlight`` and ``dogear`` are **the device's own words**, not this project's.
 ``KoboReader.sqlite`` stores them in ``Bookmark.Type``; the KOReader plugin both
 writes ``Type = "highlight"`` and selects ``WHERE Type = 'highlight'``
-(``koreader/plugins/cwasync.koplugin/kobo_sqlite_provider.lua``); and the Kobo
+(``koreader/plugins/cwngsync.koplugin/kobo_sqlite_provider.lua``); and the Kobo
 sync payload uses ``"highlight"`` for the same thing. So a web-reader highlight
 being called ``highlight`` is not an invention — it is the same word for the same
 object.

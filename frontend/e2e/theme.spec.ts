@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { webreaderInstallationId } from '../src/lib/deviceIdentity';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../src/lib/safeStorage';
 import { DEFAULT_THEME, resolveTheme } from '../src/lib/themes';
 
 test.describe('theme logic', () => {
@@ -8,6 +10,28 @@ test.describe('theme logic', () => {
     expect(resolveTheme('system')).toBe('dark'); // Node has no matchMedia.
     expect(resolveTheme(undefined)).toBe(DEFAULT_THEME);
     expect(resolveTheme('not-a-theme')).toBe(DEFAULT_THEME);
+  });
+
+  test('storage SecurityError degrades reader preferences and identity safely', () => {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        crypto: { randomUUID: () => '55555555-5555-4555-8555-555555555555' },
+        localStorage: {
+          getItem: () => { throw new DOMException('Storage disabled', 'SecurityError'); },
+          setItem: () => { throw new DOMException('Storage disabled', 'SecurityError'); },
+        },
+      },
+    });
+    try {
+      expect(safeLocalStorageGet('cwng.reader.theme')).toBeNull();
+      expect(safeLocalStorageSet('cwng.reader.font', '100')).toBe(false);
+      expect(webreaderInstallationId()).toBeNull();
+    } finally {
+      if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+      else delete (globalThis as { window?: unknown }).window;
+    }
   });
 });
 

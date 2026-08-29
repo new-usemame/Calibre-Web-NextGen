@@ -161,6 +161,7 @@
 }
 .formatDelete::before { content: ''; position: absolute; inset: -1px; }
 .formatDelete:hover:not(:disabled) { color: var(--danger); }
+.formatDeleteReason { color: var(--text-muted); font-size: var(--fs-sm); margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); }
 .convertForm { display: flex; align-items: flex-end; gap: var(--sp-3); flex-wrap: wrap; }
 .convertToLabel { font-size: var(--fs-sm); color: var(--text-muted); padding-bottom: calc(var(--sp-2) + 1px); }
 

@@ -1724,6 +1724,88 @@ def test_admin_resend_clears_target_users_entitlement_ledger(
     } == {sync_harness.device.id, other_device.id}
 
 
+def test_self_resend_clears_only_callers_entitlement_ledger(
+    sync_harness, monkeypatch,
+):
+    """A non-admin can resend their own book without touching another user."""
+    from cps import admin, ub
+
+    sync_harness.sync()
+    second_target_device = _seed_same_user_device_ledger(sync_harness)
+    other_device = _seed_other_user_ledger(sync_harness)
+    monkeypatch.setattr(admin, "calibre_db", sync_harness.calibre_db)
+    monkeypatch.setattr(admin, "_", lambda value: value)
+    monkeypatch.setattr(admin, "current_user", SimpleNamespace(
+        id=sync_harness.user.id,
+        role_admin=lambda: False,
+    ))
+
+    with sync_harness.app.test_request_context(
+        f"/ajax/kobo_resend/{sync_harness.user.id}/{sync_harness.book.id}",
+        method="POST",
+    ):
+        response = admin.ajax_kobo_resend.__wrapped__(
+            sync_harness.user.id, sync_harness.book.id,
+        )
+
+    assert response.status_code == 200
+    assert sync_harness.session.query(ub.KoboSyncedBooks).filter_by(
+        user_id=sync_harness.user.id, book_id=sync_harness.book.id,
+    ).count() == 0
+    assert sync_harness.session.query(ub.KoboSyncedBooks).filter_by(
+        user_id=18, book_id=sync_harness.book.id,
+    ).count() == 1
+    assert {
+        row.device_id
+        for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
+    } == {other_device.id}
+    assert second_target_device.id != other_device.id
+
+
+def test_user_cannot_resend_or_clear_another_users_ledger(
+    sync_harness, monkeypatch,
+):
+    """The route rejects the forged user ID before any resend write occurs."""
+    from werkzeug.exceptions import Forbidden
+
+    from cps import admin, ub
+
+    sync_harness.sync()
+    other_device = _seed_other_user_ledger(sync_harness)
+    monkeypatch.setattr(admin, "calibre_db", sync_harness.calibre_db)
+    monkeypatch.setattr(admin, "current_user", SimpleNamespace(
+        id=sync_harness.user.id,
+        role_admin=lambda: False,
+    ))
+    before_modified = sync_harness.book.last_modified
+    before_synced = {
+        (row.user_id, row.book_id)
+        for row in sync_harness.session.query(ub.KoboSyncedBooks)
+    }
+    before_ledgers = {
+        (row.device_id, row.book_id)
+        for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
+    }
+
+    with sync_harness.app.test_request_context(
+        f"/ajax/kobo_resend/18/{sync_harness.book.id}", method="POST",
+    ):
+        with pytest.raises(Forbidden) as raised:
+            admin.ajax_kobo_resend.__wrapped__(18, sync_harness.book.id)
+
+    assert raised.value.code == 403
+    assert sync_harness.book.last_modified == before_modified
+    assert {
+        (row.user_id, row.book_id)
+        for row in sync_harness.session.query(ub.KoboSyncedBooks)
+    } == before_synced
+    assert {
+        (row.device_id, row.book_id)
+        for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
+    } == before_ledgers
+    assert (other_device.id, sync_harness.book.id) in before_ledgers
+
+
 def test_admin_resend_missing_book_preserves_all_sync_state(
     sync_harness, monkeypatch,
 ):

@@ -58,7 +58,8 @@ from .services.kobo_reconcile import (
 )
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
-from .cw_babel import get_available_translations, get_available_locale, get_user_locale_language
+from .cw_babel import (get_available_translations, get_available_locale,
+                       get_user_locale_language, sanitize_locale_for_write)
 from . import debug_info
 from .string_helper import strip_whitespaces
 from .sqlite_utils import copy_sqlite_database
@@ -964,8 +965,11 @@ def edit_list_user(param):
                 elif param == 'locale':
                     if user.name == "Guest":
                         raise Exception(_("Guest's Locale is determined automatically and can't be set"))
-                    if vals['value'] in get_available_translations():
-                        user.locale = vals['value']
+                    # One mechanism for every locale write, so the four sites
+                    # cannot drift apart again (F-011141).
+                    validated_locale = sanitize_locale_for_write(vals['value'])
+                    if validated_locale:
+                        user.locale = validated_locale
                     else:
                         raise Exception(_("No Valid Locale Given"))
                 elif param == 'default_language':
@@ -1449,8 +1453,11 @@ def do_full_kobo_sync(userid):
 
 @admi.route("/ajax/kobo_resend/<int:userid>/<int:bookid>", methods=["POST"])
 @user_login_required
-@admin_required
 def ajax_kobo_resend(userid, bookid):
+    # Same IDOR guard as the Kobo token routes: a user may act only on their
+    # own device state, while admins retain the existing targeted action.
+    if current_user.id != userid and not current_user.role_admin():
+        abort(403)
     return do_kobo_resend(userid, bookid)
 
 
@@ -1465,7 +1472,7 @@ def do_kobo_resend(userid, bookid):
     #     up regardless of where the device's cursor sits;
     #   * clear the (user_id, book_id) row from kobo_synced_books;
     #   * clear every per-device entitlement fingerprint for this user/book,
-    #     otherwise Layer 2 can suppress the admin-requested replay as an exact
+    #     otherwise Layer 2 can suppress the requested replay as an exact
     #     match even though last_modified selected it for delivery.
     #
     # ⚠️ This comment used to say the deletion is what makes the sync emit
@@ -1487,7 +1494,7 @@ def do_kobo_resend(userid, bookid):
     # any other synced row remaining, this emits ChangedEntitlement.
     #
     # 🚨 Whether a Kobo re-downloads the file on a ChangedEntitlement is
-    # UNOBSERVED (F-3e383a). The success message below tells the admin the
+    # UNOBSERVED (F-3e383a). The success message below tells the requester the
     # device "will re-receive the book"; that claim is only established for the
     # empty-table case above. Do not strengthen it without measuring on
     # hardware.
@@ -3098,7 +3105,11 @@ def _db_configuration_result(error_flash=None, gdrive_error=None):
 
 def _handle_new_user(to_save, content, languages, translations, kobo_support):
     content.default_language = to_save["default_language"]
-    content.locale = to_save.get("locale", content.locale)
+    # Only a locale we ship may be stored: get_locale() returns it verbatim
+    # on every later request (F-011141).
+    validated_locale = sanitize_locale_for_write(to_save.get("locale"))
+    if validated_locale:
+        content.locale = validated_locale
 
     content.sidebar_view = sum(int(key[5:]) for key in to_save if key.startswith('show_'))
     if "show_detail_random" in to_save:
@@ -3389,7 +3400,10 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
     if to_save.get("default_language"):
         content.default_language = to_save["default_language"]
     if to_save.get("locale"):
-        content.locale = to_save["locale"]
+        # Same rule as the ajax field editor above: assign only when we ship it.
+        validated_locale = sanitize_locale_for_write(to_save["locale"])
+        if validated_locale:
+            content.locale = validated_locale
     try:
         anonymous = content.is_anonymous
         content.role = constants.selected_roles(to_save)

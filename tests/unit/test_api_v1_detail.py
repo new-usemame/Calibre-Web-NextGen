@@ -73,6 +73,7 @@ def test_serialize_book_detail_full():
     assert fmt["size_bytes"] == 500_000
     assert fmt["download_url"] == "/download/42/epub/dune"
     assert fmt["read_url"] == "/read/42/epub"
+    assert fmt["content_url"] == "/show/42/epub"
     assert out["read"] is True
     assert out["archived"] is False
 

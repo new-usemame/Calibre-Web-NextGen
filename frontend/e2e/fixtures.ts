@@ -4,7 +4,12 @@ import {
   type BrowserContext,
   type Page,
 } from '@playwright/test';
-import { randomUUID } from 'node:crypto';
+import {
+  cleanupOwnedUser,
+  createOwnedUserIdentity,
+  recordCreatedUser,
+  registerOwnedUserIntent,
+} from './user-reaper';
 
 export interface SecondaryUserSession {
   id: number;
@@ -33,19 +38,22 @@ async function csrfToken(page: Page): Promise<string> {
 }
 
 export const test = base.extend<MultiUserFixtures>({
-  secondaryUser: [async ({ page: adminPage, browser, baseURL }, use, testInfo) => {
-    const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
-    const project = testInfo.project.name.replace(/[^a-z0-9]/gi, '-').slice(0, 12);
-    const username = `e2e-${project}-${testInfo.workerIndex}-${suffix}`;
+  secondaryUser: [async ({ page: adminPage, request: adminRequest, browser, baseURL }, use, testInfo) => {
+    if (!baseURL) throw new Error('secondaryUser requires Playwright use.baseURL');
+    const { username, email } = createOwnedUserIdentity(
+      testInfo.project.name,
+      testInfo.workerIndex,
+    );
+    const ownership = await registerOwnedUserIntent(baseURL, { username, email });
     // Keep every policy class deterministic. A UUID slice can (rarely) contain
     // only digits, which made the old generated password probabilistically
     // fail instances requiring a lowercase character.
-    const password = `Aa7!zY9@${suffix}`;
+    const password = `Aa7!zY9@${username.slice(-20)}`;
     const created = await adminPage.request.post('/api/v1/admin/users', {
       headers: { 'X-CSRFToken': await csrfToken(adminPage) },
       data: {
         name: username,
-        email: `${username}@example.test`,
+        email,
         password,
         roles: {
           admin: false,
@@ -60,6 +68,7 @@ export const test = base.extend<MultiUserFixtures>({
     });
     expect(created.status(), await created.text()).toBe(201);
     const { id } = (await created.json()) as { id: number };
+    await recordCreatedUser(ownership, id);
 
     let context: BrowserContext | undefined;
     try {
@@ -91,12 +100,12 @@ export const test = base.extend<MultiUserFixtures>({
       await use({ id, username, password, context, page: secondaryPage });
     } finally {
       await context?.close().catch(() => undefined);
-      const deleted = await adminPage.request.post(`/api/v1/admin/users/${id}/delete`, {
-        headers: { 'X-CSRFToken': await csrfToken(adminPage) },
-      });
-      expect(deleted.status(), await deleted.text()).toBe(204);
+      // The request fixture is independent of the page lifecycle. Cleanup is
+      // bounded and retried; on persistent failure its durable ownership record
+      // remains for global.setup.ts to retry on the next run.
+      await cleanupOwnedUser(adminRequest, ownership, id);
     }
-  }, { timeout: 15_000 }],
+  }, { timeout: 120_000 }],
 });
 
 export { expect } from '@playwright/test';

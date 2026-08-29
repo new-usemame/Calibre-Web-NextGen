@@ -116,6 +116,12 @@ test('personal state is isolated', async ({ page, secondaryUser }) => {
 });
 ```
 
+The fixture writes a durable ownership intent under the user's CWNG cache before
+creating the account. Its normal teardown deletes through an API request context
+that does not depend on the closing page. If the runner is killed, the next
+`global.setup.ts` run reclaims only exact registered accounts whose local owner
+PID is no longer alive; live parallel workers remain outside the deletion set.
+
 The fixture is test-scoped and lazy, so the existing suite creates no extra users and keeps using
 `e2e/.auth/state.json` unchanged. Parallel workers receive different usernames and contexts. Multi-user
 specs must mutate only per-user resources (personal shelves, hidden/read state, annotations) or use an

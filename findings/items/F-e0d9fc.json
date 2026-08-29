@@ -1,0 +1,11 @@
+{
+  "area": "frontend-e2e",
+  "body": "Measured on the shared cwn-local dev instance: secondary-user E2E accounts accumulated after interrupted runs. Page-bound CSRF work and a 15-second fixture budget could prevent ordinary finally cleanup, while process termination bypasses finally entirely. This failure mode survives any one teardown fix: suite-created users require durable pre-create ownership intent, an exact account identity binding, live-owner exclusion for concurrent runs, direct bounded cleanup on the common path, and setup-time recovery after the owning worker exits. Persistent delete failures must retain that ownership state and report deferred cleanup rather than silently leaking or failing unrelated product assertions.",
+  "created": "2026-08-29",
+  "id": "F-e0d9fc",
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "SPA E2E secondary-user fixtures leak accounts when teardown loses its page or the runner is killed"
+}

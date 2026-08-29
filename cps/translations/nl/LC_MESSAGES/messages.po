@@ -2917,18 +2917,32 @@ msgstr "Mijn bibliotheek voor alle gebruikers instellen"
 
 #: cps/spa_strings.py
 msgid ""
-"Set up My Library for every user? Each account switches to its own selection "
-"after it is filled with everything that account can currently see. Accounts "
-"set up before are never reseeded."
+"Set up My Library for every non-anonymous user? Each account switches to its "
+"own selection after it is filled with everything that account can currently "
+"see. Anonymous accounts such as Guest are left unchanged; use their per-user "
+"controls to set up a curated public library. Accounts set up before are never "
+"reseeded."
 msgstr ""
-"Mijn bibliotheek voor elke gebruiker instellen? Elk account schakelt over "
-"naar een eigen selectie nadat die is gevuld met alles wat het account nu kan "
-"zien. Eerder ingestelde accounts worden nooit opnieuw gevuld."
+"Mijn bibliotheek voor elke niet-anonieme gebruiker instellen? Elk account "
+"schakelt over naar een eigen selectie nadat die is gevuld met alles wat het "
+"account nu kan zien. Anonieme accounts zoals Guest blijven ongewijzigd; "
+"gebruik de instellingen per gebruiker om een samengestelde openbare "
+"bibliotheek in te stellen. Eerder ingestelde accounts worden nooit opnieuw "
+"gevuld."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Set up {accounts} accounts with {books} books. {errors} errors."
 msgstr "{accounts} accounts ingesteld met {books} boeken. {errors} fouten."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Left anonymous accounts unchanged: {accounts}. Use their per-user controls to "
+"set up a curated public library."
+msgstr ""
+"Anonieme accounts ongewijzigd gelaten: {accounts}. Gebruik de instellingen "
+"per gebruiker om een samengestelde openbare bibliotheek in te stellen."
 
 #: cps/spa_strings.py
 msgid ""

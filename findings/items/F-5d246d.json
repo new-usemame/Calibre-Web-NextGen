@@ -6,8 +6,14 @@
   "refs": [
     "#1939"
   ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-29",
+    "note": "Unscoped bulk migration now skips and reports anonymous accounts; explicitly scoped anonymous migration remains supported and idempotent.",
+    "release": ""
+  },
   "severity": "ux",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "'Set up My Library for all users' silently includes the anonymous Guest account, freezing the server's public catalogue"
 }

@@ -161,13 +161,20 @@ export function Admin() {
   };
 
   const migrateAll = () => {
-    if (!window.confirm(t('Set up My Library for every user? Each account switches to its own selection after it is filled with everything that account can currently see. Accounts set up before are never reseeded.'))) return;
+    if (!window.confirm(t('Set up My Library for every non-anonymous user? Each account switches to its own selection after it is filled with everything that account can currently see. Anonymous accounts such as Guest are left unchanged; use their per-user controls to set up a curated public library. Accounts set up before are never reseeded.'))) return;
     setBanner(null);
     migrateLibraries.mutate(undefined, {
-      onSuccess: (result) => setBanner({ ok: result.errors === 0,
-        text: t('Set up {accounts} accounts with {books} books. {errors} errors.', {
+      onSuccess: (result) => {
+        const summary = t('Set up {accounts} accounts with {books} books. {errors} errors.', {
           accounts: result.accounts, books: result.seeded_books, errors: result.errors,
-        }) }),
+        });
+        const skippedSummary = result.skipped_accounts > 0
+          ? ` ${t('Left anonymous accounts unchanged: {accounts}. Use their per-user controls to set up a curated public library.', {
+            accounts: result.skipped.map((row) => row.name).join(', '),
+          })}`
+          : '';
+        setBanner({ ok: result.errors === 0, text: `${summary}${skippedSummary}` });
+      },
       onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Update failed.') }),
     });
   };

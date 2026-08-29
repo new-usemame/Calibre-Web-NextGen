@@ -2771,14 +2771,23 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"Set up My Library for every user? Each account switches to its own "
-"selection after it is filled with everything that account can currently "
-"see. Accounts set up before are never reseeded."
+"Set up My Library for every non-anonymous user? Each account switches to its "
+"own selection after it is filled with everything that account can currently "
+"see. Anonymous accounts such as Guest are left unchanged; use their per-user "
+"controls to set up a curated public library. Accounts set up before are never "
+"reseeded."
 msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Set up {accounts} accounts with {books} books. {errors} errors."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Left anonymous accounts unchanged: {accounts}. Use their per-user controls to "
+"set up a curated public library."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -13155,4 +13164,3 @@ msgstr ""
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr ""
-

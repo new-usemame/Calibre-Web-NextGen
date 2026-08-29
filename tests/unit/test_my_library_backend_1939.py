@@ -462,6 +462,113 @@ def test_admin_migration_api_can_target_one_account(
     assert target_result["seeded_books"] == 0
     assert untouched.library_mode() == constants.LIBRARY_MODE_PERSONAL
 
+
+def test_admin_bulk_migration_skips_anonymous_account_and_reports_reruns(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+    from cps.api import admin as api_admin
+
+    administrator = ub.User(
+        name="bulk-admin", email="bulk-admin@example.invalid", password="",
+        role=constants.ROLE_ADMIN, default_language="all",
+    )
+    reader = _user(app_session, "bulk-reader", False)
+    guest = _user(app_session, "Guest", False)
+    guest.role = constants.ROLE_ANONYMOUS
+    app_session.add(administrator)
+    app_session.commit()
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(api_admin, "current_user", administrator)
+    app = Flask(__name__)
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST", json={}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    payload = response.get_json()
+
+    assert payload["accounts"] == 2
+    assert payload["errors"] == 0
+    assert payload["skipped_accounts"] == 1
+    assert {row["user_id"] for row in payload["results"]} == {
+        administrator.id, reader.id,
+    }
+    assert payload["skipped"] == [{
+        "user_id": guest.id,
+        "name": "Guest",
+        "status": "skipped_anonymous",
+        "seeded_books": 0,
+        "membership_count": 0,
+        "library_mode": constants.LIBRARY_MODE_MONOLIBRARY,
+    }]
+    assert reader.library_mode() == constants.LIBRARY_MODE_PERSONAL
+    assert guest.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+    assert guest.user_library_seeded is False
+    assert user_library.membership_count(guest.id, app_session) == 0
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST", json={}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    rerun = response.get_json()
+
+    assert rerun["accounts"] == 2
+    assert rerun["skipped_accounts"] == 1
+    assert all(row["seeded_books"] == 0 for row in rerun["results"])
+    assert rerun["skipped"] == payload["skipped"]
+    assert guest.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+    assert guest.user_library_seeded is False
+    assert user_library.membership_count(guest.id, app_session) == 0
+
+
+def test_admin_scoped_migration_can_switch_anonymous_account_once(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+    from cps.api import admin as api_admin
+
+    administrator = ub.User(
+        name="scoped-admin", email="scoped-admin@example.invalid", password="",
+        role=constants.ROLE_ADMIN, default_language="all",
+    )
+    guest = _user(app_session, "Guest", False)
+    guest.role = constants.ROLE_ANONYMOUS
+    app_session.add(administrator)
+    app_session.commit()
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(api_admin, "current_user", administrator)
+    app = Flask(__name__)
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST",
+            json={"user_id": guest.id}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    payload = response.get_json()
+
+    assert payload["accounts"] == 1
+    assert payload["skipped_accounts"] == 0
+    assert payload["skipped"] == []
+    assert payload["results"][0]["user_id"] == guest.id
+    assert payload["results"][0]["status"] == "switched"
+    assert payload["results"][0]["seeded_books"] == 3
+    assert guest.library_mode() == constants.LIBRARY_MODE_PERSONAL
+    assert guest.user_library_seeded is True
+    assert user_library.membership_count(guest.id, app_session) == 3
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST",
+            json={"user_id": guest.id}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    rerun = response.get_json()
+
+    assert rerun["accounts"] == 1
+    assert rerun["skipped_accounts"] == 0
+    assert rerun["skipped"] == []
+    assert rerun["results"][0]["status"] == "already_personal"
+    assert rerun["results"][0]["seeded_books"] == 0
+    assert rerun["results"][0]["membership_count"] == 3
+    assert user_library.membership_count(guest.id, app_session) == 3
+
+
 def test_admin_api_switches_named_mode_for_target_user(app_session, monkeypatch):
     from cps.api import admin as api_admin
 

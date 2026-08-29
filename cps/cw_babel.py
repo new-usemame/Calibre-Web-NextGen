@@ -22,6 +22,11 @@ def _coerce_locale(raw, available):
     translation for. Returns None on any failure — caller falls through."""
     if not raw:
         return None
+    if not isinstance(raw, str):
+        # JSON bodies can carry a number, list or object here; Locale.parse
+        # would raise AttributeError on .replace and 500 the request.
+        log.debug('Ignoring non-string locale of type %s', type(raw).__name__)
+        return None
     try:
         candidate = str(Locale.parse(raw.replace('-', '_')))
     except (UnknownLocaleError, ValueError) as e:
@@ -53,7 +58,20 @@ def get_locale():
     if current_user is not None and hasattr(current_user, "locale"):
         # if the account is the guest account bypass the config lang settings
         if current_user.name != 'Guest':
-            return current_user.locale
+            # F-011141: coerce the STORED value too, not just ?lang=. This is
+            # the security boundary, deliberately placed on the read side:
+            #   - it repairs rows written before validation existed;
+            #   - it covers every writer, including ones added later and the
+            #     provisioning paths (registration, LDAP, OAuth, reverse proxy)
+            #     that copy config_default_locale in without checking it;
+            #   - it survives a server dropping a translation it used to ship.
+            # Write-time validation still exists, but for data hygiene; a
+            # missed writer must not be able to break locale resolution.
+            stored = _coerce_locale(current_user.locale, available)
+            if stored:
+                return stored
+            # An unusable stored locale falls through to negotiation rather
+            # than 500ing or pinning the user to a language they cannot read.
 
     preferred = list()
     if request.accept_languages:
@@ -92,6 +110,47 @@ def get_locale():
 
 def get_user_locale_language(user_language):
     return Locale.parse(user_language).get_language_name(get_locale())
+
+
+def sanitize_locale_for_write(raw):
+    """Best-effort hygiene for a locale about to be stored.
+
+    Returns the normalised locale when we can confirm we ship it, ``None`` when
+    we can confirm we do not, and the value UNCHANGED when availability cannot
+    be determined at all.
+
+    That third case is deliberate and is the whole reason this helper exists.
+    "Available" is a runtime Flask-Babel property: it needs an app context with
+    the extension registered, which is absent in unit contexts and in some
+    provisioning paths.  Refusing a legitimate locale because we could not check
+    is a regression; storing an unchecked one is not, because ``get_locale()``
+    coerces on READ.  Write-side validation is hygiene, and hygiene must never
+    be able to break the thing it is tidying.
+    """
+    try:
+        available = get_available_translations()
+    except Exception as e:  # no app context, or Flask-Babel not registered
+        log.debug('Locale availability unknown (%s); storing unvalidated, '
+                  'get_locale() coerces on read', e)
+        return raw
+    return _coerce_locale(raw, available)
+
+
+def coerce_stored_locale(raw, available):
+    """Validate a locale that is about to be STORED on a user.
+
+    ``get_locale()`` returns ``current_user.locale`` verbatim, so whatever is
+    written here is what every later request resolves.  The ``?lang=``
+    per-request override has always been validated through the same coercion;
+    the stored value was not, which let any authenticated user persist an
+    arbitrary string as their own locale (F-011141).
+
+    Returns the normalised locale (``en-GB`` -> ``en_GB``) when we ship a
+    translation for it, and ``None`` otherwise so the caller can keep the value
+    it already had rather than storing something unusable.  Note that
+    *parseable* is not *available*: a well-formed tag we do not ship is refused.
+    """
+    return _coerce_locale(raw, available)
 
 
 def get_available_locale():

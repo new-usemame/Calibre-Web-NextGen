@@ -18,9 +18,13 @@ from ..helper import send_mail, valid_email
 from ..kobo_sync_status import change_archived_books, remove_synced_book
 from ..services import device_delivery
 
+BATCH_MEMBERSHIP_LIMIT = 200
 
-def _err(code, message, status):
-    return jsonify({"error": {"code": code, "message": message}}), status
+
+def _err(code, message, status, **details):
+    error = {"code": code, "message": message}
+    error.update(details)
+    return jsonify({"error": error}), status
 
 
 def _require_real_user():
@@ -104,6 +108,106 @@ def remove_book_from_my_library(book_id):
         "affected_shelves": shelves,
         "kobo_removal_on_next_sync": True,
         "reading_data_preserved": True,
+    })
+
+
+def _has_library_membership(user_id, book_id):
+    return (ub.session.query(ub.UserLibraryBook.id)
+            .filter(ub.UserLibraryBook.user_id == int(user_id),
+                    ub.UserLibraryBook.book_id == int(book_id))
+            .first()) is not None
+
+
+@api_v1.route("/books/my-library/batch", methods=["POST"])
+@login_required_if_no_ano
+def batch_my_library_membership():
+    """Apply ordered, independently reportable membership operations.
+
+    This is deliberately an HTTP batching layer over the single-book policy,
+    not a bulk database path: every id calls ``add_book`` or ``remove_book``.
+    Successful earlier items therefore stay committed when a later policy
+    check fails, exactly as they would across sequential single-book requests.
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _err(
+            "invalid_request", "A JSON object is required", 400
+        )
+    operation = data.get("operation")
+    if operation not in ("add", "remove"):
+        return _err(
+            "invalid_request", "operation must be 'add' or 'remove'", 400
+        )
+    book_ids = data.get("book_ids")
+    if not isinstance(book_ids, list) or not book_ids:
+        return _err(
+            "invalid_request", "book_ids must be a non-empty list", 400
+        )
+    if len(book_ids) > BATCH_MEMBERSHIP_LIMIT:
+        return _err(
+            "batch_too_large",
+            "book_ids accepts at most {} items".format(
+                BATCH_MEMBERSHIP_LIMIT
+            ),
+            400,
+            max_items=BATCH_MEMBERSHIP_LIMIT,
+        )
+    if any(type(book_id) is not int or book_id <= 0 for book_id in book_ids):
+        return _err(
+            "invalid_request", "book_ids must contain positive integers", 400
+        )
+
+    user_library.mark_response_user_specific()
+    user_id = int(current_user.id)
+    results = []
+    succeeded_ids = []
+    failed_ids = []
+    error_status = 403 if operation == "add" else 409
+
+    for book_id in book_ids:
+        was_member = _has_library_membership(user_id, book_id)
+        try:
+            if operation == "add":
+                user_library.add_book(current_user, book_id)
+                shelves = None
+            else:
+                shelves = user_library.remove_book(current_user, book_id)
+        except user_library.UserLibraryError as ex:
+            failed_ids.append(book_id)
+            results.append({
+                "book_id": book_id,
+                "status": "failed",
+                "error": {
+                    "code": "library_membership_rejected",
+                    "message": str(ex),
+                },
+                "http_status": error_status,
+            })
+            continue
+
+        is_member = _has_library_membership(user_id, book_id)
+        item = {
+            "book_id": book_id,
+            "status": "succeeded",
+            "changed": was_member != is_member,
+            "in_my_library": is_member,
+        }
+        if operation == "remove":
+            item["affected_shelves"] = shelves
+        succeeded_ids.append(book_id)
+        results.append(item)
+
+    return jsonify({
+        "operation": operation,
+        "results": results,
+        "succeeded_ids": succeeded_ids,
+        "failed_ids": failed_ids,
+        "succeeded": len(succeeded_ids),
+        "failed": len(failed_ids),
+        "partial_failure": bool(succeeded_ids and failed_ids),
     })
 
 

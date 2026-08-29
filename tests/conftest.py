@@ -463,11 +463,62 @@ def _isolate_pytest_tempdir():
     `test_802`'s. This promotes that workaround to the harness, and the local one
     can go once this has settled.
     """
-    root = os.path.join(tempfile.gettempdir(), "cwng-pytest", str(os.getpid()))
+    base = os.path.join(tempfile.gettempdir(), "cwng-pytest")
+    _reap_stale_pytest_tempdirs(base)
+    root = os.path.join(base, str(os.getpid()))
     os.makedirs(root, exist_ok=True)
     os.environ["TMPDIR"] = root
     tempfile.tempdir = root
     return root
+
+
+
+def _reap_stale_pytest_tempdirs(base, max_age_seconds=6 * 3600):
+    """Delete per-run temp dirs left behind by runs that are no longer alive.
+
+    Each run gets ``cwng-pytest/<pid>/`` and nothing ever removed it, so every
+    pytest invocation since this fixture landed leaked a directory; they had
+    accumulated to 8.4 GB on the developer machine before anyone noticed.
+
+    Reaping happens at STARTUP rather than at exit on purpose. A run that is
+    killed -- OOM, Ctrl-C, a timed-out CI job -- never reaches an exit hook, and
+    those are precisely the runs that leave the largest directories behind. A
+    cleanup that only runs on the happy path would not have prevented this.
+
+    Two independent conditions must both hold before anything is removed, so a
+    concurrently running suite is never touched: the owning pid must be gone,
+    and the directory must be older than ``max_age_seconds``. Parallel xdist
+    workers each own a live pid, and a sibling that exited seconds ago is still
+    protected by the age floor.
+
+    Never raises. Failing to tidy up is not a reason to fail someone's test run.
+    """
+    try:
+        entries = os.listdir(base)
+    except OSError:
+        return
+    now = time.time()
+    for name in entries:
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        if pid == os.getpid():
+            continue
+        path = os.path.join(base, name)
+        try:
+            if now - os.path.getmtime(path) < max_age_seconds:
+                continue
+        except OSError:
+            continue
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            pass          # owner is gone: reapable
+        except OSError:
+            continue      # e.g. EPERM -- another user's live process; leave it
+        else:
+            continue      # still running
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def pytest_configure(config):

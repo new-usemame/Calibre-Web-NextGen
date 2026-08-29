@@ -250,6 +250,14 @@ def test_committed_index_matches_a_regeneration_from_the_real_items():
     stay there until someone regenerates for an unrelated reason. This test is the thing
     that notices. It also catches the more mundane case of editing findings/items/ and
     forgetting to regenerate (F-4ec664).
+
+    Measured across five merges, the corruption needs BOTH sides to have moved the count
+    line since the merge base -- and the worst case is when both moved it to the SAME
+    text. Two sessions each adding one finding both write base+1, git sees them agree,
+    merges cleanly with no duplicate, and the result is one entirely normal-looking line
+    that is wrong because the truth is the union of both changes. That is the ordinary
+    case on a busy ledger, not a rare one, which is why this test recomputes from the
+    items instead of comparing text.
     """
     import importlib.util
 

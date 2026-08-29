@@ -136,6 +136,14 @@ def test_add_book_invalid_book_404():
 
 
 @pytest.mark.unit
+def test_add_book_not_in_library_409():
+    from cps.api import shelves as mod
+    resp = _add_with_core_status(mod.SHELF_NOT_IN_LIBRARY, "add it first")
+    assert resp[1] == 409
+    assert json.loads(resp[0].get_data())["error"]["code"] == "library_membership_required"
+
+
+@pytest.mark.unit
 def test_add_book_already_present_409():
     from cps.api import shelves as mod
     resp = _add_with_core_status(mod.SHELF_ALREADY_PRESENT, "dupe")

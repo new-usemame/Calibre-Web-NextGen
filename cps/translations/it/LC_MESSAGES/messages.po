@@ -2345,15 +2345,25 @@ msgstr ""
 "Spiacente, ma non sei autorizzato ad aggiungere libri a questo scaffale"
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr "Il libro è gia presente nello scaffale: %(shelfname)s"
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
 msgstr ""
-"%(book_id)s non è un valido ID libro. Impossibile aggiungerlo allo scaffale"
 
 #: cps/shelf.py
 #, python-format
@@ -13561,6 +13571,12 @@ msgstr "Sincronizza gli scaffali selezionati con Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
+
+#, python-format
+#~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+#~ msgstr ""
+#~ "%(book_id)s non è un valido ID libro. Impossibile aggiungerlo allo "
+#~ "scaffale"
 
 #, python-format
 #~ msgid "Generated %(count)s cover thumbnails"

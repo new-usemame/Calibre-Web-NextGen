@@ -834,9 +834,8 @@ def test_http_route_contract_is_registered():
     assert routes["/ajax/mylibrary/<int:book_id>/remove"] >= {"POST"}
 
 
-def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
-        monkeypatch):
-    """The enable transition must not turn already-synced books into removals."""
+def _exercise_seed_on_enable_kobo_sync(monkeypatch, *, wire_contract):
+    """Drive the shared seed/re-seed fixture into the real Kobo sync route."""
     from cps import kobo as kobo_module, kobo_sync_status, user_library
 
     engine = create_engine("sqlite://")
@@ -944,18 +943,74 @@ def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
             headers={kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER: token},
         ):
             response = kobo_module.HandleSyncRequest.__wrapped__()
-        archived = [
-            item for item in response.get_json()
-            if item.get("ChangedEntitlement", {})
-            .get("BookEntitlement", {}).get("IsRemoved") is True
-        ]
-        assert archived == []
         assert session.query(ub.ArchivedBook).filter_by(user_id=user.id).count() == 1
         assert session.query(ub.UserHiddenBook).filter_by(user_id=user.id).count() == 1
         assert session.query(ub.KoboSyncedBooks).filter_by(user_id=user.id).count() == 5
+
+        if wire_contract:
+            entitlement_envelopes = [
+                item for item in response.get_json()
+                if "NewEntitlement" in item or "ChangedEntitlement" in item
+            ]
+            assert entitlement_envelopes == []
+
+            # Prove the zero-wave guard did not make the membership cursor
+            # inert. This book enters the metadata database only after the
+            # baseline seed, but carries an old modification/creation clock.
+            # Its membership added_at is therefore the only cursor arm that
+            # can deliver it.
+            old = datetime(2026, 1, 1, 12, 0, 0)
+            later_book = _book(6, "Added after seed")
+            later_book.last_modified = old
+            later_book.timestamp = old
+            later_book.uuid = "uuid-6"
+            session.add(later_book)
+            session.add(db.Data(later_book.id, "EPUB", 1, "book-6"))
+            session.commit()
+            assert user_library.admin_add_book(
+                user, later_book.id, app_session=session, cdb=cdb
+            ).id == later_book.id
+
+            next_token = response.headers[
+                kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER
+            ]
+            with app.test_request_context(
+                "/v1/library/sync",
+                headers={
+                    kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER:
+                        next_token
+                },
+            ):
+                later_response = kobo_module.HandleSyncRequest.__wrapped__()
+            delivered = [
+                item.get("NewEntitlement") or item.get("ChangedEntitlement")
+                for item in later_response.get_json()
+                if "NewEntitlement" in item or "ChangedEntitlement" in item
+            ]
+            assert [
+                int(item["BookEntitlement"]["Id"]) for item in delivered
+            ] == [later_book.id]
+        else:
+            archived = [
+                item for item in response.get_json()
+                if item.get("ChangedEntitlement", {})
+                .get("BookEntitlement", {}).get("IsRemoved") is True
+            ]
+            assert archived == []
     finally:
         session.close()
         engine.dispose()
+
+
+def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
+        monkeypatch):
+    """The enable transition must not turn already-synced books into removals."""
+    _exercise_seed_on_enable_kobo_sync(monkeypatch, wire_contract=False)
+
+
+def test_seed_and_reseed_are_wire_silent_but_later_addition_syncs(monkeypatch):
+    """Baseline membership is silent; a later membership remains deliverable."""
+    _exercise_seed_on_enable_kobo_sync(monkeypatch, wire_contract=True)
 
 
 def test_rejected_post_seed_switch_keeps_fence_false_and_retry_seeds(

@@ -99,6 +99,15 @@ def test_coarse_pointer_card_actions_follow_the_2026_08_29_reversal():
     assert ".removeBtn, .quickEditBtn" in coarse
     assert "width: 44px;" in coarse and "height: 44px;" in coarse
 
+    # Opacity only hides pixels: the resting controls must also leave pointer
+    # hit-testing, while the shared reveal rules restore it without changing
+    # keyboard reach or accessibility-tree presence.
+    for selector in (".removeBtn", ".quickEditBtn", ".readNow"):
+        block = css.split(f"{selector} {{", 1)[1].split("}", 1)[0]
+        assert "opacity: 0;" in block
+        assert "pointer-events: none;" in block
+    assert ".addToLibrary {\n  opacity: 1;\n  pointer-events: auto;" in css
+
     # Keyboard and hover reveal stay shared across pointer types; the controls
     # remain in layout/the accessibility tree rather than being display:none.
     for selector in (
@@ -113,6 +122,7 @@ def test_coarse_pointer_card_actions_follow_the_2026_08_29_reversal():
         ".readNow:focus-visible",
     ):
         assert selector in css
+    assert css.count("pointer-events: auto;") >= 4
 
 
 def test_coarse_pointer_reversal_does_not_touch_primary_actions_or_badges():

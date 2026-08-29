@@ -257,6 +257,7 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease),
               background var(--dur-fast) var(--ease),
               color var(--dur-fast) var(--ease);
@@ -266,6 +267,7 @@
 .wrap:focus-within .removeBtn,
 .removeBtn:focus-visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .removeBtn:hover {
@@ -297,6 +299,7 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease),
               background var(--dur-fast) var(--ease),
               color var(--dur-fast) var(--ease);
@@ -306,6 +309,7 @@
 .wrap:focus-within .quickEditBtn,
 .quickEditBtn:focus-visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .quickEditBtn:hover {
@@ -364,6 +368,7 @@
   white-space: nowrap;
   overflow: hidden;
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
@@ -384,13 +389,17 @@
 
 .wrap:hover .readNow,
 .wrap:focus-within .readNow,
-.readNow:focus-visible { opacity: 1; }
+.readNow:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .readNow:hover,
 .readNow:focus-visible { background: var(--accent-soft); }
 
 .addToLibrary {
   opacity: 1;
+  pointer-events: auto;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
   cursor: pointer;
@@ -407,7 +416,11 @@
    book detail page, while bulk removal remains in Select mode. Keep them in
    layout and in the accessibility tree, with their coarse-pointer target
    sizes, but leave their shared opacity: 0 resting state intact. The ordinary
-   hover, focus-within and focus-visible rules above still reveal them. */
+   hover, focus-within and focus-visible rules above still reveal them.
+
+   Third ruling (2026-08-29): opacity hides pixels, not hit targets. Transparent
+   actions must use pointer-events: none at rest, and every reveal rule must
+   restore pointer-events: auto so reveal-then-activate still works. */
 @media (any-hover: none), (any-pointer: coarse) {
   .readNow { min-height: 44px; }
   /* Bigger where legibility is worst — a phone held at arm's length is the

@@ -706,10 +706,10 @@ def test_real_last_modified_bump_under_new_payload_shape_delivers_once(
     )
 
 
-def test_upgrade_seed_suppresses_first_218_book_replay_for_all_existing_devices(
+def test_upgrade_seed_suppresses_confirmed_page_and_recovers_dropped_pages(
     sync_harness, caplog, monkeypatch,
 ):
-    """The first post-upgrade 3-page replay is protected before delivery."""
+    """Legacy Changed pages recover while the confirmed New page stays quiet."""
     from cps import db, kobo, ub
 
     monkeypatch.setattr(
@@ -771,8 +771,15 @@ def test_upgrade_seed_suppresses_first_218_book_replay_for_all_existing_devices(
         responses.append(response)
         token = response.headers[sync_harness.token_header]
 
-    assert all(_entitlements(response) == [] for response in responses)
-    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 436
+    assert [len(_entitlements(response)) for response in responses] == [0, 100, 18]
+    assert all(
+        "NewEntitlement" in item
+        for response in responses[1:]
+        for item in _entitlements(response)
+    )
+    # Both devices retain the confirmed first page. Only the speaking device
+    # records the 118 recovery entitlements returned by these requests.
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 318
     assert sync_harness.session.query(ub.KoboDeviceEntitlementSeed).count() == 2
     first_book_hashes = {
         row.device_id: row.fingerprint
@@ -795,7 +802,7 @@ def test_upgrade_seed_suppresses_first_218_book_replay_for_all_existing_devices(
     assert sum(
         int(re.search(r"suppressed_unchanged=(\d+)", line).group(1))
         for line in summaries
-    ) == 218
+    ) == 100
     seed_lines = [
         record.getMessage() for record in caplog.records
         if record.getMessage().startswith("Kobo Sync ledger seed:")
@@ -1179,7 +1186,7 @@ def test_shelf_only_unchanged_library_terminates_after_first_sync(sync_harness):
 
     assert len(_entitlements(first)) == 1
     assert _entitlements(second) == []
-    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 0
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 1
 
 
 def test_shelf_only_membership_addition_emits_once(sync_harness):
@@ -1464,7 +1471,7 @@ def test_unsuppressed_reading_state_count_and_cursor_remain_one_shot(
         sync_harness.token_header: changed.headers[sync_harness.token_header],
     })
     assert parsed.reading_state_last_modified == modified
-    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 0
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 1
 
 
 def test_payload_stabilization_replays_byte_identically_with_layer2_off(
@@ -1478,7 +1485,7 @@ def test_payload_stabilization_replays_byte_identically_with_layer2_off(
 
     assert len(first) == len(second) == 1
     assert first == second
-    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 0
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 1
 
 
 @pytest.mark.parametrize("reset_token", [None, "not-a-token", "store.part"])
@@ -1528,12 +1535,12 @@ def test_entitlement_replay_state_is_per_device(sync_harness, monkeypatch):
 
 
 def test_second_device_has_no_cross_device_state_when_layer2_is_off(sync_harness):
-    """An explicit flag-off override writes no ledger or cross-device state."""
+    """Core classification state stays isolated when replay suppression is off."""
     from cps import kobo, ub
 
     first_device = sync_harness.sync()
     assert len(_entitlements(first_device)) == 1
-    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 0
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 1
 
     second_device = ub.Device(
         user_id=sync_harness.user.id,
@@ -1558,7 +1565,10 @@ def test_second_device_has_no_cross_device_state_when_layer2_is_off(sync_harness
 
     assert len(_entitlements(first_for_second)) == 1
     assert _entitlements(stable_for_second) == []
-    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 0
+    rows = sync_harness.session.query(ub.KoboDeviceBookEntitlement).all()
+    assert {row.device_id for row in rows} == {
+        sync_harness.device.id, second_device.id,
+    }
 
 
 def _seed_other_user_ledger(sync_harness):
@@ -2160,10 +2170,10 @@ def test_device_entitlement_tables_are_created_by_app_db_migration_path():
         engine.dispose()
 
 
-def test_existing_entitlement_ledgers_receive_additive_provenance_columns(
+def test_existing_entitlement_ledgers_receive_additive_provenance_and_classification_columns(
     monkeypatch,
 ):
-    """A migrated #1925 app.db accepts both provenance-aware upserts."""
+    """A migrated #1925 app.db accepts provenance and #1735 state."""
     from cps import kobo_sync_status, ub
     from sqlalchemy import inspect as sa_inspect, text
 
@@ -2182,6 +2192,10 @@ def test_existing_entitlement_ledgers_receive_additive_provenance_columns(
             "book_uuid VARCHAR(64) NOT NULL, fingerprint VARCHAR(64) NOT NULL, "
             "updated_at DATETIME NOT NULL, "
             "UNIQUE (device_id, book_uuid))"
+        ))
+        connection.execute(text(
+            "CREATE TABLE kobo_device_entitlement_seed ("
+            "device_id INTEGER PRIMARY KEY, seeded_at DATETIME NOT NULL)"
         ))
         connection.execute(text(
             "INSERT INTO kobo_device_book_entitlement "
@@ -2203,6 +2217,15 @@ def test_existing_entitlement_ledgers_receive_additive_provenance_columns(
             }
             assert {"payload_schema_version", "change_basis"} <= set(columns)
             assert str(columns["change_basis"]["type"]) == "TEXT"
+
+        seed_columns = {
+            column["name"]: column
+            for column in sa_inspect(engine).get_columns(
+                "kobo_device_entitlement_seed"
+            )
+        }
+        assert "classification_version" in seed_columns
+        assert seed_columns["classification_version"]["nullable"] is False
 
         row = session.query(ub.KoboDeviceBookEntitlement).one()
         assert row.payload_schema_version == 1

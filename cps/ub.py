@@ -949,6 +949,12 @@ class KoboDeviceEntitlementSeed(Base):
     seeded_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
     )
+    # Version 1 means the per-device rows were audited against the legacy
+    # New/Changed classifier.  Version 0 rows predate #1735 and may include
+    # fingerprints for ChangedEntitlements a device could not apply.
+    classification_version = Column(
+        Integer, nullable=False, default=0, server_default="0",
+    )
 
 
 class NoticeEvent(Base):
@@ -2235,6 +2241,12 @@ def migrate_kobo_entitlement_ledger_columns(engine, _session):
             "change_basis",
             "change_basis TEXT",
         )
+    _add_column_if_missing(
+        engine,
+        "kobo_device_entitlement_seed",
+        "classification_version",
+        "classification_version INTEGER NOT NULL DEFAULT 0",
+    )
 
 
 # migrate all settings missing in registration table

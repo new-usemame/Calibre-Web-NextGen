@@ -65,6 +65,11 @@ SYNC_ITEM_LIMIT = 100
 # of being re-delivered to Nickel.
 ENTITLEMENT_PAYLOAD_SCHEMA_VERSION = 1
 
+# Stored in KoboDeviceEntitlementSeed, never sent to the device. Version 1
+# replaces Books.timestamp watermark classification with the physical-device
+# entitlement ledger and audits rows written by the legacy classifier once.
+ENTITLEMENT_CLASSIFICATION_VERSION = 1
+
 kobo = Blueprint("kobo", __name__, url_prefix="/kobo/<auth_token>")
 kobo_auth.disable_failed_auth_redirect_for_blueprint(kobo)
 kobo_auth.register_url_value_preprocessor(kobo)
@@ -344,6 +349,119 @@ def _seed_existing_device_entitlement_ledgers(user_id):
         len(seed_books),
         len(deleted_fingerprints),
         elapsed_ms,
+    )
+    return True
+
+
+def _legacy_new_entitlement_book_ids(books):
+    """Reconstruct the legacy pages that were actually announced as New.
+
+    The old handler ordered by ``(last_modified, id)`` but compared every row
+    in a page against the *previous* page's maximum ``timestamp``. Replaying
+    that exact state machine lets the upgrade bridge retain fingerprints for
+    entitlements a device could accept and discard fingerprints for the
+    ChangedEntitlements that #1735 devices dropped.
+
+    Flat legacy state cannot retain historical shelf membership clocks. The
+    reconstruction therefore uses the library clocks that governed the
+    reported sync-all failure; if those clocks changed after delivery, the
+    conservative outcome is one NewEntitlement recovery, not a permanently
+    missing book.
+    """
+    ordered = sorted(
+        books,
+        key=lambda book: (books_cursor_datetime(book.last_modified), book.id),
+    )
+    confirmed = set()
+    watermark = datetime.min
+    for offset in range(0, len(ordered), SYNC_ITEM_LIMIT):
+        page = ordered[offset:offset + SYNC_ITEM_LIMIT]
+        created_times = []
+        for book in page:
+            created = book.timestamp or book.last_modified or datetime.min
+            created = books_cursor_datetime(created)
+            created_times.append(created)
+            if created > watermark:
+                confirmed.add(book.id)
+        if created_times:
+            watermark = max(watermark, max(created_times))
+    return confirmed
+
+
+def _migrate_device_entitlement_classification(user_id):
+    """Remove per-device rows that only prove a legacy Changed emission.
+
+    ``KoboDeviceBookEntitlement`` predates this classifier and records what the
+    server emitted, including the ChangedEntitlements a fresh Kobo ignored.
+    The seed row's version makes this audit one-shot. Once the false-positive
+    rows are removed, the normal missing-ledger query re-arms those books as
+    New without clearing the device token or the user's flat sync history.
+    """
+    device_ids = kobo_sync_status.get_kobo_device_ids_requiring_classification(
+        user_id, ENTITLEMENT_CLASSIFICATION_VERSION,
+    )
+    if not device_ids:
+        return True
+
+    started = monotonic()
+    try:
+        synced_book_ids = sorted({
+            row.book_id for row in ub.session.query(
+                ub.KoboSyncedBooks.book_id,
+            ).filter(
+                ub.KoboSyncedBooks.user_id == int(user_id),
+            ).all()
+        })
+        books = []
+        for offset in range(0, len(synced_book_ids), 250):
+            books.extend(
+                calibre_db.session.query(db.Books).filter(
+                    db.Books.id.in_(synced_book_ids[offset:offset + 250]),
+                ).all()
+            )
+        confirmed_book_ids = _legacy_new_entitlement_book_ids(books)
+
+        removed = 0
+        for device_id in device_ids:
+            recorded_ids = {
+                row.book_id for row in ub.session.query(
+                    ub.KoboDeviceBookEntitlement.book_id,
+                ).filter(
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                ).all()
+            }
+            unconfirmed_ids = sorted(recorded_ids - confirmed_book_ids)
+            for offset in range(0, len(unconfirmed_ids), 250):
+                removed += ub.session.query(
+                    ub.KoboDeviceBookEntitlement,
+                ).filter(
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                    ub.KoboDeviceBookEntitlement.book_id.in_(
+                        unconfirmed_ids[offset:offset + 250]
+                    ),
+                ).delete(synchronize_session=False)
+
+        kobo_sync_status.mark_device_entitlement_classification(
+            device_ids, ENTITLEMENT_CLASSIFICATION_VERSION,
+        )
+        if ub.session_commit() is False:
+            return False
+    except Exception:
+        ub.session.rollback()
+        log.exception(
+            "Kobo Sync: failed to migrate entitlement classification for user %s",
+            user_id,
+        )
+        return False
+
+    log.debug(
+        "Kobo Sync classification migration: user=%s devices=%d "
+        "confirmed_new=%d rearmed=%d elapsed_ms=%.1f",
+        user_id,
+        len(device_ids),
+        len(confirmed_book_ids),
+        removed,
+        round((monotonic() - started) * 1000, 1),
     )
     return True
 
@@ -713,9 +831,17 @@ def HandleSyncRequest():
     # Upgrade bridge: existing devices already have flat delivery markers but
     # no per-device hashes. Seed before selecting any replay so the FIRST
     # valid-token replay after upgrade is suppressible, not merely later ones.
-    # A failed seed must not fall through to the harmful full replay.
-    if (replay_suppression_enabled and requesting_device_id
+    # Classification uses the same physical-device ledger even when optional
+    # byte-for-byte replay suppression is disabled, so this seed is no longer
+    # conditional on that setting.
+    if (requesting_device_id
             and not _seed_existing_device_entitlement_ledgers(current_user.id)):
+        return abort(503)
+    # Pre-#1735 rows also include ChangedEntitlements that a fresh Kobo could
+    # not apply. Audit those rows once before they can hide a missing book from
+    # the recovery arm below.
+    if (requesting_device_id
+            and not _migrate_device_entitlement_classification(current_user.id)):
         return abort(503)
 
 
@@ -826,6 +952,19 @@ def HandleSyncRequest():
     cursor_lm = sync_token.books_last_modified
     cursor_id = sync_token.books_last_id
     composite_keyset_books_only = books_keyset_after_cursor(cursor_lm, cursor_id)
+    device_entitlement_recovery_filter = None
+    if requesting_device_id and sync_token.is_cwng_token:
+        delivered_to_requesting_device = select(
+            ub.KoboDeviceBookEntitlement.book_id,
+        ).where(
+            ub.KoboDeviceBookEntitlement.device_id == int(requesting_device_id),
+        )
+        # This arm is deliberately independent of the timestamp cursor. An old
+        # poisoned cursor may be past the entire library, but a missing physical-
+        # device ledger row still means the entitlement must be announced New.
+        device_entitlement_recovery_filter = ~db.Books.id.in_(
+            delivered_to_requesting_device,
+        )
 
     # Magic-shelf membership arm (fork #359): magic-shelf-only books are not in
     # book_shelf_link, so BookShelf.date_added is NULL and Books.last_modified is
@@ -878,11 +1017,24 @@ def HandleSyncRequest():
     # only_kobo_shelves branch joins BookShelf, so its inner filter includes
     # the BookShelf.date_added arm (fork #220) alongside the composite keyset
     # and (when active) the magic-shelf membership arm.
-    if magic_shelf_arm_active:
+    if magic_shelf_arm_active and device_entitlement_recovery_filter is not None:
         inner_cursor_filter_with_bookshelf = or_(
             ub.BookShelf.date_added > cursor_lm,
             composite_keyset_books_only,
             magic_shelf_arm,
+            device_entitlement_recovery_filter,
+        )
+    elif magic_shelf_arm_active:
+        inner_cursor_filter_with_bookshelf = or_(
+            ub.BookShelf.date_added > cursor_lm,
+            composite_keyset_books_only,
+            magic_shelf_arm,
+        )
+    elif device_entitlement_recovery_filter is not None:
+        inner_cursor_filter_with_bookshelf = or_(
+            ub.BookShelf.date_added > cursor_lm,
+            composite_keyset_books_only,
+            device_entitlement_recovery_filter,
         )
     else:
         inner_cursor_filter_with_bookshelf = or_(
@@ -903,16 +1055,28 @@ def HandleSyncRequest():
     )
     library_composite_keyset = delivery_keyset_after_cursor(
         library_delivery_key, cursor_lm, cursor_id)
-    if magic_shelf_arm_active:
+    sync_all_keyset = (
+        library_composite_keyset
+        if personal_library_mode else composite_keyset_books_only
+    )
+    if magic_shelf_arm_active and device_entitlement_recovery_filter is not None:
         inner_cursor_filter_sync_all = or_(
-            (library_composite_keyset if personal_library_mode
-             else composite_keyset_books_only),
+            sync_all_keyset,
+            magic_shelf_arm,
+            device_entitlement_recovery_filter,
+        )
+    elif magic_shelf_arm_active:
+        inner_cursor_filter_sync_all = or_(
+            sync_all_keyset,
             magic_shelf_arm,
         )
-    elif personal_library_mode:
-        inner_cursor_filter_sync_all = library_composite_keyset
+    elif device_entitlement_recovery_filter is not None:
+        inner_cursor_filter_sync_all = or_(
+            sync_all_keyset,
+            device_entitlement_recovery_filter,
+        )
     else:
-        inner_cursor_filter_sync_all = composite_keyset_books_only
+        inner_cursor_filter_sync_all = sync_all_keyset
 
     if only_kobo_shelves:
         changed_entries = calibre_db.session.query(db.Books,
@@ -1033,7 +1197,7 @@ def HandleSyncRequest():
             requesting_device_id,
             [book.Books.id for book in books_list],
         )
-        if replay_suppression_eligible else {}
+        if requesting_device_id and sync_token.is_cwng_token else {}
     )
     entitlement_fingerprint_updates = {}
     entitlement_change_basis_updates = {}
@@ -1056,7 +1220,7 @@ def HandleSyncRequest():
         # and any real metadata/last_modified/archive change alters this hash.
         entitlement_fingerprint = (
             _entitlement_fingerprint(entitlement)
-            if replay_suppression_enabled and requesting_device_id else None
+            if requesting_device_id else None
         )
         entitlement_change_basis = _book_entitlement_change_basis(
             book.Books.last_modified,
@@ -1110,11 +1274,11 @@ def HandleSyncRequest():
                 entitlement_change_basis_updates[book.Books.id] = \
                     entitlement_change_basis
         else:
-            if ts_created > sync_token.books_last_created:
+            if book.Books.id not in prior_entitlement_fingerprints:
                 sync_results.append({"NewEntitlement": entitlement})
             else:
                 sync_results.append({"ChangedEntitlement": entitlement})
-            if replay_suppression_enabled and requesting_device_id:
+            if requesting_device_id:
                 entitlement_fingerprint_updates[book.Books.id] = entitlement_fingerprint
                 entitlement_change_basis_updates[book.Books.id] = \
                     entitlement_change_basis

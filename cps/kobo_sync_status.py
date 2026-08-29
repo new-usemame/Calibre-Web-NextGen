@@ -226,6 +226,35 @@ def mark_device_entitlement_ledgers_seeded(device_ids):
     ub.session.execute(statement.on_conflict_do_nothing(index_elements=["device_id"]))
 
 
+def get_kobo_device_ids_requiring_classification(user_id, version):
+    """Return seeded Kobo devices whose delivery rows predate ``version``."""
+    return [
+        row.device_id for row in ub.session.query(
+            ub.KoboDeviceEntitlementSeed.device_id,
+        ).join(
+            ub.Device,
+            ub.Device.id == ub.KoboDeviceEntitlementSeed.device_id,
+        ).filter(
+            ub.Device.user_id == int(user_id),
+            ub.Device.kind == "kobo",
+            ub.KoboDeviceEntitlementSeed.classification_version < int(version),
+        ).order_by(ub.KoboDeviceEntitlementSeed.device_id).all()
+    ]
+
+
+def mark_device_entitlement_classification(device_ids, version):
+    """Stage the completed New/Changed classification migration."""
+    normalized = sorted({int(device_id) for device_id in device_ids if device_id})
+    if not normalized:
+        return
+    ub.session.query(ub.KoboDeviceEntitlementSeed).filter(
+        ub.KoboDeviceEntitlementSeed.device_id.in_(normalized),
+    ).update(
+        {ub.KoboDeviceEntitlementSeed.classification_version: int(version)},
+        synchronize_session=False,
+    )
+
+
 def _record_user_book_deletions(session, user_id, book_deletions, deleted_at):
     added = 0
     for book_id, book_uuid in book_deletions:

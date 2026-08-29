@@ -559,13 +559,13 @@ def test_login_without_preference_uses_spa_surface(tmp_path):
     (0, False, 302),
     (spa_mod.constants.LOGIN_OAUTH, False, 302),
     (spa_mod.constants.LOGIN_LDAP, False, 200),
-    (0, True, 200),
+    (0, True, 302),
 ])
 def test_login_default_is_auth_capability_aware(
         tmp_path, login_type, reverse_proxy_login, expected_status):
     """The SPA login is default only when it can authenticate the configured
-    mode: standard and OAuth are supported; LDAP (#1893) and reverse-proxy
-    header auth (#1931) must retain Classic until their API bridges exist."""
+    mode: standard, OAuth, and reverse-proxy header auth are supported; LDAP
+    (#1893) must retain Classic until its API bridge exists."""
     app, web_mod, monkey = _login_app(tmp_path)
     try:
         resp = _get_login(
@@ -587,7 +587,7 @@ def test_login_default_is_auth_capability_aware(
     (0, False, True),
     (spa_mod.constants.LOGIN_OAUTH, False, True),
     (spa_mod.constants.LOGIN_LDAP, False, False),
-    (0, True, False),
+    (0, True, True),
 ])
 def test_spa_login_default_supported_predicate(
         login_type, reverse_proxy_login, supported):

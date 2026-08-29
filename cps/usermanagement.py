@@ -295,6 +295,23 @@ def user_login_required(func):
     return decorated_view
 
 
+def reverse_proxy_header_login(func):
+    """Let a public route participate in configured reverse-proxy login.
+
+    Unlike :func:`user_login_required`, this never makes the route require a
+    session.  It only exposes an identity when the existing admin trust switch
+    is enabled and the shared loader accepts the header; missing or refused
+    identities continue into the wrapped route as anonymous callers.
+    """
+    @wraps(func)
+    def decorated_view(*args, **kwargs):
+        if getattr(config, "config_allow_reverse_proxy_header_login", False):
+            g.flask_httpauth_user = load_user_from_reverse_proxy_header(request)
+        return func(*args, **kwargs)
+
+    return decorated_view
+
+
 def load_user_from_reverse_proxy_header(req):
     """Load user from reverse proxy header, optionally creating new users"""
     rp_header_name = config.config_reverse_proxy_login_header_name

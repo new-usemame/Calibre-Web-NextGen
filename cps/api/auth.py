@@ -15,6 +15,7 @@ from .. import ub, config, constants, limiter, services, logger
 from ..config_sql import uploads_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
+from ..usermanagement import reverse_proxy_header_login
 from ..ui_themes import config_theme_code
 from ..helper import (
     check_username, check_email, check_valid_domain, reset_password,
@@ -248,6 +249,7 @@ def _me_payload(user):
 
 
 @api_v1.route("/auth/me")
+@reverse_proxy_header_login
 def auth_me():
     # /me is in _PUBLIC_ENDPOINTS (it has to be, or logging in would be
     # impossible), so it bypasses the blueprint gate and must repeat the

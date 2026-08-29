@@ -646,6 +646,99 @@ def test_batch_add_reports_mixed_visible_and_forbidden_ids_per_item(
         )
 
 
+def test_batch_add_cannot_self_grant_without_global_browse(
+        app_session, calibre_session, monkeypatch):
+    """The self-service route must not use the admin-managed add policy."""
+    from cps import user_library
+    from cps.api import actions
+
+    user = _user(app_session, "batch-no-global-browse", True)
+    assert user.role_browse_global() is False
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(actions, "current_user", user)
+
+    app = Flask(__name__)
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            json={"operation": "add", "book_ids": [1]}):
+        response = actions.batch_my_library_membership.__wrapped__()
+
+    payload = response.get_json()
+    assert payload["succeeded_ids"] == []
+    assert payload["failed_ids"] == [1]
+    assert payload["results"] == [{
+        "book_id": 1,
+        "status": "failed",
+        "error": {
+            "code": "library_membership_rejected",
+            "message": (
+                "You need global-library browse permission to change "
+                "My Library."
+            ),
+        },
+        "http_status": 403,
+    }]
+    assert app_session.query(ub.UserLibraryBook).filter_by(
+        user_id=user.id, book_id=1
+    ).count() == 0
+
+
+def test_batch_membership_rejects_guest_when_anonymous_browsing_is_enabled(
+        app_session, monkeypatch):
+    """The per-route guard must stop Guest after both outer gates admit it."""
+    from cps import api as api_root
+    from cps import usermanagement
+    from cps.api import actions, api_v1
+
+    guest = _user(app_session, "Guest", True)
+    guest.role = constants.ROLE_ANONYMOUS
+    app_session.add(ub.UserLibraryBook(user_id=guest.id, book_id=2))
+    app_session.commit()
+    assert guest.is_anonymous is True
+
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(actions, "current_user", guest)
+    monkeypatch.setattr(api_root, "current_user", guest)
+    monkeypatch.setattr(
+        api_root.config, "config_allow_reverse_proxy_header_login", False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        api_root.config, "config_anonbrowse", 1, raising=False
+    )
+    monkeypatch.setattr(
+        usermanagement.config,
+        "config_allow_reverse_proxy_header_login",
+        False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        usermanagement.config, "config_anonbrowse", 1, raising=False
+    )
+
+    app = Flask(__name__)
+    app.testing = True
+    app.config["SECRET_KEY"] = "batch-membership-test"
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["RATELIMIT_ENABLED"] = False
+    app.register_blueprint(api_v1)
+    response = app.test_client().post(
+        "/api/v1/books/my-library/batch",
+        json={"operation": "add", "book_ids": [1]},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json() == {
+        "error": {
+            "code": "unauthorized",
+            "message": "You must be signed in",
+        }
+    }
+    assert [row.book_id for row in app_session.query(ub.UserLibraryBook)
+            .filter_by(user_id=guest.id).all()] == [2]
+
+
 def test_batch_remove_preserves_managed_account_policy_and_partial_success(
         app_session, monkeypatch):
     """Sequential removals report a protected last book and an absent no-op."""

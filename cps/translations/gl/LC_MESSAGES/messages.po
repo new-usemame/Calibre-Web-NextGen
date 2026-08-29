@@ -8171,9 +8171,8 @@ msgid "Check NextGen Status"
 msgstr ""
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Setup KOReader Sync"
-msgstr "Lector epub"
+msgstr ""
 
 #: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"

@@ -265,6 +265,15 @@ export function Devices() {
         <p>{t('Manage your Kobo sync URL in the classic account page.')}</p>
         <a href={apiUrl('/me')}>{t('Set up Kobo sync')}</a>
       </section>
+      {/* The KOReader plugin reports the inventory and storage figures this page
+          displays, but its setup page was reachable only from the classic admin
+          screen. Now that the SPA is the default surface, a KOReader user could
+          land here with no route to the plugin download or install steps. Both
+          strings are existing catalog entries, so this ships translated. */}
+      <section className={styles.setup}>
+        <h2>{t('KOReader Sync Plugin')}</h2>
+        <a href={apiUrl('/kosync')}>{t('Setup KOReader Sync')}</a>
+      </section>
       {undoDevice && <div className={styles.toast} role="status">
         <span>{t('{name} removed.', { name: undoDevice.label })}</span>
         <button type="button" onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>

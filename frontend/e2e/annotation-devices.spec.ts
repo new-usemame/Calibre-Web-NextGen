@@ -117,3 +117,17 @@ test('account summary makes the e-reader manager discoverable', async ({ page })
   await expect(card).toContainText('Libra Colour · 312 highlights and notes');
   await expect(card.getByRole('link', { name: 'Manage e-readers' })).toHaveAttribute('href', '/app/account/devices');
 });
+
+// The plugin that produces this page's inventory and storage figures had no
+// route from the SPA: its setup page was linked only from the classic admin
+// screen, so a KOReader user on the default surface could not reach the
+// download or the install steps. Pin both setup routes, not just the new one —
+// a later tidy-up of this section must not silently drop either.
+test('device manager routes to both e-reader setup pages', async ({ page }) => {
+  await stubDevices(page);
+  await page.goto('/app/account/devices');
+  await expect(page.getByRole('link', { name: 'Setup KOReader Sync' }))
+    .toHaveAttribute('href', '/kosync');
+  await expect(page.getByRole('link', { name: 'Set up Kobo sync' }))
+    .toHaveAttribute('href', '/me');
+});

@@ -219,7 +219,11 @@ def get_ingest_dir():
 def get_ingest_status():
     """Read the current ingest service status"""
     try:
-        with open('/config/cwa_ingest_status', 'r') as f:
+        status_path = os.environ.get(
+            "CWA_INGEST_STATUS_FILE",
+            constants.config_path("cwa_ingest_status"),
+        )
+        with open(status_path, 'r') as f:
             status_line = f.read().strip()
             if ':' in status_line:
                 parts = status_line.split(':')
@@ -253,7 +257,11 @@ def _coerce_book_ids(raw_book_ids):
 def get_ingest_queue_size():
     """Get the number of files in the retry queue"""
     try:
-        with open('/config/cwa_ingest_retry_queue', 'r') as f:
+        queue_path = os.environ.get(
+            "CWA_INGEST_RETRY_QUEUE",
+            constants.config_path("cwa_ingest_retry_queue"),
+        )
+        with open(queue_path, 'r') as f:
             return len([line for line in f if line.strip()])
     except (FileNotFoundError, IOError):
         return 0
@@ -1124,7 +1132,9 @@ def set_cwa_settings():
                                     cwa_settings=cwa_settings, ignorable_formats=ignorable_formats, target_formats=target_formats,
                                     automerge_options=automerge_options, autoingest_options=autoingest_options,
                                     hardcover_token_available=hardcover_token_available,
-                                    next_duplicate_scan_run=next_scan_run, config=config)
+                                    next_duplicate_scan_run=next_scan_run,
+                                    processed_books_dir=constants.processed_books_dir(),
+                                    config=config)
 
 
 def get_next_duplicate_scan_run(settings):
@@ -1958,6 +1968,11 @@ def get_log_dates(logs) -> dict[str,str]:
                             "time":log_time}}
     return log_dates
 
+
+def _service_log_path(filename: str) -> str:
+    """Resolve a service log beneath the active config directory."""
+    return constants.config_path(filename)
+
 ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
 
 def convert_library_start(queue):
@@ -1978,7 +1993,7 @@ def empty_tmp_con_dir(tmp_conversion_dir) -> None:
         print(f"[cwa-functions]: An error occurred while emptying {tmp_conversion_dir}. See the following error: {e}")
 
 def is_convert_library_finished() -> bool:
-    log_path = "/config/convert-library.log"
+    log_path = _service_log_path("convert-library.log")
     with open(log_path, 'r') as log:
         if "NextGen Convert Library Service - Run Ended: " in log.read():
             return True
@@ -1987,7 +2002,7 @@ def is_convert_library_finished() -> bool:
 
 def kill_convert_library(queue):
     trigger_file = Path(tempfile.gettempdir() + "/.kill_convert_library_trigger")
-    log_path = "/config/convert-library.log"
+    log_path = _service_log_path("convert-library.log")
     while True:
         sleep(0.05) # Required to prevent high cpu usage
         if trigger_file.exists():
@@ -2056,7 +2071,7 @@ def show_convert_library_logs():
 @admin_required
 def download_current_log(log_filename):
     log_filename = "convert-library.log"
-    LOG_DIR = "/config"
+    LOG_DIR = constants.CONFIG_DIR
     try:
         # Secure the filename to prevent directory traversal (e.g., '..')
         safe_filename = secure_filename(log_filename)
@@ -2084,7 +2099,7 @@ def download_current_log(log_filename):
 @admin_required
 def start_conversion():
     # Wipe conversion log from previous runs
-    open('/config/convert-library.log', 'w').close()
+    open(_service_log_path("convert-library.log"), 'w').close()
     # Remove any left over kill file
     try:
         os.remove(tempfile.gettempdir() + "/.kill_convert_library_trigger")
@@ -2112,7 +2127,7 @@ def cancel_convert_library():
 @login_required_if_no_ano
 @admin_required
 def get_status():
-    with open("/config/convert-library.log", 'r') as f:
+    with open(_service_log_path("convert-library.log"), 'r') as f:
         status = f.read()
     progress = extract_progress(status)
     statusList = {'status':status,
@@ -2134,7 +2149,7 @@ def epub_fixer_start(queue, input_file: str | None = None):
     queue.put(ef_process)
 
 def is_epub_fixer_finished() -> bool:
-    log_path = "/config/epub-fixer.log"
+    log_path = _service_log_path("epub-fixer.log")
     with open(log_path, 'r') as log:
         if "NextGen Kindle EPUB Fixer Service - Run Ended: " in log.read():
             return True
@@ -2143,7 +2158,7 @@ def is_epub_fixer_finished() -> bool:
 
 def kill_epub_fixer(queue):
     trigger_file = Path(tempfile.gettempdir() + "/.kill_epub_fixer_trigger")
-    log_path = "/config/epub-fixer.log"
+    log_path = _service_log_path("epub-fixer.log")
     while True:
         sleep(0.05) # Required to prevent high cpu usage
         if trigger_file.exists():
@@ -2208,7 +2223,7 @@ def show_epub_fixer_logs():
 @admin_required
 def download_current_log(log_filename):
     log_filename = "epub-fixer.log"
-    LOG_DIR = "/config"
+    LOG_DIR = constants.CONFIG_DIR
     try:
         # Secure the filename to prevent directory traversal (e.g., '..')
         safe_filename = secure_filename(log_filename)
@@ -2236,7 +2251,7 @@ def download_current_log(log_filename):
 @admin_required
 def start_epub_fixer():
     # Wipe conversion log from previous runs
-    open('/config/epub-fixer.log', 'w').close()
+    open(_service_log_path("epub-fixer.log"), 'w').close()
     # Remove any left over kill file
     try:
         os.remove(tempfile.gettempdir() + "/.kill_epub_fixer_trigger")
@@ -2284,7 +2299,7 @@ def run_epub_fixer_for_book():
             return jsonify({"success": False, "error": _("EPUB file not found on disk.")}), 404
 
         # Wipe conversion log from previous runs
-        open('/config/epub-fixer.log', 'w').close()
+        open(_service_log_path("epub-fixer.log"), 'w').close()
         # Remove any left over kill file
         try:
             os.remove(tempfile.gettempdir() + "/.kill_epub_fixer_trigger")
@@ -2321,7 +2336,7 @@ def cancel_epub_fixer():
 @login_required_if_no_ano
 @admin_required
 def get_status():
-    with open("/config/epub-fixer.log", 'r') as f:
+    with open(_service_log_path("epub-fixer.log"), 'r') as f:
         status = f.read()
     progress = extract_progress(status)
     statusList = {'status':status,
@@ -2390,7 +2405,7 @@ def cover_enforcer_start(queue):
         # O_APPEND makes every write go to the current end of file for both writers.
         # Popen dups the fd into the child, so closing the parent copy here is safe and
         # avoids leaking one descriptor per run.
-        log_file = open('/config/cover-enforcer.log', 'a')
+        log_file = open(_service_log_path("cover-enforcer.log"), 'a')
         ce_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'cover_enforcer.py'), '-all'], stdout=log_file, stderr=subprocess.STDOUT)
     except Exception as e:
         # Nothing was ever put on the queue, so the watcher blocked forever at queue.get()
@@ -2398,7 +2413,7 @@ def cover_enforcer_start(queue):
         # so the poller stops and the admin sees why, and hand the watcher a sentinel.
         log.error(f"Failed to start cover enforcer: {e}")
         try:
-            with open('/config/cover-enforcer.log', 'a') as f:
+            with open(_service_log_path("cover-enforcer.log"), 'a') as f:
                 f.write(f"\nFailed to start the enforcement run: {e}")
                 f.write(f"\nNextGen Cover & Metadata Enforcement Service - Run Ended: {datetime.now()}")
         except Exception as log_exc:
@@ -2444,7 +2459,7 @@ def is_cover_enforcer_finished() -> bool:
     # the whole file to find it was re-reading the entire log 20 times a second for the
     # duration of every run.
     return "NextGen Cover & Metadata Enforcement Service - Run Ended: " in _read_log_tail(
-        "/config/cover-enforcer.log")
+        _service_log_path("cover-enforcer.log"))
 
 def kill_cover_enforcer(queue):
     # Wrapped so the run is released on EVERY exit path, including an unexpected
@@ -2457,7 +2472,7 @@ def kill_cover_enforcer(queue):
 
 def _watch_cover_enforcer(queue):
     trigger_file = Path(tempfile.gettempdir() + "/.kill_cover_enforcer_trigger")
-    log_path = "/config/cover-enforcer.log"
+    log_path = _service_log_path("cover-enforcer.log")
     # The run this watcher owns, once cover_enforcer_start() publishes it. Held so the
     # loop can key termination on the PROCESS rather than only on a string in the log:
     # a child that dies without printing the marker - an import error, a fatal signal, a
@@ -2598,7 +2613,7 @@ def show_cover_enforcer_logs():
 @admin_required
 def download_current_log(log_filename):
     log_filename = "cover-enforcer.log"
-    LOG_DIR = "/config"
+    LOG_DIR = constants.CONFIG_DIR
     try:
         # Secure the filename to prevent directory traversal (e.g., '..')
         safe_filename = secure_filename(log_filename)
@@ -2645,7 +2660,7 @@ def start_cover_enforcer():
         _cover_enforcer_run['active'] = True
     try:
         # Wipe enforcement log from previous runs
-        open('/config/cover-enforcer.log', 'w').close()
+        open(_service_log_path("cover-enforcer.log"), 'w').close()
         # Remove any left over kill file
         try:
             os.remove(tempfile.gettempdir() + "/.kill_cover_enforcer_trigger")
@@ -2684,7 +2699,7 @@ def cancel_cover_enforcer():
 @login_required_if_no_ano
 @admin_required
 def get_status():
-    log_path = "/config/cover-enforcer.log"
+    log_path = _service_log_path("cover-enforcer.log")
     # Bounded tail, not the whole file - see COVER_ENFORCER_STATUS_TAIL_BYTES. Returns ""
     # when the log does not exist yet, so a first-ever page load still gets valid JSON.
     status = _read_log_tail(log_path)

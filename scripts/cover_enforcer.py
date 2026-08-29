@@ -37,7 +37,7 @@ except Exception:
     # environment where the Flask stack it drags in is not importable -- that is what the
     # inline sanitizer fallback below exists for, and hard-failing here would take it out.
     # Resolve through the same two knobs, in the same order, as cps/constants.py.
-    _config_root = os.environ.get("CALIBRE_DBPATH", "/config")
+    _config_root = str(app_paths.config_dir())
     _CHANGE_LOGS_DIR = os.environ.get(
         "CWA_METADATA_CHANGE_LOGS_DIR", os.path.join(_config_root, "metadata_change_logs"))
     _METADATA_TEMP_DIR = os.environ.get(

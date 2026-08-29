@@ -478,7 +478,7 @@ class AutoLibrary:
                 "[cwa-auto-library] CWA_CALIBRE_USER_PLUGINS is enabled but "
                 "the plugins directory could not be created (permission "
                 "error). Create it manually: "
-                f"mkdir -p /config/.config/calibre/plugins",
+                f"mkdir -p {app_paths.config_dir() / '.config' / 'calibre' / 'plugins'}",
                 flush=True,
             )
             return

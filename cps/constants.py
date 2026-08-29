@@ -155,6 +155,16 @@ else:
     if getattr(sys, 'frozen', False):
         CONFIG_DIR = os.path.abspath(os.path.join(CONFIG_DIR, os.pardir))
 
+
+def config_path(*parts, _join=os.path.join):
+    """Return a path beneath the resolved writable config root."""
+    return _join(CONFIG_DIR, *parts)
+
+
+def processed_books_dir():
+    """Root for retained originals, failed conversions and backup archives."""
+    return config_path("processed_books")
+
 # Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
 # metadata-change-detector s6 service) watches for change logs. Env-overridable
 # for tests.

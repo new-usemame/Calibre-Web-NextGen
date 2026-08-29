@@ -60,7 +60,7 @@ def _check_koreader_sync_enabled_lightweight() -> bool:
     Falls back to False on any error — matches the production
     is_koreader_sync_enabled() fail-closed behavior.
     """
-    cwa_db_dir = os.environ.get("CWA_DB_PATH", "/config/")
+    cwa_db_dir = os.environ.get("CWA_DB_PATH", str(app_paths.config_dir()))
     if not cwa_db_dir.endswith("/"):
         cwa_db_dir += "/"
     cwa_db_path = cwa_db_dir + "cwa.db"

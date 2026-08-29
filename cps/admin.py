@@ -3096,6 +3096,7 @@ def _db_configuration_result(error_flash=None, gdrive_error=None):
 
     return render_title_template("config_db.html",
                                  config=config,
+                                 backup_root=constants.config_path("backup"),
                                  show_authenticate_google_drive=gdrive_authenticate,
                                  gdriveError=gdrive_error,
                                  gdrivefolders=gdrivefolders,
@@ -3681,7 +3682,11 @@ def restore_calibre_db():
             flash(_("Restore failed: metadata.db not found at %(path)s", path=metadata_path), category="error")
             return redirect(url_for("admin.db_configuration"))
 
-        app_db_path = ub.app_DB_path or cli_param.settings_path or "/config/app.db"
+        app_db_path = (
+            ub.app_DB_path
+            or cli_param.settings_path
+            or constants.config_path("app.db")
+        )
         if not os.path.exists(app_db_path):
             flash(_("Restore failed: app.db not found at %(path)s", path=app_db_path), category="error")
             return redirect(url_for("admin.db_configuration"))
@@ -3696,7 +3701,9 @@ def restore_calibre_db():
         lock_handles.extend(service_lock_handles)
 
         # 1. Backup both DBs
-        backup_dir = f"/config/backup/restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        backup_dir = constants.config_path(
+            "backup", f"restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
         os.makedirs(backup_dir, exist_ok=True)
         copy_sqlite_database(metadata_path, os.path.join(backup_dir, "metadata.db.bak"))
         copy_sqlite_database(app_db_path, os.path.join(backup_dir, "app.db.bak"))

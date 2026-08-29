@@ -24,7 +24,7 @@ from cwa_db import CWA_DB
 from kindle_epub_fixer import EPUBFixer
 
 ### Global Variables
-convert_library_log_file = str(app_paths.config_dir() / "convert-library.log")
+convert_library_log_file = str(app_paths.config_path("convert-library.log"))
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -80,15 +80,32 @@ def _acquire_lock_or_exit():
     atexit.register(removeLock)
 
 
-try:
-    backup_destinations = {
+def _load_backup_destinations():
+    processed_root = app_paths.processed_books_dir()
+    try:
+        for name in ("converted", "imported", "fixed_originals", "failed"):
+            (processed_root / name).mkdir(parents=True, exist_ok=True)
+        return {
             entry.name: entry.path
-            for entry in os.scandir("/config/processed_books")
+            for entry in os.scandir(processed_root)
             if entry.is_dir()
         }
-except FileNotFoundError:
-    # Fallback for test environments where /config might not exist
-    backup_destinations = {}
+    except OSError as error:
+        print_and_log(
+            f"[convert-library]: WARN - Could not prepare backup directories "
+            f"under {processed_root}: {error}"
+        )
+        return {}
+
+
+backup_destinations = _load_backup_destinations()
+
+
+def failed_backup_dir() -> str:
+    """Resolved destination for converted files that could not be imported."""
+    return backup_destinations.get("failed") or str(
+        app_paths.processed_books_dir() / "failed"
+    )
 
 
 class LibraryConverter:
@@ -356,8 +373,11 @@ class LibraryConverter:
 
 
     def backup(self, input_file, backup_type):
+        output_path = backup_destinations.get(backup_type) or str(
+            app_paths.processed_books_dir() / backup_type
+        )
         try:
-            output_path = backup_destinations[backup_type]
+            os.makedirs(output_path, exist_ok=True)
             shutil.copy2(input_file, output_path)
         except Exception as e:
             print_and_log(f"[convert-library]: ERROR - The following error occurred when trying to copy {input_file} to {output_path}:\n{e}")
@@ -453,9 +473,11 @@ class LibraryConverter:
 
                 print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Import of {os.path.basename(target_filepath)} successfully completed!")
             except subprocess.CalledProcessError as e:
-                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Import of {os.path.basename(target_filepath)} was not successfully completed. Converted file moved to /config/processed_books/failed/{os.path.basename(target_filepath)}. See the following error:\n{e}")
+                output_path = os.path.join(
+                    failed_backup_dir(), os.path.basename(target_filepath)
+                )
+                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Import of {os.path.basename(target_filepath)} was not successfully completed. Converted file moved to {output_path}. See the following error:\n{e}")
                 try:
-                    output_path = f"/config/processed_books/failed/{os.path.basename(target_filepath)}"
                     shutil.move(target_filepath, output_path)
                 except Exception as e:
                     print_and_log(f"[convert-library]: ERROR - The following error occurred when trying to copy {file} to {output_path}:\n{e}")

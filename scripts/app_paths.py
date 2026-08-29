@@ -78,6 +78,8 @@ from pathlib import Path
 __all__ = [
     "app_root",
     "config_dir",
+    "config_path",
+    "processed_books_dir",
     "stray_legacy_config_dir",
     "dirs_json",
     "ingest_folder",
@@ -212,6 +214,16 @@ def config_dir():
     if override.suffix == ".db":
         return override.parent
     return override
+
+
+def config_path(*parts):
+    """A file or directory beneath the resolved writable config root."""
+    return config_dir().joinpath(*parts)
+
+
+def processed_books_dir():
+    """Root for retained originals, failed conversions and backup archives."""
+    return config_path("processed_books")
 
 
 def _default_config_dir():

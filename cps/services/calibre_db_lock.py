@@ -33,6 +33,7 @@ import errno
 import os
 import time
 from contextlib import contextmanager
+from pathlib import Path
 
 try:
     from .parallel import cooperative_sleep
@@ -61,13 +62,29 @@ except ImportError:  # pragma: no cover — Windows
     HAS_FCNTL = False
 
 
-DEFAULT_LOCK_DIR = "/config"
 DEFAULT_LOCK_BASENAME = ".cwa-metadata-write.lock"
 DEFAULT_TIMEOUT_SECONDS = 120.0
 
 
+def _resolved_config_dir() -> str:
+    """Mirror the dependency-free config resolver used by scripts.app_paths."""
+    override = (os.environ.get("CALIBRE_DBPATH") or "").strip()
+    if override:
+        configured = Path(override)
+        return str(configured.parent if configured.suffix == ".db" else configured)
+
+    cps_dir = Path(__file__).resolve().parents[1]
+    if (cps_dir / ".HOMEDIR").is_file():
+        return str(Path(os.path.expanduser("~")) / ".calibre-web-automated")
+    return str(cps_dir.parent)
+
+
 def _resolve_lock_path(lock_dir: str | None) -> str:
-    base = lock_dir or os.environ.get("CWA_METADATA_LOCK_DIR") or DEFAULT_LOCK_DIR
+    base = (
+        lock_dir
+        or os.environ.get("CWA_METADATA_LOCK_DIR")
+        or _resolved_config_dir()
+    )
     return os.path.join(base, DEFAULT_LOCK_BASENAME)
 
 
@@ -82,9 +99,9 @@ def metadata_db_write_lock(
     Parameters
     ----------
     lock_dir
-        Directory to place the lock file in. Defaults to /config, the
-        local Docker volume that always supports fcntl. Override via
-        the ``CWA_METADATA_LOCK_DIR`` env var or for tests.
+        Directory to place the lock file in. Defaults to the resolved config
+        directory (``/config`` in the image). Override via the
+        ``CWA_METADATA_LOCK_DIR`` env var or for tests.
     timeout
         Seconds to wait for the lock before raising ``TimeoutError``.
         Default 120s — long enough to ride out the kindle-epub-fixer
@@ -104,7 +121,7 @@ def metadata_db_write_lock(
 
     # The directory must exist. We deliberately do NOT create the lock
     # directory on demand — that would mask a misconfiguration (e.g.
-    # /config not mounted). If the directory is missing, the
+    # configured directory not mounted). If the directory is missing, the
     # ENOENT-from-open below surfaces clearly.
     fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
     try:

@@ -20,7 +20,7 @@ import threading
 import time
 from shutil import copyfile
 
-from . import db, calibre_db, logger, ub, csrf, config, helper, user_book_data
+from . import db, calibre_db, logger, ub, csrf, config, constants, helper, user_book_data
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 from .admin import admin_required  
 from .usermanagement import login_required_if_no_ano
@@ -54,6 +54,24 @@ log = logger.create()
 # request) for the holder's entire run. Preview (dry_run=True) is read-only and
 # never acquires this lock.
 _AUTO_RESOLVE_LOCK = threading.Lock()
+
+
+def duplicate_resolution_root():
+    """Directory where destructive duplicate resolution retains originals."""
+    config_root = getattr(constants, "CONFIG_DIR", None)
+    if not config_root:
+        configured = (os.environ.get("CALIBRE_DBPATH") or "").strip()
+        if configured:
+            config_root = (
+                os.path.dirname(configured)
+                if configured.endswith(".db")
+                else configured
+            )
+        else:
+            config_root = os.path.dirname(os.path.dirname(__file__))
+    return os.path.join(
+        config_root, "processed_books", "duplicate_resolutions"
+    )
 
 
 class _DeletedBookFileRef:
@@ -599,6 +617,7 @@ def show_duplicates():
                                      duplicate_groups=duplicate_groups,
                                      duplicate_index_needs_full_scan=duplicate_index_needs_full_scan,
                                      next_scan_run=next_scan_run,
+                                     duplicate_backup_dir=f"{duplicate_resolution_root()}{os.sep}",
                                      title=_("Duplicate Books"), 
                                      page="duplicates")
                                      
@@ -610,6 +629,7 @@ def show_duplicates():
                                      duplicate_groups=[],
                                      duplicate_index_needs_full_scan=False,
                                      next_scan_run=None,
+                                     duplicate_backup_dir=f"{duplicate_resolution_root()}{os.sep}",
                                      title=_("Duplicate Books"), 
                                      page="duplicates")
 
@@ -1874,7 +1894,10 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                 book_to_keep = book_to_keep_ref
 
                 deleted_ids = []
-                backup_dir = f"/config/processed_books/duplicate_resolutions/{datetime.now().strftime('%Y%m%d_%H%M%S')}_group_{group['group_hash'][:8]}"
+                backup_dir = os.path.join(
+                    duplicate_resolution_root(),
+                    f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_group_{group['group_hash'][:8]}",
+                )
                 os.makedirs(backup_dir, exist_ok=True)
 
                 if strategy == 'merge':

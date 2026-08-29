@@ -389,7 +389,7 @@ def _load_optional_cps_modules() -> None:
 def _ensure_processed_books_dirs() -> None:
     """Ensure processed backups directory structure exists so backups never crash on missing folders."""
     try:
-        processed_root = "/config/processed_books"
+        processed_root = str(app_paths.processed_books_dir())
         os.makedirs(processed_root, exist_ok=True)
         for name in ("converted", "imported", "fixed_originals", "failed"):
             os.makedirs(os.path.join(processed_root, name), exist_ok=True)
@@ -447,9 +447,12 @@ def failed_backup_dir() -> str:
     """Absolute path of the folder holding files that failed to convert.
 
     cwa-init creates it, so the scandir in _load_backup_destinations() normally
-    finds it; the literal is the fallback for a container where it is missing.
+    finds it. Bare-metal installs derive the fallback from their resolved
+    config root instead of silently writing at the filesystem root.
     """
-    return backup_destinations.get("failed") or "/config/processed_books/failed"
+    return backup_destinations.get("failed") or str(
+        app_paths.processed_books_dir() / "failed"
+    )
 
 
 def _load_backup_destinations() -> None:
@@ -457,7 +460,7 @@ def _load_backup_destinations() -> None:
     try:
         backup_destinations = {
             entry.name: entry.path
-            for entry in os.scandir("/config/processed_books")
+            for entry in os.scandir(app_paths.processed_books_dir())
             if entry.is_dir()
         }
     except FileNotFoundError:

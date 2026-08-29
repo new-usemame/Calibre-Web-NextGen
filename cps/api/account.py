@@ -16,6 +16,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from . import api_v1
 from .. import config, constants, logger, ub, user_library
 from ..cw_login import current_user
+from ..cw_babel import sanitize_locale_for_write
 from .options import locale_options, book_language_options
 from ..helper import valid_password, valid_email, check_email
 from ..kobo_sync_status import needs_shelf_reconciliation, reconcile_shelves_safely
@@ -187,7 +188,12 @@ def update_profile():
         if "opds_only_shelves_sync" in data:
             current_user.opds_only_shelves_sync = 1 if data.get("opds_only_shelves_sync") else 0
         if "locale" in data and data["locale"]:
-            current_user.locale = data["locale"]
+            # Hygiene only — get_locale() coerces on read, so a bad value here
+            # cannot break resolution. Refusing it keeps the row clean (F-011141).
+            validated_locale = sanitize_locale_for_write(data["locale"])
+            if not validated_locale:
+                return _err("invalid_request", "Unsupported locale", 400)
+            current_user.locale = validated_locale
         if "default_language" in data and data["default_language"]:
             current_user.default_language = data["default_language"]
         if "theme" in data:

@@ -45,7 +45,7 @@ from .helper import check_valid_domain, check_email, check_username, \
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS, book_sort_order
 from .redirect import get_redirect_location
-from .cw_babel import get_available_locale
+from .cw_babel import get_available_locale, get_available_translations, sanitize_locale_for_write
 from .usermanagement import login_required_if_no_ano
 from .ui_themes import config_theme_code
 from .kobo_sync_status import remove_synced_book
@@ -3195,7 +3195,12 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
                 current_user.name = check_username(to_save.get("name"))
         current_user.random_books = 1 if to_save.get("show_random") == "on" else 0
         current_user.default_language = to_save.get("default_language", "all")
-        current_user.locale = to_save.get("locale", "en")
+        # A stored locale is returned verbatim by get_locale() on every later
+        # request, so it has to be one we actually ship (F-011141). An
+        # unusable value leaves the current one alone rather than being stored.
+        validated_locale = sanitize_locale_for_write(to_save.get("locale"))
+        if validated_locale:
+            current_user.locale = validated_locale
         old_state = current_user.kobo_only_shelves_sync
         current_user.kobo_only_shelves_sync = int(to_save.get("kobo_only_shelves_sync") == "on") or 0
         if kobo_sync_status.needs_shelf_reconciliation(old_state,

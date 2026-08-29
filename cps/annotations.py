@@ -75,6 +75,11 @@ annotations_bp = Blueprint("annotations", __name__)
 # files are 30-50 MB; reject anything over 100 MB.
 MAX_UPLOAD_BYTES = MAX_KOBO_DATABASE_UPLOAD_BYTES
 
+# Public contract for the per-device inventory endpoint. Keep the server-side
+# default bounded even when a caller omits pagination entirely.
+DEFAULT_DEVICE_INVENTORY_LIMIT = 200
+MAX_DEVICE_INVENTORY_LIMIT = 200
+
 
 def _commit_required(commit):
     """Raise when CWNG's commit wrapper reports a rolled-back write."""
@@ -92,13 +97,50 @@ def _database_error_response(operation):
     return jsonify({"error": "database_error"}), 500
 
 
+def _device_inventory_pagination():
+    """Parse the inventory endpoint's strict offset pagination contract."""
+    raw_limit = request.args.get("limit")
+    raw_offset = request.args.get("offset")
+    try:
+        limit = DEFAULT_DEVICE_INVENTORY_LIMIT if raw_limit is None else int(raw_limit)
+    except (TypeError, ValueError):
+        return None, jsonify({
+            "error": "invalid_pagination",
+            "field": "limit",
+            "message": f"limit must be an integer between 1 and {MAX_DEVICE_INVENTORY_LIMIT}",
+            "max_limit": MAX_DEVICE_INVENTORY_LIMIT,
+        }), 400
+    if not 1 <= limit <= MAX_DEVICE_INVENTORY_LIMIT:
+        return None, jsonify({
+            "error": "invalid_pagination",
+            "field": "limit",
+            "message": f"limit must be an integer between 1 and {MAX_DEVICE_INVENTORY_LIMIT}",
+            "max_limit": MAX_DEVICE_INVENTORY_LIMIT,
+        }), 400
+    try:
+        offset = 0 if raw_offset is None else int(raw_offset)
+    except (TypeError, ValueError):
+        return None, jsonify({
+            "error": "invalid_pagination",
+            "field": "offset",
+            "message": "offset must be a non-negative integer",
+        }), 400
+    if offset < 0:
+        return None, jsonify({
+            "error": "invalid_pagination",
+            "field": "offset",
+            "message": "offset must be a non-negative integer",
+        }), 400
+    return (limit, offset), None, None
+
+
 def _owned_device(public_id, user_id, session):
     return session.query(ub.Device).filter(
         ub.Device.public_id == public_id, ub.Device.user_id == user_id,
     ).first()
 
 
-def _device_json(device, annotation_count=0):
+def _device_json(device, annotation_count=0, inventory_report=None):
     return {
         "public_id": device.public_id,
         "label": device.display_name,
@@ -109,6 +151,11 @@ def _device_json(device, annotation_count=0):
         "first_seen": device.first_seen_at.isoformat() if device.first_seen_at else None,
         "last_seen": device.last_seen_at.isoformat() if device.last_seen_at else None,
         "annotation_count": int(annotation_count),
+        "inventory_count": int(inventory_report.item_count) if inventory_report else 0,
+        "inventory_observed": (
+            inventory_report.observed_at.isoformat()
+            if inventory_report and inventory_report.observed_at else None
+        ),
         "active": bool(device.active),
     }
 
@@ -126,7 +173,24 @@ def list_annotation_devices(*, user_id, session, active_only=False):
     if active_only:
         query = query.filter(ub.Device.active.is_(True))
     rows = query.group_by(ub.Device.id).order_by(ub.Device.display_name, ub.Device.id).all()
-    return [_device_json(device, count) for device, count in rows]
+    device_ids = [device.id for device, _count in rows]
+    reports = {}
+    if device_ids:
+        latest_ids = (
+            session.query(func.max(ub.DeviceInventoryReport.id))
+            .filter(ub.DeviceInventoryReport.device_id.in_(device_ids))
+            .group_by(ub.DeviceInventoryReport.device_id)
+        )
+        reports = {
+            report.device_id: report
+            for report in session.query(ub.DeviceInventoryReport).filter(
+                ub.DeviceInventoryReport.id.in_(latest_ids)
+            ).all()
+        }
+    return [
+        _device_json(device, count, reports.get(device.id))
+        for device, count in rows
+    ]
 
 
 def rename_annotation_device(public_id, *, user_id, label, session, commit):
@@ -218,6 +282,65 @@ def annotation_devices_list():
     except (RuntimeError, SQLAlchemyError):
         return _database_error_response("device list")
     return jsonify({"devices": devices})
+
+
+@annotations_bp.route("/api/annotations/devices/<public_id>/inventory", methods=["GET"])
+@user_login_required
+def annotation_device_inventory(public_id):
+    """Return one bounded page of the latest inventory for an owned device."""
+    try:
+        device = _owned_device(public_id, current_user.id, ub.session)
+        if device is None:
+            abort(404)
+        pagination, error_response, error_status = _device_inventory_pagination()
+        if error_response is not None:
+            return error_response, error_status
+        limit, offset = pagination
+        report = (
+            ub.session.query(ub.DeviceInventoryReport)
+            .filter_by(device_id=device.id)
+            .order_by(ub.DeviceInventoryReport.id.desc())
+            .first()
+        )
+        if report is None:
+            return jsonify({
+                "device": _device_json(device),
+                "observed_at": None,
+                "books": [],
+                "limit": limit,
+                "offset": offset,
+                "total": 0,
+            })
+        items_query = (
+            ub.session.query(ub.DeviceInventoryItem)
+            .filter_by(device_id=device.id, last_report_id=report.id)
+        )
+        total = items_query.count()
+        items = []
+        if offset < total:
+            items = (
+                items_query
+                .order_by(ub.DeviceInventoryItem.lpath, ub.DeviceInventoryItem.id)
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+        return jsonify({
+            "device": _device_json(device, inventory_report=report),
+            "observed_at": report.observed_at.isoformat() if report.observed_at else None,
+            "books": [{
+                "book_id": item.book_id,
+                "lpath": item.lpath,
+                "checksum": item.checksum,
+                "size": item.size,
+                "mtime": item.mtime,
+            } for item in items],
+            "limit": limit,
+            "offset": offset,
+            "total": total,
+        })
+    except SQLAlchemyError:
+        return _database_error_response("device inventory")
 
 
 @annotations_bp.route("/api/annotations/devices/<public_id>", methods=["PATCH"])

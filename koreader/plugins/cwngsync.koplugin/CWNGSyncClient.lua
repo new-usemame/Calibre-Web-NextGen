@@ -8,6 +8,9 @@ local PROGRESS_TIMEOUTS = { 2,  5 }
 local AUTH_TIMEOUTS     = { 5, 10 }
 -- Annotations: payloads can be larger than a progress ping, so allow longer.
 local ANNOTATION_TIMEOUTS = { 5, 15 }
+-- A full library observation hashes local files before this call; the wire
+-- payload itself can also be larger than progress or annotation traffic.
+local INVENTORY_TIMEOUTS = { 10, 30 }
 
 local CWNGSyncClient = {
     service_spec = nil,
@@ -246,6 +249,31 @@ function CWNGSyncClient:get_progress(
             })
         end)
         finish(callback, ok, res, "CWNGSyncClient:get_progress")
+    end)
+    self.client:enable("AsyncHTTP", {thread = co})
+    coroutine.resume(co)
+    if UIManager.looper then UIManager:setInputTimeout() end
+    socketutil:reset_timeout()
+end
+
+function CWNGSyncClient:report_inventory(username, password, device, device_id, inventory, callback)
+    self.client:reset_middlewares()
+    self.client:enable("Format.JSON")
+    self.client:enable("GinClient")
+    self.client:enable("CWNGSyncAuth", {
+        username = username,
+        password = password,
+    })
+    socketutil:set_timeout(INVENTORY_TIMEOUTS[1], INVENTORY_TIMEOUTS[2])
+    local co = coroutine.create(function()
+        local ok, res = pcall(function()
+            return self.client:report_inventory({
+                device = device,
+                device_id = device_id,
+                inventory = inventory,
+            })
+        end)
+        finish(callback, ok, res, "CWNGSyncClient:report_inventory")
     end)
     self.client:enable("AsyncHTTP", {thread = co})
     coroutine.resume(co)

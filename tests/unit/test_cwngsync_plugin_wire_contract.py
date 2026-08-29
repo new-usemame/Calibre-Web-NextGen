@@ -118,7 +118,8 @@ def test_the_parser_actually_finds_the_calls():
     assertion below while checking nothing."""
     calls = _client_calls()
     assert set(calls) == {
-        "update_progress", "get_progress", "pull_annotations", "push_annotations",
+        "update_progress", "get_progress", "report_inventory",
+        "pull_annotations", "push_annotations",
     }
     assert "annotations" in calls["push_annotations"]
 
@@ -162,6 +163,15 @@ def test_push_annotations_declares_the_delete_fields():
             f"{field} would make every delete-cycle push raise "
             f"'{field} is not expected for method push_annotations'"
         )
+
+
+def test_inventory_declares_every_body_field_in_both_spore_contracts():
+    spec = _spec()["report_inventory"]
+    expected = {"device", "device_id", "inventory"}
+
+    assert set(spec["payload"]) == expected
+    assert expected <= _expected_params(spec)
+    assert _client_calls()["report_inventory"] == expected
 
 
 @pytest.mark.parametrize("method", sorted(_spec()))

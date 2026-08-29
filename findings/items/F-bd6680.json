@@ -1,0 +1,11 @@
+{
+  "area": "spa",
+  "body": "OBSERVED in source, 2026-08-23.\n\nAfter a KEPUB package repair the app computes the audience of users who synced the affected\nbook and creates a per-user notice event (`cps/tasks/kepub_package_repair.py:107-131`). It is\ndelivered as a JSON inbox at `GET /api/v1/notices` (`cps/api/notices.py:23-38`).\n\nOnly the SPA consumes it: mounted globally in `frontend/src/components/AppShell.tsx:29-35`,\nrendered with the re-sync guidance and a permanent dismissal in\n`frontend/src/components/UserNotices.tsx:50-99`, and per-book at\n`frontend/src/pages/BookDetail.tsx:305-312`. Searching the classic side for any consumer —\n`notices`, `UserNotice` across `cps/templates/` and `cps/static/js/` — returns only unrelated\nhits inside `js/libs/tinymce/license.txt`. There is no classic surface.\n\nWhy it matters for retirement: the plan keeps classic as the fallback during rollout, and this\nis the direction the audit did not look. A user whose device holds a broken KEPUB, who falls\nback to classic, is never told to re-sync — the one instruction that fixes their book.\n\nA second, milder instance of the same blind spot: `/whats-new` is an SPA-only route\n(`frontend/src/App.tsx:255-258`, `frontend/src/pages/WhatsNew.tsx:90-99`) with no classic page.\nNot material on its own; recorded because two counterexamples make the pattern, not the\nexception.\n\nAction: either accept in writing that fallback users lose repair notices, or give classic a\nminimal notice banner. Do not carry it as an unstated assumption.",
+  "created": "2026-08-24",
+  "id": "F-bd6680",
+  "refs": [],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "Per-user notices are SPA-only, so a classic-fallback user never sees KEPUB repair instructions"
+}

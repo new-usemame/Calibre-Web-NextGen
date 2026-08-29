@@ -1,0 +1,11 @@
+{
+  "area": "spa",
+  "body": "OBSERVED at runtime, 2026-08-23, against a container on the pre-fix `:dev` image, with the\nSAME task visible in both UIs at the same moment.\n\n`taskMessage` is deliberately server-built HTML: `cps/helper.py:518` composes\n`'<a href=\"/book/{}\">{}</a>'.format(book_id, escape(book.title))` — the title is escaped there,\nso this is not an injection hole, it is a rendering-contract mismatch. Classic consumes it as\nHTML (bootstrap-table's default formatter) and shows a working link.\n\nThe SPA interpolates the same string as JSX text — `frontend/src/pages/Tasks.tsx:47`,\n`<td className={styles.taskMsg}>{task.taskMessage}</td>` — so React escapes it and the user is\nshown the markup.\n\nRendered accessibility trees, same instance, same task:\n\n  /app/tasks   cell \"E-mail: <a href=\\\"/book/197\\\">The Enchanted April</a> send to eReader\"\n  /tasks       cell: text \"E-mail:\" + link \"The Enchanted April\" -> /book/197 + text \"send to eReader\"\n\nDo NOT fix this with `dangerouslySetInnerHTML`. Two reasons: it makes the SPA trust\nserver-composed markup for a field that interpolates library data, and the embedded href is a\nCLASSIC route (`/book/197`), so an SPA that rendered it as HTML would navigate the user out of\nthe SPA — which is precisely what retiring classic is supposed to stop.\n\nFix shape: give `/api/v1/tasks` the structured pieces (message text plus an optional book id)\nso the SPA composes its own `<Link href=\"/book/:id\">`, and leave the HTML field for classic.",
+  "created": "2026-08-24",
+  "id": "F-b19131",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "New UI Tasks renders the server's HTML task message as literal text"
+}

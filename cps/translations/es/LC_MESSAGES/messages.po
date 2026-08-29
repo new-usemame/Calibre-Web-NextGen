@@ -7175,6 +7175,44 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} books in latest inventory"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load this device library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Hide device library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Loading device library…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No books were reported in the latest device inventory."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Not matched to this library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "On this device"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing {shown} of {total} books from the latest device inventory."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "View device library"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{ok} of {total} assigned to {name}."
 msgstr ""
 

@@ -6,6 +6,12 @@
 .card { position: relative; display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
 .cardMain { min-width: 0; }
 .cardMain p { color: var(--text-muted); margin: var(--sp-1) 0 0; overflow-wrap: anywhere; }
+.inventoryToggle { min-height: 44px; margin-top: var(--sp-2); color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.inventory { margin-top: var(--sp-2); }
+.inventoryList { display: grid; gap: var(--sp-2); margin: 0; padding-left: var(--sp-5); }
+.inventoryList li { overflow-wrap: anywhere; }
+.onDevice { display: block; color: var(--text-muted); font-size: .875rem; }
+.unmatched { display: block; color: var(--text-muted); font-size: .875rem; }
 .cardActions { display: flex; align-items: flex-start; position: relative; }
 .cardActions > button, .renameForm button { min-width: 44px; min-height: 44px; border-radius: var(--r-md); color: var(--text-muted); }
 .cardActions > button:hover { background: var(--surface-2); color: var(--text); }

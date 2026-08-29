@@ -38,6 +38,7 @@ Reference: https://github.com/koreader/koreader-sync-server
 """
 
 import base64
+import re
 from datetime import datetime, timezone
 from typing import Dict, Optional, Any, Tuple
 
@@ -49,6 +50,7 @@ from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
 from sqlalchemy import func, desc, cast, String
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
+from werkzeug.exceptions import BadRequest
 
 from ... import logger, ub, csrf, config, constants, services, usermanagement
 from ...render_template import render_title_template
@@ -80,6 +82,10 @@ MAX_DOCUMENT_LENGTH = 255  # Maximum document identifier length
 MAX_PROGRESS_LENGTH = 255  # Maximum progress string length
 MAX_DEVICE_LENGTH = 100    # Maximum device name length
 MAX_DEVICE_ID_LENGTH = 100 # Maximum device ID length
+MAX_INVENTORY_BYTES = 2 * 1024 * 1024
+MAX_INVENTORY_ITEMS = 5000
+MAX_INVENTORY_PATH_LENGTH = 1024
+_CHECKSUM_RE = re.compile(r"^[0-9a-fA-F]{32}$")
 
 # Sentinel stored in ``KOSyncProgress.progress`` by producers that know a
 # reading percentage but cannot express a position KOReader can seek to — the
@@ -965,6 +971,166 @@ def get_progress(document: str):
     except Exception as e:
         log.error(f"get_progress: Unexpected error: {str(e)}")
         return handle_sync_error(KOSyncError(ERROR_INTERNAL, "Internal server error"))
+
+
+def _inventory_error(message, status_code=400, error="invalid_inventory"):
+    return create_sync_response({"error": error, "message": message}, status_code)
+
+
+def _validate_inventory_entry(entry):
+    if not isinstance(entry, dict):
+        raise ValueError("Every inventory entry must be an object")
+    allowed = {"lpath", "checksum", "book_id", "size", "mtime"}
+    if set(entry) - allowed:
+        raise ValueError("Inventory entry contains unexpected fields")
+
+    lpath = entry.get("lpath")
+    checksum = entry.get("checksum")
+    size = entry.get("size")
+    mtime = entry.get("mtime")
+    if not isinstance(lpath, str) or not lpath or len(lpath) > MAX_INVENTORY_PATH_LENGTH:
+        raise ValueError("Invalid lpath")
+    if lpath.startswith(("/", "\\")) or "\x00" in lpath:
+        raise ValueError("lpath must be relative")
+    if any(part in ("", ".", "..") for part in lpath.replace("\\", "/").split("/")):
+        raise ValueError("lpath must be a normalized relative path")
+    if not isinstance(checksum, str) or not _CHECKSUM_RE.fullmatch(checksum):
+        raise ValueError("Invalid checksum")
+    if isinstance(size, bool) or not isinstance(size, int) or size < 0 or size > 2**63 - 1:
+        raise ValueError("Invalid size")
+    if isinstance(mtime, bool) or not isinstance(mtime, int) or mtime < 0 or mtime > 2**63 - 1:
+        raise ValueError("Invalid mtime")
+    book_id = entry.get("book_id")
+    if book_id is not None and (
+            isinstance(book_id, bool) or not isinstance(book_id, int) or book_id <= 0):
+        raise ValueError("Invalid book_id")
+
+    return {
+        "lpath": lpath,
+        "checksum": checksum.lower(),
+        "size": size,
+        "mtime": mtime,
+    }
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/inventory", methods=["PUT"])
+def update_inventory():
+    """Record a complete device-library observation without inferring deletion."""
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+
+    user = authenticate_user()
+    if not user:
+        return create_sync_response({
+            "error": ERROR_UNAUTHORIZED_USER,
+            "message": "Unauthorized",
+        }, 401)
+
+    if request.content_length is not None and request.content_length > MAX_INVENTORY_BYTES:
+        return _inventory_error("Inventory payload is too large", 413, "inventory_too_large")
+    try:
+        data = request.get_json()
+    except BadRequest:
+        return _inventory_error("Malformed JSON")
+    if not isinstance(data, dict):
+        return _inventory_error("Inventory payload must be an object")
+
+    device_name = data.get("device")
+    raw_device_id = data.get("device_id")
+    entries = data.get("inventory")
+    if (not is_valid_field(device_name) or len(device_name) > MAX_DEVICE_LENGTH
+            or not is_valid_field(raw_device_id)
+            or len(raw_device_id) > MAX_DEVICE_ID_LENGTH):
+        return _inventory_error("Invalid device identity")
+    if not isinstance(entries, list):
+        return _inventory_error("inventory must be an array")
+    if len(entries) > MAX_INVENTORY_ITEMS:
+        return _inventory_error("Inventory contains too many entries", 413, "inventory_too_large")
+
+    try:
+        normalized = [_validate_inventory_entry(entry) for entry in entries]
+    except ValueError as error:
+        return _inventory_error(str(error))
+    observations = {(entry["lpath"], entry["checksum"]) for entry in normalized}
+    if len(observations) != len(normalized):
+        return _inventory_error("Inventory contains duplicate observations")
+
+    from ...services.device_registry import register_koreader_device_best_effort
+    internal_device_id = register_koreader_device_best_effort(
+        user_id=user.id,
+        device_id=raw_device_id,
+        device_name=device_name,
+    )
+    if internal_device_id is None:
+        return _inventory_error(
+            "Device identity could not be registered for this account",
+            409,
+            "device_identity_unavailable",
+        )
+
+    try:
+        device = ub.session.query(ub.Device).filter_by(
+            id=internal_device_id, user_id=user.id,
+        ).one_or_none()
+        if device is None:
+            return _inventory_error(
+                "Device identity could not be registered for this account",
+                409,
+                "device_identity_unavailable",
+            )
+
+        now = datetime.now(timezone.utc)
+        resolved = []
+        matched_count = 0
+        for entry in normalized:
+            book_id, _fmt, _title, _path, _version = get_book_by_checksum(entry["checksum"])
+            if book_id is not None:
+                matched_count += 1
+            resolved.append((entry, book_id))
+
+        report = ub.DeviceInventoryReport(
+            device_id=device.id,
+            observed_at=now,
+            item_count=len(resolved),
+            matched_count=matched_count,
+        )
+        ub.session.add(report)
+        ub.session.flush()
+
+        for entry, book_id in resolved:
+            item = ub.session.query(ub.DeviceInventoryItem).filter_by(
+                device_id=device.id,
+                lpath=entry["lpath"],
+                checksum=entry["checksum"],
+            ).one_or_none()
+            if item is None:
+                item = ub.DeviceInventoryItem(
+                    device_id=device.id,
+                    lpath=entry["lpath"],
+                    checksum=entry["checksum"],
+                    first_seen_at=now,
+                )
+                ub.session.add(item)
+            item.book_id = book_id
+            item.size = entry["size"]
+            item.mtime = entry["mtime"]
+            item.last_seen_at = now
+            item.last_report_id = report.id
+
+        ub.session.commit()
+        return create_sync_response({
+            "accepted": len(resolved),
+            "matched": matched_count,
+            "unmatched": len(resolved) - matched_count,
+            "report_id": report.id,
+            "device": device.public_id,
+        })
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.error("Device inventory could not be stored", exc_info=True)
+        return _inventory_error("Inventory could not be stored", 503, "inventory_unavailable")
 
 
 def _is_ascii_book_id(document: str) -> bool:

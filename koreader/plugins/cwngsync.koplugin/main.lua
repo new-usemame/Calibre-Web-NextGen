@@ -5,6 +5,7 @@ local Dispatcher = require("dispatcher")
 local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")
 local Json = require("json")
+local lfs = require("libs/libkoreader-lfs")
 local Math = require("optmath")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local NetworkMgr = require("ui/network/manager")
@@ -219,6 +220,7 @@ function CWNGSync:onReaderReady()
     if self.settings.auto_sync then
         UIManager:nextTick(function()
             self:getProgress(true, false)
+            self:reportInventory(false, false)
         end)
     end
     -- NOTE: Keep in mind that, on Android, turning on WiFi requires a focus switch, which will trip a Suspend/Resume pair.
@@ -416,6 +418,16 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                 end,
                 callback = function()
                     self:getProgress(true, true)
+                end,
+                separator = true,
+            },
+            {
+                text = _("Report books on this device now"),
+                enabled_func = function()
+                    return self.settings.password ~= nil
+                end,
+                callback = function()
+                    self:reportInventory(true, true)
                 end,
                 separator = true,
             },
@@ -834,6 +846,127 @@ function CWNGSync:getLibraryBooksForSync()
     logger.dbg("CWNGSync: [Bulk Pull] fallback scan found", #paths, "supported books under", root_path)
 
     return paths, true, root_path
+end
+
+local function inventoryRelativePath(path, root_path)
+    if root_path and path:sub(1, #root_path) == root_path
+            and (root_path:sub(-1) == "/"
+                or path:sub(#root_path + 1, #root_path + 1) == "/") then
+        local relative = path:sub(#root_path + 1):gsub("^/+", "")
+        if relative ~= "" then
+            return relative
+        end
+    end
+    return path:match("([^/]+)$")
+end
+
+function CWNGSync:getInventoryBooks()
+    -- Inventory describes the device, so it must never inherit bulk pull's
+    -- selected/current-view shortcut. Prefer KOReader's configured home (which
+    -- can itself be an SD-card library), then use progressively weaker roots.
+    local function usableRoot(candidate)
+        return candidate and util.directoryExists(candidate) and candidate or nil
+    end
+    local root_path = usableRoot(G_reader_settings:readSetting("home_dir"))
+        or usableRoot(Device.home_dir)
+        or usableRoot(G_reader_settings:readSetting("lastdir"))
+        or usableRoot(self.ui and self.ui.file_chooser and self.ui.file_chooser.path)
+    if not root_path then
+        return {}, nil
+    end
+
+    local document_registry_ok, DocumentRegistry = pcall(require, "document/documentregistry")
+    local paths = {}
+    local seen = {}
+    util.findFiles(root_path, function(path)
+        if seen[path] then
+            return
+        end
+        if document_registry_ok and DocumentRegistry and DocumentRegistry.hasProvider then
+            local ok, has_provider = pcall(DocumentRegistry.hasProvider, DocumentRegistry, path)
+            if ok and has_provider then
+                seen[path] = true
+                paths[#paths + 1] = path
+            end
+        end
+    end, true)
+    return paths, root_path
+end
+
+function CWNGSync:buildInventory(paths, root_path)
+    local inventory = {}
+    for _, file_path in ipairs(paths) do
+        local checksum = self:getDocumentDigest(file_path)
+        local ok, attributes = pcall(lfs.attributes, file_path)
+        local lpath = inventoryRelativePath(file_path, root_path)
+        if checksum and lpath and ok and type(attributes) == "table"
+                and type(attributes.size) == "number"
+                and type(attributes.modification) == "number" then
+            inventory[#inventory + 1] = {
+                lpath = lpath,
+                checksum = checksum,
+                size = math.floor(attributes.size),
+                mtime = math.floor(attributes.modification),
+            }
+        else
+            logger.warn("CWNGSync: skipping unreadable inventory entry", file_path)
+        end
+    end
+    return inventory
+end
+
+function CWNGSync:reportInventory(interactive, ensure_networking)
+    if not self.settings.password then
+        if interactive then
+            UIManager:show(InfoMessage:new{ text = _("Please login before reporting this device's library.") })
+        end
+        return
+    end
+    if not ensureServerConfigured(self.settings.server) then
+        return
+    end
+    if ensure_networking and NetworkMgr:willRerunWhenOnline(function()
+            self:reportInventory(interactive, ensure_networking)
+        end) then
+        return
+    end
+
+    local paths, root_path = self:getInventoryBooks()
+    local inventory = self:buildInventory(paths, root_path)
+    local CWNGSyncClient = require("CWNGSyncClient")
+    local client = CWNGSyncClient:new{
+        service_url = self.settings.server .. "/kosync",
+        service_spec = self.path .. "/api.json"
+    }
+    client:report_inventory(
+        self.settings.username,
+        self.settings.password,
+        Device.model,
+        self.device_id,
+        inventory,
+        function(ok, body, reason)
+            if ok and type(body) == "table" then
+                logger.info("CWNGSync: device inventory reported", {
+                    accepted = body.accepted,
+                    matched = body.matched,
+                })
+                if interactive then
+                    UIManager:show(InfoMessage:new{
+                        text = T(_("Device library reported: %1 books, %2 matched."),
+                            body.accepted or 0, body.matched or 0),
+                        timeout = 4,
+                    })
+                end
+            else
+                logger.warn("CWNGSync: device inventory report failed", reason or "unknown error")
+                if interactive then
+                    UIManager:show(InfoMessage:new{
+                        text = T(_("Device library report failed: %1"), reason or _("unknown error")),
+                        timeout = 5,
+                    })
+                end
+            end
+        end)
 end
 
 function CWNGSync:refreshLibraryViews(changed_files)

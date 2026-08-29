@@ -1,0 +1,11 @@
+{
+  "area": "spa",
+  "body": "OBSERVED at runtime, 2026-08-23, same instance and same task in both UIs.\n\n`render_task_status` (`cps/tasks_status.py:41-79`) puts BOTH fields in the payload the SPA\nalready fetches — `ret['starttime']` at line 48 and `ret['error']` at line 74 — and\n`/api/v1/tasks` (`cps/api/info.py:60-67`) returns it verbatim.\n\nLive payload from `GET /api/v1/tasks` after a send to an unreachable mail host:\n\n  \"error\": \"Socket Error sending e-mail: Name or service not known\",\n  \"starttime\": \"2026-08-23 21:15\",\n  \"status\": \"Failed\",\n\n`frontend/src/pages/Tasks.tsx:37-59` enumerates exactly five columns — Task, User, Status,\nProgress, Run time — plus a Cancel cell, and never reads either field. Classic binds both:\n`cps/templates/tasks.html:20-21` (`data-field=\"starttime\"`, `data-field=\"error\"`).\n\nRendered, same moment:\n\n  /tasks       Start Time \"2026-08-23 21:15\" | Message \"Socket Error sending e-mail: Name or service not known\"\n  /app/tasks   neither column exists\n\nSo in the new UI a failed conversion or send says \"Failed\" and nothing else, and the reason is\nsitting unused in the response the page already has. This is the same defect class as F-c6b236\n(the deletion core's failure detail discarded on the way to the user), reached by a different\nroute: there the server threw the reason away, here the client does.\n\nFix is frontend-only — no API change needed for these two fields.",
+  "created": "2026-08-24",
+  "id": "F-57c90e",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "New UI Tasks drops the start time and the failure message it already receives"
+}

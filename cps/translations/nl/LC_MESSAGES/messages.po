@@ -7190,6 +7190,46 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} books in latest inventory"
+msgstr "{n} boeken in de nieuwste inventaris"
+
+#: cps/spa_strings.py
+msgid "Could not load this device library."
+msgstr "Kan de bibliotheek van dit apparaat niet laden."
+
+#: cps/spa_strings.py
+msgid "Hide device library"
+msgstr "Apparaatbibliotheek verbergen"
+
+#: cps/spa_strings.py
+msgid "Loading device library…"
+msgstr "Apparaatbibliotheek laden…"
+
+#: cps/spa_strings.py
+msgid "No books were reported in the latest device inventory."
+msgstr "Er zijn geen boeken gemeld in de nieuwste apparaatinventaris."
+
+#: cps/spa_strings.py
+msgid "Not matched to this library"
+msgstr "Niet gekoppeld aan deze bibliotheek"
+
+#: cps/spa_strings.py
+msgid "On this device"
+msgstr "Op dit apparaat"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing {shown} of {total} books from the latest device inventory."
+msgstr ""
+"{shown} van {total} boeken uit de nieuwste apparaatinventaris worden "
+"weergegeven."
+
+#: cps/spa_strings.py
+msgid "View device library"
+msgstr "Apparaatbibliotheek bekijken"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{ok} of {total} assigned to {name}."
 msgstr "{ok} van {total} toegewezen aan {name}."
 

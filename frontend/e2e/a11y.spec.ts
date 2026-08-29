@@ -91,6 +91,7 @@ test('smart shelf builder: no critical/serious a11y violations', async ({ page }
 
 for (const [label, path] of [
   ['account', '/app/account'],
+  ['devices', '/app/account/devices'],
   ['advanced-search', '/app/search'],
   ['shelves', '/app/shelves'],
   ['duplicates', '/app/duplicates'],

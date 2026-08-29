@@ -1,0 +1,3 @@
+### Added
+
+- **Your e-readers can now tell the server which books they actually hold.** A device running the NextGen Sync plugin reports its library, and the Devices page shows how many books were in each device's latest report and lets you open the list — with anything the server recognises linked straight to the book, and anything it doesn't marked as not matched to this library. Reports are observations, never instructions: a book missing from a later report is treated as "not seen this time", never as a deletion, so a device that syncs mid-copy or with a card unmounted can't quietly remove anything.

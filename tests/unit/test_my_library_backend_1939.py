@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 from flask import Flask
 from sqlalchemy import create_engine, event, inspect
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from cps import constants, db, ub
 from cps.progress_syncing.models import KOSyncProgress
@@ -901,6 +901,137 @@ def test_batch_remove_preserves_managed_account_policy_and_partial_success(
     ]
     assert [row.book_id for row in app_session.query(ub.UserLibraryBook)
             .filter_by(user_id=user.id).all()] == [2]
+
+
+@pytest.mark.parametrize("network_share", [False, True])
+def test_concurrent_batch_removals_cannot_empty_managed_library(
+        tmp_path, monkeypatch, network_share):
+    """Concurrent route calls must atomically preserve one membership.
+
+    A sequential test cannot see this class of bug: each request observes the
+    preceding commit.  These two real HTTP requests instead pause after both
+    helpers have observed two memberships, then race removals of different
+    books.  Keep them concurrent so the read/check/delete gap cannot return.
+    """
+    from cps import api as api_root
+    from cps import user_library, usermanagement
+    from cps.api import actions, api_v1
+
+    monkeypatch.setenv(
+        "NETWORK_SHARE_MODE", "true" if network_share else "false"
+    )
+    engine = ub._create_app_db_engine(tmp_path / "app.db")
+    ub.Base.metadata.create_all(engine)
+    sessions = scoped_session(sessionmaker(bind=engine))
+    setup_session = sessions()
+    persisted_user = _user(setup_session, "concurrent-managed-remove", True)
+    user_id = persisted_user.id
+    setup_session.add_all([
+        ub.UserLibraryBook(user_id=user_id, book_id=1),
+        ub.UserLibraryBook(user_id=user_id, book_id=2),
+    ])
+    setup_session.commit()
+    sessions.remove()
+
+    with engine.connect() as connection:
+        expected_mode = "delete" if network_share else "wal"
+        assert connection.exec_driver_sql(
+            "PRAGMA journal_mode"
+        ).scalar_one().lower() == expected_mode
+
+    current_user = SimpleNamespace(
+        id=user_id,
+        has_own_library=True,
+        is_authenticated=True,
+        is_anonymous=False,
+        role_browse_global=lambda: False,
+    )
+    monkeypatch.setattr(ub, "session", sessions)
+    monkeypatch.setattr(actions, "current_user", current_user)
+    monkeypatch.setattr(api_root.config, "config_anonbrowse", 1, raising=False)
+    monkeypatch.setattr(
+        api_root.config,
+        "config_allow_reverse_proxy_header_login",
+        False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        usermanagement.config, "config_anonbrowse", 1, raising=False
+    )
+    monkeypatch.setattr(
+        usermanagement.config,
+        "config_allow_reverse_proxy_header_login",
+        False,
+        raising=False,
+    )
+
+    app = Flask(__name__)
+    app.testing = False
+    app.config["SECRET_KEY"] = "concurrent-membership-test"
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["RATELIMIT_ENABLED"] = False
+    app.register_blueprint(api_v1)
+
+    both_counted = threading.Barrier(2)
+    original_membership_count = user_library.membership_count
+
+    def synchronize_vulnerable_check(counted_user_id, session=None):
+        count = original_membership_count(counted_user_id, session)
+        both_counted.wait(timeout=5)
+        return count
+
+    monkeypatch.setattr(
+        user_library, "membership_count", synchronize_vulnerable_check
+    )
+    start = threading.Barrier(2)
+    responses = []
+    errors = []
+
+    def remove_one(book_id):
+        try:
+            start.wait(timeout=5)
+            response = app.test_client().post(
+                "/api/v1/books/my-library/batch",
+                json={"operation": "remove", "book_ids": [book_id]},
+            )
+            responses.append((book_id, response.status_code, response.get_json()))
+        except BaseException as error:  # surfaced after both threads join
+            errors.append(error)
+        finally:
+            sessions.remove()
+
+    threads = [
+        threading.Thread(target=remove_one, args=(book_id,))
+        for book_id in (1, 2)
+    ]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+        assert all(not thread.is_alive() for thread in threads)
+        assert errors == []
+        assert sorted(status for _, status, _ in responses) == [200, 200]
+        item_results = sorted(
+            (
+                response_payload["results"][0]
+                for _, _, response_payload in responses
+            ),
+            key=lambda item: item["status"],
+        )
+        assert [item["status"] for item in item_results] == [
+            "failed", "succeeded",
+        ]
+        assert [item.get("changed") for item in item_results] == [None, True]
+
+        observer = sessions()
+        assert observer.query(ub.UserLibraryBook).filter_by(
+            user_id=user_id
+        ).count() == 1
+    finally:
+        sessions.remove()
+        engine.dispose()
 
 
 def test_batch_add_and_remove_are_idempotent(

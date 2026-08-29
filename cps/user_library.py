@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Per-user membership over the one global Calibre library (#1939)."""
 
+from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import false
+from sqlalchemy import delete, exists, false
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from . import calibre_db, constants, db, ub
@@ -18,6 +19,14 @@ class UserLibraryError(Exception):
 
 class UserLibraryBookNotFound(UserLibraryError):
     """The requested book is absent from the target's visible global set."""
+
+
+@dataclass(frozen=True)
+class MembershipMutationResult:
+    """Database-observed outcome of one membership mutation."""
+
+    changed: bool
+    affected_shelves: tuple = ()
 
 
 def _session(session=None):
@@ -314,22 +323,26 @@ def _add_visible_book(user, book_id, *, require_global_browse,
         raise UserLibraryBookNotFound(
             "Book not found in the visible global library."
         )
-    app_session.execute(
+    mutation = app_session.execute(
         sqlite_insert(ub.UserLibraryBook)
         .values(user_id=int(user.id), book_id=book_id)
         .on_conflict_do_nothing(index_elements=["user_id", "book_id"])
     )
     app_session.commit()
     invalidate_request_cache(user.id)
-    return book
+    return book, max(0, mutation.rowcount or 0) > 0
 
 
-def add_book(user, book_id, *, app_session=None, cdb=None):
+def add_book(user, book_id, *, app_session=None, cdb=None,
+             return_result=False):
     """Idempotently add a globally visible book to the caller's own set."""
-    return bool(_add_visible_book(
+    book, changed = _add_visible_book(
         user, book_id, require_global_browse=True,
         app_session=app_session, cdb=cdb,
-    ))
+    )
+    if return_result:
+        return MembershipMutationResult(changed=changed)
+    return bool(book)
 
 
 def admin_add_book(user, book_id, *, app_session=None, cdb=None):
@@ -340,34 +353,62 @@ def admin_add_book(user, book_id, *, app_session=None, cdb=None):
     global book for that account. The browse-global role is intentionally not
     required: this is the recovery path promised to managed users.
     """
-    return _add_visible_book(
+    book, _changed = _add_visible_book(
         user, book_id, require_global_browse=False,
         app_session=app_session, cdb=cdb,
     )
+    return book
 
 
-def remove_book(user, book_id, *, app_session=None):
+def remove_book(user, book_id, *, app_session=None, return_result=False):
     """Remove membership and this user's ordinary shelf links only.
 
     Kobo ownership, synced-book rows, annotations, bookmarks, and progress are
-    deliberately untouched so they survive removal and a later re-add.
+    deliberately untouched so they survive removal and a later re-add. For a
+    managed account, one conditional DELETE makes the last-book policy and the
+    mutation indivisible under both WAL and rollback-journal SQLite modes.
     """
     _require_enabled_library(user)
     app_session = _session(app_session)
+    user_id = int(user.id)
     book_id = int(book_id)
-    membership = (app_session.query(ub.UserLibraryBook)
-                  .filter(ub.UserLibraryBook.user_id == int(user.id),
-                          ub.UserLibraryBook.book_id == book_id).first())
-    if membership is None:
-        return []
-    if membership_count(user.id, app_session) == 1 and not user.role_browse_global():
-        raise UserLibraryError(
-            "The last book cannot be removed unless this user can browse the "
-            "global library."
+    may_empty_library = bool(user.role_browse_global())
+    statement = delete(ub.UserLibraryBook).where(
+        ub.UserLibraryBook.user_id == user_id,
+        ub.UserLibraryBook.book_id == book_id,
+    )
+    if not may_empty_library:
+        other_membership = ub.UserLibraryBook.__table__.alias(
+            "other_membership"
         )
+        statement = statement.where(exists().where(
+            other_membership.c.user_id == user_id,
+            other_membership.c.book_id != book_id,
+        ))
+    mutation = app_session.execute(
+        statement.execution_options(synchronize_session=False)
+    )
+    changed = max(0, mutation.rowcount or 0) > 0
+    if not changed:
+        membership_still_exists = (app_session.query(ub.UserLibraryBook.id)
+                                   .filter(
+                                       ub.UserLibraryBook.user_id == user_id,
+                                       ub.UserLibraryBook.book_id == book_id,
+                                   ).first()) is not None
+        # Even a zero-row DELETE begins a sqlite3 write transaction. Close it
+        # before reporting either an idempotent no-op or a policy rejection.
+        app_session.commit()
+        if membership_still_exists and not may_empty_library:
+            raise UserLibraryError(
+                "The last book cannot be removed unless this user can browse "
+                "the global library."
+            )
+        result = MembershipMutationResult(changed=False)
+        return result if return_result else []
+
     shelves = (app_session.query(ub.Shelf)
                .join(ub.BookShelf, ub.BookShelf.shelf == ub.Shelf.id)
-               .filter(ub.Shelf.user_id == int(user.id),
+               .filter(ub.Shelf.user_id == user_id,
                        ub.BookShelf.book_id == book_id)
                .order_by(ub.Shelf.name).all())
     shelf_names = [shelf.name for shelf in shelves]
@@ -377,10 +418,13 @@ def remove_book(user, book_id, *, app_session=None):
          .filter(ub.BookShelf.shelf.in_(shelf_ids),
                  ub.BookShelf.book_id == book_id).delete(
                      synchronize_session=False))
-    app_session.delete(membership)
     app_session.commit()
     invalidate_request_cache(user.id)
-    return shelf_names
+    result = MembershipMutationResult(
+        changed=True,
+        affected_shelves=tuple(shelf_names),
+    )
+    return result if return_result else shelf_names
 
 
 def removal_impact(user, book_id, *, app_session=None):

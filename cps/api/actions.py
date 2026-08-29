@@ -111,13 +111,6 @@ def remove_book_from_my_library(book_id):
     })
 
 
-def _has_library_membership(user_id, book_id):
-    return (ub.session.query(ub.UserLibraryBook.id)
-            .filter(ub.UserLibraryBook.user_id == int(user_id),
-                    ub.UserLibraryBook.book_id == int(book_id))
-            .first()) is not None
-
-
 @api_v1.route("/books/my-library/batch", methods=["POST"])
 @login_required_if_no_ano
 def batch_my_library_membership():
@@ -161,20 +154,21 @@ def batch_my_library_membership():
         )
 
     user_library.mark_response_user_specific()
-    user_id = int(current_user.id)
     results = []
     succeeded_ids = []
     failed_ids = []
     error_status = 403 if operation == "add" else 409
 
     for book_id in book_ids:
-        was_member = _has_library_membership(user_id, book_id)
         try:
             if operation == "add":
-                user_library.add_book(current_user, book_id)
-                shelves = None
+                mutation = user_library.add_book(
+                    current_user, book_id, return_result=True
+                )
             else:
-                shelves = user_library.remove_book(current_user, book_id)
+                mutation = user_library.remove_book(
+                    current_user, book_id, return_result=True
+                )
         except user_library.UserLibraryError as ex:
             failed_ids.append(book_id)
             results.append({
@@ -188,15 +182,18 @@ def batch_my_library_membership():
             })
             continue
 
-        is_member = _has_library_membership(user_id, book_id)
         item = {
             "book_id": book_id,
             "status": "succeeded",
-            "changed": was_member != is_member,
-            "in_my_library": is_member,
+            "changed": mutation.changed,
+            "in_my_library": operation == "add",
         }
         if operation == "remove":
-            item["affected_shelves"] = shelves
+            item.update({
+                "affected_shelves": list(mutation.affected_shelves),
+                "kobo_removal_on_next_sync": True,
+                "reading_data_preserved": True,
+            })
         succeeded_ids.append(book_id)
         results.append(item)
 

@@ -878,6 +878,8 @@ def test_batch_remove_preserves_managed_account_policy_and_partial_success(
             "changed": True,
             "in_my_library": False,
             "affected_shelves": [],
+            "kobo_removal_on_next_sync": True,
+            "reading_data_preserved": True,
         },
         {
             "book_id": 2,
@@ -897,6 +899,8 @@ def test_batch_remove_preserves_managed_account_policy_and_partial_success(
             "changed": False,
             "in_my_library": False,
             "affected_shelves": [],
+            "kobo_removal_on_next_sync": True,
+            "reading_data_preserved": True,
         },
     ]
     assert [row.book_id for row in app_session.query(ub.UserLibraryBook)
@@ -1024,6 +1028,11 @@ def test_concurrent_batch_removals_cannot_empty_managed_library(
             "failed", "succeeded",
         ]
         assert [item.get("changed") for item in item_results] == [None, True]
+        succeeded = next(
+            item for item in item_results if item["status"] == "succeeded"
+        )
+        assert succeeded["kobo_removal_on_next_sync"] is True
+        assert succeeded["reading_data_preserved"] is True
 
         observer = sessions()
         assert observer.query(ub.UserLibraryBook).filter_by(

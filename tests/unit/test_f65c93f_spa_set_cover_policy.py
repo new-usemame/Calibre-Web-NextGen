@@ -11,12 +11,21 @@ cover lock is set (janeczku/calibre-web#2165).  It did neither, so:
 2. a cover you deliberately locked could be replaced from the new UI, while the
    same action through the picker or the classic editor was refused.
 
-Both are asserted at source level on purpose.  The endpoint's body is a chain
-of filesystem writes and metadata-change bookkeeping that a unit test cannot
-drive without a real library on disk; what actually regressed here is which
-lookup and which guard the handler chooses, and that is exactly what these
-assertions pin.  See F-cc5efb for why a source-pinned test is a floor: the
-runtime behaviour is covered by the integration lane.
+Most of what follows is asserted at source level on purpose: the endpoint's
+body is a chain of filesystem writes and metadata bookkeeping a unit test
+cannot drive without a real library on disk, and what regressed here is which
+lookup and which guard the handler chooses.
+
+But a source assertion can only prove a call was *written*, never that its name
+*resolves* -- see F-cc5efb.  So the first test below touches the real module
+object.  That is not decoration: the first draft of this fix called
+``helper.book_cover_is_locked(...)`` in a module that imports names from
+``..helper`` and never binds it, which satisfied every source assertion here
+and would have raised ``NameError`` on the first request.
+
+The executing coverage for this endpoint lives in ``test_api_v1_edit.py``,
+which calls the handler function directly.  There is no integration-lane test
+driving this route over HTTP.
 """
 
 from __future__ import annotations

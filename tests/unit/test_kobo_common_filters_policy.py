@@ -182,6 +182,35 @@ class TestNoLegacyBypass:
                     name, "\n  ".join(unfiltered))
             )
 
+    def test_the_cover_helpers_pass_enforce_policy_at_runtime(self, mocker):
+        """Executing counterpart to the source guard above.
+
+        The source assertions prove the right call was *written*.  They stay
+        green against a regression that keeps the call and discards its effect,
+        so this one invokes each helper and reads the kwargs actually handed to
+        the lookup.
+        """
+        import cps.helper as helper_module
+
+        lookup = mocker.patch.object(
+            helper_module.calibre_db, "get_book_by_uuid_for_kobo",
+            return_value=None,
+        )
+        mocker.patch.object(
+            helper_module, "get_book_cover_internal", return_value="cover"
+        )
+
+        helper_module.get_book_cover_with_uuid("a-uuid")
+        helper_module.get_kobo_cover_source_path("b-uuid", None)
+
+        assert lookup.call_count == 2, "a cover helper stopped consulting the lookup"
+        for call, expected_uuid in zip(lookup.call_args_list, ("a-uuid", "b-uuid")):
+            assert call.args[0] == expected_uuid, "the helper looked up a different book"
+            assert call.kwargs.get("enforce_policy") is True, (
+                "a Kobo cover helper resolved the book without enforcing "
+                "policy at runtime (F-277165)"
+            )
+
     def test_no_unfiltered_get_book_by_uuid_in_kobo(self):
         import cps.kobo as kobo_module
         src = inspect.getsource(kobo_module)

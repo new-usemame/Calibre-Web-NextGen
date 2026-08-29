@@ -16,7 +16,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from . import api_v1
 from .. import config, constants, logger, ub, user_library
 from ..cw_login import current_user
-from ..cw_babel import sanitize_locale_for_write
+from ..cw_babel import sanitize_locale_for_write, effective_locale
 from .options import locale_options, book_language_options
 from ..helper import valid_password, valid_email, check_email
 from ..kobo_sync_status import needs_shelf_reconciliation, reconcile_shelves_safely
@@ -78,7 +78,13 @@ def _serialize_account():
         "mail_body_text": (config.mail_body_text or "") if current_user.role_admin() else None,
         "kobo_only_shelves_sync": bool(current_user.kobo_only_shelves_sync),
         "opds_only_shelves_sync": bool(current_user.opds_only_shelves_sync),
-        "locale": current_user.locale,
+        # Report the locale the user will actually GET, not the raw row.
+        # The React form seeds its <select> from this and posts it back on
+        # every save, so returning an unshippable legacy value made the
+        # control display "English" while holding the bad string -- and the
+        # next save 400d the whole payload for exactly the users this fix
+        # exists to rescue (F-011141).
+        "locale": effective_locale(current_user.locale),
         "default_language": current_user.default_language,
         "theme": theme_slug(current_user.theme),
         "ui_font_body": current_user.ui_font_body or "",

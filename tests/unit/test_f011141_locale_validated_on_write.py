@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """F-011141: a stored locale must be one we actually ship.
 
-``get_locale()`` returns ``current_user.locale`` verbatim for any logged-in
-non-Guest user (cps/cw_babel.py).  The ``?lang=`` per-request override IS
-validated, through ``_coerce_locale`` against the available set — but the
-stored value was not, and validation on the write side was inconsistent:
+``get_locale()`` USED TO return ``current_user.locale`` verbatim for any
+logged-in non-Guest user.  The ``?lang=`` per-request override was validated
+through ``_coerce_locale`` against the available set; the stored value was not,
+and validation on the write side was inconsistent:
 
 * ``cps/admin.py`` (the per-field ajax editor) checked
   ``in get_available_translations()`` before assigning;
@@ -34,7 +34,7 @@ pytestmark = pytest.mark.unit
 class TestCoercion:
     """Executing tests — the behaviour, not the source text."""
 
-    def test_the_write_path_consults_the_same_set_as_the_read_path(self):
+    def test_the_live_helper_delegates_to_the_shared_coercion(self):
         """The lockout hazard, pinned without booting the app.
 
         Validating a stored locale against a set that excludes the default
@@ -48,13 +48,15 @@ class TestCoercion:
         (Deliberately not asserted by calling ``create_app()``: it starts the
         scheduler and never returns, which hangs the suite.)
         """
-        source = inspect.getsource(cw_babel)
-        assert "def coerce_stored_locale" in source
-        assert "return _coerce_locale(raw, available)" in source, (
-            "coerce_stored_locale must delegate to the same _coerce_locale the "
-            "?lang= override uses, or the stored and per-request paths can drift"
+        # Anchor the helper the WRITE SITES ACTUALLY CALL. The earlier version
+        # pinned coerce_stored_locale, which after the restructure has zero
+        # production callers -- a test guarding dead code.
+        source = inspect.getsource(cw_babel.sanitize_locale_for_write)
+        assert "_coerce_locale(raw, available)" in source, (
+            "sanitize_locale_for_write must delegate to the same _coerce_locale "
+            "the ?lang= override uses, or the stored and per-request paths drift"
         )
-        assert "babel.list_translations()" in source, (
+        assert "babel.list_translations()" in inspect.getsource(cw_babel), (
             "availability must still come from flask_babel, which includes the "
             "default locale; hardcoding a narrower list would lock users out"
         )
@@ -91,6 +93,44 @@ class TestTheReadPathIsTheBoundary:
     LDAP, OAuth or reverse-proxy provisioning paths, nor a writer added next
     year.  Coercing on read covers all of them at once.
     """
+
+    @pytest.mark.parametrize("stored,shipped,accept,expected", [
+        # the finding's own payloads must never reach a caller
+        ("../../../etc/passwd", {"en", "de"}, "de", "de"),
+        ("{{7*7}}",             {"en", "de"}, "de", "de"),
+        # junk rows: no 500, no "None" masquerading as a locale
+        (None,                  {"en", "de"}, "de", "de"),
+        (123,                   {"en", "de"}, "de", "de"),
+        # a good stored value still wins
+        ("de",                  {"en", "de"}, "en", "de"),
+        # hyphenated legacy row normalises rather than falling through
+        ("pt-BR",               {"en", "pt_BR"}, "en", "pt_BR"),
+        # the translation was dropped from the image: negotiate, do not strand
+        ("hu",                  {"en", "de"}, "de", "de"),
+        ("hu",                  {"en", "de"}, None, "en"),
+    ])
+    def test_get_locale_resolves_a_hostile_or_stale_stored_row(
+            self, stored, shipped, accept, expected, monkeypatch):
+        """The executing test the two source scans below cannot be.
+
+        Those scans catch DELETION of the coercion. They stay green against a
+        BYPASS -- `if stored: return current_user.locale` keeps every string
+        they look for. Only driving the function discriminates.
+        """
+        import flask
+
+        app = flask.Flask(__name__)
+        monkeypatch.setattr(cw_babel, "get_available_translations", lambda: shipped)
+
+        class _User:
+            name = "someone"
+            is_anonymous = False
+        _User.locale = stored
+        monkeypatch.setattr(cw_babel, "current_user", _User())
+
+        headers = {"Accept-Language": accept} if accept else {}
+        with app.test_request_context("/", headers=headers):
+            assert cw_babel.get_locale() == expected
 
     def test_get_locale_coerces_the_stored_value_not_just_the_lang_param(self):
         source = inspect.getsource(cw_babel.get_locale)
@@ -179,43 +219,74 @@ class TestWriteHygieneFailsOpenNotClosed:
             + "\n  ".join(offenders))
 
 
-class TestEveryWriteSiteValidates:
-    """No assignment of ``.locale`` may take a request value unchecked.
+class TestTheSpaCannotTrapAUserWithALegacyBadRow:
+    """The trap this fix would otherwise have set for its own beneficiaries.
 
-    Asserted over the source because the three sites live in Flask request
-    handlers that a unit test cannot drive without a full app + session; what
-    regressed here is whether a value is checked before it is stored.
+    The account GET seeds the React form's language <select>, and the form
+    posts that value back on every save. Returning the raw stored locale meant
+    a user with a legacy bad row saw a control reading "English" while its
+    state held the bad string, and any save -- changing their email, say --
+    was rejected wholesale with "Unsupported locale".
+
+    Reporting the EFFECTIVE locale closes it at the source: the form can only
+    ever hold a value the server will accept.
     """
 
-    ASSIGNMENT = re.compile(r"^\s*(?:content|user|current_user)\.locale\s*=\s*(.+)$")
+    def test_the_account_serializer_reports_the_effective_locale(self):
+        source = inspect.getsource(inspect.getmodule(
+            __import__("cps.api.account", fromlist=["x"])))
+        assert '"locale": effective_locale(' in source, (
+            "the account GET must report the locale the user actually gets; "
+            "returning the raw row re-creates the save trap (F-011141)"
+        )
+        assert '"locale": current_user.locale' not in source, (
+            "raw stored locale is still being served to the SPA form"
+        )
 
-    # Enumerated repo-wide with `grep -rn "\.locale = " cps/`, not from the
-    # diff: the first version of this guard scanned only the two modules the
-    # fix had touched, and the SPA writers in cps/api/ went unnoticed while
-    # four mutation tests went green. A guard covers exactly the files it lists.
+
+class TestEveryWriteSiteValidates:
+    """No assignment of ``.locale`` may store a request value unchecked.
+
+    Walked with ``ast`` rather than scanned line by line.  The line-based
+    version missed ``new_user.locale = (`` entirely -- a multi-line right-hand
+    side whose first line carries no evidence either way -- and a full revert of
+    that site stayed green across the whole suite.  The AST sees the assignment
+    and its complete value expression regardless of formatting.
+    """
+
     @pytest.mark.parametrize("module_name", [
         "cps.web", "cps.admin", "cps.api.account", "cps.api.admin",
     ])
     def test_no_locale_assignment_takes_a_raw_form_value(self, module_name):
+        import ast
         import importlib
 
         module = importlib.import_module(module_name)
+        tree = ast.parse(inspect.getsource(module))
         offenders = []
-        for line in inspect.getsource(module).splitlines():
-            match = self.ASSIGNMENT.match(line)
-            if not match:
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign):
                 continue
-            rhs = match.group(1)
-            # Config defaults and already-stored values are not user input.
-            if "config." in rhs or rhs.strip() in ("content.locale", "current_user.locale"):
+            if not any(isinstance(t, ast.Attribute) and t.attr == "locale"
+                       for t in node.targets):
+                continue
+            rhs = ast.unparse(node.value)
+            # Config defaults and already-stored values are not user input --
+            # but only when the RHS IS one, not merely mentions one. The
+            # substring form waved through
+            #   data.get("locale") or config.config_default_locale or "en"
+            # because it contained "config." somewhere.
+            stripped_rhs = rhs.strip()
+            if stripped_rhs.startswith("config.") or stripped_rhs in (
+                    "content.locale", "current_user.locale"):
                 continue
             if ("sanitize_locale_for_write" in rhs or "coerce_stored_locale" in rhs
                     or "validated_locale" in rhs):
                 continue
-            offenders.append(line.strip())
+            offenders.append(rhs)
         assert not offenders, (
             "{} assigns .locale from an unvalidated value; every write must go "
-            "through cw_babel.coerce_stored_locale so a stored locale can only "
-            "ever be one we ship (F-011141):\n  {}".format(
+            "through cw_babel.sanitize_locale_for_write so a stored locale can "
+            "only ever be one we ship (F-011141):\n  {}".format(
                 module_name, "\n  ".join(offenders))
         )

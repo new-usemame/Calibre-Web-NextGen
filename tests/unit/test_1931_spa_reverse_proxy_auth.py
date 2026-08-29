@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Regression coverage for reverse-proxy identity on the two SPA surfaces.
+"""Production-lifecycle coverage for reverse-proxy identity on SPA surfaces.
 
-The classic comparator is deliberately part of this test app.  The SPA shell
-must remain public so it can render the logged-out login tree, while ``/auth/me``
-must retain its JSON 401.  Authentication state, however, must be identical to
-``@user_login_required`` for the same configured header and local-user lookup.
+These tests deliberately call :func:`cps.create_app`. Reverse-proxy identity
+is installed by its app-wide ``before_request`` hook, not by the SPA or API
+routes themselves; a hand-built Flask app would bypass the behavior that this
+regression must protect.
 """
 
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import flask
 import pytest
@@ -35,21 +36,143 @@ def _user():
     return user
 
 
-def _app(monkeypatch, tmp_path):
-    from cps.api import api_v1
-    from cps.cw_login import current_user
-    from cps.cw_login import LoginManager
-    from cps.spa import spa
-    from cps.usermanagement import user_login_required
-    import cps.spa as spa_mod
+def _factory_app(monkeypatch, tmp_path):
+    """Boot the real factory with only its external startup effects stubbed."""
+    import sqlalchemy
+
+    import cps
+    from cps import calibre_init, constants, cw_babel, schedule, services
 
     (tmp_path / "index.html").write_text(
-        "<!doctype html><title>Calibre-Web NextGen</title><div id=root></div>"
+        "<!doctype html><head></head><body><div id=root></div></body>",
+        encoding="utf-8",
     )
-    monkeypatch.setattr(spa_mod, "_SPA_DIR", str(tmp_path))
-    monkeypatch.delenv("CWNG_SPA", raising=False)
 
-    app = flask.Flask(__name__)
+    # cps owns one module-global Flask object in production. Give this test a
+    # fresh equivalent so factory hooks and blueprint registrations cannot leak
+    # into another unit test, while retaining the production ProxyFix layer.
+    app = flask.Flask("test_1931_production_factory")
+    app.wsgi_app = ProxyFix(app.wsgi_app, **cps.proxyfix_hops)
+    monkeypatch.setattr(cps, "app", app)
+
+    user = _user()
+    state = {"known_user": True}
+    seen_remote_addresses = []
+    db_session = MagicMock()
+    db_session.bind = MagicMock()
+
+    def query(*entities):
+        result = MagicMock()
+        if len(entities) == 1 and entities[0] is cps.ub.User:
+            if flask.has_request_context():
+                seen_remote_addresses.append(flask.request.remote_addr)
+            result.filter.return_value.first.return_value = (
+                user if state["known_user"] else None
+            )
+        else:
+            # The factory's authenticated-user hook also loads magic shelves.
+            result.filter.return_value.all.return_value = []
+        return result
+
+    db_session.query.side_effect = query
+    inspector = MagicMock()
+    inspector.get_table_names.return_value = [
+        "magic_shelf", "hidden_magic_shelf_templates",
+    ]
+
+    monkeypatch.setattr(
+        constants, "USER_PROFILES_JSON", str(tmp_path / "users.json")
+    )
+    if cps.csrf is not None:
+        monkeypatch.setattr(cps.csrf, "init_app", lambda _app: None)
+
+    startup_values = {
+        "init": lambda: None,
+        "settings_path": str(tmp_path / "app.db"),
+        "user_credentials": None,
+        "memory_backend": False,
+        "dry_run": False,
+    }
+    for name, value in startup_values.items():
+        monkeypatch.setattr(cps.cli_param, name, value)
+
+    ub_values = {
+        "init_db": lambda _path: None,
+        "session": db_session,
+        "password_change": lambda _credentials: None,
+        "backfill_annotation_content_ids": lambda *_args: None,
+        "oauth_support": False,
+    }
+    for name, value in ub_values.items():
+        monkeypatch.setattr(cps.ub, name, value)
+
+    config_sql_values = {
+        "get_encryption_key": lambda _path: (None, None),
+        "load_configuration": lambda *_args: None,
+        "get_flask_session_key": lambda _session: "test",
+    }
+    for name, value in config_sql_values.items():
+        monkeypatch.setattr(cps.config_sql, name, value)
+
+    config_values = {
+        "init_config": lambda *_args: None,
+        "config_oauth_redirect_host": "",
+        "config_session": 0,
+        "config_ratelimiter": False,
+        "config_limiter_uri": "",
+        "config_limiter_options": "",
+        "schedule_reconnect": False,
+        "store_calibre_uuid": lambda *_args: None,
+        "config_login_type": constants.LOGIN_STANDARD,
+        "config_use_https": False,
+        "config_allow_reverse_proxy_header_login": True,
+        "config_reverse_proxy_login_header_name": _IDENTITY_HEADER,
+        "config_reverse_proxy_auto_create_users": False,
+        "config_anonbrowse": 0,
+        "config_trustedhosts": "",
+        "config_use_google_drive": False,
+        "config_use_goodreads": False,
+    }
+    for name, value in config_values.items():
+        monkeypatch.setattr(cps.config, name, value, raising=False)
+
+    monkeypatch.setattr(
+        calibre_init, "init_calibre_db_from_config", lambda *_args: None
+    )
+    calibre_values = {
+        "init_db": lambda: None,
+        "ensure_session": lambda: None,
+        "_desktop_compat": False,
+        "session": None,
+        "session_factory": None,
+    }
+    for name, value in calibre_values.items():
+        monkeypatch.setattr(cps.calibre_db, name, value)
+
+    monkeypatch.setattr(cps.updater_thread, "init_updater", lambda *_args: None)
+    monkeypatch.setattr(cps.updater_thread, "start", lambda: None)
+    monkeypatch.setattr(cps, "ReverseProxied", lambda wsgi_app: wsgi_app)
+    monkeypatch.setattr(cps, "Principal", lambda _app: None)
+    monkeypatch.setattr(cps.web_server, "init_app", lambda *_args: None)
+    monkeypatch.setattr(
+        cw_babel.babel, "init_app", lambda *_args, **_kwargs: None
+    )
+    if hasattr(cw_babel.babel, "localeselector"):
+        monkeypatch.setattr(
+            cw_babel.babel, "localeselector", lambda _selector: None
+        )
+    monkeypatch.setattr(services, "ldap", None)
+    monkeypatch.setattr(services, "goodreads_support", None)
+    monkeypatch.setattr(cps.limiter, "init_app", lambda _app: None)
+    monkeypatch.setattr(
+        schedule, "register_scheduled_tasks", lambda _enabled: None
+    )
+    monkeypatch.setattr(schedule, "register_startup_tasks", lambda: None)
+    monkeypatch.setattr(sqlalchemy, "inspect", lambda _bind: inspector)
+
+    # The assertion target: this call installs _cwa_ensure_db_session on the
+    # app. Removing that production hook makes the trusted cases below fail.
+    app = cps.create_app()
     app.testing = True
     app.config.update(
         SECRET_KEY="test",
@@ -57,49 +180,49 @@ def _app(monkeypatch, tmp_path):
         RATELIMIT_ENABLED=False,
     )
 
+    from cps.api import api_v1
+    import cps.api.auth as auth
+    import cps.spa as spa_mod
+    import cps.usermanagement as usermanagement
+    from cps.cw_login import current_user
+
+    monkeypatch.setattr(spa_mod, "_SPA_DIR", str(tmp_path))
+    monkeypatch.delenv("CWNG_SPA", raising=False)
+    app.register_blueprint(api_v1)
+    app.register_blueprint(spa_mod.spa)
+
     class Anonymous:
         is_authenticated = False
+        is_anonymous = True
+        name = None
 
-    login_manager = LoginManager()
-    login_manager.anonymous_user = Anonymous
-    login_manager.login_view = "web.login"
-
-    @login_manager.user_loader
-    def load_session_user(_user_id, _random=None, _session_key=None):
-        return None
-
-    login_manager.init_app(app)
-
-    classic = flask.Blueprint("web", __name__)
-
-    @classic.get("/login")
-    def login():
-        return "CLASSIC LOGIN"
-
-    app.register_blueprint(classic)
-
-    @app.get("/classic-protected")
-    @user_login_required
-    def classic_protected():
-        return flask.jsonify({"name": current_user.name})
+    monkeypatch.setattr(cps.lm, "anonymous_user", Anonymous)
 
     @app.after_request
-    def expose_request_identity_for_assertion(response):
-        user = getattr(flask.g, "flask_httpauth_user", None)
-        if user is not None:
-            response.headers["X-Test-Authenticated-As"] = user.name
+    def expose_current_user_for_assertion(response):
+        if current_user.is_authenticated:
+            response.headers["X-Test-Authenticated-As"] = current_user.name
         return response
 
-    app.register_blueprint(spa)
-    app.register_blueprint(api_v1)
-
-    # Exercise the same configured X-Forwarded-For trust depth as production.
-    # The loader must receive Flask's ProxyFix-corrected request, never parse the
-    # raw forwarding chain itself.
-    app.wsgi_app = ProxyFix(
-        app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+    fake_limiter = MagicMock()
+    fake_limiter.current_limits = []
+    monkeypatch.setattr(usermanagement, "limiter", fake_limiter)
+    monkeypatch.setattr(
+        auth, "_me_payload", lambda value: {"name": value.name}
     )
-    return app
+    create_user = MagicMock()
+    monkeypatch.setattr(usermanagement, "create_authenticated_user", create_user)
+    db_session.reset_mock()
+
+    return SimpleNamespace(
+        app=app,
+        config=cps.config,
+        create_user=create_user,
+        db_session=db_session,
+        seen_remote_addresses=seen_remote_addresses,
+        state=state,
+        user=user,
+    )
 
 
 def _get(client, path):
@@ -114,138 +237,56 @@ def _get(client, path):
     )
 
 
-def _config_patches(*, enabled):
-    import cps.usermanagement as usermanagement
-
-    return (
-        patch.object(
-            usermanagement.config,
-            "config_allow_reverse_proxy_header_login",
-            enabled,
-            create=True,
-        ),
-        patch.object(
-            usermanagement.config,
-            "config_reverse_proxy_login_header_name",
-            _IDENTITY_HEADER,
-            create=True,
-        ),
-        patch.object(
-            usermanagement.config,
-            "config_reverse_proxy_auto_create_users",
-            False,
-            create=True,
-        ),
-        patch.object(
-            usermanagement.config, "config_anonbrowse", 0, create=True
-        ),
-    )
-
-
-@pytest.mark.parametrize(
-    "spa_path", ["/app/", "/api/v1/auth/me"], ids=["spa-shell", "auth-me"]
-)
-def test_trusted_header_identifies_local_user_on_classic_and_spa_surface(
-    monkeypatch, tmp_path, spa_path
+def test_production_factory_hook_identifies_header_user_on_spa_surfaces(
+    monkeypatch, tmp_path
 ):
-    import cps.api.auth as auth
-    import cps.usermanagement as usermanagement
+    harness = _factory_app(monkeypatch, tmp_path)
+    client = harness.app.test_client()
 
-    user = _user()
-    seen_remote_addresses = []
-    session = MagicMock()
+    shell = _get(client, "/app/")
+    me = _get(client, "/api/v1/auth/me")
 
-    def query(_model):
-        seen_remote_addresses.append(flask.request.remote_addr)
-        return session.query.return_value
-
-    session.query.side_effect = query
-    session.query.return_value.filter.return_value.first.return_value = user
-    fake_limiter = MagicMock()
-    fake_limiter.current_limits = []
-
-    app = _app(monkeypatch, tmp_path)
-    config_patches = _config_patches(enabled=True)
-    with config_patches[0], config_patches[1], config_patches[2], config_patches[3], \
-            patch.object(usermanagement.ub, "session", session), \
-            patch.object(usermanagement, "limiter", fake_limiter), \
-            patch.object(auth, "_me_payload", side_effect=lambda value: {"name": value.name}):
-        client = app.test_client()
-        classic = _get(client, "/classic-protected")
-        spa_response = _get(client, spa_path)
-
-    assert classic.status_code == 200
-    assert classic.get_json() == {"name": user.name}
-    assert spa_response.status_code == 200
-    if spa_path == "/app/":
-        assert spa_response.headers["X-Test-Authenticated-As"] == user.name
-    else:
-        assert spa_response.get_json() == {"name": user.name}
-    assert seen_remote_addresses
-    assert set(seen_remote_addresses) == {_CLIENT_HOP}
+    assert shell.status_code == 200
+    assert shell.headers["X-Test-Authenticated-As"] == harness.user.name
+    assert me.status_code == 200
+    assert me.get_json() == {"name": harness.user.name}
+    assert me.headers["X-Test-Authenticated-As"] == harness.user.name
+    assert harness.seen_remote_addresses == [_CLIENT_HOP, _CLIENT_HOP]
 
 
-def test_same_header_on_untrusted_path_authenticates_nowhere(monkeypatch, tmp_path):
-    """The admin trust switch is the classic path's outer trust boundary.
+def test_factory_hook_ignores_same_header_when_feature_disabled(
+    monkeypatch, tmp_path
+):
+    harness = _factory_app(monkeypatch, tmp_path)
+    harness.config.config_allow_reverse_proxy_header_login = False
+    client = harness.app.test_client()
 
-    Supplying the identity and forwarding headers while that path is disabled
-    must not even query for an asserted user on Classic, the SPA shell, or /me.
-    """
-    import cps.api.auth as auth
-    import cps.usermanagement as usermanagement
+    shell = _get(client, "/app/")
+    me = _get(client, "/api/v1/auth/me")
 
-    session = MagicMock()
-    app = _app(monkeypatch, tmp_path)
-    config_patches = _config_patches(enabled=False)
-    with config_patches[0], config_patches[1], config_patches[2], config_patches[3], \
-            patch.object(usermanagement.ub, "session", session), \
-            patch.object(auth, "_me_payload") as me_payload:
-        client = app.test_client()
-        classic = _get(client, "/classic-protected")
-        shell = _get(client, "/app/")
-        me = _get(client, "/api/v1/auth/me")
-
-    assert classic.status_code == 302
-    assert classic.headers["Location"].endswith("/login?next=%2Fclassic-protected")
     assert shell.status_code == 200
     assert "X-Test-Authenticated-As" not in shell.headers
     assert me.status_code == 401
     assert me.get_json()["error"]["code"] == "unauthenticated"
-    session.query.assert_not_called()
-    me_payload.assert_not_called()
+    assert "X-Test-Authenticated-As" not in me.headers
+    harness.db_session.query.assert_not_called()
+    harness.create_user.assert_not_called()
 
 
-def test_nonexistent_header_user_matches_classic_refusal(monkeypatch, tmp_path):
-    """An enabled trusted path does not imply account creation.
+def test_factory_hook_refuses_unknown_user_when_auto_create_is_off(
+    monkeypatch, tmp_path
+):
+    harness = _factory_app(monkeypatch, tmp_path)
+    harness.state["known_user"] = False
+    client = harness.app.test_client()
 
-    With the existing auto-create setting off, the shared loader returns no user;
-    Classic refuses, /me returns JSON 401, and the public shell has no identity.
-    """
-    import cps.api.auth as auth
-    import cps.usermanagement as usermanagement
+    shell = _get(client, "/app/")
+    me = _get(client, "/api/v1/auth/me")
 
-    session = MagicMock()
-    session.query.return_value.filter.return_value.first.return_value = None
-    fake_limiter = MagicMock()
-    fake_limiter.current_limits = []
-
-    app = _app(monkeypatch, tmp_path)
-    config_patches = _config_patches(enabled=True)
-    with config_patches[0], config_patches[1], config_patches[2], config_patches[3], \
-            patch.object(usermanagement.ub, "session", session), \
-            patch.object(usermanagement, "limiter", fake_limiter), \
-            patch.object(usermanagement, "create_authenticated_user") as create_user, \
-            patch.object(auth, "_me_payload") as me_payload:
-        client = app.test_client()
-        classic = _get(client, "/classic-protected")
-        shell = _get(client, "/app/")
-        me = _get(client, "/api/v1/auth/me")
-
-    assert classic.status_code == 302
-    assert classic.headers["Location"].endswith("/login?next=%2Fclassic-protected")
     assert shell.status_code == 200
     assert "X-Test-Authenticated-As" not in shell.headers
     assert me.status_code == 401
     assert me.get_json()["error"]["code"] == "unauthenticated"
-    create_user.assert_not_called()
-    me_payload.assert_not_called()
+    assert "X-Test-Authenticated-As" not in me.headers
+    assert harness.seen_remote_addresses == [_CLIENT_HOP, _CLIENT_HOP]
+    harness.create_user.assert_not_called()

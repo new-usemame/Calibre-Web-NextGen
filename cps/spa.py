@@ -11,7 +11,6 @@ from werkzeug.datastructures import MIMEAccept
 from werkzeug.http import parse_accept_header
 
 from . import logger, constants, config
-from .usermanagement import reverse_proxy_header_login
 
 log = logger.create()
 
@@ -178,17 +177,6 @@ def preferred_spa_html_request():
     if request.cookies.get(PREFER_CLASSIC_COOKIE) == "1":
         return False
     return _browser_document_html_request()
-
-
-def spa_login_default_supported():
-    """Whether the SPA can authenticate this instance's configured login mode.
-
-    Keep this single carve-out until #1893 gives the SPA API an LDAP bind path.
-    Closing that gap reduces the login decision to deleting this predicate call;
-    OAuth and reverse-proxy login are supported. This is intentionally
-    login-only: authenticated LDAP users can use the SPA catalog normally.
-    """
-    return config.config_login_type != constants.LOGIN_LDAP
 
 
 def classic_fallback_requested_from_next(next_url):
@@ -358,7 +346,6 @@ def _render_shell(index_path, prefix):
 @spa.route("/app")
 @spa.route("/app/")
 @spa.route("/app/<path:path>")
-@reverse_proxy_header_login
 def spa_shell(path=""):
     if not _spa_enabled():
         abort(404)

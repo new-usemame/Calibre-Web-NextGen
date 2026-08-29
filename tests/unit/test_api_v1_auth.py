@@ -543,6 +543,29 @@ def test_magic_link_poll_not_verified():
 
 
 @pytest.mark.unit
+def test_magic_link_poll_allows_four_full_sessions_at_client_cadence():
+    """Four 10-minute sessions at the SPA's 3-second cadence fit one IP bucket."""
+    app = _app(rate_limits=True)
+    polls_per_session = (10 * 60) // 3
+    sessions_per_shared_address = 4
+
+    with patch.object(cps.api.auth, "config") as cfg, \
+         patch.object(cps.api.auth, "ub") as ub:
+        cfg.config_remote_login = True
+        ub.session.query.return_value.filter.return_value.first.return_value = None
+        client = app.test_client()
+        for poll_number in range(1, polls_per_session * sessions_per_shared_address + 1):
+            response = client.post(
+                "/api/v1/auth/magic-link/poll",
+                json={"token": "unknown-token"},
+            )
+            assert response.status_code == 200, (
+                f"shared-IP magic-link poll {poll_number} was throttled: "
+                f"{response.get_json()}"
+            )
+
+
+@pytest.mark.unit
 def test_magic_link_poll_success_logs_in_and_consumes_token():
     """A verified token logs the waiting device in, returns the serialized user,
     and the token is deleted (consumed)."""

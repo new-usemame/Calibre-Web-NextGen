@@ -355,7 +355,11 @@ def auth_magic_link_start():
 
 
 @api_v1.route("/auth/magic-link/poll", methods=["POST"])
-@limiter.limit("240/hour", key_func=lambda: get_remote_address())
+# The SPA waits 3 seconds before its first poll, then polls every 3 seconds for
+# a 10-minute token: 600 / 3 = 200 requests per full session. 1000/hour allows
+# four full sessions from one shared IP (800 requests) plus 200 for scheduling
+# overlap/retries, while keeping token guessing bounded per client address.
+@limiter.limit("1000/hour", key_func=lambda: get_remote_address())
 def auth_magic_link_poll():
     """Poll a magic-link token. Returns one of: not_verified | success | expired |
     not_found. On success the waiting device is logged in (session cookie set) and

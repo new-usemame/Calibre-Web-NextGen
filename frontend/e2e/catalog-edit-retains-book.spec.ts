@@ -194,8 +194,10 @@ test.describe('#1169 an edited book stays in the library listing', () => {
     const indexBefore = await targetIndex(page);
     expect(indexBefore, 'the book under test starts at the top of the grid').toBe(0);
 
-    // Client-side into the edit form via the card's own quick-edit control
-    // (hover-revealed on desktop, always shown for touch).
+    // Client-side into the edit form via the card's own quick-edit control.
+    // Hover-revealed on every pointer type since the 2026-08-29 ruling, and on
+    // a coarse pointer the resting control is not hit-testable at all — so the
+    // card.hover() below is load-bearing, not decoration.
     const card = targetCard(page).first();
     await card.hover();
     const quickEdit = page.locator(`main a[href$="/book/${TARGET_ID}/edit"]`).first();

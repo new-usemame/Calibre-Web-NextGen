@@ -99,14 +99,30 @@ def test_coarse_pointer_card_actions_follow_the_2026_08_29_reversal():
     assert ".removeBtn, .quickEditBtn" in coarse
     assert "width: 44px;" in coarse and "height: 44px;" in coarse
 
-    # Opacity only hides pixels: the resting controls must also leave pointer
-    # hit-testing, while the shared reveal rules restore it without changing
-    # keyboard reach or accessibility-tree presence.
+    # Opacity only hides pixels, not hit targets. Without hover nothing reveals
+    # a control before a tap lands, so inside THIS block the resting state must
+    # also leave hit-testing, and each reveal must restore it. Deliberately not
+    # global: on a fine pointer the mouse travels over the control first, and a
+    # global pointer-events: none would block that first click instead.
+    assert ".readNow, .removeBtn, .quickEditBtn { pointer-events: none; }" in coarse
+    assert ".quickEditBtn:focus-visible { pointer-events: auto; }" in coarse
+    for selector in (
+        ".wrap:hover .readNow",
+        ".wrap:focus-within .readNow",
+        ".readNow:focus-visible",
+        ".wrap:hover .removeBtn",
+        ".wrap:focus-within .removeBtn",
+        ".removeBtn:focus-visible",
+        ".wrap:hover .quickEditBtn",
+        ".wrap:focus-within .quickEditBtn",
+    ):
+        assert selector in coarse, selector
+    assert ".addToLibrary { pointer-events: auto; }" in coarse
+    fine = css.split("@media (any-hover: none)", 1)[0]
     for selector in (".removeBtn", ".quickEditBtn", ".readNow"):
-        block = css.split(f"{selector} {{", 1)[1].split("}", 1)[0]
-        assert "opacity: 0;" in block
-        assert "pointer-events: none;" in block
-    assert ".addToLibrary {\n  opacity: 1;\n  pointer-events: auto;" in css
+        block = fine.split(f"\n{selector} {{", 1)[1].split("}", 1)[0]
+        assert "opacity: 0;" in block, selector
+        assert "pointer-events" not in block, selector
 
     # Keyboard and hover reveal stay shared across pointer types; the controls
     # remain in layout/the accessibility tree rather than being display:none.
@@ -122,7 +138,6 @@ def test_coarse_pointer_card_actions_follow_the_2026_08_29_reversal():
         ".readNow:focus-visible",
     ):
         assert selector in css
-    assert css.count("pointer-events: auto;") >= 4
 
 
 def test_coarse_pointer_reversal_does_not_touch_primary_actions_or_badges():

@@ -257,7 +257,6 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
-  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease),
               background var(--dur-fast) var(--ease),
               color var(--dur-fast) var(--ease);
@@ -267,7 +266,6 @@
 .wrap:focus-within .removeBtn,
 .removeBtn:focus-visible {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .removeBtn:hover {
@@ -299,7 +297,6 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
-  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease),
               background var(--dur-fast) var(--ease),
               color var(--dur-fast) var(--ease);
@@ -309,7 +306,6 @@
 .wrap:focus-within .quickEditBtn,
 .quickEditBtn:focus-visible {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .quickEditBtn:hover {
@@ -368,7 +364,6 @@
   white-space: nowrap;
   overflow: hidden;
   opacity: 0;
-  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
@@ -389,17 +384,13 @@
 
 .wrap:hover .readNow,
 .wrap:focus-within .readNow,
-.readNow:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
+.readNow:focus-visible { opacity: 1; }
 
 .readNow:hover,
 .readNow:focus-visible { background: var(--accent-soft); }
 
 .addToLibrary {
   opacity: 1;
-  pointer-events: auto;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
   cursor: pointer;
@@ -418,9 +409,14 @@
    sizes, but leave their shared opacity: 0 resting state intact. The ordinary
    hover, focus-within and focus-visible rules above still reveal them.
 
-   Third ruling (2026-08-29): opacity hides pixels, not hit targets. Transparent
-   actions must use pointer-events: none at rest, and every reveal rule must
-   restore pointer-events: auto so reveal-then-activate still works. */
+   Same-day correction: opacity hides pixels, not hit targets, and this block is
+   the only place where that matters. On a fine pointer the mouse must travel
+   over a control to click it, so .wrap:hover always reveals it first; here
+   there is no hover, so the very first tap would land on a transparent 44px
+   control — remove-from-shelf sits at the cover's top-left corner. So the
+   resting state also leaves hit-testing, and every reveal restores it. Scoped
+   to this block deliberately: a global pointer-events: none would also block
+   the fine-pointer first click, which is a different and worse bug. */
 @media (any-hover: none), (any-pointer: coarse) {
   .readNow { min-height: 44px; }
   /* Bigger where legibility is worst — a phone held at arm's length is the
@@ -434,6 +430,21 @@
     width: 44px;
     height: 44px;
   }
+
+  .readNow, .removeBtn, .quickEditBtn { pointer-events: none; }
+
+  .wrap:hover .readNow,
+  .wrap:focus-within .readNow,
+  .readNow:focus-visible,
+  .wrap:hover .removeBtn,
+  .wrap:focus-within .removeBtn,
+  .removeBtn:focus-visible,
+  .wrap:hover .quickEditBtn,
+  .wrap:focus-within .quickEditBtn,
+  .quickEditBtn:focus-visible { pointer-events: auto; }
+
+  /* Always visible, so always activatable. */
+  .addToLibrary { pointer-events: auto; }
 }
 
 /* Narrow cards — the Compact and Dense grids, which are 3 and 4 columns on a

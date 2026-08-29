@@ -134,6 +134,10 @@ test('coarse pointers keep every redundant card action concealed at rest (2026-0
   await expectPointerActivation(revealedEdit, true, 'hover reveals Edit before a real click');
   await revealedEdit.click();
   await expect(page, 'hover-reveal-then-click still opens the edit route').toHaveURL(/\/app\/book\/\d+\/edit$/);
+  // Park the pointer: a hover left over a card position survives navigation and
+  // would reveal the next page's controls, making the resting-state probe below
+  // measure a hovered card instead of a resting one.
+  await page.mouse.move(0, 0);
 
   // The default E2E admin uses universal-library mode, where Catalog has no
   // per-card removal action. Exercise the same real BookCard X on a temporary

@@ -130,11 +130,13 @@ test.describe('SPA post-auth destination', () => {
       });
     });
 
+    const fatalMessage = 'Too many magic-link checks were made from this network. Generate a new link or try again later.';
     await page.goto('/app/magic-link');
-    await expect(page.getByText(
-      'Too many magic-link checks were made from this network. Generate a new link or try again later.',
-      { exact: true },
-    )).toBeVisible({ timeout: 12_000 });
+    const visibleMessage = page.locator('p', { hasText: fatalMessage });
+    await expect(visibleMessage).toHaveText(fatalMessage, { timeout: 12_000 });
+    await expect(visibleMessage).toBeVisible();
+    await expect(page.locator('[role="alert"][aria-live="assertive"][aria-atomic="true"]'))
+      .toHaveText(fatalMessage);
     expect(polls).toBe(2);
 
     await page.waitForTimeout(4_000);

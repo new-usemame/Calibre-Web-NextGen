@@ -6770,6 +6770,12 @@ msgid "This magic link expired. Generate a new one to try again."
 msgstr "Ce lien magique a expiré. Générez-en un nouveau pour réessayer."
 
 #: cps/spa_strings.py
+msgid "This magic link can’t be checked. Generate a new one to try again."
+msgstr ""
+"Ce lien magique ne peut pas être vérifié. Générez-en un nouveau pour "
+"réessayer."
+
+#: cps/spa_strings.py
 msgid "This page doesn't exist here."
 msgstr "Cette page n’existe pas ici."
 
@@ -6804,6 +6810,14 @@ msgstr "URL du jeton"
 #: cps/spa_strings.py
 msgid "Top Rated"
 msgstr "Les mieux notés"
+
+#: cps/spa_strings.py
+msgid ""
+"Too many magic-link checks were made from this network. Generate a new link "
+"or try again later."
+msgstr ""
+"Trop de vérifications de liens magiques ont été effectuées depuis ce réseau. "
+"Générez un nouveau lien ou réessayez plus tard."
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"

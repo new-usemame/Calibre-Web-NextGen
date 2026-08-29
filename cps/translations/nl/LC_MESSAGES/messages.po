@@ -6631,6 +6631,12 @@ msgstr ""
 "Deze magic link is verlopen. Genereer een nieuwe om het opnieuw te proberen."
 
 #: cps/spa_strings.py
+msgid "This magic link can’t be checked. Generate a new one to try again."
+msgstr ""
+"Deze magic link kan niet worden gecontroleerd. Genereer een nieuwe om het "
+"opnieuw te proberen."
+
+#: cps/spa_strings.py
 msgid "This page doesn't exist here."
 msgstr "Deze pagina bestaat hier niet."
 
@@ -6666,6 +6672,14 @@ msgstr "Token URL"
 #: cps/spa_strings.py
 msgid "Top Rated"
 msgstr "Best beoordeeld"
+
+#: cps/spa_strings.py
+msgid ""
+"Too many magic-link checks were made from this network. Generate a new link "
+"or try again later."
+msgstr ""
+"Er zijn vanaf dit netwerk te veel controles van magic links uitgevoerd. "
+"Genereer een nieuwe link of probeer het later opnieuw."
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"

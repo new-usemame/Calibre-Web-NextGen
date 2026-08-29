@@ -37,18 +37,17 @@ test('book-detail deletion remains visible and accessible with delete permission
   await setDeletePermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
-  // #1939 renamed this region's heading and the button's accessible name from
-  // "Delete book" to "Delete from the global library". The rename is the point:
-  // once a user can also *remove a book from their own library*, "Delete book"
-  // no longer says which of the two you are about to do, and only one of them is
-  // irreversible for everyone. What #1862 guards is unchanged and still asserted
-  // below - the region is present, has an accessible name, and exposes a
-  // reachable delete control - so this is a re-expression, not a relaxation.
+  // #1939's disambiguating wording remains load-bearing, but the redundant
+  // heading row does not: the region and the control now carry the wording.
   const region = page.getByTestId('book-destructive-actions');
   await expect(region).toBeVisible();
   await expect(region).toHaveAccessibleName('Delete from the global library');
-  await expect(region.getByRole('heading', { name: 'Delete from the global library' })).toBeVisible();
-  await expect(region.getByRole('button', { name: 'Delete from the global library' })).toBeVisible();
+  await expect(region).toHaveAttribute('aria-label', 'Delete from the global library');
+  await expect(region.getByRole('heading')).toHaveCount(0);
+  const deleteButton = region.getByRole('button', { name: 'Delete from the global library' });
+  await expect(deleteButton).toHaveCount(1);
+  await expect(deleteButton).toBeVisible();
+  await expect(deleteButton).toHaveText('Delete from the global library');
 });
 
 test('book-detail deletion remains absent without delete permission (#1862)', async ({ page }) => {
@@ -79,8 +78,6 @@ test('dismissing book-detail deletion confirmation never calls the endpoint (#18
   });
 
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
-  // Accessible name, not visible text: the button reads "Delete" and carries
-  // aria-label "Delete from the global library" (#1939).
   const deleteButton = page.getByTestId('book-destructive-actions')
     .getByRole('button', { name: 'Delete from the global library' });
   await expect(deleteButton).toBeVisible();
@@ -112,13 +109,9 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
     await page.locator('html').evaluate((html, value) => html.setAttribute('data-theme', value), theme);
     const appearance = await region.evaluate((element) => {
       const style = getComputedStyle(element);
-      const label = element.querySelector('h2');
       const button = element.querySelector('button');
-      const pageTitle = document.querySelector('h1');
-      if (!(label instanceof HTMLElement)
-        || !(button instanceof HTMLElement)
-        || !(pageTitle instanceof HTMLElement)) {
-        throw new Error('destructive region and page title must retain their semantic structure');
+      if (!(button instanceof HTMLElement)) {
+        throw new Error('destructive region must retain its delete control');
       }
 
       const dangerProbe = document.createElement('span');
@@ -127,9 +120,7 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
       const dangerColor = getComputedStyle(dangerProbe).color;
       dangerProbe.remove();
 
-      const labelStyle = getComputedStyle(label);
       const buttonStyle = getComputedStyle(button);
-      const pageTitleStyle = getComputedStyle(pageTitle);
       return {
         backgroundColor: style.backgroundColor,
         borderLeftStyle: style.borderLeftStyle,
@@ -141,13 +132,8 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
         outlineStyle: style.outlineStyle,
         boxShadow: style.boxShadow,
         dangerColor,
-        labelColor: labelStyle.color,
-        labelFontSize: labelStyle.fontSize,
-        labelFontWeight: labelStyle.fontWeight,
-        pageTitleFontSize: pageTitleStyle.fontSize,
         buttonColor: buttonStyle.color,
         buttonBorderColor: buttonStyle.borderColor,
-        buttonFontWeight: buttonStyle.fontWeight,
       };
     });
 
@@ -157,17 +143,6 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
       usesDangerColor: appearance.borderTopColor === appearance.dangerColor,
     }, `${theme} theme must retain a neutral top divider`).toEqual({
       hasTopDivider: true,
-      usesDangerColor: false,
-    });
-    expect.soft({
-      isPageTitleSized: Number.parseFloat(appearance.labelFontSize)
-        >= Number.parseFloat(appearance.pageTitleFontSize),
-      isAtLeastButtonWeight: Number.parseFloat(appearance.labelFontWeight)
-        >= Number.parseFloat(appearance.buttonFontWeight),
-      usesDangerColor: appearance.labelColor === appearance.dangerColor,
-    }, `${theme} theme must keep the region label subdued`).toEqual({
-      isPageTitleSized: false,
-      isAtLeastButtonWeight: false,
       usesDangerColor: false,
     });
     expect.soft({

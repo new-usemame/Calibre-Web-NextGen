@@ -450,14 +450,6 @@
   background: transparent;
 }
 
-.dangerZoneTitle {
-  margin: 0;
-  color: var(--text-muted);
-  font-family: var(--font-body);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-}
-
 .actionDanger {
   display: inline-flex;
   align-items: center;

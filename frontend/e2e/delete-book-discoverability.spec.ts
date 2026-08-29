@@ -113,10 +113,13 @@ test('book-detail deletion is grouped outside the ordinary action chips (#1046)'
   const destructiveActions = page.getByTestId('book-destructive-actions');
   await expect(ordinaryActions).toBeVisible();
   await expect(destructiveActions).toBeVisible();
-  // #1939: this surface's heading and button accessible name are now
-  // "Delete from the global library". The edit page's own delete button keeps
-  // "Delete book" and is asserted separately above - two different surfaces.
-  await expect(destructiveActions.getByRole('heading', { name: 'Delete from the global library' })).toBeVisible();
-  await expect(destructiveActions.getByRole('button', { name: 'Delete from the global library' })).toBeVisible();
+  // #1939's wording stays on the book-detail region and control. The edit
+  // page's separate "Delete book" button remains asserted above.
+  await expect(destructiveActions).toHaveAccessibleName('Delete from the global library');
+  await expect(destructiveActions.getByRole('heading')).toHaveCount(0);
+  const deleteButton = destructiveActions
+    .getByRole('button', { name: 'Delete from the global library' });
+  await expect(deleteButton).toBeVisible();
+  await expect(deleteButton).toHaveText('Delete from the global library');
   await expect(ordinaryActions.getByRole('button', { name: 'Delete from the global library' })).toHaveCount(0);
 });

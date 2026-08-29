@@ -685,10 +685,7 @@ export function BookDetail() {
               this gate and grouping are the discoverability/UX layer. */}
           {me?.role?.delete_books && me?.role?.edit && (
             <section className={styles.dangerZone} data-testid="book-destructive-actions"
-              aria-labelledby={`delete-book-heading-${book.id}`}>
-              <h2 id={`delete-book-heading-${book.id}`} className={styles.dangerZoneTitle}>
-                {t('Delete from the global library')}
-              </h2>
+              aria-label={t('Delete from the global library')}>
               <button
                 type="button"
                 className={styles.actionDanger}
@@ -711,7 +708,7 @@ export function BookDetail() {
                 }}
               >
                 <Trash2 size={14} aria-hidden="true" focusable={false} />
-                {deleteBook.isPending ? t('Deleting…') : t('Delete')}
+                {deleteBook.isPending ? t('Deleting…') : t('Delete from the global library')}
               </button>
               {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
             </section>

@@ -2431,16 +2431,25 @@ msgid "Sorry you are not allowed to add a book to that shelf"
 msgstr "Lo sentimos, no tiene permisos para añadir un libro a esa estantería"
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr "El libro ya forma parte de la estantería: %(shelfname)s"
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
 msgstr ""
-"%(book_id)s es un identificador de libro no válido. No se ha podido añadir a "
-"la estantería"
 
 #: cps/shelf.py
 #, python-format
@@ -14034,6 +14043,12 @@ msgstr "Exponer las estanterías seleccionadas en OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostrar Selección Leidos/No Leidos"
+
+#, python-format
+#~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+#~ msgstr ""
+#~ "%(book_id)s es un identificador de libro no válido. No se ha podido "
+#~ "añadir a la estantería"
 
 #, python-format
 #~ msgid "Generated %(count)s cover thumbnails"

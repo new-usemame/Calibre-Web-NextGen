@@ -2275,14 +2275,25 @@ msgid "Sorry you are not allowed to add a book to that shelf"
 msgstr "추가할 권한이 없습니다."
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr "이미 등록된 책입니다: %(shelfname)s"
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
-msgstr "추가할 수 없습니다. %(book_id)s는 잘못된 책 ID입니다."
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
+msgstr ""
 
 #: cps/shelf.py
 #, python-format
@@ -13431,6 +13442,10 @@ msgstr "선택한 서재 Kobo 동기화"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "읽음/읽지 않음 표시"
+
+#, python-format
+#~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+#~ msgstr "추가할 수 없습니다. %(book_id)s는 잘못된 책 ID입니다."
 
 #, python-format
 #~ msgid "Generated %(count)s cover thumbnails"

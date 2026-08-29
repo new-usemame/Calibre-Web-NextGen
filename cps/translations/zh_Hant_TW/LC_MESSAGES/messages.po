@@ -2257,14 +2257,25 @@ msgid "Sorry you are not allowed to add a book to that shelf"
 msgstr "對不起，您沒有添加書籍到這個書架的權限"
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr "此書籍已經是書架 %(shelfname)s 的一部分"
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
-msgstr "%(book_id)s 是無效的書籍 ID，無法添加到書架"
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
+msgstr ""
 
 #: cps/shelf.py
 #, python-format
@@ -13342,6 +13353,10 @@ msgstr "同步所選書架到 Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "顯示已讀/未讀選擇"
+
+#, python-format
+#~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+#~ msgstr "%(book_id)s 是無效的書籍 ID，無法添加到書架"
 
 #~ msgid "Switch to New UI"
 #~ msgstr "切換到新 UI"

@@ -56,12 +56,7 @@ test('book-card actions keep a shared baseline for touch, mouse, and keyboard', 
       `${theme}: Read now actions share a bottom baseline`,
     ).toBeLessThanOrEqual(1);
 
-    if (isTouchProject()) {
-      await expectRevealed(firstRead, true, `${theme}: Read now stays visible without hover`);
-      const quickEdit = page.locator('a[aria-label^="Edit "]').first();
-      await expect(quickEdit).toHaveCount(1);
-      await expectRevealed(quickEdit, true, `${theme}: the adjacent quick-edit action is touch-reachable`);
-    } else {
+    if (!isTouchProject()) {
       await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
       await page.mouse.move(0, 0);
       await expectRevealed(firstRead, false, `${theme}: desktop starts with the clean hover treatment`);
@@ -74,6 +69,86 @@ test('book-card actions keep a shared baseline for touch, mouse, and keyboard', 
   }
 });
 
+test('coarse pointers keep every redundant card action concealed at rest (2026-08-29 ruling)', async ({ page }) => {
+  test.skip(!isTouchProject(), 'coarse-pointer resting-state regression');
+
+  await page.goto('/app');
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+
+  const catalogControls = [
+    ['Edit', page.locator('a[aria-label^="Edit "]')],
+    ['Read now', page.locator('a[aria-label^="Read "]')],
+  ] as const;
+
+  for (const [name, control] of catalogControls) {
+    await expect(control.first(), `${name} action loads with the asynchronous catalog grid`).toBeAttached();
+    expect(await control.count(), `the fixture must render at least one ${name} card action`).toBeGreaterThan(0);
+    const opaque = await control.evaluateAll((nodes) =>
+      nodes.filter((node) => getComputedStyle(node).opacity === '1').length,
+    );
+    expect(opaque, `${name} controls are concealed at rest on a coarse pointer`).toBe(0);
+  }
+
+  const catalogCard = page.locator('[class*="wrap"]').filter({
+    has: page.locator('a[aria-label^="Edit "]'),
+  }).first();
+  const catalogDetails = catalogCard.locator('a[aria-label^="Open details for"]');
+  const catalogRead = catalogCard.locator('a[aria-label^="Read "]');
+  const catalogEdit = catalogCard.locator('a[aria-label^="Edit "]');
+  const restingHeight = await catalogCard.evaluate((node) => node.getBoundingClientRect().height);
+  await catalogCard.hover();
+  await expectRevealed(catalogRead, true, 'touch context still honors the shared hover reveal');
+  await expectRevealed(catalogEdit, true, 'touch context still honors Edit hover reveal');
+  await page.mouse.move(0, 0);
+  await catalogDetails.focus();
+  await expectRevealed(catalogRead, true, 'card focus-within reveals Read now on touch');
+  await expectRevealed(catalogEdit, true, 'card focus-within reveals Edit on touch');
+  const focusedHeight = await catalogCard.evaluate((node) => node.getBoundingClientRect().height);
+  expect(Math.abs(focusedHeight - restingHeight),
+    'revealing the reserved action row by focus must not reflow the grid').toBeLessThanOrEqual(0.5);
+  await page.keyboard.press('Tab');
+  await expect(catalogRead, 'keyboard reaches Read now after the card link').toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(catalogEdit, 'keyboard reaches Edit after Read now').toBeFocused();
+
+  // The default E2E admin uses universal-library mode, where Catalog has no
+  // per-card removal action. Exercise the same real BookCard X on a temporary
+  // shelf instead of weakening the regression into a synthetic DOM fixture.
+  const csrf = await page.request.get('/api/v1/auth/csrf');
+  const { csrf_token } = await csrf.json() as { csrf_token: string };
+  const headers = { 'X-CSRFToken': csrf_token };
+  const books = await page.request.get('/api/v1/books?per_page=1');
+  const { items } = await books.json() as { items: Array<{ id: number }> };
+  expect(items.length, 'the fixture must contain a book for the removal-card probe').toBeGreaterThan(0);
+
+  const created = await page.request.post('/api/v1/shelves', {
+    headers,
+    data: { name: `touch-card-actions-${Date.now()}` },
+  });
+  expect(created.ok(), 'temporary shelf creation').toBeTruthy();
+  const shelfId = ((await created.json()) as { id: number }).id;
+  try {
+    const added = await page.request.post(`/api/v1/shelves/${shelfId}/books/${items[0].id}`, { headers });
+    expect(added.ok(), 'temporary shelf membership').toBeTruthy();
+    await page.goto(`/app/shelf/${shelfId}`);
+    const remove = page.getByRole('button', { name: 'Remove from shelf' });
+    await expect(remove).toHaveCount(1);
+    await expectRevealed(remove, false, 'Remove controls are concealed at rest on a coarse pointer');
+    const shelfCard = remove.locator('..');
+    const shelfDetails = shelfCard.locator('a[aria-label^="Open details for"]');
+    await shelfCard.hover();
+    await expectRevealed(remove, true, 'touch context still honors Remove hover reveal');
+    await page.mouse.move(0, 0);
+    await shelfDetails.focus();
+    await expectRevealed(remove, true, 'card focus-within reveals Remove on touch');
+    await page.keyboard.press('Tab');
+    await expect(remove, 'keyboard reaches Remove after the shelf card link').toBeFocused();
+    await expectRevealed(remove, true, 'Remove remains revealed at keyboard focus');
+  } finally {
+    await page.request.post(`/api/v1/shelves/${shelfId}/delete`, { headers }).catch(() => undefined);
+  }
+});
+
 test('quick-edit pencil uses the light-theme card-surface palette', async ({ page }) => {
   await page.goto('/app');
   const quickEdit = page.locator('a[aria-label^="Edit "]').first();
@@ -81,7 +156,11 @@ test('quick-edit pencil uses the light-theme card-surface palette', async ({ pag
 
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  if (!isTouchProject()) {
+  if (isTouchProject()) {
+    // 2026-08-29 ruling: touch actions are concealed at rest, so reveal this
+    // one with the same keyboard focus path whose palette users will see.
+    await quickEdit.focus();
+  } else {
     await quickEdit.locator('..').locator('..').locator('a[aria-label^="Open details for"]').hover();
   }
   await expectRevealed(quickEdit, true, 'light: quick edit is revealed before its visible palette is measured');

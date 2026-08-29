@@ -121,6 +121,48 @@ async function bookHasFormat(page: Page, bookId: number, format: string) {
   return detail.formats.some(({ format: current }) => current.toUpperCase() === format);
 }
 
+test('focus-revealed card actions keep SC 2.5.8 targets on touch (2026-08-29 ruling)', async ({ page, isMobile }) => {
+  test.skip(isMobile !== true, 'coarse-pointer target-size regression');
+
+  await page.goto('/app/');
+  const edit = page.locator('a[aria-label^="Edit "]').first();
+  await expect(edit).toBeAttached();
+  const card = edit.locator('..').locator('..');
+  const details = card.locator('a[aria-label^="Open details for"]');
+  const read = card.locator('a[aria-label^="Read "]');
+  await details.focus();
+  await expect.poll(() => edit.evaluate((node) => getComputedStyle(node).opacity), {
+    message: 'focus-within reveals the touch card actions before target measurement',
+  }).toBe('1');
+  await expectSc258Target('Touch card Read now action', read);
+  await expectSc258Target('Touch card Edit action', edit);
+
+  const headers = await csrfHeaders(page);
+  const books = await page.request.get('/api/v1/books?per_page=1');
+  const { items } = await books.json() as BookList;
+  expect(items.length, 'the target-size fixture needs a shelfable book').toBeGreaterThan(0);
+  const created = await page.request.post('/api/v1/shelves', {
+    headers,
+    data: { name: `sc258-card-actions-${Date.now()}` },
+  });
+  expect(created.ok(), 'temporary shelf creation').toBeTruthy();
+  const shelfId = ((await created.json()) as { id: number }).id;
+  try {
+    const added = await page.request.post(`/api/v1/shelves/${shelfId}/books/${items[0].id}`, { headers });
+    expect(added.ok(), 'temporary shelf membership').toBeTruthy();
+    await page.goto(`/app/shelf/${shelfId}`);
+    const remove = page.getByRole('button', { name: 'Remove from shelf' });
+    await expect(remove).toHaveCount(1);
+    await remove.locator('..').locator('a[aria-label^="Open details for"]').focus();
+    await expect.poll(() => remove.evaluate((node) => getComputedStyle(node).opacity), {
+      message: 'focus-within reveals the touch Remove action before target measurement',
+    }).toBe('1');
+    await expectSc258Target('Touch card Remove action', remove);
+  } finally {
+    await page.request.post(`/api/v1/shelves/${shelfId}/delete`, { headers }).catch(() => undefined);
+  }
+});
+
 test('compact controls expose at least a 24x24 effective clickable target', async ({ page }) => {
   // Keep the desktop browser context (fine pointer) while exercising the
   // responsive menu. Mobile emulation would activate the unrelated 44px

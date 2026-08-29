@@ -398,10 +398,18 @@
 
 .addToLibrary:disabled { cursor: wait; opacity: .7; }
 
-/* `any-pointer` also covers hybrid devices (for example, an iPad with a
-   trackpad): touch must not lose actions merely because a fine pointer exists. */
+/* Historical ruling (2026-07-19): `any-pointer` also covers hybrid devices
+   (for example, an iPad with a trackpad): touch must not lose actions merely
+   because a fine pointer exists.
+
+   Reversed by the operator on 2026-08-29: these three card actions are
+   redundant on touch because Read, Edit and remove-from-library remain on the
+   book detail page, while bulk removal remains in Select mode. Keep them in
+   layout and in the accessibility tree, with their coarse-pointer target
+   sizes, but leave their shared opacity: 0 resting state intact. The ordinary
+   hover, focus-within and focus-visible rules above still reveal them. */
 @media (any-hover: none), (any-pointer: coarse) {
-  .readNow { min-height: 44px; opacity: 1; }
+  .readNow { min-height: 44px; }
   /* Bigger where legibility is worst — a phone held at arm's length is the
      case the reporter was describing. */
   .readBadge, .readingBadge, .hiddenBadge, .libraryBadge {
@@ -412,7 +420,6 @@
   .removeBtn, .quickEditBtn {
     width: 44px;
     height: 44px;
-    opacity: 1;
   }
 }
 

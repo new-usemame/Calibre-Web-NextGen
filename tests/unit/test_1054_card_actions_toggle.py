@@ -7,11 +7,13 @@ edit button in Library view. It makes the main page look messy [...] many users
 are reading on their ereaders, so Read Now is redundant (I never use it)."
 
 Behavioural coverage is frontend/e2e/card-actions-toggle.spec.ts, which drives
-the real toggle in the browser on desktop and touch. These pin the wiring that a
-refactor could quietly drop: the single storage key, the removal (not hiding) of
-the row, and the fact that EVERY surface rendering a BookCard honours it — a
-missed call site is invisible until a user reports the buttons are still there
-on shelves.
+the real toggle in the browser on desktop and touch. The separate
+book-card-actions.spec.ts pins the 2026-08-29 ruling that redundant actions are
+concealed at rest on coarse pointers but remain focusable. These pin the wiring
+that a refactor could quietly drop: the single storage key, the removal (not
+hiding) of the row, and the fact that EVERY surface rendering a BookCard honours
+it — a missed call site is invisible until a user reports the buttons are still
+there on shelves.
 """
 import pathlib
 
@@ -80,6 +82,46 @@ def test_bookcard_removes_the_row_rather_than_hiding_it():
     assert "hideActions" in src
     assert "const hasAddAction = membership === 'unowned' && !!onAddToLibrary;" in src
     assert "const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));" in src
+
+
+def test_coarse_pointer_card_actions_follow_the_2026_08_29_reversal():
+    """This is a deliberate policy reversal, not a defect fix. Preserve the old
+    rationale beside the new ruling, retain touch sizing, and never reintroduce
+    an opacity override that leaves every redundant action standing open."""
+    css = (_FE / "components" / "BookCard.module.css").read_text()
+    coarse = css.split("@media (any-hover: none), (any-pointer: coarse) {", 1)[1] \
+        .split("/* Narrow cards", 1)[0]
+
+    assert "Historical ruling (2026-07-19)" in css
+    assert "Reversed by the operator on 2026-08-29" in css
+    assert "opacity: 1" not in coarse
+    assert ".readNow { min-height: 44px; }" in coarse
+    assert ".removeBtn, .quickEditBtn" in coarse
+    assert "width: 44px;" in coarse and "height: 44px;" in coarse
+
+    # Keyboard and hover reveal stay shared across pointer types; the controls
+    # remain in layout/the accessibility tree rather than being display:none.
+    for selector in (
+        ".wrap:hover .removeBtn",
+        ".wrap:focus-within .removeBtn",
+        ".removeBtn:focus-visible",
+        ".wrap:hover .quickEditBtn",
+        ".wrap:focus-within .quickEditBtn",
+        ".quickEditBtn:focus-visible",
+        ".wrap:hover .readNow",
+        ".wrap:focus-within .readNow",
+        ".readNow:focus-visible",
+    ):
+        assert selector in css
+
+
+def test_coarse_pointer_reversal_does_not_touch_primary_actions_or_badges():
+    css = (_FE / "components" / "BookCard.module.css").read_text()
+    coarse = css.split("@media (any-hover: none), (any-pointer: coarse) {", 1)[1] \
+        .split("/* Narrow cards", 1)[0]
+    assert ".addToLibrary {\n  opacity: 1;" in css
+    assert ".readBadge, .readingBadge, .hiddenBadge, .libraryBadge" in coarse
+    assert ".seriesBadge { min-width: 28px; height: 28px;" in coarse
 
 
 def test_every_book_card_surface_passes_the_live_preference():

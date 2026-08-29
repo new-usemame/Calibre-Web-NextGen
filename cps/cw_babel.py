@@ -136,14 +136,29 @@ def sanitize_locale_for_write(raw):
     return _coerce_locale(raw, available)
 
 
+def effective_locale(raw):
+    """The locale a caller will actually be served, for reporting back.
+
+    Serializers hand this the stored value so a client form can only ever hold
+    something the server will accept.  Fails open exactly like
+    ``sanitize_locale_for_write``: resolution needs a request context and a
+    registered Flask-Babel, and a serializer must not 500 because it could not
+    look one up.
+    """
+    try:
+        return get_locale()
+    except Exception as e:
+        log.debug('Locale resolution unavailable (%s); reporting stored value', e)
+        return raw
+
+
 def coerce_stored_locale(raw, available):
     """Validate a locale that is about to be STORED on a user.
 
-    ``get_locale()`` returns ``current_user.locale`` verbatim, so whatever is
-    written here is what every later request resolves.  The ``?lang=``
-    per-request override has always been validated through the same coercion;
-    the stored value was not, which let any authenticated user persist an
-    arbitrary string as their own locale (F-011141).
+    Retained for explicit-set callers and tests.  Production write sites use
+    ``sanitize_locale_for_write`` instead, which fails open when availability
+    cannot be determined; ``get_locale()`` coerces on read, so this is hygiene
+    rather than the security boundary (F-011141).
 
     Returns the normalised locale (``en-GB`` -> ``en_GB``) when we ship a
     translation for it, and ``None`` otherwise so the caller can keep the value

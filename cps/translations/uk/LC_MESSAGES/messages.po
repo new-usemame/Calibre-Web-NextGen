@@ -2337,13 +2337,24 @@ msgid "Sorry you are not allowed to add a book to that shelf"
 msgstr "Вибачте, але у вас немає дозволу для видалення книги з цієї полиці"
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr ""
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
 msgstr ""
 
 #: cps/shelf.py

@@ -2305,14 +2305,25 @@ msgid "Sorry you are not allowed to add a book to that shelf"
 msgstr "عذرًا، لا يُسمح لك بإضافة كتاب إلى هذا الرف"
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr "الكتاب جزء بالفعل من الرف: %(shelfname)s"
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
-msgstr "%(book_id)s معرف كتاب غير صالح. لا يمكن إضافته إلى الرف"
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
+msgstr ""
 
 #: cps/shelf.py
 #, python-format
@@ -13448,6 +13459,10 @@ msgstr "مزامنة الرفوف المختارة مع Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "إظهار قسم المقروء/غير المقروء"
+
+#, python-format
+#~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+#~ msgstr "%(book_id)s معرف كتاب غير صالح. لا يمكن إضافته إلى الرف"
 
 #, python-format
 #~ msgid "Generated %(count)s cover thumbnails"

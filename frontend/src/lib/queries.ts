@@ -834,6 +834,7 @@ export function useMigrateMyLibrary() {
   return useMutation({
     mutationFn: (userId?: number) => apiPost<{
       results: MyLibraryMigrationRow[]; accounts: number; seeded_books: number; errors: number;
+      skipped: MyLibraryMigrationRow[]; skipped_accounts: number;
     }>('/api/v1/admin/my-library/migrate', userId === undefined ? {} : { user_id: userId }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });

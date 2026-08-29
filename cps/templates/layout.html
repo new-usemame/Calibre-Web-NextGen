@@ -231,7 +231,7 @@
             {% if current_user.is_authenticated or g.allow_anonymous %}
               {% if cwng_spa_enabled %}
               <li class="cwng-switch-li">
-                <a class="cwng-switch-ui" href="{{ url_for('spa.spa_shell') }}" title="{{_('Switch to the new Calibre-Web NextGen interface')}}">
+                <a class="cwng-switch-ui" href="{{ cwng_spa_choice_url() }}" title="{{_('Switch to the new Calibre-Web NextGen interface')}}">
                   <span class="glyphicon glyphicon-flash"></span>
                   <span class="cwng-switch-label">{{_('Back to New UI')}}</span>
                 </a>

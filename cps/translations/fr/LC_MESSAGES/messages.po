@@ -2451,16 +2451,25 @@ msgid "Sorry you are not allowed to add a book to that shelf"
 msgstr "Désolé, vous n’êtes pas autorisé à ajouter un livre dans cette étagère"
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr "Ce livre est déjà sur l’étagère : %(shelfname)s"
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
 msgstr ""
-"%(book_id)s est un identifiant de livre invalide. Il ne peut être ajouté à "
-"l'étagère"
 
 #: cps/shelf.py
 #, python-format
@@ -3028,19 +3037,32 @@ msgstr "Configurer Ma bibliothèque pour tous les utilisateurs"
 
 #: cps/spa_strings.py
 msgid ""
-"Set up My Library for every user? Each account switches to its own selection "
-"after it is filled with everything that account can currently see. Accounts "
-"set up before are never reseeded."
+"Set up My Library for every non-anonymous user? Each account switches to its "
+"own selection after it is filled with everything that account can currently "
+"see. Anonymous accounts such as Guest are left unchanged; use their per-user "
+"controls to set up a curated public library. Accounts set up before are "
+"never reseeded."
 msgstr ""
-"Configurer Ma bibliothèque pour chaque utilisateur ? Chaque compte passe à "
-"sa propre sélection après qu’elle a été remplie avec tout ce que ce compte "
-"peut voir actuellement. Les comptes déjà configurés ne sont jamais "
-"réinitialisés."
+"Configurer Ma bibliothèque pour chaque utilisateur non anonyme ? Chaque "
+"compte passe à sa propre sélection après que celle-ci a été remplie avec "
+"tout ce que le compte peut voir actuellement. Les comptes anonymes tels que "
+"Guest restent inchangés ; utilisez leurs paramètres individuels pour "
+"configurer une bibliothèque publique personnalisée. Les comptes déjà "
+"configurés ne sont jamais réinitialisés."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Set up {accounts} accounts with {books} books. {errors} errors."
 msgstr "{accounts} comptes configurés avec {books} livres. {errors} erreurs."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Left anonymous accounts unchanged: {accounts}. Use their per-user controls "
+"to set up a curated public library."
+msgstr ""
+"Comptes anonymes laissés inchangés : {accounts}. Utilisez leurs paramètres "
+"individuels pour configurer une bibliothèque publique personnalisée."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3114,9 +3136,19 @@ msgstr ""
 "disparu. Votre administrateur gère ce qui entre dans votre sélection."
 
 #: cps/spa_strings.py cps/templates/detail.html
-msgid "The next time your e-reader updates, this book disappears from it."
+msgid "It leaves your library and your OPDS feed."
+msgstr "Il disparaît de votre bibliothèque et de votre flux OPDS."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid ""
+"If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. "
+"Other e-readers keep downloaded copies, and KOReader progress sync keeps "
+"working."
 msgstr ""
-"Lors de la prochaine mise à jour de votre liseuse, ce livre en disparaîtra."
+"Si vous utilisez la synchronisation intégrée de Kobo, il disparaît également "
+"de votre Kobo lors de la prochaine synchronisation. Les autres liseuses "
+"conservent les exemplaires téléchargés et la synchronisation de la "
+"progression KOReader continue de fonctionner."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "The whole archive. Add books to your library from here."
@@ -8168,8 +8200,10 @@ msgstr "EPUB Fixer"
 
 #: cps/tasks/thumbnail.py
 #, python-format
-msgid "Generated %(count)s cover thumbnails"
-msgstr "%(count)s vignettes de couverture générées"
+msgid ""
+"%(processed)d/%(total)d processed: %(generated)d generated, %(skipped)d "
+"skipped, %(failed)d failed"
+msgstr ""
 
 #: cps/tasks/thumbnail.py
 msgid "Cover Thumbnails"
@@ -14033,6 +14067,16 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#, python-format
+#~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+#~ msgstr ""
+#~ "%(book_id)s est un identifiant de livre invalide. Il ne peut être ajouté "
+#~ "à l'étagère"
+
+#, python-format
+#~ msgid "Generated %(count)s cover thumbnails"
+#~ msgstr "%(count)s vignettes de couverture générées"
 
 #, fuzzy
 #~ msgid "New interface available"

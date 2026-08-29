@@ -398,7 +398,8 @@ export function BookDetail() {
     removalImpact.mutate(book.id, {
       onSuccess: (impact) => {
         const lines = [t('Remove "{title}" from your library?', { title: book.title }), '',
-          t('The next time your e-reader updates, this book disappears from it.')];
+          t('It leaves your library and your OPDS feed.'),
+          t("If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. Other e-readers keep downloaded copies, and KOReader progress sync keeps working.")];
         if (impact.affected_shelves.length) lines.push(t('It also leaves these shelves: {shelves}.', { shelves: impact.affected_shelves.join(', ') }));
         lines.push(t('Nothing is deleted: the book stays in the global library, and your highlights, notes and reading progress are kept.'));
         lines.push(me?.role?.browse_global ? t('You can add it back any time from the global library.') : t('Only an administrator can add it back.'));

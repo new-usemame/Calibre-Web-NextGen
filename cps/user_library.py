@@ -16,6 +16,10 @@ class UserLibraryError(Exception):
     """A user-visible membership validation failure."""
 
 
+class UserLibraryBookNotFound(UserLibraryError):
+    """The requested book is absent from the target's visible global set."""
+
+
 def _session(session=None):
     return session or ub.session
 
@@ -307,7 +311,9 @@ def _add_visible_book(user, book_id, *, require_global_browse,
                   user=user,
               )).first())
     if not book:
-        raise UserLibraryError("Book not found in the visible global library.")
+        raise UserLibraryBookNotFound(
+            "Book not found in the visible global library."
+        )
     app_session.execute(
         sqlite_insert(ub.UserLibraryBook)
         .values(user_id=int(user.id), book_id=book_id)

@@ -659,7 +659,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       onSuccess: (impact) => {
         const lines = [
           t('Remove "{title}" from your library?', { title: book.title }), '',
-          t('The next time your e-reader updates, this book disappears from it.'),
+          t('It leaves your library and your OPDS feed.'),
+          t("If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. Other e-readers keep downloaded copies, and KOReader progress sync keeps working."),
         ];
         if (impact.affected_shelves.length) {
           lines.push(t('It also leaves these shelves: {shelves}.', { shelves: impact.affected_shelves.join(', ') }));

@@ -2346,16 +2346,25 @@ msgid "Sorry you are not allowed to add a book to that shelf"
 msgstr "Sorry, je mag geen boeken toevoegen aan de boekenplank"
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr "Dit boek maakt al deel uit van boekenplank: %(shelfname)s"
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
 msgstr ""
-"%(book_id)s is een ongeldig Boek ID. Kon niet worden toegevoegd aan de "
-"boekenplank"
 
 #: cps/shelf.py
 #, python-format
@@ -2917,18 +2926,32 @@ msgstr "Mijn bibliotheek voor alle gebruikers instellen"
 
 #: cps/spa_strings.py
 msgid ""
-"Set up My Library for every user? Each account switches to its own selection "
-"after it is filled with everything that account can currently see. Accounts "
-"set up before are never reseeded."
+"Set up My Library for every non-anonymous user? Each account switches to its "
+"own selection after it is filled with everything that account can currently "
+"see. Anonymous accounts such as Guest are left unchanged; use their per-user "
+"controls to set up a curated public library. Accounts set up before are "
+"never reseeded."
 msgstr ""
-"Mijn bibliotheek voor elke gebruiker instellen? Elk account schakelt over "
-"naar een eigen selectie nadat die is gevuld met alles wat het account nu kan "
-"zien. Eerder ingestelde accounts worden nooit opnieuw gevuld."
+"Mijn bibliotheek voor elke niet-anonieme gebruiker instellen? Elk account "
+"schakelt over naar een eigen selectie nadat die is gevuld met alles wat het "
+"account nu kan zien. Anonieme accounts zoals Guest blijven ongewijzigd; "
+"gebruik de instellingen per gebruiker om een samengestelde openbare "
+"bibliotheek in te stellen. Eerder ingestelde accounts worden nooit opnieuw "
+"gevuld."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Set up {accounts} accounts with {books} books. {errors} errors."
 msgstr "{accounts} accounts ingesteld met {books} boeken. {errors} fouten."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Left anonymous accounts unchanged: {accounts}. Use their per-user controls "
+"to set up a curated public library."
+msgstr ""
+"Anonieme accounts ongewijzigd gelaten: {accounts}. Gebruik de instellingen "
+"per gebruiker om een samengestelde openbare bibliotheek in te stellen."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3000,9 +3023,19 @@ msgstr ""
 "er in je selectie komt."
 
 #: cps/spa_strings.py cps/templates/detail.html
-msgid "The next time your e-reader updates, this book disappears from it."
+msgid "It leaves your library and your OPDS feed."
+msgstr "Het verdwijnt uit je bibliotheek en je OPDS-feed."
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid ""
+"If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. "
+"Other e-readers keep downloaded copies, and KOReader progress sync keeps "
+"working."
 msgstr ""
-"De volgende keer dat je e-reader wordt bijgewerkt, verdwijnt dit boek ervan."
+"Als je de ingebouwde synchronisatie van Kobo gebruikt, verdwijnt het ook van "
+"je Kobo bij de volgende synchronisatie. Andere e-readers behouden "
+"gedownloade exemplaren en de voortgangssynchronisatie van KOReader blijft "
+"werken."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "The whole archive. Add books to your library from here."
@@ -8022,8 +8055,10 @@ msgstr ""
 
 #: cps/tasks/thumbnail.py
 #, python-format
-msgid "Generated %(count)s cover thumbnails"
-msgstr "%(count)s omslagminiaturen gegenereerd"
+msgid ""
+"%(processed)d/%(total)d processed: %(generated)d generated, %(skipped)d "
+"skipped, %(failed)d failed"
+msgstr ""
 
 #: cps/tasks/thumbnail.py
 msgid "Cover Thumbnails"
@@ -13698,6 +13733,16 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#, python-format
+#~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+#~ msgstr ""
+#~ "%(book_id)s is een ongeldig Boek ID. Kon niet worden toegevoegd aan de "
+#~ "boekenplank"
+
+#, python-format
+#~ msgid "Generated %(count)s cover thumbnails"
+#~ msgstr "%(count)s omslagminiaturen gegenereerd"
 
 #, fuzzy
 #~ msgid "New interface available"

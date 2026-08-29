@@ -1,0 +1,19 @@
+{
+  "area": "api",
+  "body": "OBSERVED 2026-08-29 against the running dev instance (cwn-local, port 8086), as a real\npersonal_library user with browse_global, over real HTTP.\n\nThe design (notes/MY-LIBRARY-UI-DESIGN.md) and the user-facing wiki both state that adding a book to\na shelf adds it to your library first, because you cannot shelve what you do not have. That rule is\nreal, but it is implemented in ONE CLIENT:\n\n    frontend/src/components/AddToShelf.tsx:68-72\n        // The shelf API correctly rejects a non-member. Establish membership\n        if (!membershipReady && !(await ensureLibraryMembership())) return;\n\nThe comment is honest about it — the server rejects, and the SPA compensates. So the invariant is a\nclient convention, not a server invariant.\n\nWHAT THE SERVER ACTUALLY DOES. cps/shelf.py:83 add_book_to_shelf() resolves the book through\ncalibre_db.common_filters(), which since #1939 carries the My Library membership predicate. A book\nthe account does not own is therefore not merely refused, it is INVISIBLE, and the function returns\nSHELF_INVALID_BOOK. cps/api/shelves.py:229 maps that to a 404:\n\n    POST /api/v1/shelves/8/books/223\n    {\"error\":{\"code\":\"not_found\",\"message\":\"223 is a invalid Book Id. Could not be added to Shelf\"}}\n\nBook 223 exists, is visible to this account in the Global Library, and can be added to My Library by\nthe same account one call later. Telling that caller the id is invalid is wrong on the facts and\nunactionable as a message.\n\nMEASURED, same session, same user:\n\n    seeded                          mine=51  not_in_my_library=0\n    DELETE /books/223/my-library    mine=50  not_in_my_library=1  ids=[223]\n    POST /shelves/8/books/223       404 'invalid Book Id'\n    library afterwards              mine=50   (it did not join)\n    PUT /books/223/my-library       mine=51  not_in_my_library=0  (so it was always addable)\n\nCLASSIC IS NOT AFFECTED THE SAME WAY, stated precisely rather than assumed by parity. For a\nnon-owned book, classic /book/223 answers 302 and POST /shelf/add/8/223 redirects to / with no\nmessage. So a classic user cannot normally reach the confusing error — but nor do they get the\ndocumented behaviour, and the failure is silent rather than explained. /global-library answers 200.\n\nSCOPE. Not data loss, and not reachable through the default SPA UI, which works around it. It\naffects any non-SPA API consumer, and it means the rule the documentation states is not enforced\nwhere rules belong. A second client — a mobile app, a script, an integration — would have to\nre-implement the same workaround to match documented behaviour.\n\nFIX SHAPE. Enforce it on the server for the user-initiated add-to-shelf paths (the API endpoint and\nthe classic route), so membership is established before the shelf link and the SPA's\nensureLibraryMembership() becomes redundant rather than load-bearing. Do NOT push it down into\nadd_book_to_shelf() unconditionally: that function is also on magic-shelf, bulk and Kobo paths where\nsilently granting membership would be a surprising side effect. If a path should refuse instead, it\nmust refuse with a message that says the book is not in the user's library — never that the id is\ninvalid.",
+  "created": "2026-08-29",
+  "id": "F-b649f0",
+  "refs": [
+    "#1939"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-29",
+    "note": "API and classic user shelf-add routes now establish eligible My Library membership before the shelf row; managed accounts receive an actionable 403, genuine missing books remain 404, and non-user core callers receive an explicit membership-required refusal.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Shelving a book you do not own is a server-side 'invalid Book Id'; the documented add-to-library-first rule lives only in the SPA client"
+}

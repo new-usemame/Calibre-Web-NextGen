@@ -101,7 +101,7 @@ def admin_list_users():
 @api_v1.route("/admin/my-library/migrate", methods=["POST"])
 @login_required_if_no_ano
 def admin_migrate_my_library():
-    """Explicit seed-once migration for one account or every account."""
+    """Seed once for one account or every non-anonymous account."""
     guard = _require_admin()
     if guard:
         return guard
@@ -117,12 +117,34 @@ def admin_migrate_my_library():
     users = query.order_by(ub.User.id.asc()).all()
     if user_id is not None and not users:
         return _err("not_found", "User not found", 404)
+    skipped = []
+    if user_id is None:
+        anonymous_users = [
+            user for user in users
+            if ((user.role & constants.ROLE_ANONYMOUS)
+                == constants.ROLE_ANONYMOUS)
+        ]
+        users = [
+            user for user in users
+            if ((user.role & constants.ROLE_ANONYMOUS)
+                != constants.ROLE_ANONYMOUS)
+        ]
+        skipped = [{
+            "user_id": int(user.id),
+            "name": user.name,
+            "status": "skipped_anonymous",
+            "seeded_books": 0,
+            "membership_count": user_library.membership_count(user.id),
+            "library_mode": user_library.mode_for_user(user),
+        } for user in anonymous_users]
     results = user_library.migrate_users_to_personal_library(users)
     return jsonify({
         "results": results,
         "accounts": len(results),
         "seeded_books": sum(row["seeded_books"] for row in results),
         "errors": sum(row["status"] == "error" for row in results),
+        "skipped": skipped,
+        "skipped_accounts": len(skipped),
     })
 
 

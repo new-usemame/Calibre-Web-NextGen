@@ -2339,14 +2339,25 @@ msgstr ""
 "Desculpe, você não tem permissão para adicionar um livro a esta estante"
 
 #: cps/shelf.py
+msgid "Book not found in the visible global library."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
 #, python-format
 msgid "Book is already part of the shelf: %(shelfname)s"
 msgstr "O livro já faz parte da estante: %(shelfname)s"
 
 #: cps/shelf.py
-#, python-format
-msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
-msgstr "%(book_id)s é um ID de livro inválido. Não foi adicionado à estante"
+msgid ""
+"This book is not in your library. Add it to My Library before adding it to a "
+"shelf."
+msgstr ""
 
 #: cps/shelf.py
 #, python-format
@@ -2887,14 +2898,23 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"Set up My Library for every user? Each account switches to its own selection "
-"after it is filled with everything that account can currently see. Accounts "
-"set up before are never reseeded."
+"Set up My Library for every non-anonymous user? Each account switches to its "
+"own selection after it is filled with everything that account can currently "
+"see. Anonymous accounts such as Guest are left unchanged; use their per-user "
+"controls to set up a curated public library. Accounts set up before are "
+"never reseeded."
 msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Set up {accounts} accounts with {books} books. {errors} errors."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Left anonymous accounts unchanged: {accounts}. Use their per-user controls "
+"to set up a curated public library."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -2946,7 +2966,14 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
-msgid "The next time your e-reader updates, this book disappears from it."
+msgid "It leaves your library and your OPDS feed."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid ""
+"If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. "
+"Other e-readers keep downloaded copies, and KOReader progress sync keeps "
+"working."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/index.html
@@ -7858,8 +7885,10 @@ msgstr ""
 
 #: cps/tasks/thumbnail.py
 #, python-format
-msgid "Generated %(count)s cover thumbnails"
-msgstr "Gerado %(count)s miniaturas de capa"
+msgid ""
+"%(processed)d/%(total)d processed: %(generated)d generated, %(skipped)d "
+"skipped, %(failed)d failed"
+msgstr ""
 
 #: cps/tasks/thumbnail.py
 msgid "Cover Thumbnails"
@@ -13591,6 +13620,14 @@ msgstr "Sincronizar Estantes Selecionadas com Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Mostrar seção de lidos/não lidos"
+
+#, python-format
+#~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"
+#~ msgstr "%(book_id)s é um ID de livro inválido. Não foi adicionado à estante"
+
+#, python-format
+#~ msgid "Generated %(count)s cover thumbnails"
+#~ msgstr "Gerado %(count)s miniaturas de capa"
 
 #, fuzzy
 #~ msgid "New interface available"

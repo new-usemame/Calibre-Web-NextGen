@@ -1,6 +1,8 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+const isPhoneProject = () => test.info().project.name === 'mobile';
+
 /*
  * Automated accessibility gate (WCAG 2.2 AA) — Layer 2 of the verification system.
  *
@@ -97,14 +99,14 @@ for (const [label, path] of [
   ['admin', '/app/admin'],
 ] as const) {
   test(`${label}: no critical/serious a11y violations`, async ({ page }) => {
-    if (isMobile()) test.skip(); // covered on desktop; keep the mobile run lean
+    if (isPhoneProject()) test.skip(); // covered on desktop; keep the mobile run lean
     await page.goto(path);
     await axeScan(page, label);
   });
 }
 
 test('reader: TOC traps focus + Escape, named progressbar, no critical/serious', async ({ page }) => {
-  if (isMobile()) test.skip();
+  if (isPhoneProject()) test.skip();
   // Find a book that offers the in-browser (epub) reader.
   await page.goto('/app');
   await page.locator('a[href*="/book/"]').first().click();
@@ -149,7 +151,7 @@ test('exactly one <main> landmark', async ({ page }) => {
 });
 
 test('skip link is the first tab stop and moves focus to <main>', async ({ page }) => {
-  if (isMobile()) test.skip();
+  if (isPhoneProject()) test.skip();
   await page.goto('/app');
   await page.locator('a[href*="/book/"]').first().waitFor({ state: 'visible' });
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());

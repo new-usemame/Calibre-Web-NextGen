@@ -141,6 +141,22 @@ function targetCard(page: Page) {
   return page.locator(`main a[href$="/book/${TARGET_ID}"]`);
 }
 
+/** Enter the edit flow through the control exposed by the active pointer
+ * contract. Fine pointers retain the hover pencil; coarse pointers expose the
+ * same edit destination as a labelled item in the card disclosure. */
+async function openQuickEdit(page: Page) {
+  const card = targetCard(page).first().locator('..');
+  if (test.info().project.use.hasTouch === true) {
+    await card.getByRole('button', { name: /^More actions for / }).click();
+    const actions = card.getByRole('group', { name: /^Actions for / });
+    await actions.getByRole('link', { name: /^Edit / }).click();
+    return;
+  }
+
+  await card.hover();
+  await card.locator(`a[href$="/book/${TARGET_ID}/edit"]`).click();
+}
+
 /** Where the book under test sits among the loaded cards — the thing the
  *  reporter actually notices. -1 when it isn't rendered at all. */
 async function targetIndex(page: Page): Promise<number> {
@@ -194,12 +210,9 @@ test.describe('#1169 an edited book stays in the library listing', () => {
     const indexBefore = await targetIndex(page);
     expect(indexBefore, 'the book under test starts at the top of the grid').toBe(0);
 
-    // Client-side into the edit form via the card's own quick-edit control
-    // (hover-revealed on desktop, always shown for touch).
-    const card = targetCard(page).first();
-    await card.hover();
-    const quickEdit = page.locator(`main a[href$="/book/${TARGET_ID}/edit"]`).first();
-    await quickEdit.click();
+    // Client-side into the edit form via the card's own quick-edit control,
+    // using the hover row on fine pointers and its touch disclosure equivalent.
+    await openQuickEdit(page);
     await page.waitForURL(`**/book/${TARGET_ID}/edit`);
 
     const titleField = page.getByLabel(/^title$/i).first();
@@ -253,9 +266,7 @@ test.describe('#1169 an edited book stays in the library listing', () => {
     await loadMore.click();
     await expect(gridBookLinks(page)).toHaveCount(firstPageCount * 2);
 
-    const card = targetCard(page).first();
-    await card.hover();
-    await page.locator(`main a[href$="/book/${TARGET_ID}/edit"]`).first().click();
+    await openQuickEdit(page);
     await page.waitForURL(`**/book/${TARGET_ID}/edit`);
     await page.getByLabel(/^title$/i).first().fill(NEW_TITLE);
     await page.getByRole('button', { name: /save changes/i }).click();

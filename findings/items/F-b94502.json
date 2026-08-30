@@ -1,0 +1,13 @@
+{
+  "area": "ci",
+  "body": "OBSERVED 2026-08-30 on PR #2028 at head a5332b7668.\n\n`scripts/lib/pr-lifecycle.sh` decides CI is terminal-green with:\n\n    if [ \"$check_count\" -gt 0 ] && [ \"$pending_count\" -eq 0 ]; then terminal_green=1\n\nIt counts rollup entries. It never asserts that the repo ruleset's REQUIRED\nchecks - `validate-author`, `Fast Tests (Smoke + Unit)`, `Test Suite Summary` -\nare among them.\n\nThe failure mode is a partially-registered rollup, which is the normal state for\nthe first ~30s after a push: the cheap workflows (`validate-author`,\n`Classify image work`, `evaluate`) register and complete quickly, while the\n`Test Suite` workflow is still queueing. At that instant check_count=8 and\npending_count=0, so the predicate holds and the harness emits\nPR_LIFECYCLE_STATUS=green. Measured: the run for a5332b7668 was still\n`status=pending` at the moment the harness printed green, and the eight graded\nchecks contained none of the three required ones.\n\nThe script's own comment shows the race was known - \"gh pr checks --watch ...\ncan return while the rollup still contains pending checks\" - but the guard\nwritten for it (`ever_registered`, \"absence is not green\") only covers a\nCOMPLETELY empty rollup. A rollup that is non-empty and non-pending yet missing\nevery required check passes.\n\nWhy this matters beyond a wrong status string: the merge path is\n`gh pr merge --squash --admin`, and `--admin` bypasses branch protection, so\nGitHub's own required-status-check enforcement is not a backstop either. Both\nsafety nets miss the same case, so a `--merge` submit landing in this window\nwould merge code whose test suite never ran. This did not happen here only\nbecause the gate carried authorize_merge=false.\n\nSuggested fix: grade against the required check NAMES, not a count. Resolve them\nfrom the ruleset (or pin them in the script) and require each to be present with\na SUCCESS conclusion before terminal_green. Absence of a required check should\nbe its own non-green status, distinct from ci-not-registered.",
+  "created": "2026-08-30",
+  "id": "F-b94502",
+  "refs": [
+    "#2028"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "pr-lifecycle grades a head green when the required checks never registered - it counts checks, not their identities"
+}

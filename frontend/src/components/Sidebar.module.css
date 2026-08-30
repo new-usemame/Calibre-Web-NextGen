@@ -169,6 +169,14 @@
     transition:
       width var(--dur-base) var(--ease-out),
       margin-right var(--dur-base) var(--ease-out);
+    /* Interim for #1813 item 4: the hover width animation runs layout every
+       frame; containment scopes that work to the rail instead of the page.
+       Expanded contents stay inside the rail's own 220px border box in both
+       modes: the unpinned negative margin removes only layout footprint, while
+       the pinned zero margin reserves that box. Paint containment therefore
+       clips nothing the rail intentionally exposes. The real fix — a
+       transform-driven panel — is tracked on the issue. */
+    contain: layout paint;
   }
 
   /* `scrollbar-width: none` above is what every current engine reads. The

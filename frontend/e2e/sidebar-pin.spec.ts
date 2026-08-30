@@ -21,6 +21,10 @@ test.describe('#1839 desktop sidebar pin', () => {
 
     await nav.hover({ position: { x: 32, y: 80 } });
     await expect.poll(() => railWidth(page)).toBe('220px');
+    await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).contain))
+      .toBe('layout paint');
+    await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).marginRight))
+      .toBe('-156px');
 
     const pin = page.getByRole('button', { name: 'Pin sidebar' });
     await expect(pin).toHaveAttribute('aria-pressed', 'false');
@@ -30,6 +34,8 @@ test.describe('#1839 desktop sidebar pin', () => {
     await expect.poll(() => railWidth(page)).toBe('220px');
     await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).marginRight))
       .toBe('0px');
+    await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).contain))
+      .toBe('layout paint');
     await expect.poll(() => page.locator('main#main').evaluate((element) => element.getBoundingClientRect().left))
       .toBeGreaterThanOrEqual(220);
 

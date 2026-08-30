@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+const isTouchProject = () => test.info().project.use.hasTouch === true;
+
 /*
  * #1166 — the Edit pencil overlaps the series line, and "Read now" renders
  * awkwardly, on narrow cards.
@@ -23,9 +25,10 @@ import { test, expect } from '@playwright/test';
  * pin *construction*, not pixels: a control that lives in normal flow below the
  * metadata cannot overlap the metadata at any width, density or locale.
  *
- * Runs on the mobile/ipad projects, where coarse-pointer rules make both
- * controls permanently visible — that is the reporters' default state, not a
- * hover edge case.
+ * The 2026-08-29 operator ruling reversed the old permanently-visible touch
+ * default. Coarse pointers use a vertical disclosure and no longer have this
+ * shared row, so these probes are fine-pointer geometry tests. Touch target
+ * geometry is covered against the disclosure in target-size-sc258.spec.ts.
  */
 
 // Dense is the worst case (4 columns at 375px) and is what @HLRobius shot.
@@ -39,16 +42,25 @@ const MEASURE = `(() => {
   const overlaps = [];   // pencil sitting on top of card text
   const wrapped = [];    // "Read now" broken onto a second line
   const overflow = [];   // action control escaping the card box
+  const unrevealed = []; // focus must make the transparent controls visible
   let checked = 0;
 
   for (const w of wraps) {
     const pencil = w.querySelector('[class*="quickEditBtn"]');
-    if (!pencil || getComputedStyle(pencil).opacity === '0') continue;
+    if (!pencil) continue;
+    pencil.style.transition = 'none';
+    const read = w.querySelector('[class*="readNow"]');
+    if (read) read.style.transition = 'none';
+    pencil.focus();
     checked++;
 
     const wb = w.getBoundingClientRect();
     const pb = pencil.getBoundingClientRect();
     const title = (w.querySelector('[class*="title"]')?.textContent || '').slice(0, 30);
+    if (getComputedStyle(pencil).opacity === '0') {
+      unrevealed.push(title);
+      continue;
+    }
 
     // 1. The pencil must not cover title / author / series.
     for (const sel of ['[class*="title"]', '[class*="author"]', '[data-testid="book-card-series"]']) {
@@ -86,11 +98,12 @@ const MEASURE = `(() => {
       overflow.push({ title, el: 'pencil', by: Math.round(Math.max(pb.right - wb.right, wb.left - pb.left)) });
     }
   }
-  return { checked, overlaps, wrapped, overflow };
+  return { checked, overlaps, wrapped, overflow, unrevealed };
 })()`;
 
 for (const density of ['dense', 'compact', 'comfortable'] as const) {
   test(`card actions never cover the metadata (${density} grid, #1166)`, async ({ page }) => {
+    test.skip(isTouchProject(), 'fine-pointer action-row geometry');
     // usePersistentChoice stores the RAW string and ignores anything not in its
     // allowed list — a JSON-encoded '"dense"' silently falls back to the
     // default, which would run all three cases at the same density and look
@@ -99,6 +112,7 @@ for (const density of ['dense', 'compact', 'comfortable'] as const) {
       ([key, value]) => window.localStorage.setItem(key, value),
       [DENSITY_KEY, density] as const,
     );
+    await page.setViewportSize({ width: 375, height: 900 });
     await page.goto('/app/');
     await page.waitForLoadState('networkidle');
     // The grid animates in; measure settled geometry.
@@ -120,9 +134,14 @@ for (const density of ['dense', 'compact', 'comfortable'] as const) {
       overlaps: { title: string; on: string; v: number; h: number }[];
       wrapped: { title: string; lines: number; text: string }[];
       overflow: { title: string; el: string; by: number }[];
+      unrevealed: string[];
     };
 
     test.skip(r.checked === 0, 'no card in this seed shows an edit control');
+
+    expect(r.unrevealed,
+      `keyboard focus did not reveal Edit on these cards: ${JSON.stringify(r.unrevealed)}`
+    ).toEqual([]);
 
     expect(r.overlaps,
       `the Edit control sits on top of card text — the reporters' symptom (#1166): ${JSON.stringify(r.overlaps)}`
@@ -153,10 +172,12 @@ for (const density of ['dense', 'compact', 'comfortable'] as const) {
  * function of whether a sibling happens to exist.
  */
 test('the Edit control stays off the metadata when a book has no readable format (#1166)', async ({ page }) => {
+  test.skip(isTouchProject(), 'fine-pointer action-row geometry');
   await page.addInitScript(
     ([key, value]) => window.localStorage.setItem(key, value),
     ['cwng:catalog-density-v1', 'comfortable'] as const,
   );
+  await page.setViewportSize({ width: 375, height: 900 });
   await page.goto('/app/');
   await page.waitForLoadState('networkidle');
   await page.locator('[class*="quickEditBtn"]').first().waitFor({ state: 'attached' });
@@ -168,6 +189,8 @@ test('the Edit control stays off the metadata when a book has no readable format
     card.querySelector('[class*="readNow"]').remove();
 
     const pencil = card.querySelector('[class*="quickEditBtn"]');
+    pencil.style.transition = 'none';
+    pencil.focus();
     const pb = pencil.getBoundingClientRect();
     const cb = card.getBoundingClientRect();
     // Alone in the row, the pencil must still sit at the RIGHT edge. A bare
@@ -184,15 +207,18 @@ test('the Edit control stays off the metadata when a book has no readable format
       const h = Math.min(pb.right, b.right) - Math.max(pb.left, b.left);
       if (v > 0.5 && h > 0.5) hits.push({ on: sel, v: Math.round(v), h: Math.round(h) });
     }
-    return { simulated: true, hits, distFromRight, distFromLeft };
+    return { simulated: true, revealed: getComputedStyle(pencil).opacity === '1', hits, distFromRight, distFromLeft };
   })()`) as {
     simulated: boolean;
+    revealed?: boolean;
     hits?: { on: string; v: number; h: number }[];
     distFromRight?: number;
     distFromLeft?: number;
   };
 
   test.skip(!r.simulated, 'no card in this seed has both a read link and an edit control');
+
+  expect(r.revealed, 'keyboard focus reveals the lone Edit control').toBe(true);
 
   expect(r.hits,
     `with no "Read now" link the Edit control drops onto the card's metadata (#1166): ${JSON.stringify(r.hits)}`
@@ -211,8 +237,12 @@ test('the Edit control stays off the metadata when a book has no readable format
  *
  * 280px dense is the worst case the app can be put in, which is why it is the
  * width asserted here: every wider grid clears the floor with room to spare.
+ * The 2026-08-29 ruling removes these controls from coarse-pointer layout.
+ * This remains the fine-pointer narrow-card floor; the touch disclosure's
+ * stricter 44px targets are covered in target-size-sc258.spec.ts.
  */
 test('both card actions stay at a tappable size on the narrowest screens (#1166)', async ({ page }) => {
+  test.skip(isTouchProject(), 'fine-pointer action-row geometry');
   await page.addInitScript(
     ([key, value]) => window.localStorage.setItem(key, value),
     ['cwng:catalog-density-v1', 'dense'] as const,
@@ -228,16 +258,28 @@ test('both card actions stay at a tappable size on the narrowest screens (#1166)
     if (!card) return { found: false };
     const cb = card.getBoundingClientRect();
     const small = [];
+    const concealed = [];
+    const pencil = card.querySelector('[class*="quickEditBtn"]');
+    pencil.style.transition = 'none';
+    const read = card.querySelector('[class*="readNow"]');
+    if (read) read.style.transition = 'none';
+    pencil.focus();
     for (const [name, sel] of [['Read now', '[class*="readNow"]:not([class*="Label"])'], ['Edit', '[class*="quickEditBtn"]']]) {
       const el = card.querySelector(sel);
-      if (!el || getComputedStyle(el).opacity === '0') continue;
+      if (!el) continue;
+      if (getComputedStyle(el).opacity === '0') {
+        concealed.push(name);
+        continue;
+      }
       const b = el.getBoundingClientRect();
       if (b.width < 24 || b.height < 24) small.push({ name, w: Math.round(b.width), h: Math.round(b.height) });
     }
-    return { found: true, cardWidth: Math.round(cb.width), small };
-  })()`) as { found: boolean; cardWidth?: number; small?: { name: string; w: number; h: number }[] };
+    return { found: true, cardWidth: Math.round(cb.width), small, concealed };
+  })()`) as { found: boolean; cardWidth?: number; small?: { name: string; w: number; h: number }[]; concealed?: string[] };
 
   test.skip(!r.found, 'no card with an edit control in this seed');
+
+  expect(r.concealed, `focus failed to reveal these touch targets: ${JSON.stringify(r.concealed)}`).toEqual([]);
 
   expect(r.small,
     `a card action shrank below the 24x24 minimum target size on a ${r.cardWidth}px card (WCAG 2.2 SC 2.5.8, #1166): ${JSON.stringify(r.small)}`

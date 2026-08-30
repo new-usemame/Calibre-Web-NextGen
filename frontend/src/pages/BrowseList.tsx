@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useDeferredValue } from 'react';
 import { Link } from 'wouter';
 import { LayoutGrid, List, Search, Pencil, Trash2, Check, X, Merge } from 'lucide-react';
 import { useEntityList, useMe, useRenameTag, useDeleteTag, tagConflictOf } from '../lib/queries';
@@ -183,12 +183,15 @@ export function BrowseList({ plural, title }: BrowseListProps) {
     ? `${styles.grid} ${styles.gridTags}`
     : styles.grid;
 
+  // Typing stays responsive on 10k-entity libraries: the filter re-runs at
+  // deferred priority instead of on every keystroke (#1813 item 6).
+  const deferredQ = useDeferredValue(q);
   const items = useMemo(() => {
     const all = data?.items ?? [];
-    if (!q.trim()) return all;
-    const needle = q.trim().toLowerCase();
+    if (!deferredQ.trim()) return all;
+    const needle = deferredQ.trim().toLowerCase();
     return all.filter((e) => e.name.toLowerCase().includes(needle));
-  }, [data, q]);
+  }, [data, deferredQ]);
 
   return (
     <main className={styles.container}>

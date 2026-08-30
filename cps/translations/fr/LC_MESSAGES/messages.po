@@ -14311,6 +14311,13 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#, python-brace-format
+msgid "Delete the {fmt} file? The book record, metadata, shelves, and reading state stay available."
+msgstr "Supprimer le fichier {fmt} ? La fiche du livre, ses métadonnées, ses étagères et l’état de lecture resteront disponibles."
+
+msgid "The book record, metadata, shelves, and reading state stay available. If this is the last format, you can add a replacement later."
+msgstr "La fiche du livre, ses métadonnées, ses étagères et l’état de lecture resteront disponibles. S’il s’agit du dernier format, vous pourrez en ajouter un autre plus tard."
+
 #~ msgid "HTML is allowed and sanitized on display."
 #~ msgstr "Le HTML est autorisé et nettoyé à l’affichage."
 

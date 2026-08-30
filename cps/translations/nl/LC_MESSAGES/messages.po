@@ -13976,6 +13976,13 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#, python-brace-format
+msgid "Delete the {fmt} file? The book record, metadata, shelves, and reading state stay available."
+msgstr "Het bestand {fmt} verwijderen? De boekvermelding, metadata, boekenplanken en leesstatus blijven beschikbaar."
+
+msgid "The book record, metadata, shelves, and reading state stay available. If this is the last format, you can add a replacement later."
+msgstr "De boekvermelding, metadata, boekenplanken en leesstatus blijven beschikbaar. Als dit het laatste formaat is, kun je later een vervangend formaat toevoegen."
+
 #~ msgid "HTML is allowed and sanitized on display."
 #~ msgstr "HTML is toegestaan en wordt bij weergave opgeschoond."
 

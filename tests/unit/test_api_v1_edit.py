@@ -315,25 +315,79 @@ def test_delete_format_uses_core_with_uppercased_format():
 
 
 @pytest.mark.unit
-def test_delete_format_rejects_removing_the_last_format():
+def test_delete_format_allows_removing_the_last_format():
     from cps.api import edit as mod
     book = SimpleNamespace(id=5, data=[SimpleNamespace(format="EPUB")])
     with _ctx("/api/v1/books/5/formats/epub/delete"):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod.calibre_db, "get_filtered_book", return_value=book), \
-             patch.object(mod, "delete_book_from_table") as core:
+             patch.object(mod, "delete_book_from_table", return_value=json.dumps([
+                 {}, {"type": "success", "message": "Book Format Successfully Deleted"}
+             ])) as core:
             resp = inspect.unwrap(mod.delete_format)(5, "epub")
-    assert resp[1] == 409
-    assert json.loads(resp[0].get_data())["error"]["code"] == "last_format"
-    core.assert_not_called()
+    assert resp[1] == 204
+    core.assert_called_once_with(5, "EPUB", True)
 
 
 @pytest.mark.unit
-def test_edit_book_explains_why_the_last_format_cannot_be_deleted():
+def test_edit_book_explains_that_deleting_the_last_format_keeps_the_book():
     component = (Path(__file__).parents[2] / "frontend" / "src" / "pages" / "EditBook.tsx").read_text()
-    assert "const isLastFormat = book!.formats.length === 1" in component
-    assert "disabled={deleteFormat.isPending || isLastFormat}" in component
-    assert "A book must keep at least one format." in component
+    assert "disabled={deleteFormat.isPending}" in component
+    assert "The book record, metadata, shelves, and reading state stay available." in component
+
+
+@pytest.mark.unit
+def test_classic_route_allows_removing_a_single_format():
+    """Drive POST /delete/<id>/<format> directly for the reporter's case."""
+    from cps import editbooks as mod
+
+    single_format_book = SimpleNamespace(
+        id=5, data=[SimpleNamespace(format="EPUB")]
+    )
+
+    def delete_core(book_id, book_format, json_response, location):
+        assert single_format_book.id == book_id
+        assert len(single_format_book.data) == 1
+        assert single_format_book.data[0].format == book_format
+        assert json_response is False
+        assert location == "/book/5"
+        return "deleted"
+
+    app = flask.Flask(__name__)
+    with app.test_request_context(
+        "/delete/5/EPUB", method="POST", data={"location": "/book/5"}
+    ):
+        with patch.object(mod, "delete_book_from_table", side_effect=delete_core) as core:
+            response = inspect.unwrap(mod.delete_book_ajax)(5, "EPUB")
+
+    assert response == "deleted"
+    core.assert_called_once()
+
+
+@pytest.mark.unit
+def test_classic_edit_explains_metadata_only_result_and_renders_single_format_control():
+    template = (Path(__file__).parents[2] / "cps" / "templates" / "book_edit.html").read_text()
+    assert "book.data|length > 1" not in template
+    assert "The book record, metadata, shelves, and reading state stay available." in template
+
+
+@pytest.mark.unit
+def test_metadata_only_detail_hides_all_file_delivery_controls():
+    component = (Path(__file__).parents[2] / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
+    assert "book.formats.map((fmt) =>" in component
+    assert "book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0" in component
+
+
+@pytest.mark.unit
+def test_classic_delete_modal_distinguishes_format_from_whole_book_consequences():
+    repo = Path(__file__).parents[2]
+    modal = (repo / "cps" / "templates" / "modal_dialogs.html").read_text()
+    script = (repo / "cps" / "static" / "js" / "main.js").read_text()
+    assert 'id="book_format_details"' in modal
+    assert 'id="book_complete_details"' in modal
+    assert "The book record, metadata, shelves, and reading state stay available." in modal
+    assert '$("#book_format_details").removeClass(\'hidden\')' in script
+    assert '$("#book_complete_details").addClass(\'hidden\')' in script
 
 
 @pytest.mark.unit

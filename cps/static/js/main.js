@@ -282,10 +282,14 @@ $("#deleteModal").on("show.bs.modal", function(e) {
     var bookfomat = $(e.relatedTarget).data("delete-format");
     if (bookfomat) {
         $("#book_format").removeClass('hidden');
+        $("#book_format_details").removeClass('hidden');
         $("#book_complete").addClass('hidden');
+        $("#book_complete_details").addClass('hidden');
     } else {
         $("#book_complete").removeClass('hidden');
+        $("#book_complete_details").removeClass('hidden');
         $("#book_format").addClass('hidden');
+        $("#book_format_details").addClass('hidden');
     }
     $(e.currentTarget).find("#delete_confirm").data("delete-id", bookId);
     $(e.currentTarget).find("#delete_confirm").data("delete-format", bookfomat);

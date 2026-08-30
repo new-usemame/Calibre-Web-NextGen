@@ -639,7 +639,7 @@ export function BookDetail() {
               </button>
             )}
 
-            {inLibrary && me?.role?.download && (deliveryDevices.data?.devices.length ?? 0) > 0 && (
+            {inLibrary && me?.role?.download && book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0 && (
               <button type="button" className={styles.downloadBtn}
                 aria-expanded={deviceSendOpen} aria-controls="device-send-panel"
                 onClick={() => { setDeviceSendOpen((value) => !value); setDeviceSendBanner(null); }}>

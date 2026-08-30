@@ -67,6 +67,8 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Deleting the final file format now keeps a supported metadata-only book instead of forcing whole-book deletion.** Classic previously hid every per-format delete control when a book had one format, while the New UI/API rejected the same action with `last_format`; the shared classic core nevertheless allowed it. The two write paths now agree that any individual format may be removed while the `Books` record, metadata, shelves, and reading state remain. Both editors explain that result and allow a replacement format later; metadata-only detail views hide download, e-mail, and pull-device delivery controls, OPDS emits the metadata entry without acquisition links, Kobo omits it from eligible entitlements, search/grid keep it discoverable, and the duplicate index records the existing `no_format` signature. The delete-books role checks are unchanged. Single-format deletion retains the existing files-first/Data-row-second ordering so a failed file removal cannot be reported as a completed deletion. Fork issue [#1705](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1705), reported by @TangentFoxy. | SHA `TBD` | release `TBD`.
+
 - **Local-only accounts can now use the classic login form in an LDAP
   deployment when the directory explicitly rejects their credentials** (fork
   [#1903](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1903),

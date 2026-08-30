@@ -5570,6 +5570,11 @@ msgid "Highlights"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 
@@ -5655,6 +5660,10 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr ""
+
+#: cps/progress_syncing/protocols/kosync.py cps/spa_strings.py
+msgid "KOReader Sync Plugin"
+msgstr "Vtičnik za sinhronizacijo KOReader"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -6729,6 +6738,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Settings saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Setup KOReader Sync"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7914,10 +7927,6 @@ msgstr "Neveljavna vloga"
 msgid "Tag could not be deleted"
 msgstr ""
 
-#: cps/progress_syncing/protocols/kosync.py
-msgid "KOReader Sync Plugin"
-msgstr "Vtičnik za sinhronizacijo KOReader"
-
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
 msgstr "Nisem našel veljavne datoteke gmail.json z informacijami OAuth"
@@ -8462,11 +8471,6 @@ msgstr ""
 #: cps/templates/admin.html
 msgid "Check NextGen Status"
 msgstr ""
-
-#: cps/templates/admin.html
-#, fuzzy
-msgid "Setup KOReader Sync"
-msgstr "epub bralnik"
 
 #: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"

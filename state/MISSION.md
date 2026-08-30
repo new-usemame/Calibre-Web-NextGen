@@ -17,9 +17,17 @@ Updated: 2026-08-28  Phase: complete  Status: 10/10 outcomes observed
 
 ## Now / next action
 
-PR #1956 is open, rebased onto main (155 of 221 concurrency modules re-measured), and awaiting its
-Test Suite run. Full unit lane on the rebased tree: 7869 passed, 92 skipped, 0 failed (the 216
-deselected are main's container-backed tests, now correctly outside the unit lane per #1986). E2E has veto over local green on this branch: it is the only gate that caught the no-JS redirect loop, and the only one that executed the corrected fallback assertion.
+All three deliverables are merged and verified as ancestors of `origin/main`: #1956 (928b715986,
+new-UI default + per-account catalog prefs), #2023 (2dd1df61b7, only an explicit action revokes a
+Classic opt-out), #2021 (194b9c1937, F-994ad6 CI-wedge finding). The parity inventory is filed as
+issue #1955. CARE deployed dev build 2b0d098 to the household canary (merge-base verified to
+contain both product SHAs).
+
+Open follow-ons, none authorized by this brief: #1955 parity closure gates any classic retirement;
+#1959 (SPA cannot surface server-side flashed notices); F-adaa84 (sub-path e2e lane has never run
+in CI). Post-compaction hydration record: `state/HYDRATION-2026-08-30.md` — note the operator's
+free-text ruling recovered there (stop exposing entry points to classic pages that have a new-UI
+equivalent, once parity is proven).
 
 ## How to build/run/verify
 

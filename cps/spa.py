@@ -5,8 +5,8 @@ import json
 import os
 import re
 from html import escape as html_escape
-from urllib.parse import parse_qsl, urlsplit
-from flask import Blueprint, request, Response, abort, current_app
+from urllib.parse import parse_qsl, urlencode, urlsplit
+from flask import Blueprint, request, Response, abort, current_app, redirect
 from werkzeug.datastructures import MIMEAccept
 from werkzeug.http import parse_accept_header
 
@@ -57,6 +57,10 @@ def _inject_spa_flag():
     return {
         "cwng_spa_enabled": spa_available(),
         "cwng_app_version": constants.INSTALLED_VERSION,
+        # A callable defers request.script_root lookup until a request-backed
+        # template actually renders; app-context-only callers can still inspect
+        # this context processor without manufacturing a request.
+        "cwng_spa_choice_url": spa_shell_choice_url,
     }
 
 
@@ -84,10 +88,14 @@ def _mount_prefix():
 # UI preference cookies (#739/#908). ``cwng_prefer_spa`` is retained for
 # compatibility with browsers and older releases that used the opt-in scheme.
 # The current scheme is an explicit Classic opt-out: no Classic cookie means
-# SPA, and entering /app clears that opt-out. Both cookies remain per-browser.
+# SPA, and only the marked Classic-nav action clears that opt-out. Merely
+# entering /app (including a shared deep link) preserves it. Both cookies remain
+# per-browser.
 PREFER_SPA_COOKIE = "cwng_prefer_spa"
 PREFER_CLASSIC_COOKIE = "cwng_prefer_classic"
 _UI_PREFERENCE_MAX_AGE = 60 * 60 * 24 * 365  # one year
+_SPA_CHOICE_PARAM = "cwng_switch"
+_SPA_CHOICE_VALUE = "spa"
 
 
 def prefer_spa_cookie_path():
@@ -248,6 +256,30 @@ def spa_shell_url():
     return f"{_mount_prefix()}/app/"
 
 
+def spa_shell_choice_url():
+    """Prefix-safe URL for the explicit Classic -> SPA navigation control.
+
+    The path comes from :func:`spa_shell_url`, so it shares the strict #571
+    mount-prefix sanitizer. The query is fixed server-owned data, never copied
+    from a request value.
+    """
+    return "%s?%s" % (
+        spa_shell_url(),
+        urlencode({_SPA_CHOICE_PARAM: _SPA_CHOICE_VALUE}),
+    )
+
+
+def _explicit_spa_choice_requested(path):
+    """True only for the exact marker on the base SPA shell route.
+
+    Requiring an empty routed path prevents a marker copied onto a content deep
+    link from becoming preference-mutating. Requiring the sole query pair keeps
+    unrelated application query strings non-mutating too.
+    """
+    return not path and list(request.args.lists()) == [
+        (_SPA_CHOICE_PARAM, [_SPA_CHOICE_VALUE])]
+
+
 def _inline_script_json(value):
     """JSON for an inline script without an HTML ``</script>`` breakout."""
     return (
@@ -339,10 +371,19 @@ def spa_shell(path=""):
         log.warning("SPA shell requested but build artifact not found: %s — run the Vite build "
                     "or set CWNG_SPA=0 to suppress this warning", index_path)
         abort(404)
+    if _explicit_spa_choice_requested(path):
+        # Consume the preference-mutating marker once, then land on the clean
+        # shell URL. Refreshes, bookmarks, and shared SPA URLs are therefore
+        # ordinary non-mutating navigations. The fixed redirect target shares
+        # the same sanitized mount-prefix path as the marked URL.
+        resp = redirect(spa_shell_url())
+        clear_prefer_classic_cookie(resp)
+        stamp_prefer_spa_cookie(resp)
+        return resp
+
     resp = _render_shell(index_path, _mount_prefix())
-    # Loading the SPA is the act of choosing it. Clear the current Classic
-    # opt-out, and keep stamping the legacy SPA cookie so a downgrade retains
-    # the user's choice.
-    clear_prefer_classic_cookie(resp)
+    # Every shell load retains the downgrade-compatible SPA cookie, but does
+    # not revoke an explicit Classic choice. Only the marked nav action above
+    # has authority to clear that opt-out.
     stamp_prefer_spa_cookie(resp)
     return resp

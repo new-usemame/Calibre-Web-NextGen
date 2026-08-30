@@ -26,6 +26,10 @@
   scrollbar-color: var(--border-strong) transparent;
 }
 
+/* Match Discover: overflow-x:auto otherwise clips an open card disclosure on
+   the block axis as well as the scrolling axis. */
+.strip:has([aria-expanded="true"]) { overflow: visible; }
+
 /* Legacy fallback only — mirrors DiscoverSection. See #1089: an engine that
    honours these pseudo-elements swaps the strip's overlay scrollbar for an
    always-visible classic one, so they are scoped to engines that lack the

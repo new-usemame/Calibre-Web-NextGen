@@ -659,7 +659,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       onSuccess: (impact) => {
         const lines = [
           t('Remove "{title}" from your library?', { title: book.title }), '',
-          t('The next time your e-reader updates, this book disappears from it.'),
+          t('It leaves your library and your OPDS feed.'),
+          t("If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. Other e-readers keep downloaded copies, and KOReader progress sync keeps working."),
         ];
         if (impact.affected_shelves.length) {
           lines.push(t('It also leaves these shelves: {shelves}.', { shelves: impact.affected_shelves.join(', ') }));
@@ -1038,7 +1039,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                 key={book.id}
                 book={book}
                 showSeriesIndex={isSeries}
-                style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }}
+                style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }}
                 quickEdit={canEdit && !selecting}
                 canRead={!!me?.role?.viewer}
                 hideActions={cardActionsHidden}
@@ -1083,6 +1084,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       {selecting && selected.size > 0 && (
         <BulkBar
           ids={[...selected]}
+          personalLibrary={personalLibrary}
           onClear={() => {
             setSelected(new Set());
             setSelecting(false);

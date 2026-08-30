@@ -232,3 +232,64 @@ def test_runs_as_a_subprocess_with_no_third_party_imports():
     src = TOOL.read_text()
     for banned in ("import requests", "import yaml", "from pydantic", "import click"):
         assert banned not in src
+
+
+def test_committed_index_matches_a_regeneration_from_the_real_items():
+    """The committed INDEX.md must equal what findings.py would generate right now.
+
+    INDEX.md is generated, but it is carried on every branch, so two branches that each
+    legitimately add a finding both edit it. Git's line-based merge does not always
+    conflict on that: observed 2026-08-29, merging main into a feature branch produced a
+    CLEAN merge whose index carried two different count lines at once --
+
+        251 open, 37 closed.
+        250 open, 40 closed.
+
+    A conflict is self-announcing and gets fixed. That is not; it is a generated file
+    nobody reads closely precisely because it is generated, and it can reach main and
+    stay there until someone regenerates for an unrelated reason. This test is the thing
+    that notices. It also catches the more mundane case of editing findings/items/ and
+    forgetting to regenerate (F-4ec664).
+
+    Measured across five merges, the corruption needs BOTH sides to have moved the count
+    line since the merge base -- and the worst case is when both moved it to the SAME
+    text. Two sessions each adding one finding both write base+1, git sees them agree,
+    merges cleanly with no duplicate, and the result is one entirely normal-looking line
+    that is wrong because the truth is the union of both changes. That is the ordinary
+    case on a busy ledger, not a rare one, which is why this test recomputes from the
+    items instead of comparing text.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("findings_real", TOOL)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    committed = mod.INDEX.read_text(encoding="utf-8")
+
+    written = {}
+    original_write = mod._write_atomic
+    mod._write_atomic = lambda path, text: written.__setitem__("text", text)
+    try:
+        mod.cmd_index(None)
+    finally:
+        mod._write_atomic = original_write
+
+    regenerated = written["text"]
+    if committed != regenerated:
+        import difflib
+
+        diff = "\n".join(
+            difflib.unified_diff(
+                committed.splitlines(),
+                regenerated.splitlines(),
+                "findings/INDEX.md (committed)",
+                "findings/INDEX.md (regenerated)",
+                lineterm="",
+                n=1,
+            )
+        )
+        raise AssertionError(
+            "findings/INDEX.md is stale or corrupt. Run `python3 scripts/findings.py index` "
+            "and commit the result — do not hand-edit it.\n\n" + diff
+        )

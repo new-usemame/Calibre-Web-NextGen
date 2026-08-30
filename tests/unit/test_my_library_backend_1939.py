@@ -5,14 +5,16 @@
 from datetime import datetime, timezone
 import inspect as pyinspect
 import sqlite3
+import threading
 from types import SimpleNamespace
 
 import pytest
 from flask import Flask
 from sqlalchemy import create_engine, event, inspect
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from cps import constants, db, ub
+from cps.progress_syncing.models import KOSyncProgress
 
 pytestmark = pytest.mark.unit
 
@@ -461,6 +463,113 @@ def test_admin_migration_api_can_target_one_account(
     assert target_result["seeded_books"] == 0
     assert untouched.library_mode() == constants.LIBRARY_MODE_PERSONAL
 
+
+def test_admin_bulk_migration_skips_anonymous_account_and_reports_reruns(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+    from cps.api import admin as api_admin
+
+    administrator = ub.User(
+        name="bulk-admin", email="bulk-admin@example.invalid", password="",
+        role=constants.ROLE_ADMIN, default_language="all",
+    )
+    reader = _user(app_session, "bulk-reader", False)
+    guest = _user(app_session, "Guest", False)
+    guest.role = constants.ROLE_ANONYMOUS
+    app_session.add(administrator)
+    app_session.commit()
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(api_admin, "current_user", administrator)
+    app = Flask(__name__)
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST", json={}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    payload = response.get_json()
+
+    assert payload["accounts"] == 2
+    assert payload["errors"] == 0
+    assert payload["skipped_accounts"] == 1
+    assert {row["user_id"] for row in payload["results"]} == {
+        administrator.id, reader.id,
+    }
+    assert payload["skipped"] == [{
+        "user_id": guest.id,
+        "name": "Guest",
+        "status": "skipped_anonymous",
+        "seeded_books": 0,
+        "membership_count": 0,
+        "library_mode": constants.LIBRARY_MODE_MONOLIBRARY,
+    }]
+    assert reader.library_mode() == constants.LIBRARY_MODE_PERSONAL
+    assert guest.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+    assert guest.user_library_seeded is False
+    assert user_library.membership_count(guest.id, app_session) == 0
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST", json={}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    rerun = response.get_json()
+
+    assert rerun["accounts"] == 2
+    assert rerun["skipped_accounts"] == 1
+    assert all(row["seeded_books"] == 0 for row in rerun["results"])
+    assert rerun["skipped"] == payload["skipped"]
+    assert guest.library_mode() == constants.LIBRARY_MODE_MONOLIBRARY
+    assert guest.user_library_seeded is False
+    assert user_library.membership_count(guest.id, app_session) == 0
+
+
+def test_admin_scoped_migration_can_switch_anonymous_account_once(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+    from cps.api import admin as api_admin
+
+    administrator = ub.User(
+        name="scoped-admin", email="scoped-admin@example.invalid", password="",
+        role=constants.ROLE_ADMIN, default_language="all",
+    )
+    guest = _user(app_session, "Guest", False)
+    guest.role = constants.ROLE_ANONYMOUS
+    app_session.add(administrator)
+    app_session.commit()
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(api_admin, "current_user", administrator)
+    app = Flask(__name__)
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST",
+            json={"user_id": guest.id}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    payload = response.get_json()
+
+    assert payload["accounts"] == 1
+    assert payload["skipped_accounts"] == 0
+    assert payload["skipped"] == []
+    assert payload["results"][0]["user_id"] == guest.id
+    assert payload["results"][0]["status"] == "switched"
+    assert payload["results"][0]["seeded_books"] == 3
+    assert guest.library_mode() == constants.LIBRARY_MODE_PERSONAL
+    assert guest.user_library_seeded is True
+    assert user_library.membership_count(guest.id, app_session) == 3
+
+    with app.test_request_context(
+            "/api/v1/admin/my-library/migrate", method="POST",
+            json={"user_id": guest.id}):
+        response = api_admin.admin_migrate_my_library.__wrapped__()
+    rerun = response.get_json()
+
+    assert rerun["accounts"] == 1
+    assert rerun["skipped_accounts"] == 0
+    assert rerun["skipped"] == []
+    assert rerun["results"][0]["status"] == "already_personal"
+    assert rerun["results"][0]["seeded_books"] == 0
+    assert rerun["results"][0]["membership_count"] == 3
+    assert user_library.membership_count(guest.id, app_session) == 3
+
+
 def test_admin_api_switches_named_mode_for_target_user(app_session, monkeypatch):
     from cps.api import admin as api_admin
 
@@ -586,6 +695,462 @@ def test_membership_mutations_invalidate_cached_filter_in_same_request(
         after_remove = cdb.common_filters()
         assert [row.id for row in calibre_session.query(db.Books.id)
                 .filter(after_remove).all()] == [2]
+
+
+def test_batch_add_reports_mixed_visible_and_forbidden_ids_per_item(
+        app_session, calibre_session, monkeypatch):
+    """One forbidden id must not bypass policy or hide an allowed success."""
+    from cps import user_library
+    from cps.api import actions
+
+    english = db.Languages("eng")
+    french = db.Languages("fra")
+    books = calibre_session.query(db.Books).order_by(db.Books.id).all()
+    books[0].languages.append(english)
+    books[1].languages.append(french)
+    calibre_session.commit()
+
+    user = _mode_user(app_session, "batch-mixed-policy")
+    user.default_language = "eng"
+    app_session.commit()
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(actions, "current_user", user)
+
+    app = Flask(__name__)
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            json={"operation": "add", "book_ids": [1, 2]}):
+        response = actions.batch_my_library_membership.__wrapped__()
+
+    payload = response.get_json()
+    assert payload["operation"] == "add"
+    assert payload["succeeded_ids"] == [1]
+    assert payload["failed_ids"] == [2]
+    assert payload["partial_failure"] is True
+    assert payload["results"] == [
+        {
+            "book_id": 1,
+            "status": "succeeded",
+            "changed": True,
+            "in_my_library": True,
+        },
+        {
+            "book_id": 2,
+            "status": "failed",
+            "error": {
+                "code": "library_membership_rejected",
+                "message": "Book not found in the visible global library.",
+            },
+            "http_status": 403,
+        },
+    ]
+    memberships = (app_session.query(ub.UserLibraryBook)
+                   .filter_by(user_id=user.id).all())
+    assert [row.book_id for row in memberships] == [1]
+    assert memberships[0].added_at != datetime.min
+    with pytest.raises(user_library.UserLibraryError, match="visible global"):
+        user_library.add_book(
+            user, 2, app_session=app_session, cdb=_cdb(calibre_session)
+        )
+
+
+def test_batch_add_cannot_self_grant_without_global_browse(
+        app_session, calibre_session, monkeypatch):
+    """The self-service route must not use the admin-managed add policy."""
+    from cps import user_library
+    from cps.api import actions
+
+    user = _user(app_session, "batch-no-global-browse", True)
+    assert user.role_browse_global() is False
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(actions, "current_user", user)
+
+    app = Flask(__name__)
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            json={"operation": "add", "book_ids": [1]}):
+        response = actions.batch_my_library_membership.__wrapped__()
+
+    payload = response.get_json()
+    assert payload["succeeded_ids"] == []
+    assert payload["failed_ids"] == [1]
+    assert payload["results"] == [{
+        "book_id": 1,
+        "status": "failed",
+        "error": {
+            "code": "library_membership_rejected",
+            "message": (
+                "You need global-library browse permission to change "
+                "My Library."
+            ),
+        },
+        "http_status": 403,
+    }]
+    assert app_session.query(ub.UserLibraryBook).filter_by(
+        user_id=user.id, book_id=1
+    ).count() == 0
+
+
+def test_batch_membership_rejects_guest_when_anonymous_browsing_is_enabled(
+        app_session, monkeypatch):
+    """The per-route guard must stop Guest after both outer gates admit it."""
+    from cps import api as api_root
+    from cps import usermanagement
+    from cps.api import actions, api_v1
+
+    guest = _user(app_session, "Guest", True)
+    guest.role = constants.ROLE_ANONYMOUS
+    app_session.add(ub.UserLibraryBook(user_id=guest.id, book_id=2))
+    app_session.commit()
+    assert guest.is_anonymous is True
+
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(actions, "current_user", guest)
+    monkeypatch.setattr(api_root, "current_user", guest)
+    monkeypatch.setattr(
+        api_root.config, "config_allow_reverse_proxy_header_login", False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        api_root.config, "config_anonbrowse", 1, raising=False
+    )
+    monkeypatch.setattr(
+        usermanagement.config,
+        "config_allow_reverse_proxy_header_login",
+        False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        usermanagement.config, "config_anonbrowse", 1, raising=False
+    )
+
+    app = Flask(__name__)
+    app.testing = True
+    app.config["SECRET_KEY"] = "batch-membership-test"
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["RATELIMIT_ENABLED"] = False
+    app.register_blueprint(api_v1)
+    response = app.test_client().post(
+        "/api/v1/books/my-library/batch",
+        json={"operation": "add", "book_ids": [1]},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json() == {
+        "error": {
+            "code": "unauthorized",
+            "message": "You must be signed in",
+        }
+    }
+    assert [row.book_id for row in app_session.query(ub.UserLibraryBook)
+            .filter_by(user_id=guest.id).all()] == [2]
+
+
+def test_batch_remove_preserves_managed_account_policy_and_partial_success(
+        app_session, monkeypatch):
+    """Sequential removals report a protected last book and an absent no-op."""
+    from cps.api import actions
+
+    user = _user(app_session, "batch-managed-remove", True)
+    app_session.add_all([
+        ub.UserLibraryBook(user_id=user.id, book_id=1),
+        ub.UserLibraryBook(user_id=user.id, book_id=2),
+    ])
+    app_session.commit()
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(actions, "current_user", user)
+
+    app = Flask(__name__)
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            json={"operation": "remove", "book_ids": [1, 2, 3]}):
+        response = actions.batch_my_library_membership.__wrapped__()
+
+    payload = response.get_json()
+    assert payload["succeeded_ids"] == [1, 3]
+    assert payload["failed_ids"] == [2]
+    assert payload["results"] == [
+        {
+            "book_id": 1,
+            "status": "succeeded",
+            "changed": True,
+            "in_my_library": False,
+            "affected_shelves": [],
+            "kobo_removal_on_next_sync": True,
+            "reading_data_preserved": True,
+        },
+        {
+            "book_id": 2,
+            "status": "failed",
+            "error": {
+                "code": "library_membership_rejected",
+                "message": (
+                    "The last book cannot be removed unless this user can "
+                    "browse the global library."
+                ),
+            },
+            "http_status": 409,
+        },
+        {
+            "book_id": 3,
+            "status": "succeeded",
+            "changed": False,
+            "in_my_library": False,
+            "affected_shelves": [],
+            "kobo_removal_on_next_sync": True,
+            "reading_data_preserved": True,
+        },
+    ]
+    assert [row.book_id for row in app_session.query(ub.UserLibraryBook)
+            .filter_by(user_id=user.id).all()] == [2]
+
+
+@pytest.mark.parametrize("network_share", [False, True])
+def test_concurrent_batch_removals_cannot_empty_managed_library(
+        tmp_path, monkeypatch, network_share):
+    """Concurrent route calls must atomically preserve one membership.
+
+    A sequential test cannot see this class of bug: each request observes the
+    preceding commit.  These two real HTTP requests instead pause after both
+    helpers have observed two memberships, then race removals of different
+    books.  Keep them concurrent so the read/check/delete gap cannot return.
+    """
+    from cps import api as api_root
+    from cps import user_library, usermanagement
+    from cps.api import actions, api_v1
+
+    monkeypatch.setenv(
+        "NETWORK_SHARE_MODE", "true" if network_share else "false"
+    )
+    engine = ub._create_app_db_engine(tmp_path / "app.db")
+    ub.Base.metadata.create_all(engine)
+    sessions = scoped_session(sessionmaker(bind=engine))
+    setup_session = sessions()
+    persisted_user = _user(setup_session, "concurrent-managed-remove", True)
+    user_id = persisted_user.id
+    setup_session.add_all([
+        ub.UserLibraryBook(user_id=user_id, book_id=1),
+        ub.UserLibraryBook(user_id=user_id, book_id=2),
+    ])
+    setup_session.commit()
+    sessions.remove()
+
+    with engine.connect() as connection:
+        expected_mode = "delete" if network_share else "wal"
+        assert connection.exec_driver_sql(
+            "PRAGMA journal_mode"
+        ).scalar_one().lower() == expected_mode
+
+    current_user = SimpleNamespace(
+        id=user_id,
+        has_own_library=True,
+        is_authenticated=True,
+        is_anonymous=False,
+        role_browse_global=lambda: False,
+    )
+    monkeypatch.setattr(ub, "session", sessions)
+    monkeypatch.setattr(actions, "current_user", current_user)
+    monkeypatch.setattr(api_root.config, "config_anonbrowse", 1, raising=False)
+    monkeypatch.setattr(
+        api_root.config,
+        "config_allow_reverse_proxy_header_login",
+        False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        usermanagement.config, "config_anonbrowse", 1, raising=False
+    )
+    monkeypatch.setattr(
+        usermanagement.config,
+        "config_allow_reverse_proxy_header_login",
+        False,
+        raising=False,
+    )
+
+    app = Flask(__name__)
+    app.testing = False
+    app.config["SECRET_KEY"] = "concurrent-membership-test"
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["RATELIMIT_ENABLED"] = False
+    app.register_blueprint(api_v1)
+
+    both_counted = threading.Barrier(2)
+    original_membership_count = user_library.membership_count
+
+    def synchronize_vulnerable_check(counted_user_id, session=None):
+        count = original_membership_count(counted_user_id, session)
+        both_counted.wait(timeout=5)
+        return count
+
+    monkeypatch.setattr(
+        user_library, "membership_count", synchronize_vulnerable_check
+    )
+    start = threading.Barrier(2)
+    responses = []
+    errors = []
+
+    def remove_one(book_id):
+        try:
+            start.wait(timeout=5)
+            response = app.test_client().post(
+                "/api/v1/books/my-library/batch",
+                json={"operation": "remove", "book_ids": [book_id]},
+            )
+            responses.append((book_id, response.status_code, response.get_json()))
+        except BaseException as error:  # surfaced after both threads join
+            errors.append(error)
+        finally:
+            sessions.remove()
+
+    threads = [
+        threading.Thread(target=remove_one, args=(book_id,))
+        for book_id in (1, 2)
+    ]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+        assert all(not thread.is_alive() for thread in threads)
+        assert errors == []
+        assert sorted(status for _, status, _ in responses) == [200, 200]
+        item_results = sorted(
+            (
+                response_payload["results"][0]
+                for _, _, response_payload in responses
+            ),
+            key=lambda item: item["status"],
+        )
+        assert [item["status"] for item in item_results] == [
+            "failed", "succeeded",
+        ]
+        assert [item.get("changed") for item in item_results] == [None, True]
+        succeeded = next(
+            item for item in item_results if item["status"] == "succeeded"
+        )
+        assert succeeded["kobo_removal_on_next_sync"] is True
+        assert succeeded["reading_data_preserved"] is True
+
+        observer = sessions()
+        assert observer.query(ub.UserLibraryBook).filter_by(
+            user_id=user_id
+        ).count() == 1
+    finally:
+        sessions.remove()
+        engine.dispose()
+
+
+def test_batch_add_and_remove_are_idempotent(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+    from cps.api import actions
+
+    user = _mode_user(app_session, "batch-idempotent")
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(actions, "current_user", user)
+    app = Flask(__name__)
+
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            json={"operation": "add", "book_ids": [1, 1]}):
+        add_payload = (
+            actions.batch_my_library_membership.__wrapped__().get_json()
+        )
+    assert [result["changed"] for result in add_payload["results"]] == [
+        True, False,
+    ]
+    membership = (app_session.query(ub.UserLibraryBook)
+                  .filter_by(user_id=user.id, book_id=1).one())
+    genuine_arrival = membership.added_at
+    assert genuine_arrival != datetime.min
+
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            json={"operation": "add", "book_ids": [1]}):
+        repeat_add = actions.batch_my_library_membership.__wrapped__().get_json()
+    app_session.refresh(membership)
+    assert repeat_add["results"][0]["changed"] is False
+    assert membership.added_at == genuine_arrival
+    assert app_session.query(ub.UserLibraryBook).filter_by(
+        user_id=user.id, book_id=1
+    ).count() == 1
+
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            json={"operation": "remove", "book_ids": [1, 1]}):
+        remove_payload = (
+            actions.batch_my_library_membership.__wrapped__().get_json()
+        )
+    assert [result["changed"] for result in remove_payload["results"]] == [
+        True, False,
+    ]
+    assert app_session.query(ub.UserLibraryBook).filter_by(
+        user_id=user.id, book_id=1
+    ).count() == 0
+
+
+def test_batch_membership_rejects_more_than_200_before_mutating(
+        app_session, calibre_session, monkeypatch):
+    from cps import user_library
+    from cps.api import actions
+
+    user = _mode_user(app_session, "batch-cap")
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(user_library, "calibre_db", _cdb(calibre_session))
+    monkeypatch.setattr(actions, "current_user", user)
+
+    app = Flask(__name__)
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            json={"operation": "add", "book_ids": list(range(1, 202))}):
+        response, status = (
+            actions.batch_my_library_membership.__wrapped__()
+        )
+    assert status == 400
+    assert response.get_json() == {
+        "error": {
+            "code": "batch_too_large",
+            "message": "book_ids accepts at most 200 items",
+            "max_items": 200,
+        }
+    }
+    assert app_session.query(ub.UserLibraryBook).filter_by(
+        user_id=user.id
+    ).count() == 0
+
+
+@pytest.mark.parametrize("payload", [
+    None,
+    {},
+    {"operation": "archive", "book_ids": [1]},
+    {"operation": "add", "book_ids": []},
+    {"operation": "add", "book_ids": [1, True]},
+    {"operation": "remove", "book_ids": [0]},
+])
+def test_batch_membership_rejects_invalid_envelopes_before_mutating(
+        payload, app_session, monkeypatch):
+    from cps.api import actions
+
+    user = _mode_user(app_session, "batch-invalid")
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(actions, "current_user", user)
+    app = Flask(__name__)
+    request_kwargs = {} if payload is None else {"json": payload}
+    with app.test_request_context(
+            "/api/v1/books/my-library/batch", method="POST",
+            **request_kwargs):
+        response, status = (
+            actions.batch_my_library_membership.__wrapped__()
+        )
+    assert status == 400
+    assert response.get_json()["error"]["code"] == "invalid_request"
+    assert app_session.query(ub.UserLibraryBook).filter_by(
+        user_id=user.id
+    ).count() == 0
 
 
 def test_recent_global_discovery_excludes_existing_membership(
@@ -805,6 +1370,266 @@ def test_add_remove_contract_is_idempotent_shelf_aware_and_role_gated(
         )
 
 
+def test_opds_and_kosync_effects_after_membership_removal(
+        app_session, calibre_session, monkeypatch):
+    """OPDS loses the book while file-local KOReader state remains usable."""
+    import importlib
+
+    from cps import opds, user_library
+
+    kosync = importlib.import_module("cps.progress_syncing.protocols.kosync")
+
+    user = _mode_user(app_session, "opds-kosync")
+    shelf = ub.Shelf(name="On device", user_id=user.id, is_public=0)
+    app_session.add_all([
+        shelf,
+        ub.UserLibraryBook(user_id=user.id, book_id=1),
+    ])
+    app_session.flush()
+    link = ub.BookShelf(shelf=shelf.id, book_id=1, order=1)
+    link.ub_shelf = shelf
+    device = ub.Device(
+        user_id=user.id, kind="koreader", display_name="Local reader",
+    )
+    app_session.add_all([
+        link,
+        device,
+        KOSyncProgress(
+            user_id=user.id,
+            document="0123456789abcdef0123456789abcdef",
+            progress="/body/DocFragment[4]",
+            percentage=37.0,
+            device="KOReader",
+            device_id="reader-1",
+        ),
+    ])
+    app_session.flush()
+    report = ub.DeviceInventoryReport(
+        device_id=device.id, item_count=1, matched_count=1,
+    )
+    app_session.add(report)
+    app_session.flush()
+    inventory = ub.DeviceInventoryItem(
+        device_id=device.id,
+        lpath="Books/One.epub",
+        checksum="0123456789abcdef0123456789abcdef",
+        book_id=1,
+        size=123,
+        mtime=456,
+        last_report_id=report.id,
+    )
+    app_session.add(inventory)
+    app_session.commit()
+
+    cdb = _cdb(calibre_session)
+    monkeypatch.setattr(db.ub, "session", app_session)
+    monkeypatch.setattr(db, "current_user", user)
+    monkeypatch.setattr(ub, "session", app_session)
+    monkeypatch.setattr(opds, "calibre_db", cdb)
+    monkeypatch.setattr(opds.auth, "current_user", lambda: user)
+
+    app = Flask(__name__)
+    with app.test_request_context("/opds/books"):
+        before = calibre_session.query(db.Books.id).filter(
+            opds.get_opds_restricted_common_filter(user)
+        ).order_by(db.Books.id).all()
+        assert [row.id for row in before] == [1]
+
+        assert user_library.remove_book(
+            user, 1, app_session=app_session
+        ) == ["On device"]
+
+        after = calibre_session.query(db.Books.id).filter(
+            opds.get_opds_restricted_common_filter(user)
+        ).order_by(db.Books.id).all()
+        assert [row.id for row in after] == []
+        # The direct OPDS acquisition route delegates to this same filtered
+        # lookup. A non-admin cannot reuse a cached acquisition URL.
+        assert cdb.get_filtered_book(
+            1, allow_show_archived=True, allow_show_hidden=True
+        ) is None
+        # The global archive remains intact and can be used to add the book
+        # back by an account with the browse-global role.
+        global_ids = calibre_session.query(db.Books.id).filter(
+            cdb.common_filters(allow_show_global=True, user=user)
+        ).order_by(db.Books.id).all()
+        assert [row.id for row in global_ids] == [1, 2, 3]
+
+    progress = kosync.get_progress_record(
+        user.id, "0123456789abcdef0123456789abcdef", None
+    )
+    assert progress is not None
+    assert progress.percentage == 37.0
+    assert app_session.get(ub.DeviceInventoryItem, inventory.id) is not None
+    assert app_session.query(ub.DeviceBookDeletion).count() == 0
+
+
+def test_account_without_an_ereader_only_loses_membership_and_shelf_link(
+        app_session, calibre_session):
+    from cps import user_library
+
+    user = _mode_user(app_session, "browser-only")
+    shelf = ub.Shelf(name="Browser shelf", user_id=user.id, is_public=0)
+    app_session.add_all([
+        shelf,
+        ub.UserLibraryBook(user_id=user.id, book_id=1),
+    ])
+    app_session.flush()
+    link = ub.BookShelf(shelf=shelf.id, book_id=1, order=1)
+    link.ub_shelf = shelf
+    app_session.add(link)
+    app_session.commit()
+
+    assert user_library.remove_book(user, 1, app_session=app_session) == [
+        "Browser shelf"
+    ]
+    assert app_session.query(ub.UserLibraryBook).filter_by(
+        user_id=user.id, book_id=1
+    ).count() == 0
+    assert app_session.query(ub.BookShelf).filter_by(book_id=1).count() == 0
+    assert calibre_session.get(db.Books, 1) is not None
+    assert app_session.query(ub.Device).filter_by(user_id=user.id).count() == 0
+    assert app_session.query(ub.DeviceBookDeletion).count() == 0
+
+
+def test_personal_library_removal_archives_book_in_kobo_shelf_sync(
+        monkeypatch):
+    """Drive the real Kobo sync handler with shelf-only sync enabled."""
+    from cps import kobo as kobo_module, kobo_sync_status, user_library
+
+    engine = create_engine("sqlite://")
+    event.listen(
+        engine,
+        "connect",
+        lambda connection, _record: connection.execute(
+            "ATTACH DATABASE ':memory:' AS calibre"
+        ),
+    )
+    ub.Base.metadata.create_all(engine)
+    db.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    now = datetime(2026, 8, 29, 12, 0, 0)
+    book = _book(1, "Shelf-synced book")
+    book.last_modified = now
+    book.timestamp = now
+    book.uuid = "shelf-sync-book-uuid"
+    session.add(book)
+    session.add(db.Data(book.id, "EPUB", 1, "shelf-sync-book"))
+    user = ub.User(
+        name="kobo-shelf-reader",
+        email="kobo-shelf-reader@example.invalid",
+        password="",
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+        role=(constants.ROLE_USER | constants.ROLE_DOWNLOAD
+              | constants.ROLE_BROWSE_GLOBAL),
+        kobo_only_shelves_sync=1,
+    )
+    session.add(user)
+    session.flush()
+    shelf = ub.Shelf(
+        name="Kobo shelf", user_id=user.id, is_public=0, kobo_sync=True,
+    )
+    session.add_all([
+        shelf,
+        ub.UserLibraryBook(user_id=user.id, book_id=book.id),
+        ub.KoboSyncedBooks(
+            user_id=user.id, book_id=book.id, book_uuid=book.uuid,
+        ),
+    ])
+    session.flush()
+    link = ub.BookShelf(shelf=shelf.id, book_id=book.id, order=1)
+    link.ub_shelf = shelf
+    session.add(link)
+    session.commit()
+
+    cdb = object.__new__(db.CalibreDB)
+    cdb.session = session
+    cdb.config = SimpleNamespace(config_restricted_column=0)
+    cdb.reconnect_db = lambda *_args, **_kwargs: None
+    monkeypatch.setattr(db.ub, "session", session)
+    monkeypatch.setattr(db, "current_user", user)
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(
+        ub, "session_commit", lambda *_args, **_kwargs: session.commit()
+    )
+    monkeypatch.setattr(kobo_module, "calibre_db", cdb)
+    monkeypatch.setattr(kobo_module, "current_user", user)
+    monkeypatch.setattr(kobo_sync_status, "current_user", user)
+    monkeypatch.setattr(
+        kobo_module.config, "config_kobo_proxy", False, raising=False
+    )
+    monkeypatch.setattr(
+        kobo_module.config,
+        "config_kobo_sync_magic_shelves",
+        False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        kobo_module, "get_download_url_for_book", lambda *_args: "/download"
+    )
+    monkeypatch.setattr(
+        kobo_module,
+        "get_magic_shelf_book_ids_for_kobo",
+        lambda _user_id: (set(), True),
+    )
+    monkeypatch.setattr(
+        kobo_module,
+        "get_magic_shelf_membership_added_at",
+        lambda _user_id: None,
+    )
+    monkeypatch.setattr(
+        kobo_module, "sync_shelves", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        kobo_module,
+        "create_book_entitlement",
+        lambda item, archived=False: {
+            "Id": str(item.id), "IsRemoved": archived,
+        },
+    )
+    monkeypatch.setattr(
+        kobo_module, "get_metadata", lambda item: {"Id": str(item.id)}
+    )
+
+    assert user_library.remove_book(
+        user, book.id, app_session=session
+    ) == ["Kobo shelf"]
+
+    app = Flask(__name__)
+    app.wsgi_app = SimpleNamespace(is_proxied=True)
+    token = kobo_module.SyncToken.SyncToken(
+        books_last_created=now,
+        books_last_modified=now,
+        archive_last_modified=now,
+        books_last_id=book.id,
+    ).build_sync_token()
+    try:
+        with app.test_request_context(
+            "/v1/library/sync",
+            headers={
+                kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER: token,
+            },
+        ):
+            response = kobo_module.HandleSyncRequest.__wrapped__()
+
+        removals = [
+            item["ChangedEntitlement"]["BookEntitlement"]
+            for item in response.get_json()
+            if item.get("ChangedEntitlement", {})
+            .get("BookEntitlement", {})
+            .get("IsRemoved") is True
+        ]
+        assert removals == [{"Id": str(book.id), "IsRemoved": True}]
+        assert session.query(ub.KoboSyncedBooks).filter_by(
+            user_id=user.id, book_id=book.id
+        ).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
 def test_http_route_contract_is_registered():
     from flask import Flask
     from cps.api import api_v1
@@ -820,6 +1645,7 @@ def test_http_route_contract_is_registered():
     assert routes["/api/v1/books/<int:book_id>/my-library"] >= {
         "GET", "PUT", "DELETE"
     }
+    assert routes["/api/v1/books/my-library/batch"] >= {"POST"}
     assert routes["/api/v1/account/library-mode"] >= {"POST"}
     assert routes["/api/v1/account/my-library-intro/dismiss"] >= {"POST"}
     assert routes["/api/v1/admin/users/<int:user_id>"] >= {"POST"}
@@ -834,9 +1660,165 @@ def test_http_route_contract_is_registered():
     assert routes["/ajax/mylibrary/<int:book_id>/remove"] >= {"POST"}
 
 
-def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
-        monkeypatch):
-    """The enable transition must not turn already-synced books into removals."""
+def test_network_share_seed_releases_writer_lock_between_chunks(
+        tmp_path, monkeypatch):
+    """A rollback-journal seed must release its database-wide writer lock.
+
+    The WAL test rig cannot express this production-only cost: in rollback
+    journal mode, the first membership INSERT reserves app.db against every
+    other writer.  Hold that real first INSERT open, prove the competing write
+    is locked, then require the configured busy timeout to carry it across the
+    chunk commit before the seed is allowed to issue chunk two.
+    """
+    from cps import user_library
+
+    monkeypatch.setenv("NETWORK_SHARE_MODE", "true")
+    app_db_path = tmp_path / "app.db"
+    calibre_db_path = tmp_path / "metadata.db"
+    app_engine = ub._create_app_db_engine(app_db_path)
+    calibre_engine = create_engine(
+        "sqlite:///{}".format(calibre_db_path),
+        execution_options={"schema_translate_map": {"calibre": None}},
+    )
+    ub.Base.metadata.create_all(app_engine)
+    db.Base.metadata.create_all(calibre_engine)
+
+    with app_engine.begin() as connection:
+        assert connection.exec_driver_sql("PRAGMA journal_mode").scalar_one() == "delete"
+        assert connection.exec_driver_sql("PRAGMA busy_timeout").scalar_one() == 30_000
+        connection.exec_driver_sql(
+            "CREATE TABLE competing_writer (value TEXT NOT NULL)"
+        )
+    with sessionmaker(bind=app_engine)() as setup_session:
+        user = _user(setup_session, "network-share-seed", False)
+        user_id = user.id
+    with sessionmaker(bind=calibre_engine)() as setup_session:
+        setup_session.add_all([
+            _book(book_id, "Network share %d" % book_id)
+            for book_id in range(1, 5)
+        ])
+        setup_session.commit()
+
+    first_chunk_written = threading.Event()
+    release_first_chunk = threading.Event()
+    competing_execute_started = threading.Event()
+    competing_done = threading.Event()
+    seed_errors = []
+    competing_errors = []
+    membership_inserts = 0
+
+    def gate_seed_chunks(
+            _connection, _cursor, statement, _parameters, _context, _many):
+        nonlocal membership_inserts
+        normalized = statement.lstrip().lower()
+        if normalized.startswith("insert into user_library_book"):
+            membership_inserts += 1
+            if membership_inserts == 2 and not competing_done.wait(timeout=5):
+                raise AssertionError(
+                    "the competing app.db writer did not complete at the first "
+                    "seed chunk boundary"
+                )
+        elif normalized.startswith("insert into competing_writer"):
+            competing_execute_started.set()
+
+    def hold_first_seed_chunk(
+            _connection, _cursor, statement, _parameters, _context, _many):
+        if (
+                statement.lstrip().lower().startswith(
+                    "insert into user_library_book"
+                )
+                and membership_inserts == 1
+        ):
+            first_chunk_written.set()
+            if not release_first_chunk.wait(timeout=5):
+                raise AssertionError("the test did not release seed chunk one")
+
+    event.listen(app_engine, "before_cursor_execute", gate_seed_chunks)
+    event.listen(app_engine, "after_cursor_execute", hold_first_seed_chunk)
+
+    def seed_library():
+        app_session = sessionmaker(bind=app_engine)()
+        calibre_session = sessionmaker(bind=calibre_engine)()
+        try:
+            user = app_session.get(ub.User, user_id)
+            user_library.prepare_user_library_seed(
+                user,
+                chunk_size=2,
+                app_session=app_session,
+                cdb=_cdb(calibre_session),
+            )
+        except BaseException as error:  # surfaced after both threads join
+            seed_errors.append(error)
+        finally:
+            calibre_session.close()
+            app_session.close()
+
+    def competing_writer():
+        try:
+            with app_engine.begin() as connection:
+                assert (
+                    connection.exec_driver_sql("PRAGMA busy_timeout").scalar_one()
+                    == 30_000
+                )
+                connection.exec_driver_sql(
+                    "INSERT INTO competing_writer VALUES ('completed')"
+                )
+        except BaseException as error:  # surfaced after both threads join
+            competing_errors.append(error)
+        finally:
+            competing_done.set()
+
+    seed_thread = threading.Thread(target=seed_library)
+    writer_thread = threading.Thread(target=competing_writer)
+    try:
+        seed_thread.start()
+        assert first_chunk_written.wait(timeout=5), "seed chunk one never wrote"
+
+        # A zero-timeout probe observes the lock directly, without timing how
+        # long an arbitrary INSERT happens to take on this machine.
+        with sqlite3.connect(app_db_path, timeout=0) as lock_probe:
+            with pytest.raises(sqlite3.OperationalError, match="database is locked"):
+                lock_probe.execute(
+                    "INSERT INTO competing_writer VALUES ('must-block')"
+                )
+
+        writer_thread.start()
+        assert competing_execute_started.wait(timeout=5), (
+            "the competing writer never reached SQLite"
+        )
+        release_first_chunk.set()
+        assert competing_done.wait(timeout=5), (
+            "the competing writer did not cross the seed chunk boundary"
+        )
+    finally:
+        release_first_chunk.set()
+        seed_thread.join(timeout=10)
+        if writer_thread.ident is not None:
+            writer_thread.join(timeout=10)
+        event.remove(app_engine, "before_cursor_execute", gate_seed_chunks)
+        event.remove(app_engine, "after_cursor_execute", hold_first_seed_chunk)
+
+    assert not seed_thread.is_alive(), "seed thread did not terminate"
+    assert not writer_thread.is_alive(), "competing writer thread did not terminate"
+    assert seed_errors == []
+    assert competing_errors == []
+    assert membership_inserts == 2
+    with sqlite3.connect(app_db_path) as observer:
+        assert observer.execute(
+            "SELECT book_id FROM user_library_book "
+            "WHERE user_id = ? ORDER BY book_id",
+            (user_id,),
+        ).fetchall() == [(1,), (2,), (3,), (4,)]
+        assert observer.execute(
+            "SELECT value FROM competing_writer"
+        ).fetchall() == [("completed",)]
+
+    calibre_engine.dispose()
+    app_engine.dispose()
+
+
+def _exercise_seed_on_enable_kobo_sync(monkeypatch, *, wire_contract):
+    """Drive the shared seed/re-seed fixture into the real Kobo sync route."""
     from cps import kobo as kobo_module, kobo_sync_status, user_library
 
     engine = create_engine("sqlite://")
@@ -944,18 +1926,74 @@ def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
             headers={kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER: token},
         ):
             response = kobo_module.HandleSyncRequest.__wrapped__()
-        archived = [
-            item for item in response.get_json()
-            if item.get("ChangedEntitlement", {})
-            .get("BookEntitlement", {}).get("IsRemoved") is True
-        ]
-        assert archived == []
         assert session.query(ub.ArchivedBook).filter_by(user_id=user.id).count() == 1
         assert session.query(ub.UserHiddenBook).filter_by(user_id=user.id).count() == 1
         assert session.query(ub.KoboSyncedBooks).filter_by(user_id=user.id).count() == 5
+
+        if wire_contract:
+            entitlement_envelopes = [
+                item for item in response.get_json()
+                if "NewEntitlement" in item or "ChangedEntitlement" in item
+            ]
+            assert entitlement_envelopes == []
+
+            # Prove the zero-wave guard did not make the membership cursor
+            # inert. This book enters the metadata database only after the
+            # baseline seed, but carries an old modification/creation clock.
+            # Its membership added_at is therefore the only cursor arm that
+            # can deliver it.
+            old = datetime(2026, 1, 1, 12, 0, 0)
+            later_book = _book(6, "Added after seed")
+            later_book.last_modified = old
+            later_book.timestamp = old
+            later_book.uuid = "uuid-6"
+            session.add(later_book)
+            session.add(db.Data(later_book.id, "EPUB", 1, "book-6"))
+            session.commit()
+            assert user_library.admin_add_book(
+                user, later_book.id, app_session=session, cdb=cdb
+            ).id == later_book.id
+
+            next_token = response.headers[
+                kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER
+            ]
+            with app.test_request_context(
+                "/v1/library/sync",
+                headers={
+                    kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER:
+                        next_token
+                },
+            ):
+                later_response = kobo_module.HandleSyncRequest.__wrapped__()
+            delivered = [
+                item.get("NewEntitlement") or item.get("ChangedEntitlement")
+                for item in later_response.get_json()
+                if "NewEntitlement" in item or "ChangedEntitlement" in item
+            ]
+            assert [
+                int(item["BookEntitlement"]["Id"]) for item in delivered
+            ] == [later_book.id]
+        else:
+            archived = [
+                item for item in response.get_json()
+                if item.get("ChangedEntitlement", {})
+                .get("BookEntitlement", {}).get("IsRemoved") is True
+            ]
+            assert archived == []
     finally:
         session.close()
         engine.dispose()
+
+
+def test_seed_on_enable_is_chunked_idempotent_and_preserves_next_kobo_sync(
+        monkeypatch):
+    """The enable transition must not turn already-synced books into removals."""
+    _exercise_seed_on_enable_kobo_sync(monkeypatch, wire_contract=False)
+
+
+def test_seed_and_reseed_are_wire_silent_but_later_addition_syncs(monkeypatch):
+    """Baseline membership is silent; a later membership remains deliverable."""
+    _exercise_seed_on_enable_kobo_sync(monkeypatch, wire_contract=True)
 
 
 def test_rejected_post_seed_switch_keeps_fence_false_and_retry_seeds(

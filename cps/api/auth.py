@@ -11,7 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
 from .serializers import serialize_user
-from .. import ub, config, constants, limiter, logger
+from .. import ub, config, constants, limiter, services, logger
 from ..config_sql import uploads_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
@@ -21,12 +21,11 @@ from ..helper import (
     send_registration_mail, generate_random_password,
 )
 
+log = logger.create()
+
 
 def _err(code, message, status):
     return jsonify({"error": {"code": code, "message": message}}), status
-
-
-log = logger.create()
 
 
 # Display labels for the fixed GitHub/Google providers, mirroring the strings the
@@ -276,7 +275,6 @@ def auth_login():
         return rate_limit_error
 
     # I2: Honour config_disable_standard_login.
-    # LDAP/OAuth login routing is deferred to the auth-bridge sub-project (sub-project 2).
     if config.config_disable_standard_login:
         return jsonify({"error": {"code": "standard_login_disabled",
                                   "message": "Standard login is disabled"}}), 403
@@ -285,6 +283,58 @@ def auth_login():
     username = _normalized_username(data)
     password = data.get("password") or ""
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
+
+    # ── LDAP authentication ────────────────────────────────────────────
+    # When the instance is configured for LDAP login, authenticate against
+    # the directory service first.  This mirrors the classic UI flow in
+    # usermanagement.verify_password():  existing users are LDAP-bound;
+    # users who exist in the directory but not yet locally are auto-created
+    # (matching the OPDS/API auto-creation path in the same file).
+    login_type = getattr(config, "config_login_type", constants.LOGIN_STANDARD)
+    if login_type == constants.LOGIN_LDAP and services.ldap:
+        if user and not user.role_anonymous():
+            # Existing local user — bind against LDAP to validate the password.
+            try:
+                login_result, error = services.ldap.bind_user(user.name, password)
+                if login_result:
+                    login_user(user, remember=bool(data.get("remember")))
+                    return jsonify(_me_payload(user))
+                if error is not None:
+                    log.error("LDAP bind error for '%s': %s", username, error)
+            except Exception as ex:
+                log.error("LDAP authentication error for '%s': %s", username, ex)
+            # LDAP bind failed — fall through to 401 below.
+        elif getattr(config, 'config_ldap_auto_create_users', True):
+            # User not found locally — try LDAP bind and auto-create if
+            # the directory recognises the credentials (needed for OPDS /
+            # API clients that bypass the classic login page).
+            try:
+                login_result, error = services.ldap.bind_user(username, password)
+                if login_result:
+                    ldap_user_details = services.ldap.get_object_details(username)
+                    if ldap_user_details:
+                        from . import admin as admin_mod
+                        create_result, error_msg = admin_mod.ldap_import_create_user(
+                            username, ldap_user_details)
+                        if create_result:
+                            user = ub.session.query(ub.User).filter(
+                                func.lower(ub.User.name) == username.lower()).first()
+                            if user:
+                                log.info("LDAP auto-created user '%s' via SPA login",
+                                         username)
+                                login_user(user, remember=bool(data.get("remember")))
+                                return jsonify(_me_payload(user))
+                    log.warning("LDAP auth succeeded but user creation failed for '%s'",
+                                username)
+                elif error:
+                    log.debug("LDAP auth failed for new user '%s': %s", username, error)
+            except Exception as ex:
+                log.error("LDAP auto-creation error for '%s': %s", username, ex)
+        # Either LDAP bind failed or user creation failed — return 401.
+        return jsonify({"error": {"code": "invalid_credentials",
+                                  "message": "Invalid username or password"}}), 401
+
+    # ── Local password authentication ──────────────────────────────────
     if user and not user.role_anonymous() and check_password_hash(str(user.password), password):
         login_user(user, remember=bool(data.get("remember")))
         _clear_current_rate_limits()

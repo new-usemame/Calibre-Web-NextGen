@@ -13,6 +13,15 @@
   justify-content: space-between;
 }
 
+/* Device inventory pages can contain a bounded 200-row window. Keep the bar in
+   normal document flow there so its interactive search field cannot obscure a
+   row action when the page is scrolled; position:relative preserves the mobile
+   search overlay's containing block. */
+.barInFlow {
+  position: relative;
+  top: auto;
+}
+
 .left {
   display: flex;
   align-items: center;

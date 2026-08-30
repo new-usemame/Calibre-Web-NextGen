@@ -200,6 +200,33 @@ def test_already_delivered_book_is_changed_not_new_on_later_sync(large_library_s
     assert _entitlements(changed) == [("ChangedEntitlement", 101)]
 
 
+def test_classification_ledger_is_written_when_replay_suppression_is_disabled(
+        large_library_sync, monkeypatch):
+    """The classification ledger is core state, not an optional replay cache."""
+    from cps import kobo, ub
+
+    harness = large_library_sync
+    monkeypatch.setattr(
+        kobo.config,
+        "config_kobo_suppress_replayed_entitlements",
+        False,
+    )
+
+    first = harness.sync()
+    assert len(_entitlements(first)) == 100
+    assert harness.session.query(ub.KoboDeviceBookEntitlement).count() == 100
+
+    second = harness.sync(first.headers[harness.token_header])
+    assert _entitlements(second) == [("NewEntitlement", 101)]
+    assert harness.session.query(ub.KoboDeviceBookEntitlement).count() == 101
+
+    harness.books[-1].last_modified = datetime(2027, 1, 1)
+    harness.session.commit()
+    changed = harness.sync(second.headers[harness.token_header])
+
+    assert _entitlements(changed) == [("ChangedEntitlement", 101)]
+
+
 def test_legacy_stuck_cursor_recovers_missing_page_without_reset(large_library_sync):
     """An old complete cursor cannot hide books the device never received."""
     from cps import kobo, ub

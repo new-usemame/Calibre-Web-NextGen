@@ -4,8 +4,9 @@
 
 A cookie-less browser and the old ``cwng_prefer_spa=1`` population both use the
 SPA. Leaving through ``?cwng_feedback=newui`` stores ``cwng_prefer_classic=1``;
-loading the SPA clears that opt-out so Classic -> SPA -> Classic can round-trip
-indefinitely. Redirects are limited to explicit browser-document HTML requests,
+only the marked Classic-nav action clears that opt-out so Classic -> SPA ->
+Classic can round-trip indefinitely; ordinary SPA deep links preserve it.
+Redirects are limited to explicit browser-document HTML requests,
 because wildcard or missing Accept headers are ordinary machine-client traffic.
 
 Most sticky-cookie cases exercise the REAL spa.py helpers through a minimal
@@ -275,18 +276,76 @@ def test_a_app_shell_sets_prefer_cookie(tmp_path):
 
 
 @pytest.mark.unit
-def test_app_shell_clears_classic_opt_out(tmp_path):
-    """Choosing the SPA again removes the durable Classic preference while
-    retaining the legacy SPA cookie for downgrade compatibility."""
-    app, monkey = _spa_only_app(tmp_path)
+def test_explicit_spa_choice_clears_classic_opt_out(tmp_path):
+    """Only the marked Classic-nav action revokes the durable opt-out.
+
+    It redirects to the clean shell URL so refreshing or bookmarking the SPA
+    does not retain a preference-mutating query parameter.
+    """
+    app, monkey = _sticky_app(tmp_path)
     try:
-        resp = _client(app).get(
-            "/app", headers=_HTML_ACCEPT, environ_overrides=_CLASSIC_COOKIE)
-        assert resp.status_code == 200
+        client = app.test_client()
+        client.set_cookie(spa_mod.PREFER_CLASSIC_COOKIE, "1")
+
+        resp = client.get(
+            "/app/?cwng_switch=spa", headers=_HTML_ACCEPT)
+
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "/app/"
         sc = _set_cookie(resp)
         assert "cwng_prefer_classic=" in sc
         assert "Max-Age=0" in sc
         assert "cwng_prefer_spa=1" in sc
+        assert client.get_cookie(spa_mod.PREFER_CLASSIC_COOKIE) is None
+
+        shell = client.get(resp.headers["Location"], headers=_HTML_ACCEPT)
+        assert shell.status_code == 200
+        assert not any(
+            value.startswith("cwng_prefer_classic=")
+            for value in shell.headers.getlist("Set-Cookie")
+        )
+
+        home = client.get("/", headers=_HTML_ACCEPT)
+        assert home.status_code == 302
+        assert home.headers["Location"] == "/app/"
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_spa_deep_link_preserves_explicit_classic_choice(tmp_path):
+    """Visiting shared SPA content is not consent to revoke Classic.
+
+    Assert the response cookie mutation, the browser's resulting cookie jar,
+    and the next preference-routed navigation. A header-only assertion could
+    miss a differently-shaped deletion; a route-only assertion could miss a
+    stale duplicate cookie that happens to win in this test client.
+    """
+    app, monkey = _sticky_app(tmp_path)
+    try:
+        client = app.test_client()
+        client.set_cookie(spa_mod.PREFER_CLASSIC_COOKIE, "1")
+
+        deep_link = client.get("/app/book/5", headers=_HTML_ACCEPT)
+
+        assert deep_link.status_code == 200
+        set_cookies = deep_link.headers.getlist("Set-Cookie")
+        assert any(
+            value.startswith("cwng_prefer_spa=1;")
+            for value in set_cookies
+        )
+        assert not any(
+            value.startswith("cwng_prefer_classic=")
+            for value in set_cookies
+        )
+        preserved = client.get_cookie(spa_mod.PREFER_CLASSIC_COOKIE)
+        assert preserved is not None
+        assert preserved.value == "1"
+
+        classic_home = client.get("/", headers=_HTML_ACCEPT)
+        assert classic_home.status_code == 200
+        assert classic_home.get_data(as_text=True) == "CLASSIC HOME"
+        assert client.get_cookie(spa_mod.PREFER_CLASSIC_COOKIE).value == "1"
     finally:
         monkey.undo()
 
@@ -306,6 +365,24 @@ def test_app_shell_cookie_path_under_subpath(tmp_path):
         sc = _set_cookie(resp)
         assert "Path=/cwa" in sc
         assert "Path=/" not in sc.replace("Path=/cwa", "")  # not the bare root
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_explicit_spa_choice_url_uses_sanitized_mount_prefix(tmp_path):
+    """The Classic nav action shares spa_shell_url's #571 prefix sanitizer."""
+    app, monkey = _spa_only_app(tmp_path)
+    try:
+        with app.test_request_context(
+                "/", environ_overrides={"SCRIPT_NAME": "/cwa"}):
+            assert spa_mod.spa_shell_choice_url() == (
+                "/cwa/app/?cwng_switch=spa")
+
+        with app.test_request_context(
+                "/", environ_overrides={"SCRIPT_NAME": "//evil.example"}):
+            assert spa_mod.spa_shell_choice_url() == (
+                "/app/?cwng_switch=spa")
     finally:
         monkey.undo()
 
@@ -907,6 +984,7 @@ def test_e_layout_has_plain_return_affordance_without_banner():
     assert "cwng_newui_banner_dismissed" not in src
     assert "Back to New UI" in src
     assert "Switch to New UI" not in src
+    assert 'href="{{ cwng_spa_choice_url() }}"' in src
 
 
 @pytest.mark.unit

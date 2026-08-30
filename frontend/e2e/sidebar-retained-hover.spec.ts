@@ -1,10 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 async function sidebarExpanded(nav: import('@playwright/test').Locator): Promise<boolean> {
-  return nav.evaluate((element) => {
-    const clip = getComputedStyle(element).clipPath;
-    return clip === 'none' || !clip.includes('156px');
-  });
+  return nav.evaluate((element) => parseFloat(getComputedStyle(element).width) > 64);
 }
 
 test('desktop sidebar releases hover retained across navigation', async ({ page }, testInfo) => {
@@ -26,9 +23,9 @@ test('desktop sidebar releases hover retained across navigation', async ({ page 
   const mainBeforeHover = await main.boundingBox();
   expect(mainBeforeHover).not.toBeNull();
   await tagsLink.hover();
-  // The nav panel is always 220px; only its compositor clip changes. Sample the
-  // flex sibling throughout that transition so a future width/margin animation
-  // cannot creep back in while still landing at the same final position.
+  // The panel is out of flow: its width animates 64px -> 220px, but that layout
+  // is contained to the panel's own subtree. Sample the flex sibling throughout
+  // the transition — <main> moving or resizing here is the #1813 regression.
   for (const pause of [0, 60, 100, 140]) {
     if (pause) await page.waitForTimeout(pause);
     const during = await main.boundingBox();
@@ -41,10 +38,12 @@ test('desktop sidebar releases hover retained across navigation', async ({ page 
     .toBe('220px');
   await expect.poll(() => nav.locator('..').evaluate((element) => getComputedStyle(element).width))
     .toBe('64px');
+  // The unpinned rail wrapper must never reserve expanded width or animate
+  // margin — the panel overlays <main>, it does not push it.
   await expect.poll(() => nav.evaluate((element) => ({
-    width: getComputedStyle(element).transitionProperty.includes('width'),
     margin: getComputedStyle(element).transitionProperty.includes('margin'),
-  }))).toEqual({ width: false, margin: false });
+    outOfFlow: getComputedStyle(element).position === 'absolute',
+  }))).toEqual({ margin: false, outOfFlow: true });
   const navBox = await nav.boundingBox();
   const tagsBox = await tagsLink.boundingBox();
   expect(navBox).not.toBeNull();

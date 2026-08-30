@@ -180,19 +180,21 @@
   :is(.nav, .navOpen) {
     position: absolute;
     inset: 0 auto 0 0;
-    width: 220px;
+    width: 64px;
     height: 100%;
     padding-right: var(--sp-2);
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: none;
     box-sizing: border-box;
-    clip-path: inset(0 156px 0 0);
-    transition: clip-path var(--dur-base) var(--ease-out);
-    /* Kept as a belt after the structural fix: it scopes layout and paint from
-       the panel's own scrolling/editable contents. The reveal itself is now a
-       clip-path compositor transition and needs no containment to protect the
-       catalog sibling. */
+    /* The collapsed panel is a real 64px box, not a 220px box clipped to 64px:
+       clip-path removes the clipped strip from hit-testing, so a pointer aimed
+       at a link's centre (x > 64px) fell through to <main> and hover-to-expand
+       could never fire from there. Width is what both users and the e2e specs
+       aim at. The width transition runs layout, but only inside this contained,
+       out-of-flow subtree — the flex sibling (<main>/catalog) never reflows,
+       which is the #1813 item-4 guarantee. */
+    transition: width var(--dur-base) var(--ease-out);
     contain: layout paint;
   }
 
@@ -207,7 +209,7 @@
   }
 
   :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) {
-    clip-path: inset(0);
+    width: 220px;
   }
 
   :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .pinButton {

@@ -44,6 +44,8 @@ _("Format deleted.")
 _("Read now")
 _("Open details for {title}")
 _("Read {title}")
+_("More actions for {title}")
+_("Actions for {title}")
 
 # Built-in magic-shelf names are canonical English database identity but are
 # translated as request-local display text by the SPA API. They do not appear

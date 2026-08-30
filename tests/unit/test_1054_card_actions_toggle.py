@@ -8,8 +8,8 @@ are reading on their ereaders, so Read Now is redundant (I never use it)."
 
 Behavioural coverage is frontend/e2e/card-actions-toggle.spec.ts, which drives
 the real toggle in the browser on desktop and touch. The separate
-book-card-actions.spec.ts pins the 2026-08-29 ruling that redundant actions are
-concealed at rest on coarse pointers but remain focusable. These pin the wiring
+book-card-actions.spec.ts pins the 2026-08-29 ruling that redundant actions use
+one visible disclosure on coarse pointers. These pin the wiring
 that a refactor could quietly drop: the single storage key, the removal (not
 hiding) of the row, and the fact that EVERY surface rendering a BookCard honours
 it — a missed call site is invisible until a user reports the buttons are still
@@ -44,6 +44,29 @@ _CARD_SURFACES = {
 
 # Only these five own the preference; the rails receive it.
 _STATE_OWNERS = tuple(k for k in _CARD_SURFACES if k[0] == "pages")
+
+
+
+def _media_block(css: str, opener: str) -> str:
+    """Return the body of one @media block, matched by braces.
+
+    Deliberately NOT a `split` on some inner token: an earlier version of this
+    test sliced the block at ".moreActionsWrap" and then asserted that the same
+    token was present in the slice, which can never hold. The assertion was
+    unsatisfiable regardless of the CSS, so it reported a defect in correct
+    production code. Brace-match the block so the extraction is independent of
+    whatever the caller is about to assert.
+    """
+    start = css.index(opener) + len(opener)
+    depth = 1
+    for i in range(start, len(css)):
+        if css[i] == "{":
+            depth += 1
+        elif css[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return css[start:i]
+    raise AssertionError("unterminated media block for {!r}".format(opener))
 
 
 def test_preference_key_has_exactly_one_definition():
@@ -84,23 +107,29 @@ def test_bookcard_removes_the_row_rather_than_hiding_it():
     assert "const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));" in src
 
 
-def test_coarse_pointer_card_actions_follow_the_2026_08_29_reversal():
-    """This is a deliberate policy reversal, not a defect fix. Preserve the old
-    rationale beside the new ruling, retain touch sizing, and never reintroduce
-    an opacity override that leaves every redundant action standing open."""
+def test_coarse_pointer_card_actions_use_a_visible_disclosure():
+    """Touch must never hit an opacity-hidden live action.
+
+    The coarse layout removes the legacy controls from layout and exposes one
+    named 44px disclosure; fine pointers keep the established hover controls.
+    """
+    src = (_FE / "components" / "BookCard.tsx").read_text()
     css = (_FE / "components" / "BookCard.module.css").read_text()
-    coarse = css.split("@media (any-hover: none), (any-pointer: coarse) {", 1)[1] \
-        .split("/* Narrow cards", 1)[0]
+    coarse = _media_block(css, "@media (any-hover: none), (any-pointer: coarse) {")
 
-    assert "Historical ruling (2026-07-19)" in css
-    assert "Reversed by the operator on 2026-08-29" in css
-    assert "opacity: 1" not in coarse
-    assert ".readNow { min-height: 44px; }" in coarse
-    assert ".removeBtn, .quickEditBtn" in coarse
-    assert "width: 44px;" in coarse and "height: 44px;" in coarse
+    assert ".legacyPointerAction, .removeBtn, .quickEditBtn { display: none; }" in coarse
+    assert ".moreActionsWrap { display: block; }" in coarse
+    assert ".moreActionsTrigger" in css
+    assert "width: 44px;" in css and "height: 44px;" in css
+    assert "aria-expanded={actionsOpen}" in src
+    assert "aria-controls={actionsOpen ? actionsPanelId : undefined}" in src
+    assert "t('More actions for {title}'" in src
+    assert "t('Actions for {title}'" in src
+    assert 'role="group"' in src
 
-    # Keyboard and hover reveal stay shared across pointer types; the controls
-    # remain in layout/the accessibility tree rather than being display:none.
+    # Fine-pointer hidden actions cannot take a click until hover/focus reveals
+    # them; coarse pointers remove them entirely instead of relying on this.
+    assert css.count("pointer-events: none;") >= 3
     for selector in (
         ".wrap:hover .removeBtn",
         ".wrap:focus-within .removeBtn",
@@ -113,6 +142,7 @@ def test_coarse_pointer_card_actions_follow_the_2026_08_29_reversal():
         ".readNow:focus-visible",
     ):
         assert selector in css
+    assert css.count("pointer-events: auto;") >= 4
 
 
 def test_coarse_pointer_reversal_does_not_touch_primary_actions_or_badges():

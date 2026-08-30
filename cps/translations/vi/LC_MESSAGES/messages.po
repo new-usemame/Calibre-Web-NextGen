@@ -5476,6 +5476,11 @@ msgid "Highlights"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 
@@ -5560,6 +5565,10 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
+msgstr ""
+
+#: cps/progress_syncing/protocols/kosync.py cps/spa_strings.py
+msgid "KOReader Sync Plugin"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6635,6 +6644,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Settings saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Setup KOReader Sync"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7812,10 +7825,6 @@ msgstr "Vai trò không hợp lệ"
 msgid "Tag could not be deleted"
 msgstr ""
 
-#: cps/progress_syncing/protocols/kosync.py
-msgid "KOReader Sync Plugin"
-msgstr ""
-
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
 msgstr ""
@@ -8360,11 +8369,6 @@ msgstr ""
 #: cps/templates/admin.html
 msgid "Check NextGen Status"
 msgstr ""
-
-#: cps/templates/admin.html
-#, fuzzy
-msgid "Setup KOReader Sync"
-msgstr "trình đọc epub"
 
 #: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"

@@ -20,13 +20,19 @@ const FAIL_IMPACTS = ['critical', 'serious'];
 // Named debt only. EMPTY is the goal. { 'rule-id': 'why + tracking issue' }.
 const KNOWN: Record<string, string> = {};
 
+// Axe compares rendered color endpoints; normal-motion interaction specs keep
+// their real transitions. global.css turns this preference into effectively
+// zero durations, and axeScan asserts the context option reached the page.
+test.use({ contextOptions: { reducedMotion: 'reduce' } });
+
 async function axeScan(page: Page, label: string) {
   await page.waitForLoadState('networkidle');
+  expect(
+    await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
+    'the a11y harness must disable transitions before comparing theme endpoints',
+  ).toBe(true);
   for (const theme of ['dark', 'light'] as const) {
     await page.evaluate((slug) => document.documentElement.setAttribute('data-theme', slug), theme);
-    // Components animate token-backed colors for --dur-fast. Scan the settled
-    // rendered state, not a transient dark→light interpolation frame.
-    await page.waitForTimeout(250);
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze();

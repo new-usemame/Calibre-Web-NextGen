@@ -21,6 +21,7 @@ wiki_images
 .editorconfig
 AI_README.md
 babel.cfg
+changelog.d
 CHANGELOG.md
 CHANGES-vs-upstream.md
 CONTRIBUTING.md

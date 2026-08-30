@@ -191,6 +191,53 @@ def test_no_test_module_puts_the_tests_root_on_sys_path():
     )
 
 
+def _imports_first_party_cps(nodes):
+    tree = ast.Module(body=nodes, type_ignores=[])
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name == "cps" or alias.name.startswith("cps.")
+                   for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if node.module == "cps" or (node.module or "").startswith("cps."):
+                return True
+    return False
+
+
+def _calls_pytest_skip(nodes):
+    tree = ast.Module(body=nodes, type_ignores=[])
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "pytest"
+        and node.func.attr == "skip"
+        for node in ast.walk(tree)
+    )
+
+
+def test_first_party_import_failures_never_become_skips():
+    """A broken ``cps.*`` import is a product regression, not an environment skip."""
+    offenders = []
+    for source_file in sorted(TESTS_ROOT.rglob("*.py")):
+        if "__pycache__" in source_file.parts:
+            continue
+        source = source_file.read_text(encoding="utf-8")
+        if "try:" not in source or "cps" not in source or "pytest.skip" not in source:
+            continue
+        tree = ast.parse(source, filename=str(source_file))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Try) or not _imports_first_party_cps(node.body):
+                continue
+            if any(_calls_pytest_skip(handler.body) for handler in node.handlers):
+                offenders.append((str(source_file.relative_to(REPO_ROOT)), node.lineno))
+
+    assert not offenders, (
+        "%s turn first-party cps import failures into skips. Import cps modules "
+        "directly so a regression fails the suite." % offenders
+    )
+
+
 def test_testcontainers_compose_backend_imports():
     """The exact import the Docker integration fixtures perform.
 

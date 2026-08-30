@@ -5,8 +5,14 @@
   "id": "F-5647b8",
   "origin_issue": 1147,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-30",
+    "note": "The live race was token-backed dark-to-light transition state, not resources, banners, account mutation, or axe overlap handling. Playwright now emulates reduced motion through use.contextOptions; every axe scan asserts prefers-reduced-motion is armed, and the fixed timer is gone. Red: the assertion received false before config. Green: focused grid and full desktop/mobile a11y gate.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "a11y.spec.ts reports a different failure set on every run, so the a11y gate cannot be trusted"
 }

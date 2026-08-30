@@ -179,23 +179,6 @@ def preferred_spa_html_request():
     return _browser_document_html_request()
 
 
-def spa_login_default_supported():
-    """Whether the SPA can authenticate this instance's configured login mode.
-
-    Keep this single carve-out until #1893 gives the SPA API an LDAP bind path
-    and #1931 makes the SPA participate in reverse-proxy header login. Removing
-    those two gaps then reduces the login decision to deleting this predicate
-    call; OAuth already has native SPA provider buttons and remains supported.
-    This is intentionally login-only: authenticated LDAP/proxy users can use the
-    SPA catalog normally.
-    """
-    return (
-        config.config_login_type != constants.LOGIN_LDAP
-        and not bool(getattr(
-            config, "config_allow_reverse_proxy_header_login", False))
-    )
-
-
 def classic_fallback_requested_from_next(next_url):
     """Whether ``next`` is the exact no-JS Classic fallback emitted by us.
 

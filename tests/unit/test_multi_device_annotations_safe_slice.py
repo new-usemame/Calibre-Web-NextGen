@@ -73,6 +73,54 @@ def test_known_device_last_seen_write_is_throttled(db_session):
     assert device.last_seen_at == first_seen
 
 
+def test_kobo_device_cap_refuses_new_identity_but_keeps_known_device(
+    db_session, caplog,
+):
+    from cps import ub
+    from cps.services import device_registry
+
+    device_registry._kobo_cap_logged_users.clear()
+    caplog.set_level("WARNING", logger=device_registry.__name__)
+    devices = []
+    for index in range(device_registry.MAX_KOBO_DEVICES_PER_USER):
+        devices.append(device_registry.upsert_kobo_device(
+            db_session,
+            user_id=7,
+            headers={"x-kobo-deviceid": f"{index:064x}"},
+            secret_key="test-secret",
+        ))
+    db_session.commit()
+
+    # Retired identities still consume a slot, matching the web-reader cap:
+    # otherwise soft-delete/new-header churn restores unbounded growth.
+    devices[0].active = False
+    db_session.commit()
+    with pytest.raises(
+        device_registry.KoboDeviceLimitReached,
+        match="Kobo device limit reached",
+    ):
+        device_registry.upsert_kobo_device(
+            db_session,
+            user_id=7,
+            headers={"x-kobo-deviceid": "f" * 64},
+            secret_key="test-secret",
+        )
+    db_session.rollback()
+
+    known = device_registry.upsert_kobo_device(
+        db_session,
+        user_id=7,
+        headers={"x-kobo-deviceid": f"{1:064x}"},
+        secret_key="test-secret",
+    )
+    assert known.id == devices[1].id
+    assert db_session.query(ub.Device).filter_by(user_id=7, kind="kobo").count() == 20
+    assert db_session.query(ub.DeviceIdentity).count() == 20
+    messages = [record.getMessage() for record in caplog.records]
+    assert messages.count(device_registry.KOBO_DEVICE_LIMIT_MESSAGE) == 1
+    assert all("ffffffff" not in message for message in messages)
+
+
 def test_registry_failure_does_not_break_reading_services_request(monkeypatch):
     from cps import readingservices
     from cps.services import device_registry
@@ -90,6 +138,43 @@ def test_registry_failure_does_not_break_reading_services_request(monkeypatch):
     with app.test_request_context("/api/v3/content/x/annotations", method="PATCH",
                                   headers={"x-kobo-deviceid": "b" * 64}):
         assert wrapped() == ("upstream", 207)
+
+
+def test_reading_services_returns_clear_conflict_at_kobo_device_cap(monkeypatch):
+    from cps import readingservices
+    from cps.services import device_registry
+
+    app = Flask(__name__)
+    app.secret_key = "x"
+    monkeypatch.setattr(
+        readingservices.config, "config_kobo_sync", True, raising=False,
+    )
+    monkeypatch.setattr(
+        readingservices,
+        "current_user",
+        SimpleNamespace(is_authenticated=True, id=7),
+    )
+
+    def at_cap(**_kwargs):
+        raise device_registry.KoboDeviceLimitReached(
+            device_registry.KOBO_DEVICE_LIMIT_MESSAGE,
+        )
+
+    monkeypatch.setattr(device_registry, "register_kobo_device_best_effort", at_cap)
+    wrapped = readingservices.requires_reading_services_auth_and_config(
+        lambda: ("must-not-run", 200),
+    )
+    with app.test_request_context(
+        "/api/v3/content/x/annotations",
+        method="PATCH",
+        headers={"x-kobo-deviceid": "b" * 64},
+    ):
+        response = wrapped()
+
+    assert response.status_code == 409
+    assert response.get_json() == {
+        "error": device_registry.KOBO_DEVICE_LIMIT_MESSAGE,
+    }
 
 
 @pytest.mark.parametrize("value", ["not-a-shape", "../bad", "00000000-0000-0000-0000-000000000000!!../x"])
@@ -166,7 +251,9 @@ def test_backfill_is_conservative_and_idempotent():
             "d": f"{uuid}!OEBPS!device-only.xhtml",
         })
     ub.migrate_multi_device_annotation_safe_slice(engine, None)
-    lookup = lambda book_id: uuid if book_id == 5 else None
+    def lookup(book_id):
+        return uuid if book_id == 5 else None
+
     ub.backfill_annotation_content_ids(engine, lookup)
     once = engine.connect().execute(text("SELECT id, content_id FROM annotation ORDER BY id")).fetchall()
     ub.backfill_annotation_content_ids(engine, lookup)

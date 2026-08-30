@@ -393,6 +393,33 @@ def test_interrupted_sync_token_loss_does_not_redeliver_unchanged_entitlement(
     assert "cursors in=" in summaries[-1] and " out=" in summaries[-1]
 
 
+def test_expired_pending_page_is_pruned_before_same_token_rebuild(sync_harness):
+    """An abandoned response body expires without confirming its delivery."""
+    from cps import kobo_sync_status, ub
+
+    first = sync_harness.sync(acknowledge=False)
+    pending = sync_harness.session.query(
+        ub.KoboDevicePendingSyncPage,
+    ).filter_by(device_id=sync_harness.device.id).one()
+    expired_at = (
+        datetime.now(timezone.utc)
+        - kobo_sync_status.PENDING_SYNC_PAGE_TTL
+        - timedelta(seconds=1)
+    )
+    pending.created_at = expired_at
+    sync_harness.session.commit()
+
+    rebuilt = sync_harness.sync(acknowledge=False)
+    replacement = sync_harness.session.query(
+        ub.KoboDevicePendingSyncPage,
+    ).filter_by(device_id=sync_harness.device.id).one()
+
+    assert first.status_code == rebuilt.status_code == 200
+    assert len(_entitlements(rebuilt)) == 1
+    assert replacement.created_at > expired_at.replace(tzinfo=None)
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 0
+
+
 def test_same_version_payload_mismatch_delivers_and_restamps(
     sync_harness, caplog, monkeypatch,
 ):
@@ -2394,7 +2421,10 @@ def test_full_sync_clears_only_target_users_entitlement_ledger(
     monkeypatch.setattr(
         kobo.config, "config_kobo_suppress_replayed_entitlements", True,
     )
-    first = sync_harness.sync()
+    first = sync_harness.sync(acknowledge=False)
+    assert sync_harness.session.query(
+        ub.KoboDevicePendingSyncPage,
+    ).filter_by(device_id=sync_harness.device.id).count() == 1
     second_target_device = _seed_same_user_device_ledger(sync_harness)
     other_device = _seed_other_user_ledger(sync_harness)
     sync_harness.session.add_all([
@@ -2423,6 +2453,9 @@ def test_full_sync_clears_only_target_users_entitlement_ledger(
         response = admin.do_full_kobo_sync(sync_harness.user.id)
 
     assert response.status_code == 200
+    assert sync_harness.session.query(
+        ub.KoboDevicePendingSyncPage,
+    ).filter_by(device_id=sync_harness.device.id).count() == 0
     rows = sync_harness.session.query(ub.KoboDeviceBookEntitlement).all()
     assert [(row.device_id, row.book_id) for row in rows] == [
         (other_device.id, sync_harness.book.id),
@@ -2462,7 +2495,10 @@ def test_admin_resend_clears_target_users_entitlement_ledger(
     monkeypatch.setattr(
         kobo.config, "config_kobo_suppress_replayed_entitlements", True,
     )
-    first = sync_harness.sync()
+    first = sync_harness.sync(acknowledge=False)
+    assert sync_harness.session.query(
+        ub.KoboDevicePendingSyncPage,
+    ).filter_by(device_id=sync_harness.device.id).count() == 1
     _seed_same_user_device_ledger(sync_harness)
     other_device = _seed_other_user_ledger(sync_harness)
     monkeypatch.setattr(admin, "calibre_db", sync_harness.calibre_db)
@@ -2478,6 +2514,9 @@ def test_admin_resend_clears_target_users_entitlement_ledger(
         )
 
     assert response.status_code == 200
+    assert sync_harness.session.query(
+        ub.KoboDevicePendingSyncPage,
+    ).filter_by(device_id=sync_harness.device.id).count() == 0
     assert sync_harness.book.last_modified > before
     rows = sync_harness.session.query(ub.KoboDeviceBookEntitlement).all()
     assert [(row.device_id, row.book_id) for row in rows] == [

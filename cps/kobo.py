@@ -717,6 +717,11 @@ def HandleSyncRequest():
     sync_token = SyncToken.SyncToken.from_headers(request.headers)
     sync_cursor_in = _sync_cursor_summary(sync_token)
     requesting_device_id = getattr(g, "annotation_origin_device_id", None)
+    pruned_pending_pages = kobo_sync_status.prune_expired_pending_sync_pages(
+        current_user.id,
+    )
+    if pruned_pending_pages and ub.session_commit() is False:
+        return abort(503)
     pending_page = kobo_sync_status.get_pending_sync_page(
         requesting_device_id,
     )

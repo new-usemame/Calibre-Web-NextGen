@@ -24,6 +24,18 @@ LAST_SEEN_WRITE_INTERVAL = timedelta(minutes=5)
 # must not turn a client-controlled header into unbounded persistent rows.
 MAX_WEBREADER_DEVICES_PER_USER = 20
 _webreader_cap_logged_users = set()
+# Kobo hardware identifiers are client-controlled too. Count every retained
+# identity, including retired devices, so identity rotation cannot grow the
+# device, delivery-ledger, and pending-response tables without bound.
+MAX_KOBO_DEVICES_PER_USER = MAX_WEBREADER_DEVICES_PER_USER
+KOBO_DEVICE_LIMIT_MESSAGE = (
+    "Kobo device limit reached; use an already registered device"
+)
+_kobo_cap_logged_users = set()
+
+
+class KoboDeviceLimitReached(RuntimeError):
+    """A new hardware identity would exceed the user's durable Kobo bound."""
 
 
 def _bounded_header(value, limit):
@@ -98,6 +110,29 @@ def _webreader_identity_count(session, ub, *, user_id):
     )
 
 
+def _kobo_identity_count(session, ub, *, user_id):
+    """Count all Kobo identities, active or retired, to bound stored rows."""
+    return (
+        session.query(ub.Device.id)
+        .join(ub.DeviceIdentity, ub.DeviceIdentity.device_id == ub.Device.id)
+        .filter(
+            ub.Device.user_id == user_id,
+            ub.Device.kind == "kobo",
+            ub.DeviceIdentity.scheme == SCHEME,
+        )
+        .distinct()
+        .count()
+    )
+
+
+def _log_kobo_cap_once(user_id):
+    """Emit one privacy-safe process-lifetime diagnostic for each capped user."""
+    if user_id in _kobo_cap_logged_users:
+        return
+    _kobo_cap_logged_users.add(user_id)
+    log.warning(KOBO_DEVICE_LIMIT_MESSAGE)
+
+
 def _ensure_legacy_webreader_device(session, ub, *, user_id, seen_at=None):
     """Return the bounded historical fallback, reactivating it if retired."""
     device = (
@@ -160,6 +195,9 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
     model = _bounded_header(headers.get("x-kobo-devicemodel"), 160)
     firmware = _bounded_header(headers.get("x-kobo-appversion"), 64)
     if identity is None:
+        if _kobo_identity_count(session, ub, user_id=user_id) >= MAX_KOBO_DEVICES_PER_USER:
+            _log_kobo_cap_once(user_id)
+            raise KoboDeviceLimitReached(KOBO_DEVICE_LIMIT_MESSAGE)
         # User-editable labels are capped at 60 by the API. Keep generated
         # labels inside the same contract without silently truncating a
         # suspiciously long client-controlled model header.
@@ -205,7 +243,7 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
 
 
 def register_kobo_device_best_effort(*, user_id, headers, secret_key=None, return_internal=False):
-    """Observe in an isolated transaction; every failure is swallowed."""
+    """Observe in an isolated transaction; surface only the intentional cap."""
     owned = None
     try:
         from flask import current_app
@@ -215,6 +253,13 @@ def register_kobo_device_best_effort(*, user_id, headers, secret_key=None, retur
         device = upsert_kobo_device(owned, user_id=user_id, headers=headers, secret_key=key)
         owned.commit()
         return (device.id if return_internal else device.public_id) if device else None
+    except KoboDeviceLimitReached:
+        if owned is not None:
+            try:
+                owned.rollback()
+            except Exception:
+                pass
+        raise
     except Exception:
         if owned is not None:
             try:

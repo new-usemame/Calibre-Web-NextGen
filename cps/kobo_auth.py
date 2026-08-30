@@ -56,9 +56,8 @@ from flask import g, Blueprint, abort, request
 from .cw_login import login_user, current_user
 from flask_babel import gettext as _
 from flask_limiter import RateLimitExceeded
-from sqlalchemy.orm import joinedload
 
-from . import logger, config, calibre_db, db, helper, ub, lm, limiter
+from . import logger, ub, lm, limiter
 from .render_template import render_title_template
 from .usermanagement import user_login_required
 
@@ -169,10 +168,15 @@ def requires_kobo_auth(f):
             if user is not None:
                 login_user(user)
                 try:
-                    from .services.device_registry import register_kobo_device_best_effort
+                    from .services.device_registry import (
+                        KoboDeviceLimitReached,
+                        register_kobo_device_best_effort,
+                    )
                     g.annotation_origin_device_id = register_kobo_device_best_effort(
                         user_id=user.id, headers=request.headers, return_internal=True,
                     )
+                except KoboDeviceLimitReached as error:
+                    return abort(409, description=str(error))
                 except Exception:
                     log.warning("Best-effort Kobo device observation failed", exc_info=True)
                 [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]

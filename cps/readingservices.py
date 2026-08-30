@@ -190,10 +190,15 @@ def requires_reading_services_auth_and_config(f):
         if current_user.is_authenticated:
             if config.config_kobo_sync:
                 try:
-                    from .services.device_registry import register_kobo_device_best_effort
+                    from .services.device_registry import (
+                        KoboDeviceLimitReached,
+                        register_kobo_device_best_effort,
+                    )
                     g.annotation_origin_device_id = register_kobo_device_best_effort(
                         user_id=current_user.id, headers=request.headers, return_internal=True,
                     )
+                except KoboDeviceLimitReached as error:
+                    return make_response(jsonify({"error": str(error)}), 409)
                 except Exception:
                     log.warning("Best-effort Kobo device observation failed", exc_info=True)
             return f(*args, **kwargs)

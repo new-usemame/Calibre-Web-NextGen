@@ -7,7 +7,7 @@
 
 from .cw_login import current_user
 from . import logger, ub
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.sql.expression import and_, true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 # from sqlalchemy import exc
@@ -15,6 +15,8 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 log = logger.create()
 
 _LEDGER_UPSERT_BATCH_SIZE = 250
+PENDING_SYNC_PAGE_TTL = timedelta(days=7)
+PENDING_SYNC_PAGE_PRUNE_LIMIT = 10
 
 
 # Record the current user's delivered book identity.
@@ -300,6 +302,46 @@ def delete_pending_sync_page(device_id):
         return 0
     return ub.session.query(ub.KoboDevicePendingSyncPage).filter_by(
         device_id=int(device_id),
+    ).delete(synchronize_session=False)
+
+
+def prune_expired_pending_sync_pages(
+    user_id,
+    *,
+    now=None,
+    ttl=PENDING_SYNC_PAGE_TTL,
+    limit=PENDING_SYNC_PAGE_PRUNE_LIMIT,
+):
+    """Stage a bounded deletion of one user's abandoned response snapshots.
+
+    A pending page is only delivery evidence after the device acknowledges its
+    returned token. Expiry therefore discards the opaque replay body without
+    promoting its confirmation payload. Per-device entitlement ledgers and
+    rehydrate latches are deliberately untouched.
+    """
+    batch_size = max(0, min(int(limit), PENDING_SYNC_PAGE_PRUNE_LIMIT))
+    if not user_id or batch_size == 0:
+        return 0
+    cutoff = (now or datetime.now(timezone.utc)) - ttl
+    expired_device_ids = [
+        row.device_id for row in ub.session.query(
+            ub.KoboDevicePendingSyncPage.device_id,
+        ).join(
+            ub.Device,
+            ub.Device.id == ub.KoboDevicePendingSyncPage.device_id,
+        ).filter(
+            ub.Device.user_id == int(user_id),
+            ub.Device.kind == "kobo",
+            ub.KoboDevicePendingSyncPage.created_at <= cutoff,
+        ).order_by(
+            ub.KoboDevicePendingSyncPage.created_at.asc(),
+            ub.KoboDevicePendingSyncPage.device_id.asc(),
+        ).limit(batch_size).all()
+    ]
+    if not expired_device_ids:
+        return 0
+    return ub.session.query(ub.KoboDevicePendingSyncPage).filter(
+        ub.KoboDevicePendingSyncPage.device_id.in_(expired_device_ids),
     ).delete(synchronize_session=False)
 
 

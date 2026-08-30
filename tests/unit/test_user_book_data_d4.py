@@ -301,7 +301,9 @@ class TestMigrate:
         session.commit()
 
         links = session.query(ub.BookShelf).order_by(ub.BookShelf.shelf).all()
-        assert [(l.shelf, l.book_id, l.order) for l in links] == [(1, WINNER, 5), (2, WINNER, 9)]
+        assert [
+            (link.shelf, link.book_id, link.order) for link in links
+        ] == [(1, WINNER, 5), (2, WINNER, 9)]
 
     def test_kobo_synced_marker_dropped_not_migrated(self, session):
         from cps import ub
@@ -370,6 +372,14 @@ class TestPurge:
             ub.KoboDeviceBookEntitlement(
                 device_id=device.id, book_id=LOSER, fingerprint="b" * 64,
             ),
+            ub.KoboDevicePendingSyncPage(
+                device_id=device.id,
+                incoming_token_hash="a" * 64,
+                outgoing_token="pending-outgoing-token",
+                response_body='[{"NewEntitlement":{}}]',
+                response_headers_json="{}",
+                confirmation_json="{}",
+            ),
         ])
         _shelf_link(session, ub, LOSER, 1, 1)
         session.commit()
@@ -385,7 +395,7 @@ class TestPurge:
         for model in (ub.Annotation, ub.AnnotationSyncTarget, ub.KoboReadingState,
                       ub.KoboBookmark, ub.KoboStatistics, ub.ReadBook, ub.Bookmark,
                       ub.ArchivedBook, ub.Downloads, ub.BookShelf, ub.KoboSyncedBooks,
-                      ub.KoboDeviceBookEntitlement):
+                      ub.KoboDeviceBookEntitlement, ub.KoboDevicePendingSyncPage):
             assert session.query(model).count() == 0, model.__name__
 
     def test_purge_by_book_leaves_other_books_alone(self, session):

@@ -4335,6 +4335,10 @@ msgid "Account: {name}"
 msgstr "Conta: {name}"
 
 #: cps/spa_strings.py
+msgid "Active"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Add identifier"
 msgstr ""
 
@@ -4382,6 +4386,10 @@ msgstr "Permitir login remoto (link mágico)"
 msgid "Allowed groups (comma-separated)"
 msgstr "Grupos permitidos (separado por vírgulas)"
 
+#: cps/spa_strings.py
+msgid "Annotation pages"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/search_form.html
 msgid "Any"
 msgstr "Qualquer"
@@ -4402,12 +4410,12 @@ msgstr "Qualquer série"
 msgid "Any tags"
 msgstr "Qualquer tag"
 
-#: cps/spa_strings.py
-msgid "Apply metadata"
-msgstr ""
-
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "Apply"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Apply metadata"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4463,6 +4471,10 @@ msgstr "Autor Z-A"
 #: cps/spa_strings.py
 msgid "Authorised — signing you in…"
 msgstr "Autorizado — entrando…"
+
+#: cps/spa_strings.py
+msgid "Authoritative books"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Authorize URL"
@@ -4535,8 +4547,16 @@ msgid "Books"
 msgstr "Livros"
 
 #: cps/spa_strings.py
+msgid "Books awaiting authority"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Books per page"
 msgstr "Livros por página"
+
+#: cps/spa_strings.py
+msgid "Books seeding"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -4729,6 +4749,10 @@ msgid "Could not load candidates."
 msgstr "Não foi possível carregar candidatos."
 
 #: cps/spa_strings.py
+msgid "Could not load device annotations."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load duplicates."
 msgstr "Não foi possível carregar duplicados."
 
@@ -4741,12 +4765,24 @@ msgid "Could not load highlights and notes."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not load reading positions."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load stats."
 msgstr "Não foi possível carregar estatísticas."
 
 #: cps/spa_strings.py
 msgid "Could not load tasks."
 msgstr "Não foi possível carregar tarefas."
+
+#: cps/spa_strings.py
+msgid "Could not load the device board."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load this device library."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load this text file."
@@ -4775,6 +4811,10 @@ msgstr "Não foi possível recarregar os metadados"
 #: cps/spa_strings.py
 msgid "Could not rename shelf."
 msgstr "Não foi possível renomear a estante."
+
+#: cps/spa_strings.py
+msgid "Could not request deletion from this device."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not reset password."
@@ -4948,6 +4988,10 @@ msgid "Delete failed."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Delete from device"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete shelf \"{name}\"? This cannot be undone."
 msgstr ""
@@ -4972,6 +5016,11 @@ msgid "Delete {name}"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {path} from {name} on its next sync?"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Deleted device"
 msgstr ""
 
@@ -4983,6 +5032,10 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Deleted {name}."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Deletion requested"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4999,6 +5052,18 @@ msgid "Description formatting"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Device administration"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Device data"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Device library"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Device name"
 msgstr ""
 
@@ -5008,6 +5073,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Device restored."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Device summary"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5021,6 +5090,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Disable standard password login"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Disabled books"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5043,6 +5116,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Documentation"
 msgstr "Documentação"
+
+#: cps/spa_strings.py
+msgid "Dog-ears"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Done reordering"
@@ -5073,6 +5150,10 @@ msgstr ""
 msgid ""
 "Duplicate scan started. It runs in the background — this list updates when "
 "it finishes."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "E-reader not found"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
@@ -5332,10 +5413,6 @@ msgid "Group object filter"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "HTML is allowed and sanitized on display."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Has pen or drawing notes"
 msgstr ""
 
@@ -5365,6 +5442,10 @@ msgstr "Esconder"
 
 #: cps/spa_strings.py
 msgid "Hide Discover section"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Hide device library"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5447,6 +5528,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Inactive"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Included"
 msgstr ""
 
@@ -5476,6 +5561,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Key path"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Kind"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5525,6 +5614,11 @@ msgstr "Última modificação"
 msgid "Last seen {when}"
 msgstr ""
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Last seen: {when}"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last synced"
 msgstr "Última sincronização"
@@ -5552,7 +5646,19 @@ msgid "Loading"
 msgstr "Carregando"
 
 #: cps/spa_strings.py
+msgid "Loading device annotations…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Loading device library…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Loading new Discover picks."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Loading reading positions…"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
@@ -5676,6 +5782,10 @@ msgid "Minimum rating"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Model"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr ""
@@ -5707,6 +5817,10 @@ msgstr "Nome"
 #: cps/spa_strings.py
 msgid "Need to report an issue? Try the new"
 msgstr "Precisa reportar um problema? Experimente o novo"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Never"
+msgstr "Nunca"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "New"
@@ -5750,6 +5864,11 @@ msgstr "Mais recentes"
 msgid "Newest published"
 msgstr "Publicados mais recentemente"
 
+#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
+#: cps/templates/feed.xml cps/templates/layout.html
+msgid "Next"
+msgstr "Próximo"
+
 #: cps/spa_strings.py
 msgid "Next page"
 msgstr "Próxima página"
@@ -5765,6 +5884,10 @@ msgstr "Nenhum livro corresponde a esta estante inteligente no momento."
 #: cps/spa_strings.py
 msgid "No books match those criteria."
 msgstr "Nenhum livro corresponde a esses critérios."
+
+#: cps/spa_strings.py
+msgid "No books were reported in the latest device inventory."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "No candidates found yet. Try a different search or refresh."
@@ -5805,6 +5928,14 @@ msgid "No pages found in this comic."
 msgstr "Nenhuma página encontrada neste quadrinho."
 
 #: cps/spa_strings.py
+msgid "No reading positions from this device yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No registered devices."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No shelves yet — create one below."
 msgstr "Ainda não há estantes - crie uma abaixo"
 
@@ -5838,6 +5969,10 @@ msgid "Not in current file"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Not matched to this library"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Not picked"
 msgstr ""
 
@@ -5866,15 +6001,17 @@ msgid "Note saved"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Notes"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Nothing here yet. Highlight or write a note while reading, or import from a "
 "Kobo device."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"Off by default. While in beta, opting in only records your preference and "
-"recovery evidence — it does not change what your Kobo receives yet."
+msgid "Nothing in this category yet."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5883,6 +6020,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Numbered list"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. While in beta, opting in only records your preference and "
+"recovery evidence — it does not change what your Kobo receives yet."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5897,6 +6040,10 @@ msgstr "Publicados há mais tempo"
 msgid ""
 "On another device where you’re already signed in, scan this code or open the "
 "link below to authorise this device."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "On this device"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
@@ -5979,9 +6126,18 @@ msgid "Page {number}"
 msgstr "Página {number}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Page {page} of {pages}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Pages marked below open in the classic view. Changes there apply to the "
 "whole server."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Partially seeded books"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/login.html
@@ -6023,6 +6179,10 @@ msgid "Port"
 msgstr "Porta"
 
 #: cps/spa_strings.py
+msgid "Position recorded"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Preparing your magic link…"
 msgstr "Preparando seu link mágico..."
 
@@ -6030,6 +6190,10 @@ msgstr "Preparando seu link mágico..."
 #: cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr ""
+
+#: cps/spa_strings.py cps/templates/layout.html
+msgid "Previous"
+msgstr "Anterior"
 
 #: cps/spa_strings.py
 msgid "Previous page"
@@ -6050,6 +6214,10 @@ msgstr "Publicados após"
 #: cps/spa_strings.py
 msgid "Published before"
 msgstr "Publicados antes"
+
+#: cps/spa_strings.py
+msgid "Quarantined books"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Quote"
@@ -6083,6 +6251,10 @@ msgstr "Configurações do leitor salvas."
 #: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Aparência da leitura"
+
+#: cps/spa_strings.py
+msgid "Reading positions"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Recipient(s)"
@@ -6340,6 +6512,10 @@ msgstr "Configurações de Segurança salvas."
 msgid "See how each cover looks padded for your device"
 msgstr "Veja como cada capa parece com espaçamento para o seu dispositivo"
 
+#: cps/spa_strings.py
+msgid "Seeded books"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/modal_dialogs.html
 msgid "Select"
 msgstr "Selecione"
@@ -6483,6 +6659,10 @@ msgid "Show all {items}"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Show annotations assigned to this device"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Show books in language"
 msgstr ""
 
@@ -6505,6 +6685,16 @@ msgstr "Mostrar senha"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing the first {count} matches."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing {shown} of {total} annotations."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Showing {shown} of {total} books from the latest device inventory."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6662,6 +6852,10 @@ msgid "This device will no longer sync."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This e-reader is unavailable or belongs to another account."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This feature is currently disabled at server level."
 msgstr ""
 
@@ -6674,11 +6868,11 @@ msgid "This highlight has no saved position"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "This magic link expired. Generate a new one to try again."
+msgid "This magic link can’t be checked. Generate a new one to try again."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "This magic link can’t be checked. Generate a new one to try again."
+msgid "This magic link expired. Generate a new one to try again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6712,14 +6906,14 @@ msgid "Token URL"
 msgstr "URL do token"
 
 #: cps/spa_strings.py
-msgid "Top Rated"
-msgstr "Melhores avaliados"
-
-#: cps/spa_strings.py
 msgid ""
 "Too many magic-link checks were made from this network. Generate a new link "
 "or try again later."
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Top Rated"
+msgstr "Melhores avaliados"
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"
@@ -6772,6 +6966,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Unlock the cover to change it"
 msgstr "Desbloqueie a capa para alterá-la"
+
+#: cps/spa_strings.py
+msgid "Unseeded books"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Untitled"
@@ -6842,6 +7040,10 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/user_table.html
 msgid "View"
 msgstr "Ver"
+
+#: cps/spa_strings.py
+msgid "View device library"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "View settings"
@@ -7055,6 +7257,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{free} free of {total}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{name} removed."
 msgstr ""
 
@@ -7066,6 +7273,11 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} assigned to {name}."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} books in latest inventory"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7098,66 +7310,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{n} books in latest inventory"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not load this device library."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Hide device library"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Loading device library…"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "No books were reported in the latest device inventory."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Not matched to this library"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "On this device"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Showing {shown} of {total} books from the latest device inventory."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "View device library"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Delete from device"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Deletion requested"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Could not request deletion from this device."
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Delete {path} from {name} on its next sync?"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "{free} free of {total}"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
 msgid "{ok} of {total} assigned to {name}."
 msgstr ""
 
@@ -7165,6 +7317,11 @@ msgstr ""
 #, python-brace-format
 msgid "{ok} of {total} sources answered"
 msgstr "{ok} de {total} fontes respondidas"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{percent}% read"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "…or paste an image URL"
@@ -11254,11 +11411,6 @@ msgstr ""
 msgid "No thanks"
 msgstr ""
 
-#: cps/templates/cwng_feedback_popup.html cps/templates/feed.xml
-#: cps/templates/layout.html
-msgid "Next"
-msgstr "Próximo"
-
 #: cps/templates/cwng_feedback_popup.html
 msgid "Anything you’d like to add?"
 msgstr ""
@@ -12230,10 +12382,6 @@ msgstr "Crie uma Estante"
 #: cps/templates/layout.html
 msgid "Magic Shelves ✨"
 msgstr ""
-
-#: cps/templates/layout.html
-msgid "Previous"
-msgstr "Anterior"
 
 #: cps/templates/layout.html
 msgid "Book Details"
@@ -13501,10 +13649,6 @@ msgstr "Criado"
 #: cps/templates/user_edit.html
 msgid "Last used"
 msgstr "Último uso"
-
-#: cps/templates/user_edit.html
-msgid "Never"
-msgstr "Nunca"
 
 #: cps/templates/user_edit.html
 msgid "Revoke this app password?"

@@ -3,12 +3,15 @@
 .heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .heading h1, .card h2, .setup h2, .empty h2 { margin: 0; }
 .list { list-style: none; display: grid; gap: var(--sp-2); margin: 0; padding: 0; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-4); }
+.pagination button { min-height: 44px; padding: 0 var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.pagination button:disabled { opacity: .55; }
 .card { position: relative; display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
 .cardMain { min-width: 0; }
 .cardMain p { color: var(--text-muted); margin: var(--sp-1) 0 0; overflow-wrap: anywhere; }
 .inventoryToggle { min-height: 44px; margin-top: var(--sp-2); color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .inventory { margin-top: var(--sp-2); }
-.inventoryList { display: grid; gap: var(--sp-2); margin: 0; padding-left: var(--sp-5); }
+.inventoryList { display: grid; gap: var(--sp-5); margin: 0; padding-left: var(--sp-5); }
 .inventoryList li { overflow-wrap: anywhere; }
 .inventoryRow { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
 .inventoryRow > div { min-width: 0; }
@@ -40,5 +43,6 @@
   .inventoryRow { flex-direction: column; }
   .dialogActions { flex-direction: column-reverse; }
   .dialogActions button { width: 100%; }
+  .pagination { justify-content: space-between; }
 }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

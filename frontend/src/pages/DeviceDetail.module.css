@@ -1,0 +1,33 @@
+.container { max-width: 900px; margin: 0 auto; padding: var(--sp-5); color: var(--text); }
+.back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: var(--sp-3); color: var(--text-muted); }
+.header { display: flex; align-items: center; gap: var(--sp-3); }
+.header h1, .header p { margin: 0; }
+.header p { color: var(--text-muted); }
+.summary { margin: var(--sp-4) 0; padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
+.summary dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--sp-3); margin: 0; }
+.summary dl div { min-width: 0; }
+.summary dt { color: var(--text-muted); font-size: .875rem; }
+.summary dd { margin: var(--sp-1) 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.assignedToggle { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; margin-bottom: var(--sp-2); }
+.assignedToggle input { width: 20px; height: 20px; }
+.tabs { display: flex; gap: var(--sp-1); overflow-x: auto; border-bottom: 1px solid var(--border); }
+.tabs button { flex: 0 0 auto; min-height: 44px; padding: 0 var(--sp-3); border-bottom: 3px solid transparent; color: var(--text-muted); }
+.tabs button[aria-selected='true'] { border-bottom-color: var(--accent); color: var(--text); font-weight: 700; }
+.panel { min-height: 180px; padding: var(--sp-4) 0; outline-offset: 3px; }
+.annotationList, .positionList { display: grid; gap: var(--sp-2); margin: 0; padding: 0; }
+.annotationRow, .positionList li { padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); overflow-wrap: anywhere; }
+.annotationRow blockquote { margin: var(--sp-2) 0; padding-left: var(--sp-3); border-left: 3px solid var(--accent); }
+.annotationRow p { margin: var(--sp-2) 0; }
+.annotationRow small { color: var(--text-muted); }
+.positionList li { display: flex; justify-content: space-between; gap: var(--sp-3); }
+.positionList span { color: var(--text-muted); }
+.positions { margin-top: var(--sp-4); }
+.positions h2 { margin-bottom: var(--sp-3); }
+.pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-4); }
+.pagination button { min-height: 44px; padding: 0 var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.pagination button:disabled { opacity: .55; }
+@media (max-width: 600px) {
+  .container { padding: var(--sp-4); }
+  .positionList li { flex-direction: column; }
+  .pagination { justify-content: space-between; }
+}

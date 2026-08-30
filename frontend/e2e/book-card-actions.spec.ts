@@ -1,6 +1,19 @@
 import { test, expect, type Locator } from '@playwright/test';
 
-const isTouchProject = () => ['mobile', 'ipad-touch'].includes(test.info().project.name);
+const isTouchProject = () => test.info().project.use.hasTouch === true;
+
+async function tap(locator: Locator) {
+  const box = await locator.boundingBox();
+  expect(box, 'a real touch target needs a rendered hit-test box').not.toBeNull();
+  await test.info().attach('touch-target', {
+    body: JSON.stringify(box),
+    contentType: 'application/json',
+  });
+  await locator.page().touchscreen.tap(
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2,
+  );
+}
 
 async function expectRevealed(locator: Locator, revealed: boolean, message: string) {
   await expect.poll(
@@ -69,47 +82,79 @@ test('book-card actions keep a shared baseline for touch, mouse, and keyboard', 
   }
 });
 
-test('coarse pointers keep every redundant card action concealed at rest (2026-08-29 ruling)', async ({ page }) => {
-  test.skip(!isTouchProject(), 'coarse-pointer resting-state regression');
+test('coarse pointers use a visible actions disclosure with real touch input', async ({ page }) => {
+  test.skip(!isTouchProject(), 'coarse-pointer actions disclosure');
 
   await page.goto('/app');
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
 
-  const catalogControls = [
-    ['Edit', page.locator('a[aria-label^="Edit "]')],
-    ['Read now', page.locator('a[aria-label^="Read "]')],
-  ] as const;
-
-  for (const [name, control] of catalogControls) {
-    await expect(control.first(), `${name} action loads with the asynchronous catalog grid`).toBeAttached();
-    expect(await control.count(), `the fixture must render at least one ${name} card action`).toBeGreaterThan(0);
-    const opaque = await control.evaluateAll((nodes) =>
-      nodes.filter((node) => getComputedStyle(node).opacity === '1').length,
-    );
-    expect(opaque, `${name} controls are concealed at rest on a coarse pointer`).toBe(0);
-  }
-
   const catalogCard = page.locator('[class*="wrap"]').filter({
     has: page.locator('a[aria-label^="Edit "]'),
   }).first();
-  const catalogDetails = catalogCard.locator('a[aria-label^="Open details for"]');
   const catalogRead = catalogCard.locator('a[aria-label^="Read "]');
   const catalogEdit = catalogCard.locator('a[aria-label^="Edit "]');
-  const restingHeight = await catalogCard.evaluate((node) => node.getBoundingClientRect().height);
-  await catalogCard.hover();
-  await expectRevealed(catalogRead, true, 'touch context still honors the shared hover reveal');
-  await expectRevealed(catalogEdit, true, 'touch context still honors Edit hover reveal');
-  await page.mouse.move(0, 0);
-  await catalogDetails.focus();
-  await expectRevealed(catalogRead, true, 'card focus-within reveals Read now on touch');
-  await expectRevealed(catalogEdit, true, 'card focus-within reveals Edit on touch');
-  const focusedHeight = await catalogCard.evaluate((node) => node.getBoundingClientRect().height);
-  expect(Math.abs(focusedHeight - restingHeight),
-    'revealing the reserved action row by focus must not reflow the grid').toBeLessThanOrEqual(0.5);
+  await expect(catalogRead, 'the catalog fixture needs a readable book').toBeAttached();
+  await expect(catalogEdit, 'the catalog fixture needs an editable book').toBeAttached();
+
+  // Broken-state discriminator. Before the disclosure fix these links had
+  // opacity:0 but still owned real hit-test boxes. A genuine touch tap at the
+  // blank-looking Read box navigated iPad-class WebKit and Chromium straight
+  // into the reader. The fixed coarse-pointer layout removes those legacy
+  // controls from layout and hit testing, so there is no box to tap.
+  const invisibleReadBox = await catalogRead.boundingBox();
+  if (invisibleReadBox) {
+    const before = page.url();
+    await page.touchscreen.tap(
+      invisibleReadBox.x + invisibleReadBox.width / 2,
+      invisibleReadBox.y + invisibleReadBox.height / 2,
+    );
+    await page.waitForTimeout(300);
+    expect(page.url(), 'blank card space must never activate an invisible Read link').toBe(before);
+  }
+
+  await expect(catalogRead, 'legacy Read is absent from the coarse-pointer layout').toBeHidden();
+  await expect(catalogEdit, 'legacy Edit is absent from the coarse-pointer layout').toBeHidden();
+
+  const more = catalogCard.getByRole('button', { name: /^More actions for / });
+  await expect(more).toBeVisible();
+  const target = await more.boundingBox();
+  expect(target!.width, 'More actions touch target width').toBeGreaterThanOrEqual(44);
+  expect(target!.height, 'More actions touch target height').toBeGreaterThanOrEqual(44);
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+
+  // TOUCH: the first tap reveals labelled actions without navigating.
+  const catalogUrl = page.url();
+  await tap(more);
+  await expect(page).toHaveURL(catalogUrl);
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  const actions = catalogCard.getByRole('group', { name: /^Actions for / });
+  const readAction = actions.getByRole('link', { name: /^Read / });
+  const editAction = actions.getByRole('link', { name: /^Edit / });
+  await expect(readAction).toBeVisible();
+  await expect(editAction).toBeVisible();
+
+  // KEYBOARD: disclosure state is announced, Tab reaches its ordinary links,
+  // and Escape closes it while restoring focus to the trigger.
+  await page.keyboard.press('Escape');
+  await expect(more).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Tab');
-  await expect(catalogRead, 'keyboard reaches Read now after the card link').toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(catalogEdit, 'keyboard reaches Edit after Read now').toBeFocused();
+  await expect(readAction).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(more).toBeFocused();
+
+  // MOUSE on a hybrid coarse-pointer device: the same disclosure is clickable.
+  await more.click();
+  await expect(editAction).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // TOUCH: activate the real Read action from the visible disclosure.
+  await tap(more);
+  await tap(readAction);
+  await expect(page).toHaveURL(/\/app\/read\/\d+/);
+  await page.goBack();
+  await expect(catalogCard).toBeVisible();
 
   // The default E2E admin uses universal-library mode, where Catalog has no
   // per-card removal action. Exercise the same real BookCard X on a temporary
@@ -133,17 +178,15 @@ test('coarse pointers keep every redundant card action concealed at rest (2026-0
     await page.goto(`/app/shelf/${shelfId}`);
     const remove = page.getByRole('button', { name: 'Remove from shelf' });
     await expect(remove).toHaveCount(1);
-    await expectRevealed(remove, false, 'Remove controls are concealed at rest on a coarse pointer');
     const shelfCard = remove.locator('..');
-    const shelfDetails = shelfCard.locator('a[aria-label^="Open details for"]');
-    await shelfCard.hover();
-    await expectRevealed(remove, true, 'touch context still honors Remove hover reveal');
-    await page.mouse.move(0, 0);
-    await shelfDetails.focus();
-    await expectRevealed(remove, true, 'card focus-within reveals Remove on touch');
-    await page.keyboard.press('Tab');
-    await expect(remove, 'keyboard reaches Remove after the shelf card link').toBeFocused();
-    await expectRevealed(remove, true, 'Remove remains revealed at keyboard focus');
+    await expect(remove, 'legacy Remove is absent from the coarse-pointer layout').toBeHidden();
+    const shelfMore = shelfCard.getByRole('button', { name: /^More actions for / });
+    await tap(shelfMore);
+    const shelfActions = shelfCard.getByRole('group', { name: /^Actions for / });
+    const removeAction = shelfActions.getByRole('button', { name: 'Remove from shelf' });
+    await expect(removeAction).toBeVisible();
+    await tap(removeAction);
+    await expect(page.getByRole('button', { name: 'Remove from shelf' })).toHaveCount(0);
   } finally {
     await page.request.post(`/api/v1/shelves/${shelfId}/delete`, { headers }).catch(() => undefined);
   }

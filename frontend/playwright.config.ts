@@ -86,7 +86,36 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
-    // 5. Focused WebKit coverage for Safari's non-focusable-scroller behavior.
+    // 5. Safari-engine touch coverage for the card-action regression. Chromium
+    // touch emulation and WebKit disagree about synthetic hover on first tap;
+    // both engines must reach the same visible disclosure instead of an
+    // opacity-hidden link. Keep these projects focused on the one touch spec.
+    {
+      name: 'webkit-mobile-touch',
+      testMatch: /book-card-actions\.spec\.ts/,
+      use: {
+        browserName: 'webkit',
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        storageState: STORAGE,
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'webkit-ipad-touch',
+      testMatch: /book-card-actions\.spec\.ts/,
+      use: {
+        browserName: 'webkit',
+        viewport: { width: 1024, height: 1366 },
+        isMobile: true,
+        hasTouch: true,
+        storageState: STORAGE,
+      },
+      dependencies: ['setup'],
+    },
+
+    // 7. Focused WebKit coverage for Safari's non-focusable-scroller behavior.
     //    Keep this project narrow: the broad suite remains Chromium-backed.
     {
       name: 'webkit-reader',
@@ -99,7 +128,7 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
-    // 6. Sub-path reverse proxy (opt-in: set E2E_SUBPATH_URL to the nginx rig).
+    // 8. Sub-path reverse proxy (opt-in: set E2E_SUBPATH_URL to the nginx rig).
     //    Guards Class 1 subpath breakage (v4.1.1 reader 404, #571 white page).
     ...(SUBPATH_URL
       ? [{

@@ -119,9 +119,11 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
       setHoverSuppressed(false);
     } else {
       // The unpin click leaves both the pointer and focus inside the rail. Move
-      // focus to the page and suppress this pointer journey so it collapses now;
-      // a later leave-and-return is fresh hover intent, exactly like route links.
-      hoverExitObserved.current = false;
+      // focus to the page and suppress hover so it collapses now. Unlike a route
+      // click, shrinking 220px -> 64px guarantees the pointer has geometrically
+      // exited the rail; record that layout-induced exit so the next sampled
+      // pointermove can restore hover even when it lands directly inside 64px.
+      hoverExitObserved.current = true;
       setHoverSuppressed(true);
       document.getElementById('main')?.focus();
     }

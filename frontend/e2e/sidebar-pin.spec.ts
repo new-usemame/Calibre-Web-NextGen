@@ -49,7 +49,17 @@ test.describe('#1839 desktop sidebar pin', () => {
     // collapse immediately instead of resurrecting the stale-hover regression.
     await page.getByRole('button', { name: 'Unpin sidebar' }).click();
     await expect.poll(() => railWidth(page)).toBe('64px');
+    await expect(page.getByRole('button', { name: 'Pin sidebar' }))
+      .toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('main');
+    await expect(page.locator('[aria-live="polite"]')).toHaveText('Sidebar unpinned.');
     expect(await page.evaluate((key) => localStorage.getItem(key), PIN_STORAGE_KEY)).toBe('0');
+
+    // Browser pointer sampling can skip the gap created by the 220px -> 64px
+    // collapse. The first pointermove may therefore already be inside the rail;
+    // that single move must restore hover expansion without an extra journey.
+    await page.mouse.move(32, 100);
+    await expect.poll(() => railWidth(page)).toBe('220px');
 
     await page.mouse.move(1000, 300);
     await expect.poll(() => railWidth(page)).toBe('64px');
@@ -57,6 +67,38 @@ test.describe('#1839 desktop sidebar pin', () => {
     await expect.poll(() => railWidth(page)).toBe('220px');
     await page.mouse.move(1000, 300);
     await expect.poll(() => railWidth(page)).toBe('64px');
+  });
+
+  test('pinned rail survives a mobile drawer transition back to desktop', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'fine-pointer breakpoint transition only');
+
+    await page.addInitScript((key) => localStorage.setItem(key, '1'), PIN_STORAGE_KEY);
+    await page.goto('/app/');
+
+    const nav = page.getByRole('navigation', { name: 'Browse' });
+    await expect(page.getByRole('button', { name: 'Unpin sidebar' }))
+      .toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(() => railWidth(page)).toBe('220px');
+
+    await page.setViewportSize({ width: 375, height: 667 });
+    await expect(page.getByRole('button', { name: /(?:un)?pin sidebar/i })).toHaveCount(0);
+    await expect(nav).toHaveAttribute('inert', '');
+    await expect(nav).not.toBeInViewport();
+
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(nav).not.toHaveAttribute('inert', '');
+    await expect(nav).toBeInViewport();
+    await expect.poll(() => railWidth(page)).toBe('240px');
+
+    // Keep the mobile drawer open while crossing the breakpoint: `.navOpen`
+    // must become the pinned desktop rail, not retain drawer-only behavior.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.getByRole('button', { name: 'Unpin sidebar' }))
+      .toHaveAttribute('aria-pressed', 'true');
+    await expect(nav).not.toHaveAttribute('inert', '');
+    await expect.poll(() => railWidth(page)).toBe('220px');
+    await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).marginRight))
+      .toBe('0px');
   });
 
   test('a pinned short rail with many shelves scrolls to its final item', async ({ page }, testInfo) => {
@@ -104,6 +146,14 @@ test.describe('#1839 desktop sidebar pin', () => {
     await expect(page.getByRole('button', { name: /(?:un)?pin sidebar/i })).toHaveCount(0);
     const nav = page.getByRole('navigation', { name: 'Browse' });
     await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).width)).toBe('240px');
+    await expect(nav).not.toBeInViewport();
+
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(nav).toBeInViewport();
+    await expect(page.getByRole('button', { name: /(?:un)?pin sidebar/i })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Close menu' }).click();
+    await expect(nav).not.toBeInViewport();
     expect(await page.evaluate((key) => localStorage.getItem(key), PIN_STORAGE_KEY)).toBe('1');
   });
 });

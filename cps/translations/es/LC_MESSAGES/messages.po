@@ -6382,6 +6382,10 @@ msgid "Position recorded"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Position repair queued"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Preparing your magic link…"
 msgstr "Preparando tu enlace mágico…"
 
@@ -7503,6 +7507,11 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} books in latest inventory"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} devices · {m} active"
 msgstr ""
 
 #: cps/spa_strings.py

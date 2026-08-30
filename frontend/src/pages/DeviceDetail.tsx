@@ -59,6 +59,9 @@ interface PositionRow {
   location_value: string | null;
   client_modified_at: string | null;
   server_modified_at: string;
+  /** Explicit degraded marker from the API: this row is armed for a position
+      repair that the device collects on its next sync. */
+  rehydrate_needed?: boolean;
 }
 
 interface PositionsPayload {
@@ -69,6 +72,17 @@ interface PositionsPayload {
 }
 
 const POSITION_PAGE_SIZE = 100;
+
+/* Kobo's own highlight palette (the names arrive from the device as data).
+   Unknown names fall back to the theme accent rather than disappearing. */
+const HIGHLIGHT_COLORS: Record<string, string> = {
+  yellow: '#e8c547',
+  pink: '#e58bb1',
+  blue: '#6ea8e0',
+  green: '#7fc06c',
+  purple: '#b08ad9',
+  orange: '#e08a4c',
+};
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'highlight', label: 'Highlights' },
@@ -83,18 +97,26 @@ function AnnotationList({ payload, loading, error }: {
   error: unknown;
 }) {
   const t = useT();
-  if (loading) return <p role="status">{t('Loading device annotations…')}</p>;
-  if (error) return <p role="alert">{t('Could not load device annotations.')}</p>;
+  if (loading) return <p role="status" className={styles.panelStatus}>{t('Loading device annotations…')}</p>;
+  if (error) return <p role="alert" className={styles.panelAlert}>{t('Could not load device annotations.')}</p>;
   const rows = payload?.annotations ?? [];
-  if (!rows.length) return <p role="status">{t('Nothing in this category yet.')}</p>;
+  if (!rows.length) return <p role="status" className={styles.panelStatus}>{t('Nothing in this category yet.')}</p>;
   return (
     <>
-      <p role="status">{t('Showing {shown} of {total} annotations.', {
+      <p role="status" className={styles.countLine}>{t('Showing {shown} of {total} annotations.', {
         shown: rows.length, total: payload?.total ?? 0,
       })}</p>
       <ul className={styles.annotationList} role="list">
         {rows.map((row) => (
           <li key={`${row.book_id}:${row.annotation_id}`} className={styles.annotationRow}>
+            {row.highlight_color && (
+              <span
+                className={styles.colorChip}
+                style={{ background: HIGHLIGHT_COLORS[row.highlight_color] ?? 'var(--accent)' }}
+                role="img"
+                aria-label={`${t('Highlight color')}: ${row.highlight_color}`}
+              />
+            )}
             <Link href={`/book/${row.book_id}/annotations`}>
               {row.book.title || t('Book {id}', { id: row.book_id })}
             </Link>
@@ -122,25 +144,39 @@ function PositionList({ data, loading, error }: {
   error: unknown;
 }) {
   const t = useT();
-  if (loading) return <p role="status">{t('Loading reading positions…')}</p>;
-  if (error) return <p role="alert">{t('Could not load reading positions.')}</p>;
+  if (loading) return <p role="status" className={styles.panelStatus}>{t('Loading reading positions…')}</p>;
+  if (error) return <p role="alert" className={styles.panelAlert}>{t('Could not load reading positions.')}</p>;
   const positions = data?.positions ?? [];
-  if (!positions.length) return <p>{t('No reading positions from this device yet.')}</p>;
+  if (!positions.length) return <p className={styles.panelStatus}>{t('No reading positions from this device yet.')}</p>;
   return (
     <>
-      <p role="status">{t('Page {page} of {pages}', {
+      <p role="status" className={styles.countLine}>{t('Page {page} of {pages}', {
         page: Math.floor((data?.offset ?? 0) / (data?.limit ?? POSITION_PAGE_SIZE)) + 1,
         pages: Math.max(1, Math.ceil((data?.total ?? 0) / (data?.limit ?? POSITION_PAGE_SIZE))),
       })}</p>
       <ul className={styles.positionList} role="list">
         {positions.map((position) => (
           <li key={position.book_id}>
-            <Link href={`/book/${position.book_id}`}>
-              {position.book.title || t('Book {id}', { id: position.book_id })}
-            </Link>
-            <span>{position.progress_percent == null
-              ? t('Position recorded')
-              : t('{percent}% read', { percent: Math.round(position.progress_percent) })}</span>
+            <div className={styles.positionRow}>
+              <Link href={`/book/${position.book_id}`}>
+                {position.book.title || t('Book {id}', { id: position.book_id })}
+              </Link>
+              <span className={styles.positionMeta}>
+                <span>{position.progress_percent == null
+                  ? t('Position recorded')
+                  : t('{percent}% read', { percent: Math.round(position.progress_percent) })}</span>
+                {position.rehydrate_needed && (
+                  <span className={styles.repairPill}>{t('Position repair queued')}</span>
+                )}
+              </span>
+            </div>
+            {position.progress_percent != null && (
+              <div className={styles.progressTrack} aria-hidden="true">
+                <div className={styles.progressFill} style={{
+                  width: `${Math.min(100, Math.max(0, position.progress_percent))}%`,
+                }} />
+              </div>
+            )}
           </li>
         ))}
       </ul>

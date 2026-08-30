@@ -5478,6 +5478,11 @@ msgid "Highlights"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 
@@ -5563,6 +5568,10 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr ""
+
+#: cps/progress_syncing/protocols/kosync.py cps/spa_strings.py
+msgid "KOReader Sync Plugin"
+msgstr "KOReader 同步插件"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -6637,6 +6646,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Settings saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Setup KOReader Sync"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7811,10 +7824,6 @@ msgstr "无效角色"
 msgid "Tag could not be deleted"
 msgstr ""
 
-#: cps/progress_syncing/protocols/kosync.py
-msgid "KOReader Sync Plugin"
-msgstr "KOReader 同步插件"
-
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
 msgstr "找不到包含 OAuth 信息的有效 gmail.json 文件"
@@ -8356,11 +8365,6 @@ msgstr ""
 #: cps/templates/admin.html
 msgid "Check NextGen Status"
 msgstr ""
-
-#: cps/templates/admin.html
-#, fuzzy
-msgid "Setup KOReader Sync"
-msgstr "epub 阅读器"
 
 #: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"

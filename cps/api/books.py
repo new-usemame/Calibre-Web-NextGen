@@ -14,6 +14,7 @@ from .serializers import serialize_book_list_item, serialize_book_detail
 from .. import (
     calibre_db, config, constants, db, ub, isoLanguages, logger, user_library,
 )
+from ..annotations import count_user_annotations
 from ..cw_login import current_user
 from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
     get_convert_options, get_kosync_progress_display, \
@@ -493,6 +494,7 @@ def book_detail(book_id):
     # Per-user favorite + hidden state (presence-based rows). Anonymous/guest
     # sessions have no real id, so they simply read back as not-favorited/hidden.
     favorited = hidden = False
+    annotation_count = 0
     kosync_progress = None
     kosync_progress_timestamp = None
     kosync_progress_created_at = None
@@ -504,6 +506,7 @@ def book_detail(book_id):
         hidden = (ub.session.query(ub.UserHiddenBook)
                   .filter(ub.UserHiddenBook.user_id == uid, ub.UserHiddenBook.book_id == book_id)
                   .first() is not None)
+        annotation_count = count_user_annotations(uid, book_id, session=ub.session)
         # KOReader/Kobo synced reading progress (#587) — surfaced on the new-UI
         # book page like the classic detail view. Same source as web.show_book:
         # KoboReadingState.current_bookmark.progress_percent (None when unsynced).
@@ -535,6 +538,7 @@ def book_detail(book_id):
         favorited=favorited,
         hidden=hidden,
         in_progress=in_progress,
+        annotation_count=annotation_count,
         custom_column_definitions=_detail_custom_columns(),
         original_filename=_original_filename(book_id),
     )

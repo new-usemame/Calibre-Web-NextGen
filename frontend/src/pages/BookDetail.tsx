@@ -682,9 +682,17 @@ export function BookDetail() {
             {/* Highlights/annotations — view + export + import (Kobo). Opens the
                 server annotations page; in-reader highlight creation is the
                 flagship reader phase-2 (tracked separately). */}
-            {inLibrary && <Link href={`/book/${book.id}/annotations`} className={styles.downloadBtn}>
+            {inLibrary && <Link href={`/book/${book.id}/annotations`} className={styles.downloadBtn}
+              aria-label={(book.annotation_count ?? 0) > 0
+                ? t('Highlights, {count} saved annotations', { count: book.annotation_count ?? 0 })
+                : undefined}>
               <Highlighter size={14} aria-hidden="true" focusable={false} />
               {t('Highlights')}
+              {(book.annotation_count ?? 0) > 0 && (
+                <span className={styles.highlightCount} data-testid="highlight-count" aria-hidden="true">
+                  {book.annotation_count}
+                </span>
+              )}
             </Link>}
 
             {/* Stage 0 per-book two-way state, when the user opted in and the

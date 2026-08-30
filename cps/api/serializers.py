@@ -230,7 +230,7 @@ def _serialize_custom_columns(book, definitions):
 
 def serialize_book_detail(book, read=False, archived=False, favorited=False, hidden=False,
                           in_progress=False, custom_column_definitions=None,
-                          original_filename=None):
+                          original_filename=None, annotation_count=0):
     """Full detail serializer — pure, no Flask/DB imports.
 
     Callers must enrich each language object with a ``.language_name`` attribute
@@ -369,4 +369,5 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "favorited": bool(favorited),
         "hidden": bool(hidden),
         "in_progress": bool(in_progress),
+        "annotation_count": int(annotation_count or 0),
     }

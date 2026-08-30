@@ -2,13 +2,15 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   Library, Globe, BookCopy,
-  Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X,
+  Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff,
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useIsMobile } from '../lib/a11y/useIsMobile';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import { useMediaQuery } from '../lib/useMediaQuery';
+import { usePersistentBool } from '../lib/usePersistentBool';
 import {
   resolveSidebarOrder, ORDERABLE_ENTRIES, DEFAULT_SIDEBAR_ORDER, type SidebarEntryDef,
 } from '../lib/sidebarEntries';
@@ -20,6 +22,9 @@ const SYSTEM = [
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
   { href: '/about', label: 'About', icon: Info },
 ];
+
+const DESKTOP_RAIL_QUERY = '(min-width: 768px) and (hover: hover) and (pointer: fine)';
+const SIDEBAR_PIN_KEY = 'cwng:sidebar-pinned';
 
 function isActive(location: string, href: string, exact?: boolean): boolean {
   if (exact) return location === href;
@@ -41,6 +46,8 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const announce = useAnnouncer();
   const navRef = useRef<HTMLElement>(null);
   const update = useUpdateSidebar();
+  const isDesktopRail = useMediaQuery(DESKTOP_RAIL_QUERY);
+  const [sidebarPinned, setSidebarPinned] = usePersistentBool(SIDEBAR_PIN_KEY, false);
   const [hoverSuppressed, setHoverSuppressed] = useState(false);
   const hoverExitObserved = useRef(false);
 
@@ -102,6 +109,26 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const isAuthed = !!me?.id;
   const personalLibrary = me?.library_mode === 'personal_library';
   const showGlobalLibrary = personalLibrary && !!me?.role?.browse_global;
+  const pinActive = isDesktopRail && sidebarPinned;
+  const pinLabel = sidebarPinned ? t('Unpin sidebar') : t('Pin sidebar');
+
+  const toggleSidebarPin = () => {
+    const next = !sidebarPinned;
+    setSidebarPinned(next);
+    if (next) {
+      setHoverSuppressed(false);
+    } else {
+      // The unpin click leaves both the pointer and focus inside the rail. Move
+      // focus to the page and suppress hover so it collapses now. Unlike a route
+      // click, shrinking the reserved flow box from 220px to 64px guarantees the
+      // pointer has geometrically exited the rail; record that layout-induced
+      // exit so the next sampled pointermove can restore hover immediately.
+      hoverExitObserved.current = true;
+      setHoverSuppressed(true);
+      document.getElementById('main')?.focus();
+    }
+    announce(next ? t('Sidebar pinned.') : t('Sidebar unpinned.'));
+  };
 
   const sidebarVis = me?.sidebar;
   const isVisible = (v?: string) => !v || sidebarVis?.[v] !== false;
@@ -219,22 +246,41 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   return (
     <>
       {open && <div className={styles.scrim} onClick={onClose} aria-hidden="true" />}
-      <nav
-        ref={navRef}
-        className={`${open ? styles.navOpen : styles.nav}${hoverSuppressed ? ` ${styles.hoverSuppressed}` : ''}`}
-        aria-label={t('Browse')}
-        tabIndex={-1}
-        onClickCapture={(event) => {
-          if (event.target instanceof Element && event.target.closest('a[href]')) {
-            hoverExitObserved.current = false;
-            setHoverSuppressed(true);
-          }
-        }}
-      >
+      <div className={`${styles.rail}${pinActive ? ` ${styles.railPinned}` : ''}`}>
+        <nav
+          ref={navRef}
+          className={`${open ? styles.navOpen : styles.nav}${hoverSuppressed ? ` ${styles.hoverSuppressed}` : ''}${pinActive ? ` ${styles.pinned}` : ''}`}
+          aria-label={t('Browse')}
+          tabIndex={-1}
+          onClickCapture={(event) => {
+            if (event.target instanceof Element && event.target.closest('a[href]')) {
+              hoverExitObserved.current = false;
+              setHoverSuppressed(true);
+            }
+          }}
+        >
         {/* Mobile-only close affordance (labelled); hidden on the desktop rail. */}
         <button type="button" className={styles.drawerClose} onClick={onClose} aria-label={t('Close menu')}>
           <X size={20} aria-hidden="true" focusable={false} />
         </button>
+
+        {isDesktopRail && (
+          <div className={styles.pinRow}>
+            <button
+              type="button"
+              className={styles.pinButton}
+              onClick={toggleSidebarPin}
+              aria-label={pinLabel}
+              aria-pressed={sidebarPinned}
+              title={pinLabel}
+            >
+              {sidebarPinned
+                ? <PinOff size={16} aria-hidden="true" focusable={false} />
+                : <Pin size={16} aria-hidden="true" focusable={false} />}
+              <span>{pinLabel}</span>
+            </button>
+          </div>
+        )}
 
         {/* #585 v3: liquid-glass Customize capsule, pinned at the top. Tapping it
             turns the sidebar into an editable list (reorder + hide entries). */}
@@ -395,7 +441,8 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
             )}
           </>
         )}
-      </nav>
+        </nav>
+      </div>
     </>
   );
 }

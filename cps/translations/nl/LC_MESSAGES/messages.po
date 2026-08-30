@@ -6368,6 +6368,10 @@ msgid "Picked up {label}. Drag to reorder, release to drop."
 msgstr "{label} opgepakt. Sleep om te herschikken, laat los om neer te zetten."
 
 #: cps/spa_strings.py
+msgid "Pin sidebar"
+msgstr "Zijbalk vastzetten"
+
+#: cps/spa_strings.py
 msgid "Pink"
 msgstr "Roze"
 
@@ -6911,6 +6915,14 @@ msgid "Shuffle picks"
 msgstr "Selectie schudden"
 
 #: cps/spa_strings.py
+msgid "Sidebar pinned."
+msgstr "Zijbalk vastgezet."
+
+#: cps/spa_strings.py
+msgid "Sidebar unpinned."
+msgstr "Zijbalk losgemaakt."
+
+#: cps/spa_strings.py
 msgid "Sign in with a magic link"
 msgstr "Inloggen met een magic link"
 
@@ -7185,6 +7197,10 @@ msgstr "Ontgrendel de omslag hierboven om een nieuwe toe te passen."
 #: cps/spa_strings.py
 msgid "Unlock the cover to change it"
 msgstr "Ontgrendel de omslag om deze te wijzigen"
+
+#: cps/spa_strings.py
+msgid "Unpin sidebar"
+msgstr "Zijbalk losmaken"
 
 #: cps/spa_strings.py
 msgid "Unseeded books"

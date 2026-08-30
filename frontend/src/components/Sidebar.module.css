@@ -10,6 +10,13 @@
   overflow-y: auto;
 }
 
+/* On mobile the wrapper has no box, so the existing fixed drawer remains the
+   positioning surface. The desktop fine-pointer query below turns this into
+   the rail's one fixed-size flex item. */
+.rail {
+  display: contents;
+}
+
 .list {
   display: flex;
   flex-direction: column;
@@ -107,6 +114,39 @@
   display: none;
 }
 
+.pinRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 32px;
+  margin-bottom: var(--sp-1);
+}
+
+.pinButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 24px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.pinButton:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 /* Mobile scrim behind the drawer */
 .scrim {
   display: none;
@@ -114,33 +154,45 @@
 
 /* ---- Desktop (persistent rail) ---- */
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  .nav,
-  .navOpen {
+  /* The shell only lays out this 64px rail. The 220px navigation panel is an
+     absolute child, so revealing it never changes the flex sibling's box and
+     cannot relayout <main> or its catalog grid (#1813 item 4). */
+  .rail {
+    display: block;
     position: sticky;
     top: var(--topbar-h);
-    height: calc(100vh - var(--topbar-h));
-    width: 220px;
-    flex-shrink: 0;
-  }
-}
-
-@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  :is(.nav, .navOpen) {
     width: 64px;
+    height: calc(100vh - var(--topbar-h));
+    flex: 0 0 64px;
+    box-sizing: border-box;
+    background: var(--surface-1);
+    border-right: 1px solid var(--border);
+    z-index: var(--z-overlay);
+  }
+
+  /* Pinning is an explicit persistent layout choice, not a hover animation.
+     Reserve the expanded width in one discrete style change. */
+  .railPinned {
+    width: 220px;
+    flex-basis: 220px;
+  }
+
+  :is(.nav, .navOpen) {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 220px;
+    height: 100%;
     padding-right: var(--sp-2);
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: none;
-    z-index: var(--z-overlay);
     box-sizing: border-box;
-    transition:
-      width var(--dur-base) var(--ease-out),
-      margin-right var(--dur-base) var(--ease-out);
-    /* Interim for #1813 item 4: the hover width animation runs layout every
-       frame; containment scopes that work to the rail instead of the page.
-       (The expanded panel lives inside the rail's own 220px border box via
-       the negative margin, so paint containment clips nothing visible.)
-       The real fix — a transform-driven panel — is tracked on the issue. */
+    clip-path: inset(0 156px 0 0);
+    transition: clip-path var(--dur-base) var(--ease-out);
+    /* Kept as a belt after the structural fix: it scopes layout and paint from
+       the panel's own scrolling/editable contents. The reveal itself is now a
+       clip-path compositor transition and needs no containment to protect the
+       catalog sibling. */
     contain: layout paint;
   }
 
@@ -154,9 +206,13 @@
     }
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) {
-    width: 220px;
-    margin-right: -156px;
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) {
+    clip-path: inset(0);
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .pinButton {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   :is(.item, .itemActive, .customizeBtn) > span,
@@ -167,36 +223,40 @@
   }
 
   .shelfList :is(.shelfItem, .shelfItemActive) {
-    padding-left: var(--sp-3);
+    /* Keep this alignment stable in both reveal states. Animating padding-left
+       would reintroduce per-frame layout work inside the new panel. */
+    padding-left: calc(var(--sp-3) + 18px + var(--sp-3));
   }
   .shelfList .shelfCount {
     display: none;
   }
 
   .magicShelfIcon {
-    transition: left var(--dur-base) var(--ease-out);
+    transform: translate(0, -50%);
+    transition: transform var(--dur-base) var(--ease-out);
   }
 
   .magicShelfName {
     padding-left: calc(18px + var(--sp-2));
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within)
     :is(.item > span, .itemActive > span, .customizeBtn > span, .magicShelfName) {
     opacity: 1;
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
-    .shelfList :is(.shelfItem, .shelfItemActive) {
-    padding-left: calc(var(--sp-3) + 18px + var(--sp-3));
-  }
-
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .shelfList .shelfCount {
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .shelfList .shelfCount {
     display: inline;
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .magicShelfIcon {
-    left: calc(var(--sp-3) + 18px + var(--sp-3));
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .magicShelfIcon {
+    transform: translate(calc(18px + var(--sp-3)), -50%);
+  }
+}
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+  :is(.nav, .navOpen) {
+    transition: none;
   }
 }
 

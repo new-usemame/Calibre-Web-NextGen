@@ -6507,6 +6507,10 @@ msgid "Picked up {label}. Drag to reorder, release to drop."
 msgstr "{label} saisi. Faites glisser pour réorganiser, relâchez pour déposer."
 
 #: cps/spa_strings.py
+msgid "Pin sidebar"
+msgstr "Épingler la barre latérale"
+
+#: cps/spa_strings.py
 msgid "Pink"
 msgstr "Rose"
 
@@ -7053,6 +7057,14 @@ msgid "Shuffle picks"
 msgstr "Mélanger la sélection"
 
 #: cps/spa_strings.py
+msgid "Sidebar pinned."
+msgstr "Barre latérale épinglée."
+
+#: cps/spa_strings.py
+msgid "Sidebar unpinned."
+msgstr "Barre latérale détachée."
+
+#: cps/spa_strings.py
 msgid "Sign in with a magic link"
 msgstr "Se connecter avec un lien magique"
 
@@ -7326,6 +7338,10 @@ msgstr "Déverrouillez la couverture ci-dessus pour en appliquer une nouvelle."
 #: cps/spa_strings.py
 msgid "Unlock the cover to change it"
 msgstr "Déverrouillez la couverture pour la changer"
+
+#: cps/spa_strings.py
+msgid "Unpin sidebar"
+msgstr "Détacher la barre latérale"
 
 #: cps/spa_strings.py
 msgid "Unseeded books"

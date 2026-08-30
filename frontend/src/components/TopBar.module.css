@@ -13,6 +13,15 @@
   justify-content: space-between;
 }
 
+/* Device inventory pages can contain a bounded 200-row window. Keep the bar in
+   normal document flow there so its interactive search field cannot obscure a
+   row action when the page is scrolled; position:relative preserves the mobile
+   search overlay's containing block. */
+.barInFlow {
+  position: relative;
+  top: auto;
+}
+
 .left {
   display: flex;
   align-items: center;
@@ -47,6 +56,8 @@
   color: var(--text);
 }
 
+/* Keep this condition identical to DRAWER_MODE_QUERY in
+   ../lib/a11y/drawerMode.ts. unit/structuralPerformance.test.ts pins it. */
 @media (max-width: 767px), (hover: none), (pointer: coarse) {
   .menuBtn {
     display: inline-flex;

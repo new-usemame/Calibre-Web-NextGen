@@ -73,7 +73,7 @@
   flex-wrap: wrap;
 }
 
-.action, .actionDanger {
+.action, .actionPrimary, .actionDanger {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -86,8 +86,14 @@
 }
 
 .action:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+.actionPrimary {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: var(--fw-semi);
+}
+.actionPrimary:hover:not(:disabled) { filter: brightness(1.08); }
 .actionDanger:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
-.action:disabled, .actionDanger:disabled { opacity: 0.45; cursor: not-allowed; }
+.action:disabled, .actionPrimary:disabled, .actionDanger:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .shelfWrap { position: relative; }
 
@@ -139,7 +145,7 @@
   /* The action labels are text nodes, not nested spans. Keep that text in the
      accessibility tree while collapsing it visually so a wrapped toolbar can
      fit inside short landscape/split-screen viewports. */
-  .action, .actionDanger { gap: 0; font-size: 0; }
+  .action, .actionPrimary, .actionDanger { gap: 0; font-size: 0; }
 }
 
 .metaPanel {

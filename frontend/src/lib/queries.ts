@@ -6,7 +6,7 @@ import {
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
-import { settleById } from './bulkResults';
+import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { createEntityListQueryOptions } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse } from './api';
@@ -868,7 +868,9 @@ export function useBulkActions() {
   const qc = useQueryClient();
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['books'] });
+    void qc.invalidateQueries({ queryKey: ['global-library'] });
     void qc.invalidateQueries({ queryKey: ['shelves'] });
+    void qc.invalidateQueries({ queryKey: ['shelf'] });
   };
   const markRead = useMutation({
     mutationFn: (v: { ids: number[]; read: boolean }) =>
@@ -884,7 +886,7 @@ export function useBulkActions() {
       })),
     onSuccess: refresh,
   });
-  const remove = useMutation({
+  const deleteBooks = useMutation({
     mutationFn: (ids: number[]) => settleById(ids, (id) => apiPost(`/api/v1/books/${id}/delete`)),
     onSuccess: ({ succeededIds }) => {
       // Evict deleted books from every cached catalog snapshot so a later
@@ -893,6 +895,39 @@ export function useBulkActions() {
       refresh();
     },
   });
+  const removeFromMyLibrary = useMutation({
+    // Keep this synchronized with cps.api.actions.BATCH_MEMBERSHIP_LIMIT. The
+    // server still validates the request and returns a structured
+    // batch_too_large error, which settleByBatch preserves for the UI.
+    mutationFn: (ids: number[]) => settleByBatch(ids, 200, async (bookIds) => {
+      const result = await apiPost<{
+        succeeded_ids: number[];
+        failed_ids: number[];
+        results: Array<{
+          book_id: number;
+          status: 'succeeded' | 'failed';
+          error?: { code?: unknown; message?: unknown };
+        }>;
+      }>(
+        '/api/v1/books/my-library/batch',
+        { operation: 'remove', book_ids: bookIds },
+      );
+      const failureDetails: BulkFailureDetail[] = result.results.flatMap((item) => {
+        if (item.status !== 'failed' || typeof item.error?.message !== 'string') return [];
+        return [{
+          id: item.book_id,
+          ...(typeof item.error.code === 'string' ? { code: item.error.code } : {}),
+          message: item.error.message,
+        }];
+      });
+      return {
+        succeededIds: result.succeeded_ids,
+        failedIds: result.failed_ids,
+        failureDetails,
+      };
+    }),
+    onSuccess: refresh,
+  });
   // Bulk metadata: apply the same partial field set and explicit relationship
   // mode to every selected book via the per-book metadata endpoint.
   const setMetadata = useMutation({
@@ -900,7 +935,7 @@ export function useBulkActions() {
       settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/metadata`, v.fields)),
     onSuccess: refresh,
   });
-  return { markRead, addToShelf, remove, setMetadata };
+  return { markRead, addToShelf, deleteBooks, removeFromMyLibrary, setMetadata };
 }
 
 /** Merge books: the first id is the target (kept); the rest are merged into it

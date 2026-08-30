@@ -4,10 +4,12 @@ import { test, expect } from './fixtures';
  * #1054 — "Can we please have the option of hiding the 'Read Now' and the edit
  * button in Library view. It makes the main page look messy." (@Glennza1962)
  *
- * The controls were already hover-revealed on a mouse (#1185), but a user who
- * reads on an ereader never wants them, and on a touchscreen they are pinned
- * visible by the coarse-pointer block. So: a real preference in the catalog's
- * View settings, persisted per account with a guest/local fallback.
+ * The controls were already hover-revealed on a mouse (#1185), and were pinned
+ * visible on touch by the coarse-pointer block when this preference shipped.
+ * The 2026-08-29 operator ruling reversed that touch default, but the
+ * preference is still the thing a user who NEVER wants them reaches for: it
+ * removes the row entirely rather than merely hiding it. Persisted per account,
+ * with a guest/local fallback.
  *
  * The load-bearing assertion is that switching it off REMOVES the controls
  * rather than hiding them. The hover-reveal uses `opacity: 0`, which leaves a

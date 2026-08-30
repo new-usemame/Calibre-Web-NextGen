@@ -182,7 +182,7 @@ export function MagicShelfView({ id }: { id: string }) {
           <div className={styles.grid}>
             {books.map((b, i) => (
               <BookCard key={b.id} book={b} hideActions={cardActionsHidden} canRead={!!me?.role?.viewer}
-                style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }} />
+                style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
             ))}
           </div>
           {hasMore && (

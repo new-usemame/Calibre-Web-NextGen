@@ -438,8 +438,12 @@
 
 .progressFill {
   height: 100%;
+  width: 100%;
   background: var(--accent);
-  transition: width var(--dur-base) var(--ease);
+  /* Animate on the compositor: a width transition relayouts the reader chrome
+     on every page turn, exactly when epub.js owns the main thread (#1813). */
+  transform-origin: left;
+  transition: transform var(--dur-base) var(--ease);
 }
 
 /* Highlight color popover */

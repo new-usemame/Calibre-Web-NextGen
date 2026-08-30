@@ -54,12 +54,14 @@ protecting `cps/api/` added zero historical gate runs in that sample.
 | `setup` | — | logs in once via the real UI, saves session |
 | `desktop` | 1280×800 | full flow + a11y baseline |
 | `mobile` | 375×667 (chromium emulation) | drawer reachability + scroll-lock (#576), no h-overflow (#288) |
+| `ipad-touch` | 1024×1366 (touch/no hover) | persistent card actions + drawer inert/trap/Escape contract |
 | `subpath` | reverse proxy (opt-in) | assets/nav under a base path (v4.1.1 reader 404, #571) |
 
 Specs: `browse.spec.ts` (grid→detail→reader flow + clean console + default-state), `mobile.spec.ts`
 (drawer), `a11y.spec.ts` (WCAG 2.2 AA gate — axe across every route, **fails on any critical OR
 serious** violation, `KNOWN` allowlist must stay empty; plus keyboard/focus invariants: skip link,
-single `<main>`, no nested-card tab stop, mobile drawer inert/trapped), `subpath.spec.ts` (base-path).
+single `<main>`, no nested-card tab stop), `sidebar-drawer-a11y.spec.ts` (closed drawer inert/Tab skip,
+open Tab trap, Escape close + trigger restoration on mobile and iPad touch), `subpath.spec.ts` (base-path).
 Grow the a11y gate via the `CWNG_a11y` skill.
 
 ## Extending it (keep it honest)

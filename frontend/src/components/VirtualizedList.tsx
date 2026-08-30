@@ -28,7 +28,11 @@ export function VirtualizedList<T>({
 }: VirtualizedListProps<T>) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [viewportHeight, setViewportHeight] = useState(600);
-  const [scrollTop, setScrollTop] = useState(0);
+  // Store the derived row index, not the raw pixel offset: a pixel value in
+  // state forces a React render on every scroll event (~60-120/s) even when
+  // the visible window has not moved by a single row (#1813 item 5).
+  const [scrollRow, setScrollRow] = useState(0);
+  const scrollFrame = useRef(0);
 
   useLayoutEffect(() => {
     const node = viewportRef.current;
@@ -41,12 +45,17 @@ export function VirtualizedList<T>({
   }, []);
 
   const onScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
-    setScrollTop(event.currentTarget.scrollTop);
-  }, []);
+    const top = event.currentTarget.scrollTop;
+    cancelAnimationFrame(scrollFrame.current);
+    scrollFrame.current = requestAnimationFrame(() => {
+      const row = Math.floor(top / rowHeight);
+      setScrollRow((current) => (current === row ? current : row));
+    });
+  }, [rowHeight]);
 
   const visibleCount = Math.max(1, Math.ceil(viewportHeight / rowHeight));
   const overscan = visibleCount * overscanViewports;
-  const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+  const start = Math.max(0, scrollRow - overscan);
   const end = Math.min(items.length, start + visibleCount + overscan * 2);
   const visible = items.slice(start, end);
 

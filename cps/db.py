@@ -16,7 +16,6 @@ from weakref import WeakSet, WeakKeyDictionary
 from uuid import uuid4
 
 import sqlite3
-from sqlite3 import OperationalError as sqliteOperationalError
 from sqlalchemy import create_engine, event
 from sqlalchemy import Table, Column, ForeignKey, CheckConstraint
 from sqlalchemy import String, Integer, Boolean, TIMESTAMP, Float
@@ -30,7 +29,7 @@ try:
 except ImportError:
     from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.sql.expression import and_, true, false, text, func, or_, select
+from sqlalchemy.sql.expression import and_, true, false, text, func, literal, or_, select, union_all
 try:
     # Scope key for the session registry, see _make_session_factory. greenlet is
     # a pinned dependency (pyproject.toml) and a hard dependency of gevent;
@@ -52,6 +51,10 @@ from .sqlite_utils import network_share_mode_enabled
 from .unicode_collation import unicode_initial, unicode_sort_key
 
 log = logger.create()
+
+
+class FilteredBookVisibilityUnavailable(RuntimeError):
+    """The configured filtered-library policy could not be resolved safely."""
 
 # Rate-limit author-sort drift diagnostics. Books.author_sort is denormalized
 # from Authors.sort and can drift after an Authors edit; the divergence is
@@ -1514,6 +1517,129 @@ class CalibreDB:
                 ))
                 .first())
 
+    def get_filtered_book_ids_for_users(self, users, visibility_state,
+                                        candidates_by_user):
+        """Resolve candidate books in several users' current filtered views.
+
+        ``common_filters`` intentionally performs app-database lookups for one
+        user.  A cross-user board must not repeat those lookups per account, so
+        its caller supplies the archived/hidden/membership rows prefetched once
+        per table.  The predicates below are the same policy expressed against
+        that immutable request snapshot; the metadata query is one UNION ALL
+        execution.  Every branch is constrained to IDs that already have
+        device data, so the admin board never evaluates an owner's policy over
+        the entire Calibre library.
+        """
+        self.ensure_session()
+        users = list(users)
+        if not users:
+            return {}
+        if has_request_context():
+            g._common_filters_user_specific = True
+
+        branches = []
+        for filter_user in users:
+            user_id = int(filter_user.id)
+            candidate_ids = tuple(sorted({
+                int(book_id)
+                for book_id in candidates_by_user.get(user_id, ())
+                if book_id is not None
+            }))
+            if not candidate_ids:
+                continue
+            state = visibility_state.get(user_id, {})
+            archived_ids = tuple(state.get("archived", ()))
+            hidden_ids = (
+                () if filter_user.is_anonymous
+                else tuple(state.get("hidden", ()))
+            )
+            membership_ids = tuple(state.get("membership", ()))
+
+            language = filter_user.filter_language()
+            language_filter = (
+                true() if language == "all"
+                else Books.languages.any(Languages.lang_code == language)
+            )
+            denied_tags = filter_user.list_denied_tags()
+            allowed_tags = filter_user.list_allowed_tags()
+            denied_tags_filter = (
+                false() if denied_tags == [""]
+                else Books.tags.any(Tags.name.in_(denied_tags))
+            )
+            allowed_tags_filter = (
+                true() if allowed_tags == [""]
+                else Books.tags.any(Tags.name.in_(allowed_tags))
+            )
+
+            if self.config.config_restricted_column:
+                try:
+                    column = getattr(
+                        Books,
+                        "custom_column_" + str(self.config.config_restricted_column),
+                    )
+                    values = cc_classes[self.config.config_restricted_column]
+                    allowed_values = filter_user.list_allowed_column_values()
+                    denied_values = filter_user.list_denied_column_values()
+                    allowed_column_filter = (
+                        true() if allowed_values == [""]
+                        else column.any(values.value.in_(allowed_values))
+                    )
+                    denied_column_filter = (
+                        false() if denied_values == [""]
+                        else column.any(values.value.in_(denied_values))
+                    )
+                except (KeyError, AttributeError, IndexError):
+                    log.error(
+                        "Custom Column No.%s does not exist in calibre database",
+                        self.config.config_restricted_column,
+                    )
+                    raise FilteredBookVisibilityUnavailable(
+                        "configured restricted column is unavailable"
+                    )
+            else:
+                allowed_column_filter = true()
+                denied_column_filter = false()
+
+            membership_filter = true()
+            if bool(getattr(filter_user, "has_own_library", False)):
+                membership_filter = Books.id.in_(membership_ids)
+
+            candidate_values = func.json_each(
+                json.dumps(candidate_ids),
+            ).table_valued("value").alias()
+
+            branches.append(select(
+                literal(user_id).label("user_id"),
+                Books.id.label("book_id"),
+            ).where(and_(
+                Books.id.in_(select(candidate_values.c.value)),
+                language_filter,
+                allowed_tags_filter,
+                ~denied_tags_filter,
+                allowed_column_filter,
+                ~denied_column_filter,
+                Books.id.notin_(archived_ids),
+                Books.id.notin_(hidden_ids),
+                membership_filter,
+            )))
+
+        result = {int(user.id): frozenset() for user in users}
+        if not branches:
+            return result
+        visible = union_all(*branches).subquery("device_visible_books")
+        rows = self.session.execute(select(
+            visible.c.user_id,
+            visible.c.book_id,
+        )).all()
+        mutable = {user_id: set() for user_id in result}
+        for user_id, book_id in rows:
+            mutable[int(user_id)].add(int(book_id))
+        result = {
+            user_id: frozenset(book_ids)
+            for user_id, book_ids in mutable.items()
+        }
+        return result
+
     def get_book_read_archived(
         self,
         book_id,
@@ -2245,22 +2371,44 @@ class CalibreDB:
         Replaces the prior async TaskReconnectDatabase path which
         disposed the shared engine on a worker thread and raced with
         in-flight request greenlets (fork issue #192).
+
+        Every instance is attempted. If any active session cannot be
+        refreshed, raise after the sweep so callers never mistake a partial
+        refresh for success.
         """
+        failures = []
         with cls._reconnect_lock:
             for inst in list(cls.instances):
                 try:
-                    if inst.session is not None:
-                        try:
-                            inst.session.expire_all()
-                        except Exception:
-                            pass
-                        try:
-                            inst.session.rollback()
-                        except Exception:
-                            pass
-                except Exception:
-                    # One bad instance must not block the rest.
+                    session = inst._peek_session()
+                    if session is None:
+                        continue
+                except Exception as exc:
+                    # Refresh every other instance before reporting failure to
+                    # the caller. A partial refresh must not be reported as a
+                    # success: request handlers need a defined failure path.
+                    failures.append(exc)
                     continue
+
+                session_failure = None
+                try:
+                    session.expire_all()
+                except Exception as exc:
+                    session_failure = exc
+                try:
+                    session.rollback()
+                except Exception as exc:
+                    if session_failure is None:
+                        session_failure = exc
+                if session_failure is not None:
+                    failures.append(session_failure)
+
+        if failures:
+            raise RuntimeError(
+                "Could not refresh {} Calibre database session(s)".format(
+                    len(failures)
+                )
+            ) from failures[0]
 
 
 def lcase(s):

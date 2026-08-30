@@ -1,4 +1,5 @@
-import { BookOpen, BookCheck, BookPlus, Check, EyeOff, X, Pencil } from 'lucide-react';
+import { memo, useEffect, useId, useRef, useState } from 'react';
+import { BookOpen, BookCheck, BookPlus, Check, EyeOff, X, Pencil, MoreHorizontal } from 'lucide-react';
 import { Link } from 'wouter';
 import type { Book } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -56,7 +57,7 @@ function formatSeriesIndex(idx: number | null | undefined): string | null {
   return Number.isInteger(idx) ? String(idx) : String(idx);
 }
 
-export function BookCard({
+function BookCardInner({
   book, style, onRemove, removeLabel = 'Remove',
   selectable = false, selected = false, onToggleSelect,
   showSeriesIndex = false,
@@ -69,9 +70,46 @@ export function BookCard({
   canRead = false,
 }: BookCardProps) {
   const t = useT();
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [actionsAlign, setActionsAlign] = useState<'start' | 'end'>('end');
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const actionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const actionsPanelId = useId();
   const authorStr = formatAuthors(book.authors);
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
   const readTarget = getPrimaryReadTarget(book.id, book.formats, canRead);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
+        setActionsOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setActionsOpen(false);
+      actionsTriggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [actionsOpen]);
+
+  const toggleActions = () => {
+    if (!actionsOpen) {
+      const trigger = actionsTriggerRef.current?.getBoundingClientRect();
+      if (trigger) {
+        setActionsAlign(
+          trigger.left + trigger.width / 2 < window.innerWidth / 2 ? 'start' : 'end',
+        );
+      }
+    }
+    setActionsOpen((open) => !open);
+  };
 
   // Series name + position under the cover (fork #657, #673, #855). Series-heavy
   // libraries navigate by series and want it visible without clicking into each
@@ -204,9 +242,14 @@ export function BookCard({
   // not to this row.
   const hasAddAction = membership === 'unowned' && !!onAddToLibrary;
   const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));
+  const hasCoarseActions = Boolean(onRemove)
+    || (!hideActions && (Boolean(readTarget) || quickEdit));
 
   return (
-    <div className={styles.wrap} style={style}>
+    <div
+      className={`${styles.wrap} ${actionsOpen ? styles.wrapActionsOpen : ''}`}
+      style={style}
+    >
       {detailsEnabled ? (
         <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
           {cover}{info}
@@ -225,7 +268,10 @@ export function BookCard({
         </button>
       )}
       {hasActionRow && (
-        <div className={quickEdit ? `${styles.actionRow} ${styles.actionRowEdit}` : styles.actionRow}>
+        <div className={[
+          styles.actionRow,
+          quickEdit ? styles.actionRowEdit : '',
+        ].filter(Boolean).join(' ')}>
           {hasAddAction ? (
             <button type="button" className={`${styles.readNow} ${styles.addToLibrary}`}
               disabled={addPending}
@@ -265,6 +311,74 @@ export function BookCard({
           )}
         </div>
       )}
+      {hasCoarseActions && (
+        <div
+          className={styles.moreActionsWrap}
+          ref={actionsRef}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setActionsOpen(false);
+            }
+          }}
+        >
+          <button
+            ref={actionsTriggerRef}
+            type="button"
+            className={styles.moreActionsTrigger}
+            aria-label={t('More actions for {title}', { title: book.title })}
+            aria-expanded={actionsOpen}
+            aria-controls={actionsOpen ? actionsPanelId : undefined}
+            onClick={toggleActions}
+          >
+            <MoreHorizontal size={22} aria-hidden="true" focusable={false} />
+          </button>
+          {actionsOpen && (
+            <div
+              id={actionsPanelId}
+              role="group"
+              aria-label={t('Actions for {title}', { title: book.title })}
+              className={`${styles.moreActionsPanel} ${
+                actionsAlign === 'start' ? styles.moreActionsPanelStart : styles.moreActionsPanelEnd
+              }`}
+            >
+              {readTarget && !hideActions && (
+                <Link href={readTarget} className={styles.moreActionsItem}
+                  aria-label={t('Read {title}', { title: book.title })}
+                  onClick={() => setActionsOpen(false)}>
+                  <BookOpen size={17} aria-hidden="true" focusable={false} />
+                  <span>{t('Read now')}</span>
+                </Link>
+              )}
+              {quickEdit && !hideActions && (
+                <Link href={`/book/${book.id}/edit`} className={styles.moreActionsItem}
+                  aria-label={t('Edit {title}', { title: book.title })}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setActionsOpen(false);
+                  }}>
+                  <Pencil size={17} aria-hidden="true" focusable={false} />
+                  <span>{t('Edit')}</span>
+                </Link>
+              )}
+              {onRemove && (
+                <button type="button" className={`${styles.moreActionsItem} ${styles.moreActionsDanger}`}
+                  aria-label={t(removeLabel)}
+                  onClick={() => {
+                    setActionsOpen(false);
+                    onRemove(book);
+                  }}>
+                  <X size={17} strokeWidth={2.5} aria-hidden="true" focusable={false} />
+                  <span>{t(removeLabel)}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+/** Grid items re-render only when their own props change: a selection tap or
+ *  settings refetch in a 500-card catalog must not reconcile every card. */
+export const BookCard = memo(BookCardInner);

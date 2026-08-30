@@ -1,7 +1,7 @@
 import { Link } from 'wouter';
 import { Fragment, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Server, Users } from 'lucide-react';
+import { ChevronLeft, Smartphone, Users } from 'lucide-react';
 import { apiGet } from '../lib/api';
 import { clampOffset } from '../lib/pagination';
 import { relativeWhen } from '../lib/relativeTime';
@@ -60,7 +60,7 @@ export function AdminDevices() {
         <ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Admin')}
       </Link>
       <div className={styles.heading}>
-        <Server aria-hidden="true" focusable={false} />
+        <Smartphone aria-hidden="true" focusable="false" />
         <h1>{t('Device administration')}</h1>
       </div>
       {error ? (
@@ -78,7 +78,14 @@ export function AdminDevices() {
               <Fragment key={group.user.id}>
                 {groups.length > 1 && (
                   <li className={styles.groupHeader}>
-                    <h2>{group.user.name}</h2>
+                    <h2>
+                      <Users size={15} aria-hidden="true" focusable="false" />
+                      {group.user.name}
+                    </h2>
+                    <p className={styles.groupMeta}>{t('{n} devices · {m} active', {
+                      n: group.devices.length,
+                      m: group.devices.filter((device) => device.active).length,
+                    })}</p>
                   </li>
                 )}
                 {group.devices.map((device) => (
@@ -86,10 +93,12 @@ export function AdminDevices() {
                     <header>
                       <div>
                         <DeviceTitle>{device.label}</DeviceTitle>
-                        <p className={styles.account}>
-                          <Users size={13} aria-hidden="true" focusable={false} />
-                          {t('Account: {name}', { name: device.user.name })}
-                        </p>
+                        {groups.length === 1 && (
+                          <p className={styles.account}>
+                            <Users size={13} aria-hidden="true" focusable="false" />
+                            {t('Account: {name}', { name: device.user.name })}
+                          </p>
+                        )}
                       </div>
                       <span className={device.active ? styles.stateOk : styles.stateMuted}>
                         {device.active ? t('Active') : t('Inactive')}

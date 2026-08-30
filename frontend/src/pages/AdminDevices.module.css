@@ -10,10 +10,20 @@
 .list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: var(--sp-4); margin: 0; padding: 0; }
 
 /* Per-account group divider — spans the full grid row so the fleet reads as
-   "user → their readers" instead of one undifferentiated card field. */
-.groupHeader { grid-column: 1 / -1; margin-top: var(--sp-3); padding-bottom: var(--sp-2); border-bottom: 1px solid var(--border); }
+   "user → their readers" instead of one undifferentiated card field. The
+   header carries the per-account rollup (readers · active) so the count is
+   answered without scanning cards; cards drop their own Account line while a
+   header is present. */
+.groupHeader {
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
+  margin-top: var(--sp-3); padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
 .groupHeader:first-child { margin-top: 0; }
-.groupHeader h2 { margin: 0; font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
+.groupHeader h2 { display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
+.groupHeader h2 svg { flex: none; color: var(--accent); }
+.groupMeta { margin: 0; flex: none; color: var(--text-muted); font-size: var(--fs-sm); white-space: nowrap; }
 
 .card {
   padding: var(--sp-4) var(--sp-5);

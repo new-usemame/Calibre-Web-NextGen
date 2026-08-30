@@ -126,7 +126,7 @@ export function Devices() {
         </section>
       ) : (
         <>
-          <p role="status">{t('Page {page} of {pages}', {
+          <p role="status" className={styles.countLine}>{t('Page {page} of {pages}', {
             page: Math.floor(deviceOffset / DEVICE_PAGE_SIZE) + 1,
             pages: Math.max(1, Math.ceil((data?.total ?? 0) / DEVICE_PAGE_SIZE)),
           })}</p>

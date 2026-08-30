@@ -45,14 +45,14 @@
 .assignedToggle:has(input:checked) { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
 .assignedToggle input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
 
-/* Page-level tabs — the app's segmented-switcher idiom (Sidebar nav, Catalog /
-   BrowseList view toggles, filter pills): a quiet track, and the active segment
-   carries the amber "you are here" tint. 44px targets; the strip scrolls
-   horizontally on narrow screens (keyboard focus scrolls the active tab into
-   view natively). */
+/* Page-level tabs — the app's segmented-switcher idiom, matched exactly to the
+   Catalog / BrowseList .viewToggle: a quiet surface-2 track (2px padding, no
+   border), and the active segment carries the amber "you are here" tint. 44px
+   targets; the strip scrolls horizontally on narrow screens (keyboard focus
+   scrolls the active tab into view natively). */
 .tabs {
-  display: flex; gap: 2px; padding: 3px;
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md);
+  display: flex; gap: 2px; padding: 2px;
+  background: var(--surface-2); border-radius: var(--r-md);
   overflow-x: auto; scrollbar-width: none;
 }
 .tabs::-webkit-scrollbar { display: none; }

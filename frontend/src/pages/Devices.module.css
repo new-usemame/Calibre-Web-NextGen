@@ -11,6 +11,18 @@
 .pagination button:disabled { opacity: .55; cursor: default; }
 .pagination span { color: var(--text-muted); font-size: var(--fs-sm); }
 
+.countLine { margin: 0 0 var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); }
+
+/* DeviceInventory status line — the same quiet register as the page count line
+   for loading/empty/count; a failure gets the calm danger-tinted callout (the
+   DeviceDetail panelStatus/panelAlert pair). */
+.inventoryStatus { margin: 0 0 var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); }
+.inventoryAlert {
+  margin: 0 0 var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  color: var(--danger); background: var(--danger-soft); border: 1px solid var(--danger-border);
+  border-radius: var(--r-md);
+}
+
 /* Device card — name, then the stats that answer "is this reader alive?":
    annotation count + last-seen first, inventory/storage quiet below. */
 .card {

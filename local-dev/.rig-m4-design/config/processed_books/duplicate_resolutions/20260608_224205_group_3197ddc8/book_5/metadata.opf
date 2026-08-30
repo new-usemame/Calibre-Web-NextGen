@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:identifier opf:scheme="calibre" id="calibre_id">5</dc:identifier>
+        <dc:identifier opf:scheme="uuid" id="uuid_id">92d79774-e8ad-467a-b862-c795bdf20ecf</dc:identifier>
+        <dc:title>Alice's Adventures in Wonderland</dc:title>
+        <dc:creator opf:file-as="Carroll, Lewis" opf:role="aut">Lewis Carroll</dc:creator>
+        <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (9.1.0) [https://calibre-ebook.com]</dc:contributor>
+        <dc:date>2008-06-27T04:00:00+00:00</dc:date>
+        <dc:identifier opf:scheme="URI">http://www.gutenberg.org/11</dc:identifier>
+        <dc:language>eng</dc:language>
+        <dc:subject>Fantasy fiction</dc:subject>
+        <dc:subject>Children's stories</dc:subject>
+        <dc:subject>Imaginary places -- Juvenile fiction</dc:subject>
+        <dc:subject>Alice (Fictitious character from Carroll) -- Juvenile fiction</dc:subject>
+        <meta name="calibre:timestamp" content="2026-05-15T22:59:54.559179+00:00"/>
+        <meta name="calibre:title_sort" content="Alice's Adventures in Wonderland"/>
+    </metadata>
+    <guide>
+        <reference type="cover" title="Cover" href="cover.jpg"/>
+    </guide>
+</package>

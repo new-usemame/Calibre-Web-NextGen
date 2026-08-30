@@ -1,44 +1,102 @@
-.container { max-width: 860px; margin: 0 auto; padding: var(--sp-5); color: var(--text); }
-.back { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); margin-bottom: var(--sp-3); }
+.container { max-width: 860px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
+.back { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-3); transition: color var(--dur-fast) var(--ease); }
+.back:hover { color: var(--accent); }
 .heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.heading svg { color: var(--accent); }
 .heading h1, .card h2, .setup h2, .empty h2 { margin: 0; }
-.list { list-style: none; display: grid; gap: var(--sp-2); margin: 0; padding: 0; }
+.list { list-style: none; display: grid; gap: var(--sp-3); margin: 0; padding: 0; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-4); }
-.pagination button { min-height: 44px; padding: 0 var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
-.pagination button:disabled { opacity: .55; }
-.card { position: relative; display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
-.cardMain { min-width: 0; }
-.cardMain p { color: var(--text-muted); margin: var(--sp-1) 0 0; overflow-wrap: anywhere; }
-.inventoryToggle { min-height: 44px; margin-top: var(--sp-2); color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.pagination button { min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.pagination button:not(:disabled):hover { background: var(--surface-2); border-color: var(--border-strong); }
+.pagination button:disabled { opacity: .55; cursor: default; }
+.pagination span { color: var(--text-muted); font-size: var(--fs-sm); }
+
+/* Device card — name, then the stats that answer "is this reader alive?":
+   annotation count + last-seen first, inventory/storage quiet below. */
+.card {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  box-shadow: var(--elev-1);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.card:hover { border-color: var(--border-strong); }
+.cardMain { min-width: 0; flex: 1; }
+.cardMain h2 { font-size: var(--fs-md); line-height: var(--lh-snug); }
+.cardMain h2 a { color: var(--text); transition: color var(--dur-fast) var(--ease); }
+.cardMain h2 a:hover { color: var(--accent-text); }
+.deviceMeta { color: var(--text-muted); font-size: var(--fs-sm); margin: var(--sp-1) 0 0; overflow-wrap: anywhere; }
+.deviceMeta:empty { display: none; }
+.deviceStats { color: var(--text); font-size: var(--fs-sm); font-weight: var(--fw-medium); margin: var(--sp-2) 0 0; overflow-wrap: anywhere; }
+.stalePill {
+  display: inline-block;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-normal);
+  color: var(--text);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--r-full);
+  padding: 1px var(--sp-2);
+  white-space: nowrap;
+}
+.storage { display: flex; flex-direction: column; gap: var(--sp-1); margin: var(--sp-2) 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.storageMeter { display: block; width: min(240px, 100%); height: 6px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
+.storageMeter > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+
+.inventoryToggle { min-height: 44px; margin-top: var(--sp-2); color: var(--accent-text); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: 3px; }
+.inventoryToggle:hover { color: var(--accent-hover); }
 .inventory { margin-top: var(--sp-2); }
+/* The 200-row bounded inventory keeps generous row rhythm on purpose: the e2e
+   contract pins ≥24px between adjacent per-row delete buttons. */
 .inventoryList { display: grid; gap: var(--sp-5); margin: 0; padding-left: var(--sp-5); }
 .inventoryList li { overflow-wrap: anywhere; }
 .inventoryRow { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
 .inventoryRow > div { min-width: 0; }
-.inventoryDelete { min-height: 44px; flex: 0 0 auto; padding: 0 var(--sp-3); border: 1px solid var(--danger); border-radius: var(--r-md); color: var(--danger); }
+.inventoryRow a { color: var(--text); font-weight: var(--fw-medium); }
+.inventoryRow a:hover { color: var(--accent-text); }
+.inventoryDelete { min-height: 44px; flex: 0 0 auto; padding: 0 var(--sp-3); border: 1px solid var(--danger-border); border-radius: var(--r-md); color: var(--danger); transition: background var(--dur-fast) var(--ease); }
+.inventoryDelete:not(:disabled):hover { background: var(--danger-soft); }
 .inventoryDelete:disabled { opacity: .65; cursor: default; }
-.onDevice { display: block; color: var(--text-muted); font-size: .875rem; }
-.unmatched { display: block; color: var(--text-muted); font-size: .875rem; }
+.onDevice { display: block; color: var(--text-muted); font-size: var(--fs-xs); }
+.unmatched { display: block; color: var(--text-muted); font-size: var(--fs-xs); font-style: italic; }
 .cardActions { display: flex; align-items: flex-start; position: relative; }
-.cardActions > button, .renameForm button { min-width: 44px; min-height: 44px; border-radius: var(--r-md); color: var(--text-muted); }
+.cardActions > button, .renameForm button { min-width: 44px; min-height: 44px; border-radius: var(--r-md); color: var(--text-muted); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .cardActions > button:hover { background: var(--surface-2); color: var(--text); }
-.menu { position: absolute; z-index: 3; right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--shadow-md); }
-.menu button { width: 100%; min-height: 44px; text-align: left; padding: 0 var(--sp-3); color: var(--danger); }
+.menu { position: absolute; z-index: 3; right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--elev-2); }
+.menu button { width: 100%; min-height: 44px; text-align: left; padding: 0 var(--sp-3); border-radius: var(--r-sm); color: var(--danger); }
+.menu button:hover { background: var(--danger-soft); }
 .renameForm { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-.renameForm input { min-width: min(260px, 100%); min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 0 var(--sp-2); background: var(--surface-0); color: var(--text); }
-.setup, .empty { margin-top: var(--sp-5); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
+.renameForm input { min-width: min(260px, 100%); min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 0 var(--sp-3); background: var(--surface-3); color: var(--text); }
+.renameForm input:focus { border-color: var(--accent); }
+.renameForm button { padding: 0 var(--sp-3); border: 1px solid var(--border); color: var(--text); }
+.renameForm button[type='submit'] { color: var(--accent-text); background: var(--accent-soft); }
+.renameForm button:disabled { opacity: .55; cursor: default; }
+.setup, .empty { margin-top: var(--sp-5); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); }
 .setup p, .empty p { color: var(--text-muted); }
-.scrim { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: var(--sp-4); background: rgb(0 0 0 / .65); }
-.dialog { width: min(520px, 100%); padding: var(--sp-5); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--shadow-lg); }
-.dialog p { color: var(--text-muted); line-height: 1.5; }
+.setup a, .empty a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: 3px; }
+.setup a:hover, .empty a:hover { color: var(--accent-hover); }
+.scrim { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: var(--sp-4); background: var(--overlay-backdrop); }
+.dialog { width: min(520px, 100%); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--elev-3); }
+.dialog h2 { font-size: var(--fs-lg); }
+.dialog p { color: var(--text-muted); line-height: var(--lh-base); margin-top: var(--sp-2); }
 .dialogActions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
-.button, .dangerButton { min-height: 44px; padding: 0 var(--sp-4); border-radius: var(--r-md); border: 1px solid var(--border); }
-.dangerButton { background: var(--danger); color: white; border-color: transparent; }
-.toast { position: fixed; z-index: 60; left: 50%; bottom: var(--sp-5); transform: translateX(-50%); display: flex; align-items: center; gap: var(--sp-4); min-width: min(420px, calc(100vw - 32px)); padding: var(--sp-3) var(--sp-4); background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-lg); }
-.toast button { margin-left: auto; min-height: 44px; color: var(--accent); font-weight: 700; }
+.button, .dangerButton { min-height: 44px; padding: 0 var(--sp-4); border-radius: var(--r-md); border: 1px solid var(--border); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.button:hover { background: var(--surface-2); border-color: var(--border-strong); }
+/* Destructive confirm follows the shared Button 'danger' idiom (tint + danger
+   text): a white-on---danger fill fails AA in the dark palette (≈3.3:1). */
+.dangerButton { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); font-weight: var(--fw-medium); }
+.dangerButton:hover { border-color: var(--danger); }
+.toast { position: fixed; z-index: 60; left: 50%; bottom: var(--sp-5); transform: translateX(-50%); display: flex; align-items: center; gap: var(--sp-4); min-width: min(420px, calc(100vw - 32px)); padding: var(--sp-3) var(--sp-4); background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--elev-3); }
+.toast button { margin-left: auto; min-height: 44px; color: var(--accent-text); font-weight: var(--fw-bold); }
+.toast button:hover { color: var(--accent-hover); }
 @media (max-width: 600px) {
-  .container { padding: var(--sp-4); }
-  .card { padding: var(--sp-3); }
+  .container { padding: var(--sp-4) var(--sp-3); }
+  .card { padding: var(--sp-4); }
   .cardActions { flex-direction: column; }
   .inventoryRow { flex-direction: column; }
   .dialogActions { flex-direction: column-reverse; }

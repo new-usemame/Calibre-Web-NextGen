@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" unique-identifier="book-id" version="3.0">
+  <metadata>
+    <dc:identifier id="book-id">issue-1372</dc:identifier>
+    <dc:title>Series Clear Control</dc:title>
+    <dc:creator>Reporter</dc:creator>
+    <dc:language>en</dc:language>
+  </metadata>
+</package>

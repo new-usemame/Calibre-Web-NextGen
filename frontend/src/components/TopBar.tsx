@@ -270,7 +270,9 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
 
 export function TopBar({ userName, instanceName, onLogout, onMenu }: TopBarProps) {
   const t = useT();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const deviceRoute = location === '/account/devices'
+    || location.startsWith('/account/devices/');
   const rawSearch = useSearch();
   const urlQ = new URLSearchParams(rawSearch).get('q') || '';
   const [q, setQ] = useState(urlQ);
@@ -293,7 +295,7 @@ export function TopBar({ userName, instanceName, onLogout, onMenu }: TopBarProps
     });
   };
   return (
-    <header className={styles.bar}>
+    <header className={`${styles.bar} ${deviceRoute ? styles.barInFlow : ''}`}>
       <div className={styles.left}>
         {onMenu && (
           <button className={styles.menuBtn} onClick={onMenu} aria-label={t('Open navigation')}>

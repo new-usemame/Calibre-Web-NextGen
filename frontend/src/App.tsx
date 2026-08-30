@@ -16,10 +16,12 @@ import { Shelf } from './pages/Shelf';
 import { AdvancedSearch } from './pages/AdvancedSearch';
 import { Account } from './pages/Account';
 import { Devices } from './pages/Devices';
+import { DeviceDetail } from './pages/DeviceDetail';
 import { EditBook } from './pages/EditBook';
 import { CoverPicker } from './pages/CoverPicker';
 import { Upload } from './pages/Upload';
 import { Admin } from './pages/Admin';
+import { AdminDevices } from './pages/AdminDevices';
 import { About } from './pages/About';
 import { Tasks } from './pages/Tasks';
 import { Table } from './pages/Table';
@@ -261,12 +263,16 @@ export function App() {
 
           {/* Account / settings */}
           <Route path={SPA_ROUTES.account}>{() => <Account />}</Route>
+          <Route path={SPA_ROUTES.deviceDetail}>{(p) => <DeviceDetail publicId={p.id} />}</Route>
           <Route path={SPA_ROUTES.devices}>{() => <Devices />}</Route>
 
           {/* Upload */}
           <Route path={SPA_ROUTES.upload}>{() => <Upload />}</Route>
 
           {/* Admin */}
+          <Route path={SPA_ROUTES.adminDevices}>
+            {() => me.role?.admin ? <AdminDevices /> : <NotFound />}
+          </Route>
           <Route path={SPA_ROUTES.admin}>{() => <Admin />}</Route>
 
           {/* Info pages */}

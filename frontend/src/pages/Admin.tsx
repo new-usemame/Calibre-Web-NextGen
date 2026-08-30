@@ -24,6 +24,7 @@ import styles from './Admin.module.css';
 // that are not part of the day-to-day user/auth flows. Login/authentication
 // security (LDAP/OAuth/SSL/reverse-proxy) and SMTP are rebuilt natively below.
 const SERVER_SETTINGS: { href: string; label: string; icon: typeof Settings; spa?: boolean }[] = [
+  { href: '/admin/devices', label: 'Device administration', icon: Server, spa: true },
   { href: '/admin/view', label: 'Full user table & restrictions', icon: Shield },
   { href: '/admin/config', label: 'Basic configuration', icon: Settings },
   { href: '/admin/viewconfig', label: 'UI / display configuration', icon: Sliders },

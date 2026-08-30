@@ -409,9 +409,17 @@
   z-index: 1;
 }
 
-/* Lift only the active card above sibling cards. Keep it below --z-bar and
-   --z-overlay so global navigation and dialogs remain the top interaction. */
-.moreActionsWrapOpen { z-index: calc(var(--z-bar) - 1); }
+/* The named query container on every card creates an independent stacking
+   context, so raising only the child panel cannot clear later sibling cards.
+   Lift the entire active card while keeping it below application chrome. */
+.wrapActionsOpen { z-index: calc(var(--z-bar) - 1); }
+
+/* Main's catalog jank pass applies content-visibility:auto to each grid card,
+   which brings paint containment with it. An open disclosure intentionally
+   overflows the card, so release that containment only for the active card.
+   The compound selector outranks Catalog's `.grid > *` regardless of bundle
+   order; closed cards retain the off-screen rendering optimization. */
+.wrap.wrapActionsOpen { content-visibility: visible; }
 
 /* Coarse pointers use one visible disclosure rather than opacity-hidden live
    controls. A real iPad tap applies synthetic hover before click; that made the

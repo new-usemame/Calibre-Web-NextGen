@@ -155,7 +155,10 @@ test('disclosed card actions keep SC 2.5.8 targets on touch (2026-08-29 ruling)'
     const added = await page.request.post(`/api/v1/shelves/${shelfId}/books/${items[0].id}`, { headers });
     expect(added.ok(), 'temporary shelf membership').toBeTruthy();
     await page.goto(`/app/shelf/${shelfId}`);
-    const remove = page.getByRole('button', { name: 'Remove from shelf' });
+    // The legacy fine-pointer control remains attached but is deliberately
+    // display:none on touch. Include it only to resolve the owning card; target
+    // measurements below remain scoped to the visible disclosure controls.
+    const remove = page.getByRole('button', { name: 'Remove from shelf', includeHidden: true });
     await expect(remove).toHaveCount(1);
     const shelfCard = remove.locator('..');
     const shelfMore = shelfCard.getByRole('button', { name: /^More actions for / });

@@ -136,6 +136,12 @@
     transition:
       width var(--dur-base) var(--ease-out),
       margin-right var(--dur-base) var(--ease-out);
+    /* Interim for #1813 item 4: the hover width animation runs layout every
+       frame; containment scopes that work to the rail instead of the page.
+       (The expanded panel lives inside the rail's own 220px border box via
+       the negative margin, so paint containment clips nothing visible.)
+       The real fix — a transform-driven panel — is tracked on the issue. */
+    contain: layout paint;
   }
 
   /* `scrollbar-width: none` above is what every current engine reads. The

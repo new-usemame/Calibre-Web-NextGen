@@ -352,11 +352,11 @@ def test_real_touch_helper_scrolls_before_sampling_raw_coordinates():
 
 
 def test_disclosure_stacking_stays_below_global_overlays_until_open():
-    """Closed card chrome must not intercept controls in a global popover."""
+    """The active card, not merely its child panel, must clear sibling cards."""
     src = (_FE / "components" / "BookCard.tsx").read_text()
     css = (_FE / "components" / "BookCard.module.css").read_text()
     closed = _effective_class_property(css, "moreActionsWrap", "z-index", coarse=True)
-    opened = _effective_class_property(css, "moreActionsWrapOpen", "z-index", coarse=True)
+    opened = _effective_class_property(css, "wrapActionsOpen", "z-index", coarse=True)
 
     assert closed is not None and closed[0] == "1", (
         "a closed per-card trigger must remain in the card stacking layer; "
@@ -366,7 +366,8 @@ def test_disclosure_stacking_stays_below_global_overlays_until_open():
         "an open card disclosure must clear sibling cards without outranking "
         f"global overlays; winner={opened}"
     )
-    assert "actionsOpen ? styles.moreActionsWrapOpen" in src
+    assert "actionsOpen ? styles.wrapActionsOpen" in src
+    assert ".wrap.wrapActionsOpen { content-visibility: visible; }" in css
 
 
 def test_touch_palette_coverage_measures_the_visible_disclosure_action():

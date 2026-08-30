@@ -254,7 +254,7 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
                 {results.map((book, i) => (
                   <BookCard key={book.id} book={book} quickEdit={canEdit} canRead={!!me?.role?.viewer}
                     hideActions={cardActionsHidden}
-                    style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }} />
+                    style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
                 ))}
               </div>
               {hasMore && (

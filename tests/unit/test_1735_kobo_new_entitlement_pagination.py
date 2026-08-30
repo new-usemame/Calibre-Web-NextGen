@@ -91,6 +91,7 @@ def large_library_sync(monkeypatch):
     fake_calibre_db = SimpleNamespace(
         session=session,
         reconnect_db=lambda *_args, **_kwargs: None,
+        refresh_for_new_data=lambda: None,
         common_filters=lambda **_kwargs: true(),
         get_book=lambda book_id: session.query(db.Books).filter_by(
             id=book_id

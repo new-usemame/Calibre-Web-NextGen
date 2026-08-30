@@ -55,9 +55,11 @@ finished-book guard below stays clearable on a custom-read-column install too
 """
 
 import math
+from datetime import datetime, timezone
 from typing import Optional
 
 from .. import logger, ub
+from .device_reading_position import stage_position
 
 log = logger.create()
 
@@ -86,7 +88,7 @@ def coerce_percentage(raw) -> Optional[float]:
 
 
 def record_web_reader_progress(user, book_id: int, percentage: float,
-                               *, origin_device_id=None) -> bool:
+                               *, origin_device_id=None, cfi=None) -> bool:
     """Advance the shared progress carrier from a web-reader position.
 
     Returns ``True`` when the carrier was advanced.  The caller is responsible
@@ -175,6 +177,28 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
             ub.session.refresh(state.current_bookmark)
             stored = state.current_bookmark.progress_percent
 
+    # The device journal records what this browser actually reported even when
+    # its percentage loses the resolved furthest-wins comparison below. Its
+    # exact epub.js CFI is intentionally private to this browser row; Kobo and
+    # KOReader continue to receive only the portable percentage.
+    if origin_device_id:
+        observed_at = datetime.now(timezone.utc)
+        try:
+            with ub.begin_contained_nested(ub.session):
+                stage_position(
+                    device_id=origin_device_id,
+                    book_id=book_id,
+                    progress_percent=percentage,
+                    cfi=cfi,
+                    client_modified_at=observed_at,
+                )
+        except Exception as e:
+            log.warning(
+                "Could not record web-reader device position for user %s "
+                "book %s: %s", user_id, book_id, e,
+            )
+            return False
+
     # Imported lazily: the KOSync protocol module pulls in cps.kobo, and this
     # service is imported from cps.web / cps.api.reader at request time.
     from ..progress_syncing.protocols.kosync import (read_status_for_percentage,
@@ -233,7 +257,7 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
     # write raising inside this best-effort helper, where the routes' broad
     # handler logs it as an optional progress-sharing failure and answers success
     # anyway. Both bookmark routes settle before calling in.
-    # Both carriers go in the one savepoint: the Kobo bookmark that
+    # Both resolved carriers go in the one savepoint: the Kobo bookmark that
     # ``update_book_read_status`` maintains, and the KOSync row KOReader pulls
     # from (#1366). They describe the same position, so a partial write would
     # leave the two devices disagreeing about where the user is — worse than

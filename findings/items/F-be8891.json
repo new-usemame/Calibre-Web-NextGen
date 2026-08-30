@@ -1,0 +1,20 @@
+{
+  "area": "my-library",
+  "body": "The operator's own instance runs `NETWORK_SHARE_MODE=true`. `cps/ub.py:4925-4940`\nbranches the app.db journal mode on exactly that flag: true means WAL is never\nrequested and app.db uses \"legacy sqlite3 transaction control with a rollback\njournal; call sites requiring contained SAVEPOINTs acquire a local write\ntransaction.\"\n\n`prepare_user_library_seed` (cps/user_library.py:90-143) is built directly on that\nmachinery. Its own docstring says so:\n\n    Each chunk is its own app.db transaction. That bounds the BEGIN IMMEDIATE\n    write-lock window introduced by the contained-savepoint policy (#1936).\n\nSo the seed's transaction behaviour is a function of NETWORK_SHARE_MODE, and the\nchunking exists specifically to bound a lock the flag changes the semantics of.\n\n**No My Library test sets NETWORK_SHARE_MODE.** Verified across all three files:\n\n    grep -n 'NETWORK_SHARE_MODE\\|journal_mode\\|WAL' \\\n        tests/unit/test_1939_migration_ordering.py \\\n        tests/unit/test_my_library_backend_1939.py \\\n        tests/unit/test_my_library_leg6_regressions.py\n    (no matches)\n\nEvery rig runs the opposite of production:\n\n| rig | NETWORK_SHARE_MODE | journal |\n|---|---|---|\n| production (operator's instance) | **true** | rollback journal |\n| tests/conftest.py:765 | false | WAL |\n| docker-compose.local.yml | false | WAL |\n| docker-compose.dev-live.yml | false | WAL |\n| docker-compose.bindmount.yml | false | WAL |\n\nThis is a coverage finding, not a known defect. The seed HAS run once on the real\nconfiguration — 222 rows committed cleanly on the operator's instance, OBSERVED —\nso there is no evidence of breakage. What is missing is anything that would keep\nit working: the passing run was accidental (it happened because an unrelated\nauthorisation put me on the real instance), it covers one library size and zero\nconcurrency, and nothing in CI would catch a regression.\n\nThe specific risk the chunking was written to bound, and which is unmeasured\nwithout WAL: under a rollback journal a write transaction takes a RESERVED lock on\nthe whole database, so a concurrent app.db writer blocks for the chunk's duration\nrather than proceeding as it would under WAL. `connect_args={'timeout': 30}`\n(cps/ub.py:4920) is the only thing standing between that and SQLITE_BUSY. Under\nWAL — the only mode ever tested — writers never block readers at all, so the test\nsuite cannot observe this class by construction.\n\nNote this is the same shape as `a-green-suite-can-be-incapable-of-detecting-its-own-bug`:\nthe suite is green and would stay green through a real regression, because the\npredicate it exercises is not the one production runs.",
+  "created": "2026-08-29",
+  "id": "F-be8891",
+  "refs": [
+    "#1939",
+    "#1936"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-29",
+    "note": "Closed as a coverage gap; no production defect was found. Added one feature-level rollback-journal discriminator in tests/unit/test_my_library_backend_1939.py. With NETWORK_SHARE_MODE=true it builds the real app.db engine, observes journal_mode=delete and busy_timeout=30000, holds the first two-row seed chunk after its INSERT, directly proves an independent app.db write receives database-is-locked, and then requires a competing writer to commit before the seed may issue chunk two. The test therefore pins the reason prepare_user_library_seed commits every chunk, not merely final row correctness. Deliberately replacing the full-chunk app_session.commit() with app_session.flush() produced 1 failed in 5.74s: the competing writer could not cross the first seed chunk boundary. Restoring HEAD produced 1 passed in 0.41s. No elapsed-time or exact wait-duration assertion was added: scheduler and filesystem timing would be noise; the deterministic execution-event gates pin lock existence and the release boundary without sleeps.",
+    "release": ""
+  },
+  "severity": "test",
+  "source": "audit",
+  "status": "resolved",
+  "title": "the My Library seed is never exercised in the transaction mode production actually runs"
+}

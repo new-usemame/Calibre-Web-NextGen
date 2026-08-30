@@ -81,7 +81,7 @@ def _delete_annotation(session, annotation):
 
 # Models tied to a user and book handled by this module, with merge semantics
 # for migrate. BookShelf has no user_id (shelf-scoped), the Kobo entitlement
-# ledger resolves user scope through Device, and KoboBookmark/KoboStatistics/
+# ledgers resolve user scope through Device, and KoboBookmark/KoboStatistics/
 # AnnotationSyncTarget are children reached through their parents; all are
 # still handled below.
 PER_USER_BOOK_MODELS = (
@@ -98,11 +98,15 @@ PER_USER_BOOK_MODELS = (
     "BookCoverPreview",
     "UserLibraryBook",
 )
-# This ledger is user-scoped through Device rather than a user_id column.
+# These ledgers are user-scoped through Device rather than a user_id column.
 # Keep the device-scoped registry extension separate from the flat-model tuple
 # so independently added flat per-user models merge without competing for the
 # tuple's final insertion point.
-PER_USER_BOOK_MODELS += ("KoboDeviceBookEntitlement", "DeviceBookDelivery")
+PER_USER_BOOK_MODELS += (
+    "KoboDeviceBookEntitlement",
+    "DeviceBookDelivery",
+    "DeviceReadingPosition",
+)
 
 
 def migrate_user_book_data(from_book_id, to_book_id, session=None):
@@ -235,6 +239,45 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
     session.query(ub.KoboDeviceBookEntitlement).filter(
         ub.KoboDeviceBookEntitlement.book_id == from_book_id,
     ).delete(synchronize_session=False)
+
+    # Per-device reading positions survive duplicate merges. A device may
+    # already have observations for both copies, so keep the greater client
+    # clock and use progress as the deterministic equal-clock tie-break. The
+    # rehydrate latch is request state rather than position content: OR it
+    # across the pair so resolving a duplicate cannot silently consume a
+    # pending device repair.
+    for position in session.query(ub.DeviceReadingPosition).filter(
+            ub.DeviceReadingPosition.book_id == from_book_id).all():
+        clash = session.query(ub.DeviceReadingPosition).filter(
+            ub.DeviceReadingPosition.device_id == position.device_id,
+            ub.DeviceReadingPosition.book_id == to_book_id,
+        ).first()
+        if clash is None:
+            position.book_id = to_book_id
+            continue
+        keep_source = _newer(
+            position.client_modified_at, clash.client_modified_at,
+        )
+        if not keep_source and not _newer(
+                clash.client_modified_at, position.client_modified_at):
+            keep_source = (
+                position.progress_percent
+                if position.progress_percent is not None else float("-inf")
+            ) > (
+                clash.progress_percent
+                if clash.progress_percent is not None else float("-inf")
+            )
+        pending_rehydrate = bool(
+            position.rehydrate_needed or clash.rehydrate_needed,
+        )
+        if keep_source:
+            position.rehydrate_needed = pending_rehydrate
+            session.delete(clash)
+            session.flush()
+            position.book_id = to_book_id
+        else:
+            clash.rehydrate_needed = pending_rehydrate
+            session.delete(position)
 
     # Wanted-book rows are per physical device. Preserve an outstanding claim
     # when its source book is merged into the kept copy; if that device already
@@ -369,6 +412,17 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
         entitlement_state = entitlement_state.filter(
             ub.KoboDeviceBookEntitlement.device_id.in_(device_ids))
     entitlement_state.delete(synchronize_session=False)
+
+    position_state = session.query(ub.DeviceReadingPosition)
+    if book_id is not None:
+        position_state = position_state.filter(
+            ub.DeviceReadingPosition.book_id == book_id)
+    if user_id is not None:
+        device_ids = session.query(ub.Device.id).filter(
+            ub.Device.user_id == user_id).scalar_subquery()
+        position_state = position_state.filter(
+            ub.DeviceReadingPosition.device_id.in_(device_ids))
+    position_state.delete(synchronize_session=False)
 
     # Pull-delivery rows are scoped through Device, just like the Kobo
     # entitlement ledger. A removed metadata book can never satisfy a queued

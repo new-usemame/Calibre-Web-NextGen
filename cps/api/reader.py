@@ -101,6 +101,7 @@ def save_bookmark(book_id):
                     book_id,
                     percentage,
                     origin_device_id=g.annotation_origin_device_id,
+                    cfi=bookmark_key,
                 )
             except Exception as e:
                 # Position sharing must never cost the user their bookmark.

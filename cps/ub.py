@@ -1191,6 +1191,48 @@ class Device(Base):
     )
 
 
+class DeviceReadingPosition(Base):
+    """One device's last reported position for a Calibre book.
+
+    ``book_id`` deliberately has no foreign key because the book lives in
+    metadata.db while this journal lives in app.db. ``KoboReadingState`` stays
+    the resolved, user-level carrier served on the Kobo wire; this table keeps
+    the device observations that feed that resolution and the rehydrate latch.
+    """
+    __tablename__ = 'device_reading_position'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(
+        Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False,
+    )
+    book_id = Column(Integer, nullable=False)
+    location_source = Column(String, nullable=True)
+    location_type = Column(String, nullable=True)
+    location_value = Column(String, nullable=True)
+    progress_percent = Column(Float, nullable=True)
+    content_source_progress_percent = Column(Float, nullable=True)
+    cfi = Column(Text, nullable=True)
+    client_modified_at = Column(DateTime, nullable=True)
+    server_modified_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+    )
+    rehydrate_needed = Column(
+        Boolean, nullable=False, default=False, server_default='0',
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            'device_id', 'book_id',
+            name='uq_device_reading_position_device_book',
+        ),
+        Index('ix_device_reading_position_book', 'book_id'),
+        Index(
+            'ix_device_reading_position_rehydrate',
+            'device_id', 'rehydrate_needed',
+        ),
+    )
+
+
 class DeviceIdentity(Base):
     """Versioned, keyed derivation of an upstream device identifier."""
     __tablename__ = 'device_identity'
@@ -3877,6 +3919,29 @@ def migrate_webreader_device_identity_slice(engine, _session):
         ))
 
 
+def migrate_device_reading_position_slice(engine, _session):
+    """Install M3's additive per-device position journal before ORM use."""
+    Base.metadata.create_all(
+        engine,
+        tables=[DeviceReadingPosition.__table__],
+        checkfirst=True,
+    )
+    with engine.begin() as conn:
+        if not conn.execute(text(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='device_reading_position'"
+        )).first():
+            return
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_device_reading_position_book "
+            "ON device_reading_position(book_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_device_reading_position_rehydrate "
+            "ON device_reading_position(device_id, rehydrate_needed)"
+        ))
+
+
 def migrate_kobo_annotation_seed_pipeline(engine, _session):
     """Install M2's sticky-authority and capture-kind columns before ORM use."""
     Base.metadata.create_all(
@@ -4693,6 +4758,7 @@ def migrate_Database(_session):
     migrate_multi_device_annotation_safe_slice(engine, _session)
     migrate_device_management_slice(engine, _session)
     migrate_webreader_device_identity_slice(engine, _session)
+    migrate_device_reading_position_slice(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_book_cover_preview_table(engine, _session)

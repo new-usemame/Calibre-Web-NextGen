@@ -14557,3 +14557,9 @@ msgstr "Niet-geïnitialiseerde boeken"
 #: cps/spa_strings.py
 msgid "{percent}% read"
 msgstr "{percent}% gelezen"
+
+msgid "Position repair queued"
+msgstr "Herstel van leespositie in wachtrij"
+
+msgid "{n} devices · {m} active"
+msgstr "{n} apparaten · {m} actief"

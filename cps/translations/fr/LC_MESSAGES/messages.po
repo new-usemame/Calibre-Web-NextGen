@@ -15049,3 +15049,9 @@ msgstr "Livres non initialisés"
 #: cps/spa_strings.py
 msgid "{percent}% read"
 msgstr "{percent} % lu"
+
+msgid "Position repair queued"
+msgstr "Restauration de la position en attente"
+
+msgid "{n} devices · {m} active"
+msgstr "{n} appareils · {m} actifs"

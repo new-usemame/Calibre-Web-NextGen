@@ -75,7 +75,7 @@ export default defineConfig({
     //    card actions are persistent because hover is unavailable.
     {
       name: 'ipad-touch',
-      testMatch: /book-card-actions\.spec\.ts/,
+      testMatch: [/book-card-actions\.spec\.ts/, /sidebar-pin\.spec\.ts/],
       use: {
         browserName: 'chromium',
         viewport: { width: 1024, height: 1366 },

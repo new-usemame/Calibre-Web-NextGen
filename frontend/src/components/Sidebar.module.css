@@ -107,6 +107,39 @@
   display: none;
 }
 
+.pinRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 32px;
+  margin-bottom: var(--sp-1);
+}
+
+.pinButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 24px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.pinButton:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 /* Mobile scrim behind the drawer */
 .scrim {
   display: none;
@@ -148,9 +181,18 @@
     }
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) {
+  :is(.nav, .navOpen).pinned {
+    --sidebar-expanded-margin: 0px;
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) {
     width: 220px;
-    margin-right: -156px;
+    margin-right: var(--sidebar-expanded-margin, -156px);
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .pinButton {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   :is(.item, .itemActive, .customizeBtn) > span,
@@ -175,21 +217,21 @@
     padding-left: calc(18px + var(--sp-2));
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within)
     :is(.item > span, .itemActive > span, .customizeBtn > span, .magicShelfName) {
     opacity: 1;
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within)
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within)
     .shelfList :is(.shelfItem, .shelfItemActive) {
     padding-left: calc(var(--sp-3) + 18px + var(--sp-3));
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .shelfList .shelfCount {
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .shelfList .shelfCount {
     display: inline;
   }
 
-  :is(.nav, .navOpen):is(:hover:not(.hoverSuppressed), :focus-within) .magicShelfIcon {
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .magicShelfIcon {
     left: calc(var(--sp-3) + 18px + var(--sp-3));
   }
 }

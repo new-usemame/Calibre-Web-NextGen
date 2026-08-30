@@ -55,7 +55,9 @@
   background: var(--surface-2); border-radius: var(--r-md);
   overflow-x: auto; scrollbar-width: none;
 }
-.tabs::-webkit-scrollbar { display: none; }
+@supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
+  .tabs::-webkit-scrollbar { display: none; }
+}
 .tabs button {
   flex: 0 0 auto; min-height: 44px; padding: 0 var(--sp-3);
   border-radius: var(--r-sm);

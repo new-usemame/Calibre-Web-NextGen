@@ -719,7 +719,11 @@ def HandleSyncRequest():
     books_to_delete_ids = set()
     rehydrate_positions_emitted = []
 
-    calibre_db.reconnect_db(config, ub.app_DB_path)
+    try:
+        calibre_db.refresh_for_new_data()
+    except Exception:
+        log.exception("Kobo Sync: failed to refresh the library database")
+        return abort(503)
 
     # Upgrade bridge: existing devices already have flat delivery markers but
     # no per-device hashes. Seed before selecting any replay so the FIRST

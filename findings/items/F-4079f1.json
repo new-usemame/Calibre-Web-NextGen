@@ -4,8 +4,14 @@
   "created": "2026-08-10",
   "id": "F-4079f1",
   "refs": [],
+  "resolution": {
+    "commit": "a23fcf7dd9",
+    "date": "2026-08-30",
+    "note": "Dutch translated both Compact and Dense as 'Compact', so two of three mutually exclusive density options were indistinguishable. Dense now reads 'Zeer compact'. Guard added over the option SET (coverage gates cannot see two msgids colliding on one msgstr); it went red on nl and green on fr before the fix. Merged in #2036.",
+    "release": ""
+  },
   "severity": "ux",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Dutch renders the Compact and Dense density options identically"
 }

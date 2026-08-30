@@ -5377,6 +5377,11 @@ msgid "Highlights"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 

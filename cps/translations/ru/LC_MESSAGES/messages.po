@@ -743,8 +743,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py
 msgid "Password length has to be between 1 and 40"
@@ -5485,6 +5485,11 @@ msgid "Highlights"
 msgstr "Выделения"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr "Выделения и заметки"
 
@@ -9549,9 +9554,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -10551,9 +10556,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -10576,9 +10581,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -14434,9 +14439,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

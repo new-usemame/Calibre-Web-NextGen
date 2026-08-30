@@ -462,8 +462,8 @@ msgid ""
 "LDAP CACertificate, Certificate or Key Location is not Valid, Please Enter "
 "Correct Path"
 msgstr ""
-"Der angegebene Speicherort für LDAP-CA-Zertifikat, -Zertifikat oder -"
-"Schlüsseldatei ist falsch,Bitte den korrekten Pfad eingeben."
+"Der angegebene Speicherort für LDAP-CA-Zertifikat, -Zertifikat oder "
+"-Schlüsseldatei ist falsch,Bitte den korrekten Pfad eingeben."
 
 #: cps/admin.py cps/templates/admin.html
 msgid "Add New User"
@@ -5472,6 +5472,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Highlights"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -13979,9 +13984,9 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ "        <a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
 #~ "wiki/Configuration#database-configuration\">see here</a>!"
 #~ msgstr ""
-#~ "CWA ist so konfiguriert, dass es deine Calibre-Datenbank (<code>metadata."
-#~ "db</code>-Datei) irgendwo in dem Pfad <code>/calibre-library</code> "
-#~ "sucht.\n"
+#~ "CWA ist so konfiguriert, dass es deine Calibre-Datenbank "
+#~ "(<code>metadata.db</code>-Datei) irgendwo in dem Pfad <code>/calibre-"
+#~ "library</code> sucht.\n"
 #~ "        CWA durchsucht automatisch das Verzeichnis, das du auf <code>/"
 #~ "calibre-library</code> in der docker-compose-Datei verbunden hast, um "
 #~ "eine existierende Calibre-\n"

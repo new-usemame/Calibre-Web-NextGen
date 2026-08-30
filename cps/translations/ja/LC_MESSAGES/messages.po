@@ -5395,6 +5395,11 @@ msgid "Highlights"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 
@@ -10252,8 +10257,8 @@ msgid ""
 "innocenat\">innocenat</a>."
 msgstr ""
 "このツールは<a href=\"https://github.com/innocenat\">innocenat</a>氏が作成し"
-"た<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-fix.netlify."
-"app</a>ツールから移植されました。"
+"た<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-"
+"fix.netlify.app</a>ツールから移植されました。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"

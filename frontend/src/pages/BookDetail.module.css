@@ -436,6 +436,21 @@
   background: var(--surface-2);
 }
 
+.highlightCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 /* Whole-book deletion stays separate from the ordinary-actions row (#1046),
    but the region itself is intentionally quiet; danger emphasis belongs to
    the control that performs the destructive action (#1862). */

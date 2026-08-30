@@ -5411,6 +5411,11 @@ msgid "Highlights"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 
@@ -13974,9 +13979,9 @@ msgstr "Olvasott/olvasatlan mutatása"
 #~ "        <a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
 #~ "wiki/Configuration#database-configuration\">see here</a>!"
 #~ msgstr ""
-#~ "A CWA úgy van konfigurálva, hogy a Calibre adatbázisa (a <code>metadata."
-#~ "db</code> fájl) mindig a <code>/calibre-library</code> könyvtáron belül "
-#~ "helyezkedjen el. \n"
+#~ "A CWA úgy van konfigurálva, hogy a Calibre adatbázisa (a "
+#~ "<code>metadata.db</code> fájl) mindig a <code>/calibre-library</code> "
+#~ "könyvtáron belül helyezkedjen el. \n"
 #~ "Induláskor a CWA automatikusan átvizsgálja azt a könyvtárat, amelyet a "
 #~ "docker-compose fájlban a <code>/calibre-library</code> útvonalhoz "
 #~ "rendelt, és meglévő Calibre \n"

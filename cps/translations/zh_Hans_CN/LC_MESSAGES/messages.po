@@ -5332,6 +5332,11 @@ msgid "Highlights"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 
@@ -10187,8 +10192,8 @@ msgid ""
 "innocenat\">innocenat</a>."
 msgstr ""
 "此工具改编自 <a href=\"https://github.com/innocenat\">innocenat</a> 制作的 "
-"<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-fix.netlify."
-"app</a> 工具。"
+"<a href=\"https://kindle-epub-fix.netlify.app/\">kindle-epub-"
+"fix.netlify.app</a> 工具。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -10207,8 +10212,8 @@ msgid ""
 "temporarily lock metadata.db. To stop a running backfill, restart the "
 "container after disabling."
 msgstr ""
-"注意：启用此功能会在启动时启动校验和回填服务，该服务可能会暂时锁定 metadata."
-"db。要停止正在运行的回填，请在禁用后重新启动容器。"
+"注意：启用此功能会在启动时启动校验和回填服务，该服务可能会暂时锁定 "
+"metadata.db。要停止正在运行的回填，请在禁用后重新启动容器。"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -11072,8 +11077,8 @@ msgid ""
 "users with edit rights will see a badge on the Duplicates sidebar button and "
 "a notification popup when they login."
 msgstr ""
-"检测到未解决的重复项时显示弹出通知。管理员和具有编辑权限的用户在登录时，将"
-"在“重复项”侧边栏按钮上看到一个徽章，并会看到一个弹出通知。"
+"检测到未解决的重复项时显示弹出通知。管理员和具有编辑权限的用户在登录时，将在"
+"“重复项”侧边栏按钮上看到一个徽章，并会看到一个弹出通知。"
 
 #: cps/templates/cwa_settings.html
 #, fuzzy

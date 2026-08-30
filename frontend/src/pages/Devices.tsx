@@ -4,6 +4,7 @@ import { Link } from 'wouter';
 import { ChevronLeft, MoreHorizontal, Pencil, Smartphone } from 'lucide-react';
 import { apiDelete, apiGet, apiPatch, apiPost, apiUrl } from '../lib/api';
 import { clampOffset } from '../lib/pagination';
+import { relativeWhen } from '../lib/relativeTime';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { useT } from '../lib/i18n';
 import { EmptyState } from '../components/EmptyState';
@@ -15,15 +16,6 @@ interface Counts { origin_count: number; assigned_count: number }
 interface DevicePage { devices: Device[]; limit: number; offset: number; total: number }
 
 const DEVICE_PAGE_SIZE = 100;
-
-function relativeWhen(value: string | null): string {
-  if (!value) return '—';
-  const elapsed = new Date(value).getTime() - Date.now();
-  const formatter = new Intl.RelativeTimeFormat(document.documentElement.lang || undefined, { numeric: 'auto' });
-  const hours = Math.round(elapsed / 3_600_000);
-  if (Math.abs(hours) < 48) return formatter.format(hours, 'hour');
-  return formatter.format(Math.round(hours / 24), 'day');
-}
 
 function formatStorage(bytes: number): string {
   const gibibytes = bytes / (1024 ** 3);
@@ -134,7 +126,7 @@ export function Devices() {
         </section>
       ) : (
         <>
-          <p role="status">{t('Page {page} of {pages}', {
+          <p role="status" className={styles.countLine}>{t('Page {page} of {pages}', {
             page: Math.floor(deviceOffset / DEVICE_PAGE_SIZE) + 1,
             pages: Math.max(1, Math.ceil((data?.total ?? 0) / DEVICE_PAGE_SIZE)),
           })}</p>
@@ -151,14 +143,23 @@ export function Devices() {
                     <button type="button" onClick={() => setEditing(null)}>{t('Cancel')}</button>
                   </form>
                 ) : <h2><Link href={`/account/devices/${device.public_id}`}>{device.label}</Link></h2>}
-                <p>{[device.model, device.firmware && `FW ${device.firmware}`].filter(Boolean).join(' · ')}</p>
-                <p>{t('{n} highlights and notes', { n: device.annotation_count })} · {t('Last seen {when}', { when: relativeWhen(device.last_seen) })}
-                  {device.last_seen && Date.now() - new Date(device.last_seen).getTime() > 30 * 86400000 && <> · {t('Not seen lately')}</>}</p>
-                <p>{t('{n} books in latest inventory', { n: device.inventory_count })}</p>
+                <p className={styles.deviceMeta}>{[device.model, device.firmware && `FW ${device.firmware}`].filter(Boolean).join(' · ')}</p>
+                <p className={styles.deviceStats}>{t('{n} highlights and notes', { n: device.annotation_count })} · {t('Last seen {when}', { when: relativeWhen(device.last_seen) })}
+                  {device.last_seen && Date.now() - new Date(device.last_seen).getTime() > 30 * 86400000 && <> <span className={styles.stalePill}>{t('Not seen lately')}</span></>}</p>
+                <p className={styles.deviceMeta}>{t('{n} books in latest inventory', { n: device.inventory_count })}</p>
                 {device.storage_free !== null && device.storage_total !== null && (
-                  <p>{t('{free} free of {total}', {
-                    free: formatStorage(device.storage_free), total: formatStorage(device.storage_total),
-                  })}</p>
+                  <p className={styles.storage}>
+                    <span>{t('{free} free of {total}', {
+                      free: formatStorage(device.storage_free), total: formatStorage(device.storage_total),
+                    })}</span>
+                    <span className={styles.storageMeter} aria-hidden="true">
+                      <span style={{
+                        width: `${device.storage_total > 0
+                          ? Math.min(100, Math.max(0, ((device.storage_total - device.storage_free) / device.storage_total) * 100))
+                          : 0}%`,
+                      }} />
+                    </span>
+                  </p>
                 )}
                 <button type="button" className={styles.inventoryToggle}
                   aria-expanded={expandedInventory === device.public_id}

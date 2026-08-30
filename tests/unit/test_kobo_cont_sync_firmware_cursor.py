@@ -93,6 +93,7 @@ def test_full_library_sync_drains_when_firmware_pins_cursor_on_continue(
     fake_calibre_db = SimpleNamespace(
         session=session,
         reconnect_db=lambda *_args, **_kwargs: None,
+        refresh_for_new_data=lambda: None,
         common_filters=lambda **_kwargs: true(),
     )
 

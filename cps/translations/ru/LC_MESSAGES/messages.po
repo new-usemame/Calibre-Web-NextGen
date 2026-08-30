@@ -2654,6 +2654,16 @@ msgid "Read {title}"
 msgstr "Читать «{title}»"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {title}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Стандартный (имя пользователя / пароль)"
 
@@ -6349,6 +6359,10 @@ msgstr ""
 "перемещения."
 
 #: cps/spa_strings.py
+msgid "Pin sidebar"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Pink"
 msgstr "Розовый"
 
@@ -6358,6 +6372,10 @@ msgstr "Порт"
 
 #: cps/spa_strings.py
 msgid "Position recorded"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Position repair queued"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6890,6 +6908,14 @@ msgid "Shuffle picks"
 msgstr "Перемешать подборку"
 
 #: cps/spa_strings.py
+msgid "Sidebar pinned."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sidebar unpinned."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Sign in with a magic link"
 msgstr "Войти по волшебной ссылке"
 
@@ -7163,6 +7189,10 @@ msgstr "Разблокируйте обложку выше, чтобы уста�
 #: cps/spa_strings.py
 msgid "Unlock the cover to change it"
 msgstr "Разблокируйте обложку, чтобы изменить её"
+
+#: cps/spa_strings.py
+msgid "Unpin sidebar"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unseeded books"
@@ -7493,6 +7523,11 @@ msgstr "{n} назначено устройству {name}."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} books in latest inventory"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} devices · {m} active"
 msgstr ""
 
 #: cps/spa_strings.py

@@ -2600,6 +2600,16 @@ msgid "Read {title}"
 msgstr "{title} lezen"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {title}"
+msgstr "Meer acties voor {title}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr "Acties voor {title}"
+
+#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Standaard (gebruikersnaam / wachtwoord)"
 
@@ -6384,6 +6394,10 @@ msgid "Position recorded"
 msgstr "Positie vastgelegd"
 
 #: cps/spa_strings.py
+msgid "Position repair queued"
+msgstr "Herstel van leespositie in wachtrij"
+
+#: cps/spa_strings.py
 msgid "Preparing your magic link…"
 msgstr "Je magische link voorbereiden…"
 
@@ -7536,6 +7550,11 @@ msgstr "{n} toegewezen aan {name}."
 #, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "{n} boeken in de nieuwste inventaris"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} devices · {m} active"
+msgstr "{n} apparaten · {m} actief"
 
 #: cps/spa_strings.py
 #, python-brace-format

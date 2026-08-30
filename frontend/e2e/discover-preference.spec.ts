@@ -28,6 +28,24 @@ async function installReadNowObserver(page: import('@playwright/test').Page) {
   });
 }
 
+async function expectCardActionsAvailable(page: import('@playwright/test').Page) {
+  if (test.info().project.use.hasTouch === true) {
+    const card = page.locator('[class*="wrap"]').filter({
+      has: page.locator('a[aria-label^="Read "]'),
+    }).first();
+    const more = card.getByRole('button', { name: /^More actions for / });
+    await expect(more).toBeVisible();
+    await more.click();
+    await expect(card
+      .getByRole('group', { name: /^Actions for / })
+      .getByRole('link', { name: /^Read / })).toBeVisible();
+    await page.keyboard.press('Escape');
+    return;
+  }
+
+  await expect(page.getByText('Read now', { exact: true }).first()).toBeVisible();
+}
+
 function preferenceWrite(
   response: import('@playwright/test').Response,
   name: string,
@@ -145,7 +163,7 @@ test('hidden books and card actions adopt local state and follow the account', a
   secondaryUser, browser, baseURL,
 }) => {
   const { page, context } = secondaryUser;
-  await expect(page.getByText('Read now', { exact: true }).first()).toBeVisible();
+  await expectCardActionsAvailable(page);
 
   const adopted = new Set<string>();
   page.on('request', (request) => {
@@ -211,7 +229,8 @@ test('hidden books and card actions adopt local state and follow the account', a
     await showCardActions.click();
     expect((await actionsSaved).ok()).toBeTruthy();
     await expect(showCardActions).toBeChecked();
-    await expect(pageB.getByText('Read now', { exact: true }).first()).toBeVisible();
+    await pageB.keyboard.press('Escape');
+    await expectCardActionsAvailable(pageB);
 
     await page.evaluate(() => {
       localStorage.removeItem('cwng_show_hidden_books_v1');

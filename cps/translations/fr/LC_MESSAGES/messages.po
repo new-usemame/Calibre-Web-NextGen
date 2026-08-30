@@ -2711,6 +2711,16 @@ msgid "Read {title}"
 msgstr "Lire {title}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {title}"
+msgstr "Plus d’actions pour {title}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr "Actions pour {title}"
+
+#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Standard (nom d’utilisateur / mot de passe)"
 
@@ -6523,6 +6533,10 @@ msgid "Position recorded"
 msgstr "Position enregistrée"
 
 #: cps/spa_strings.py
+msgid "Position repair queued"
+msgstr "Restauration de la position en attente"
+
+#: cps/spa_strings.py
 msgid "Preparing your magic link…"
 msgstr "Préparation de votre lien magique…"
 
@@ -7679,6 +7693,11 @@ msgstr "{n} attribués à {name}."
 #, python-brace-format
 msgid "{n} books in latest inventory"
 msgstr "{n} livres dans le dernier inventaire"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} devices · {m} active"
+msgstr "{n} appareils · {m} actifs"
 
 #: cps/spa_strings.py
 #, python-brace-format

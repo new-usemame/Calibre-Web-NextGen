@@ -2680,6 +2680,16 @@ msgid "Read {title}"
 msgstr "Leer {title}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {title}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Estándar (usuario / contraseña)"
 
@@ -6356,6 +6366,10 @@ msgstr ""
 "Elemento tomado: {label}. Arrastra para reordenar, suelta para colocarlo."
 
 #: cps/spa_strings.py
+msgid "Pin sidebar"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Pink"
 msgstr ""
 
@@ -6365,6 +6379,10 @@ msgstr "Puerto"
 
 #: cps/spa_strings.py
 msgid "Position recorded"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Position repair queued"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6890,6 +6908,14 @@ msgid "Shuffle picks"
 msgstr "Aleatorizar selección"
 
 #: cps/spa_strings.py
+msgid "Sidebar pinned."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sidebar unpinned."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Sign in with a magic link"
 msgstr "Iniciar sesión con un enlace mágico"
 
@@ -7159,6 +7185,10 @@ msgstr "Desbloquea la portada de arriba para aplicar una nueva."
 #: cps/spa_strings.py
 msgid "Unlock the cover to change it"
 msgstr "Desbloquea la portada para cambiarla"
+
+#: cps/spa_strings.py
+msgid "Unpin sidebar"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unseeded books"
@@ -7477,6 +7507,11 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} books in latest inventory"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} devices · {m} active"
 msgstr ""
 
 #: cps/spa_strings.py

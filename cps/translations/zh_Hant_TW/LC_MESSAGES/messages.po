@@ -2503,6 +2503,16 @@ msgid "Read {title}"
 msgstr "閱讀 {title}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {title}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "標準（用戶名 / 密碼）"
 
@@ -6131,6 +6141,10 @@ msgid "Picked up {label}. Drag to reorder, release to drop."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Pin sidebar"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Pink"
 msgstr ""
 
@@ -6140,6 +6154,10 @@ msgstr "端口"
 
 #: cps/spa_strings.py
 msgid "Position recorded"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Position repair queued"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6659,6 +6677,14 @@ msgid "Shuffle picks"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Sidebar pinned."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sidebar unpinned."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Sign in with a magic link"
 msgstr ""
 
@@ -6922,6 +6948,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unlock the cover to change it"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unpin sidebar"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7232,6 +7262,11 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} books in latest inventory"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} devices · {m} active"
 msgstr ""
 
 #: cps/spa_strings.py

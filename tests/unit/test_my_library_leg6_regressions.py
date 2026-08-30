@@ -89,6 +89,7 @@ def test_sync_all_delivers_old_books_after_membership_add_across_pages(monkeypat
     )
     cdb = SimpleNamespace(
         session=session, reconnect_db=lambda *_a, **_kw: None,
+        refresh_for_new_data=lambda: None,
         common_filters=lambda **_kw: true(),
     )
     monkeypatch.setattr(ub, "session", session)

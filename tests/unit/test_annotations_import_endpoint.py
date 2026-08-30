@@ -216,19 +216,16 @@ class TestIngestCounts:
 
 @pytest.mark.unit
 class TestWireAndDatabaseSentinelEquivalence:
-    def test_wire_delivered_annotation_is_already_present(
-        self, memory_db, synthetic_db, monkeypatch,
-    ):
-        """NULL on the wire and -99 in SQLite describe one KoboSpan selector."""
+    BOOK_UUID = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
+
+    @staticmethod
+    def _write_wire_row(session, monkeypatch):
         from cps import ub
-        from cps.annotations import ingest_bookmarks
         from cps.services.annotation_sync import (
             dispatch_annotation_sync,
             reset_registry_for_testing,
             set_remote_enqueue,
         )
-
-        session, _, _ = memory_db
 
         def commit():
             session.commit()
@@ -238,8 +235,11 @@ class TestWireAndDatabaseSentinelEquivalence:
         monkeypatch.setattr(ub, "session_commit", commit)
         reset_registry_for_testing()
         set_remote_enqueue(None)
-        book_uuid = "b3d1b38b-74fd-43b7-a796-996e5a6a8b04"
-        book = SimpleNamespace(id=348, uuid=book_uuid, title="Animal Farm")
+        book = SimpleNamespace(
+            id=348,
+            uuid=TestWireAndDatabaseSentinelEquivalence.BOOK_UUID,
+            title="Animal Farm",
+        )
         user = SimpleNamespace(id=7)
         payload = {
             "id": "bm-001",
@@ -265,12 +265,23 @@ class TestWireAndDatabaseSentinelEquivalence:
         ).one()
         assert wire_row.start_container_child_index is None
         assert wire_row.end_container_child_index is None
+        return wire_row, commit
+
+    def test_wire_delivered_annotation_is_already_present(
+        self, memory_db, synthetic_db, monkeypatch,
+    ):
+        """NULL on the wire and -99 in SQLite describe one KoboSpan selector."""
+        from cps import ub
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        _, commit = self._write_wire_row(session, monkeypatch)
 
         result = ingest_bookmarks(
             synthetic_db,
             user_id=7,
             session=session,
-            book_lookup=_make_book_lookup({book_uuid: 348}),
+            book_lookup=_make_book_lookup({self.BOOK_UUID: 348}),
             commit=commit,
         )
 
@@ -279,6 +290,59 @@ class TestWireAndDatabaseSentinelEquivalence:
         assert session.query(ub.Annotation).filter_by(
             user_id=7, book_id=348, annotation_id="bm-001",
         ).count() == 1
+
+    def test_wire_delivered_annotation_with_newer_server_content_is_rejected(
+        self, memory_db, synthetic_db, monkeypatch,
+    ):
+        """Sentinel equivalence must not hide a real server-side edit."""
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        wire_row, commit = self._write_wire_row(session, monkeypatch)
+        wire_row.note_text = "newer server note"
+        session.commit()
+
+        result = ingest_bookmarks(
+            synthetic_db,
+            user_id=7,
+            session=session,
+            book_lookup=_make_book_lookup({self.BOOK_UUID: 348}),
+            commit=commit,
+        )
+
+        assert result["skipped_existing"] == 0, result
+        assert result["skipped_newer_server"] == 1, result
+        assert wire_row.note_text == "newer server note"
+        assert wire_row.start_container_child_index is None
+        assert wire_row.end_container_child_index is None
+
+    def test_newer_device_edit_preserves_wire_child_index_representation(
+        self, memory_db, synthetic_db, monkeypatch,
+    ):
+        """A content update must not turn wire NULLs into equivalent -99s."""
+        from cps.annotations import ingest_bookmarks
+
+        session, _, _ = memory_db
+        wire_row, commit = self._write_wire_row(session, monkeypatch)
+        old_clock = datetime(2025, 1, 1)
+        wire_row.client_modified_at = old_clock
+        wire_row.server_modified_at = old_clock
+        wire_row.last_synced = old_clock
+        wire_row.created_at = old_clock
+        session.commit()
+
+        result = ingest_bookmarks(
+            synthetic_db,
+            user_id=7,
+            session=session,
+            book_lookup=_make_book_lookup({self.BOOK_UUID: 348}),
+            commit=commit,
+        )
+
+        assert result["updated"] == 1, result
+        assert result["skipped_newer_server"] == 0, result
+        assert wire_row.start_container_child_index is None
+        assert wire_row.end_container_child_index is None
 
 
 @pytest.mark.unit

@@ -108,7 +108,8 @@ export function DeviceInventory({ device }: { device: Device }) {
         });
   return (
     <>
-      <p role={error ? 'alert' : 'status'}>{status}</p>
+      <p role={error ? 'alert' : 'status'}
+        className={error ? styles.inventoryAlert : styles.inventoryStatus}>{status}</p>
       {!isLoading && !stalePage && !error && books.length > 0 && (
         <ul className={styles.inventoryList} role="list">
           {books.map((book) => (

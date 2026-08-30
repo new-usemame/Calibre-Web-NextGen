@@ -9,6 +9,7 @@ import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { DiscoverSection } from '../components/DiscoverSection';
+import { VirtualizedGridRows } from '../components/VirtualizedGridRows';
 import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary } from '../lib/queries';
 import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
@@ -334,7 +335,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [rowsChoice, setRowsChoice] = usePersistentChoice(
     'cwng:catalog-rows-v1', ['1', '2', '3', '4', '5', '6'] as const, '2');
   const rowsPerLoad = Number(rowsChoice);
+  const [catalogNode, setCatalogNode] = useState<HTMLElement | null>(null);
   const [gridNode, setGridNode] = useState<HTMLDivElement | null>(null);
+  const [gridTop, setGridTop] = useState(0);
   const fallbackPerPage = me?.display?.books_per_page && me.display.books_per_page > 0
     ? me.display.books_per_page : 24;
   // columnCount starts as a GUESS derived from books_per_page; the real value is
@@ -352,7 +355,13 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   useEffect(() => {
     if (!gridNode) return;
-    const measure = () => {
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(() => {
+      // Both layout reads happen in ResizeObserver's post-layout delivery. The
+      // old effect-body read ran immediately after React DOM writes and forced
+      // style/layout; keeping one grid node mounted also removes the loading ->
+      // loaded ref churn that used to repeat that forced read (#1813 item 8).
       const tracks = getComputedStyle(gridNode).gridTemplateColumns.trim();
       // An empty or 'none' track list means the grid has not been laid out yet
       // (a hidden ancestor, a panel mid-transition), which is the absence of a
@@ -361,21 +370,20 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       // layout arrived — reinstating the double fetch this gate exists to stop.
       // Leave gridMeasured false and let the next observer callback, or the
       // fail-open timer, resolve it.
-      if (!tracks || tracks === 'none') return;
-      setColumnCount(Math.max(1, tracks.split(/\s+/).length));
-      setGridMeasured(true);
-    };
-    // Measure first, observe second. Without a ResizeObserver the grid stops
-    // reacting to later resizes, but the one measurement that the initial query
-    // waits on still happens — the absence of the observer used to skip it
-    // entirely, which would now mean waiting out the fail-open timer on every
-    // load and then querying at the guessed size anyway.
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measure);
+      if (tracks && tracks !== 'none') {
+        setColumnCount(Math.max(1, tracks.split(/\s+/).length));
+        setGridMeasured(true);
+      }
+      setGridTop(gridNode.getBoundingClientRect().top + window.scrollY);
+    });
     observer.observe(gridNode);
+    // Content above the grid (notably Discover and the settings disclosure) can
+    // change its document offset without changing the grid's own border box.
+    // Observing the stable page container keeps that cached offset current;
+    // scroll handling itself remains layout-read-free.
+    if (catalogNode) observer.observe(catalogNode);
     return () => observer.disconnect();
-  }, [gridNode, density]);
+  }, [catalogNode, gridNode, density]);
 
   // Fail-open. The measurement needs the grid element to exist, and a first
   // attempt at this gate deadlocked: no data -> no grid -> no observer -> no
@@ -683,7 +691,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   };
 
   return (
-    <main className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`} data-testid="catalog-page">
+    <main ref={setCatalogNode} className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`} data-testid="catalog-page">
       {filtered && (
         <Link href={`/${ENTITY_PLURAL[entityKind!]}`} className={styles.back}>
           <ChevronLeft size={16} />
@@ -930,7 +938,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   {DENSITY_OPTIONS.map((option) => (
                     <label key={option.value} className={styles.settingsItem}>
                       <input type="radio" name="book-density" value={option.value}
-                        checked={density === option.value} onChange={() => setDensity(option.value)} />
+                        checked={density === option.value}
+                        onChange={() => {
+                          // Gate the new page size until ResizeObserver reports
+                          // the tracks for this density; never query on stale
+                          // columns and then immediately refetch.
+                          setGridMeasured(false);
+                          setDensity(option.value);
+                        }} />
                       <span>{t(option.label)}</span>
                     </label>
                   ))}
@@ -972,18 +987,64 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         />
       )}
 
-      {isFirstLoad ? (
-        // The loading state renders INSIDE the grid container rather than in
-        // place of it. The column measurement reads gridTemplateColumns off this
-        // element, and a CSS grid reports its tracks even with no cards in it —
-        // so having it on the first paint is what lets the very first query use
-        // the real column count instead of a guess (#1144).
-        <div ref={setGridNode} data-testid="catalog-grid" className={`${styles.grid} ${styles[`density_${density}`]}`}>
-          <div className={styles.gridLoading}>
-            <SpinnerCentered size={36} />
-          </div>
+      {/* One stable grid node spans first-load, loaded, empty, and error states.
+          ResizeObserver is therefore the only owner of column measurement and
+          never has to follow a loading -> loaded ref replacement (#1813 item 8). */}
+      {(usesGrid || isFirstLoad) && (
+        <div
+          ref={setGridNode}
+          data-testid="catalog-grid"
+          data-virtualized-grid={usesGrid ? 'true' : undefined}
+          className={`${styles.grid} ${styles[`density_${density}`]}`}
+        >
+          {isFirstLoad && (
+            <div className={styles.gridLoading}>
+              <SpinnerCentered size={36} />
+            </div>
+          )}
+          {usesGrid && !isFirstLoad && !error && allBooks.length > 0 && (
+            <VirtualizedGridRows
+              items={allBooks}
+              columnCount={columnCount}
+              gridNode={gridNode}
+              gridTop={gridTop}
+              itemKey={(book) => book.id}
+              rowClassName={styles.virtualRow}
+              spacerClassName={styles.virtualSpacer}
+              layoutKey={[density, cardActionsHidden, selecting, isSeries, canEdit, !!me?.role?.viewer].join('|')}
+              renderItem={(book, i) => (
+                <BookCard
+                  book={book}
+                  showSeriesIndex={isSeries}
+                  style={{
+                    animationDelay: i < 24 ? `${i * 35}ms` : '0ms',
+                    // Appended/window-remounted cards must be immediately usable;
+                    // replaying fadeRise while scrolling would hide them again.
+                    animation: i < 24 ? undefined : 'none',
+                  }}
+                  quickEdit={canEdit && !selecting}
+                  canRead={!!me?.role?.viewer}
+                  hideActions={cardActionsHidden}
+                  selectable={selecting}
+                  selected={selected.has(book.id)}
+                  onToggleSelect={(b) =>
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(b.id)) next.delete(b.id);
+                      else next.add(b.id);
+                      return next;
+                    })
+                  }
+                  onRemove={personalLibrary && isPlainLibrary && !search && !filterActive && !selecting ? removeBook : undefined}
+                  removeLabel={t('Remove {title} from my library', { title: book.title })}
+                />
+              )}
+            />
+          )}
         </div>
-      ) : error ? (
+      )}
+
+      {!isFirstLoad && (error ? (
         <EmptyState message={error instanceof Error ? error.message : t('Failed to load books.')} />
       ) : allBooks.length === 0 && !isFetching ? (
         <>{personalLibrary && isPlainLibrary && !search && !filterActive && readFilter === 'all' ? (
@@ -1008,9 +1069,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           )}
         </EmptyState>
         }</>
-      ) : (
-        <>
-          {isSeries && seriesPresentation === 'list' && !selecting ? (
+      ) : isSeries && seriesPresentation === 'list' && !selecting ? (
             <ul className={styles.bookList} role="list">
               {allBooks.map((book) => (
                 <li key={book.id}>
@@ -1032,35 +1091,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                 </li>
               ))}
             </ul>
-          ) : (
-          <div ref={setGridNode} data-testid="catalog-grid" className={`${styles.grid} ${styles[`density_${density}`]}`}>
-            {allBooks.map((book, i) => (
-              <BookCard
-                key={book.id}
-                book={book}
-                showSeriesIndex={isSeries}
-                style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }}
-                quickEdit={canEdit && !selecting}
-                canRead={!!me?.role?.viewer}
-                hideActions={cardActionsHidden}
-                selectable={selecting}
-                selected={selected.has(book.id)}
-                onToggleSelect={(b) =>
-                  setSelected((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(b.id)) next.delete(b.id);
-                    else next.add(b.id);
-                    return next;
-                  })
-                }
-                onRemove={personalLibrary && isPlainLibrary && !search && !filterActive && !selecting ? removeBook : undefined}
-                removeLabel={t('Remove {title} from my library', { title: book.title })}
-              />
-            ))}
-          </div>
-          )}
+      ) : null)}
 
-          {hasMore && (
+      {!isFirstLoad && !error && allBooks.length > 0 && hasMore && (
             <div ref={sentinelRef} className={styles.loadMore}>
               <button
                 type="button"
@@ -1077,8 +1110,6 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                 </span>
               )}
             </div>
-          )}
-        </>
       )}
 
       {selecting && selected.size > 0 && (

@@ -246,13 +246,20 @@ def _device_owner(device, session):
 
 
 def _visible_books_for_owner(owner, book_ids):
-    """Resolve a live, owner-filtered metadata view for a device-scoped read."""
+    """Resolve metadata for the owner's global annotation archive.
+
+    My Library membership is a catalogue curation boundary, not ownership of
+    reading data.  Keep every other live content restriction in force while
+    allowing annotations for a removed book to remain readable.
+    """
     if owner is None:
         log.error("annotations: device owner unavailable; filtered book view denied")
         raise FilteredBookVisibilityUnavailable("device owner unavailable")
     books = {}
     for book_id in sorted({int(value) for value in book_ids if value is not None}):
-        book = calibre_db.get_filtered_book(book_id, user=owner)
+        book = calibre_db.get_filtered_book(
+            book_id, allow_show_global=True, user=owner,
+        )
         if book is not None:
             books[book_id] = book
     return books
@@ -345,6 +352,7 @@ def _visible_book_scopes_for_owners(owners, session, candidates_by_owner):
     visibility_state = _owner_visibility_state(session, candidates_by_owner)
     resolved = calibre_db.get_filtered_book_ids_for_users(
         owners, visibility_state, candidates_by_owner,
+        allow_show_global=True,
     )
     return {
         int(owner.id): frozenset(resolved.get(int(owner.id), ()))
@@ -1982,8 +1990,15 @@ def _safe_filename_part(s: str, default: str = "book") -> str:
 
 
 def _resolve_book_or_404(book_id: int):
-    """Load the Book row + enforce visibility. Returns the Book."""
-    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True)
+    """Load an annotation archive book while enforcing content policy.
+
+    A personal-library membership removal must not make the user's retained
+    annotations unreadable.  Bypass only that membership predicate; language,
+    tag, custom-column and hidden-book restrictions remain enforced.
+    """
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_global=True,
+    )
     if not book:
         abort(404)
     return book

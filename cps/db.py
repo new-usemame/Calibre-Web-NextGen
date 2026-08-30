@@ -1492,7 +1492,8 @@ class CalibreDB:
         return self.session.query(Books).filter(Books.id == book_id).first()
 
     def get_filtered_book(self, book_id, allow_show_archived=False,
-                          allow_show_hidden=False, user=None):
+                          allow_show_hidden=False, allow_show_global=False,
+                          user=None):
         self.ensure_session()
         # Eagerly load all relationships to prevent detached instance errors during editing
         # allow_show_hidden=True: covers/read/edit/download flows for a user's
@@ -1513,12 +1514,14 @@ class CalibreDB:
                 .filter(self.common_filters(
                     allow_show_archived,
                     allow_show_hidden=allow_show_hidden,
+                    allow_show_global=allow_show_global,
                     user=user,
                 ))
                 .first())
 
     def get_filtered_book_ids_for_users(self, users, visibility_state,
-                                        candidates_by_user):
+                                        candidates_by_user,
+                                        allow_show_global=False):
         """Resolve candidate books in several users' current filtered views.
 
         ``common_filters`` intentionally performs app-database lookups for one
@@ -1601,7 +1604,8 @@ class CalibreDB:
                 denied_column_filter = false()
 
             membership_filter = true()
-            if bool(getattr(filter_user, "has_own_library", False)):
+            if (not allow_show_global
+                    and bool(getattr(filter_user, "has_own_library", False))):
                 membership_filter = Books.id.in_(membership_ids)
 
             candidate_values = func.json_each(

@@ -70,7 +70,9 @@ def filtered_library_stub(monkeypatch):
     monkeypatch.setattr(
         annotations.calibre_db,
         "get_filtered_book",
-        lambda book_id, user=None: SimpleNamespace(id=book_id, title=f"Book {book_id}"),
+        lambda book_id, user=None, allow_show_global=False: SimpleNamespace(
+            id=book_id, title=f"Book {book_id}",
+        ),
     )
     return original
 
@@ -677,7 +679,10 @@ def test_device_annotations_default_to_origin_and_assigned_toggle_has_facets_and
     assert assigned_payload["role"] == "assigned"
     assert assigned_payload["type"] == "note"
     assert calls and all(user_id == 7 for _book_id, user_id, _kwargs in calls)
-    assert all(set(kwargs) == {"user"} for _book_id, _user_id, kwargs in calls)
+    assert all(
+        kwargs == {"user": kwargs["user"], "allow_show_global": True}
+        for _book_id, _user_id, kwargs in calls
+    )
 
 
 @pytest.mark.unit

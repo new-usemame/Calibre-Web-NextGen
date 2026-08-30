@@ -38,8 +38,19 @@ def _is_definitely_not_a_database(error) -> bool:
 
 def create_appdb(appdb_path):
     app_paths.ensure_app_root_on_sys_path()
-    from cps import ub
+    from cps import config_sql, ub
+
     ub.init_db(appdb_path)
+    # app.db is split across two declarative bases. ub.init_db() creates the
+    # user-facing tables; the canonical configuration bootstrap creates and
+    # migrates settings/flask_settings and inserts the singleton settings row.
+    # Auto-library writes that row before the Flask application starts (#2047).
+    encrypt_key, error = config_sql.get_encryption_key(
+        os.path.dirname(appdb_path)
+    )
+    config_sql.load_configuration(ub.session, encrypt_key)
+    if error:
+        print(f"[cwa-auto-library] WARN: {error}", flush=True)
 
 
 def create_metadb(metadb_path):
@@ -383,13 +394,30 @@ class AutoLibrary:
             try:
                 print("[cwa-auto-library]: Updating Settings Database with library location...")
                 con = sqlite3.connect(self.app_db, timeout=30)
-                cur = con.cursor()
-                cur.execute(f'UPDATE settings SET config_calibre_dir="{self.lib_path}";')
-                con.commit()
+                try:
+                    result = con.execute(
+                        "UPDATE settings SET config_calibre_dir = ?",
+                        (self.lib_path,),
+                    )
+                    if result.rowcount != 1:
+                        raise RuntimeError(
+                            "expected exactly one settings row; "
+                            f"updated {result.rowcount}"
+                        )
+                    con.commit()
+                finally:
+                    con.close()
                 return
-            except Exception as e:
-                print("[cwa-auto-library]: ERROR: Could not update Calibre Web Database")
-                print(e)
+            except (sqlite3.Error, OSError, RuntimeError) as error:
+                print(
+                    "[cwa-auto-library]: FATAL: Could not persist the library "
+                    "location to the Calibre Web Database"
+                )
+                print(f"[cwa-auto-library]: {type(error).__name__}: {error}")
+                print(
+                    "[cwa-auto-library]: Startup cannot continue because "
+                    "app.db would be left unconfigured."
+                )
                 sys.exit(1)
         else:
             print(f"[cwa-auto-library]: ERROR: app.db in {self.app_db} not found")

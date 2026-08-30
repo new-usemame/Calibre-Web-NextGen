@@ -516,19 +516,13 @@ def delete_book(book_id):
 def delete_format(book_id, fmt):
     """Delete a single format from a book while keeping its metadata record.
 
-    The shared core re-checks the role and deliberately removes the format file
-    before deleting its Data row, so a file-removal failure leaves the database
-    pointing at the still-present file rather than reporting a deletion that did
-    not happen.
+    The shared core re-checks the role, performs the sole visibility-scoped
+    lookup, and stages storage deletion reversibly across the metadata commit.
     """
     if not current_user.is_authenticated or current_user.is_anonymous:
         return _err("unauthorized", "You must be signed in", 401)
     if not current_user.role_delete_books():
         return _err("forbidden", "You are not allowed to delete books", 403)
-    # Same visibility-scoped authorization as whole-book delete above.
-    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True)
-    if not book:
-        return _err("not_found", "Book not found", 404)
     return _delete_api_response(delete_book_from_table(book_id, fmt.upper(), True))
 
 

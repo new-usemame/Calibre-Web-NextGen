@@ -392,17 +392,16 @@ def test_classic_delete_modal_distinguishes_format_from_whole_book_consequences(
 
 @pytest.mark.unit
 def test_delete_format_visibility_scoped_404_does_not_delete():
-    """Same IDOR guard as whole-book delete, on the per-format endpoint."""
+    """The API must rely on the shared core's visibility decision, not drift."""
     from cps.api import edit as mod
+    from werkzeug.exceptions import NotFound
+
     with _ctx("/api/v1/books/7/formats/epub/delete"):
         with patch.object(mod, "current_user", _editor(role_delete=True)), \
-             patch.object(mod, "calibre_db", SimpleNamespace(
-                 get_book=lambda _id: SimpleNamespace(id=7),          # raw row EXISTS
-                 get_filtered_book=lambda *a, **k: None)), \
-             patch.object(mod, "delete_book_from_table") as core:
-            resp = inspect.unwrap(mod.delete_format)(7, "epub")
-    assert resp[1] == 404
-    core.assert_not_called()
+             patch.object(mod, "delete_book_from_table", side_effect=NotFound) as core, \
+             pytest.raises(NotFound):
+            inspect.unwrap(mod.delete_format)(7, "epub")
+    core.assert_called_once_with(7, "EPUB", True)
 
 
 # ── cover (#27) ──────────────────────────────────────────────────────────────

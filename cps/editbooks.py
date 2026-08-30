@@ -1595,126 +1595,241 @@ def render_delete_book_result(book_format, json_response, warning, book_id, loca
             return redirect(get_redirect_location(location, "web.index"))
 
 
-def delete_book_from_table(book_id, book_format, json_response, location="", skip_cache_invalidation=False):
+def get_visible_book_for_delete(book_id):
+    """Resolve a delete target through the caller's canonical library policy.
+
+    Both Classic and API deletion routes delegate to ``delete_book_from_table``,
+    so keeping the object-level authorization lookup here makes it impossible
+    for either surface (or a future caller) to fall back to the raw Books table.
+    """
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True
+    )
+    if not book:
+        abort(404)
+    return book
+
+
+def delete_book_from_table(
+    book_id, book_format, json_response, location="", skip_cache_invalidation=False
+):
     warning = {}
     if current_user.role_delete_books():
-        book = calibre_db.get_book(book_id)
-        if book:
-            try:
-                if not book_format:
-                    # Whole-book delete — data-safety (D3-sibling): commit the DB deletes
-                    # FIRST, remove files LAST. The old order deleted the files
-                    # (helper.delete_book) before delete_whole_book + commit, so a DB failure
-                    # left the files gone but the Books row surviving — a phantom book that
-                    # still shows in the library and 404s when opened, unrecoverable. DB-first
-                    # leaves the book fully intact on a DB failure (the except below rolls back);
-                    # a file-cleanup failure after the DB is consistent is recoverable (rows
-                    # already gone, orphaned files reclaimable) and is logged + warned, not raised.
-                    deleted_book_id = book.id
-                    deleted_book_path = book.path
-                    delete_whole_book(deleted_book_id, book)
-                    calibre_db.session.commit()
-                    # Files last: a plain stand-in, never the now-detached ORM book
-                    # (delete_whole_book's intermediate commits expire/detach it; a whole-book
-                    # cleanup reads only .id and .path).
-                    result, error = helper.delete_book(
-                        _DeletedBookFileRef(deleted_book_id, deleted_book_path),
-                        config.get_book_path(), book_format="")
-                    if not result:
-                        log.warning("[delete-book] Book %s removed from the database but file "
-                                    "cleanup failed: %s (files remain on disk)", deleted_book_id, error)
-                    if error:
-                        if json_response:
-                            warning = {"location": url_for("edit-book.show_edit_book", book_id=book_id),
-                                       "type": "warning",
-                                       "format": "",
-                                       "message": error}
-                        else:
-                            flash(error, category="warning")
-                else:
-                    # Single-format delete: remove the format file, then its Data row. Kept
-                    # files-first — a failure here orphans at most one format's row (not the
-                    # whole book), and the format's on-disk path is resolved from that Data row,
-                    # which a files-last order would have already removed.
-                    result, error = helper.delete_book(book, config.get_book_path(), book_format=book_format.upper())
-                    if not result:
-                        if json_response:
-                            return json.dumps([{"location": url_for("edit-book.show_edit_book", book_id=book_id),
-                                                "type": "danger",
-                                                "format": "",
-                                                "message": error}])
-                        else:
-                            flash(error, category="error")
-                            return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
-                    if error:
-                        if json_response:
-                            warning = {"location": url_for("edit-book.show_edit_book", book_id=book_id),
-                                       "type": "warning",
-                                       "format": "",
-                                       "message": error}
-                        else:
-                            flash(error, category="warning")
-                    calibre_db.session.query(db.Data).filter(db.Data.book == book.id).\
-                        filter(db.Data.format == book_format).delete()
-                    if book_format.upper() in ['KEPUB', 'EPUB', 'EPUB3']:
-                        kobo_sync_status.remove_synced_book(book.id, True)
-                    calibre_db.session.commit()
-
-                refreshed_duplicate_cache = False
-                if not book_format:
-                    try:
-                        from cps.duplicate_index import (
-                            _current_max_book_id,
-                            delete_book_keys,
-                            get_duplicate_groups_from_index,
+        book = get_visible_book_for_delete(book_id)
+        format_delete = None
+        format_commit_succeeded = False
+        try:
+            if not book_format:
+                # Whole-book delete — data-safety (D3-sibling): commit the DB deletes
+                # FIRST, remove files LAST. The old order deleted the files
+                # (helper.delete_book) before delete_whole_book + commit, so a DB failure
+                # left the files gone but the Books row surviving — a phantom book that
+                # still shows in the library and 404s when opened, unrecoverable. DB-first
+                # leaves the book fully intact on a DB failure (the except below rolls back);
+                # a file-cleanup failure after the DB is consistent is recoverable (rows
+                # already gone, orphaned files reclaimable) and is logged + warned, not raised.
+                deleted_book_id = book.id
+                deleted_book_path = book.path
+                delete_whole_book(deleted_book_id, book)
+                calibre_db.session.commit()
+                # Files last: a plain stand-in, never the now-detached ORM book
+                # (delete_whole_book's intermediate commits expire/detach it; a whole-book
+                # cleanup reads only .id and .path).
+                result, error = helper.delete_book(
+                    _DeletedBookFileRef(deleted_book_id, deleted_book_path),
+                    config.get_book_path(),
+                    book_format="",
+                )
+                if not result:
+                    log.warning(
+                        "[delete-book] Book %s removed from the database but file "
+                        "cleanup failed: %s (files remain on disk)",
+                        deleted_book_id,
+                        error,
+                    )
+                if error:
+                    if json_response:
+                        warning = {
+                            "location": url_for(
+                                "edit-book.show_edit_book", book_id=book_id
+                            ),
+                            "type": "warning",
+                            "format": "",
+                            "message": error,
+                        }
+                    else:
+                        flash(error, category="warning")
+            else:
+                # Single-format delete: hide the bytes behind a reversible,
+                # same-filesystem (or compensating Google Drive) rename. The
+                # Data row can then be committed without creating a window in
+                # which SQL rollback advertises bytes already destroyed.
+                format_delete, error = helper.stage_book_format_delete(
+                    book, config.get_book_path(), book_format.upper()
+                )
+                if format_delete is None:
+                    if json_response:
+                        return json.dumps(
+                            [
+                                {
+                                    "location": url_for(
+                                        "edit-book.show_edit_book", book_id=book_id
+                                    ),
+                                    "type": "danger",
+                                    "format": "",
+                                    "message": error,
+                                }
+                            ]
                         )
-                        from cps.cwa_db_loader import load_cwa_db
-                        CWA_DB = load_cwa_db().CWA_DB
+                    else:
+                        flash(error, category="error")
+                        return redirect(
+                            url_for("edit-book.show_edit_book", book_id=book_id)
+                        )
+                if error:
+                    if json_response:
+                        warning = {
+                            "location": url_for(
+                                "edit-book.show_edit_book", book_id=book_id
+                            ),
+                            "type": "warning",
+                            "format": "",
+                            "message": error,
+                        }
+                    else:
+                        flash(error, category="warning")
+                calibre_db.session.query(db.Data).filter(
+                    db.Data.book == book.id
+                ).filter(db.Data.format == book_format).delete()
+                calibre_db.session.commit()
+                format_commit_succeeded = True
 
-                        delete_book_keys([book_id])
-                        cwa_db = CWA_DB()
-                        duplicate_groups = get_duplicate_groups_from_index(cwa_db.cwa_settings, include_dismissed=True)
-                        cwa_db.update_duplicate_cache(duplicate_groups, len(duplicate_groups), _current_max_book_id())
-                        refreshed_duplicate_cache = True
-                    except Exception as e:
-                        log.warning("Failed to refresh duplicate index/cache after deleting book %s: %s", book_id, str(e))
-                
-                # Skip cache invalidation when batching, or when the indexed refresh
-                # above already handled it; otherwise mark the cache as stale.
-                if not skip_cache_invalidation and not refreshed_duplicate_cache:
+                cleanup_succeeded, cleanup_error = format_delete.finalize()
+                if not cleanup_succeeded:
+                    log.warning(
+                        "[delete-format] Book %s format %s was removed from the database "
+                        "but quarantine cleanup failed; bytes remain recoverable: %s",
+                        book.id,
+                        book_format,
+                        cleanup_error,
+                    )
+                    error = _(
+                        "Format metadata was deleted, but file cleanup failed: %(message)s",
+                        message=cleanup_error,
+                    )
+                if error:
+                    if json_response:
+                        warning = {
+                            "location": url_for(
+                                "edit-book.show_edit_book", book_id=book_id
+                            ),
+                            "type": "warning",
+                            "format": "",
+                            "message": error,
+                        }
+                    else:
+                        flash(error, category="warning")
+                if book_format.upper() in ["KEPUB", "EPUB", "EPUB3"]:
                     try:
-                        from cps.cwa_db_loader import load_cwa_db
-                        CWA_DB = load_cwa_db().CWA_DB
-                        cwa_db = CWA_DB()
-                        cwa_db.invalidate_duplicate_cache()
-                    except Exception as e:
-                        log.error("Failed to invalidate duplicate cache after deletion: %s", str(e))
-                
-            except Exception as ex:
-                log.error_or_exception(ex)
-                calibre_db.session.rollback()
-                if json_response:
-                    return json.dumps([{"location": url_for("edit-book.show_edit_book", book_id=book_id),
-                                        "type": "danger",
-                                        "format": "",
-                                        "message": str(ex)}])
-                else:
-                    flash(str(ex), category="error")
-                    return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
+                        kobo_sync_status.remove_synced_book(book.id, True)
+                    except Exception as ex:
+                        log.warning(
+                            "Failed to invalidate Kobo sync state after deleting book %s "
+                            "format %s: %s",
+                            book.id,
+                            book_format,
+                            ex,
+                        )
 
-        else:
-            # book not found
-            log.error('Book with id "%s" could not be deleted: not found', book_id)
-        return render_delete_book_result(book_format, json_response, warning, book_id, location)
+            refreshed_duplicate_cache = False
+            if not book_format:
+                try:
+                    from cps.duplicate_index import (
+                        _current_max_book_id,
+                        delete_book_keys,
+                        get_duplicate_groups_from_index,
+                    )
+                    from cps.cwa_db_loader import load_cwa_db
+
+                    CWA_DB = load_cwa_db().CWA_DB
+
+                    delete_book_keys([book_id])
+                    cwa_db = CWA_DB()
+                    duplicate_groups = get_duplicate_groups_from_index(
+                        cwa_db.cwa_settings, include_dismissed=True
+                    )
+                    cwa_db.update_duplicate_cache(
+                        duplicate_groups, len(duplicate_groups), _current_max_book_id()
+                    )
+                    refreshed_duplicate_cache = True
+                except Exception as e:
+                    log.warning(
+                        "Failed to refresh duplicate index/cache after deleting book %s: %s",
+                        book_id,
+                        str(e),
+                    )
+
+            # Skip cache invalidation when batching, or when the indexed refresh
+            # above already handled it; otherwise mark the cache as stale.
+            if not skip_cache_invalidation and not refreshed_duplicate_cache:
+                try:
+                    from cps.cwa_db_loader import load_cwa_db
+
+                    CWA_DB = load_cwa_db().CWA_DB
+                    cwa_db = CWA_DB()
+                    cwa_db.invalidate_duplicate_cache()
+                except Exception as e:
+                    log.error(
+                        "Failed to invalidate duplicate cache after deletion: %s",
+                        str(e),
+                    )
+
+        except Exception as ex:
+            log.error_or_exception(ex)
+            calibre_db.session.rollback()
+            if format_delete is not None and not format_commit_succeeded:
+                restored, restore_error = format_delete.restore()
+                if not restored:
+                    log.error(
+                        "[delete-format] Restoring book %s format %s after database "
+                        "failure also failed; quarantined bytes were retained: %s",
+                        book_id,
+                        book_format,
+                        restore_error,
+                    )
+            if json_response:
+                return json.dumps(
+                    [
+                        {
+                            "location": url_for(
+                                "edit-book.show_edit_book", book_id=book_id
+                            ),
+                            "type": "danger",
+                            "format": "",
+                            "message": str(ex),
+                        }
+                    ]
+                )
+            else:
+                flash(str(ex), category="error")
+                return redirect(url_for("edit-book.show_edit_book", book_id=book_id))
+
+        return render_delete_book_result(
+            book_format, json_response, warning, book_id, location
+        )
     message = _("You are missing permissions to delete books")
     if json_response:
-        return json.dumps({"location": url_for("edit-book.show_edit_book", book_id=book_id),
-                           "type": "danger",
-                           "format": "",
-                           "message": message})
+        return json.dumps(
+            {
+                "location": url_for("edit-book.show_edit_book", book_id=book_id),
+                "type": "danger",
+                "format": "",
+                "message": message,
+            }
+        )
     else:
         flash(message, category="error")
-        return redirect(url_for('edit-book.show_edit_book', book_id=book_id))
+        return redirect(url_for("edit-book.show_edit_book", book_id=book_id))
 
 
 def render_edit_book(book_id):

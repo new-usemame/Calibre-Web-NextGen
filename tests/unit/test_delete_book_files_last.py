@@ -13,9 +13,9 @@ The whole-book branch now: commit the DB deletes first, then remove files last v
 plain-value stand-in (`_DeletedBookFileRef`) — never the now-detached ORM `book`
 (`delete_whole_book`'s intermediate commits expire/detach it). A post-commit file
 cleanup failure is logged + surfaced as a warning, not raised (the row is already
-gone; orphaned files are reclaimable). The single-format branch is intentionally left
-files-first (a failure orphans at most one format's row, and the format's on-disk path
-is resolved from that Data row) — see notes/delete-ordering-d4-findings.md.
+gone; orphaned files are reclaimable). The single-format branch instead stages a
+reversible quarantine rename across its DB commit, restoring the original path when
+the commit fails and unlinking the quarantine only after the row deletion is durable.
 
 The behavioural proof is the live cwn-local repro (injected delete_whole_book failure ->
 book row + files both survive). These source-pins lock the ordering.
@@ -64,7 +64,7 @@ def test_whole_book_file_failure_is_logged_not_returned():
     # after the DB is committed, a file-cleanup failure must be logged/warned, not
     # returned as a hard "danger" (that would falsely report the completed DB delete
     # as failed). The else: starts the single-format branch.
-    whole_book_tail = after.split("\n                else:", 1)[0]
+    whole_book_tail = after.split("\n            else:", 1)[0]
     assert "removed from the database but file" in whole_book_tail, (
         "whole-book file-cleanup failure must log a warning"
     )

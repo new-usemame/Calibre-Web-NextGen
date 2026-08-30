@@ -157,12 +157,25 @@ def _load_editbooks_module(delete_key_calls):
 
     cps = _install_stub("cps")
     logger = _install_stub("cps.logger", {"create": lambda: _Logger()})
-    helper = _install_stub("cps.helper", {"delete_book": lambda *args, **kwargs: (True, None)})
+    staged_format = SimpleNamespace(
+        finalize=lambda: (True, None),
+        restore=lambda: (True, None),
+    )
+    helper = _install_stub(
+        "cps.helper",
+        {
+            "delete_book": lambda *args, **kwargs: (True, None),
+            "stage_book_format_delete": lambda *args, **kwargs: (staged_format, None),
+        },
+    )
     config = _install_stub("cps.config", {"get_book_path": lambda: "/library"})
     calls = []
     calibre_db = _install_stub(
         "cps.calibre_db",
-        {"get_book": lambda book_id: SimpleNamespace(id=book_id), "session": _Session(calls)},
+        {
+            "get_filtered_book": lambda book_id, **kwargs: SimpleNamespace(id=book_id),
+            "session": _Session(calls),
+        },
     )
     data_cls = SimpleNamespace(book=_Field(), format=_Field())
     db = _install_stub("cps.db", {"Data": data_cls})

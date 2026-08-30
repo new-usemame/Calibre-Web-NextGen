@@ -1330,6 +1330,158 @@ def delete_book_gdrive(book, book_format):
     return error is None, error
 
 
+class _LocalFormatDelete:
+    """A reversible, same-filesystem format deletion staged for a DB commit."""
+
+    def __init__(self, renamed_files):
+        self.renamed_files = renamed_files
+
+    def restore(self):
+        errors = []
+        for original, quarantine in reversed(self.renamed_files):
+            if not os.path.exists(quarantine):
+                continue
+            if os.path.exists(original):
+                errors.append(
+                    "{} already exists; quarantined copy retained at {}".format(
+                        original, quarantine
+                    )
+                )
+                continue
+            try:
+                os.replace(quarantine, original)
+            except OSError as ex:
+                errors.append("{}: {}".format(original, ex))
+        if errors:
+            return False, "; ".join(errors)
+        return True, None
+
+    def finalize(self):
+        errors = []
+        for _original, quarantine in self.renamed_files:
+            try:
+                os.remove(quarantine)
+            except OSError as ex:
+                errors.append("{}: {}".format(quarantine, ex))
+        if errors:
+            return False, "; ".join(errors)
+        return True, None
+
+
+class _GDriveFormatDelete:
+    """A reversible remote rename, finalized by trashing only after DB commit."""
+
+    def __init__(self, g_file, original_title):
+        self.g_file = g_file
+        self.original_title = original_title
+
+    def restore(self):
+        try:
+            gd.moveGdriveFileRemote(self.g_file, self.original_title)
+            gd.updateDatabaseOnEdit(self.g_file["id"], self.original_title)
+            return True, None
+        except Exception as ex:
+            return False, str(ex)
+
+    def finalize(self):
+        try:
+            self.g_file.Trash()
+            gd.deleteDatabaseEntry(self.g_file["id"])
+            return True, None
+        except Exception as ex:
+            return False, str(ex)
+
+
+def _format_quarantine_name(filename):
+    return ".{}.cwng-delete-{}.quarantine".format(filename, uuid4().hex)
+
+
+def stage_book_format_delete(book, calibrepath, book_format):
+    """Hide one format reversibly until its ``Data`` deletion commits.
+
+    Local files are atomically renamed within their current directory, which
+    keeps the operation on the same filesystem. Google Drive files receive an
+    equivalent reversible remote rename. Callers must invoke ``restore`` when
+    their database transaction fails and ``finalize`` only after it commits.
+    """
+    normalized_format = book_format.upper()
+    if config.config_use_google_drive:
+        name = next(
+            (
+                entry.name + "." + entry.format.lower()
+                for entry in book.data
+                if entry.format.upper() == normalized_format
+            ),
+            "",
+        )
+        g_file = (
+            gd.getFileFromEbooksFolder(book.path, name, nocase=True) if name else None
+        )
+        if not g_file:
+            return None, _(
+                "Book path %(path)s not found on Google Drive", path=book.path
+            )
+        original_title = g_file["title"]
+        quarantine_title = _format_quarantine_name(original_title)
+        renamed = False
+        try:
+            gd.moveGdriveFileRemote(g_file, quarantine_title)
+            renamed = True
+            gd.updateDatabaseOnEdit(g_file["id"], quarantine_title)
+        except Exception as ex:
+            if renamed:
+                try:
+                    gd.moveGdriveFileRemote(g_file, original_title)
+                    gd.updateDatabaseOnEdit(g_file["id"], original_title)
+                except Exception as restore_ex:
+                    log.error(
+                        "Restoring Google Drive format for book %s after staging "
+                        "failed; remote bytes remain quarantined: %s",
+                        book.id,
+                        restore_ex,
+                    )
+            return None, _(
+                "Deleting book %(id)s failed: %(message)s", id=book.id, message=ex
+            )
+        return _GDriveFormatDelete(g_file, original_title), None
+
+    if book.path.count("/") != 1:
+        log.error(
+            "Deleting format from database only, book path in database not valid: %s",
+            book.path,
+        )
+        return _LocalFormatDelete([]), _(
+            "Deleting book %(id)s from database only, book path in database not valid: %(path)s",
+            id=book.id,
+            path=book.path,
+        )
+
+    path = os.path.join(calibrepath, book.path)
+    renamed_files = []
+    try:
+        filenames = os.listdir(path)
+        for filename in filenames:
+            if not filename.upper().endswith("." + normalized_format):
+                continue
+            original = os.path.join(path, filename)
+            quarantine = os.path.join(path, _format_quarantine_name(filename))
+            os.replace(original, quarantine)
+            renamed_files.append((original, quarantine))
+    except (IOError, OSError) as ex:
+        restored, restore_error = _LocalFormatDelete(renamed_files).restore()
+        if not restored:
+            log.error(
+                "Restoring staged format files for book %s also failed: %s",
+                book.id,
+                restore_error,
+            )
+        log.error("Deleting book %s failed: %s", book.id, ex)
+        return None, _(
+            "Deleting book %(id)s failed: %(message)s", id=book.id, message=ex
+        )
+    return _LocalFormatDelete(renamed_files), None
+
+
 def reset_password(user_id):
     existing_user = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
     if not existing_user:

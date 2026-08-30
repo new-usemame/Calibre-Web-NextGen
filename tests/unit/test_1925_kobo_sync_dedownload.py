@@ -160,6 +160,7 @@ def sync_harness(monkeypatch):
     fake_calibre_db = SimpleNamespace(
         session=session,
         reconnect_db=lambda *_args, **_kwargs: None,
+        refresh_for_new_data=lambda: None,
         common_filters=lambda **_kwargs: true(),
         get_book=lambda book_id: session.query(db.Books).filter_by(id=book_id).one_or_none(),
         get_book_by_uuid_for_kobo=lambda book_uuid, **_kwargs: session.query(
@@ -264,6 +265,79 @@ def sync_harness(monkeypatch):
 
     session.close()
     engine.dispose()
+
+
+def test_sync_refresh_preserves_a_concurrent_library_session(
+    sync_harness, monkeypatch,
+):
+    """A library sync must not dispose the engine under another request.
+
+    The old reconnect path disposed the shared StaticPool connection. Keep a
+    second SQLAlchemy session in a live transaction while the real Kobo sync
+    body runs; that session must remain usable after the refresh.
+    """
+    from cps import db
+
+    engine = sync_harness.session.get_bind()
+    concurrent_session = sessionmaker(bind=engine)()
+    dispose_calls = []
+
+    def destructive_reconnect(*_args, **_kwargs):
+        dispose_calls.append(True)
+        engine.dispose()
+
+    def nondisposing_refresh():
+        sync_harness.session.expire_all()
+        sync_harness.session.rollback()
+
+    monkeypatch.setattr(
+        sync_harness.calibre_db, "reconnect_db", destructive_reconnect
+    )
+    monkeypatch.setattr(
+        sync_harness.calibre_db, "refresh_for_new_data", nondisposing_refresh
+    )
+
+    try:
+        assert concurrent_session.query(db.Books).count() == 1
+        response = sync_harness.sync()
+
+        assert response.status_code == 200
+        assert dispose_calls == [], (
+            "Kobo sync invoked the destructive reconnect path and disposed "
+            "the class-level library engine"
+        )
+        assert concurrent_session.query(db.Books).count() == 1, (
+            "Kobo sync invalidated a concurrent library session"
+        )
+    finally:
+        concurrent_session.close()
+
+
+def test_sync_refresh_failure_logs_kobo_error_and_aborts_503(
+    sync_harness, monkeypatch, caplog,
+):
+    """An incomplete pre-sync refresh is loud and has a stable HTTP status."""
+    from werkzeug.exceptions import ServiceUnavailable
+
+    def fail_refresh():
+        raise RuntimeError("library refresh unavailable")
+
+    monkeypatch.setattr(
+        sync_harness.calibre_db, "refresh_for_new_data", fail_refresh
+    )
+
+    with caplog.at_level(logging.ERROR, logger="cps.kobo"):
+        with pytest.raises(ServiceUnavailable) as exc_info:
+            sync_harness.sync()
+
+    assert exc_info.value.code == 503
+    assert any(
+        record.name == "cps.kobo"
+        and "Kobo Sync: failed to refresh the library database"
+        in record.getMessage()
+        and record.exc_info is not None
+        for record in caplog.records
+    ), "refresh failure must produce a Kobo-side exception log before aborting"
 
 
 def test_interrupted_sync_token_loss_does_not_redeliver_unchanged_entitlement(

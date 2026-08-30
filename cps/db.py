@@ -2371,22 +2371,44 @@ class CalibreDB:
         Replaces the prior async TaskReconnectDatabase path which
         disposed the shared engine on a worker thread and raced with
         in-flight request greenlets (fork issue #192).
+
+        Every instance is attempted. If any active session cannot be
+        refreshed, raise after the sweep so callers never mistake a partial
+        refresh for success.
         """
+        failures = []
         with cls._reconnect_lock:
             for inst in list(cls.instances):
                 try:
-                    if inst.session is not None:
-                        try:
-                            inst.session.expire_all()
-                        except Exception:
-                            pass
-                        try:
-                            inst.session.rollback()
-                        except Exception:
-                            pass
-                except Exception:
-                    # One bad instance must not block the rest.
+                    session = inst._peek_session()
+                    if session is None:
+                        continue
+                except Exception as exc:
+                    # Refresh every other instance before reporting failure to
+                    # the caller. A partial refresh must not be reported as a
+                    # success: request handlers need a defined failure path.
+                    failures.append(exc)
                     continue
+
+                session_failure = None
+                try:
+                    session.expire_all()
+                except Exception as exc:
+                    session_failure = exc
+                try:
+                    session.rollback()
+                except Exception as exc:
+                    if session_failure is None:
+                        session_failure = exc
+                if session_failure is not None:
+                    failures.append(session_failure)
+
+        if failures:
+            raise RuntimeError(
+                "Could not refresh {} Calibre database session(s)".format(
+                    len(failures)
+                )
+            ) from failures[0]
 
 
 def lcase(s):

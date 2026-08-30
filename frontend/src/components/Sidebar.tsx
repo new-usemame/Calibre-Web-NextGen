@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
 import { useT } from '../lib/i18n';
-import { useIsMobile } from '../lib/a11y/useIsMobile';
+import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { useMediaQuery } from '../lib/useMediaQuery';
@@ -32,9 +32,9 @@ function isActive(location: string, href: string, exact?: boolean): boolean {
 }
 
 interface SidebarProps {
-  /** Mobile drawer open state. Ignored on desktop (always visible). */
+  /** Off-canvas drawer open state. Ignored by the persistent desktop rail. */
   open: boolean;
-  /** Close the mobile drawer (Escape, scrim click, close button). */
+  /** Close the drawer (Escape, scrim click, close button). */
   onClose: () => void;
   onNavigate: () => void;
 }
@@ -42,7 +42,7 @@ interface SidebarProps {
 export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const [location] = useLocation();
   const t = useT();
-  const isMobile = useIsMobile();
+  const isDrawerMode = useIsDrawerMode();
   const announce = useAnnouncer();
   const navRef = useRef<HTMLElement>(null);
   const update = useUpdateSidebar();
@@ -71,9 +71,9 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   useEffect(() => {
     const node = navRef.current;
     if (!node) return;
-    if (isMobile && !open) node.setAttribute('inert', '');
+    if (isDrawerMode && !open) node.setAttribute('inert', '');
     else node.removeAttribute('inert');
-  }, [isMobile, open]);
+  }, [isDrawerMode, open]);
 
   useEffect(() => {
     if (!hoverSuppressed) return;
@@ -99,7 +99,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
     return () => window.removeEventListener('pointermove', trackPointerJourney, true);
   }, [hoverSuppressed]);
 
-  useFocusTrap(navRef, { onClose, active: isMobile && open });
+  useFocusTrap(navRef, { onClose, active: isDrawerMode && open });
   const { data: shelvesData } = useShelves();
   const shelves = shelvesData?.items ?? [];
   const magicShelves = useMagicShelves().data?.items ?? [];

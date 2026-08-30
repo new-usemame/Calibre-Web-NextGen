@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { DRAWER_MODE_QUERY } from '../src/lib/a11y/drawerMode.ts';
 
 const source = (relative: string) => fs.readFileSync(path.join(process.cwd(), relative), 'utf8');
 
@@ -21,6 +22,22 @@ test('desktop sidebar reveal animates only the out-of-flow panel, never the flow
   assert.doesNotMatch(desktop, /clip-path\s*:/);
   assert.match(desktop, /\.magicShelfIcon\s*\{[\s\S]*?transition:\s*transform/);
   assert.doesNotMatch(desktop, /transition\s*:[^;]*(?:margin(?:-right)?|left)/);
+});
+
+test('drawer-mode CSS stays synchronized with the JavaScript accessibility query', () => {
+  const expectedRule = `@media ${DRAWER_MODE_QUERY}`;
+
+  for (const stylesheet of [
+    'src/components/Sidebar.module.css',
+    'src/components/TopBar.module.css',
+  ]) {
+    const css = source(stylesheet);
+    assert.equal(
+      css.split(expectedRule).length - 1,
+      1,
+      `${stylesheet} must contain exactly one drawer-mode rule matching DRAWER_MODE_QUERY`,
+    );
+  }
 });
 
 test('catalog owns one stable measured grid node and delegates its cards to the row window', () => {

@@ -270,6 +270,8 @@
 }
 
 /* ---- Mobile (off-canvas drawer) ---- */
+/* Keep this condition identical to DRAWER_MODE_QUERY in
+   ../lib/a11y/drawerMode.ts. unit/structuralPerformance.test.ts pins it. */
 @media (max-width: 767px), (hover: none), (pointer: coarse) {
   .nav,
   .navOpen {

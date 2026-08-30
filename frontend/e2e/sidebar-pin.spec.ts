@@ -106,7 +106,7 @@ test.describe('#1839 desktop sidebar pin', () => {
       .toBe('220px');
   });
 
-  test('a pinned short rail with many shelves scrolls to its final item', async ({ page }, testInfo) => {
+  test('a pinned short rail stays at the top and scrolls to its final item', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'desktop fine-pointer rail only');
 
     await page.setViewportSize({ width: 1280, height: 360 });
@@ -126,7 +126,13 @@ test.describe('#1839 desktop sidebar pin', () => {
     await page.goto('/app/');
     const nav = page.getByRole('navigation', { name: 'Browse' });
     await nav.hover({ position: { x: 32, y: 80 } });
-    await page.getByRole('button', { name: 'Pin sidebar' }).click();
+    const pin = page.getByRole('button', { name: 'Pin sidebar' });
+
+    // A Playwright click may scroll its target into view before dispatching the
+    // event. The first pin test covers that user-level path. Invoke the native
+    // control here so this assertion isolates the product's pin transition: a
+    // rerender must not move a rail that was already at its defined top.
+    await nav.evaluate((element) => { element.scrollTop = 0; });
 
     const metricsBefore = await nav.evaluate((element) => ({
       clientHeight: element.clientHeight,
@@ -135,6 +141,13 @@ test.describe('#1839 desktop sidebar pin', () => {
     }));
     expect(metricsBefore.scrollHeight).toBeGreaterThan(metricsBefore.clientHeight);
     expect(metricsBefore.scrollTop).toBe(0);
+
+    await pin.evaluate((element) => element.click());
+    await expect(pin).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      await nav.evaluate((element) => element.scrollTop),
+      'pinning must not auto-scroll the rail',
+    ).toBe(0);
 
     const finalItem = nav.getByRole('link', { name: 'About', exact: true });
     await finalItem.scrollIntoViewIfNeeded();

@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /*
- * Mobile drawer — the #576 surface (transparent drawer + scroll-through +
- * lower nav items unreachable). Runs only under the mobile project.
+ * Touch drawer — the #576 surface (transparent drawer + scroll-through +
+ * lower nav items unreachable). Runs under both off-canvas drawer projects.
  */
 test.describe('mobile drawer', () => {
   test('drawer opens, lower nav items are reachable, page is scroll-locked behind it', async ({ page }) => {
@@ -39,7 +39,9 @@ test.describe('mobile drawer', () => {
 test.describe('library gear menu at 360px', () => {
   test.use({ viewport: { width: 360, height: 740 } });
 
-  test('view-settings menu stays fully onscreen when the gear wraps left', async ({ page }) => {
+  test('view-settings menu stays fully onscreen when the gear wraps left', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'ipad-touch', '360px phone geometry is owned by the mobile project');
+
     await page.goto('/app/');
     await expect(page.locator('a[href*="/book/"]').first()).toBeVisible();
 

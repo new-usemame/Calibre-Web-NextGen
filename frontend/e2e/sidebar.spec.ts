@@ -23,7 +23,9 @@ async function topY(loc: Locator): Promise<number> {
 }
 
 test.describe('sidebar shelves grouping', () => {
-  test('desktop: user shelves render under the SHELVES header, above Tasks/About', async ({ page }) => {
+  test('desktop: user shelves render under the SHELVES header, above Tasks/About', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'persistent rail exists only on the desktop project');
+
     await page.goto('/app');
     await expect(page.locator('a[href*="/book/"]').first()).toBeVisible();
 
@@ -44,8 +46,8 @@ test.describe('sidebar shelves grouping', () => {
     expect(shelfY, 'user shelves must render ABOVE the Tasks/About info pages (not orphaned at the bottom)').toBeLessThan(tasksY);
   });
 
-  test('mobile: shelves are grouped under the header inside the opened drawer', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'mobile', 'drawer + hamburger exist only on the mobile project');
+  test('drawer: shelves are grouped under the header inside the opened drawer', async ({ page }, testInfo) => {
+    test.skip(!['mobile', 'ipad-touch'].includes(testInfo.project.name), 'off-canvas drawer projects only');
 
     await page.goto('/app');
     await expect(page.locator('a[href*="/book/"]').first()).toBeVisible();

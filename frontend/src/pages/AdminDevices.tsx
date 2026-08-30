@@ -1,9 +1,10 @@
 import { Link } from 'wouter';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Server } from 'lucide-react';
+import { ChevronLeft, Smartphone, Users } from 'lucide-react';
 import { apiGet } from '../lib/api';
 import { clampOffset } from '../lib/pagination';
+import { relativeWhen } from '../lib/relativeTime';
 import { useT } from '../lib/i18n';
 import { type Device } from '../components/DeviceInventory';
 import { DeviceSummary } from '../components/DeviceSummary';
@@ -42,13 +43,24 @@ export function AdminDevices() {
   }, [correctedOffset, stalePage]);
   if (isLoading || stalePage) return <SpinnerCentered size={40} />;
   const devices = data?.devices ?? [];
+  // The API sorts by user, so a user's devices are contiguous on the page;
+  // regroup here to render a header per account (presentational only).
+  const groups: { user: AdminDevice['user']; devices: AdminDevice[] }[] = [];
+  for (const device of devices) {
+    const last = groups[groups.length - 1];
+    if (last && last.user.id === device.user.id) last.devices.push(device);
+    else groups.push({ user: device.user, devices: [device] });
+  }
+  // Card titles sit one heading level under the group header when accounts are
+  // grouped, and directly under the page h1 when a single account fills the page.
+  const DeviceTitle = groups.length > 1 ? 'h3' : 'h2';
   return (
     <main className={styles.container}>
       <Link href="/admin" className={styles.back}>
         <ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Admin')}
       </Link>
       <div className={styles.heading}>
-        <Server aria-hidden="true" focusable={false} />
+        <Smartphone aria-hidden="true" focusable="false" />
         <h1>{t('Device administration')}</h1>
       </div>
       {error ? (
@@ -57,23 +69,48 @@ export function AdminDevices() {
         <EmptyState message={t('No registered devices.')} />
       ) : (
         <>
-          <p role="status">{t('Page {page} of {pages}', {
+          <p role="status" className={styles.countLine}>{t('Page {page} of {pages}', {
             page: Math.floor(offset / ADMIN_DEVICE_PAGE_SIZE) + 1,
             pages: Math.max(1, Math.ceil((data?.total ?? 0) / ADMIN_DEVICE_PAGE_SIZE)),
           })}</p>
           <ul className={styles.list} role="list" data-testid="admin-device-list">
-            {devices.map((device) => (
-              <li key={device.public_id} className={styles.card}>
-                <header>
-                  <div>
-                    <h2>{device.label}</h2>
-                    <p>{t('Account: {name}', { name: device.user.name })}</p>
-                  </div>
-                  <span>{device.active ? t('Active') : t('Inactive')}</span>
-                </header>
-                <DeviceSummary device={device} />
-                <p>{t('Last seen: {when}', { when: device.last_seen || t('Never') })}</p>
-              </li>
+            {groups.map((group) => (
+              <Fragment key={group.user.id}>
+                {groups.length > 1 && (
+                  <li className={styles.groupHeader}>
+                    <h2>
+                      <Users size={15} aria-hidden="true" focusable="false" />
+                      {group.user.name}
+                    </h2>
+                    <p className={styles.groupMeta}>{t('{n} devices · {m} active', {
+                      n: group.devices.length,
+                      m: group.devices.filter((device) => device.active).length,
+                    })}</p>
+                  </li>
+                )}
+                {group.devices.map((device) => (
+                  <li key={device.public_id} className={styles.card} data-active={device.active}>
+                    <header>
+                      <div>
+                        <DeviceTitle>{device.label}</DeviceTitle>
+                        {groups.length === 1 && (
+                          <p className={styles.account}>
+                            <Users size={13} aria-hidden="true" focusable="false" />
+                            {t('Account: {name}', { name: device.user.name })}
+                          </p>
+                        )}
+                      </div>
+                      <span className={device.active ? styles.stateOk : styles.stateMuted}>
+                        {device.active ? t('Active') : t('Inactive')}
+                      </span>
+                    </header>
+                    <DeviceSummary device={device} />
+                    <p className={styles.lastSeen}>{t('Last seen: {when}', {
+                      when: device.last_seen ? relativeWhen(device.last_seen) : t('Never'),
+                    })}</p>
+                  </li>
+                ))}
+              </Fragment>
             ))}
           </ul>
           {(data?.total ?? 0) > ADMIN_DEVICE_PAGE_SIZE && (

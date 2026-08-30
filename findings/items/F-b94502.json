@@ -6,8 +6,14 @@
   "refs": [
     "#2028"
   ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-30",
+    "note": "Fixed in the CONTROL repository (scripts/lib/pr-lifecycle.sh is not tracked by this product repo), commit d102cac on its local main. Green now requires every REQUIRED check by NAME, resolved at runtime from repos/{repo}/rules/branches/{base} - the rules actually applied to the PR's base, rather than a pinned list that could drift from the ruleset. A required identity with no rollup entry is reported NAME=MISSING; a present one counts only when every matching entry is SUCCESS. Unreadable, non-array, malformed or empty policy emits required-checks-unknown and exits 38 before any push, PR creation or merge, so unknown state can never degrade to the rollup count. Optional green checks can no longer substitute for a missing required one. Red evidence: the two new guards run against the pre-fix script give 'unknown required-check policy must fail closed (expected 38, got 0)' - 15 passed, 2 failed; after the fix 17 passed, 0 failed. Regression surface re-run on merged main: test_tick_lock 9 passed, test_community_pr_lane 17 passed, test_pr_lifecycle 17 passed, 0 failed. Verified separately against PR #2050's live rollup that the predicate names real identities. Known edge, not reachable today: a SKIPPED required check would read as unmet - none of the three required jobs is path-skippable (Fast Tests has no if:, Test Suite Summary is if: always(), validate-author has no if:).",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "pr-lifecycle grades a head green when the required checks never registered - it counts checks, not their identities"
 }

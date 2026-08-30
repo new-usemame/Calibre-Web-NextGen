@@ -19,6 +19,7 @@ from .serializers import serialize_shelf
 from .books import _rows_to_items
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
+from ..sort_orders import BOOK_SORT_ORDERS
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
     check_shelf_view_permissions,
@@ -86,14 +87,34 @@ def shelf_detail(shelf_id):
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", config.config_books_per_page, type=int)
 
-    # Same fetch the HTML shelf view uses: ordered by the shelf's stored order,
-    # ACL- and archive-filtered via common_filters, with read/archived joined.
+    # Shelf sorting is view-only: "stored", an unknown value, and the two
+    # app-DB download-count sorts all retain the manual BookShelf order. Every
+    # metadata sort comes from the shared ORDER BY map used by the catalog.
+    sort = request.args.get("sort", "stored")
+    order = BOOK_SORT_ORDERS.get(sort)
+    if order is None or sort in ("hotdesc", "hotasc"):
+        order = [ub.BookShelf.order.asc()]
+
+    # Author sorting uses Series as a deterministic tiebreaker. fill_indexpage
+    # greedily consumes join varargs 3, then 2, then 1 from the front, so this
+    # three-argument group must precede the two-argument BookShelf group.
+    joins = []
+    if sort in ("authaz", "authza"):
+        joins.extend((
+            db.books_series_link,
+            db.Books.id == db.books_series_link.c.book,
+            db.Series,
+        ))
+    joins.extend((ub.BookShelf, ub.BookShelf.book_id == db.Books.id))
+
+    # Same ACL/archive-filtered fetch as the HTML shelf view, with read/archived
+    # joined. Unlike the classic sort action, this never rewrites BookShelf.
     entries, _random, pagination = calibre_db.fill_indexpage(
         page, per_page, db.Books,
         ub.BookShelf.shelf == shelf_id,
-        [ub.BookShelf.order.asc()],
+        order,
         True, config.config_read_column,
-        ub.BookShelf, ub.BookShelf.book_id == db.Books.id,
+        *joins,
     )
 
     body = serialize_shelf(shelf, pagination.total_count, is_owner=(shelf.user_id == _uid()))

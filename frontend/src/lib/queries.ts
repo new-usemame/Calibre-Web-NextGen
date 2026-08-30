@@ -578,16 +578,26 @@ export function useShelves() {
   });
 }
 
-export function useShelf(id: string | number | undefined, page = 1) {
+export function useShelf(id: string | number | undefined, page = 1, sort = 'stored') {
   return useQuery<ShelfDetail>({
-    queryKey: ['shelf', String(id), page],
-    queryFn: () => apiGet<ShelfDetail>(`/api/v1/shelves/${id}?page=${page}&per_page=24`),
+    queryKey: ['shelf', String(id), sort, page],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        per_page: '24',
+        sort,
+      });
+      return apiGet<ShelfDetail>(`/api/v1/shelves/${id}?${params.toString()}`);
+    },
     enabled: id !== undefined && id !== '',
-    // Keep the previous page's rows only while paging within the SAME shelf —
-    // never carry one shelf's rows across an id change, where they'd render
-    // under the next shelf's key and mix both shelves' books (#612).
+    // Keep the previous page's rows only while paging within the SAME shelf and
+    // sort. Never carry rows across either identity change (#612/#2059).
     placeholderData: (prev, prevQuery) =>
-      prevQuery && String(prevQuery.queryKey[1]) === String(id) ? prev : undefined,
+      prevQuery
+      && String(prevQuery.queryKey[1]) === String(id)
+      && prevQuery.queryKey[2] === sort
+        ? prev
+        : undefined,
   });
 }
 

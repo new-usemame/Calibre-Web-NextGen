@@ -23,6 +23,7 @@ import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './Catalog.module.css';
 import { canUploadBooks } from '../lib/permissions';
+import { SORT_OPTIONS } from '../lib/bookSortOptions';
 
 const VIEW_OPTIONS: Record<DiscoveryView, { label: string }> = {
   hot: { label: 'Hot — Most Downloaded' },
@@ -31,17 +32,6 @@ const VIEW_OPTIONS: Record<DiscoveryView, { label: string }> = {
   favorites: { label: 'Favorites' },
   archived: { label: 'Archived' },
 };
-
-const SORT_OPTIONS = [
-  { label: 'Newest', value: 'new' },
-  { label: 'Oldest', value: 'old' },
-  { label: 'Title A–Z', value: 'abc' },
-  { label: 'Title Z–A', value: 'zyx' },
-  { label: 'Author A–Z', value: 'authaz' },
-  { label: 'Author Z–A', value: 'authza' },
-  { label: 'Newest published', value: 'pubnew' },
-  { label: 'Oldest published', value: 'pubold' },
-];
 
 // Series-order sorts (by metadata series_index). Only offered when viewing a
 // single series, where a numeric position is meaningful — a whole-library

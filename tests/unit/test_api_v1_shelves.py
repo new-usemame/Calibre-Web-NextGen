@@ -9,8 +9,13 @@ permission gating, and the mapping from core status codes to HTTP responses.
 """
 import inspect
 import json
+import sqlite3
+from datetime import datetime, timezone
 import flask
 import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
@@ -104,6 +109,124 @@ def test_detail_shelf_not_found_404():
             mock_ub.session.query.return_value.filter.return_value.first.return_value = None
             resp = inspect.unwrap(mod.shelf_detail)(99)
     assert resp[1] == 404
+
+
+@pytest.fixture
+def real_shelf_sort_env(monkeypatch):
+    """Shelf endpoint wired to real Calibre + app SQLite schemas.
+
+    One connection has the same ``calibre`` and ``app_settings`` attachments as
+    production, so this exercises fill_indexpage's greedy join grouping instead
+    of merely asserting which mock arguments the endpoint supplied.
+    """
+    from cps import db, ub
+    from cps.api import shelves as mod
+
+    def creator():
+        connection = sqlite3.connect(":memory:", check_same_thread=False)
+        connection.execute("ATTACH DATABASE ':memory:' AS calibre")
+        connection.execute("ATTACH DATABASE ':memory:' AS app_settings")
+        return connection
+
+    engine = create_engine(
+        "sqlite+pysqlite://", creator=creator, poolclass=StaticPool)
+    event.listen(engine, "connect", db._register_sqlite_udfs)
+    db.Base.metadata.create_all(engine)
+    ub.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    series_alpha = db.Series("Alpha Series", "Alpha Series")
+    series_omega = db.Series("Omega Series", "Omega Series")
+    books = [
+        db.Books("Zulu", "Zulu", "Alpha Author", now, now, "1.0", now,
+                 "zulu", 0, [], []),
+        db.Books("Alpha", "Alpha", "Zulu Author", now, now, "1.0", now,
+                 "alpha", 0, [], []),
+        db.Books("Middle", "Middle", "Alpha Author", now, now, "1.0", now,
+                 "middle", 0, [], []),
+    ]
+    for book_id, book in enumerate(books, 1):
+        book.id = book_id
+        book.uuid = "shelf-sort-%d" % book_id
+    books[0].series.append(series_omega)
+    books[2].series.append(series_alpha)
+
+    shelf = ub.Shelf(id=1, name="Sorted shelf", is_public=0, user_id=7)
+    stored_rows = [
+        ub.BookShelf(book_id=2, order=1, shelf=1),
+        ub.BookShelf(book_id=1, order=2, shelf=1),
+        ub.BookShelf(book_id=3, order=3, shelf=1),
+    ]
+    for row in stored_rows:
+        row.ub_shelf = shelf
+    session.add_all([series_alpha, series_omega, *books, shelf, *stored_rows])
+    session.commit()
+
+    cdb = object.__new__(db.CalibreDB)
+    cdb.session = session
+    cdb.config = SimpleNamespace(
+        config_restricted_column=0,
+        config_books_per_page=24,
+        config_random_books=0,
+    )
+    user = SimpleNamespace(
+        id=7,
+        is_authenticated=True,
+        is_anonymous=False,
+        has_own_library=False,
+        show_detail_random=lambda: False,
+        filter_language=lambda: "all",
+        list_denied_tags=lambda: [""],
+        list_allowed_tags=lambda: [""],
+    )
+
+    monkeypatch.setattr(mod, "calibre_db", cdb)
+    monkeypatch.setattr(mod, "config", SimpleNamespace(
+        config_books_per_page=24, config_read_column=0))
+    monkeypatch.setattr(mod, "current_user", user)
+    monkeypatch.setattr(mod, "check_shelf_view_permissions", lambda _shelf: True)
+    monkeypatch.setattr(mod, "check_shelf_edit_permissions", lambda _shelf: True)
+    monkeypatch.setattr(
+        mod,
+        "_rows_to_items",
+        lambda entries: [getattr(entry, "Books", entry).title for entry in entries],
+    )
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(db, "current_user", user)
+
+    yield SimpleNamespace(module=mod, session=session, ub=ub)
+    session.close()
+    engine.dispose()
+
+
+@pytest.mark.unit
+def test_detail_sort_query_is_view_only_and_preserves_manual_order(real_shelf_sort_env):
+    env = real_shelf_sort_env
+
+    def titles(query=""):
+        with _ctx("/api/v1/shelves/1%s" % query, method="GET"):
+            response = inspect.unwrap(env.module.shelf_detail)(1)
+        return json.loads(response.get_data())["items"]
+
+    stored_before = [
+        (row.book_id, row.order)
+        for row in env.session.query(env.ub.BookShelf).order_by(env.ub.BookShelf.order).all()
+    ]
+
+    assert titles() == ["Alpha", "Zulu", "Middle"]
+    assert titles("?sort=abc") == ["Alpha", "Middle", "Zulu"]
+    # Both Alpha-author books require the Series join for their deterministic
+    # tiebreak: Alpha Series precedes Omega Series.
+    assert titles("?sort=authaz") == ["Middle", "Zulu", "Alpha"]
+    assert titles("?sort=not-a-sort") == ["Alpha", "Zulu", "Middle"]
+    assert titles("?sort=hotdesc") == ["Alpha", "Zulu", "Middle"]
+
+    stored_after = [
+        (row.book_id, row.order)
+        for row in env.session.query(env.ub.BookShelf).order_by(env.ub.BookShelf.order).all()
+    ]
+    assert stored_after == stored_before == [(2, 1), (1, 2), (3, 3)]
 
 
 # ── add book — status mapping ────────────────────────────────────────────────

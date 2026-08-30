@@ -18,6 +18,23 @@ import { useT } from '../lib/i18n';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { getShelfVisibilityAction } from '../lib/shelfVisibility';
+import { SORT_OPTIONS } from '../lib/bookSortOptions';
+
+const SHELF_SORT_OPTIONS = [
+  { label: 'Manual order', value: 'stored' },
+  ...SORT_OPTIONS,
+] as const;
+const SHELF_SORT_VALUES = new Set<string>(SHELF_SORT_OPTIONS.map((option) => option.value));
+const SHELF_SORT_KEY_PREFIX = 'cwng:shelf-sort-v1:';
+
+function readShelfSort(shelfId: string): string {
+  try {
+    const stored = localStorage.getItem(`${SHELF_SORT_KEY_PREFIX}${shelfId}`);
+    return stored && SHELF_SORT_VALUES.has(stored) ? stored : 'stored';
+  } catch {
+    return 'stored';
+  }
+}
 
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const seen = new Set(prev.map((b) => b.id));
@@ -31,9 +48,10 @@ export function Shelf({ id }: { id: string }) {
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
   const [books, setBooks] = useState<Book[]>([]);
+  const [sort, setSort] = useState(() => readShelfSort(id));
   const accKeyRef = useRef<string>('');
 
-  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page);
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page, sort);
   const updateShelf = useUpdateShelf(id);
   const deleteShelf = useDeleteShelf();
   const reorder = useReorderShelfBooks(id);
@@ -49,26 +67,42 @@ export function Shelf({ id }: { id: string }) {
   // Route reuse (/shelf/A -> /shelf/B keeps this component mounted): reset
   // paging and per-shelf UI modes when the shelf changes (#612).
   useEffect(() => {
+    setSort(readShelfSort(id));
     setPage(1);
+    setBooks([]);
+    accKeyRef.current = '';
     setEditing(false);
     setReordering(false);
     setActionError(null);
   }, [id]);
 
-  // Accumulate pages; replace when the shelf changes. Skip placeholder data:
-  // on an id change react-query would briefly serve the PREVIOUS shelf's rows
-  // (placeholderData) — accumulating those stamps them as the new shelf's and
-  // appends the real rows behind them, mixing both shelves' books (#612).
+  useEffect(() => {
+    try { localStorage.setItem(`${SHELF_SORT_KEY_PREFIX}${id}`, sort); } catch { /* storage can be disabled */ }
+  }, [id, sort]);
+
+  // Accumulate pages; replace when the shelf or sort changes. Skip placeholder
+  // data so a previous query's rows can never be stamped into a new result set
+  // (#612). The sort handler clears immediately; this key also guards updates
+  // that settle out of order while a new request is in flight (#2059).
   useEffect(() => {
     if (!data || isPlaceholderData) return;
-    const key = String(id);
+    const key = `${id}:${sort}`;
     if (key !== accKeyRef.current) {
       setBooks(data.items);
       accKeyRef.current = key;
     } else {
       setBooks((prev) => dedupAppend(prev, data.items));
     }
-  }, [data, id, isPlaceholderData]);
+  }, [data, id, isPlaceholderData, sort]);
+
+  const changeSort = (nextSort: string) => {
+    const safeSort = SHELF_SORT_VALUES.has(nextSort) ? nextSort : 'stored';
+    setReordering(false);
+    setBooks([]);
+    accKeyRef.current = '';
+    setPage(1);
+    setSort(safeSort);
+  };
 
   // Infinite-scroll sentinel. This hook MUST be called before any conditional
   // early return below — Rules of Hooks require a stable hook order across
@@ -239,6 +273,18 @@ export function Shelf({ id }: { id: string }) {
               ? t('{count} book', { count: total })
               : t('{count} books', { count: total })}
           </span>
+          <select
+            className={styles.sortSelect}
+            value={sort}
+            onChange={(event) => changeSort(event.target.value)}
+            aria-label={t('Sort order')}
+          >
+            {SHELF_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.label)}
+              </option>
+            ))}
+          </select>
           {canEdit && !editing && (
             <div className={styles.manage}>
               <button className={styles.manageBtn} onClick={startRename}>
@@ -258,7 +304,7 @@ export function Shelf({ id }: { id: string }) {
                   <Smartphone size={14} /> {data.kobo_sync ? t('Kobo sync on') : t('Enable Kobo sync')}
                 </button>
               )}
-              {books.length > 1 && !hasMore && (
+              {sort === 'stored' && books.length > 1 && !hasMore && (
                 <button className={reordering ? styles.manageBtnActive : styles.manageBtn}
                   onClick={() => setReordering((v) => !v)}>
                   <ArrowUpDown size={14} /> {reordering ? t('Done reordering') : t('Reorder')}

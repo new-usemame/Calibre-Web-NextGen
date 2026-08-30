@@ -13,7 +13,8 @@ async function stubDevices(page: import('@playwright/test').Page) {
   let restored = 0;
   await page.route('**/api/annotations/devices?*', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ json: { devices: current.active ? [current] : [] } });
+      const devices = current.active ? [current] : [];
+      await route.fulfill({ json: { devices, limit: 100, offset: 0, total: devices.length } });
     } else await route.continue();
   });
   await page.route('**/api/annotations/devices/device-1/delete-preflight', (route) =>
@@ -74,6 +75,7 @@ test('device inventory renders one bounded window and reports the true total', a
   let inventoryRequestUrl: URL | null = null;
   await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
     devices: [{ ...device, inventory_count: 5000, inventory_observed: '2026-08-09T12:00:00' }],
+    limit: 100, offset: 0, total: 1,
   } }));
   await page.route('**/api/annotations/devices/device-1/inventory?*', (route) => {
     inventoryRequestUrl = new URL(route.request().url());
@@ -100,8 +102,18 @@ test('device inventory renders one bounded window and reports the true total', a
   );
   await expect(inventory.getByRole('listitem')).toHaveCount(200);
   await expect(inventory.getByRole('link')).toHaveCount(200);
+  const deleteGeometry = await inventory.getByRole('button', { name: 'Delete from device' })
+    .evaluateAll((buttons) => {
+      const first = buttons[0].getBoundingClientRect();
+      const second = buttons[1].getBoundingClientRect();
+      return { height: first.height, neighborGap: second.top - first.bottom };
+    });
+  expect(deleteGeometry.height).toBeGreaterThanOrEqual(44);
+  expect(deleteGeometry.neighborGap).toBeGreaterThanOrEqual(24);
   expect(inventoryRequestUrl?.searchParams.get('limit')).toBe('200');
   expect(inventoryRequestUrl?.searchParams.get('offset')).toBe('0');
+  await inventory.getByRole('button', { name: 'Next' }).click();
+  await expect.poll(() => inventoryRequestUrl?.searchParams.get('offset')).toBe('200');
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
     .analyze();

@@ -1,6 +1,22 @@
+export interface BulkFailureDetail {
+  id: number;
+  code?: string;
+  message: string;
+}
+
 export interface BulkActionResult {
   succeededIds: number[];
   failedIds: number[];
+  /** Optional for per-request fan-out; populated by structured batch APIs. */
+  failureDetails?: BulkFailureDetail[];
+}
+
+export interface BulkBatchResult extends BulkActionResult {
+  /** Request-level failures (for example batch_too_large). Per-id policy
+   *  refusals stay in failedIds/failureDetails because the batch endpoint
+   *  reports them in a successful response. */
+  errors: unknown[];
+  failureDetails: BulkFailureDetail[];
 }
 
 /** Settle every per-book request while retaining which id produced each result. */
@@ -14,4 +30,50 @@ export async function settleById(
     accounting[key].push(ids[index]);
     return accounting;
   }, { succeededIds: [], failedIds: [] });
+}
+
+/** Run a bounded batch endpoint without losing per-id accounting.
+ *
+ * Every requested id is classified exactly once. A rejected request marks its
+ * whole chunk failed while successful earlier/later chunks remain recorded;
+ * an id omitted by a malformed/truncated response is failed, never silently
+ * treated as successful. */
+export async function settleByBatch(
+  ids: number[],
+  batchSize: number,
+  run: (ids: number[]) => Promise<BulkActionResult>,
+): Promise<BulkBatchResult> {
+  if (!Number.isInteger(batchSize) || batchSize < 1) {
+    throw new RangeError('batchSize must be a positive integer');
+  }
+
+  const chunks: number[][] = [];
+  for (let start = 0; start < ids.length; start += batchSize) {
+    chunks.push(ids.slice(start, start + batchSize));
+  }
+  const settled = await Promise.allSettled(chunks.map(run));
+
+  return settled.reduce<BulkBatchResult>((accounting, result, index) => {
+    const chunk = chunks[index];
+    if (result.status === 'rejected') {
+      accounting.failedIds.push(...chunk);
+      accounting.errors.push(result.reason);
+      return accounting;
+    }
+
+    const succeeded = new Set(result.value.succeededIds);
+    const failureById = new Map(
+      (result.value.failureDetails ?? []).map((detail) => [detail.id, detail]),
+    );
+    chunk.forEach((id) => {
+      if (succeeded.has(id)) {
+        accounting.succeededIds.push(id);
+        return;
+      }
+      accounting.failedIds.push(id);
+      const detail = failureById.get(id);
+      if (detail) accounting.failureDetails.push(detail);
+    });
+    return accounting;
+  }, { succeededIds: [], failedIds: [], errors: [], failureDetails: [] });
 }

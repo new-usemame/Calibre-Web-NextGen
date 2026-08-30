@@ -17,7 +17,7 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError
 from . import api_v1
 from .serializers import serialize_shelf
 from .books import _rows_to_items
-from .. import calibre_db, config, db, ub
+from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
@@ -26,6 +26,7 @@ from ..shelf import (
     check_shelf_is_unique,
     delete_shelf_helper,
     add_book_to_shelf,
+    prepare_user_shelf_add,
     remove_book_from_shelf,
     compute_shelf_positions,
     queue_hardcover_sync,
@@ -34,6 +35,8 @@ from ..shelf import (
     SHELF_OK,
     SHELF_ALREADY_PRESENT,
     SHELF_INVALID_BOOK,
+    SHELF_NOT_IN_LIBRARY,
+    SHELF_MANAGED_MEMBERSHIP_REFUSAL,
     SHELF_NOT_PRESENT,
 )
 
@@ -236,6 +239,17 @@ def add_book_to_shelf_api(shelf_id, book_id):
         return _err("forbidden", "You are not allowed to add to this shelf", 403)
 
     try:
+        prepare_user_shelf_add(book_id)
+    except user_library.UserLibraryBookNotFound as ex:
+        return _err("not_found", str(ex), 404)
+    except user_library.UserLibraryError:
+        return _err(
+            "library_membership_rejected",
+            SHELF_MANAGED_MEMBERSHIP_REFUSAL,
+            403,
+        )
+
+    try:
         status, message = add_book_to_shelf(shelf, book_id)
     except (OperationalError, InvalidRequestError) as e:
         ub.session.rollback()
@@ -243,6 +257,8 @@ def add_book_to_shelf_api(shelf_id, book_id):
 
     if status == SHELF_INVALID_BOOK:
         return _err("not_found", message, 404)
+    if status == SHELF_NOT_IN_LIBRARY:
+        return _err("library_membership_required", message, 409)
     if status == SHELF_ALREADY_PRESENT:
         return _err("conflict", message, 409)
     return jsonify({"shelf_id": shelf_id, "book_id": book_id, "on_shelf": True})

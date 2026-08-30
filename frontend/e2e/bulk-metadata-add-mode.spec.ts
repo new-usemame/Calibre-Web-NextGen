@@ -194,7 +194,7 @@ for (const viewport of [
       'Add to shelf',
       'Edit metadata',
       'Merge',
-      'Delete',
+      'Delete from the global library',
       'Clear selection',
     ];
 
@@ -218,7 +218,7 @@ for (const viewport of [
     page.once('dialog', (dialog) => void dialog.dismiss());
     await bulkBar.getByRole('button', { name: 'Merge', exact: true }).click();
     page.once('dialog', (dialog) => void dialog.dismiss());
-    await bulkBar.getByRole('button', { name: 'Delete', exact: true }).click();
+    await bulkBar.getByRole('button', { name: 'Delete from the global library', exact: true }).click();
   });
 }
 

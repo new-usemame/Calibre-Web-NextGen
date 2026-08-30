@@ -391,6 +391,7 @@
 
 .addToLibrary {
   opacity: 1;
+  pointer-events: auto;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
   cursor: pointer;
@@ -398,10 +399,37 @@
 
 .addToLibrary:disabled { cursor: wait; opacity: .7; }
 
-/* `any-pointer` also covers hybrid devices (for example, an iPad with a
-   trackpad): touch must not lose actions merely because a fine pointer exists. */
+.moreActionsWrap {
+  display: none;
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  /* Card chrome must stay below application popovers. The old overlay+1 value
+     let every closed trigger intercept View settings controls above the grid. */
+  z-index: 1;
+}
+
+/* The named query container on every card creates an independent stacking
+   context, so raising only the child panel cannot clear later sibling cards.
+   Lift the entire active card while keeping it below application chrome. */
+.wrapActionsOpen { z-index: calc(var(--z-bar) - 1); }
+
+/* Main's catalog jank pass applies content-visibility:auto to each grid card,
+   which brings paint containment with it. An open disclosure intentionally
+   overflows the card, so release that containment only for the active card.
+   The compound selector outranks Catalog's `.grid > *` regardless of bundle
+   order; closed cards retain the off-screen rendering optimization. */
+.wrap.wrapActionsOpen { content-visibility: visible; }
+
+/* Coarse pointers use one visible disclosure rather than opacity-hidden live
+   controls. A real iPad tap applies synthetic hover before click; that made the
+   old opacity:0 Read link reveal and activate under the same finger. Removing
+   the legacy controls from layout makes invisible activation impossible while
+   preserving the established hover/focus treatment for fine pointers. */
 @media (any-hover: none), (any-pointer: coarse) {
-  .readNow { min-height: 44px; opacity: 1; }
+  .readNow, .removeBtn, .quickEditBtn { display: none; }
+  .addToLibrary { display: flex; min-height: 44px; }
+  .moreActionsWrap { display: block; }
   /* Bigger where legibility is worst — a phone held at arm's length is the
      case the reporter was describing. */
   .readBadge, .readingBadge, .hiddenBadge, .libraryBadge {
@@ -409,12 +437,66 @@
     font-size: var(--fs-sm);
   }
   .seriesBadge { min-width: 28px; height: 28px; font-size: var(--fs-sm); }
-  .removeBtn, .quickEditBtn {
-    width: 44px;
-    height: 44px;
-    opacity: 1;
-  }
 }
+
+.moreActionsTrigger {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  color: var(--cover-control-fg);
+  background: var(--cover-control-bg);
+  border: 1px solid var(--cover-control-border);
+  box-shadow: var(--elev-2);
+}
+
+.moreActionsTrigger[aria-expanded="true"],
+.moreActionsTrigger:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.moreActionsPanel {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  width: max-content;
+  min-width: 180px;
+  max-width: min(240px, calc(100vw - 2 * var(--sp-4)));
+  padding: var(--sp-1);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--elev-3);
+}
+
+.moreActionsPanelStart { left: 0; }
+.moreActionsPanelEnd { right: 0; }
+
+.moreActionsItem {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+}
+
+.moreActionsItem:hover,
+.moreActionsItem:focus-visible {
+  background: var(--surface-3);
+}
+
+.moreActionsDanger { color: var(--danger); }
+.moreActionsDanger:hover,
+.moreActionsDanger:focus-visible { background: var(--danger-soft); }
 
 /* Narrow cards — the Compact and Dense grids, which are 3 and 4 columns on a
    phone. Measured at 375px: comfortable 164px, compact 106px, dense 82px per

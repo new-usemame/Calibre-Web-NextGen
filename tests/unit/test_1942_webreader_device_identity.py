@@ -191,6 +191,11 @@ def test_retired_browser_falls_back_until_explicitly_restored(registry):
     from cps.annotations import restore_annotation_device
     from cps.services.device_registry import ensure_webreader_device_best_effort
 
+    registry.add(ub.User(
+        id=7, name="Reader", email="reader@example.invalid",
+        default_language="all",
+    ))
+    registry.commit()
     browser_id = ensure_webreader_device_best_effort(
         user_id=7, installation_id=INSTALLATION_A,
     )

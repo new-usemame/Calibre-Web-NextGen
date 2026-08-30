@@ -1656,7 +1656,7 @@ export function Reader({ id }: { id: string }) {
         aria-label={t('Reading progress')}
         aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}
         aria-valuetext={t('{pct}% read', { pct: Math.round(progress) })}>
-        <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+        <div className={styles.progressFill} style={{ transform: `scaleX(${progress / 100})` }} />
       </div>
     </div>
   );

@@ -129,6 +129,10 @@
 
 .grid > * {
   animation: fadeRise var(--dur-slow) var(--ease-out) both;
+  /* Off-screen cards skip render work entirely; the intrinsic size keeps the
+     scrollbar stable for the unvirtualized, accumulating grid (#1813). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
 }
 
 /* The first-load spinner is a grid child (it is what gives the column

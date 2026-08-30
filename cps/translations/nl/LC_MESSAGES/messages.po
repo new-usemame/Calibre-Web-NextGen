@@ -3895,6 +3895,45 @@ msgstr "{name} API-sleutel"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{succeeded} book(s) permanently deleted from the global library for every user; {failed} failed."
+msgstr "{succeeded} boek(en) definitief uit de globale bibliotheek verwijderd voor alle gebruikers; {failed} mislukt."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{succeeded} book(s) removed from your library; {failed} failed."
+msgstr "{succeeded} boek(en) uit je bibliotheek verwijderd; {failed} mislukt."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Permanently delete {n} selected book(s) from the global library for every user? The books and all their files will be erased from the server. This cannot be undone."
+msgstr "Wil je {n} geselecteerde boek(en) definitief uit de globale bibliotheek verwijderen voor alle gebruikers? De boeken en al hun bestanden worden van de server gewist. Dit kan niet ongedaan worden gemaakt."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Remove {n} selected book(s) from your library? They leave your library and your OPDS feed. They are also removed from any regular shelves you added them to. Nothing is deleted from the global library. Highlights, notes, bookmarks, and reading progress are kept. If you use Kobo's built-in sync, the books also leave your Kobo at its next sync; other e-readers keep downloaded copies."
+msgstr "Wil je {n} geselecteerde boek(en) uit je bibliotheek verwijderen? Ze verdwijnen uit je bibliotheek en je OPDS-feed. Ze worden ook verwijderd van gewone planken waaraan je ze hebt toegevoegd. Er wordt niets uit de globale bibliotheek verwijderd. Markeringen, notities, bladwijzers en leesvoortgang blijven bewaard. Als je de ingebouwde Kobo-synchronisatie gebruikt, verdwijnen de boeken bij de volgende synchronisatie ook van je Kobo; andere e-readers behouden gedownloade exemplaren."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "The server rejected a batch as too large (maximum {max} books)."
+msgstr "De server heeft een te grote batch geweigerd (maximaal {max} boeken)."
+
+#: cps/spa_strings.py
+msgid "The server rejected a batch as too large."
+msgstr "De server heeft een te grote batch geweigerd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} book(s) permanently deleted from the global library for every user."
+msgstr "{n} boek(en) definitief uit de globale bibliotheek verwijderd voor alle gebruikers."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} book(s) removed from your library."
+msgstr "{n} boek(en) uit je bibliotheek verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} book(s) added to the shelf."
 msgstr "{n} boek(en) toegevoegd aan de boekenplank."
 

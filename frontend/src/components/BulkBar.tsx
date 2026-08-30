@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, X, BookCopy, Trash2, CheckCheck, Pencil, Combine } from 'lucide-react';
+import { Check, X, BookCopy, BookMinus, Trash2, CheckCheck, Pencil, Combine } from 'lucide-react';
 import { useBulkActions, useShelves, useMe, useMergeBooks } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { Spinner } from './Spinner';
-import type { MetadataListMode, MetadataUpdate } from '../lib/api';
+import { ApiError, type MetadataListMode, type MetadataUpdate } from '../lib/api';
 import styles from './BulkBar.module.css';
 
 interface BulkBarProps {
   ids: number[];
+  personalLibrary: boolean;
   onClear: () => void;
   /** Called after a mutation that changes what the catalog should show
    *  (read state / membership / deletion), so the grid can refresh. */
@@ -59,13 +60,14 @@ export function BulkSelectionBar({ count, onClear, children, sticky = false }: {
   );
 }
 
-/** Floating action bar for the catalog's multi-select mode. Fans each action
- *  out over the selected book ids via the existing per-book endpoints. */
-export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
+/** Floating action bar for the catalog's multi-select mode. Uses per-book
+ *  accounting whether the server receives individual requests or bounded
+ *  membership batches. */
+export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarProps) {
   const t = useT();
   const announce = useAnnouncer();
   const me = useMe().data;
-  const { markRead, addToShelf, remove, setMetadata } = useBulkActions();
+  const { markRead, addToShelf, deleteBooks, removeFromMyLibrary, setMetadata } = useBulkActions();
   const mergeBooks = useMergeBooks();
   const { data: shelvesData } = useShelves();
   const [shelfOpen, setShelfOpen] = useState(false);
@@ -93,7 +95,8 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
   const editableShelves = (shelvesData?.items ?? []).filter(
     (s) => s.is_owner || (s.is_public && canEditPublic),
   );
-  const busy = markRead.isPending || addToShelf.isPending || remove.isPending
+  const busy = markRead.isPending || addToShelf.isPending || deleteBooks.isPending
+    || removeFromMyLibrary.isPending
     || setMetadata.isPending || mergeBooks.isPending;
   const count = ids.length;
 
@@ -104,14 +107,38 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
   };
 
   const onDelete = () => {
-    if (!window.confirm(t('Delete {n} book(s)? This cannot be undone.', { n: count }))) return;
-    remove.mutate(ids, {
+    if (!window.confirm(t('Permanently delete {n} selected book(s) from the global library for every user? The books and all their files will be erased from the server. This cannot be undone.', { n: count }))) return;
+    deleteBooks.mutate(ids, {
       onSuccess: (result) => {
         const succeeded = result.succeededIds.length;
         const failed = result.failedIds.length;
         announce(failed
-          ? t('{succeeded} book(s) deleted; {failed} failed.', { succeeded, failed })
-          : t('{n} book(s) deleted.', { n: succeeded }), { assertive: failed > 0 });
+          ? t('{succeeded} book(s) permanently deleted from the global library for every user; {failed} failed.', { succeeded, failed })
+          : t('{n} book(s) permanently deleted from the global library for every user.', { n: succeeded }), { assertive: failed > 0 });
+        if (succeeded) onChanged?.();
+        if (!failed) onClear();
+      },
+    });
+  };
+
+  const onRemoveFromMyLibrary = () => {
+    if (!window.confirm(t("Remove {n} selected book(s) from your library? They leave your library and your OPDS feed. They are also removed from any regular shelves you added them to. Nothing is deleted from the global library. Highlights, notes, bookmarks, and reading progress are kept. If you use Kobo's built-in sync, the books also leave your Kobo at its next sync; other e-readers keep downloaded copies.", { n: count }))) return;
+    removeFromMyLibrary.mutate(ids, {
+      onSuccess: (result) => {
+        const succeeded = result.succeededIds.length;
+        const failed = result.failedIds.length;
+        let message = failed
+          ? t('{succeeded} book(s) removed from your library; {failed} failed.', { succeeded, failed })
+          : t('{n} book(s) removed from your library.', { n: succeeded });
+        const tooLarge = result.errors.find((error) =>
+          error instanceof ApiError && error.detail?.code === 'batch_too_large');
+        if (tooLarge instanceof ApiError) {
+          const maxItems = tooLarge.detail?.max_items;
+          message += ' ' + (typeof maxItems === 'number'
+            ? t('The server rejected a batch as too large (maximum {max} books).', { max: maxItems })
+            : t('The server rejected a batch as too large.'));
+        }
+        announce(message, { assertive: failed > 0 });
         if (succeeded) onChanged?.();
         if (!failed) onClear();
       },
@@ -220,6 +247,12 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
       </div>
     )}
     <BulkSelectionBar count={count} onClear={onClear}>
+        {personalLibrary && (
+          <button type="button" className={styles.actionPrimary} disabled={busy}
+            onClick={onRemoveFromMyLibrary}>
+            <BookMinus size={15} aria-hidden="true" focusable={false} /> {t('Remove from my library')}
+          </button>
+        )}
         <button className={styles.action} disabled={busy}
           onClick={() => doMarkRead(true)}>
           <CheckCheck size={15} aria-hidden="true" focusable={false} /> {t('Mark read')}
@@ -265,8 +298,8 @@ export function BulkBar({ ids, onClear, onChanged }: BulkBarProps) {
         )}
 
         {canDelete && (
-          <button className={styles.actionDanger} disabled={busy} onClick={onDelete}>
-            <Trash2 size={15} aria-hidden="true" focusable={false} /> {t('Delete')}
+          <button type="button" className={styles.actionDanger} disabled={busy} onClick={onDelete}>
+            <Trash2 size={15} aria-hidden="true" focusable={false} /> {t('Delete from the global library')}
           </button>
         )}
 

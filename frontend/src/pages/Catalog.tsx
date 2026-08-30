@@ -1084,6 +1084,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       {selecting && selected.size > 0 && (
         <BulkBar
           ids={[...selected]}
+          personalLibrary={personalLibrary}
           onClear={() => {
             setSelected(new Set());
             setSelecting(false);

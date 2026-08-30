@@ -121,21 +121,25 @@ async function bookHasFormat(page: Page, bookId: number, format: string) {
   return detail.formats.some(({ format: current }) => current.toUpperCase() === format);
 }
 
-test('focus-revealed card actions keep SC 2.5.8 targets on touch (2026-08-29 ruling)', async ({ page, isMobile }) => {
+test('disclosed card actions keep SC 2.5.8 targets on touch (2026-08-29 ruling)', async ({ page, isMobile }) => {
   test.skip(isMobile !== true, 'coarse-pointer target-size regression');
 
   await page.goto('/app/');
   const edit = page.locator('a[aria-label^="Edit "]').first();
   await expect(edit).toBeAttached();
   const card = edit.locator('..').locator('..');
-  const details = card.locator('a[aria-label^="Open details for"]');
-  const read = card.locator('a[aria-label^="Read "]');
-  await details.focus();
-  await expect.poll(() => edit.evaluate((node) => getComputedStyle(node).opacity), {
-    message: 'focus-within reveals the touch card actions before target measurement',
-  }).toBe('1');
-  await expectSc258Target('Touch card Read now action', read);
-  await expectSc258Target('Touch card Edit action', edit);
+  const more = card.getByRole('button', { name: /^More actions for / });
+  await expectSc258Target('Touch card More actions trigger', more);
+  await more.click();
+  const actions = card.getByRole('group', { name: /^Actions for / });
+  await expectSc258Target(
+    'Touch card Read now disclosure action',
+    actions.getByRole('link', { name: /^Read / }),
+  );
+  await expectSc258Target(
+    'Touch card Edit disclosure action',
+    actions.getByRole('link', { name: /^Edit / }),
+  );
 
   const headers = await csrfHeaders(page);
   const books = await page.request.get('/api/v1/books?per_page=1');
@@ -153,11 +157,16 @@ test('focus-revealed card actions keep SC 2.5.8 targets on touch (2026-08-29 rul
     await page.goto(`/app/shelf/${shelfId}`);
     const remove = page.getByRole('button', { name: 'Remove from shelf' });
     await expect(remove).toHaveCount(1);
-    await remove.locator('..').locator('a[aria-label^="Open details for"]').focus();
-    await expect.poll(() => remove.evaluate((node) => getComputedStyle(node).opacity), {
-      message: 'focus-within reveals the touch Remove action before target measurement',
-    }).toBe('1');
-    await expectSc258Target('Touch card Remove action', remove);
+    const shelfCard = remove.locator('..');
+    const shelfMore = shelfCard.getByRole('button', { name: /^More actions for / });
+    await expectSc258Target('Touch shelf More actions trigger', shelfMore);
+    await shelfMore.click();
+    await expectSc258Target(
+      'Touch card Remove disclosure action',
+      shelfCard
+        .getByRole('group', { name: /^Actions for / })
+        .getByRole('button', { name: 'Remove from shelf' }),
+    );
   } finally {
     await page.request.post(`/api/v1/shelves/${shelfId}/delete`, { headers }).catch(() => undefined);
   }

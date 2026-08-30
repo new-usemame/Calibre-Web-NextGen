@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+const isTouchProject = () => test.info().project.use.hasTouch === true;
+
 /*
  * #1112 — the Edit pencil overlapped the "Read now" label on a book card.
  *
@@ -7,8 +9,9 @@ import { test, expect } from '@playwright/test';
  * 335px-wide screenshot: the label read "Read no…" because the pencil sat on
  * top of its tail. At the time this shipped, the coarse-pointer block made both
  * controls permanently visible. The operator reversed that ruling on
- * 2026-08-29; the probe now focuses each pencil before measuring, so it still
- * pins the visible/focused geometry instead of silently checking zero cards.
+ * 2026-08-29; coarse pointers no longer have this side-by-side row, while
+ * fine pointers retain it. This probe therefore runs only where the overlap
+ * contract exists and still focuses each pencil before measuring.
  *
  * Measured on a real library before the fix: 52px of the label ran under the
  * button at 360px and at 768px. After: 0px.
@@ -51,6 +54,7 @@ const OVERLAP = `(() => {
 
 for (const [name, width, height] of [['phone', 360, 760], ['tablet', 768, 1024]] as const) {
   test(`the Edit control never covers the "Read now" label (${name}, #1112)`, async ({ page }) => {
+    test.skip(isTouchProject(), 'fine-pointer action-row geometry');
     await page.setViewportSize({ width, height });
     await page.goto('/app/');
     await page.waitForLoadState('networkidle');

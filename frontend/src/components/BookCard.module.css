@@ -404,8 +404,14 @@
   position: absolute;
   top: var(--sp-2);
   right: var(--sp-2);
-  z-index: calc(var(--z-overlay) + 1);
+  /* Card chrome must stay below application popovers. The old overlay+1 value
+     let every closed trigger intercept View settings controls above the grid. */
+  z-index: 1;
 }
+
+/* Lift only the active card above sibling cards. Keep it below --z-bar and
+   --z-overlay so global navigation and dialogs remain the top interaction. */
+.moreActionsWrapOpen { z-index: calc(var(--z-bar) - 1); }
 
 /* Coarse pointers use one visible disclosure rather than opacity-hidden live
    controls. A real iPad tap applies synthetic hover before click; that made the

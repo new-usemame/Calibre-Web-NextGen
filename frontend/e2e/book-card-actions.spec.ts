@@ -3,6 +3,7 @@ import { test, expect, type Locator } from '@playwright/test';
 const isTouchProject = () => test.info().project.use.hasTouch === true;
 
 async function tap(locator: Locator) {
+  await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   expect(box, 'a real touch target needs a rendered hit-test box').not.toBeNull();
   await test.info().attach('touch-target', {
@@ -60,16 +61,16 @@ test('book-card actions keep a shared baseline for touch, mouse, and keyboard', 
       `${theme}: one- and two-line titles reserve the same two-line block`,
     ).toBeLessThanOrEqual(1);
 
-    const actionBottoms = await Promise.all([
-      firstRead.evaluate((node) => node.getBoundingClientRect().bottom),
-      secondRead.evaluate((node) => node.getBoundingClientRect().bottom),
-    ]);
-    expect(
-      Math.abs(actionBottoms[0] - actionBottoms[1]),
-      `${theme}: Read now actions share a bottom baseline`,
-    ).toBeLessThanOrEqual(1);
-
     if (!isTouchProject()) {
+      const actionBottoms = await Promise.all([
+        firstRead.evaluate((node) => node.getBoundingClientRect().bottom),
+        secondRead.evaluate((node) => node.getBoundingClientRect().bottom),
+      ]);
+      expect(
+        Math.abs(actionBottoms[0] - actionBottoms[1]),
+        `${theme}: Read now actions share a bottom baseline`,
+      ).toBeLessThanOrEqual(1);
+
       await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
       await page.mouse.move(0, 0);
       await expectRevealed(firstRead, false, `${theme}: desktop starts with the clean hover treatment`);
@@ -156,6 +157,26 @@ test('coarse pointers use a visible actions disclosure with real touch input', a
   await page.goBack();
   await expect(catalogCard).toBeVisible();
 
+  // Horizontal rails are overflow containers, which otherwise clip an
+  // absolutely-positioned panel on the block axis. Exercise a real Discover
+  // BookCard and assert the disclosed Read link is the element hit at its own
+  // centre, not merely present behind the rail's clipping layer.
+  const discover = page.getByTestId('discover-section');
+  await expect(discover).toBeVisible();
+  const railMore = discover.getByRole('button', { name: /^More actions for / }).first();
+  await tap(railMore);
+  const railRead = discover
+    .getByRole('group', { name: /^Actions for / })
+    .getByRole('link', { name: /^Read / });
+  await expect(railRead).toBeVisible();
+  await railRead.scrollIntoViewIfNeeded();
+  expect(await railRead.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+    return hit === node || node.contains(hit);
+  }), 'Discover disclosure action is not clipped or covered at its centre').toBe(true);
+  await page.keyboard.press('Escape');
+
   // The default E2E admin uses universal-library mode, where Catalog has no
   // per-card removal action. Exercise the same real BookCard X on a temporary
   // shelf instead of weakening the regression into a synthetic DOM fixture.
@@ -192,7 +213,7 @@ test('coarse pointers use a visible actions disclosure with real touch input', a
   }
 });
 
-test('quick-edit pencil uses the light-theme card-surface palette', async ({ page }) => {
+test('quick-edit action uses the light-theme palette in both presentations', async ({ page }) => {
   await page.goto('/app');
   const quickEdit = page.locator('a[aria-label^="Edit "]').first();
   await expect(quickEdit).toHaveCount(1);
@@ -200,12 +221,47 @@ test('quick-edit pencil uses the light-theme card-surface palette', async ({ pag
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   if (isTouchProject()) {
-    // 2026-08-29 ruling: touch actions are concealed at rest, so reveal this
-    // one with the same keyboard focus path whose palette users will see.
-    await quickEdit.focus();
-  } else {
-    await quickEdit.locator('..').locator('..').locator('a[aria-label^="Open details for"]').hover();
+    // Touch quick-edit disclosure: measure the visible presentation users now
+    // invoke, not the deliberately removed pencil that remains in the DOM for
+    // fine-pointer CSS. This preserves palette coverage at the real control.
+    const card = quickEdit.locator('..').locator('..');
+    await tap(card.getByRole('button', { name: /^More actions for / }));
+    const panel = card.getByRole('group', { name: /^Actions for / });
+    const editAction = panel.getByRole('link', { name: /^Edit / });
+    await expect(editAction).toBeVisible();
+
+    const expected = await editAction.evaluate(() => {
+      const resolveToken = (token: string) => {
+        const probe = document.createElement('span');
+        probe.style.color = `var(${token})`;
+        document.body.appendChild(probe);
+        const resolved = getComputedStyle(probe).color;
+        probe.remove();
+        return resolved;
+      };
+      return {
+        panelBackground: resolveToken('--surface-2'),
+        panelBorder: resolveToken('--border-strong'),
+        actionColor: resolveToken('--text'),
+      };
+    });
+
+    await expect.poll(async () => {
+      const panelStyle = await panel.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { background: style.backgroundColor, border: style.borderColor };
+      });
+      const actionColor = await editAction.evaluate((node) => getComputedStyle(node).color);
+      return {
+        panelBackground: panelStyle.background,
+        panelBorder: panelStyle.border,
+        actionColor,
+      };
+    }, { message: 'light: touch quick edit resolves to the disclosure palette' }).toEqual(expected);
+    return;
   }
+
+  await quickEdit.locator('..').locator('..').locator('a[aria-label^="Open details for"]').hover();
   await expectRevealed(quickEdit, true, 'light: quick edit is revealed before its visible palette is measured');
 
   const expected = await quickEdit.evaluate(() => {

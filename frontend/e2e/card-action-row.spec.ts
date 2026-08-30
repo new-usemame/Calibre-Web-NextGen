@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+const isTouchProject = () => test.info().project.use.hasTouch === true;
+
 /*
  * #1166 — the Edit pencil overlaps the series line, and "Read now" renders
  * awkwardly, on narrow cards.
@@ -24,9 +26,9 @@ import { test, expect } from '@playwright/test';
  * metadata cannot overlap the metadata at any width, density or locale.
  *
  * The 2026-08-29 operator ruling reversed the old permanently-visible touch
- * default. Each geometry probe now focuses the real pencil first, pinning both
- * the new focus reveal and the original no-overlap contract without turning a
- * transparent resting state into a skipped/no-op assertion.
+ * default. Coarse pointers use a vertical disclosure and no longer have this
+ * shared row, so these probes are fine-pointer geometry tests. Touch target
+ * geometry is covered against the disclosure in target-size-sc258.spec.ts.
  */
 
 // Dense is the worst case (4 columns at 375px) and is what @HLRobius shot.
@@ -101,6 +103,7 @@ const MEASURE = `(() => {
 
 for (const density of ['dense', 'compact', 'comfortable'] as const) {
   test(`card actions never cover the metadata (${density} grid, #1166)`, async ({ page }) => {
+    test.skip(isTouchProject(), 'fine-pointer action-row geometry');
     // usePersistentChoice stores the RAW string and ignores anything not in its
     // allowed list — a JSON-encoded '"dense"' silently falls back to the
     // default, which would run all three cases at the same density and look
@@ -109,6 +112,7 @@ for (const density of ['dense', 'compact', 'comfortable'] as const) {
       ([key, value]) => window.localStorage.setItem(key, value),
       [DENSITY_KEY, density] as const,
     );
+    await page.setViewportSize({ width: 375, height: 900 });
     await page.goto('/app/');
     await page.waitForLoadState('networkidle');
     // The grid animates in; measure settled geometry.
@@ -168,10 +172,12 @@ for (const density of ['dense', 'compact', 'comfortable'] as const) {
  * function of whether a sibling happens to exist.
  */
 test('the Edit control stays off the metadata when a book has no readable format (#1166)', async ({ page }) => {
+  test.skip(isTouchProject(), 'fine-pointer action-row geometry');
   await page.addInitScript(
     ([key, value]) => window.localStorage.setItem(key, value),
     ['cwng:catalog-density-v1', 'comfortable'] as const,
   );
+  await page.setViewportSize({ width: 375, height: 900 });
   await page.goto('/app/');
   await page.waitForLoadState('networkidle');
   await page.locator('[class*="quickEditBtn"]').first().waitFor({ state: 'attached' });
@@ -231,10 +237,12 @@ test('the Edit control stays off the metadata when a book has no readable format
  *
  * 280px dense is the worst case the app can be put in, which is why it is the
  * width asserted here: every wider grid clears the floor with room to spare.
- * The 2026-08-29 ruling conceals these controls at rest, so this probe focuses
- * the pencil first and measures the touch targets in their revealed state.
+ * The 2026-08-29 ruling removes these controls from coarse-pointer layout.
+ * This remains the fine-pointer narrow-card floor; the touch disclosure's
+ * stricter 44px targets are covered in target-size-sc258.spec.ts.
  */
 test('both card actions stay at a tappable size on the narrowest screens (#1166)', async ({ page }) => {
+  test.skip(isTouchProject(), 'fine-pointer action-row geometry');
   await page.addInitScript(
     ([key, value]) => window.localStorage.setItem(key, value),
     ['cwng:catalog-density-v1', 'dense'] as const,

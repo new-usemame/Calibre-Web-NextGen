@@ -309,13 +309,17 @@ export function BookCard({
         </div>
       )}
       {hasCoarseActions && (
-        <div className={styles.moreActionsWrap} ref={actionsRef}>
+        <div
+          className={`${styles.moreActionsWrap} ${
+            actionsOpen ? styles.moreActionsWrapOpen : ''
+          }`}
+          ref={actionsRef}
+        >
           <button
             ref={actionsTriggerRef}
             type="button"
             className={styles.moreActionsTrigger}
             aria-label={t('More actions for {title}', { title: book.title })}
-            aria-haspopup="true"
             aria-expanded={actionsOpen}
             aria-controls={actionsOpen ? actionsPanelId : undefined}
             onClick={toggleActions}

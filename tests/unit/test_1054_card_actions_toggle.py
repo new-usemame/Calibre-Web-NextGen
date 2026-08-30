@@ -22,6 +22,7 @@ import pytest
 
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
 _FE = _ROOT / "frontend" / "src"
+_E2E = _ROOT / "frontend" / "e2e"
 
 pytestmark = pytest.mark.unit
 
@@ -188,6 +189,10 @@ def test_coarse_pointer_card_actions_use_a_visible_disclosure():
     assert "width: 44px;" in css and "height: 44px;" in css
     assert "aria-expanded={actionsOpen}" in src
     assert "aria-controls={actionsOpen ? actionsPanelId : undefined}" in src
+    # `aria-haspopup=true` promises a menu, but this is an ordinary disclosure
+    # containing links and a button in a labelled group. Expanded/controls is
+    # the correct screen-reader contract without a false popup role promise.
+    assert 'aria-haspopup="true"' not in src
     assert "t('More actions for {title}'" in src
     assert "t('Actions for {title}'" in src
     assert 'role="group"' in src
@@ -328,3 +333,84 @@ def test_spa_only_msgid_is_anchored_for_extraction():
     English (the #577 failure)."""
     anchors = (_ROOT / "cps" / "spa_strings.py").read_text()
     assert '_("Show Read now and edit buttons")' in anchors
+
+
+def test_real_touch_helper_scrolls_before_sampling_raw_coordinates():
+    """A raw touchscreen coordinate is viewport-relative and never auto-scrolls.
+
+    Sampling an off-screen disclosure's box made the gesture miss while still
+    looking like a real tap in the trace.  Require the helper to bring the
+    target into the viewport before it samples the centre point.
+    """
+    src = (_E2E / "book-card-actions.spec.ts").read_text()
+    helper = src[src.index("async function tap("):src.index("async function expectRevealed(")]
+    scroll = helper.find("await locator.scrollIntoViewIfNeeded();")
+    sample = helper.find("const box = await locator.boundingBox();")
+    assert 0 <= scroll < sample, (
+        "the real-touch helper must scroll the target before sampling its raw coordinates"
+    )
+
+
+def test_disclosure_stacking_stays_below_global_overlays_until_open():
+    """Closed card chrome must not intercept controls in a global popover."""
+    src = (_FE / "components" / "BookCard.tsx").read_text()
+    css = (_FE / "components" / "BookCard.module.css").read_text()
+    closed = _effective_class_property(css, "moreActionsWrap", "z-index", coarse=True)
+    opened = _effective_class_property(css, "moreActionsWrapOpen", "z-index", coarse=True)
+
+    assert closed is not None and closed[0] == "1", (
+        "a closed per-card trigger must remain in the card stacking layer; "
+        f"winner={closed}"
+    )
+    assert opened is not None and opened[0] == "calc(var(--z-bar) - 1)", (
+        "an open card disclosure must clear sibling cards without outranking "
+        f"global overlays; winner={opened}"
+    )
+    assert "actionsOpen ? styles.moreActionsWrapOpen" in src
+
+
+def test_touch_palette_coverage_measures_the_visible_disclosure_action():
+    src = (_E2E / "book-card-actions.spec.ts").read_text()
+    assert "Touch quick-edit disclosure" in src
+    assert "getByRole('group', { name: /^Actions for / })" in src
+    assert "getByRole('link', { name: /^Edit / })" in src
+
+
+def test_fine_pointer_action_row_geometry_is_not_run_against_removed_touch_row():
+    src = (_E2E / "card-action-row.spec.ts").read_text()
+    overlap = (_E2E / "card-action-overlap.spec.ts").read_text()
+    marker = "test.skip(isTouchProject(), 'fine-pointer action-row geometry');"
+    # One parametrized density test plus two standalone geometry tests.
+    assert src.count(marker) == 3
+    assert marker in overlap
+
+
+def test_mobile_edit_flows_enter_through_the_disclosure():
+    src = (_E2E / "catalog-edit-retains-book.spec.ts").read_text()
+    assert "async function openQuickEdit(" in src
+    assert "getByRole('button', { name: /^More actions for / })" in src
+    assert src.count("await openQuickEdit(page);") == 2
+
+
+def test_preference_availability_probe_uses_the_active_pointer_contract():
+    src = (_E2E / "discover-preference.spec.ts").read_text()
+    assert "async function expectCardActionsAvailable(" in src
+    assert "getByRole('button', { name: /^More actions for / })" in src
+    assert src.count("await expectCardActionsAvailable(") == 2
+
+
+def test_touch_target_size_coverage_measures_disclosed_actions():
+    src = (_E2E / "target-size-sc258.spec.ts").read_text()
+    assert "Touch card More actions trigger" in src
+    assert "Touch card Read now disclosure action" in src
+    assert "Touch card Edit disclosure action" in src
+    assert "Touch card Remove disclosure action" in src
+
+
+def test_horizontal_card_rails_release_clipping_while_a_disclosure_is_open():
+    discover = (_FE / "components" / "DiscoverSection.module.css").read_text()
+    author = (_FE / "components" / "MoreByAuthor.module.css").read_text()
+    state = ':has([aria-expanded="true"])'
+    assert f".box{state}" in discover
+    assert f".strip{state}" in discover
+    assert f".strip{state}" in author

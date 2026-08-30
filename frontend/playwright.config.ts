@@ -20,6 +20,7 @@ const SUBPATH_URL = process.env.E2E_SUBPATH_URL;
 const STORAGE = 'e2e/.auth/state.json';
 const isCI = !!process.env.CI;
 const WEBKIT_READER_SPEC = /native-reader-keyboard-scroll\.spec\.ts/;
+const IPAD_TOUCH_SPECS = /(?:book-card-actions|mobile|sidebar|sidebar-drawer-a11y|sidebar-pin)\.spec\.ts/;
 
 export default defineConfig({
   testDir: './e2e',
@@ -71,11 +72,11 @@ export default defineConfig({
       testIgnore: [/subpath\.spec\.ts/, /default-library-view\.spec\.ts/, WEBKIT_READER_SPEC],
     },
 
-    // 4. iPad-class touch viewport — #863 was reported at this width, where
-    //    card actions are persistent because hover is unavailable.
+    // 4. iPad-class touch viewport — card actions remain persistent and the
+    //    sidebar remains an off-canvas drawer because hover is unavailable.
     {
       name: 'ipad-touch',
-      testMatch: [/book-card-actions\.spec\.ts/, /sidebar-pin\.spec\.ts/],
+      testMatch: IPAD_TOUCH_SPECS,
       use: {
         browserName: 'chromium',
         viewport: { width: 1024, height: 1366 },

@@ -108,13 +108,26 @@
 }
 
 .grid {
+  --catalog-grid-gap: var(--sp-5);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: var(--sp-5);
+  column-gap: var(--catalog-grid-gap);
+  row-gap: 0;
 }
 .grid.density_comfortable { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-.grid.density_compact { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-4); }
-.grid.density_dense { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--sp-3); }
+.grid.density_compact { --catalog-grid-gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.grid.density_dense { --catalog-grid-gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+.virtualRow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  padding-bottom: var(--catalog-grid-gap);
+}
+.virtualSpacer {
+  grid-column: 1 / -1;
+  min-width: 0;
+  pointer-events: none;
+}
 .bookList { display: flex; flex-direction: column; gap: var(--sp-2); max-width: 860px; }
 .bookListItem { display: flex; align-items: center; gap: var(--sp-3); min-height: 72px; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); color: var(--text); }
 .bookListItem:hover { background: var(--surface-2); border-color: var(--border-strong); }
@@ -127,10 +140,10 @@
 .densityField { border: 0; padding: var(--sp-2) 0 0; margin: var(--sp-2) 0 0; border-top: 1px solid var(--border); }
 .densityField legend { padding: var(--sp-2) 0 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semi); }
 
-.grid > * {
+.virtualRow > * {
   animation: fadeRise var(--dur-slow) var(--ease-out) both;
-  /* Off-screen cards skip render work entirely; the intrinsic size keeps the
-     scrollbar stable for the unvirtualized, accumulating grid (#1813). */
+  /* Kept as a belt around the window: cards just outside the painted viewport
+     can still skip rendering, while row spacers preserve scroll geometry. */
   content-visibility: auto;
   contain-intrinsic-size: auto 280px;
 }
@@ -285,7 +298,7 @@
   .container { padding-inline: var(--sp-3); }
   .grid.density_comfortable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid.density_compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .grid.density_dense { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); }
+  .grid.density_dense { --catalog-grid-gap: var(--sp-2); grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .bookList { max-width: none; }
   .bookListIndex { font-size: var(--fs-xs); }
 }

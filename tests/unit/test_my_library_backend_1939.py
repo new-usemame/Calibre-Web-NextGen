@@ -1866,6 +1866,7 @@ def _exercise_seed_on_enable_kobo_sync(monkeypatch, *, wire_contract):
     cdb.session = session
     cdb.config = SimpleNamespace(config_restricted_column=0)
     cdb.reconnect_db = lambda *_args, **_kwargs: None
+    cdb.refresh_for_new_data = lambda: None
     monkeypatch.setattr(db.ub, "session", session)
     monkeypatch.setattr(db, "current_user", user)
     monkeypatch.setattr(ub, "session", session)

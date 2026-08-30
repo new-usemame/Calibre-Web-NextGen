@@ -208,6 +208,26 @@ def test_mixing_a_findings_ledger_with_shipping_code_requires_an_entry():
     assert "shipping paths" in errors[0]
 
 
+def test_mission_state_only_pr_does_not_require_a_changelog_entry():
+    """`state/` holds agent mission records, which have no release-note form.
+
+    This case was unreachable until PR #2034: every earlier `state/`-only
+    COMMIT rode inside a PR that also carried shipping code, so that PR's
+    fragment satisfied the guard and the gap never surfaced. The first
+    genuinely state-only PR went red, and the only way to satisfy the guard
+    would have been to invent a user-facing changelog entry for a note about
+    which SHAs merged -- the same failure recorded in this module for
+    translations (#1896) and the CHANGES-vs-upstream backfill.
+    """
+    assert changelog_requirement_errors(["state/MISSION.md"]) == []
+
+
+def test_mixing_mission_state_with_shipping_code_requires_an_entry():
+    errors = changelog_requirement_errors(["state/MISSION.md", "cps/spa.py"])
+    assert len(errors) == 1
+    assert "shipping paths" in errors[0]
+
+
 def test_other_allowlisted_non_shipping_paths_do_not_require_an_entry():
     for path in (
         "notes/kobo-hardware-run.md",

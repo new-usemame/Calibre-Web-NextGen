@@ -1,13 +1,16 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+const isPhoneProject = () => test.info().project.name === 'mobile';
+
 /*
  * Automated accessibility gate (WCAG 2.2 AA) — Layer 2 of the verification system.
  *
  * After the 2026-07-04 remediation this gate FAILS on any 'critical' OR 'serious'
  * axe violation across the app's routes, plus keyboard/focus invariants axe can't
- * see (skip link, single <main>, no nested card tab stop, mobile drawer inert /
- * trapped). KNOWN is the named-debt allowlist (Class 9): it must stay EMPTY —
+ * see (skip link, single <main>, no nested card tab stop). The cross-device
+ * drawer keyboard contract lives in sidebar-drawer-a11y.spec.ts. KNOWN is the
+ * named-debt allowlist (Class 9): it must stay EMPTY —
  * add a rule id ONLY with a tracking note and a follow-up, never to silence a red.
  *
  * See ~/.claude/skills/CWNG_a11y (the growing a11y skill) for how to grow this.
@@ -54,8 +57,6 @@ async function axeScan(page: Page, label: string) {
   }
 }
 
-const isMobile = () => (test.info().project.name === 'mobile');
-
 // ── axe across the app's routes ──────────────────────────────────────────────
 test('grid: no critical/serious a11y violations', async ({ page }) => {
   await page.goto('/app');
@@ -98,14 +99,14 @@ for (const [label, path] of [
   ['admin', '/app/admin'],
 ] as const) {
   test(`${label}: no critical/serious a11y violations`, async ({ page }) => {
-    if (isMobile()) test.skip(); // covered on desktop; keep the mobile run lean
+    if (isPhoneProject()) test.skip(); // covered on desktop; keep the mobile run lean
     await page.goto(path);
     await axeScan(page, label);
   });
 }
 
 test('reader: TOC traps focus + Escape, named progressbar, no critical/serious', async ({ page }) => {
-  if (isMobile()) test.skip();
+  if (isPhoneProject()) test.skip();
   // Find a book that offers the in-browser (epub) reader.
   await page.goto('/app');
   await page.locator('a[href*="/book/"]').first().click();
@@ -150,7 +151,7 @@ test('exactly one <main> landmark', async ({ page }) => {
 });
 
 test('skip link is the first tab stop and moves focus to <main>', async ({ page }) => {
-  if (isMobile()) test.skip();
+  if (isPhoneProject()) test.skip();
   await page.goto('/app');
   await page.locator('a[href*="/book/"]').first().waitFor({ state: 'visible' });
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
@@ -193,27 +194,4 @@ test('clickable announcement is a link with a sibling dismiss button', async ({ 
   await page.keyboard.press('Tab');
   await expect(dismissButton).toBeFocused();
   await axeScan(page, 'announcement-kofi');
-});
-
-test('mobile: closed drawer is inert; open traps focus and Escape closes', async ({ page }) => {
-  test.skip(!isMobile(), 'mobile-only');
-  await page.goto('/app');
-  await page.locator('a[href*="/book/"]').first().waitFor({ state: 'visible' });
-
-  const nav = page.locator('nav[aria-label]').first();
-  // Closed off-canvas drawer must be out of the a11y tree / tab order.
-  await expect(nav).toHaveAttribute('inert', '');
-
-  // Open it via the hamburger.
-  await page.getByRole('banner').getByRole('button').first().click();
-  await expect(nav).not.toHaveAttribute('inert', '');
-  // Focus should have moved into the drawer.
-  const focusInDrawer = await page.evaluate(() =>
-    !!document.activeElement?.closest('nav[aria-label]'),
-  );
-  expect(focusInDrawer).toBeTruthy();
-
-  // Escape closes and re-inerts.
-  await page.keyboard.press('Escape');
-  await expect(nav).toHaveAttribute('inert', '');
 });

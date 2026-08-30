@@ -1,8 +1,13 @@
 import { test, expect } from '@playwright/test';
 
+async function sidebarExpanded(nav: import('@playwright/test').Locator): Promise<boolean> {
+  return nav.evaluate((element) => parseFloat(getComputedStyle(element).width) > 64);
+}
+
 test('desktop sidebar releases hover retained across navigation', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop fine-pointer rail only');
 
+  await page.addInitScript(() => localStorage.setItem('cwng:sidebar-pinned', '0'));
   await page.goto('/app/');
   const firstBook = page.locator('main a[href*="/book/"]').first();
   await expect(firstBook).toBeVisible({ timeout: 20_000 });
@@ -14,9 +19,31 @@ test('desktop sidebar releases hover retained across navigation', async ({ page 
   // the clicked item while navigation changes the page beneath it.
   const nav = page.getByRole('navigation', { name: 'Browse' });
   const tagsLink = nav.getByRole('link', { name: 'Tags', exact: true });
+  const main = page.locator('main#main');
+  const mainBeforeHover = await main.boundingBox();
+  expect(mainBeforeHover).not.toBeNull();
   await tagsLink.hover();
+  // The panel is out of flow: its width animates 64px -> 220px, but that layout
+  // is contained to the panel's own subtree. Sample the flex sibling throughout
+  // the transition — <main> moving or resizing here is the #1813 regression.
+  for (const pause of [0, 60, 100, 140]) {
+    if (pause) await page.waitForTimeout(pause);
+    const during = await main.boundingBox();
+    expect(during).not.toBeNull();
+    expect(during!.x).toBeCloseTo(mainBeforeHover!.x, 3);
+    expect(during!.width).toBeCloseTo(mainBeforeHover!.width, 3);
+  }
+  await expect.poll(() => sidebarExpanded(nav)).toBe(true);
   await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).width))
     .toBe('220px');
+  await expect.poll(() => nav.locator('..').evaluate((element) => getComputedStyle(element).width))
+    .toBe('64px');
+  // The unpinned rail wrapper must never reserve expanded width or animate
+  // margin — the panel overlays <main>, it does not push it.
+  await expect.poll(() => nav.evaluate((element) => ({
+    margin: getComputedStyle(element).transitionProperty.includes('margin'),
+    outOfFlow: getComputedStyle(element).position === 'absolute',
+  }))).toEqual({ margin: false, outOfFlow: true });
   const navBox = await nav.boundingBox();
   const tagsBox = await tagsLink.boundingBox();
   expect(navBox).not.toBeNull();
@@ -36,8 +63,7 @@ test('desktop sidebar releases hover retained across navigation', async ({ page 
   await page.keyboard.press('Shift+Tab');
   expect(await nav.evaluate((element) => element.contains(document.activeElement)))
     .toBe(true);
-  await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).width))
-    .toBe('220px');
+  await expect.poll(() => sidebarExpanded(nav)).toBe(true);
 
   // Returning to the book does not move the pointer. The newly landed page's
   // back link is inside the 156px overlay strip formerly retained by :hover.
@@ -77,8 +103,8 @@ test('desktop sidebar releases hover retained across navigation', async ({ page 
     };
     await page.mouse.move(point.x, point.y);
     await page.waitForTimeout(50);
-    expect(await nav.evaluate((element) => getComputedStyle(element).width),
-      `rail width after traversal step ${step}`).toBe('64px');
+    expect(await sidebarExpanded(nav),
+      `rail reveal state after traversal step ${step}`).toBe(false);
     const hit = await hitAtCentre();
     expect(hit.targetOwnsHit,
       `step ${step}: back-link centre ${JSON.stringify(centre)} hit ${JSON.stringify(hit)}`)
@@ -92,6 +118,5 @@ test('desktop sidebar releases hover retained across navigation', async ({ page 
   // Once the pointer has completed its journey out, deliberately returning to
   // the collapsed rail is new hover intent and must expand it again.
   await page.mouse.move(navBox!.x + 32, navBox!.y + 32, { steps: 12 });
-  await expect.poll(() => nav.evaluate((element) => getComputedStyle(element).width))
-    .toBe('220px');
+  await expect.poll(() => sidebarExpanded(nav)).toBe(true);
 });

@@ -25,6 +25,7 @@ previously-invisible file with the gate's own selector and see nothing dropped.
 
 import pathlib
 import re
+import shlex
 import subprocess
 import sys
 
@@ -83,6 +84,34 @@ def _fast_gate_marker_expression():
         "if the gate moved, this guard has to follow it" % WORKFLOW.name
     )
     return match.group(1)
+
+
+def _workflow_step_block(step_name):
+    """Return one named workflow step without requiring a YAML dependency."""
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    marker = "      - name: %s\n" % step_name
+    assert marker in workflow, "workflow step %r is missing" % step_name
+    return workflow.split(marker, 1)[1].split("\n      - name:", 1)[0]
+
+
+@pytest.mark.parametrize(
+    "step_name",
+    [
+        "Run smoke and unit tests",
+        "Run non-xdist unit tests (lane opt-outs)",
+        "Run Docker integration tests",
+    ],
+)
+def test_ci_pytest_steps_report_skip_reasons(step_name):
+    """A green count is insufficient: CI must name every skip and its reason."""
+    block = re.sub(r"\\\s*\n\s*", " ", _workflow_step_block(step_name))
+    commands = [line.strip() for line in block.splitlines()
+                if line.strip().startswith("pytest ")]
+    assert len(commands) == 1, "%s must contain one pytest command" % step_name
+    assert "-rs" in shlex.split(commands[0]), (
+        "%s must pass -rs so its job log names every skipped test and reason"
+        % step_name
+    )
 
 
 def test_every_test_directory_has_a_lane_or_a_stated_reason():

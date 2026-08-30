@@ -555,17 +555,15 @@ def test_login_without_preference_uses_spa_surface(tmp_path):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(("login_type", "reverse_proxy_login", "expected_status"), [
-    (0, False, 302),
-    (spa_mod.constants.LOGIN_OAUTH, False, 302),
-    (spa_mod.constants.LOGIN_LDAP, False, 200),
-    (0, True, 200),
+@pytest.mark.parametrize(("login_type", "reverse_proxy_login"), [
+    (0, False),
+    (spa_mod.constants.LOGIN_OAUTH, False),
+    (spa_mod.constants.LOGIN_LDAP, False),
+    (0, True),
 ])
 def test_login_default_is_auth_capability_aware(
-        tmp_path, login_type, reverse_proxy_login, expected_status):
-    """The SPA login is default only when it can authenticate the configured
-    mode: standard and OAuth are supported; LDAP (#1893) and reverse-proxy
-    header auth (#1931) must retain Classic until their API bridges exist."""
+        tmp_path, login_type, reverse_proxy_login):
+    """Every configured authentication mode now has a working SPA path."""
     app, web_mod, monkey = _login_app(tmp_path)
     try:
         resp = _get_login(
@@ -573,29 +571,10 @@ def test_login_default_is_auth_capability_aware(
             login_type=login_type,
             reverse_proxy_login=reverse_proxy_login,
         )
-        assert resp.status_code == expected_status
-        if expected_status == 302:
-            assert resp.headers["Location"] == "/app/"
-        else:
-            assert resp.get_data(as_text=True) == "CLASSIC LOGIN"
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "/app/"
     finally:
         monkey.undo()
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(("login_type", "reverse_proxy_login", "supported"), [
-    (0, False, True),
-    (spa_mod.constants.LOGIN_OAUTH, False, True),
-    (spa_mod.constants.LOGIN_LDAP, False, False),
-    (0, True, False),
-])
-def test_spa_login_default_supported_predicate(
-        login_type, reverse_proxy_login, supported):
-    """The one named predicate owns the temporary authentication carve-out."""
-    with patch.object(spa_mod.config, "config_login_type", login_type, create=True), \
-         patch.object(spa_mod.config, "config_allow_reverse_proxy_header_login",
-                      reverse_proxy_login, create=True):
-        assert spa_mod.spa_login_default_supported() is supported
 
 
 @pytest.mark.unit
@@ -603,10 +582,9 @@ def test_spa_login_default_supported_predicate(
     (spa_mod.constants.LOGIN_LDAP, False),
     (0, True),
 ])
-def test_auth_carve_out_does_not_disable_authenticated_index_spa(
+def test_auth_mode_does_not_disable_authenticated_index_spa(
         tmp_path, login_type, reverse_proxy_login):
-    """LDAP/proxy gaps apply only to login; an authenticated user's `/`
-    preference routing stays on the SPA for either instance configuration."""
+    """An authenticated user's `/` routing stays on the SPA in either mode."""
     app, monkey = _sticky_app(tmp_path)
     try:
         with patch.object(spa_mod.config, "config_login_type", login_type,

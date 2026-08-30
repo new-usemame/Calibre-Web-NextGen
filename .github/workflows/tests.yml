@@ -143,6 +143,7 @@ jobs:
             --dist=loadfile \
             --maxfail=3 \
             -v \
+            -rs \
             --tb=short \
             --timeout=120 \
             --timeout-method=thread \
@@ -167,6 +168,7 @@ jobs:
         run: |
           pytest tests/unit -m "integration" \
             -v \
+            -rs \
             --tb=short \
             --timeout=120 \
             --timeout-method=thread
@@ -358,6 +360,7 @@ jobs:
           # CRITICAL: No -n flag! Docker tests must run sequentially
           pytest tests/docker/ tests/integration/ \
             -v \
+            -rs \
             --tb=long \
             --durations=10 \
             --junitxml=integration-results.xml

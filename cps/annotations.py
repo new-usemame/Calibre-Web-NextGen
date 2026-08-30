@@ -1852,13 +1852,10 @@ _EXPORT_FIELDS = (
 )
 
 
-def _load_user_annotations(user_id: int, book_id: int) -> list:
-    """Per-user-per-book read of ``kobo_annotation_sync``. Filters out
-    soft-deleted rows so the view shows the live set. Stable order by
-    chapter_progress so the export round-trips a sensible reading
-    order even for books with hundreds of highlights."""
+def _visible_user_annotations_query(session, user_id: int, book_id: int):
+    """Canonical visible-set query for every per-user/per-book surface."""
     return (
-        ub.session.query(ub.Annotation)
+        session.query(ub.Annotation)
         .filter(
             ub.Annotation.user_id == user_id,
             ub.Annotation.book_id == book_id,
@@ -1867,6 +1864,27 @@ def _load_user_annotations(user_id: int, book_id: int) -> list:
             (ub.Annotation.hidden.is_(None))
             | (ub.Annotation.hidden == False)  # noqa: E712 — SQLA needs ==
         )
+    )
+
+
+def count_user_annotations(user_id: int, book_id: int, session=None) -> int:
+    """Count exactly the live annotation rows shown on the linked page."""
+    app_session = session if session is not None else ub.session
+    count = (
+        _visible_user_annotations_query(app_session, user_id, book_id)
+        .with_entities(func.count(ub.Annotation.id))
+        .scalar()
+    )
+    return int(count or 0)
+
+
+def _load_user_annotations(user_id: int, book_id: int) -> list:
+    """Per-user-per-book read of ``kobo_annotation_sync``. Filters out
+    soft-deleted rows so the view shows the live set. Stable order by
+    chapter_progress so the export round-trips a sensible reading
+    order even for books with hundreds of highlights."""
+    return (
+        _visible_user_annotations_query(ub.session, user_id, book_id)
         .order_by(
             ub.Annotation.chapter_progress.asc().nullslast(),
             ub.Annotation.created_at.asc().nullslast(),

@@ -5462,6 +5462,11 @@ msgid "Highlights"
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 
@@ -5547,6 +5552,10 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr ""
+
+#: cps/progress_syncing/protocols/kosync.py cps/spa_strings.py
+msgid "KOReader Sync Plugin"
+msgstr "KOReader Sync 플러그인"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -6622,6 +6631,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Settings saved."
 msgstr ""
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Setup KOReader Sync"
+msgstr "KOReader Sync 설치"
 
 #: cps/spa_strings.py
 msgid "Shelf name"
@@ -7800,10 +7813,6 @@ msgstr "잘못된 "
 msgid "Tag could not be deleted"
 msgstr ""
 
-#: cps/progress_syncing/protocols/kosync.py
-msgid "KOReader Sync Plugin"
-msgstr "KOReader Sync 플러그인"
-
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
 msgstr "인증 정보가 포함된 유요한 gmail.json을 찾을 수 없습니다."
@@ -8343,10 +8352,6 @@ msgstr ""
 #: cps/templates/admin.html
 msgid "Check NextGen Status"
 msgstr ""
-
-#: cps/templates/admin.html
-msgid "Setup KOReader Sync"
-msgstr "KOReader Sync 설치"
 
 #: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"

@@ -244,6 +244,8 @@ export interface BookDetail {
   archived: boolean;
   favorited: boolean;
   hidden: boolean;
+  /** Current user's visible highlights/notes for this book. Older servers omit it. */
+  annotation_count?: number;
   /** Membership for personal-library detail deep links. Older servers omit it,
    *  which preserves the historical whole-library behavior. */
   in_my_library?: boolean;

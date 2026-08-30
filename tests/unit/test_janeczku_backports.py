@@ -89,10 +89,7 @@ class TestLDAPFilterEscape:
     def _escape(self, s):
         # Import lazily so the test doesn't pull in the whole flask_simpleldap
         # stack at collection time.
-        try:
-            from cps.services.simpleldap import _escape_ldap_filter
-        except ImportError:
-            pytest.skip("flask_simpleldap not available in this environment")
+        from cps.services.simpleldap import _escape_ldap_filter
         return _escape_ldap_filter(s)
 
     def test_escapes_backslash(self):

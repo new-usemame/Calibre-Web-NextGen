@@ -5656,6 +5656,11 @@ msgid "Highlights"
 msgstr "Subrayados"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Highlights, {count} saved annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Highlights and notes"
 msgstr ""
 
@@ -5743,6 +5748,10 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr "Progreso de KOReader"
+
+#: cps/progress_syncing/protocols/kosync.py cps/spa_strings.py
+msgid "KOReader Sync Plugin"
+msgstr "Plugin de Sincronización de KOReader"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -6833,6 +6842,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Configuración guardada."
+
+#: cps/spa_strings.py cps/templates/admin.html
+msgid "Setup KOReader Sync"
+msgstr "Configurar Sincronización de KOReader"
 
 #: cps/spa_strings.py
 msgid "Shelf name"
@@ -8032,10 +8045,6 @@ msgstr "ID inválido del libro."
 msgid "Tag could not be deleted"
 msgstr "No se pudo borrar la etiqueta"
 
-#: cps/progress_syncing/protocols/kosync.py
-msgid "KOReader Sync Plugin"
-msgstr "Plugin de Sincronización de KOReader"
-
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
 msgstr ""
@@ -8551,10 +8560,6 @@ msgstr "Mostrar estadísticas de NextGen"
 #: cps/templates/admin.html
 msgid "Check NextGen Status"
 msgstr "Comprobar el estado de NextGen"
-
-#: cps/templates/admin.html
-msgid "Setup KOReader Sync"
-msgstr "Configurar Sincronización de KOReader"
 
 #: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"

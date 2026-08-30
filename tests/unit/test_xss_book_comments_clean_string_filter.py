@@ -137,10 +137,7 @@ def test_vulnerable_comment_lines_pass_through_clean_string(template, pattern, m
 
 @pytest.fixture(scope='module')
 def clean_string_fn():
-    try:
-        from cps.clean_html import clean_string
-    except Exception as exc:
-        pytest.skip(f"cps.clean_html not importable in this env: {exc}")
+    from cps.clean_html import clean_string
     return clean_string
 
 

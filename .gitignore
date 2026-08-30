@@ -304,9 +304,17 @@ wiki-generated/
 # private-observability parent structurally uncommittable.
 .cwng-private-observability/
 
-# KOReader emulator state. docker-compose.koreader.yml defaults KOEMU_HOME to
-# ./koreader-emulator/data, so running the emulator without setting it writes a
-# KOReader home and book library straight into the working tree. This was only
-# excluded in .git/info/exclude, which is local to one clone and protects
-# nobody else -- including CI and anyone who checks the repo out fresh.
-local-dev/koreader-emulator/data/
+# Local development instance state. docker-compose.worktree.yml accepts any
+# CWNG_DEV_STATE path, and pointing it inside the checkout writes databases,
+# secrets, annotation backups, and repaired book copies below an unpredictable
+# rig directory. Naming each known state directory has failed repeatedly, so
+# keep local-dev closed by default: new children are ignored without another
+# .gitignore edit. Only the Compose definitions and KOReader emulator image
+# sources below are repository source and must remain committable.
+/local-dev/*
+!/local-dev/docker-compose.koreader.yml
+!/local-dev/docker-compose.worktree.yml
+!/local-dev/koreader-emulator/
+/local-dev/koreader-emulator/*
+!/local-dev/koreader-emulator/Dockerfile
+!/local-dev/koreader-emulator/entrypoint.sh

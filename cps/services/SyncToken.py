@@ -6,7 +6,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-import sys
 import zlib
 from base64 import b64decode, b64encode
 from jsonschema import validate, exceptions
@@ -65,7 +64,7 @@ class SyncToken:
     """
 
     SYNC_TOKEN_HEADER = "x-kobo-synctoken"  # nosec
-    VERSION = "1-4-0"
+    VERSION = "1-5-0"
     LAST_MODIFIED_ADDED_VERSION = "1-1-0"
     MIN_VERSION = "1-0-0"
     # Transport-level compression marker (fork #331). With Kobo store
@@ -106,6 +105,7 @@ class SyncToken:
             "books_last_id": {"type": "integer"},
             "magic_shelf_last_id": {"type": "integer"},
             "magic_shelf_membership_at": {"type": "number"},
+            "delivery_epoch": {"type": "string"},
         },
     }
 
@@ -120,6 +120,7 @@ class SyncToken:
         books_last_id=-1,
         magic_shelf_last_id=-1,
         magic_shelf_membership_at=datetime.min,
+        delivery_epoch="",
         is_cwng_token=False,
     ):  # nosec
         self.raw_kobo_store_token = raw_kobo_store_token
@@ -131,6 +132,10 @@ class SyncToken:
         self.books_last_id = books_last_id
         self.magic_shelf_last_id = magic_shelf_last_id
         self.magic_shelf_membership_at = magic_shelf_membership_at
+        # A fresh value is emitted for each durable response page.  It makes an
+        # otherwise cursor-identical response distinguishable from its
+        # acknowledgment without adding the response payload to the token.
+        self.delivery_epoch = delivery_epoch
         # Request provenance only; never serialized. True means from_headers
         # successfully decoded and schema-validated a token produced by CWNG.
         # Empty, malformed, and official-store tokens remain False so callers
@@ -247,6 +252,7 @@ class SyncToken:
             books_last_id=books_last_id,
             magic_shelf_last_id=magic_shelf_last_id,
             magic_shelf_membership_at=magic_shelf_membership_at,
+            delivery_epoch=data_json.get("delivery_epoch", ""),
             is_cwng_token=is_cwng_token,
         )
 
@@ -274,6 +280,7 @@ class SyncToken:
                 "books_last_id": self.books_last_id,
                 "magic_shelf_last_id": self.magic_shelf_last_id,
                 "magic_shelf_membership_at": to_epoch_timestamp(self.magic_shelf_membership_at),
+                "delivery_epoch": self.delivery_epoch,
             },
         }
         # Transport compression (fork #331): the embedded raw_kobo_store_token

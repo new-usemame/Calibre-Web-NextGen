@@ -180,11 +180,10 @@ class TestCompressedTokens:
         raw = zlib.decompress(b64decode(payload))
         assert len(raw) < SyncToken.MAX_DECOMPRESSED / 8
 
-    def test_schema_version_untouched(self):
-        """Compression is transport-level: the inner schema VERSION must
-        stay 1-4-0 so version-gated logic is unaffected."""
-        assert SyncToken.VERSION == "1-4-0"
+    def test_schema_version_includes_delivery_epoch(self):
+        """The acknowledgment epoch is an additive 1-5-0 schema field."""
+        assert SyncToken.VERSION == "1-5-0"
         src = SyncToken(books_last_id=1)
         header = src.build_sync_token()
         raw = zlib.decompress(b64decode(header[3:]))
-        assert json.loads(raw)["version"] == "1-4-0"
+        assert json.loads(raw)["version"] == "1-5-0"

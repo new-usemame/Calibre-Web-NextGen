@@ -113,7 +113,7 @@ def test_deletions_stay_page_capped_without_continuation_writer():
     assert ".limit(SYNC_ITEM_LIMIT)" in pending_query
     assert "cont_sync = True" not in source
     assert "cont_sync |= " not in source
-    assert (
-        "return generate_sync_response(sync_token, sync_results)"
-        in source
+    assert "response = generate_sync_response(sync_token, sync_results)" in source
+    assert source.index("response = generate_sync_response") < source.index(
+        "if ub.session_commit() is False:"
     )

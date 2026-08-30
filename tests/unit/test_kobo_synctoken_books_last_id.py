@@ -165,6 +165,11 @@ class TestSyncTokenVersion:
         wrapper = _decode_built_token(encoded)
         assert wrapper["data"]["books_last_id"] == 99
 
+    def test_delivery_epoch_round_trips_as_additive_ack_identity(self):
+        encoded = SyncToken(delivery_epoch="page-ack-1735").build_sync_token()
+        parsed = SyncToken.from_headers({SyncToken.SYNC_TOKEN_HEADER: encoded})
+        assert parsed.delivery_epoch == "page-ack-1735"
+
 
 @pytest.mark.unit
 class TestSyncTokenMagicShelfLastId:

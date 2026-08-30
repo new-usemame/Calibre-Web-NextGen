@@ -239,6 +239,11 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
     session.query(ub.KoboDeviceBookEntitlement).filter(
         ub.KoboDeviceBookEntitlement.book_id == from_book_id,
     ).delete(synchronize_session=False)
+    # A pending response embeds immutable metadata and confirmation ids for the
+    # losing book. Invalidate the bounded page rather than promoting stale ids.
+    session.query(ub.KoboDevicePendingSyncPage).delete(
+        synchronize_session=False,
+    )
 
     # Per-device reading positions survive duplicate merges. A device may
     # already have observations for both copies, so keep the greater client
@@ -412,6 +417,19 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
         entitlement_state = entitlement_state.filter(
             ub.KoboDeviceBookEntitlement.device_id.in_(device_ids))
     entitlement_state.delete(synchronize_session=False)
+
+    # Pending pages are deliberately opaque exact-response snapshots. A
+    # book/user purge cannot surgically edit one without breaking retry
+    # identity, so invalidate every page in the affected device scope.
+    pending_state = session.query(ub.KoboDevicePendingSyncPage)
+    if user_id is not None:
+        device_ids = session.query(ub.Device.id).filter(
+            ub.Device.user_id == user_id,
+        ).scalar_subquery()
+        pending_state = pending_state.filter(
+            ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
+        )
+    pending_state.delete(synchronize_session=False)
 
     position_state = session.query(ub.DeviceReadingPosition)
     if book_id is not None:

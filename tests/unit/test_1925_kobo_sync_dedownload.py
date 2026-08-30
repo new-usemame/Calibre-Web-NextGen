@@ -12,7 +12,6 @@ be delivered.
 
 from datetime import datetime, timedelta, timezone
 import logging
-import re
 from types import SimpleNamespace
 
 import pytest
@@ -205,7 +204,13 @@ def sync_harness(monkeypatch):
     app.secret_key = "issue-1925-test-key"
     app.wsgi_app = SimpleNamespace(is_proxied=True)
 
-    def sync(token=None, *, internal_device_id=None, raw_device_id=None):
+    def sync(
+        token=None,
+        *,
+        internal_device_id=None,
+        raw_device_id=None,
+        acknowledge=True,
+    ):
         internal_device_id = internal_device_id or device.id
         raw_device_id = raw_device_id or ("a" * 64)
         speaking_device = session.get(ub.Device, internal_device_id)
@@ -220,7 +225,21 @@ def sync_harness(monkeypatch):
         with app.test_request_context("/v1/library/sync", headers=headers):
             # The auth decorator normally sets this from x-kobo-deviceid.
             g.annotation_origin_device_id = internal_device_id
-            return kobo.HandleSyncRequest.__wrapped__()
+            response = kobo.HandleSyncRequest.__wrapped__()
+            # Most tests model a response the device received successfully.
+            # Promote that page directly so their next assertion observes the
+            # same state as the next real request's token acknowledgment. Tests
+            # for the lost-response boundary opt out explicitly.
+            if acknowledge and getattr(response, "status_code", None) == 200:
+                pending = kobo_sync_status.get_pending_sync_page(
+                    internal_device_id,
+                )
+                if pending is not None:
+                    assert kobo._acknowledge_pending_page(
+                        pending, internal_device_id,
+                    )
+                    session.commit()
+            return response
 
     def put_position(percent, *, clock, internal_device_id=None):
         internal_device_id = internal_device_id or device.id
@@ -466,10 +485,10 @@ def test_declared_payload_schema_transition_reseeds_without_delivery(
     assert "reseeded_shape_change=1" in summaries[-1]
 
 
-def test_failed_live_reseed_commit_aborts_before_summary(
+def test_failed_live_reseed_commit_rolls_back_pending_page_and_aborts(
     sync_harness, caplog, monkeypatch,
 ):
-    """A rolled-back live ledger update is neither returned nor reported."""
+    """A rolled-back exact response is not returned or left replayable."""
     from cps import kobo, ub
     from werkzeug.exceptions import ServiceUnavailable
 
@@ -515,10 +534,13 @@ def test_failed_live_reseed_commit_aborts_before_summary(
     ).one()
     assert after.fingerprint == old_fingerprint
     assert after.payload_schema_version == old_version
-    assert not any(
+    assert any(
         record.getMessage().startswith("Kobo Sync summary:")
         for record in caplog.records
     )
+    assert sync_harness.session.query(
+        ub.KoboDevicePendingSyncPage,
+    ).count() == 0
 
 
 def test_entitlement_payload_shape_matches_declared_schema_version(
@@ -985,10 +1007,10 @@ def test_real_last_modified_bump_under_new_payload_shape_delivers_once(
     )
 
 
-def test_upgrade_seed_suppresses_confirmed_page_and_recovers_dropped_pages(
+def test_upgrade_reannounces_divergent_device_histories_without_starvation(
     sync_harness, caplog, monkeypatch,
 ):
-    """Legacy Changed pages recover while the confirmed New page stays quiet."""
+    """Ambiguous, divergent legacy rows become New independently per Kobo."""
     from cps import db, kobo, ub
 
     monkeypatch.setattr(
@@ -1041,24 +1063,75 @@ def test_upgrade_seed_suppresses_confirmed_page_and_recovers_dropped_pages(
         )
         for book in delivered
     ])
+    # Model two genuinely different pre-ack histories. Device A's old ledger
+    # says the first page was emitted; device B's says only later rows were.
+    # Neither proves physical receipt, and the flat table above is merely their
+    # user-wide union.
+    sync_harness.session.add_all([
+        ub.KoboDeviceEntitlementSeed(
+            device_id=sync_harness.device.id,
+            classification_version=0,
+        ),
+        ub.KoboDeviceEntitlementSeed(
+            device_id=second_device.id,
+            classification_version=0,
+        ),
+        *[
+            ub.KoboDeviceBookEntitlement(
+                device_id=sync_harness.device.id,
+                book_id=book.id,
+                fingerprint="a" * 64,
+            )
+            for book in delivered[:100]
+        ],
+        *[
+            ub.KoboDeviceBookEntitlement(
+                device_id=second_device.id,
+                book_id=book.id,
+                fingerprint="b" * 64,
+            )
+            for book in delivered[100:]
+        ],
+    ])
     sync_harness.session.commit()
 
-    token = kobo.SyncToken.SyncToken().build_sync_token()
-    responses = []
-    for _page in range(3):
-        response = sync_harness.sync(token)
-        responses.append(response)
-        token = response.headers[sync_harness.token_header]
+    poisoned_token = kobo.SyncToken.SyncToken(
+        books_last_modified=modified + timedelta(days=1),
+        books_last_created=modified + timedelta(days=1),
+        books_last_id=999_999,
+    ).build_sync_token()
 
-    assert [len(_entitlements(response)) for response in responses] == [0, 100, 18]
+    pages_by_device = {}
+    for device, raw_id in (
+        (sync_harness.device, "a" * 64),
+        (second_device, "b" * 64),
+    ):
+        token = poisoned_token
+        responses = []
+        for _page in range(3):
+            response = sync_harness.sync(
+                token,
+                internal_device_id=device.id,
+                raw_device_id=raw_id,
+            )
+            responses.append(response)
+            token = response.headers[sync_harness.token_header]
+        pages_by_device[device.id] = responses
+
+    assert {
+        device_id: [len(_entitlements(response)) for response in responses]
+        for device_id, responses in pages_by_device.items()
+    } == {
+        sync_harness.device.id: [100, 100, 18],
+        second_device.id: [100, 100, 18],
+    }
     assert all(
         "NewEntitlement" in item
-        for response in responses[1:]
+        for responses in pages_by_device.values()
+        for response in responses
         for item in _entitlements(response)
     )
-    # Both devices retain the confirmed first page. Only the speaking device
-    # records the 118 recovery entitlements returned by these requests.
-    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 318
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 436
     assert sync_harness.session.query(ub.KoboDeviceEntitlementSeed).count() == 2
     first_book_hashes = {
         row.device_id: row.fingerprint
@@ -1070,39 +1143,36 @@ def test_upgrade_seed_suppresses_confirmed_page_and_recovers_dropped_pages(
     }
     assert first_book_hashes[sync_harness.device.id] != \
         first_book_hashes[second_device.id], (
-            "upgrade seeding must reproduce device-specific cover metadata, "
-            "not copy the speaking Kobo's payload across the household"
+            "confirmed hashes must come from each device's acknowledged "
+            "payload, not copied user-wide upgrade history"
         )
 
     summaries = [
         record.getMessage() for record in caplog.records
         if record.getMessage().startswith("Kobo Sync summary:")
     ]
-    assert sum(
-        int(re.search(r"suppressed_unchanged=(\d+)", line).group(1))
-        for line in summaries
-    ) == 100
+    assert all("suppressed_unchanged=0" in line for line in summaries)
     seed_lines = [
         record.getMessage() for record in caplog.records
         if record.getMessage().startswith("Kobo Sync ledger seed:")
     ]
-    assert len(seed_lines) == 1
-    assert "devices=2 books=218 deleted=0 new_devices=0" in seed_lines[0]
-    assert float(re.search(r"elapsed_ms=([0-9.]+)", seed_lines[0]).group(1)) >= 0
-
-    # Even a device whose historical ledger was seeded gets a full initial
-    # library after factory reset because a tokenless request is ineligible.
-    factory_reset = sync_harness.sync(
-        internal_device_id=second_device.id,
-        raw_device_id="b" * 64,
-    )
-    assert len(_entitlements(factory_reset)) == 100
+    # Pre-existing version-0 markers bypass the initial marker insert, but the
+    # one classification audit must still have cleared both divergent sets.
+    assert seed_lines == []
+    migration_lines = [
+        record.getMessage() for record in caplog.records
+        if record.getMessage().startswith(
+            "Kobo Sync classification migration:"
+        )
+    ]
+    assert len(migration_lines) == 1
+    assert "devices=2 device_proven=0 rearmed=218" in migration_lines[0]
 
 
 def test_upgrade_seed_skips_null_archived_last_modified(
     sync_harness, monkeypatch,
 ):
-    """Legacy NULL archive clocks do not break canonical-basis seeding."""
+    """Legacy NULL archive clocks do not break conservative reannouncement."""
     from cps import kobo, ub
 
     monkeypatch.setattr(
@@ -1129,7 +1199,8 @@ def test_upgrade_seed_skips_null_archived_last_modified(
     replay = sync_harness.sync(stale_token)
 
     assert replay.status_code == 200
-    assert _entitlements(replay) == []
+    assert len(_entitlements(replay)) == 1
+    assert "NewEntitlement" in _entitlements(replay)[0]
     row = sync_harness.session.query(
         ub.KoboDeviceBookEntitlement,
     ).one()
@@ -1815,6 +1886,40 @@ def test_rehydrate_emits_past_advanced_cursor_clears_atomically_and_ignores_exac
     ).scalar() is False
 
 
+def test_lost_rehydrate_page_replays_and_clears_only_after_token_ack(
+    sync_harness,
+):
+    """The #1942 repair latch follows the same response acknowledgment."""
+    from cps import ub
+
+    modified = datetime(2026, 8, 28, 12, 30, 0)
+    _add_reading_state(sync_harness, modified, progress=63.0)
+    entitlement = sync_harness.sync()
+
+    repair_incoming = entitlement.headers[sync_harness.token_header]
+    offered = sync_harness.sync(repair_incoming, acknowledge=False)
+    assert len(_changed_reading_states(offered)) == 1
+    assert sync_harness.session.query(
+        ub.DeviceReadingPosition.rehydrate_needed,
+    ).scalar() is True
+
+    retried = sync_harness.sync(repair_incoming, acknowledge=False)
+    assert offered.get_data() == retried.get_data()
+    assert offered.headers[sync_harness.token_header] == retried.headers[
+        sync_harness.token_header
+    ]
+    assert sync_harness.session.query(
+        ub.DeviceReadingPosition.rehydrate_needed,
+    ).scalar() is True
+
+    sync_harness.sync(
+        offered.headers[sync_harness.token_header], acknowledge=False,
+    )
+    assert sync_harness.session.query(
+        ub.DeviceReadingPosition.rehydrate_needed,
+    ).scalar() is False
+
+
 @pytest.mark.parametrize(
     "ordering",
     ["download_then_sync", "sync_then_download"],
@@ -2171,7 +2276,7 @@ def test_entitlement_replay_state_is_per_device(sync_harness, monkeypatch):
     monkeypatch.setattr(
         kobo.config, "config_kobo_suppress_replayed_entitlements", True,
     )
-    first = sync_harness.sync()
+    _first = sync_harness.sync()
     second_device = ub.Device(
         user_id=17,
         kind="kobo",
@@ -2750,7 +2855,8 @@ def test_restored_size_paths_still_serve_the_kobo_download_route(
         requested_format = "epub"
         expected_bytes = b"rewritten-epub-bytes"
         (book_dir / "stable-book.epub").write_bytes(expected_bytes)
-        get_format = lambda _book_id, fmt: epub if fmt == "EPUB" else None
+        def get_format(_book_id, fmt):
+            return epub if fmt == "EPUB" else None
         monkeypatch.setattr(
             helper,
             "do_calibre_export",
@@ -2761,7 +2867,8 @@ def test_restored_size_paths_still_serve_the_kobo_download_route(
         requested_format = "kepub"
         expected_bytes = b"rewritten-kepub-bytes"
         (book_dir / "stable-book.kepub").write_bytes(expected_bytes)
-        get_format = lambda _book_id, fmt: kepub if fmt == "KEPUB" else None
+        def get_format(_book_id, fmt):
+            return kepub if fmt == "KEPUB" else None
         monkeypatch.setattr(
             helper,
             "do_kepubify_metadata_replace",
@@ -2819,6 +2926,7 @@ def test_device_entitlement_tables_are_created_by_app_db_migration_path():
             "kobo_device_book_entitlement",
             "kobo_device_deleted_entitlement",
             "kobo_device_entitlement_seed",
+            "kobo_device_pending_sync_page",
         }
         assert expected.isdisjoint(sa_inspect(engine).get_table_names())
         ub.add_missing_tables(engine, session)

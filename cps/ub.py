@@ -24,12 +24,12 @@ from .cw_login import user_logged_in
 try:
     from flask_dance.consumer.backend.sqla import OAuthConsumerMixin  # pyright: ignore[reportMissingImports]
     oauth_support = True
-except ImportError as e:
+except ImportError:
     # fails on flask-dance >1.3, due to renaming
     try:
         from flask_dance.consumer.storage.sqla import OAuthConsumerMixin
         oauth_support = True
-    except ImportError as e:
+    except ImportError:
         OAuthConsumerMixin = BaseException
         oauth_support = False
 from sqlalchemy import create_engine, DDL, exc, exists, event, text
@@ -476,7 +476,7 @@ class Anonymous(AnonymousUserMixin, UserBase):
         return None
 
     def set_view_property(self, page, prop, value, commit=True):
-        if not 'view' in flask_session:
+        if 'view' not in flask_session:
             flask_session['view'] = dict()
         if not flask_session['view'].get(page):
             flask_session['view'][page] = dict()
@@ -954,6 +954,29 @@ class KoboDeviceEntitlementSeed(Base):
     # fingerprints for ChangedEntitlements a device could not apply.
     classification_version = Column(
         Integer, nullable=False, default=0, server_default="0",
+    )
+
+
+class KoboDevicePendingSyncPage(Base):
+    """One unacknowledged Kobo sync response per physical device.
+
+    The response body and wire headers are retained verbatim so a retry with
+    the same incoming token can be replayed without consulting mutable library
+    state.  ``confirmation_json`` contains only the bounded page state that is
+    promoted after the device presents ``outgoing_token``.
+    """
+    __tablename__ = 'kobo_device_pending_sync_page'
+
+    device_id = Column(
+        Integer, ForeignKey('device.id', ondelete='CASCADE'), primary_key=True,
+    )
+    incoming_token_hash = Column(String(64), nullable=False, index=True)
+    outgoing_token = Column(Text, nullable=False)
+    response_body = Column(Text, nullable=False)
+    response_headers_json = Column(Text, nullable=False, default="{}")
+    confirmation_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
     )
 
 
@@ -2247,6 +2270,7 @@ def add_missing_tables(engine, _session):
         ("kobo_device_book_entitlement", KoboDeviceBookEntitlement.__table__),
         ("kobo_device_deleted_entitlement", KoboDeviceDeletedEntitlement.__table__),
         ("kobo_device_entitlement_seed", KoboDeviceEntitlementSeed.__table__),
+        ("kobo_device_pending_sync_page", KoboDevicePendingSyncPage.__table__),
     )
     for table_name, table in tables + kobo_entitlement_tables:
         # Explicit transaction control means even schema inspection begins a
@@ -3058,21 +3082,24 @@ def _merge_kobo_bookmark(_session, winner, loser):
         winner.current_bookmark = loser.current_bookmark
         loser.current_bookmark = None
         return
-    w, l = winner.current_bookmark, loser.current_bookmark
-    if l.created_at and (not w.created_at or l.created_at < w.created_at):
-        w.created_at = l.created_at
-    if _loser_wins_lm(l, w):
+    winning, losing = winner.current_bookmark, loser.current_bookmark
+    if (losing.created_at
+            and (not winning.created_at
+                 or losing.created_at < winning.created_at)):
+        winning.created_at = losing.created_at
+    if _loser_wins_lm(losing, winning):
         for attr in ("location_source", "location_type", "location_value",
                      "progress_percent", "content_source_progress_percent",
                      "last_modified"):
-            setattr(w, attr, getattr(l, attr))
+            setattr(winning, attr, getattr(losing, attr))
     else:
         # Even if winner's bookmark is newer overall, prefer non-null
         # losing fields if the winner has nulls there (defensive).
         for attr in ("location_source", "location_type", "location_value",
                      "progress_percent", "content_source_progress_percent"):
-            if getattr(w, attr) is None and getattr(l, attr) is not None:
-                setattr(w, attr, getattr(l, attr))
+            if (getattr(winning, attr) is None
+                    and getattr(losing, attr) is not None):
+                setattr(winning, attr, getattr(losing, attr))
 
 
 def _merge_kobo_statistics(_session, winner, loser):
@@ -3083,15 +3110,16 @@ def _merge_kobo_statistics(_session, winner, loser):
         winner.statistics = loser.statistics
         loser.statistics = None
         return
-    w, l = winner.statistics, loser.statistics
-    if _loser_wins_lm(l, w):
+    winning, losing = winner.statistics, loser.statistics
+    if _loser_wins_lm(losing, winning):
         for attr in ("remaining_time_minutes", "spent_reading_minutes",
                      "last_modified"):
-            setattr(w, attr, getattr(l, attr))
+            setattr(winning, attr, getattr(losing, attr))
     else:
         for attr in ("remaining_time_minutes", "spent_reading_minutes"):
-            if getattr(w, attr) is None and getattr(l, attr) is not None:
-                setattr(w, attr, getattr(l, attr))
+            if (getattr(winning, attr) is None
+                    and getattr(losing, attr) is not None):
+                setattr(winning, attr, getattr(losing, attr))
 
 
 def _dedupe_book_read_link(_session):
@@ -4800,7 +4828,7 @@ def migrate_Database(_session):
             # Get all system shelves for this user
             user_system_shelves = _session.query(MagicShelf).filter(
                 MagicShelf.user_id == user.id,
-                MagicShelf.is_system == True
+                MagicShelf.is_system.is_(True)
             ).all()
             
             # Delete system shelves that don't match current templates
@@ -4831,7 +4859,7 @@ def migrate_Database(_session):
                 has_template = _session.query(MagicShelf).filter(
                     MagicShelf.user_id == user.id,
                     MagicShelf.name == template_data['name'],
-                    MagicShelf.is_system == True
+                    MagicShelf.is_system.is_(True)
                 ).first()
                 
                 if not has_template:

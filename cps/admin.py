@@ -9,7 +9,6 @@ import os
 import re
 import json
 import operator
-import time
 import sys
 import string
 import requests
@@ -17,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from datetime import time as datetime_time
 from functools import wraps
 from urllib.parse import urlparse
-import shutil
+import shutil  # noqa: F401 -- test/extension monkeypatch compatibility
 import subprocess
 import tempfile
 import fcntl
@@ -28,7 +27,7 @@ from markupsafe import Markup
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from .cw_login import current_user
 from flask_babel import gettext as _
-from flask_babel import get_locale, format_time, format_datetime, format_timedelta, LazyString
+from flask_babel import get_locale, format_time, format_timedelta, LazyString
 from sqlalchemy import and_
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
@@ -58,7 +57,7 @@ from .services.kobo_reconcile import (
 )
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
-from .cw_babel import (get_available_translations, get_available_locale,
+from .cw_babel import (get_available_locale,
                        get_user_locale_language, sanitize_locale_for_write)
 from . import debug_info
 from .string_helper import strip_whitespaces
@@ -78,7 +77,7 @@ feature_support = {
 }
 
 try:
-    import rarfile  # pylint: disable=unused-import
+    import rarfile  # noqa: F401  # pylint: disable=unused-import
 
     feature_support['rar'] = True
 except (ImportError, SyntaxError):
@@ -893,7 +892,7 @@ def edit_list_user(param):
         vals['field_index'] = vals['field_index'][0]
     if 'value' in vals:
         vals['value'] = vals['value'][0]
-    elif not ('value[]' in vals):
+    elif 'value[]' not in vals:
         return _("Malformed request"), 400
     for user in users:
         try:
@@ -1445,6 +1444,9 @@ def do_full_kobo_sync(userid):
     ub.session.query(ub.KoboDeviceEntitlementSeed).filter(
         ub.KoboDeviceEntitlementSeed.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
+    ub.session.query(ub.KoboDevicePendingSyncPage).filter(
+        ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
     count = ub.session.query(ub.KoboSyncedBooks).filter(userid == ub.KoboSyncedBooks.user_id).delete()
     message = _("{} sync entries deleted").format(count)
     ub.session_commit(message)
@@ -1509,6 +1511,12 @@ def do_kobo_resend(userid, bookid):
     ledger_deleted = ub.session.query(ub.KoboDeviceBookEntitlement).filter(
         ub.KoboDeviceBookEntitlement.device_id.in_(device_ids),
         ub.KoboDeviceBookEntitlement.book_id == bookid,
+    ).delete(synchronize_session=False)
+    # The bounded pending body may contain this book. It cannot be rewritten
+    # without violating byte-identical retry, so invalidate the user's page and
+    # let the next request build a fresh NewEntitlement after the ledger clear.
+    ub.session.query(ub.KoboDevicePendingSyncPage).filter(
+        ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
     deleted = ub.session.query(ub.KoboSyncedBooks).filter(
         ub.KoboSyncedBooks.user_id == userid,
@@ -1689,7 +1697,7 @@ def restriction_addition(element, list_func):
     elementlist = list_func()
     if elementlist == ['']:
         elementlist = []
-    if not element['add_element'] in elementlist:
+    if element['add_element'] not in elementlist:
         elementlist += [element['add_element']]
     return ','.join(elementlist)
 
@@ -2458,7 +2466,7 @@ def edit_user(user_id):
     all_public_shelves = ub.session.query(ub.MagicShelf).filter(
         ub.MagicShelf.is_public == 1,
         ub.MagicShelf.user_id != content.id,
-        ub.MagicShelf.is_system == False
+        ub.MagicShelf.is_system.is_(False)
     ).all()
     
     # Separate into hidden and visible
@@ -3046,7 +3054,8 @@ def _configuration_update_helper():
                   category="warning")
     # Keep the retired cwa.db auto-fetch flag synchronized solely for safe
     # rollback. Runtime consumers use ConfigSQL.hardcover_sync_enabled().
-    effective_hardcover_sync, _ = schedule.reconcile_hardcover_configuration()
+    effective_hardcover_sync, _hardcover_sync_changed = \
+        schedule.reconcile_hardcover_configuration()
     hardcover_token_available = bool(config.resolved_hardcover_token())
     if (effective_hardcover_sync != prev_hardcover_sync
             or hardcover_token_available != prev_hardcover_token_available):
@@ -3376,7 +3385,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         all_public_shelves = ub.session.query(ub.MagicShelf).filter(
             ub.MagicShelf.is_public == 1,
             ub.MagicShelf.user_id != content.id,
-            ub.MagicShelf.is_system == False
+            ub.MagicShelf.is_system.is_(False)
         ).all()
         
         # Check which ones should be visible (checked)

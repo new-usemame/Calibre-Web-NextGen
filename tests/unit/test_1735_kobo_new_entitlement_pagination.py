@@ -147,7 +147,7 @@ def large_library_sync(monkeypatch):
     app.secret_key = "issue-1735-test-key"
     app.wsgi_app = SimpleNamespace(is_proxied=True)
 
-    def sync(token=None):
+    def sync(token=None, *, acknowledge=True):
         headers = {
             "x-kobo-deviceid": "a" * 64,
             "x-kobo-devicemodel": device.model,
@@ -156,7 +156,19 @@ def large_library_sync(monkeypatch):
             headers[kobo.SyncToken.SyncToken.SYNC_TOKEN_HEADER] = token
         with app.test_request_context("/v1/library/sync", headers=headers):
             g.annotation_origin_device_id = device.id
-            return kobo.HandleSyncRequest.__wrapped__()
+            response = kobo.HandleSyncRequest.__wrapped__()
+            # The capability guard lets this regression be copied unchanged
+            # onto the pre-ack branch for the required red proof.
+            if (
+                acknowledge
+                and getattr(response, "status_code", None) == 200
+                and hasattr(kobo_sync_status, "get_pending_sync_page")
+            ):
+                pending = kobo_sync_status.get_pending_sync_page(device.id)
+                if pending is not None:
+                    assert kobo._acknowledge_pending_page(pending, device.id)
+                    session.commit()
+            return response
 
     try:
         yield SimpleNamespace(
@@ -186,6 +198,48 @@ def test_every_never_delivered_book_is_new_across_multiple_pages(large_library_s
         "a book absent from this device's delivery record must not become a "
         "ChangedEntitlement merely because its date-added is old"
     )
+
+
+@pytest.mark.parametrize("replay_suppression", [True, False])
+def test_lost_second_page_same_token_replays_identical_new_entitlement(
+    large_library_sync, monkeypatch, replay_suppression,
+):
+    """A committed page whose response is lost remains byte-identical New."""
+    from cps import kobo, ub
+
+    harness = large_library_sync
+    monkeypatch.setattr(
+        kobo.config,
+        "config_kobo_suppress_replayed_entitlements",
+        replay_suppression,
+    )
+
+    first = harness.sync()
+    page_two_incoming = first.headers[harness.token_header]
+    offered = harness.sync(page_two_incoming, acknowledge=False)
+
+    # Discard the committed response and repeat the exact valid incoming token.
+    retried = harness.sync(page_two_incoming, acknowledge=False)
+
+    assert offered.get_data() == retried.get_data()
+    assert offered.headers[harness.token_header] == retried.headers[
+        harness.token_header
+    ]
+    assert _entitlements(offered) == _entitlements(retried) == [
+        ("NewEntitlement", 101),
+    ]
+    assert harness.session.query(ub.KoboDevicePendingSyncPage).count() == 1
+    assert harness.session.query(ub.KoboDeviceBookEntitlement).count() == 100
+    assert harness.session.query(ub.KoboSyncedBooks).count() == 100
+
+    # Only presenting page two's returned token promotes its delivery state.
+    advanced = harness.sync(
+        offered.headers[harness.token_header], acknowledge=False,
+    )
+    assert harness.session.query(ub.KoboDeviceBookEntitlement).count() == 101
+    assert harness.session.query(ub.KoboSyncedBooks).count() == 101
+    replacement = harness.session.query(ub.KoboDevicePendingSyncPage).one()
+    assert replacement.outgoing_token == advanced.headers[harness.token_header]
 
 
 def test_already_delivered_book_is_changed_not_new_on_later_sync(large_library_sync):
@@ -228,8 +282,10 @@ def test_classification_ledger_is_written_when_replay_suppression_is_disabled(
     assert _entitlements(changed) == [("ChangedEntitlement", 101)]
 
 
-def test_legacy_stuck_cursor_recovers_missing_page_without_reset(large_library_sync):
-    """An old complete cursor cannot hide books the device never received."""
+def test_legacy_stuck_cursor_recovers_all_uncertain_pages_without_reset(
+    large_library_sync,
+):
+    """An old complete cursor cannot turn user-wide history into receipt."""
     from cps import kobo, ub
 
     harness = large_library_sync
@@ -252,8 +308,14 @@ def test_legacy_stuck_cursor_recovers_missing_page_without_reset(large_library_s
         books_last_id=harness.books[-1].id,
     ).build_sync_token()
 
-    recovered = harness.sync(poisoned)
+    first_recovery = harness.sync(poisoned)
+    second_recovery = harness.sync(
+        first_recovery.headers[harness.token_header],
+    )
 
-    assert _entitlements(recovered) == [("NewEntitlement", 101)]
+    assert _entitlements(first_recovery) == [
+        ("NewEntitlement", book_id) for book_id in range(1, 101)
+    ]
+    assert _entitlements(second_recovery) == [("NewEntitlement", 101)]
     assert harness.session.query(ub.KoboSyncedBooks).count() == 101
     assert harness.session.query(ub.KoboDeviceBookEntitlement).count() == 101

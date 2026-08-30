@@ -9,7 +9,7 @@ import threading
 from types import SimpleNamespace
 
 import pytest
-from flask import Flask
+from flask import Flask, g
 from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -1528,10 +1528,19 @@ def test_personal_library_removal_archives_book_in_kobo_shelf_sync(
     )
     session.add(user)
     session.flush()
+    device = ub.Device(
+        user_id=user.id,
+        kind="kobo",
+        display_name="Shelf-sync Kobo",
+        model="Kobo",
+        active=True,
+        created_by="auto",
+    )
     shelf = ub.Shelf(
         name="Kobo shelf", user_id=user.id, is_public=0, kobo_sync=True,
     )
     session.add_all([
+        device,
         shelf,
         ub.UserLibraryBook(user_id=user.id, book_id=book.id),
         ub.KoboSyncedBooks(
@@ -1612,6 +1621,7 @@ def test_personal_library_removal_archives_book_in_kobo_shelf_sync(
                 kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER: token,
             },
         ):
+            g.annotation_origin_device_id = device.id
             response = kobo_module.HandleSyncRequest.__wrapped__()
 
         removals = [
@@ -1622,6 +1632,24 @@ def test_personal_library_removal_archives_book_in_kobo_shelf_sync(
             .get("IsRemoved") is True
         ]
         assert removals == [{"Id": str(book.id), "IsRemoved": True}]
+        # Constructing the archive page is not delivery evidence.  Its
+        # bookkeeping is promoted only when Kobo acknowledges the page by
+        # presenting the returned token on its next request.
+        assert session.query(ub.KoboSyncedBooks).filter_by(
+            user_id=user.id, book_id=book.id
+        ).count() == 1
+        acknowledged_token = response.headers[
+            kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER
+        ]
+        with app.test_request_context(
+            "/v1/library/sync",
+            headers={
+                kobo_module.SyncToken.SyncToken.SYNC_TOKEN_HEADER:
+                    acknowledged_token,
+            },
+        ):
+            g.annotation_origin_device_id = device.id
+            kobo_module.HandleSyncRequest.__wrapped__()
         assert session.query(ub.KoboSyncedBooks).filter_by(
             user_id=user.id, book_id=book.id
         ).count() == 0

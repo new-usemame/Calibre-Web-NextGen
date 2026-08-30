@@ -8,7 +8,7 @@
 from .cw_login import current_user
 from . import logger, ub
 from datetime import datetime, timezone
-from sqlalchemy.sql.expression import or_, and_, true
+from sqlalchemy.sql.expression import and_, true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 # from sqlalchemy import exc
 
@@ -42,7 +42,7 @@ def _book_identity(identity):
 
 
 def add_synced_books_batch(book_identities, *, commit=True):
-    """Stage a delivered page, optionally committing the shared transaction."""
+    """Stage an acknowledged page, optionally committing its transaction."""
     page_books = dict(_book_identity(identity) for identity in book_identities)
     if not page_books:
         return True
@@ -92,11 +92,11 @@ def get_device_entitlement_fingerprints(device_id, book_ids):
 def stage_device_entitlement_fingerprints(
     device_id, fingerprints, change_bases=None, payload_schema_version=1,
 ):
-    """Upsert delivered entitlement hashes into the caller's transaction.
+    """Upsert acknowledged entitlement hashes in the caller's transaction.
 
-    The sync handler stages this alongside ``add_synced_books_batch``
-    (``commit=False``) and makes both durable in one checked request-level
-    commit before the response token is constructed.
+    The sync acknowledgment path stages this beside the flat markers and the
+    replacement pending page. The request-level commit therefore cannot expose
+    confirmed classification without the token evidence that justified it.
     """
     if not device_id or not fingerprints:
         return
@@ -253,6 +253,54 @@ def mark_device_entitlement_classification(device_ids, version):
         {ub.KoboDeviceEntitlementSeed.classification_version: int(version)},
         synchronize_session=False,
     )
+
+
+def get_pending_sync_page(device_id):
+    """Return the single unacknowledged response retained for ``device_id``."""
+    if not device_id:
+        return None
+    return ub.session.get(ub.KoboDevicePendingSyncPage, int(device_id))
+
+
+def stage_pending_sync_page(
+    device_id,
+    incoming_token_hash,
+    outgoing_token,
+    response_body,
+    response_headers_json,
+    confirmation_json,
+):
+    """Replace a device's acknowledged page with its next durable response."""
+    now = datetime.now(timezone.utc)
+    statement = sqlite_insert(ub.KoboDevicePendingSyncPage).values({
+        "device_id": int(device_id),
+        "incoming_token_hash": incoming_token_hash,
+        "outgoing_token": outgoing_token,
+        "response_body": response_body,
+        "response_headers_json": response_headers_json,
+        "confirmation_json": confirmation_json,
+        "created_at": now,
+    })
+    ub.session.execute(statement.on_conflict_do_update(
+        index_elements=["device_id"],
+        set_={
+            "incoming_token_hash": statement.excluded.incoming_token_hash,
+            "outgoing_token": statement.excluded.outgoing_token,
+            "response_body": statement.excluded.response_body,
+            "response_headers_json": statement.excluded.response_headers_json,
+            "confirmation_json": statement.excluded.confirmation_json,
+            "created_at": statement.excluded.created_at,
+        },
+    ))
+
+
+def delete_pending_sync_page(device_id):
+    """Delete a pending page inside the caller-owned transaction."""
+    if not device_id:
+        return 0
+    return ub.session.query(ub.KoboDevicePendingSyncPage).filter_by(
+        device_id=int(device_id),
+    ).delete(synchronize_session=False)
 
 
 def _record_user_book_deletions(session, user_id, book_deletions, deleted_at):

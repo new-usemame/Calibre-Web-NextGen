@@ -70,7 +70,7 @@ def test_stock_store_proxy_results_remain_after_local_removal(monkeypatch):
     handler_source = inspect.getsource(HandleSyncRequest)
     response_source = inspect.getsource(generate_sync_response)
     assert handler_source.index("pending_deletions") < handler_source.index(
-        "return generate_sync_response")
+        "response = generate_sync_response")
     assert "if config.config_kobo_proxy" in response_source
     assert "sync_results += store_sync_results" in response_source
 

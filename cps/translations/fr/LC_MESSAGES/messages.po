@@ -7155,6 +7155,10 @@ msgid "Something went wrong. Try again."
 msgstr "Une erreur s’est produite. Réessayez."
 
 #: cps/spa_strings.py
+msgid "Manual order"
+msgstr "Ordre manuel"
+
+#: cps/spa_strings.py
 msgid "Sort order"
 msgstr "Ordre de tri"
 

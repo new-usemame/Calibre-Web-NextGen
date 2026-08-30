@@ -7013,6 +7013,10 @@ msgid "Something went wrong. Try again."
 msgstr "Er is iets misgegaan. Probeer het opnieuw."
 
 #: cps/spa_strings.py
+msgid "Manual order"
+msgstr "Handmatige volgorde"
+
+#: cps/spa_strings.py
 msgid "Sort order"
 msgstr "Sorteervolgorde"
 

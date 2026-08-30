@@ -166,13 +166,20 @@ test('coarse pointers use a visible actions disclosure with real touch input', a
   await tap(more);
   await tap(readAction);
   await expect(page).toHaveURL(/\/app\/read\/\d+/);
+  const discoverRefetch = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return response.request().method() === 'GET'
+      && url.pathname === '/api/v1/books'
+      && url.searchParams.get('filter') === 'discover';
+  });
   await page.goBack();
+  const discoverResponse = await discoverRefetch;
+  expect(discoverResponse.ok(), 'Discover refetch after reader navigation').toBeTruthy();
+  const { items: discoverItems } = await discoverResponse.json() as {
+    items: Array<{ id: number }>;
+  };
+  expect(discoverItems.length, 'Discover refetch returns a rail card').toBeGreaterThan(0);
   await expect(catalogCard).toBeVisible();
-  // Returning to the cached catalog starts a background query refresh. Wait
-  // for that replacement pass before sampling raw touch coordinates on a
-  // Discover card, otherwise the component can be replaced after the tap and
-  // its newly-open state is correctly discarded with the old instance.
-  await page.waitForLoadState('networkidle');
 
   // Horizontal rails are overflow containers, which otherwise clip an
   // absolutely-positioned panel on the block axis. Exercise a real Discover
@@ -180,11 +187,23 @@ test('coarse pointers use a visible actions disclosure with real touch input', a
   // centre, not merely present behind the rail's clipping layer.
   const discover = page.getByTestId('discover-section');
   await expect(discover).toBeVisible();
-  const railMore = discover.getByRole('button', { name: /^More actions for / }).first();
-  // This leg isolates rail clipping/paint order; genuine touch activation was
-  // already exercised above. Playwright's actionability click re-resolves the
-  // shuffled/refetched rail card and still refuses an intercepted trigger.
-  await railMore.click();
+  const railDetails = discover.locator('a[aria-label^="Open details for"]').first();
+  await expect(railDetails).toHaveAttribute('href', new RegExp(`/book/${discoverItems[0].id}$`));
+  const railMore = railDetails.locator('..')
+    .getByRole('button', { name: /^More actions for / });
+  await expect(railMore).toHaveAttribute('aria-expanded', 'false');
+  await railMore.evaluate((node) => node.scrollIntoView({
+    block: 'center',
+    inline: 'center',
+    behavior: 'instant',
+  }));
+  await expect.poll(() => railMore.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+    return hit === node || node.contains(hit);
+  }), { message: 'Discover trigger owns its centre after rail scroll release' }).toBe(true);
+  await tap(railMore);
+  await expect(railMore).toHaveAttribute('aria-expanded', 'true');
   const railRead = discover
     .getByRole('group', { name: /^Actions for / })
     .getByRole('link', { name: /^Read / });
@@ -234,6 +253,40 @@ test('coarse pointers use a visible actions disclosure with real touch input', a
   } finally {
     await page.request.post(`/api/v1/shelves/${shelfId}/delete`, { headers }).catch(() => undefined);
   }
+});
+
+test('keyboard focus leaving a card closes its actions disclosure', async ({ page }) => {
+  test.skip(!isTouchProject(), 'coarse-pointer actions disclosure');
+
+  await page.goto('/app');
+
+  const disclosures = page.getByRole('button', { name: /^More actions for / });
+  await expect(disclosures.first()).toBeVisible();
+  expect(await disclosures.count(), 'the catalog fixture needs at least two action disclosures')
+    .toBeGreaterThan(1);
+  const first = disclosures.nth(0);
+  const second = disclosures.nth(1);
+
+  await first.focus();
+  await page.keyboard.press('Enter');
+  await expect(first).toHaveAttribute('aria-expanded', 'true');
+
+  // Focus moving within one disclosure must leave it open.
+  await page.keyboard.press('Tab');
+  await expect(first.locator('..').getByRole('link').first()).toBeFocused();
+  await expect(first).toHaveAttribute('aria-expanded', 'true');
+
+  // Continue as a keyboard user would until the next card's trigger, then open
+  // it. Leaving the first card must release its panel and paint containment.
+  for (let tab = 0; tab < 8; tab += 1) {
+    if (await second.evaluate((node) => document.activeElement === node)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(second).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(second).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('button[aria-expanded="true"]')).toHaveCount(1);
+  await expect(first).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('quick-edit action uses the light-theme palette in both presentations', async ({ page }) => {

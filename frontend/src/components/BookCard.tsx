@@ -312,7 +312,15 @@ function BookCardInner({
         </div>
       )}
       {hasCoarseActions && (
-        <div className={styles.moreActionsWrap} ref={actionsRef}>
+        <div
+          className={styles.moreActionsWrap}
+          ref={actionsRef}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setActionsOpen(false);
+            }
+          }}
+        >
           <button
             ref={actionsTriggerRef}
             type="button"

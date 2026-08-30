@@ -257,7 +257,6 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
-  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease),
               background var(--dur-fast) var(--ease),
               color var(--dur-fast) var(--ease);
@@ -267,7 +266,6 @@
 .wrap:focus-within .removeBtn,
 .removeBtn:focus-visible {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .removeBtn:hover {
@@ -299,7 +297,6 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
-  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease),
               background var(--dur-fast) var(--ease),
               color var(--dur-fast) var(--ease);
@@ -309,7 +306,6 @@
 .wrap:focus-within .quickEditBtn,
 .quickEditBtn:focus-visible {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .quickEditBtn:hover {
@@ -368,7 +364,6 @@
   white-space: nowrap;
   overflow: hidden;
   opacity: 0;
-  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
@@ -389,7 +384,7 @@
 
 .wrap:hover .readNow,
 .wrap:focus-within .readNow,
-.readNow:focus-visible { opacity: 1; pointer-events: auto; }
+.readNow:focus-visible { opacity: 1; }
 
 .readNow:hover,
 .readNow:focus-visible { background: var(--accent-soft); }
@@ -404,13 +399,21 @@
 
 .addToLibrary:disabled { cursor: wait; opacity: .7; }
 
+.moreActionsWrap {
+  display: none;
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  z-index: calc(var(--z-overlay) + 1);
+}
+
 /* Coarse pointers use one visible disclosure rather than opacity-hidden live
    controls. A real iPad tap applies synthetic hover before click; that made the
    old opacity:0 Read link reveal and activate under the same finger. Removing
    the legacy controls from layout makes invisible activation impossible while
    preserving the established hover/focus treatment for fine pointers. */
 @media (any-hover: none), (any-pointer: coarse) {
-  .legacyPointerAction, .removeBtn, .quickEditBtn { display: none; }
+  .readNow, .removeBtn, .quickEditBtn { display: none; }
   .addToLibrary { display: flex; min-height: 44px; }
   .moreActionsWrap { display: block; }
   /* Bigger where legibility is worst — a phone held at arm's length is the
@@ -420,14 +423,6 @@
     font-size: var(--fs-sm);
   }
   .seriesBadge { min-width: 28px; height: 28px; font-size: var(--fs-sm); }
-}
-
-.moreActionsWrap {
-  display: none;
-  position: absolute;
-  top: var(--sp-2);
-  right: var(--sp-2);
-  z-index: calc(var(--z-overlay) + 1);
 }
 
 .moreActionsTrigger {

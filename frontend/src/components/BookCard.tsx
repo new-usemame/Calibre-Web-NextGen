@@ -257,7 +257,7 @@ export function BookCard({
       {onRemove && (
         <button
           type="button"
-          className={`${styles.removeBtn} ${styles.legacyPointerAction}`}
+          className={styles.removeBtn}
           aria-label={t(removeLabel)}
           onClick={() => onRemove(book)}
         >
@@ -268,7 +268,6 @@ export function BookCard({
         <div className={[
           styles.actionRow,
           quickEdit ? styles.actionRowEdit : '',
-          hasAddAction ? '' : styles.legacyPointerAction,
         ].filter(Boolean).join(' ')}>
           {hasAddAction ? (
             <button type="button" className={`${styles.readNow} ${styles.addToLibrary}`}

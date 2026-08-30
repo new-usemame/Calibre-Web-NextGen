@@ -16,6 +16,7 @@ it — a missed call site is invisible until a user reports the buttons are stil
 there on shelves.
 """
 import pathlib
+import re
 
 import pytest
 
@@ -45,6 +46,8 @@ _CARD_SURFACES = {
 # Only these five own the preference; the rails receive it.
 _STATE_OWNERS = tuple(k for k in _CARD_SURFACES if k[0] == "pages")
 
+_COARSE_MEDIA = "(any-hover: none), (any-pointer: coarse)"
+
 
 
 def _media_block(css: str, opener: str) -> str:
@@ -67,6 +70,70 @@ def _media_block(css: str, opener: str) -> str:
             if depth == 0:
                 return css[start:i]
     raise AssertionError("unterminated media block for {!r}".format(opener))
+
+
+def _css_rules(css: str):
+    """Return ordinary CSS rules with their media context and source order.
+
+    This is intentionally a small cascade reader, not a CSS validator.  The
+    card-action regression happened because a test inspected one media block
+    in isolation and ignored a later, equally-specific rule.  Keeping source
+    order and media context makes these assertions exercise the declaration
+    that actually wins.
+    """
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    rules = []
+
+    def walk(fragment: str, media=()):
+        cursor = 0
+        while True:
+            opening = fragment.find("{", cursor)
+            if opening == -1:
+                return
+            header = fragment[cursor:opening].strip()
+            depth = 1
+            closing = opening + 1
+            while closing < len(fragment) and depth:
+                if fragment[closing] == "{":
+                    depth += 1
+                elif fragment[closing] == "}":
+                    depth -= 1
+                closing += 1
+            if depth:
+                raise AssertionError(f"unterminated CSS block after {header!r}")
+
+            body = fragment[opening + 1:closing - 1]
+            if header.startswith("@media "):
+                walk(body, media + (header.removeprefix("@media ").strip(),))
+            elif header.startswith("@"):  # e.g. @container; retain media context
+                walk(body, media)
+            elif header:
+                declarations = {
+                    name.strip(): value.strip()
+                    for name, value in re.findall(
+                        r"(?:^|;)\s*([\w-]+)\s*:\s*([^;{}]+)", body
+                    )
+                }
+                rules.append((tuple(s.strip() for s in header.split(",")), declarations, media))
+            cursor = closing
+
+    walk(css)
+    return rules
+
+
+def _effective_class_property(css: str, class_name: str, prop: str, *, coarse: bool):
+    """Resolve a property for a plain class selector in the requested mode."""
+    requested_media = {(), (_COARSE_MEDIA,)} if coarse else {()}
+    winner = None
+    for order, (selectors, declarations, media) in enumerate(_css_rules(css)):
+        if media not in requested_media or prop not in declarations:
+            continue
+        if f".{class_name}" not in selectors:
+            continue
+        # Every accepted selector is one class, so specificity is equal and
+        # the later declaration wins exactly as it does in the production bug.
+        winner = (declarations[prop], order, media)
+    return winner
 
 
 def test_preference_key_has_exactly_one_definition():
@@ -117,8 +184,6 @@ def test_coarse_pointer_card_actions_use_a_visible_disclosure():
     css = (_FE / "components" / "BookCard.module.css").read_text()
     coarse = _media_block(css, "@media (any-hover: none), (any-pointer: coarse) {")
 
-    assert ".legacyPointerAction, .removeBtn, .quickEditBtn { display: none; }" in coarse
-    assert ".moreActionsWrap { display: block; }" in coarse
     assert ".moreActionsTrigger" in css
     assert "width: 44px;" in css and "height: 44px;" in css
     assert "aria-expanded={actionsOpen}" in src
@@ -127,9 +192,6 @@ def test_coarse_pointer_card_actions_use_a_visible_disclosure():
     assert "t('Actions for {title}'" in src
     assert 'role="group"' in src
 
-    # Fine-pointer hidden actions cannot take a click until hover/focus reveals
-    # them; coarse pointers remove them entirely instead of relying on this.
-    assert css.count("pointer-events: none;") >= 3
     for selector in (
         ".wrap:hover .removeBtn",
         ".wrap:focus-within .removeBtn",
@@ -142,7 +204,61 @@ def test_coarse_pointer_card_actions_use_a_visible_disclosure():
         ".readNow:focus-visible",
     ):
         assert selector in css
-    assert css.count("pointer-events: auto;") >= 4
+
+
+def test_coarse_pointer_hide_rule_names_the_real_action_classes():
+    """The coarse rule must hide the controls, not an unrelated class name.
+
+    Validate both sides of the CSS-module contract: the rule names the three
+    concrete controls, and every class it hides is referenced by BookCard.
+    """
+    src = (_FE / "components" / "BookCard.tsx").read_text()
+    css = (_FE / "components" / "BookCard.module.css").read_text()
+    hidden = set()
+    for selectors, declarations, media in _css_rules(css):
+        if media == (_COARSE_MEDIA,) and declarations.get("display") == "none":
+            hidden.update(selector.removeprefix(".") for selector in selectors
+                          if re.fullmatch(r"\.[A-Za-z_][\w-]*", selector))
+
+    assert hidden == {"readNow", "removeBtn", "quickEditBtn"}, (
+        "coarse-pointer hiding must target the three concrete BookCard controls; "
+        f"found {sorted(hidden)}"
+    )
+    unreferenced = sorted(name for name in hidden if f"styles.{name}" not in src)
+    assert unreferenced == [], f"CSS hides classes BookCard never renders: {unreferenced}"
+
+
+@pytest.mark.parametrize("class_name", ("readNow", "removeBtn", "quickEditBtn"))
+def test_coarse_pointer_hides_each_action_in_the_effective_cascade(class_name):
+    css = (_FE / "components" / "BookCard.module.css").read_text()
+    winner = _effective_class_property(css, class_name, "display", coarse=True)
+    assert winner is not None and winner[0] == "none", (
+        f".{class_name} must resolve to display:none on coarse pointers; winner={winner}"
+    )
+
+
+def test_coarse_pointer_disclosure_wins_the_effective_cascade():
+    css = (_FE / "components" / "BookCard.module.css").read_text()
+    winner = _effective_class_property(css, "moreActionsWrap", "display", coarse=True)
+    assert winner is not None and winner[0] == "block", (
+        ".moreActionsWrap must resolve to display:block on coarse pointers; "
+        f"winner={winner}"
+    )
+
+
+@pytest.mark.parametrize("class_name", ("readNow", "removeBtn", "quickEditBtn"))
+def test_hover_revealed_actions_do_not_disable_pointer_events_at_rest(class_name):
+    """Actionability hit-testing happens before Playwright synthesizes hover.
+
+    Coarse pointers remove these controls from layout, so disabling hit-testing
+    in the fine-pointer rest state has no remaining job and makes real clicks
+    race the hover reveal.
+    """
+    css = (_FE / "components" / "BookCard.module.css").read_text()
+    winner = _effective_class_property(css, class_name, "pointer-events", coarse=False)
+    assert winner is None or winner[0] == "auto", (
+        f".{class_name} must retain normal pointer hit-testing at rest; winner={winner}"
+    )
 
 
 def test_coarse_pointer_reversal_does_not_touch_primary_actions_or_badges():

@@ -5917,6 +5917,16 @@ msgid "More actions for {name}"
 msgstr "Plus d'actions pour {name}"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "More actions for {title}"
+msgstr "Plus d’actions pour {title}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Actions for {title}"
+msgstr "Actions pour {title}"
+
+#: cps/spa_strings.py
 msgid "More cover options (search providers, e-reader preview)"
 msgstr ""
 "Plus d’options de couverture (recherche de sources, aperçu sur liseuse)"

@@ -6,7 +6,7 @@ import {
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
-import { settleByBatch, settleById } from './bulkResults';
+import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { createEntityListQueryOptions } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
 import type { MetadataProvider, MetaSearchResponse } from './api';
@@ -900,11 +900,31 @@ export function useBulkActions() {
     // server still validates the request and returns a structured
     // batch_too_large error, which settleByBatch preserves for the UI.
     mutationFn: (ids: number[]) => settleByBatch(ids, 200, async (bookIds) => {
-      const result = await apiPost<{ succeeded_ids: number[]; failed_ids: number[] }>(
+      const result = await apiPost<{
+        succeeded_ids: number[];
+        failed_ids: number[];
+        results: Array<{
+          book_id: number;
+          status: 'succeeded' | 'failed';
+          error?: { code?: unknown; message?: unknown };
+        }>;
+      }>(
         '/api/v1/books/my-library/batch',
         { operation: 'remove', book_ids: bookIds },
       );
-      return { succeededIds: result.succeeded_ids, failedIds: result.failed_ids };
+      const failureDetails: BulkFailureDetail[] = result.results.flatMap((item) => {
+        if (item.status !== 'failed' || typeof item.error?.message !== 'string') return [];
+        return [{
+          id: item.book_id,
+          ...(typeof item.error.code === 'string' ? { code: item.error.code } : {}),
+          message: item.error.message,
+        }];
+      });
+      return {
+        succeededIds: result.succeeded_ids,
+        failedIds: result.failed_ids,
+        failureDetails,
+      };
     }),
     onSuccess: refresh,
   });

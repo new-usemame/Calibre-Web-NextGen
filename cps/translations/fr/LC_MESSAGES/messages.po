@@ -4024,8 +4024,12 @@ msgstr "Supprimer définitivement {n} livre(s) sélectionné(s) de la bibliothè
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "Remove {n} selected book(s) from your library? They leave your library and your OPDS feed. They are also removed from any regular shelves you added them to. Nothing is deleted from the global library. Highlights, notes, bookmarks, and reading progress are kept. If you use Kobo's built-in sync, the books also leave your Kobo at its next sync; other e-readers keep downloaded copies."
-msgstr "Retirer {n} livre(s) sélectionné(s) de votre bibliothèque ? Ils quittent votre bibliothèque et votre flux OPDS. Ils sont également retirés des étagères ordinaires auxquelles vous les aviez ajoutés. Rien n’est supprimé de la bibliothèque globale. Les surlignages, notes, marque-pages et la progression de lecture sont conservés. Si vous utilisez la synchronisation intégrée de Kobo, les livres quittent également votre Kobo lors de sa prochaine synchronisation ; les autres liseuses conservent les copies téléchargées."
+msgid "Remove {n} selected book(s) from your library? They leave your library and your OPDS feed. They are also removed from any regular shelves you added them to. Nothing is deleted from the global library. Highlights, notes, bookmarks, and reading progress are kept. If you use Kobo's built-in sync, the books also leave each Kobo device on your account at its next sync; other e-readers keep downloaded copies."
+msgstr "Retirer {n} livre(s) sélectionné(s) de votre bibliothèque ? Ils quittent votre bibliothèque et votre flux OPDS. Ils sont également retirés des étagères ordinaires auxquelles vous les aviez ajoutés. Rien n’est supprimé de la bibliothèque globale. Les surlignages, notes, marque-pages et la progression de lecture sont conservés. Si vous utilisez la synchronisation intégrée de Kobo, les livres quittent également chaque appareil Kobo associé à votre compte lors de sa prochaine synchronisation ; les autres liseuses conservent les copies téléchargées."
+
+#: cps/spa_strings.py
+msgid "The last book cannot be removed unless you can browse the global library."
+msgstr "Le dernier livre ne peut être retiré que si vous pouvez parcourir la bibliothèque globale."
 
 #: cps/spa_strings.py
 #, python-brace-format

@@ -5,6 +5,7 @@ import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { Spinner } from './Spinner';
 import { ApiError, type MetadataListMode, type MetadataUpdate } from '../lib/api';
+import { uniqueBulkRemovalFailureReasons } from '../lib/bulkRemoval';
 import styles from './BulkBar.module.css';
 
 interface BulkBarProps {
@@ -122,7 +123,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
   };
 
   const onRemoveFromMyLibrary = () => {
-    if (!window.confirm(t("Remove {n} selected book(s) from your library? They leave your library and your OPDS feed. They are also removed from any regular shelves you added them to. Nothing is deleted from the global library. Highlights, notes, bookmarks, and reading progress are kept. If you use Kobo's built-in sync, the books also leave your Kobo at its next sync; other e-readers keep downloaded copies.", { n: count }))) return;
+    if (!window.confirm(t("Remove {n} selected book(s) from your library? They leave your library and your OPDS feed. They are also removed from any regular shelves you added them to. Nothing is deleted from the global library. Highlights, notes, bookmarks, and reading progress are kept. If you use Kobo's built-in sync, the books also leave each Kobo device on your account at its next sync; other e-readers keep downloaded copies.", { n: count }))) return;
     removeFromMyLibrary.mutate(ids, {
       onSuccess: (result) => {
         const succeeded = result.succeededIds.length;
@@ -130,6 +131,9 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
         let message = failed
           ? t('{succeeded} book(s) removed from your library; {failed} failed.', { succeeded, failed })
           : t('{n} book(s) removed from your library.', { n: succeeded });
+        for (const reason of uniqueBulkRemovalFailureReasons(result.failureDetails, t)) {
+          message += ` ${reason}`;
+        }
         const tooLarge = result.errors.find((error) =>
           error instanceof ApiError && error.detail?.code === 'batch_too_large');
         if (tooLarge instanceof ApiError) {

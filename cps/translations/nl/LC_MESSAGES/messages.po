@@ -3910,8 +3910,12 @@ msgstr "Wil je {n} geselecteerde boek(en) definitief uit de globale bibliotheek 
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "Remove {n} selected book(s) from your library? They leave your library and your OPDS feed. They are also removed from any regular shelves you added them to. Nothing is deleted from the global library. Highlights, notes, bookmarks, and reading progress are kept. If you use Kobo's built-in sync, the books also leave your Kobo at its next sync; other e-readers keep downloaded copies."
-msgstr "Wil je {n} geselecteerde boek(en) uit je bibliotheek verwijderen? Ze verdwijnen uit je bibliotheek en je OPDS-feed. Ze worden ook verwijderd van gewone planken waaraan je ze hebt toegevoegd. Er wordt niets uit de globale bibliotheek verwijderd. Markeringen, notities, bladwijzers en leesvoortgang blijven bewaard. Als je de ingebouwde Kobo-synchronisatie gebruikt, verdwijnen de boeken bij de volgende synchronisatie ook van je Kobo; andere e-readers behouden gedownloade exemplaren."
+msgid "Remove {n} selected book(s) from your library? They leave your library and your OPDS feed. They are also removed from any regular shelves you added them to. Nothing is deleted from the global library. Highlights, notes, bookmarks, and reading progress are kept. If you use Kobo's built-in sync, the books also leave each Kobo device on your account at its next sync; other e-readers keep downloaded copies."
+msgstr "Wil je {n} geselecteerde boek(en) uit je bibliotheek verwijderen? Ze verdwijnen uit je bibliotheek en je OPDS-feed. Ze worden ook verwijderd van gewone planken waaraan je ze hebt toegevoegd. Er wordt niets uit de globale bibliotheek verwijderd. Markeringen, notities, bladwijzers en leesvoortgang blijven bewaard. Als je de ingebouwde Kobo-synchronisatie gebruikt, verdwijnen de boeken ook van elk Kobo-apparaat van je account zodra dat apparaat de volgende keer synchroniseert; andere e-readers behouden gedownloade exemplaren."
+
+#: cps/spa_strings.py
+msgid "The last book cannot be removed unless you can browse the global library."
+msgstr "Het laatste boek kan alleen worden verwijderd als je door de globale bibliotheek kunt bladeren."
 
 #: cps/spa_strings.py
 #, python-brace-format

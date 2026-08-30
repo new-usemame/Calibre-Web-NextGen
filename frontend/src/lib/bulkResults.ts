@@ -1,13 +1,22 @@
+export interface BulkFailureDetail {
+  id: number;
+  code?: string;
+  message: string;
+}
+
 export interface BulkActionResult {
   succeededIds: number[];
   failedIds: number[];
+  /** Optional for per-request fan-out; populated by structured batch APIs. */
+  failureDetails?: BulkFailureDetail[];
 }
 
 export interface BulkBatchResult extends BulkActionResult {
   /** Request-level failures (for example batch_too_large). Per-id policy
-   *  refusals stay in failedIds because the batch endpoint reports them in a
-   *  successful response. */
+   *  refusals stay in failedIds/failureDetails because the batch endpoint
+   *  reports them in a successful response. */
   errors: unknown[];
+  failureDetails: BulkFailureDetail[];
 }
 
 /** Settle every per-book request while retaining which id produced each result. */
@@ -53,9 +62,18 @@ export async function settleByBatch(
     }
 
     const succeeded = new Set(result.value.succeededIds);
+    const failureById = new Map(
+      (result.value.failureDetails ?? []).map((detail) => [detail.id, detail]),
+    );
     chunk.forEach((id) => {
-      (succeeded.has(id) ? accounting.succeededIds : accounting.failedIds).push(id);
+      if (succeeded.has(id)) {
+        accounting.succeededIds.push(id);
+        return;
+      }
+      accounting.failedIds.push(id);
+      const detail = failureById.get(id);
+      if (detail) accounting.failureDetails.push(detail);
     });
     return accounting;
-  }, { succeededIds: [], failedIds: [], errors: [] });
+  }, { succeededIds: [], failedIds: [], errors: [], failureDetails: [] });
 }

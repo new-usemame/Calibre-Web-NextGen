@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-import glob
 import os
 import random
 import io
@@ -39,7 +38,7 @@ try:
     from . import cw_advocate
     from .cw_advocate.exceptions import UnacceptableAddressException
     use_advocate = True
-except ImportError as e:
+except ImportError:
     use_advocate = False
     advocate = requests
     UnacceptableAddressException = MissingSchema = BaseException
@@ -51,27 +50,30 @@ from . import logger, config, db, ub, fs
 from . import gdriveutils as gd
 from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBNAIL_TYPE_COVER, THUMBNAIL_TYPE_SERIES,
                         SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_FROM, EXTENSIONS_CONVERT_TO)
-from .subproc_wrapper import process_wait, process_open
+from .subproc_wrapper import process_wait
 from .services.file_move import copy_with_metadata_fallback
 from .services import parallel
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
 
-from cps.cwa_db_loader import load_cwa_db
+from cps.cwa_db_loader import load_cwa_db  # noqa: E402
 CWA_DB = load_cwa_db().CWA_DB
-from .services.worker import WorkerThread, STAT_FINISH_SUCCESS
-from .tasks.mail import TaskEmail
-from .tasks.thumbnail import TaskClearCoverThumbnailCache, TaskGenerateCoverThumbnails
-from .tasks.metadata_backup import TaskBackupMetadata
-from .file_helper import get_temp_dir
-from .epub_helper import (
+from .services.worker import WorkerThread, STAT_FINISH_SUCCESS  # noqa: E402
+from .tasks.mail import TaskEmail  # noqa: E402
+from .tasks.thumbnail import (  # noqa: E402
+    TaskClearCoverThumbnailCache,
+    TaskGenerateCoverThumbnails,
+)
+from .tasks.metadata_backup import TaskBackupMetadata  # noqa: E402
+from .file_helper import get_temp_dir  # noqa: E402
+from .epub_helper import (  # noqa: E402
     create_new_metadata_backup,
     get_content_opf,
     merge_kepub_metadata,
     updateEpub,
 )
-from .embed_helper import do_calibre_export
+from .embed_helper import do_calibre_export  # noqa: E402
 
 log = logger.create()
 
@@ -549,7 +551,8 @@ def get_valid_filename(value, replace_whitespace=True, chars=128):
     except ModuleNotFoundError:
         # Attempt path adjustment (similar to scripts/cover_enforcer)
         try:  # pragma: no cover
-            import sys as _sys, os as _os
+            import os as _os
+            import sys as _sys
             project_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '..'))
             if project_root not in _sys.path:
                 _sys.path.insert(0, project_root)
@@ -1090,8 +1093,11 @@ def rename_all_files_on_change(one_book, new_path, old_path, all_new_name, gdriv
                 gd.moveGdriveFileRemote(g_file, all_new_name + '.' + file_format.format.lower())
                 gd.updateDatabaseOnEdit(g_file['id'], all_new_name + '.' + file_format.format.lower())
             else:
-                log.error("File {} not found on gdrive"
-                          .format(old_path, file_format.name + '.' + file_format.format.lower()))
+                log.error(
+                    "File %s not found on gdrive path %s",
+                    file_format.name + '.' + file_format.format.lower(),
+                    old_path,
+                )
 
         # change name in Database
         file_format.name = all_new_name
@@ -1357,14 +1363,19 @@ class _LocalFormatDelete:
         return True, None
 
     def finalize(self):
-        errors = []
+        failed = False
         for _original, quarantine in self.renamed_files:
             try:
                 os.remove(quarantine)
             except OSError as ex:
-                errors.append("{}: {}".format(quarantine, ex))
-        if errors:
-            return False, "; ".join(errors)
+                failed = True
+                log.error(
+                    "Removing quarantined format file %s failed: %s",
+                    quarantine,
+                    ex,
+                )
+        if failed:
+            return False, "One or more quarantined format files could not be removed"
         return True, None
 
 
@@ -1378,7 +1389,7 @@ class _GDriveFormatDelete:
     def restore(self):
         try:
             gd.moveGdriveFileRemote(self.g_file, self.original_title)
-            gd.updateDatabaseOnEdit(self.g_file["id"], self.original_title)
+            gd.updateDatabaseOnEditStrict(self.g_file["id"], self.original_title)
             return True, None
         except Exception as ex:
             return False, str(ex)
@@ -1386,7 +1397,7 @@ class _GDriveFormatDelete:
     def finalize(self):
         try:
             self.g_file.Trash()
-            gd.deleteDatabaseEntry(self.g_file["id"])
+            gd.deleteDatabaseEntryStrict(self.g_file["id"])
             return True, None
         except Exception as ex:
             return False, str(ex)
@@ -1394,6 +1405,24 @@ class _GDriveFormatDelete:
 
 def _format_quarantine_name(filename):
     return ".{}.cwng-delete-{}.quarantine".format(filename, uuid4().hex)
+
+
+def _restore_gdrive_after_staging_failure(g_file, original_title):
+    """Reconcile an ambiguous Drive rename by ID, then restore cache state."""
+    try:
+        remote_file = gd.getGdriveFileById(g_file["id"])
+    except Exception as ex:
+        log.warning(
+            "Refreshing Google Drive file %s after a staging failure failed; "
+            "attempting compensation with the existing handle: %s",
+            g_file["id"],
+            ex,
+        )
+        remote_file = g_file
+
+    if remote_file.get("title") != original_title:
+        gd.moveGdriveFileRemote(remote_file, original_title)
+    gd.updateDatabaseOnEditStrict(g_file["id"], original_title)
 
 
 def stage_book_format_delete(book, calibrepath, book_format):
@@ -1423,23 +1452,19 @@ def stage_book_format_delete(book, calibrepath, book_format):
             )
         original_title = g_file["title"]
         quarantine_title = _format_quarantine_name(original_title)
-        renamed = False
         try:
             gd.moveGdriveFileRemote(g_file, quarantine_title)
-            renamed = True
-            gd.updateDatabaseOnEdit(g_file["id"], quarantine_title)
+            gd.updateDatabaseOnEditStrict(g_file["id"], quarantine_title)
         except Exception as ex:
-            if renamed:
-                try:
-                    gd.moveGdriveFileRemote(g_file, original_title)
-                    gd.updateDatabaseOnEdit(g_file["id"], original_title)
-                except Exception as restore_ex:
-                    log.error(
-                        "Restoring Google Drive format for book %s after staging "
-                        "failed; remote bytes remain quarantined: %s",
-                        book.id,
-                        restore_ex,
-                    )
+            try:
+                _restore_gdrive_after_staging_failure(g_file, original_title)
+            except Exception as restore_ex:
+                log.error(
+                    "Restoring Google Drive format for book %s after staging "
+                    "failed; remote bytes may remain quarantined: %s",
+                    book.id,
+                    restore_ex,
+                )
             return None, _(
                 "Deleting book %(id)s failed: %(message)s", id=book.id, message=ex
             )
@@ -1847,7 +1872,7 @@ def get_book_cover_internal(book, resolution=None):
                     thumbnail_to_serve = jpg_thumb if jpg_exists else (webp_thumb if webp_exists else None)
                 else:
                     thumbnail_to_serve = webp_thumb if webp_exists else (jpg_thumb if jpg_exists else None)
-            except:
+            except Exception:
                 # Fallback if we can't determine request context
                 thumbnail_to_serve = webp_thumb if webp_exists else (jpg_thumb if jpg_exists else None)
             if thumbnail_to_serve:
@@ -2145,7 +2170,7 @@ def save_cover_from_url(url, book_path):
     except MissingDelegateError as ex:
         log.info(u'File Format Error %s', ex)
         return False, _("Cover Format Error")
-    except UnacceptableAddressException as e:
+    except UnacceptableAddressException:
         log.error("Localhost or local network was accessed for cover upload")
         return False, _("You are not allowed to access localhost or the local network for cover uploads")
     finally:
@@ -2308,7 +2333,7 @@ def do_download_file(book, book_format, client, data, headers):
 
     book_name = data.name
     download_name = filename = None
-    metadata_was_embedded = False  # Track if we embedded metadata
+    metadata_was_embedded = False
 
     if config.config_use_google_drive:
         # startTime = time.time()
@@ -2422,7 +2447,13 @@ def do_download_file(book, book_format, client, data, headers):
                         file_path=exported_file
                     )
         except Exception as e:
-            log.error(f"Failed to calculate/store checksum for book {book.id}: {e}")
+            checksum_source = "embedded" if metadata_was_embedded else "original"
+            log.error(
+                "Failed to calculate/store checksum for book %s from %s file: %s",
+                book.id,
+                checksum_source,
+                e,
+            )
             # Don't fail the download if checksum calculation fails
 
     # Clean up staged copies in /tmp/calibre_web after the response is sent

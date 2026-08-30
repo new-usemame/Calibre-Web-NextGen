@@ -18,7 +18,7 @@ from flask import Blueprint, request, flash, redirect, url_for, abort, Response,
 from flask_babel import gettext as _
 from flask_babel import lazy_gettext as N_
 from flask_babel import get_locale
-from .cw_login import current_user, login_required
+from .cw_login import current_user
 from sqlalchemy.exc import OperationalError, IntegrityError, InterfaceError, InvalidRequestError
 from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.sql.expression import func
@@ -827,14 +827,11 @@ def read_selected_books():
     if vals:
         try:
             for book_id in vals:
-                ret = helper.edit_book_read_status(book_id, markAsRead)
+                helper.edit_book_read_status(book_id, markAsRead)
 
         except (OperationalError, IntegrityError, StaleDataError) as e:
             calibre_db.session.rollback()
             log.error_or_exception("Database error: {}".format(e))
-            ret = Response(json.dumps({'success': False,
-                    'msg': 'Database error: {}'.format(e.orig if hasattr(e, "orig") else e)}),
-                    mimetype='application/json')
 
         return json.dumps({'success': True})
     return ""
@@ -941,7 +938,7 @@ def table_xchange_author_title():
 
             if edited_books_id:
                 # toDo: Handle error
-                edit_error = helper.update_dir_structure(edited_books_id, config.get_book_path(), input_authors[0])
+                helper.update_dir_structure(edited_books_id, config.get_book_path(), input_authors[0])
             if modify_date:
                 helper.mark_book_modified(book)
             try:
@@ -1714,8 +1711,8 @@ def delete_book_from_table(
                         cleanup_error,
                     )
                     error = _(
-                        "Format metadata was deleted, but file cleanup failed: %(message)s",
-                        message=cleanup_error,
+                        "Format metadata was deleted, but file cleanup was incomplete; "
+                        "an administrator can recover the quarantined file."
                     )
                 if error:
                     if json_response:

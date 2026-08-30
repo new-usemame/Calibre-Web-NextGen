@@ -10,6 +10,7 @@ import flask
 import pytest
 from flask_babel import Babel
 from sqlalchemy import create_engine, event
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -146,8 +147,9 @@ def format_delete_server(tmp_path, monkeypatch):
         methods=["POST"],
     )
 
+    client = app.test_client()
+
     def request(surface):
-        client = app.test_client()
         if surface == "classic":
             return client.post(
                 f"/delete/{book.id}/EPUB", data={"location": f"/book/{book.id}"}
@@ -157,6 +159,8 @@ def format_delete_server(tmp_path, monkeypatch):
     yield SimpleNamespace(
         app=app,
         book_id=book.id,
+        book_path=str(library),
+        client=client,
         data_name=data_name,
         engine=engine,
         format_file=format_file,
@@ -169,6 +173,32 @@ def format_delete_server(tmp_path, monkeypatch):
 
     session.close()
     engine.dispose()
+
+
+@pytest.fixture
+def real_gdrive_cache_session(monkeypatch):
+    """Install a real gdriveutils cache session containing one file mapping."""
+    from cps import gdriveutils
+
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    gdriveutils.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine, expire_on_commit=False)()
+    session.add(
+        gdriveutils.GdriveId(gdrive_id=1, path="Book.epub/")
+    )
+    session.commit()
+    monkeypatch.setattr(gdriveutils, "session", session)
+
+    yield SimpleNamespace(gd=gdriveutils, session=session)
+
+    session.close()
+    engine.dispose()
+
+
+def _fail_gdrive_cache_commits(session, message):
+    @event.listens_for(session, "before_commit")
+    def _raise_operational_error(_session):
+        raise OperationalError("COMMIT", {}, RuntimeError(message))
 
 
 def _assert_book_and_user_state_survive(server):
@@ -258,6 +288,50 @@ def test_format_commit_failure_restores_physical_file(
 
 
 @pytest.mark.parametrize("surface", ["classic", "api"])
+def test_format_cleanup_failure_retains_quarantine_without_path_leak(
+    format_delete_server, surface, monkeypatch
+):
+    server = format_delete_server
+
+    def fail_unlink(_path):
+        raise OSError("simulated quarantine unlink failure")
+
+    monkeypatch.setattr(server.helper.os, "remove", fail_unlink)
+    response = server.request(surface)
+
+    assert response.status_code == (302 if surface == "classic" else 200)
+    assert not server.format_file.exists()
+    quarantines = list(server.format_file.parent.glob("*.quarantine"))
+    assert len(quarantines) == 1
+    assert quarantines[0].read_bytes() == b"the only copy of this book"
+    assert (
+        server.session.query(db.Data)
+        .filter_by(book=server.book_id, format="EPUB")
+        .count()
+        == 0
+    )
+    _assert_book_and_user_state_survive(server)
+
+    if surface == "classic":
+        with server.client.session_transaction() as browser_session:
+            flashes = browser_session.get("_flashes", [])
+        warning = next(message for category, message in flashes if category == "warning")
+        user_content = warning
+    else:
+        payload = response.get_json()
+        assert payload["deleted"] is True
+        assert payload["warning"]["code"] == "cleanup_incomplete"
+        user_content = payload["warning"]["message"]
+
+    assert user_content == (
+        "Format metadata was deleted, but file cleanup was incomplete; "
+        "an administrator can recover the quarantined file."
+    )
+    assert server.book_path not in user_content
+    assert str(quarantines[0]) not in user_content
+
+
+@pytest.mark.parametrize("surface", ["classic", "api"])
 def test_invisible_format_target_is_404_on_both_surfaces(format_delete_server, surface):
     server = format_delete_server
     server.session.query(ub.UserLibraryBook).filter_by(
@@ -314,7 +388,7 @@ def test_google_drive_stage_restores_remote_name_on_rollback(monkeypatch):
     monkeypatch.setattr(helper.gd, "moveGdriveFileRemote", move)
     monkeypatch.setattr(
         helper.gd,
-        "updateDatabaseOnEdit",
+        "updateDatabaseOnEditStrict",
         lambda file_id, title: cache_updates.append((file_id, title)),
     )
     book = SimpleNamespace(
@@ -352,10 +426,10 @@ def test_google_drive_finalize_trashes_only_after_staging(monkeypatch):
         helper.gd, "getFileFromEbooksFolder", lambda *_args, **_kwargs: remote
     )
     monkeypatch.setattr(helper.gd, "moveGdriveFileRemote", move)
-    monkeypatch.setattr(helper.gd, "updateDatabaseOnEdit", lambda *_args: None)
+    monkeypatch.setattr(helper.gd, "updateDatabaseOnEditStrict", lambda *_args: None)
     monkeypatch.setattr(
         helper.gd,
-        "deleteDatabaseEntry",
+        "deleteDatabaseEntryStrict",
         lambda file_id: events.append(("delete-cache", file_id)),
     )
     book = SimpleNamespace(
@@ -373,26 +447,27 @@ def test_google_drive_finalize_trashes_only_after_staging(monkeypatch):
     assert events[1:] == ["trash", ("delete-cache", "remote-1")]
 
 
-def test_google_drive_stage_failure_compensates_successful_remote_rename(monkeypatch):
+def test_google_drive_stage_real_cache_failure_compensates_remote_rename(
+    monkeypatch, real_gdrive_cache_session
+):
     from cps import helper
 
     moves = []
-    remote = {"id": "remote-1", "title": "Book.epub"}
+    remote = {"id": 1, "title": "Book.epub"}
 
     def move(g_file, title):
         moves.append(title)
         g_file["title"] = title
-
-    def update(_file_id, title):
-        if title != "Book.epub":
-            raise RuntimeError("simulated cache update failure")
 
     monkeypatch.setattr(helper.config, "config_use_google_drive", True, raising=False)
     monkeypatch.setattr(
         helper.gd, "getFileFromEbooksFolder", lambda *_args, **_kwargs: remote
     )
     monkeypatch.setattr(helper.gd, "moveGdriveFileRemote", move)
-    monkeypatch.setattr(helper.gd, "updateDatabaseOnEdit", update)
+    monkeypatch.setattr(helper.gd, "getGdriveFileById", lambda _file_id: remote)
+    _fail_gdrive_cache_commits(
+        real_gdrive_cache_session.session, "simulated cache update failure"
+    )
     book = SimpleNamespace(
         id=1,
         path="Author/Book (1)",
@@ -404,4 +479,153 @@ def test_google_drive_stage_failure_compensates_successful_remote_rename(monkeyp
     assert staged is None
     assert "cache update failure" in error
     assert moves[-1] == "Book.epub"
+    assert remote["title"] == "Book.epub"
+
+
+def test_google_drive_restore_real_cache_failure_is_surfaced(
+    monkeypatch, real_gdrive_cache_session
+):
+    from cps import helper
+
+    cache = real_gdrive_cache_session
+    cache.session.query(cache.gd.GdriveId).filter_by(gdrive_id=1).one().path = (
+        ".Book.epub.quarantine/"
+    )
+    cache.session.commit()
+    _fail_gdrive_cache_commits(cache.session, "simulated cache restore failure")
+    remote = {"id": 1, "title": ".Book.epub.quarantine"}
+
+    def move(g_file, title):
+        g_file["title"] = title
+
+    monkeypatch.setattr(helper.gd, "moveGdriveFileRemote", move)
+
+    restored, restore_error = helper._GDriveFormatDelete(
+        remote, "Book.epub"
+    ).restore()
+
+    assert restored is False
+    assert "cache restore failure" in restore_error
+    assert remote["title"] == "Book.epub"
+    assert (
+        cache.session.query(cache.gd.GdriveId).filter_by(gdrive_id=1).one().path
+        == ".Book.epub.quarantine/"
+    )
+
+
+def test_google_drive_finalize_real_cache_failure_is_cleanup_incomplete(
+    real_gdrive_cache_session,
+):
+    from cps import helper
+
+    cache = real_gdrive_cache_session
+    _fail_gdrive_cache_commits(cache.session, "simulated cache delete failure")
+
+    class RemoteFile(dict):
+        trashed = False
+
+        def Trash(self):
+            self.trashed = True
+
+    remote = RemoteFile(id=1, title=".Book.epub.quarantine")
+
+    finalized, finalize_error = helper._GDriveFormatDelete(
+        remote, "Book.epub"
+    ).finalize()
+
+    assert finalized is False
+    assert "cache delete failure" in finalize_error
+    assert remote.trashed is True
+    assert cache.session.query(cache.gd.GdriveId).filter_by(gdrive_id=1).count() == 1
+
+
+def test_google_drive_cache_delete_failure_reaches_api_cleanup_warning(
+    format_delete_server, monkeypatch, real_gdrive_cache_session
+):
+    from cps import helper
+
+    server = format_delete_server
+    cache = real_gdrive_cache_session
+
+    class RemoteFile(dict):
+        trashed = False
+
+        def Trash(self):
+            self.trashed = True
+
+    remote = RemoteFile(id=1, title="Book.epub")
+
+    def move(g_file, title):
+        g_file["title"] = title
+
+    @event.listens_for(cache.session, "before_commit")
+    def fail_cache_delete_after_trash(_session):
+        if remote.trashed:
+            raise OperationalError(
+                "COMMIT", {}, RuntimeError("simulated cache delete failure")
+            )
+
+    monkeypatch.setattr(helper.config, "config_use_google_drive", True, raising=False)
+    monkeypatch.setattr(
+        helper.gd, "getFileFromEbooksFolder", lambda *_args, **_kwargs: remote
+    )
+    monkeypatch.setattr(helper.gd, "moveGdriveFileRemote", move)
+
+    response = server.request("api")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "deleted": True,
+        "warning": {
+            "code": "cleanup_incomplete",
+            "message": (
+                "Format metadata was deleted, but file cleanup was incomplete; "
+                "an administrator can recover the quarantined file."
+            ),
+        },
+    }
+    assert remote.trashed is True
+    assert cache.session.query(cache.gd.GdriveId).filter_by(gdrive_id=1).count() == 1
+    assert (
+        server.session.query(db.Data)
+        .filter_by(book=server.book_id, format="EPUB")
+        .count()
+        == 0
+    )
+    _assert_book_and_user_state_survive(server)
+
+
+def test_google_drive_ambiguous_rename_is_reconciled_by_id(monkeypatch):
+    from cps import helper
+
+    remote = {"id": 1, "title": "Book.epub"}
+    looked_up = []
+
+    def move(g_file, title):
+        g_file["title"] = title
+        if title != "Book.epub":
+            raise TimeoutError("rename response timed out")
+
+    def fetch_by_id(file_id):
+        looked_up.append(file_id)
+        return remote
+
+    monkeypatch.setattr(helper.config, "config_use_google_drive", True, raising=False)
+    monkeypatch.setattr(
+        helper.gd, "getFileFromEbooksFolder", lambda *_args, **_kwargs: remote
+    )
+    monkeypatch.setattr(helper.gd, "moveGdriveFileRemote", move)
+    monkeypatch.setattr(helper.gd, "getGdriveFileById", fetch_by_id)
+    monkeypatch.setattr(helper.gd, "updateDatabaseOnEditStrict", lambda *_args: None)
+    book = SimpleNamespace(
+        id=1,
+        path="Author/Book (1)",
+        data=[SimpleNamespace(name="Book", format="EPUB")],
+    )
+
+    staged, error = helper.stage_book_format_delete(book, "/unused", "EPUB")
+
+    assert staged is None
+    assert "rename response timed out" in error
+    assert looked_up == [1]
     assert remote["title"] == "Book.epub"

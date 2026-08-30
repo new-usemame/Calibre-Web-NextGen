@@ -11,7 +11,6 @@ import shutil
 import chardet
 import ssl
 import sqlite3
-import mimetypes
 
 from werkzeug.datastructures import Headers
 from flask import Response, stream_with_context
@@ -45,7 +44,7 @@ try:
     from pydrive2.drive import GoogleDrive
     from pydrive2.auth import RefreshError
     from pydrive2.files import ApiRequestError
-except ImportError as err:
+except ImportError:
     try:
         from pydrive.auth import GoogleAuth
         from pydrive.drive import GoogleDrive
@@ -336,6 +335,14 @@ def moveGdriveFileRemote(origin_file_id, new_title):
     origin_file_id.Upload()
 
 
+def getGdriveFileById(file_id):
+    """Return freshly fetched Drive metadata for ``file_id``."""
+    drive = getDrive(Gdrive.Instance().drive)
+    g_file = drive.CreateFile({'id': file_id})
+    g_file.FetchMetadata(fields='id,title')
+    return g_file
+
+
 # Download metadata.db from gdrive
 def downloadFile(path, filename, output):
     f = getFileFromEbooksFolder(path, filename)
@@ -571,6 +578,22 @@ def updateDatabaseOnEdit(ID, newPath):
             session.rollback()
 
 
+def updateDatabaseOnEditStrict(ID, newPath):
+    """Update one cached Drive path or raise if the postcondition is not met."""
+    if not session:
+        raise RuntimeError('GDrive database session not available')
+    sqlCheckPath = newPath if newPath[-1] == '/' else newPath + '/'
+    try:
+        storedPathName = session.query(GdriveId).filter(GdriveId.gdrive_id == ID).first()
+        if not storedPathName:
+            raise RuntimeError('GDrive cache entry not found for file {}'.format(ID))
+        storedPathName.path = sqlCheckPath
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+
 # Deletes the hashes in database of deleted book
 def deleteDatabaseEntry(ID):
     if not session:
@@ -582,6 +605,19 @@ def deleteDatabaseEntry(ID):
     except OperationalError as ex:
         log.error_or_exception('Database error: {}'.format(ex))
         session.rollback()
+
+
+def deleteDatabaseEntryStrict(ID):
+    """Delete one cached Drive mapping or raise when the cache cannot commit."""
+    if not session:
+        raise RuntimeError('GDrive database session not available')
+    try:
+        session.query(GdriveId).filter(GdriveId.gdrive_id == ID).delete()
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
 
 def deleteDatabasePath(Pathname):
     if not session:

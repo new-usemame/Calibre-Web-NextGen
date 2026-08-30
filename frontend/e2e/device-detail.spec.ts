@@ -92,7 +92,7 @@ test('device detail exposes typed tabs, assignment view, inventory, and position
   await expect(notes).toBeFocused();
 
   await page.getByRole('checkbox', { name: 'Show annotations assigned to this device' }).check();
-  await expect.poll(() => requests.at(-1)?.searchParams.get('role')).toBe('assigned');
+  await expect.poll(() => requests[requests.length - 1]?.searchParams.get('role')).toBe('assigned');
 
   await notes.press('End');
   await expect(page.getByRole('tab', { name: 'Device library' })).toBeFocused();

@@ -85,7 +85,11 @@ function detail(title: string): BookDetail {
     archived: false,
     favorited: false,
     hidden: false,
-  } as BookDetail;
+    in_progress: false,
+    kosync_progress: null,
+    kosync_progress_timestamp: null,
+    kosync_progress_created_at: null,
+  };
 }
 
 /** Two pages of library, with the book under test first on page 1. The grid

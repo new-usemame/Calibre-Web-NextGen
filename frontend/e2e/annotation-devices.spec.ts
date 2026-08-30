@@ -72,13 +72,13 @@ test('device manager is axe-clean and has no 390px overflow', async ({ page }, t
 });
 
 test('device inventory renders one bounded window and reports the true total', async ({ page }) => {
-  let inventoryRequestUrl: URL | null = null;
+  const inventoryRequestUrls: URL[] = [];
   await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
     devices: [{ ...device, inventory_count: 5000, inventory_observed: '2026-08-09T12:00:00' }],
     limit: 100, offset: 0, total: 1,
   } }));
   await page.route('**/api/annotations/devices/device-1/inventory?*', (route) => {
-    inventoryRequestUrl = new URL(route.request().url());
+    inventoryRequestUrls.push(new URL(route.request().url()));
     return route.fulfill({ json: {
       observed_at: '2026-08-09T12:00:00',
       limit: 200,
@@ -110,10 +110,12 @@ test('device inventory renders one bounded window and reports the true total', a
     });
   expect(deleteGeometry.height).toBeGreaterThanOrEqual(44);
   expect(deleteGeometry.neighborGap).toBeGreaterThanOrEqual(24);
-  expect(inventoryRequestUrl?.searchParams.get('limit')).toBe('200');
-  expect(inventoryRequestUrl?.searchParams.get('offset')).toBe('0');
+  expect(inventoryRequestUrls).toHaveLength(1);
+  expect(inventoryRequestUrls[0].searchParams.get('limit')).toBe('200');
+  expect(inventoryRequestUrls[0].searchParams.get('offset')).toBe('0');
   await inventory.getByRole('button', { name: 'Next' }).click();
-  await expect.poll(() => inventoryRequestUrl?.searchParams.get('offset')).toBe('200');
+  await expect.poll(() => inventoryRequestUrls[inventoryRequestUrls.length - 1]
+    ?.searchParams.get('offset')).toBe('200');
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
     .analyze();

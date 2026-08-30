@@ -87,7 +87,7 @@ export function createOwnedUserIdentity(projectName: string, workerIndex: number
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 12) || 'project';
-  const suffix = randomUUID().replaceAll('-', '').slice(0, 20);
+  const suffix = randomUUID().replace(/-/g, '').slice(0, 20);
   const username = `e2e-v2-${project}-${workerIndex}-${suffix}`;
   assertSuiteUsername(username);
   return { username, email: `${username}@example.test` };

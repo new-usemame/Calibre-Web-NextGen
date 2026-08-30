@@ -35,7 +35,10 @@ test('book-detail deletion remains visible and accessible with delete permission
   test.skip(isMobile === true, 'desktop region — mobile uses the icon-level control (#1828)');
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
@@ -56,7 +59,10 @@ test('book-detail deletion remains visible and accessible with delete permission
 test('book-detail deletion remains absent without delete permission (#1862)', async ({ page }) => {
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, false);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
@@ -72,7 +78,10 @@ test('dismissing book-detail deletion confirmation never calls the endpoint (#18
   test.skip(isMobile === true, 'desktop region — the mobile confirm path is covered by the icon-control test below');
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, true);
   let deleteCalls = 0;
@@ -104,7 +113,10 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
   test.skip(isMobile === true, 'desktop region — hidden on mobile by #1828, so there is nothing to theme');
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
@@ -180,15 +192,18 @@ test('mobile demotes deletion to a hit-testable icon control in the action row (
   test.skip(isMobile !== true, 'mobile-only layout');
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, true);
   let deleteCalls = 0;
-  await page.route(`**/api/v1/books/${book!.id}/delete`, async (route) => {
+  await page.route(`**/api/v1/books/${book.id}/delete`, async (route) => {
     deleteCalls += 1;
     await route.fulfill({ status: 204, contentType: 'application/json', body: '' });
   });
-  await page.goto(`/app/book/${book!.id}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
   // The heavy region is not in the narrow DOM at all…
   await expect(page.getByTestId('book-destructive-actions')).toHaveCount(0);
@@ -218,8 +233,8 @@ test('mobile demotes deletion to a hit-testable icon control in the action row (
   });
   await icon.click();
   await page.waitForTimeout(500);
-  expect(declinedPrompt).toContain(`"${book!.title}"`);
+  expect(declinedPrompt).toContain(`"${book.title}"`);
   expect(declinedPrompt).toContain('cannot be undone');
   expect(deleteCalls, 'declining confirmation must not call the delete endpoint').toBe(0);
-  await expect(page).toHaveURL(new RegExp(`/book/${book!.id}\\b`));
+  await expect(page).toHaveURL(new RegExp(`/book/${book.id}\\b`));
 });

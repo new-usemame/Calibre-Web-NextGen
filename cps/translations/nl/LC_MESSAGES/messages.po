@@ -5082,7 +5082,7 @@ msgstr "{name} verwijderd."
 
 #: cps/spa_strings.py
 msgid "Dense"
-msgstr "Compact"
+msgstr "Zeer compact"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/search_form.html

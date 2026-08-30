@@ -29,6 +29,12 @@ NON_SHIPPING_PATH_PREFIXES = (
     # steps 6 and 6.1).
     "frontend/tests/",
     "notes/",
+    # Agent mission records. Unreachable until PR #2034, because every earlier
+    # `state/`-only commit rode inside a PR that also carried shipping code and
+    # was covered by that PR's fragment. The first state-only PR went red, and
+    # the only way to satisfy the guard would have been to invent a user-facing
+    # entry for a note recording which SHAs merged.
+    "state/",
     "tests/",
     "wiki-src/",
 )

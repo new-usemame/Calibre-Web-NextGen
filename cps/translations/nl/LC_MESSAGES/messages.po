@@ -14413,3 +14413,19 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Pin sidebar"
+msgstr "Zijbalk vastzetten"
+
+#: cps/spa_strings.py
+msgid "Sidebar pinned."
+msgstr "Zijbalk vastgezet."
+
+#: cps/spa_strings.py
+msgid "Sidebar unpinned."
+msgstr "Zijbalk losgemaakt."
+
+#: cps/spa_strings.py
+msgid "Unpin sidebar"
+msgstr "Zijbalk losmaken"

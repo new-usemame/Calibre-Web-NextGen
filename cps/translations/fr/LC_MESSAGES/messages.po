@@ -14905,3 +14905,19 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Pin sidebar"
+msgstr "Épingler la barre latérale"
+
+#: cps/spa_strings.py
+msgid "Sidebar pinned."
+msgstr "Barre latérale épinglée."
+
+#: cps/spa_strings.py
+msgid "Sidebar unpinned."
+msgstr "Barre latérale détachée."
+
+#: cps/spa_strings.py
+msgid "Unpin sidebar"
+msgstr "Détacher la barre latérale"

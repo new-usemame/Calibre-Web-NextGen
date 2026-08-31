@@ -60,6 +60,20 @@ test('device actions menu dismisses on an outside pointer press', async ({ page 
   await expect(remove).toBeHidden();
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await page.mouse.up();
+
+  await trigger.click();
+  await expect(remove).toBeVisible();
+  const topBar = page.getByRole('banner');
+  const topBarBox = await topBar.boundingBox();
+  expect(topBarBox).not.toBeNull();
+  await page.mouse.move(
+    topBarBox!.x + topBarBox!.width / 2,
+    topBarBox!.y + topBarBox!.height / 2,
+  );
+  await page.mouse.down();
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await page.mouse.up();
   expect(calls.deletePreflights()).toBe(0);
 });
 
@@ -98,6 +112,21 @@ test('touch dismissal does not activate the control beneath the press', async ({
   await expect(remove).toBeHidden();
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(inventory).toHaveAttribute('aria-expanded', 'false');
+
+  await trigger.tap();
+  await expect(remove).toBeVisible();
+  const navigationToggle = page.getByRole('button', { name: 'Open navigation' });
+  const navigation = page.locator('nav[aria-label="Browse"]');
+  const navigationToggleBox = await navigationToggle.boundingBox();
+  expect(navigationToggleBox).not.toBeNull();
+  await page.touchscreen.tap(
+    navigationToggleBox!.x + navigationToggleBox!.width / 2,
+    navigationToggleBox!.y + navigationToggleBox!.height / 2,
+  );
+
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(navigation).toHaveAttribute('inert', '');
   expect(calls.deletePreflights()).toBe(0);
 });
 

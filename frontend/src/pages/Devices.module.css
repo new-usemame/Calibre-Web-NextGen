@@ -79,9 +79,9 @@
 .cardActions { display: flex; align-items: flex-start; position: relative; }
 .cardActions > button, .renameForm button { min-width: 44px; min-height: 44px; border-radius: var(--r-md); color: var(--text-muted); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .cardActions > button:hover { background: var(--surface-2); color: var(--text); }
-.menuDismissLayer { position: fixed; z-index: 2; inset: 0; }
-.menuTriggerOpen { position: relative; z-index: 3; }
-.menu { position: absolute; z-index: 3; right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--elev-2); }
+.menuDismissLayer { position: fixed; z-index: calc(var(--z-overlay) + 1); inset: 0; }
+.menuTriggerOpen { position: relative; z-index: calc(var(--z-overlay) + 2); }
+.menu { position: absolute; z-index: calc(var(--z-overlay) + 2); right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--elev-2); }
 .menu button { width: 100%; min-height: 44px; text-align: left; padding: 0 var(--sp-3); border-radius: var(--r-sm); color: var(--danger); }
 .menu button:hover { background: var(--danger-soft); }
 .renameForm { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
@@ -147,7 +147,7 @@
 .deviceSeen > svg { color: var(--success); }
 .deviceSeen p, .deviceWaiting p { margin: 0; line-height: var(--lh-base); }
 .copyError { min-height: 1.5em; margin: var(--sp-2) 0 0; color: var(--danger); font-size: var(--fs-sm); }
-.scrim { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: var(--sp-4); background: var(--overlay-backdrop); }
+.scrim { position: fixed; z-index: calc(var(--z-overlay) + 3); inset: 0; display: grid; place-items: center; padding: var(--sp-4); background: var(--overlay-backdrop); }
 .dialog { width: min(520px, 100%); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--elev-3); }
 .dialog h2 { font-size: var(--fs-lg); }
 .dialog p { color: var(--text-muted); line-height: var(--lh-base); margin-top: var(--sp-2); }
@@ -158,7 +158,7 @@
    text): a white-on---danger fill fails AA in the dark palette (≈3.3:1). */
 .dangerButton { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); font-weight: var(--fw-medium); }
 .dangerButton:hover { border-color: var(--danger); }
-.toast { position: fixed; z-index: 60; left: 50%; bottom: var(--sp-5); transform: translateX(-50%); display: flex; align-items: center; gap: var(--sp-4); min-width: min(420px, calc(100vw - 32px)); padding: var(--sp-3) var(--sp-4); background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--elev-3); }
+.toast { position: fixed; z-index: calc(var(--z-overlay) + 4); left: 50%; bottom: var(--sp-5); transform: translateX(-50%); display: flex; align-items: center; gap: var(--sp-4); min-width: min(420px, calc(100vw - 32px)); padding: var(--sp-3) var(--sp-4); background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--elev-3); }
 .toast button { margin-left: auto; min-height: 44px; color: var(--accent-text); font-weight: var(--fw-bold); }
 .toast button:hover { color: var(--accent-hover); }
 @media (max-width: 600px) {

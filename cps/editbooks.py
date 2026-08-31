@@ -279,6 +279,7 @@ def edit_selected_books():
                     'files_may_be_inconsistent': False,
                 })
                 continue
+            resolved_book_id = book.id
 
             # Collect all changes
             changes = {key: d.get(key) for key in ['title', 'title_sort', 'author_sort', 'authors', 'categories', 'series', 'languages', 'publishers', 'comments'] if d.get(key)}
@@ -347,12 +348,12 @@ def edit_selected_books():
 
             # Update directory structure once if title or authors changed
             if title_changed or authors_changed:
-                rename_error = helper.update_dir_structure(book.id, config.get_book_path(), input_authors[0])
+                rename_error = helper.update_dir_structure(resolved_book_id, config.get_book_path(), input_authors[0])
                 if rename_error:
                     calibre_db.session.rollback()
-                    log.error("Bulk edit failed to rename book %s: %s", book.id, rename_error)
+                    log.error("Bulk edit failed to rename book %s: %s", resolved_book_id, rename_error)
                     failed_books.append({
-                        'book_id': book.id,
+                        'book_id': resolved_book_id,
                         'stage': 'rename',
                         'files_may_be_inconsistent': True,
                     })
@@ -365,13 +366,13 @@ def edit_selected_books():
                 calibre_db.session.rollback()
                 log.error_or_exception("Database error: {}".format(e))
                 failed_books.append({
-                    'book_id': book.id,
+                    'book_id': resolved_book_id,
                     'stage': 'commit',
                     'files_may_be_inconsistent': title_changed or authors_changed,
                 })
                 continue
 
-            successful_books.append(book.id)
+            successful_books.append(resolved_book_id)
             if metadata_changed and log_payload:
                 try:
                     log_payload.setdefault('title', book.title)
@@ -387,12 +388,12 @@ def edit_selected_books():
                     os.makedirs(constants.CWA_METADATA_CHANGE_LOGS_DIR, exist_ok=True)
                     log_path = os.path.join(
                         constants.CWA_METADATA_CHANGE_LOGS_DIR,
-                        f'{now.strftime("%Y%m%d%H%M%S")}-{book.id}.json')
+                        f'{now.strftime("%Y%m%d%H%M%S")}-{resolved_book_id}.json')
                     with open(log_path, 'w', encoding='utf-8') as f:
                         json.dump(log_payload, f, indent=4, ensure_ascii=False)
-                    log.debug(f"Created metadata change log for book {book.id} with changes: {list(log_payload.keys())}")
+                    log.debug(f"Created metadata change log for book {resolved_book_id} with changes: {list(log_payload.keys())}")
                 except Exception as e:
-                    log.error_or_exception(f"Failed to write metadata change log for book {book.id}: {e}")
+                    log.error_or_exception(f"Failed to write metadata change log for book {resolved_book_id}: {e}")
 
         if failed_books:
             failed_ids = ", ".join(

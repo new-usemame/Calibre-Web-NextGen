@@ -126,10 +126,7 @@ def _resolve_shelf_owner(shelf_obj):
             "Shelf %s has malformed non-NULL owner id %r; refusing book add",
             getattr(shelf_obj, "id", None), shelf_obj.user_id,
         )
-        raise ShelfAddRefusal(
-            SHELF_ADD_REFUSAL_INVALID_OWNER,
-            SHELF_INVALID_OWNER_REFUSAL,
-        )
+        _raise_invalid_shelf_owner_refusal(shelf_obj)
     shelf_owner = (ub.session.query(ub.User)
                    .filter(ub.User.id == owner_id).first())
     if shelf_owner is None:
@@ -137,11 +134,25 @@ def _resolve_shelf_owner(shelf_obj):
             "Shelf %s references missing owner id %s; refusing book add",
             getattr(shelf_obj, "id", None), owner_id,
         )
+        _raise_invalid_shelf_owner_refusal(shelf_obj)
+    return owner_id, shelf_owner
+
+
+def _raise_invalid_shelf_owner_refusal(shelf_obj):
+    """Expose repair details only to an administrator or the recorded owner."""
+    try:
+        actor_is_owner = int(shelf_obj.user_id) == int(current_user.id)
+    except (TypeError, ValueError):
+        actor_is_owner = False
+    if current_user.role_admin() or actor_is_owner:
         raise ShelfAddRefusal(
             SHELF_ADD_REFUSAL_INVALID_OWNER,
             SHELF_INVALID_OWNER_REFUSAL,
         )
-    return owner_id, shelf_owner
+    raise ShelfAddRefusal(
+        SHELF_ADD_REFUSAL_OWNER_HIDDEN,
+        SHELF_NON_OWNER_MEMBERSHIP_REFUSAL,
+    )
 
 
 def _translated_shelf_add_refusal(ex):
@@ -191,14 +202,14 @@ def prepare_user_shelf_add(shelf_obj, book_id):
     """
     owner_id, shelf_owner = _resolve_shelf_owner(shelf_obj)
     if shelf_owner is None:
-        return
+        return None
     if user_library.mode_for_user(shelf_owner) != constants.LIBRARY_MODE_PERSONAL:
-        return
+        return None
     membership = (ub.session.query(ub.UserLibraryBook)
                   .filter(ub.UserLibraryBook.user_id == owner_id,
                           ub.UserLibraryBook.book_id == int(book_id)).first())
     if membership is not None:
-        return
+        return None
     if not shelf_owner.role_browse_global():
         if owner_id == int(current_user.id):
             reason = SHELF_ADD_REFUSAL_SELF_MANAGED
@@ -216,7 +227,22 @@ def prepare_user_shelf_add(shelf_obj, book_id):
             reason = SHELF_ADD_REFUSAL_OWNER_HIDDEN
             message = SHELF_NON_OWNER_MEMBERSHIP_REFUSAL
         raise ShelfAddRefusal(reason, message)
-    user_library.add_book(shelf_owner, book_id)
+    mutation = user_library.add_book(
+        shelf_owner, book_id, return_result=True,
+    )
+    return owner_id if mutation.changed else None
+
+
+def revert_prepared_user_shelf_add(owner_id, book_id):
+    """Remove only the owner membership created for this failed shelf add."""
+    if owner_id is None:
+        return
+    (ub.session.query(ub.UserLibraryBook)
+     .filter(ub.UserLibraryBook.user_id == int(owner_id),
+             ub.UserLibraryBook.book_id == int(book_id))
+     .delete(synchronize_session=False))
+    ub.session.commit()
+    user_library.invalidate_request_cache(owner_id)
 
 
 def add_book_to_shelf(shelf_obj, book_id):
@@ -298,8 +324,9 @@ def add_to_shelf(shelf_id, book_id):
             return redirect(url_for('web.index'))
         return "Sorry you are not allowed to add a book to the that shelf", 403
 
+    prepared_owner_id = None
     try:
-        prepare_user_shelf_add(shelf, book_id)
+        prepared_owner_id = prepare_user_shelf_add(shelf, book_id)
     except user_library.UserLibraryBookNotFound:
         message = "Book not found in the visible global library."
         if not xhr:
@@ -312,15 +339,20 @@ def add_to_shelf(shelf_id, book_id):
     try:
         status, _message = add_book_to_shelf(shelf, book_id)
     except user_library.UserLibraryError as ex:
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
         return _classic_shelf_add_refusal_response(ex, xhr)
     except (OperationalError, InvalidRequestError) as e:
         ub.session.rollback()
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
         log.error_or_exception("Settings Database error: {}".format(e))
         flash(_("Oops! Database Error: %(error)s.", error=getattr(e, 'orig', e)), category="error")
         if "HTTP_REFERER" in request.environ:
             return redirect(request.environ["HTTP_REFERER"])
         else:
             return redirect(url_for('web.index'))
+
+    if status != SHELF_OK:
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
 
     if status == SHELF_ALREADY_PRESENT:
         log.error("Book %s is already part of %s", book_id, shelf)

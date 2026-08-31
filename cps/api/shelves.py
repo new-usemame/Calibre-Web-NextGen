@@ -27,6 +27,7 @@ from ..shelf import (
     delete_shelf_helper,
     add_book_to_shelf,
     prepare_user_shelf_add,
+    revert_prepared_user_shelf_add,
     remove_book_from_shelf,
     compute_shelf_positions,
     queue_hardcover_sync,
@@ -249,8 +250,9 @@ def add_book_to_shelf_api(shelf_id, book_id):
     if not check_shelf_edit_permissions(shelf):
         return _err("forbidden", "You are not allowed to add to this shelf", 403)
 
+    prepared_owner_id = None
     try:
-        prepare_user_shelf_add(shelf, book_id)
+        prepared_owner_id = prepare_user_shelf_add(shelf, book_id)
     except user_library.UserLibraryBookNotFound as ex:
         return _err("not_found", str(ex), 404)
     except user_library.UserLibraryError as ex:
@@ -259,10 +261,15 @@ def add_book_to_shelf_api(shelf_id, book_id):
     try:
         status, message = add_book_to_shelf(shelf, book_id)
     except user_library.UserLibraryError as ex:
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
         return _shelf_add_refusal(ex)
     except (OperationalError, InvalidRequestError) as e:
         ub.session.rollback()
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
         return _err("db_error", "Database error: %s" % getattr(e, "orig", e), 500)
+
+    if status != SHELF_OK:
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
 
     if status == SHELF_INVALID_BOOK:
         return _err("not_found", message, 404)

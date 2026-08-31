@@ -79,13 +79,19 @@ def shelf_server(monkeypatch):
     session.commit()
 
     def common_filters(**kwargs):
-        if kwargs.get("allow_show_global"):
-            return true()
-        return db.Books.id.in_(
-            session.query(ub.UserLibraryBook.book_id).filter(
-                ub.UserLibraryBook.user_id == int(user.id)
+        filter_user = kwargs.get("user") or user
+        visibility_filter = true()
+        if filter_user.filter_language() != "all":
+            visibility_filter &= db.Books.languages.any(
+                db.Languages.lang_code == filter_user.filter_language()
             )
-        )
+        if not kwargs.get("allow_show_global"):
+            visibility_filter &= db.Books.id.in_(
+                session.query(ub.UserLibraryBook.book_id).filter(
+                    ub.UserLibraryBook.user_id == int(filter_user.id)
+                )
+            )
+        return visibility_filter
 
     cdb = type("TestCalibreDB", (), {
         "session": session,
@@ -148,6 +154,65 @@ def test_owner_add_to_own_shelf_grants_membership(shelf_server):
     }
     assert _membership_count(session, user.id, 2) == 1
     assert _shelf_count(session, shelf.id, 2) == 1
+
+
+def test_non_owner_repeat_add_does_not_grant_owner_membership(shelf_server):
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="shelf-owner",
+        email="shelf-owner@example.invalid",
+        password="",
+        role=constants.ROLE_BROWSE_GLOBAL,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    shelf.books.append(ub.BookShelf(shelf=shelf.id, book_id=2, order=1))
+    session.commit()
+    memberships_before = _membership_count(session, owner.id, 2)
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 409, response.get_json()
+    assert response.get_json()["error"]["code"] == "conflict"
+    assert _membership_count(session, owner.id, 2) == memberships_before
+    assert _shelf_count(session, shelf.id, 2) == 1
+
+
+def test_non_owner_restricted_book_refusal_does_not_grant_owner_membership(
+        shelf_server):
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="shelf-owner",
+        email="shelf-owner@example.invalid",
+        password="",
+        role=constants.ROLE_BROWSE_GLOBAL,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    actor.default_language = "fra"
+    session.query(db.Books).filter_by(id=2).one().languages = [
+        db.Languages("eng")
+    ]
+    session.commit()
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 404, response.get_json()
+    assert response.get_json()["error"]["code"] == "not_found"
+    assert _membership_count(session, owner.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
 
 
 def test_non_owner_add_grants_membership_to_shelf_owner_only(shelf_server):
@@ -316,17 +381,50 @@ def test_owner_on_own_shelf_managed_refusal_is_unchanged(shelf_server):
     assert _shelf_count(session, shelf.id, 2) == 0
 
 
-def test_numeric_dangling_owner_is_refused_without_shelf_insert(shelf_server):
+def test_dangling_owner_refusal_hides_detail_from_non_owner_but_not_admin(
+        shelf_server):
     app, session, actor, shelf = shelf_server
-    shelf.user_id = 9999
+    owner = ub.User(
+        name="managed-owner",
+        email="managed-owner@example.invalid",
+        password="",
+        role=0,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
     shelf.is_public = 1
     actor.role |= constants.ROLE_EDIT_SHELFS
     session.commit()
+    client = app.test_client()
 
-    response = app.test_client().post("/api/v1/shelves/9/books/2")
+    generic_response = client.post("/api/v1/shelves/9/books/2")
+    assert generic_response.status_code == 403, generic_response.get_json()
+    assert generic_response.get_json()["error"]["code"] == (
+        "library_membership_rejected"
+    )
+
+    shelf.user_id = 9999
+    session.commit()
+    response = client.post("/api/v1/shelves/9/books/2")
 
     assert response.status_code == 403, response.get_json()
-    assert response.get_json() == {
+    assert response.data == generic_response.data
+    assert response.get_json()["error"]["code"] == (
+        "library_membership_rejected"
+    )
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+    actor.role |= constants.ROLE_ADMIN
+    session.commit()
+    admin_response = client.post("/api/v1/shelves/9/books/2")
+
+    assert admin_response.status_code == 403, admin_response.get_json()
+    assert admin_response.get_json() == {
         "error": {
             "code": "invalid_shelf_owner",
             "message": INVALID_OWNER_REFUSAL,
@@ -351,8 +449,8 @@ def test_api_refuses_unresolved_owner_raised_by_shared_add_core(shelf_server, mo
     assert response.status_code == 403, response.get_json()
     assert response.get_json() == {
         "error": {
-            "code": "invalid_shelf_owner",
-            "message": INVALID_OWNER_REFUSAL,
+            "code": "library_membership_rejected",
+            "message": GENERIC_OWNER_REFUSAL,
         }
     }
     assert _membership_count(session, actor.id, 2) == 0
@@ -375,7 +473,7 @@ def test_non_numeric_owner_is_classic_refusal_not_server_error(shelf_server):
     assert response.status_code == 302
     with client.session_transaction() as client_session:
         flashes = client_session.get("_flashes", [])
-    assert ("error", INVALID_OWNER_REFUSAL) in flashes
+    assert ("error", GENERIC_OWNER_REFUSAL) in flashes
     assert _membership_count(session, actor.id, 2) == 0
     assert _shelf_count(session, shelf.id, 2) == 0
 

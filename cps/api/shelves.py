@@ -250,6 +250,10 @@ def add_book_to_shelf_api(shelf_id, book_id):
     if not check_shelf_edit_permissions(shelf):
         return _err("forbidden", "You are not allowed to add to this shelf", 403)
 
+    book_was_on_shelf = (ub.session.query(ub.BookShelf)
+                         .filter(ub.BookShelf.shelf == shelf.id,
+                                 ub.BookShelf.book_id == book_id)
+                         .first()) is not None
     prepared_owner_id = None
     try:
         prepared_owner_id = prepare_user_shelf_add(shelf, book_id)
@@ -268,7 +272,8 @@ def add_book_to_shelf_api(shelf_id, book_id):
         revert_prepared_user_shelf_add(prepared_owner_id, book_id)
         return _err("db_error", "Database error: %s" % getattr(e, "orig", e), 500)
 
-    if status != SHELF_OK:
+    if status != SHELF_OK and (
+            status != SHELF_ALREADY_PRESENT or book_was_on_shelf):
         revert_prepared_user_shelf_add(prepared_owner_id, book_id)
 
     if status == SHELF_INVALID_BOOK:

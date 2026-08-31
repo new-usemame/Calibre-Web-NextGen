@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, flash, redirect, request, url_for, abort, jsonify
 from flask_babel import gettext as _
 from .cw_login import current_user
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 from sqlalchemy.sql.expression import func, true
 
 from . import calibre_db, config, constants, db, logger, ub, user_library
@@ -237,11 +237,32 @@ def revert_prepared_user_shelf_add(owner_id, book_id):
     """Remove only the owner membership created for this failed shelf add."""
     if owner_id is None:
         return
-    (ub.session.query(ub.UserLibraryBook)
-     .filter(ub.UserLibraryBook.user_id == int(owner_id),
-             ub.UserLibraryBook.book_id == int(book_id))
-     .delete(synchronize_session=False))
-    ub.session.commit()
+    try:
+        (ub.session.query(ub.UserLibraryBook)
+         .filter(ub.UserLibraryBook.user_id == int(owner_id),
+                 ub.UserLibraryBook.book_id == int(book_id))
+         .delete(synchronize_session=False))
+        ub.session.commit()
+    except SQLAlchemyError as ex:
+        log.error_or_exception(
+            "Could not compensate shelf-add membership for owner=%s book=%s: %s",
+            owner_id, book_id, ex,
+        )
+        try:
+            ub.session.rollback()
+        except SQLAlchemyError as rollback_ex:
+            log.error_or_exception(
+                "Could not roll back failed shelf-add compensation: %s",
+                rollback_ex,
+            )
+            try:
+                ub.session.close()
+            except SQLAlchemyError as close_ex:
+                log.error_or_exception(
+                    "Could not close session after failed shelf-add compensation: %s",
+                    close_ex,
+                )
+        return
     user_library.invalidate_request_cache(owner_id)
 
 
@@ -324,6 +345,10 @@ def add_to_shelf(shelf_id, book_id):
             return redirect(url_for('web.index'))
         return "Sorry you are not allowed to add a book to the that shelf", 403
 
+    book_was_on_shelf = (ub.session.query(ub.BookShelf)
+                         .filter(ub.BookShelf.shelf == shelf.id,
+                                 ub.BookShelf.book_id == book_id)
+                         .first()) is not None
     prepared_owner_id = None
     try:
         prepared_owner_id = prepare_user_shelf_add(shelf, book_id)
@@ -351,7 +376,8 @@ def add_to_shelf(shelf_id, book_id):
         else:
             return redirect(url_for('web.index'))
 
-    if status != SHELF_OK:
+    if status != SHELF_OK and (
+            status != SHELF_ALREADY_PRESENT or book_was_on_shelf):
         revert_prepared_user_shelf_add(prepared_owner_id, book_id)
 
     if status == SHELF_ALREADY_PRESENT:

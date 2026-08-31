@@ -8,6 +8,7 @@ import inspect
 import pytest
 from flask import Flask
 from sqlalchemy import create_engine, event, true
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from cps import constants, db, ub
@@ -182,6 +183,43 @@ def test_non_owner_repeat_add_does_not_grant_owner_membership(shelf_server):
     assert response.get_json()["error"]["code"] == "conflict"
     assert _membership_count(session, owner.id, 2) == memberships_before
     assert _shelf_count(session, shelf.id, 2) == 1
+
+
+def test_concurrent_shelf_insert_keeps_prepared_owner_membership(
+        shelf_server, monkeypatch):
+    from cps import shelf as shelf_module
+    from cps.api import shelves as shelves_api
+
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="shelf-owner",
+        email="shelf-owner@example.invalid",
+        password="",
+        role=constants.ROLE_BROWSE_GLOBAL,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+    monkeypatch.setattr(
+        shelves_api,
+        "add_book_to_shelf",
+        lambda *_args: (
+            shelf_module.SHELF_ALREADY_PRESENT,
+            "Book is already part of the shelf: Read later",
+        ),
+    )
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 409, response.get_json()
+    assert response.get_json()["error"]["code"] == "conflict"
+    assert _membership_count(session, owner.id, 2) == 1
 
 
 def test_non_owner_restricted_book_refusal_does_not_grant_owner_membership(
@@ -555,3 +593,46 @@ def test_classic_add_establishes_membership_and_reports_managed_refusal(shelf_se
     )
     assert xhr_response.status_code == 403
     assert xhr_response.get_data(as_text=True) == MANAGED_REFUSAL
+
+
+def test_classic_db_error_response_survives_compensation_failure(
+        shelf_server, monkeypatch):
+    from cps import shelf as shelf_module
+
+    app, session, user, _shelf = shelf_server
+    app.config["PROPAGATE_EXCEPTIONS"] = False
+    compensation_armed = False
+    real_commit = session.commit
+
+    def fail_shelf_add(*_args):
+        nonlocal compensation_armed
+        compensation_armed = True
+        raise OperationalError(
+            "INSERT INTO book_shelf", {}, Exception("forced shelf failure")
+        )
+
+    def fail_compensation_commit():
+        if compensation_armed:
+            raise OperationalError(
+                "DELETE FROM user_library_book", {},
+                Exception("forced compensation failure"),
+            )
+        return real_commit()
+
+    monkeypatch.setattr(shelf_module, "add_book_to_shelf", fail_shelf_add)
+    monkeypatch.setattr(session, "commit", fail_compensation_commit)
+
+    client = app.test_client()
+    response = client.post(
+        "/shelf/add/9/2",
+        headers={"Referer": "/book/2"},
+    )
+
+    assert response.status_code == 302
+    with client.session_transaction() as client_session:
+        flashes = client_session.get("_flashes", [])
+    assert any(
+        category == "error" and message.startswith("Oops! Database Error:")
+        for category, message in flashes
+    )
+    assert _membership_count(session, user.id, 2) == 1

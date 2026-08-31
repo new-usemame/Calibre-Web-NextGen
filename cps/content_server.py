@@ -37,9 +37,13 @@ def start():
     if not os.path.isfile(binary):
         log.error("calibre-server binary not found: %s", binary)
         return
-    args = [binary, "--port", str(config.config_calibre_server_port)]
+    args = [binary, "--port", str(config.config_calibre_server_port),
+            "--listen-on", config.config_calibre_server_listen or "127.0.0.1",
+            "--disable-fallback-to-detected-interface"]
     if config.config_calibre_server_anonymous_writes:
-        args += ["--enable-local-write", "--trusted-ips", "0.0.0.0/0,::/0"]
+        args.append("--enable-local-write")
+        if config.config_calibre_server_trusted_ips:
+            args += ["--trusted-ips", config.config_calibre_server_trusted_ips]
     elif config.config_calibre_server_username and config.config_calibre_server_password_e:
         userdb = os.path.join(constants.CONFIG_DIR, "content_server_users.sqlite")
         try:

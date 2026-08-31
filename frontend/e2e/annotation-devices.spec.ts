@@ -11,14 +11,17 @@ const device = {
 async function stubDevices(page: import('@playwright/test').Page) {
   let current = { ...device };
   let restored = 0;
+  let deletePreflights = 0;
   await page.route('**/api/annotations/devices?*', async (route) => {
     if (route.request().method() === 'GET') {
       const devices = current.active ? [current] : [];
       await route.fulfill({ json: { devices, limit: 100, offset: 0, total: devices.length } });
     } else await route.continue();
   });
-  await page.route('**/api/annotations/devices/device-1/delete-preflight', (route) =>
-    route.fulfill({ json: { origin_count: 4, assigned_count: 2 } }));
+  await page.route('**/api/annotations/devices/device-1/delete-preflight', (route) => {
+    deletePreflights += 1;
+    return route.fulfill({ json: { origin_count: 4, assigned_count: 2 } });
+  });
   await page.route('**/api/annotations/devices/device-1', async (route) => {
     if (route.request().method() === 'PATCH') {
       current = { ...current, label: (await route.request().postDataJSON()).label };
@@ -33,8 +36,70 @@ async function stubDevices(page: import('@playwright/test').Page) {
     current = { ...current, active: true };
     await route.fulfill({ json: { device: current, restored_assignment_count: 2, assignment_conflict_count: 0 } });
   });
-  return { restored: () => restored };
+  return {
+    restored: () => restored,
+    deletePreflights: () => deletePreflights,
+  };
 }
+
+test('device actions menu dismisses on an outside pointer press', async ({ page }) => {
+  const calls = await stubDevices(page);
+  await page.goto('/app/account/devices');
+
+  const trigger = page.getByRole('button', { name: 'More actions for Libra Colour' });
+  const remove = page.getByRole('button', { name: 'Remove device' });
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(remove).toBeVisible();
+
+  const heading = page.getByRole('heading', { name: 'E-readers' });
+  const box = await heading.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await page.mouse.up();
+  expect(calls.deletePreflights()).toBe(0);
+});
+
+test('Escape dismisses the device actions menu and restores trigger focus', async ({ page }) => {
+  const calls = await stubDevices(page);
+  await page.goto('/app/account/devices');
+
+  const trigger = page.getByRole('button', { name: 'More actions for Libra Colour' });
+  const remove = page.getByRole('button', { name: 'Remove device' });
+  await trigger.click();
+  await expect(remove).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(trigger).toBeFocused();
+  expect(calls.deletePreflights()).toBe(0);
+});
+
+test('touch dismissal does not activate the control beneath the press', async ({ page }) => {
+  test.skip(test.info().project.use.hasTouch !== true, 'requires real touch input');
+
+  const calls = await stubDevices(page);
+  await page.goto('/app/account/devices');
+
+  const trigger = page.getByRole('button', { name: 'More actions for Libra Colour' });
+  const inventory = page.getByRole('button', { name: 'View device library' });
+  const remove = page.getByRole('button', { name: 'Remove device' });
+  await trigger.tap();
+  await expect(remove).toBeVisible();
+
+  const box = await inventory.boundingBox();
+  expect(box).not.toBeNull();
+  await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
+
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(inventory).toHaveAttribute('aria-expanded', 'false');
+  expect(calls.deletePreflights()).toBe(0);
+});
 
 test('device manager renames and removes only through counted confirmation, then restores', async ({ page }) => {
   const calls = await stubDevices(page);

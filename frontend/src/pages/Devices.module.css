@@ -79,6 +79,8 @@
 .cardActions { display: flex; align-items: flex-start; position: relative; }
 .cardActions > button, .renameForm button { min-width: 44px; min-height: 44px; border-radius: var(--r-md); color: var(--text-muted); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .cardActions > button:hover { background: var(--surface-2); color: var(--text); }
+.menuDismissLayer { position: fixed; z-index: 2; inset: 0; }
+.menuTriggerOpen { position: relative; z-index: 3; }
 .menu { position: absolute; z-index: 3; right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--elev-2); }
 .menu button { width: 100%; min-height: 44px; text-align: left; padding: 0 var(--sp-3); border-radius: var(--r-sm); color: var(--danger); }
 .menu button:hover { background: var(--danger-soft); }

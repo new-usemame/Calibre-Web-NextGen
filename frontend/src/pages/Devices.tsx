@@ -75,6 +75,8 @@ export function Devices() {
   const [undoDevice, setUndoDevice] = useState<Device | null>(null);
   const [deviceOffset, setDeviceOffset] = useState(0);
   const invokerRef = useRef<HTMLButtonElement | null>(null);
+  const menuInvokerRef = useRef<HTMLButtonElement | null>(null);
+  const menuDismissLayerRef = useRef<HTMLDivElement | null>(null);
   const { data, isLoading, error } = useQuery<DevicePage>({
     queryKey: ['annotation-devices', deviceOffset],
     queryFn: () => apiGet(
@@ -88,6 +90,27 @@ export function Devices() {
   useEffect(() => {
     if (staleDevicePage) setDeviceOffset(correctedDeviceOffset);
   }, [correctedDeviceOffset, staleDevicePage]);
+  useEffect(() => {
+    if (menu === null) return undefined;
+    const dismissLayer = menuDismissLayerRef.current;
+    const dismissOnTouchStart = (event: TouchEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setMenu(null);
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setMenu(null);
+      menuInvokerRef.current?.focus();
+    };
+    dismissLayer?.addEventListener('touchstart', dismissOnTouchStart, { passive: false });
+    document.addEventListener('keydown', dismissOnEscape);
+    return () => {
+      dismissLayer?.removeEventListener('touchstart', dismissOnTouchStart);
+      document.removeEventListener('keydown', dismissOnEscape);
+    };
+  }, [menu]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['annotation-devices'] });
   const rename = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) => apiPatch(`/api/annotations/devices/${id}`, { label: name }),
@@ -178,12 +201,26 @@ export function Devices() {
                 <button type="button" aria-label={t('Rename {name}', { name: device.label })}
                   onClick={() => { setEditing(device.public_id); setLabel(device.label); }}><Pencil size={17} aria-hidden="true" focusable={false} /></button>
                 <button type="button" aria-label={t('More actions for {name}', { name: device.label })}
-                  aria-expanded={menu === device.public_id} onClick={() => setMenu(menu === device.public_id ? null : device.public_id)}>
+                  aria-expanded={menu === device.public_id}
+                  className={menu === device.public_id ? styles.menuTriggerOpen : undefined}
+                  onClick={(event) => {
+                    menuInvokerRef.current = event.currentTarget;
+                    setMenu(menu === device.public_id ? null : device.public_id);
+                  }}>
                   <MoreHorizontal aria-hidden="true" focusable={false} />
                 </button>
-                {menu === device.public_id && <div className={styles.menu}>
-                  <button type="button" onClick={(event) => void openRemove(device, event.currentTarget)}>{t('Remove device')}</button>
-                </div>}
+                {menu === device.public_id && <>
+                  <div ref={menuDismissLayerRef} className={styles.menuDismissLayer} aria-hidden="true"
+                    onPointerDown={(event) => {
+                      if (event.pointerType === 'touch') return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setMenu(null);
+                    }} />
+                  <div className={styles.menu}>
+                    <button type="button" onClick={(event) => void openRemove(device, event.currentTarget)}>{t('Remove device')}</button>
+                  </div>
+                </>}
               </div>
             </li>
             ))}

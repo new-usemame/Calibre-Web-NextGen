@@ -24,7 +24,7 @@ def _book(book_id):
     )
 
 
-def _run_bulk_edit(monkeypatch, tmp_path, failure_stage):
+def _run_bulk_edit(monkeypatch, tmp_path, failure_stage, selections=None):
     from cps import editbooks
 
     books = {book_id: _book(book_id) for book_id in (1, 2, 3)}
@@ -67,7 +67,7 @@ def _run_bulk_edit(monkeypatch, tmp_path, failure_stage):
         "/ajax/editselectedbooks",
         method="POST",
         json={
-            "selections": [1, 2, 3],
+            "selections": selections if selections is not None else [1, 2, 3],
             "title": "Updated title",
             "checkA": "false",
         },
@@ -109,6 +109,29 @@ def test_bulk_edit_keeps_the_legacy_all_success_shape(monkeypatch, tmp_path):
     assert rename_attempts == [1, 2, 3]
     assert session.commit.call_count == 3
     session.rollback.assert_not_called()
+
+
+def test_non_numeric_failed_id_is_not_reflected_in_user_message(
+    monkeypatch, tmp_path,
+):
+    hostile_id = '<img src=x onerror="alert(1)">'
+    payload, rename_attempts, session = _run_bulk_edit(
+        monkeypatch,
+        tmp_path,
+        failure_stage=None,
+        selections=[hostile_id, 1],
+    )
+
+    assert payload["success"] is False
+    assert hostile_id not in payload["message"]
+    assert payload["failed_books"] == [{
+        "book_id": hostile_id,
+        "stage": "lookup",
+        "files_may_be_inconsistent": False,
+    }]
+    assert payload["successful_books"] == [1]
+    assert rename_attempts == [1]
+    session.commit.assert_called_once_with()
 
 
 def test_books_table_surfaces_the_partial_failure_message():

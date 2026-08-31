@@ -395,15 +395,23 @@ def edit_selected_books():
                     log.error_or_exception(f"Failed to write metadata change log for book {book.id}: {e}")
 
         if failed_books:
-            failed_ids = ", ".join(str(failure['book_id']) for failure in failed_books)
+            failed_ids = ", ".join(
+                str(failure['book_id'])
+                for failure in failed_books
+                if isinstance(failure['book_id'], int)
+                and not isinstance(failure['book_id'], bool)
+            )
+            failed_ids_message = _(
+                " (book IDs: %(failed_ids)s)", failed_ids=failed_ids,
+            ) if failed_ids else ""
             message = _(
                 "Bulk edit completed with errors: %(success_count)s succeeded and "
-                "%(failure_count)s failed (book IDs: %(failed_ids)s). One or more "
+                "%(failure_count)s failed%(failed_ids_message)s. One or more "
                 "failed books may have had files renamed before the database update "
                 "failed; their files and database entries may now be inconsistent.",
                 success_count=len(successful_books),
                 failure_count=len(failed_books),
-                failed_ids=failed_ids,
+                failed_ids_message=failed_ids_message,
             )
             return json.dumps({
                 'success': False,

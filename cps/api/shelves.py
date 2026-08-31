@@ -37,6 +37,7 @@ from ..shelf import (
     SHELF_INVALID_BOOK,
     SHELF_NOT_IN_LIBRARY,
     SHELF_MANAGED_MEMBERSHIP_REFUSAL,
+    SHELF_ADD_REFUSAL_INVALID_OWNER,
     SHELF_NOT_PRESENT,
 )
 
@@ -48,6 +49,16 @@ def _uid():
 
 def _err(code, message, status):
     return jsonify({"error": {"code": code, "message": message}}), status
+
+
+def _shelf_add_refusal(ex):
+    message = str(ex) or SHELF_MANAGED_MEMBERSHIP_REFUSAL
+    code = (
+        "invalid_shelf_owner"
+        if getattr(ex, "reason", None) == SHELF_ADD_REFUSAL_INVALID_OWNER
+        else "library_membership_rejected"
+    )
+    return _err(code, message, 403)
 
 
 # ── List ─────────────────────────────────────────────────────────────────────
@@ -243,15 +254,12 @@ def add_book_to_shelf_api(shelf_id, book_id):
     except user_library.UserLibraryBookNotFound as ex:
         return _err("not_found", str(ex), 404)
     except user_library.UserLibraryError as ex:
-        message = str(ex) or SHELF_MANAGED_MEMBERSHIP_REFUSAL
-        return _err(
-            "library_membership_rejected",
-            message,
-            403,
-        )
+        return _shelf_add_refusal(ex)
 
     try:
         status, message = add_book_to_shelf(shelf, book_id)
+    except user_library.UserLibraryError as ex:
+        return _shelf_add_refusal(ex)
     except (OperationalError, InvalidRequestError) as e:
         ub.session.rollback()
         return _err("db_error", "Database error: %s" % getattr(e, "orig", e), 500)

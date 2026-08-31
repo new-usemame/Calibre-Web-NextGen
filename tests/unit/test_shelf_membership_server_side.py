@@ -328,7 +328,30 @@ def test_numeric_dangling_owner_is_refused_without_shelf_insert(shelf_server):
     assert response.status_code == 403, response.get_json()
     assert response.get_json() == {
         "error": {
-            "code": "library_membership_rejected",
+            "code": "invalid_shelf_owner",
+            "message": INVALID_OWNER_REFUSAL,
+        }
+    }
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+
+def test_api_refuses_unresolved_owner_raised_by_shared_add_core(shelf_server, monkeypatch):
+    from cps.api import shelves as shelves_api
+
+    app, session, actor, shelf = shelf_server
+    shelf.user_id = 9999
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+    monkeypatch.setattr(shelves_api, "prepare_user_shelf_add", lambda *_args: None)
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 403, response.get_json()
+    assert response.get_json() == {
+        "error": {
+            "code": "invalid_shelf_owner",
             "message": INVALID_OWNER_REFUSAL,
         }
     }

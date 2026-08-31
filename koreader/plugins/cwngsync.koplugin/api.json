@@ -1,0 +1,177 @@
+{
+    "name" : "koreader-sync-api",
+    "methods" : {
+        "authorize" : {
+            "path" : "/users/auth",
+            "method" : "GET",
+            "expected_status" : [200, 401]
+        },
+        "update_progress" : {
+            "path" : "/syncs/progress",
+            "method" : "PUT",
+            "required_params" : [
+                "document",
+                "progress",
+                "percentage",
+                "device",
+                "device_id"
+            ],
+            "payload" : [
+                "document",
+                "progress",
+                "percentage",
+                "device",
+                "device_id"
+            ],
+            "expected_status" : [200, 202, 401]
+        },
+        "get_progress" : {
+            "path" : "/syncs/progress/:document",
+            "method" : "GET",
+            "required_params" : [
+                "document"
+            ],
+            "optional_params" : [
+                "position_kinds"
+            ],
+            "expected_status" : [200, 401]
+        },
+        "report_inventory" : {
+            "path" : "/syncs/inventory",
+            "method" : "PUT",
+            "required_params" : [
+                "device",
+                "device_id",
+                "inventory"
+            ],
+            "optional_params" : [
+                "free_space",
+                "total_space"
+            ],
+            "payload" : [
+                "device",
+                "device_id",
+                "inventory",
+                "free_space",
+                "total_space"
+            ],
+            "expected_status" : [200, 400, 401, 409, 413, 503]
+        },
+        "claim_delivery" : {
+            "path" : "/syncs/deliveries/claim",
+            "method" : "POST",
+            "required_params" : [
+                "device",
+                "device_id",
+                "free_space",
+                "total_space"
+            ],
+            "payload" : [
+                "device",
+                "device_id",
+                "free_space",
+                "total_space"
+            ],
+            "expected_status" : [200, 400, 401, 403, 409, 413, 503]
+        },
+        "complete_delivery" : {
+            "path" : "/syncs/deliveries/complete",
+            "method" : "PUT",
+            "required_params" : [
+                "device",
+                "device_id",
+                "delivery_id",
+                "claim_token",
+                "lpath",
+                "checksum",
+                "size",
+                "mtime"
+            ],
+            "payload" : [
+                "device",
+                "device_id",
+                "delivery_id",
+                "claim_token",
+                "lpath",
+                "checksum",
+                "size",
+                "mtime"
+            ],
+            "expected_status" : [200, 400, 401, 409, 413, 503]
+        },
+        "refuse_delivery" : {
+            "path" : "/syncs/deliveries/refuse",
+            "method" : "PUT",
+            "required_params" : [
+                "device", "device_id", "delivery_id", "claim_token", "reason",
+                "free_space", "total_space"
+            ],
+            "payload" : [
+                "device", "device_id", "delivery_id", "claim_token", "reason",
+                "free_space", "total_space"
+            ],
+            "expected_status" : [200, 400, 401, 409, 503]
+        },
+        "claim_deletion" : {
+            "path" : "/syncs/deletions/claim",
+            "method" : "POST",
+            "required_params" : ["device", "device_id"],
+            "payload" : ["device", "device_id"],
+            "expected_status" : [200, 400, 401, 409, 503]
+        },
+        "complete_deletion" : {
+            "path" : "/syncs/deletions/complete",
+            "method" : "PUT",
+            "required_params" : [
+                "device", "device_id", "deletion_id", "claim_token", "deleted"
+            ],
+            "optional_params" : ["failure_reason"],
+            "payload" : [
+                "device", "device_id", "deletion_id", "claim_token", "deleted",
+                "failure_reason"
+            ],
+            "expected_status" : [200, 400, 401, 409, 503]
+        },
+        "get_collections" : {
+            "path" : "/syncs/collections",
+            "method" : "POST",
+            "required_params" : ["device", "device_id"],
+            "payload" : ["device", "device_id"],
+            "expected_status" : [200, 400, 401, 409, 503]
+        },
+        "complete_collections" : {
+            "path" : "/syncs/collections/complete",
+            "method" : "PUT",
+            "required_params" : ["device", "device_id", "revision"],
+            "payload" : ["device", "device_id", "revision"],
+            "expected_status" : [200, 400, 401, 409, 503]
+        },
+        "pull_annotations" : {
+            "path" : "/syncs/annotations/:document",
+            "method" : "GET",
+            "required_params" : [
+                "document"
+            ],
+            "expected_status" : [200, 401, 503]
+        },
+        "push_annotations" : {
+            "path" : "/syncs/annotations",
+            "method" : "PUT",
+            "required_params" : [
+                "document",
+                "annotations"
+            ],
+            "optional_params" : [
+                "deleted",
+                "delete_source"
+            ],
+            "payload" : [
+                "document",
+                "annotations",
+                "deleted",
+                "delete_source"
+            ],
+            "expected_status" : [200, 400, 401, 503]
+        }
+    }
+}

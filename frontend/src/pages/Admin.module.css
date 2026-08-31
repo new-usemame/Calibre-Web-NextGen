@@ -117,6 +117,25 @@
   padding: var(--sp-4);
 }
 
+.libraryMode { margin: var(--sp-4) 0 0; padding: var(--sp-3) 0 0; border: 0; border-top: 1px solid var(--border); }
+.libraryMode legend { color: var(--text); font-weight: var(--fw-semi); padding-right: var(--sp-2); }
+.libraryMode label { display: flex; align-items: flex-start; gap: var(--sp-2); margin-top: var(--sp-2); }
+.libraryMode label span { display: flex; flex-direction: column; gap: 2px; }
+.libraryMode small { color: var(--text-muted); }
+.modeWarning { color: var(--warning, var(--accent-text)); font-size: var(--fs-sm); margin-top: var(--sp-2); }
+.libraryAddForm {
+  display: flex;
+  align-items: end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+.libraryAddForm .field { max-width: 10rem; }
+.fieldError { color: var(--danger); font-size: var(--fs-sm); }
+
+@media (max-width: 520px) {
+  .libraryAddForm { align-items: stretch; flex-direction: column; }
+}
+
 .cardHead {
   display: flex;
   align-items: flex-start;

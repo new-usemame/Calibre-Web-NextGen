@@ -111,7 +111,7 @@ def test_full_position_fields_captured(session):
     ann = s.query(ub.Annotation).one()
     assert ann.highlighted_text == "There is no such thing as a moral or an immoral book."
     assert ann.note_text == "Iconic opening line."
-    assert ann.highlight_color == "yellow"
+    assert ann.highlight_color == "#F6F3B3"   # normalised to the wire hex
     assert ann.chapter_progress == 0.05
     # The new sub-project (2) bits — position fields:
     assert ann.content_id == "f5bf555e-ab63-4649-8430-38449747cace!!OEBPS/chapter-01.html"
@@ -129,7 +129,7 @@ def test_partial_payload_doesnt_overwrite_existing_fields(session):
     update = {"id": "kobo-1", "highlightColor": "red"}
     dispatch_annotation_sync([update], _book(), user)
     ann = s.query(ub.Annotation).one()
-    assert ann.highlight_color == "red"
+    assert ann.highlight_color == "#D9534F"   # web-reader red has no Kobo hex
     assert ann.content_id == "f5bf555e-ab63-4649-8430-38449747cace!!OEBPS/chapter-01.html"
     assert ann.start_offset == 0  # preserved
 
@@ -141,7 +141,7 @@ def test_delete_soft_deletes_local_row_with_no_handler(session):
     dispatch_annotation_sync([_full_payload("kobo-1")], _book(), user)
     ann = s.query(ub.Annotation).one()
     assert ann.hidden is False or ann.hidden is None
-    dispatch_annotation_deletes(["kobo-1"], user)
+    dispatch_annotation_deletes(["kobo-1"], user, deletable_sources={"kobo"})
     s.refresh(ann)
     assert ann.hidden is True
 
@@ -155,14 +155,16 @@ def test_delete_soft_deletes_locally_even_when_handler_disabled(session):
         def delete(self, *a, **kw): return SyncResult(status="tombstone")
     register_handler(DisabledHandler())
     dispatch_annotation_sync([_full_payload("kobo-1")], _book(), user)
-    dispatch_annotation_deletes(["kobo-1"], user)
+    dispatch_annotation_deletes(["kobo-1"], user, deletable_sources={"kobo"})
     ann = s.query(ub.Annotation).one()
     assert ann.hidden is True
 
 
 def test_delete_nonexistent_annotation_is_noop(session):
     s, user = session
-    dispatch_annotation_deletes(["never-existed"], user)
+    dispatch_annotation_deletes(
+        ["never-existed"], user, deletable_sources={"kobo"},
+    )
     assert s.query(ub.Annotation).count() == 0
 
 
@@ -173,7 +175,7 @@ def test_recreate_unhides_previously_deleted_annotation(session):
     the local row comes back to life rather than staying hidden."""
     s, user = session
     dispatch_annotation_sync([_full_payload("kobo-1")], _book(), user)
-    dispatch_annotation_deletes(["kobo-1"], user)
+    dispatch_annotation_deletes(["kobo-1"], user, deletable_sources={"kobo"})
     ann = s.query(ub.Annotation).one()
     assert ann.hidden is True
     # PATCH the same annotation_id again with new text.

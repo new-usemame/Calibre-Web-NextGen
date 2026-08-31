@@ -84,10 +84,9 @@ class TestCustomReadColumnMirrorMatchesWebPath:
             "must read the book via the unfiltered calibre_db.get_book"
         )
         assert "calibre_db.get_filtered_book(" not in src, (
-            "must NOT use get_filtered_book: kosync requests carry no flask-login "
-            "user, so current_user is the ANONYMOUS user and get_filtered_book "
-            "would apply anonymous content/language restrictions — filtering the "
-            "book to None and silently dropping the read marker"
+            "must NOT visibility-filter a book-level metadata marker write: a later "
+            "library/restriction change must not silently drop an already-reported "
+            "finished state; content-serving routes re-authorize separately"
         )
         assert "custom_column_" in src, (
             "must address the custom column via getattr(book, 'custom_column_'+id)"

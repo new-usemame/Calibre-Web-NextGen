@@ -1,0 +1,6 @@
+.intro { margin: calc(-1 * var(--sp-3)) 0 var(--sp-5); color: var(--text-muted); font-size: var(--fs-sm); }
+.scope { display: flex; gap: 2px; padding: 2px; background: var(--surface-2); border-radius: var(--r-md); }
+.scope button { min-height: 40px; padding: 0 var(--sp-3); border-radius: var(--r-sm); color: var(--text-muted); }
+.scope button[aria-pressed='true'] { color: var(--accent-text); background: var(--accent-soft); }
+.scope button:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.back { display: inline-block; margin-top: var(--sp-6); color: var(--accent-text); }

@@ -21,6 +21,7 @@ from flask_babel import gettext as _
 
 from . import constants, logger  #  config, web_server
 from .file_helper import get_temp_dir
+from .sqlite_utils import network_share_mode_enabled
 
 
 log = logger.create()
@@ -266,7 +267,7 @@ class Updater(threading.Thread):
         change_permissions = not (sys.platform == "win32" or sys.platform == "darwin")
         # Only skip permission changes for network-share paths
         try:
-            nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
+            nsm = network_share_mode_enabled()
         except Exception:
             nsm = False
 

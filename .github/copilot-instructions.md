@@ -77,7 +77,7 @@ Scripts use **filesystem locks** to prevent concurrent execution (e.g., `ingest_
 - **Status tracking**: Read `/config/cwa_ingest_status` for current ingest state
 
 ### Common Calibre Commands
-CWA shells out to Calibre binaries (installed in `/app/calibre/`):
+CWA shells out to Calibre binaries (installed in `/opt/calibre/`):
 - **Import**: `calibredb add <file> --library-path=/calibre-library`
 - **Convert**: `ebook-convert input.azw output.epub` (28 supported input formats)
 - **Metadata**: `ebook-meta file.epub --set-cover=cover.jpg --title="New Title"`
@@ -159,7 +159,7 @@ Enhanced OAuth 2.0/OIDC in `cps/oauth_bb.py`:
 ### Kobo Sync Integration
 `cps/kobo.py` + `cps/kosync.py`:
 - **Kobo device sync**: Native Calibre-Web functionality, syncs reading positions
-- **KOReader sync**: Custom CWA feature, RFC 7617 auth, plugin in `koreader/plugins/cwasync.koplugin/`
+- **KOReader sync**: Custom CWA feature, RFC 7617 auth, plugin in `koreader/plugins/cwngsync.koplugin/`
 - **Plugin delivery**: `koplugin.zip` built during Docker image creation, served at `/kosync` endpoint
 
 ### Metadata Provider System
@@ -207,6 +207,6 @@ Pluggable providers in `cps/metadata_provider/`:
 ## Contributing Guidelines
 - Follow SPDX headers in all Python files (use `scripts/update_spdx_headers.py`)
 - Update `CONTRIBUTORS` file for new contributors
-- Changelogs in `changelogs/` directory (semver naming)
+- Add one categorized, symptom-first Markdown fragment at `changelog.d/<pr-or-slug>.md`; release preparation assembles and deletes fragments. See `changelog.d/README.md`.
 - Join Discord for feature discussions before major PRs
 - Test with both local disk and network share deployments

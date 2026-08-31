@@ -6,6 +6,7 @@ services:
     image: ghcr.io/new-usemame/calibre-web-nextgen:latest
     container_name: calibre-web-nextgen
     environment:
+      # See examples/.env.example for the complete environment-variable reference and defaults.
       # Only change these if you know what you're doing
       - PUID=1000
       - PGID=1000
@@ -27,6 +28,11 @@ services:
       # Skip the automatic library detection/mount at startup. When enabled, the auto-library service will not run.
       # Accepts: true/yes/1 to disable auto-mount (default: false)
       # - DISABLE_LIBRARY_AUTOMOUNT=false
+      # Optional: override the paths used inside the container. If changed,
+      # update the matching volume targets below to the same paths.
+      # - CWA_INGEST_FOLDER=/cwa-book-ingest
+      # - CWA_CALIBRE_LIBRARY_DIR=/calibre-library
+      # - CWA_TMP_CONVERSION_DIR=/config/.cwa_conversion_tmp
     volumes:
       # CW users migrating should stop their existing CW instance, make a copy of the config folder, and bind that here to carry over all of their user settings etc.
       - /path/to/config/folder:/config

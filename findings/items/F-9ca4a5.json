@@ -1,0 +1,13 @@
+{
+  "area": "container-init",
+  "body": "#1596 moved both s6 units to `python3 -P -m cps`. `-P` correctly removes the\nunit's cwd (/config, a user-mounted volume) from sys.path, which is the hazard\nthe change set out to close and is covered by tests.\n\nIt does not cover the rest of the import environment. Measured locally:\n\n    PYTHONPATH=<evil> python3 -P -c \"sys.path.append(<app>); import cps\"\n      -> evil at sys.path index 0, app at index 6, evil wins\n\nThe old form did not lose that race. `python3 /app/calibre-web-automated/cps.py`\nput the app root at sys.path[0] (and cps.py itself does sys.path.insert(0, ...)),\nwhich precedes PYTHONPATH. Under `-m`, the application is only reachable through\nthe editable install's .pth, and .pth entries are appended during site\nprocessing — after PYTHONPATH.\n\nAlso uncovered by -P: .pth files in site-packages, sitecustomize/usercustomize,\nand a /config-based PYTHONUSERBASE or HOME.\n\nNot exploitable in the shipped image: no PYTHONPATH is set anywhere in the\nDockerfile or the s6 units, and setting one requires control of the container's\nenvironment, which is already the deployment-control boundary. Recorded because\nthe code comments read as though -P is comprehensive, and a future change that\nstarts setting PYTHONPATH would silently reopen the exact hazard -P was added\nfor.\n\nCheapest hardening if wanted: have the units export PYTHONPATH= explicitly, or\npin the absence with a test alongside the existing -P tests.",
+  "created": "2026-08-14",
+  "id": "F-9ca4a5",
+  "refs": [
+    "#1596"
+  ],
+  "severity": "security",
+  "source": "audit",
+  "status": "open",
+  "title": "python -m cps resolves via the editable .pth, so PYTHONPATH now outranks the application"
+}

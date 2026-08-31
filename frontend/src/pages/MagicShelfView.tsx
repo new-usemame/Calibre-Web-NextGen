@@ -76,7 +76,7 @@ export function MagicShelfView({ id }: { id: string }) {
   // whether the mark does anything, so hide the control when it is off rather
   // than let it store inert intent.
   const canKobo = Boolean(
-    data.is_owner && me?.features?.kobo_sync && me?.features?.kobo_sync_magic_shelves,
+    data.can_kobo_sync && me?.features?.kobo_sync && me?.features?.kobo_sync_magic_shelves,
   );
 
   const onToggleKobo = () => {
@@ -114,28 +114,34 @@ export function MagicShelfView({ id }: { id: string }) {
         </div>
         <div className={styles.subRow}>
           <span className={styles.count}>{total} {t('books')}</span>
-          {data.is_owner && (
+          {(data.can_edit || data.can_duplicate || canKobo || data.can_delete) && (
             <div className={styles.manage}>
-              <Link href={`/magic/${id}/edit`} className={styles.manageBtn}>
-                <Pencil size={14} /> {t('Edit')}
-              </Link>
-              <button className={styles.manageBtn} disabled={dup.isPending}
-                onClick={() => dup.mutate(Number(id))}>
-                <Copy size={14} /> {t('Duplicate')}
-              </button>
+              {data.can_edit && (
+                <Link href={`/magic/${id}/edit`} className={styles.manageBtn}>
+                  <Pencil size={14} /> {t('Edit')}
+                </Link>
+              )}
+              {data.can_duplicate && (
+                <button className={styles.manageBtn} disabled={dup.isPending}
+                  onClick={() => dup.mutate(Number(id))}>
+                  <Copy size={14} /> {t('Duplicate')}
+                </button>
+              )}
               {canKobo && (
                 <button className={data.kobo_sync ? styles.manageBtnActive : styles.manageBtn}
                   onClick={onToggleKobo} disabled={toggleKobo.isPending}>
                   <Smartphone size={14} /> {data.kobo_sync ? t('Kobo sync on') : t('Enable Kobo sync')}
                 </button>
               )}
-              <button className={styles.manageBtnDanger} disabled={del.isPending}
-                onClick={() => {
-                  if (window.confirm(t('Delete this smart shelf? Your books are not affected.')))
-                    del.mutate(Number(id), { onSuccess: () => navigate('/') });
-                }}>
-                <Trash2 size={14} /> {t('Delete')}
-              </button>
+              {data.can_delete && (
+                <button className={styles.manageBtnDanger} disabled={del.isPending}
+                  onClick={() => {
+                    if (window.confirm(t('Delete this smart shelf? Your books are not affected.')))
+                      del.mutate(Number(id), { onSuccess: () => navigate('/') });
+                  }}>
+                  <Trash2 size={14} /> {t('Delete')}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -175,8 +181,8 @@ export function MagicShelfView({ id }: { id: string }) {
         <>
           <div className={styles.grid}>
             {books.map((b, i) => (
-              <BookCard key={b.id} book={b} hideActions={cardActionsHidden}
-                style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }} />
+              <BookCard key={b.id} book={b} hideActions={cardActionsHidden} canRead={!!me?.role?.viewer}
+                style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
             ))}
           </div>
           {hasMore && (

@@ -23,6 +23,9 @@ Dockerfile to the helper. Each test inspects the union of the two so
 either form passes.
 """
 
+import os
+import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -31,6 +34,17 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPO_ROOT / "Dockerfile"
 HEALTHCHECK_HELPER = REPO_ROOT / "root" / "usr" / "local" / "bin" / "cwa-healthcheck"
+
+
+def _release_notes_text() -> str:
+    """Read release notes before or after changelog fragments are assembled."""
+    fragments = sorted(
+        path
+        for path in (REPO_ROOT / "changelog.d").glob("*.md")
+        if path.name != "README.md"
+    )
+    sources = [REPO_ROOT / "CHANGELOG.md", *fragments]
+    return "\n".join(path.read_text() for path in sources)
 
 
 @pytest.fixture(scope="module")
@@ -95,3 +109,73 @@ def test_healthcheck_curl_has_bounded_max_time(healthcheck_sources: str) -> None
         "HEALTHCHECK curl must pass --max-time so a wedged gevent loop "
         "produces a deterministic, bounded probe failure."
     )
+
+
+def test_healthcheck_budgets_allow_slow_hosts_but_remain_bounded() -> None:
+    """#1799's Docker-in-a-VM host flapped on the old 2s/3s budgets.
+
+    Pin the deliberately wider inner/outer pair: curl gets five seconds for
+    slow ARM/VM scheduler and fork variance, and Docker retains a seven-second
+    hard stop so a truly dead app still fails fast. The HTTPS-detection DB
+    preflight gets one second, so the outer timeout must cover preflight plus
+    curl plus shell scheduling overhead.
+    """
+    dockerfile = DOCKERFILE.read_text()
+    helper = HEALTHCHECK_HELPER.read_text()
+
+    assert "--max-time 5" in helper, (
+        "cwa-healthcheck must give /health five bounded seconds on slow ARM/VM hosts (#1799)"
+    )
+    assert "timeout 1 sqlite3" in helper, (
+        "HTTPS detection must not consume an unbounded part of the Docker health budget"
+    )
+    assert "HEALTHCHECK --interval=30s --timeout=7s" in dockerfile, (
+        "Docker's seven-second outer timeout must cover one second of preflight, five seconds "
+        "of curl, and bounded shell scheduling overhead"
+    )
+
+
+def test_healthcheck_https_sqlite_preflight_has_a_real_wall_clock_bound(tmp_path) -> None:
+    app_db = tmp_path / "app.db"
+    app_db.touch()
+
+    fake_sqlite = tmp_path / "sqlite3"
+    fake_sqlite.write_text("#!/usr/bin/env bash\nsleep 10\n")
+    fake_sqlite.chmod(0o755)
+    fake_curl = tmp_path / "curl"
+    fake_curl.write_text("#!/usr/bin/env bash\nexit 0\n")
+    fake_curl.chmod(0o755)
+
+    helper = tmp_path / "cwa-healthcheck"
+    helper.write_text(
+        HEALTHCHECK_HELPER.read_text().replace("/config/app.db", str(app_db))
+    )
+    helper.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = str(tmp_path) + os.pathsep + env["PATH"]
+    started = time.monotonic()
+    completed = subprocess.run(
+        [str(helper)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=3,
+        check=False,
+    )
+    elapsed = time.monotonic() - started
+
+    assert completed.returncode == 0, completed.stderr
+    assert elapsed < 2.5, f"HTTPS sqlite preflight retained the helper for {elapsed:.2f}s"
+
+
+def test_health_release_notes_state_lock_and_unknown_limits_honestly() -> None:
+    release_notes = _release_notes_text()
+    divergence = (REPO_ROOT / "CHANGES-vs-upstream.md").read_text()
+
+    assert "corruption behind a qualifying lock" in release_notes
+    assert "corruption behind a qualifying lock" in divergence
+    assert "only detected once the lock clears" in release_notes
+    assert "contents remain unknown" in release_notes
+    assert "explicitly reported `down`" in release_notes
+    assert "genuinely down services still report degraded/503" not in release_notes

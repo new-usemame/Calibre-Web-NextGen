@@ -1,0 +1,184 @@
+/* Description formatting editor — fork #919. Sized to sit in the EditBook
+   field grid where a plain .textarea used to be. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.wrap:focus-within { border-color: var(--accent); }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 32px keeps the row compact on desktop; the 44px touch target below is the
+     WCAG 2.2 AA target-size floor on coarse pointers. */
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.toolBtn:hover { background: var(--surface-4, var(--surface-1)); color: var(--text); }
+.toolBtn:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: -2px; }
+.toolBtn[data-active='true'] { background: var(--accent-soft, var(--surface-1)); color: var(--accent); }
+
+.sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--sp-1);
+  background: var(--border);
+}
+
+.modeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 5px var(--sp-2);
+  min-height: 32px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.modeBtn:hover { color: var(--text); background: var(--surface-4, var(--surface-1)); }
+.modeBtn:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: -2px; }
+
+.linkRow {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.linkInput {
+  flex: 1;
+  min-width: 0;
+  padding: 6px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-family: var(--font-body);
+}
+
+.linkApply, .linkCancel {
+  padding: 6px var(--sp-3);
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.linkApply { border-color: var(--accent); color: var(--accent); }
+
+.editor, .source {
+  min-height: 190px;
+  padding: var(--sp-3);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: var(--fs-base);
+  font-family: var(--font-body);
+  line-height: var(--lh-base);
+  outline: none;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.source {
+  width: 100%;
+  border: none;
+  resize: vertical;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--fs-sm);
+}
+
+/* Descriptions are prose: give the block elements the spacing they would get on
+   the book page so what is typed reads like what will be published. */
+.editor :global(p) { margin: 0 0 var(--sp-3); }
+.editor :global(p:last-child) { margin-bottom: 0; }
+.editor :global(h2) { font-size: var(--fs-lg); margin: var(--sp-3) 0 var(--sp-2); }
+.editor :global(h3), .editor :global(h4) { font-size: var(--fs-base); margin: var(--sp-3) 0 var(--sp-2); }
+.editor :global(ul), .editor :global(ol) { margin: 0 0 var(--sp-3); padding-left: var(--sp-5, 24px); }
+.editor :global(li) { margin-bottom: 2px; }
+.editor :global(blockquote) {
+  margin: 0 0 var(--sp-3);
+  padding-left: var(--sp-3);
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+.editor :global(code) {
+  padding: 1px 4px;
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: .92em;
+}
+.editor :global(a) { color: var(--accent); text-decoration: underline; }
+
+.previewLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--sp-2) var(--sp-3) 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  border-top: 1px solid var(--border);
+}
+
+.preview {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  color: var(--text);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+}
+
+.preview :global(p) { margin: 0 0 var(--sp-2); }
+.preview :global(ul), .preview :global(ol) { margin: 0 0 var(--sp-2); padding-left: var(--sp-5, 24px); }
+.preview :global(blockquote) {
+  margin: 0 0 var(--sp-2);
+  padding-left: var(--sp-3);
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+.preview :global(a) { color: var(--accent); text-decoration: underline; }
+
+.previewEmpty {
+  padding: 0 var(--sp-3) var(--sp-3);
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+}
+
+@media (pointer: coarse) {
+  .toolBtn { width: 44px; height: 44px; }
+  .modeBtn { min-height: 44px; }
+}

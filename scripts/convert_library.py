@@ -18,14 +18,13 @@ import atexit
 from datetime import datetime
 import sqlite3
 
-import pwd
-import grp
-
+import app_paths
+import service_user
 from cwa_db import CWA_DB
 from kindle_epub_fixer import EPUBFixer
 
 ### Global Variables
-convert_library_log_file = "/config/convert-library.log"
+convert_library_log_file = str(app_paths.config_path("convert-library.log"))
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -37,37 +36,21 @@ try:
     formatter = logging.Formatter(LOG_FORMAT)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-except FileNotFoundError:
-    # Fallback for test environments where /config might not exist
+except OSError:
+    # Fallback when the log file cannot be opened -- a missing directory, or
+    # (now that the config dir resolves to the app root off Docker) a
+    # read-only install tree. Importing this module must not require a
+    # writable log file. See kindle_epub_fixer.py for the same change.
     stream_handler = logging.StreamHandler()
     LOG_FORMAT = '%(message)s'
     formatter = logging.Formatter(LOG_FORMAT)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
-# Define user and group
-USER_NAME = "abc"
-GROUP_NAME = "abc"
-
-# Get UID and GID (skip if user doesn't exist, e.g., in CI environments)
-uid = None
-gid = None
-try:
-    uid = pwd.getpwnam(USER_NAME).pw_uid
-    gid = grp.getgrnam(GROUP_NAME).gr_gid
-except KeyError:
-    pass
-
-# Set permissions for log file (skip on network shares or if uid/gid not available)
-if uid is not None and gid is not None:
-    try:
-        nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-        if not nsm:
-            subprocess.run(["chown", f"{uid}:{gid}", convert_library_log_file], check=True)
-        else:
-            print(f"[convert-library] NETWORK_SHARE_MODE=true detected; skipping chown of {convert_library_log_file}", flush=True)
-    except subprocess.CalledProcessError as e:
-        print(f"[convert-library] An error occurred while attempting to set ownership of {convert_library_log_file} to abc:abc. See the following error:\n{e}", flush=True)
+# Hand the log file to the service account. service_user skips this when there
+# is no such account, which is the normal case outside the container.
+service_user.chown_to_service_user(
+    convert_library_log_file, "[convert-library]", recursive=False)
 
 def print_and_log(string) -> None:
     """ Ensures the provided string is passed to STDOUT and stored in the runs log file """
@@ -97,15 +80,32 @@ def _acquire_lock_or_exit():
     atexit.register(removeLock)
 
 
-try:
-    backup_destinations = {
+def _load_backup_destinations():
+    processed_root = app_paths.processed_books_dir()
+    try:
+        for name in ("converted", "imported", "fixed_originals", "failed"):
+            (processed_root / name).mkdir(parents=True, exist_ok=True)
+        return {
             entry.name: entry.path
-            for entry in os.scandir("/config/processed_books")
+            for entry in os.scandir(processed_root)
             if entry.is_dir()
         }
-except FileNotFoundError:
-    # Fallback for test environments where /config might not exist
-    backup_destinations = {}
+    except OSError as error:
+        print_and_log(
+            f"[convert-library]: WARN - Could not prepare backup directories "
+            f"under {processed_root}: {error}"
+        )
+        return {}
+
+
+backup_destinations = _load_backup_destinations()
+
+
+def failed_backup_dir() -> str:
+    """Resolved destination for converted files that could not be imported."""
+    return backup_destinations.get("failed") or str(
+        app_paths.processed_books_dir() / "failed"
+    )
 
 
 class LibraryConverter:
@@ -143,7 +143,7 @@ class LibraryConverter:
         self.hierarchy_of_success = {'epub', 'lit', 'mobi', 'azw', 'azw3', 'fb2', 'fbz', 'azw4', 'prc', 'odt', 'lrf', 'pdb',  'cbz', 'pml', 'rb', 'cbr', 'cb7', 'cbc', 'chm', 'djvu', 'snb', 'tcr', 'pdf', 'docx', 'rtf', 'html', 'htmlz', 'txtz', 'txt', 'kfx', 'kfx-zip'}
 
         self.current_book = 1
-        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs('/app/calibre-web-automated/dirs.json')
+        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs(str(app_paths.dirs_json()))
 
         # Calibre subprocess environment. Operator-opt-in plugin loading
         # (CWA_CALIBRE_USER_PLUGINS=true) routes HOME to /config so any
@@ -152,9 +152,7 @@ class LibraryConverter:
         # CWA #243.
         self.calibre_env = os.environ.copy()
         try:
-            _CPS_ROOT = "/app/calibre-web-automated"
-            if _CPS_ROOT not in sys.path:
-                sys.path.insert(0, _CPS_ROOT)
+            app_paths.ensure_app_root_on_sys_path()
             from cps.services import calibre_user_plugins
             calibre_user_plugins.apply_to_env(self.calibre_env)
         except ImportError:
@@ -169,7 +167,7 @@ class LibraryConverter:
 
     def get_split_library(self) -> dict[str, str] | None:
         """Checks whether or not the user has split library enabled. Returns None if they don't and the path of the Split Library location if True."""
-        con = sqlite3.connect("/config/app.db", timeout=30)
+        con = sqlite3.connect(str(app_paths.app_db_path()), timeout=30)
         cur = con.cursor()
         split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 
@@ -187,13 +185,9 @@ class LibraryConverter:
 
 
     def get_dirs(self, dirs_json_path: str) -> tuple[str, str, str]:
-        dirs = {}
-        with open(dirs_json_path, 'r') as f:
-            dirs: dict[str, str] = json.load(f)
-
-        ingest_folder = f"{dirs['ingest_folder']}/"
-        library_dir = f"{dirs['calibre_library_dir']}/"
-        tmp_conversion_dir = f"{dirs['tmp_conversion_dir']}/"
+        ingest_folder = f"{app_paths.ingest_folder(dirs_json_path)}/"
+        library_dir = f"{app_paths.calibre_library_dir(dirs_json_path)}/"
+        tmp_conversion_dir = f"{app_paths.tmp_conversion_dir(dirs_json_path)}/"
 
         return ingest_folder, library_dir, tmp_conversion_dir
 
@@ -379,8 +373,11 @@ class LibraryConverter:
 
 
     def backup(self, input_file, backup_type):
+        output_path = backup_destinations.get(backup_type) or str(
+            app_paths.processed_books_dir() / backup_type
+        )
         try:
-            output_path = backup_destinations[backup_type]
+            os.makedirs(output_path, exist_ok=True)
             shutil.copy2(input_file, output_path)
         except Exception as e:
             print_and_log(f"[convert-library]: ERROR - The following error occurred when trying to copy {input_file} to {output_path}:\n{e}")
@@ -476,9 +473,11 @@ class LibraryConverter:
 
                 print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Import of {os.path.basename(target_filepath)} successfully completed!")
             except subprocess.CalledProcessError as e:
-                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Import of {os.path.basename(target_filepath)} was not successfully completed. Converted file moved to /config/processed_books/failed/{os.path.basename(target_filepath)}. See the following error:\n{e}")
+                output_path = os.path.join(
+                    failed_backup_dir(), os.path.basename(target_filepath)
+                )
+                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Import of {os.path.basename(target_filepath)} was not successfully completed. Converted file moved to {output_path}. See the following error:\n{e}")
                 try:
-                    output_path = f"/config/processed_books/failed/{os.path.basename(target_filepath)}"
                     shutil.move(target_filepath, output_path)
                 except Exception as e:
                     print_and_log(f"[convert-library]: ERROR - The following error occurred when trying to copy {file} to {output_path}:\n{e}")
@@ -574,15 +573,9 @@ class LibraryConverter:
 
 
     def set_library_permissions(self):
-        try:
-            nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-            if not nsm:
-                subprocess.run(["chown", "-R", "abc:abc", self.library_dir], check=True)
-                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Successfully set ownership of new files in {self.library_dir} to abc:abc.")
-            else:
-                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) NETWORK_SHARE_MODE=true detected; skipping chown of {self.library_dir}")
-        except subprocess.CalledProcessError as e:
-            print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) An error occurred while attempting to recursively set ownership of {self.library_dir} to abc:abc. See the following error:\n{e}")
+        label = f"[convert-library]: ({self.current_book}/{len(self.to_convert)})"
+        if service_user.chown_to_service_user(self.library_dir, label, log=print_and_log):
+            print_and_log(f"{label} Successfully set ownership of new files in {self.library_dir}.")
 
 
 def main():

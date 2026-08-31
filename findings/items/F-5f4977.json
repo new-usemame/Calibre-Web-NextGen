@@ -1,0 +1,11 @@
+{
+  "area": "kosync",
+  "body": "`cps/progress_syncing/settings.py:is_koreader_sync_enabled()` wraps `CWA_DB()` in\n`try/except Exception` with the stated intent \"Fail closed to avoid unexpected DB\nwrites when setting is missing.\"\n\n`CWA_DB.connect_to_db()` does not raise an `Exception` on failure — it calls\n`sys.exit()`, which raises `SystemExit`, a `BaseException`. It is not caught by\n`except Exception`, so it propagates out of the request handler. An unopenable\n`cwa.db` therefore terminates a web worker instead of disabling KOReader sync,\nwhich is the opposite of the documented behaviour.\n\nReachable on any install whose config dir is not writable, and on a corrupt or\nlocked `cwa.db` in an otherwise normal Docker install.\n\n#1474 narrowed the trigger (the config dir now resolves correctly, and the exit\ncode is no longer 0) but deliberately did not change the exception type, since\ncallers that rely on process exit would change behaviour and that is not a\nrelease-eve change.\n\nFix direction: `connect_to_db()` raises a module-level `CWADBUnavailable`, and the\nfew top-level script entry points that genuinely want to die catch it and exit.\nNeeds an audit of every `CWA_DB()` construction site first.",
+  "created": "2026-08-08",
+  "id": "F-5f4977",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "CWA_DB's SystemExit escapes the fail-closed guard in progress_syncing/settings.py"
+}

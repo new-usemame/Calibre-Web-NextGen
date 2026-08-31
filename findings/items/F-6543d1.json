@@ -1,0 +1,11 @@
+{
+  "area": "spa",
+  "body": "Found by an adversarial review pass over the SVG-compositing fix\n(fix/spa-svg-animation-main-thread). Pre-existing; the fix did not introduce it\nand deliberately did not change it, because an a11y change belongs in a change\nwith its own a11y verification rather than smuggled into a perf fix.\n\nlucide-react 0.460.0 does NOT add `aria-hidden` or `focusable` by default, so a\ndecorative icon is only hidden if the call site says so. The project's own\nconvention says every decorative lucide icon is explicitly hidden — most call\nsites do it. These do not:\n\n- `frontend/src/pages/Catalog.tsx` — `<RefreshCw size={15} />` (button already\n  has `aria-label` \"Refresh library\")\n- `frontend/src/pages/CoverPicker.tsx` — `<RefreshCw size={14} />` beside the\n  text \"Refresh\"; `<Loader2 size={22} />` beside \"Searching every source…\";\n  `<Loader2 size={18} />` alone in `.cardShimmer`; `<Loader2 size={14} />` at\n  three Button call sites beside \"Use this cover\" / \"Upload as cover\"\n- `frontend/src/pages/Reader.tsx` — `<Loader2 size={36} />` alone in\n  `.fullCenter`; `<Loader2 size={32} />` alone in `.viewerOverlay`\n\nTwo distinct cases, and they want different remedies:\n\n1. Icon beside text or inside a labelled button (Catalog, and CoverPicker's\n   Refresh / Use this cover / Upload as cover / Searching every source). Purely\n   decorative — add `aria-hidden=\"true\" focusable={false}` and it is done.\n2. Icon that is the ONLY content of a loading state (`CoverPicker` cardShimmer,\n   `Reader` fullCenter, `Reader` viewerOverlay). Hiding it is not enough: today\n   the loading state is announced to nobody at all, because an `<svg>` with no\n   role and no name is already ignored. These want a real status affordance\n   (`role=\"status\"` + a visually-hidden label), the way `components/Spinner.tsx`\n   already does it with `role=\"status\" aria-label={t('Loading')}`.\n\nNote the sibling icons on the same CoverPicker lines (`<Check size={14} />`,\n`<UploadIcon size={14} />`) are missing the attributes too and belong in the\nsame sweep.",
+  "created": "2026-08-18",
+  "id": "F-6543d1",
+  "refs": [],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "Nine decorative lucide icons in the SPA carry neither aria-hidden nor focusable={false}"
+}

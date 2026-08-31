@@ -11,19 +11,18 @@ from sqlalchemy.sql.functions import coalesce
 
 from . import api_v1
 from .serializers import serialize_book_list_item, serialize_book_detail
-from .. import calibre_db, config, db, ub, isoLanguages, logger
+from .. import (
+    calibre_db, config, constants, db, ub, isoLanguages, logger, user_library,
+)
+from ..annotations import count_user_annotations
 from ..cw_login import current_user
-from ..helper import edit_book_read_status, book_is_in_progress, get_convert_options, \
-    get_kosync_progress_display
+from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
+    get_convert_options, get_kosync_progress_display, \
+    SQLITE_IN_CHUNK_SIZE as _SQLITE_IN_CHUNK
+from ..sort_orders import BOOK_SORT_ORDERS
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
-
-# SQLite builds vary in their host-parameter ceiling. Stay below even the
-# conservative historical limit when filtering app.db-derived download ids
-# against the separate calibre metadata database.
-_SQLITE_IN_CHUNK = 900
-
 
 def _visible_ids_for_chunk(book_ids):
     query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
@@ -36,7 +35,8 @@ def _visible_hot_book_ids(book_ids):
     """Return visible ids in hotness order without an unbounded SQL ``IN``."""
     visible = set()
     for start in range(0, len(book_ids), _SQLITE_IN_CHUNK):
-        visible.update(_visible_ids_for_chunk(book_ids[start:start + _SQLITE_IN_CHUNK]))
+        visible.update(_visible_ids_for_chunk(
+            book_ids[start:start + _SQLITE_IN_CHUNK]))
     return [book_id for book_id in book_ids if book_id in visible]
 
 
@@ -70,28 +70,11 @@ def _original_filename(book_id):
     except Exception:
         return None
 
-# Stateless sort map — mirrors web.py sort options without calling get_sort_function
-# (which writes per-user state and must not be called from a read-only API endpoint).
-SORT_MAP = {
-    "new": [db.Books.timestamp.desc()],
-    "old": [db.Books.timestamp],
-    "abc": [func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id],
-    "zyx": [func.ng_sort_key(db.Books.sort).desc(), db.Books.sort.desc(), db.Books.id.desc()],
-    "pubnew": [db.Books.pubdate.desc()],
-    "pubold": [db.Books.pubdate],
-    "modifiednew": [db.Books.last_modified.desc()],
-    "modifiedold": [db.Books.last_modified],
-    "authaz": [func.ng_sort_key(db.Books.author_sort), db.Books.author_sort,
-               func.ng_sort_key(db.Series.name), db.Series.name, db.Books.series_index],
-    "authza": [func.ng_sort_key(db.Books.author_sort).desc(), db.Books.author_sort.desc(),
-               func.ng_sort_key(db.Series.name).desc(), db.Series.name.desc(), db.Books.series_index.desc()],
-    # Series reading order — mirrors web.py get_sort_function's seriesasc/seriesdesc.
-    # Every list_books path already joins db.Series (series_join), so ordering by
-    # db.Books.series_index needs no extra plumbing. Used by the new-UI series view
-    # so a series reads 1, 2, 3… instead of newest-first (fork #573).
-    "seriesasc": [db.Books.series_index.asc()],
-    "seriesdesc": [db.Books.series_index.desc()],
-}
+# The sort options, shared with the classic UI's get_sort_function — which
+# additionally writes per-user view state and so cannot be called from a
+# read-only API endpoint. Only the ORDER BY is common, and it lives in one place
+# so a sort cannot be correct in one UI and wrong in the other (fork #1331).
+SORT_MAP = BOOK_SORT_ORDERS
 
 
 def _real_user_id():
@@ -102,6 +85,16 @@ def _real_user_id():
         return int(current_user.id)
     except (AttributeError, RuntimeError):
         return None
+
+
+def _can_browse_global():
+    """Role gate that stays safe in stripped-decorator unit contexts."""
+    if _real_user_id() is None:
+        return False
+    try:
+        return bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        return False
 
 
 def _hidden_book_ids():
@@ -125,24 +118,46 @@ def _archived_book_ids():
     return {int(row[0]) for row in rows}
 
 
-def _row_to_item(e, hidden_ids=None):
+def _row_read_status(e):
+    """Return the configured read carrier from a list-query row."""
+    if config.config_read_column:
+        # generate_linked_query aliases the custom column as ``value``.
+        return getattr(e, "value", None)
+    return getattr(e, "read_status", None)
+
+
+def _row_to_item(e, in_progress_ids, hidden_ids=None):
     """Unwrap a SQLAlchemy Row (Books, is_archived, read_status) or plain Books object."""
     book = getattr(e, "Books", e)
+    read_status = _row_read_status(e)
     if config.config_read_column:
         # Custom read column: generate_linked_query selects read_column.value as the
         # third column (Row attr "value"), NOT ub.ReadBook.read_status — a truthy
         # value means the book is read. Without this the badge is always false when
         # an admin links read status to a Calibre column (fork #579).
-        read = bool(getattr(e, "value", None))
+        read = bool(read_status)
     else:
-        read = getattr(e, "read_status", None) == ub.ReadBook.STATUS_FINISHED
+        read = read_status == ub.ReadBook.STATUS_FINISHED
     archived = bool(getattr(e, "is_archived", False))
     return serialize_book_list_item(
         book,
         read=read,
+        in_progress=book.id in (in_progress_ids or set()),
         archived=archived,
         hidden=book.id in (hidden_ids or set()),
     )
+
+
+def _rows_to_items(entries, hidden_ids=None):
+    """Serialize one list page after resolving its in-progress ids in bulk."""
+    entries = list(entries)
+    statuses = [
+        (getattr(entry, "Books", entry).id, _row_read_status(entry))
+        for entry in entries
+    ]
+    in_progress_ids = book_in_progress_ids(
+        statuses, config.config_read_column, current_user)
+    return [_row_to_item(entry, in_progress_ids, hidden_ids) for entry in entries]
 
 
 def _build_entity_filter(author, series, tag, publisher, language, rating=None, book_format=None):
@@ -225,7 +240,7 @@ def list_books():
     # mutation guard.
     show_hidden = bool(show_hidden and _real_user_id() is not None)
     hidden_ids = _hidden_book_ids() if show_hidden else set()
-    to_items = lambda entries: [_row_to_item(e, hidden_ids) for e in entries]
+    to_items = lambda entries: _rows_to_items(entries, hidden_ids)
 
     if search:
         offset = (page - 1) * per_page
@@ -316,7 +331,7 @@ def list_books():
         off = per_page * (page - 1)
         all_hot_ids = [row[0] for row in (ub.session.query(ub.Downloads.book_id)
                    .group_by(ub.Downloads.book_id)
-                   .order_by(func.count(ub.Downloads.book_id).desc()))]
+                   .order_by(*BOOK_SORT_ORDERS["hotdesc"]))]
         # Filter before paginating: otherwise a hidden/restricted book leaves a
         # short page while the header still counts it.
         visible_hot_ids = _visible_hot_book_ids(all_hot_ids)
@@ -376,12 +391,96 @@ def list_books():
     })
 
 
+@api_v1.route("/library/global")
+@login_required_if_no_ano
+def list_global_library():
+    """List the global archive, including recent books absent from My Library.
+
+    ``filter=not_in_my_library&sort=new`` is the discovery view for curated
+    accounts. It never auto-adds a book.
+    """
+    if (not current_user.is_authenticated or current_user.is_anonymous
+            or not current_user.role_browse_global()):
+        return jsonify({
+            "error": {"code": "forbidden", "message": "Global library access required"}
+        }), 403
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = max(1, min(200, request.args.get(
+        "per_page", config.config_books_per_page, type=int
+    )))
+    sort = request.args.get("sort", "new")
+    order = SORT_MAP.get(sort, SORT_MAP["new"])
+    term = (request.args.get("search") or "").strip()
+    filter_name = request.args.get("filter", "all")
+    if filter_name not in ("all", "not_in_my_library"):
+        return jsonify({
+            "error": {
+                "code": "invalid_filter",
+                "message": "filter must be 'all' or 'not_in_my_library'",
+            }
+        }), 400
+    filters = []
+    if filter_name == "not_in_my_library":
+        filters.append(user_library.global_missing_filter(
+            current_user, cdb=calibre_db
+        ))
+    if term:
+        like = "%" + term + "%"
+        filters.append(or_(
+            func.lower(db.Books.title).ilike(func.lower(like)),
+            db.Books.authors.any(func.lower(db.Authors.name).ilike(func.lower(like))),
+            db.Books.series.any(func.lower(db.Series.name).ilike(func.lower(like))),
+        ))
+    global_filter = and_(*filters) if filters else True
+    series_join = (
+        db.books_series_link,
+        db.Books.id == db.books_series_link.c.book,
+        db.Series,
+    )
+    entries, _random, pagination = calibre_db.fill_indexpage(
+        page, per_page, db.Books, global_filter, order,
+        True, config.config_read_column, *series_join,
+        allow_show_global=True,
+    )
+    member_ids = set()
+    personal_library_mode = (
+        user_library.mode_for_user(current_user)
+        == constants.LIBRARY_MODE_PERSONAL
+    )
+    if personal_library_mode:
+        page_ids = [int(getattr(entry, "Books", entry).id) for entry in entries]
+        member_ids = {int(row[0]) for row in (
+            ub.session.query(ub.UserLibraryBook.book_id)
+            .filter(ub.UserLibraryBook.user_id == int(current_user.id),
+                    ub.UserLibraryBook.book_id.in_(page_ids)).all()
+        )}
+    items = _rows_to_items(entries)
+    for item in items:
+        item["in_my_library"] = (
+            not personal_library_mode
+            or item["id"] in member_ids
+        )
+    return jsonify({
+        "items": items,
+        "page": pagination.page,
+        "per_page": pagination.per_page,
+        "total": pagination.total_count,
+        "library_mode": user_library.mode_for_user(current_user),
+        "filter": filter_name,
+    })
+
+
 @api_v1.route("/books/<int:book_id>")
 @login_required_if_no_ano
 def book_detail(book_id):
+    # A global-library card is a valid deep link for a curator even when the
+    # book is outside their selection. Bypass only the membership predicate;
+    # language/content restrictions still flow through common_filters().
+    allow_show_global = _can_browse_global()
     result = calibre_db.get_book_read_archived(
         book_id, config.config_read_column,
         allow_show_archived=True, allow_show_hidden=True,
+        allow_show_global=allow_show_global,
     )
     if not result:
         return jsonify({"error": {"code": "not_found", "message": "Book not found"}}), 404
@@ -395,6 +494,7 @@ def book_detail(book_id):
     # Per-user favorite + hidden state (presence-based rows). Anonymous/guest
     # sessions have no real id, so they simply read back as not-favorited/hidden.
     favorited = hidden = False
+    annotation_count = 0
     kosync_progress = None
     kosync_progress_timestamp = None
     kosync_progress_created_at = None
@@ -406,6 +506,7 @@ def book_detail(book_id):
         hidden = (ub.session.query(ub.UserHiddenBook)
                   .filter(ub.UserHiddenBook.user_id == uid, ub.UserHiddenBook.book_id == book_id)
                   .first() is not None)
+        annotation_count = count_user_annotations(uid, book_id, session=ub.session)
         # KOReader/Kobo synced reading progress (#587) — surfaced on the new-UI
         # book page like the classic detail view. Same source as web.show_book:
         # KoboReadingState.current_bookmark.progress_percent (None when unsynced).
@@ -437,8 +538,17 @@ def book_detail(book_id):
         favorited=favorited,
         hidden=hidden,
         in_progress=in_progress,
+        annotation_count=annotation_count,
         custom_column_definitions=_detail_custom_columns(),
         original_filename=_original_filename(book_id),
+    )
+    body["in_my_library"] = (
+        user_library.mode_for_user(current_user)
+        != constants.LIBRARY_MODE_PERSONAL
+        or ub.session.query(ub.UserLibraryBook.id).filter(
+            ub.UserLibraryBook.user_id == int(current_user.id),
+            ub.UserLibraryBook.book_id == int(book_id),
+        ).first() is not None
     )
     source_formats, target_formats = get_convert_options(book)
     body["convert_options"] = {

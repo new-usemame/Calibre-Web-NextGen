@@ -52,8 +52,9 @@
     <div class="text-center">
       <button type="button" class="btn btn-danger" id="delete" data-toggle="modal" data-delete-id="{{ book.id }}" data-target="#deleteModal">{{_("Delete Book")}}</button>
     </div>
-    {% if book.data|length > 1 %}
+    {% if book.data|length > 0 %}
       <div class="text-center more-stuff"><h4>{{_('Delete formats:')}}</h4>
+      <p class="help-block">{{ _('The book record, metadata, shelves, and reading state stay available. If this is the last format, you can add a replacement later.') }}</p>
       {% for file in book.data %}
         <div class="form-group">
           <button type="button" class="btn btn-danger" id="delete_format" data-toggle="modal" data-delete-id="{{ book.id }}" data-delete-format="{{ file.format }}" data-target="#deleteModal">{{_('Delete')}} - {{file.format}}</button>

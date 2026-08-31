@@ -30,18 +30,28 @@ on:
 # Cancel in-progress runs when new commit pushed
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # On a PR branch only the newest head matters, so a new push cancels the
+  # running verification. On main every landed commit must be verified:
+  # cancelling there let ~80% of main's runs die before dispatch under a high
+  # merge rate while Build & Push - Dev published those same commits
+  # (F-493b49). Runs on main queue behind each other instead.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # ============================================================================
   # JOB 1: Fast Tests (Smoke + Unit)
   # Runs on: Every push, every PR
-  # Duration: ~2 minutes
+  # Duration: a few minutes (~4 on a healthy runner, plus the npm install)
   # Purpose: Catch basic errors immediately
   # ============================================================================
   fast-tests:
     name: Fast Tests (Smoke + Unit)
     runs-on: ubuntu-latest
+    # Bounds hangs in the SETUP steps, which the test step's own
+    # timeout-minutes cannot reach. This job runs two networked installs (apt
+    # and npm) before pytest starts; without a job-level cap a stall in either
+    # runs to GitHub's 6-hour default. Twice observed stalling in the apt step.
+    timeout-minutes: 25
     env:
       PYTHONDONTWRITEBYTECODE: '1'
     
@@ -66,10 +76,25 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
+      # The frontend's unit suites are Node programs run from pytest
+      # (tests/unit/test_frontend_unit_suites_run.py). Without a pinned node the
+      # runner's default decides whether they execute at all, and a suite that
+      # silently stops running is the hole this job exists to close.
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies (npm ci)
+        working-directory: frontend
+        run: npm ci
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          # lua5.4 runs the cwasync KOReader plugin's own test suites. They are
+          # lua5.4 runs the cwngsync KOReader plugin's own test suites. They are
           # pure logic with no KOReader imports and had no CI runner until now,
           # so the plugin's sync-safety logic was gated by nothing (#920).
           sudo apt-get install -y libldap2-dev libsasl2-dev libssl-dev gettext lua5.4
@@ -118,6 +143,7 @@ jobs:
             --dist=loadfile \
             --maxfail=3 \
             -v \
+            -rs \
             --tb=short \
             --timeout=120 \
             --timeout-method=thread \
@@ -125,6 +151,27 @@ jobs:
             --cov=cps \
             --cov-report=xml \
             --cov-report=term-missing
+
+      # Tests that live under tests/unit/ but declare a non-fast lane. The
+      # marker expression above deselects them, and the Integration job selects
+      # by PATH (tests/docker/ tests/integration/), so before this step they ran
+      # in NEITHER job -- see tests/unit/test_ci_test_lanes.py, which fails if
+      # any opt-out becomes unreachable again.
+      #
+      # Deliberately NO -n: the one file here is marked `integration` precisely
+      # to stay out of the xdist pool, because cps.progress_syncing.models
+      # imports cps.db and cps.ub at module level and hangs in a worker
+      # subprocess (notes/xdist-worker-ipc-hang-followup-2026-05-21.md). Running
+      # it with -n would reintroduce the hang this classification exists to
+      # avoid. It is sub-second, so a serial step costs nothing.
+      - name: Run non-xdist unit tests (lane opt-outs)
+        run: |
+          pytest tests/unit -m "integration" \
+            -v \
+            -rs \
+            --tb=short \
+            --timeout=120 \
+            --timeout-method=thread
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
@@ -305,14 +352,15 @@ jobs:
 
       - name: Set test UID/GID
         run: |
-          echo "CWA_TEST_PUID=$(id -u)" >> $GITHUB_ENV
-          echo "CWA_TEST_PGID=$(id -g)" >> $GITHUB_ENV
+          echo "CWA_TEST_PUID=$(id -u)" >> "$GITHUB_ENV"
+          echo "CWA_TEST_PGID=$(id -g)" >> "$GITHUB_ENV"
       
       - name: Run Docker integration tests
         run: |
           # CRITICAL: No -n flag! Docker tests must run sequentially
           pytest tests/docker/ tests/integration/ \
             -v \
+            -rs \
             --tb=long \
             --durations=10 \
             --junitxml=integration-results.xml
@@ -365,6 +413,7 @@ jobs:
     outputs:
       frontend: ${{ steps.detect.outputs.frontend }}
       build: ${{ steps.detect.outputs.build }}
+      concurrency: ${{ steps.detect.outputs.concurrency }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -387,60 +436,23 @@ jobs:
           # busy main does not make every PR look like it touched everything.
           files="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" || git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
           echo "$files"
-          # tests.yml itself counts: the e2e job's container setup and seed steps
-          # live in this file, so a PR that changes how the harness is fixtured
-          # could not otherwise be validated by the harness. That is how a broken
-          # seed (config_remote_login left at its default False, so every
-          # magic-link spec 403'd) stayed invisible — the fix for a red e2e gate
-          # would not have run the e2e gate.
-          if echo "$files" | grep -qE '^(frontend/|cps/static/app/|\.github/workflows/tests\.yml$)'; then
-            echo "frontend=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          # A PR cannot certify that its own gate is unnecessary by narrowing
+          # this script. Execute the base commit's classifier against the base
+          # tree. The introducing PR has no trusted base implementation, so it
+          # fails closed into every expensive gate instead of self-certifying.
+          classifier_ref="$BASE_SHA"
+          if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py"; then
+            echo "::warning::Base has no path classifier; enabling every path-derived gate"
+            printf 'frontend=true\nbuild=true\nconcurrency=true\nimage=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-          # Build-definition changes: things that alter the IMAGE, and so
-          # can only be validated by building and booting it.
-          #   Dockerfile          pins CALIBRE_RELEASE / PYTHON_VERSION /
-          #                       KEPUBIFY_RELEASE — the binaries every
-          #                       conversion and ingest actually runs on.
-          #   *requirements*.txt  the Python side. Note the pattern must
-          #                       also catch optional-requirements.txt,
-          #                       which the image pip-installs alongside
-          #                       requirements.txt; a leading-anchored
-          #                       `requirements` would silently miss it.
-          #   root/               copied to / at build time — the s6
-          #                       service definitions that decide whether
-          #                       the container boots at all.
-          # integration-tests is the ONLY job that builds the image and
-          # exercises that flow, so these must turn it on regardless of
-          # tier label. Before this, a Calibre version bump could merge
-          # with the image never built (#1261).
-          # tests/docker/ and tests/integration/ are included for the same
-          # reason tests.yml counts as frontend-relevant above: a PR that
-          # changes a harness must be validated by the harness it changes.
-          #   cps/**.py          the application the image exists to run. A
-          #                      pure-Python change can stop the container
-          #                      booting just as dead as a bad Dockerfile,
-          #                      and integration-tests is still the ONLY job
-          #                      that boots it. #1438 removed a hardcoded
-          #                      path in cps/web.py without importing the
-          #                      constant that replaced it: import-time was
-          #                      fine, every unit test was green, and the
-          #                      container went permanently unhealthy. It
-          #                      touched no Dockerfile, carried no tier-2
-          #                      label, so Integration Tests was advisory,
-          #                      went red, and the summary reported success.
-          #                      Scoped to .py on purpose: cps/translations/
-          #                      *.po are tier-1 auto-merge PRs and a broken
-          #                      catalogue is already a hard failure in Fast
-          #                      Tests (test_translations_compile.py), so
-          #                      routing them through a full image build
-          #                      would buy nothing and stall every locale PR.
-          if echo "$files" | grep -qE '^(Dockerfile$|[^/]*requirements[^/]*\.txt$|root/|cps/.*\.py$|tests/(docker|integration)/|\.github/workflows/tests\.yml$)'; then
-            echo "build=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build=false" >> "$GITHUB_OUTPUT"
-          fi
+          classifier_root="$RUNNER_TEMP/base-path-classifier"
+          mkdir -p "$classifier_root"
+          git archive "$classifier_ref" cps scripts/ci_path_classification.py \
+            | tar -x -C "$classifier_root"
+          printf '%s\n' "$files" \
+            | python3 "$classifier_root/scripts/ci_path_classification.py" \
+                --repo-root "$classifier_root" --github-output "$GITHUB_OUTPUT"
 
   # ============================================================================
   # JOB 3: E2E Tests (Full Stack)
@@ -456,14 +468,15 @@ jobs:
     # skipped dependency would drag the tag and dispatch runs down with it —
     # silently turning the release gate off, which is the exact class of
     # failure this whole change exists to remove.
-    needs: [changed_paths]
+    needs: [changed_paths, integration-tests]
     # Release gate + manual dispatch. The SPA e2e matrix (Layer 2 of the
     # verification system, frontend/e2e/) is the "earn the release" gate;
     # /CWNG_verify runs the same harness on-demand in dev. Tag runs test the
     # tag's own GHCR image (requires `on.push.tags` above — a `branches:`-only
-    # push trigger never delivers tag events). The dev-branch condition is
-    # forward wiring: no dev branch exists today, so per-merge canary coverage
-    # is a follow-up (workflow_run after the :dev image build).
+    # push trigger never delivers tag events). The dev-branch condition is an
+    # explicit fail-fast tripwire: the dev-image workflow does not build dev
+    # pushes, so this job names that unsupported pairing instead of waiting for
+    # a sha tag no producer will publish.
     # GATING (promoted 2026-07-31, #1130). This was advisory on every PR, and
     # the promotion condition written here — "once several tag runs are green"
     # — has been met: the harness step is green on 9 consecutive runs that
@@ -479,22 +492,26 @@ jobs:
     # regardless of what the PR did to the SPA — green either way, and worse
     # than skipping because it would look like a gate.
     #
-    # So PR runs take the API from :dev and overlay the PR's OWN SPA bundle
-    # into the container. The specs here assert frontend behaviour and the SPA
-    # is a static bundle under cps/static/app, so this gates exactly what they
-    # cover, with no from-source image build (the resolver comment explains why
-    # that path is avoided). Limit, stated rather than glossed: it will not
-    # catch a regression that needs the PR's BACKEND changes. It is an SPA
-    # gate, not a full-stack one — and the alternative today is no gate at all.
+    # Frontend-only PRs take the API from :dev and overlay the PR's OWN SPA
+    # bundle into the container. Backend/build PRs wait for integration-tests,
+    # then load their own full image from the same GHA layer cache; otherwise a
+    # branch API change would be tested against main's Python code.
     if: |
       always() && (
       startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.ref == 'refs/heads/dev' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_e2e) ||
-      (github.event_name == 'pull_request' && needs.changed_paths.outputs.frontend == 'true')
+      (github.event_name == 'pull_request' && (
+        needs.changed_paths.outputs.frontend == 'true' ||
+        (needs.changed_paths.outputs.concurrency == 'true' && github.event.pull_request.head.repo.fork != true)
+      ))
       )
-    # Tag runs may wait up to ~40 min for the GHCR release build to publish
-    # the image (see the pull loop below) before the ~15 min harness run.
+    # Awaited builds may consume their full 15m mirror + 60m architecture +
+    # 15m manifest budgets. Main image runs also serialize, so a neutral commit
+    # can wait behind the relevant build whose manifest it will honestly alias.
+    # Leave 60m after the 120m resolver budget for setup and Playwright's two
+    # retries of a roughly 15m suite.
     #
     # Advisory ONLY for fork PRs now. A fork's runner gets no repo secrets, and
     # the resolve/pull/overlay path above has never been exercised from one —
@@ -505,13 +522,22 @@ jobs:
     # result is still surfaced; only the block is deferred. Promote (drop the
     # fork clause) once a real fork run shows the path works.
     continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
-    timeout-minutes: 75
+    timeout-minutes: 180
     permissions:
       contents: read
       packages: read   # pull the private pbs-cache mirror images the Dockerfile COPYs from
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Refuse unsupported dev-branch image wait
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: |
+          echo "::error::Automatic dev-branch E2E has no matching dev-image producer."
+          echo "Run the dev-image workflow for this commit, then dispatch Test Suite with run_e2e=true."
+          exit 1
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -520,44 +546,92 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Log in to GHCR (to pull the app image)
+      - name: Set up Docker Buildx
+        if: >-
+          github.event_name == 'pull_request' &&
+          needs.changed_paths.outputs.build == 'true' &&
+          needs.changed_paths.outputs.concurrency != 'true'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR (app image and pbs-cache mirror)
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # Backend PRs COPY from the same private pbs-cache package as the
+          # integration build. Use its proven read:packages credential path;
+          # GITHUB_TOKEN remains the fallback when GH_PAT is out of scope.
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      # A static SPA overlay is sound only when the PR did not change the API.
+      # For backend/build PRs, changed_paths already made integration-tests build
+      # this exact tree; reuse its GHA cache and load a full-stack image so e2e
+      # cannot silently exercise main's Python code under the branch's UI.
+      - name: Build full-stack PR image
+        if: >-
+          github.event_name == 'pull_request' &&
+          needs.changed_paths.outputs.build == 'true' &&
+          needs.changed_paths.outputs.concurrency != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: cwng-e2e-head:local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true && 'upstream' || 'ghcr' }}
 
       - name: Resolve image to test
         id: img
+        env:
+          SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          # Test the image users actually get (Class 2/4: verify the shipped
-          # artifact, not a locally-rebuilt one). Version tag → that tag's image;
-          # otherwise → the :dev canary. Avoids the from-source build, which
-          # cold-pulls the private pbs-cache mirror and is fragile in CI.
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            echo "image=ghcr.io/new-usemame/calibre-web-nextgen:${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          image="ghcr.io/new-usemame/calibre-web-nextgen"
+          if [[ "${{ github.event_name }}" == "pull_request" \
+                  && "${{ needs.changed_paths.outputs.build }}" == "true" \
+                  && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
+            # Non-concurrency backend PRs already built their checked-out full
+            # stack above. Do not replace it with :dev or wait for a sha tag
+            # whose producer only owns the concurrency-shaped lane.
+            echo "image=cwng-e2e-head:local" >> "$GITHUB_OUTPUT"
+            exit 0
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+            attempts=240
+          elif [[ "${{ github.event_name }}" == "pull_request" \
+                  && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
+            # Frontend-only PRs (including forks) still overlay their own SPA on
+            # the currently published backend. Freeze that backend to a digest
+            # immediately; capability probes own routes it may not have.
+            tag=dev
+            attempts=1
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual runs are an assertion that the operator has already
+            # dispatched the dev build for this ref. Waiting two hours cannot
+            # create a tag whose producer was never started.
+            tag="sha-$SUBJECT_SHA"
+            attempts=1
           else
-            # PRs land here too: :dev supplies the API, and the overlay step
-            # below replaces its SPA with the one built from this PR (#953).
-            echo "image=ghcr.io/new-usemame/calibre-web-nextgen:dev" >> "$GITHUB_OUTPUT"
+            # Main pushes and concurrency-shaped same-repo PRs are paired with
+            # docker-image-build-dev.yml. Wait for this exact commit tag. No
+            # :dev fallback is allowed: an absent subject cannot earn a verdict.
+            tag="sha-$SUBJECT_SHA"
+            attempts=240
           fi
+          resolved="$(bash scripts/resolve-e2e-image.sh "$image" "$tag" "$attempts" 30)"
+          echo "image=$resolved" >> "$GITHUB_OUTPUT"
 
       - name: Start container (SPA enabled)
         env:
           IMAGE: ${{ steps.img.outputs.image }}
         run: |
-          echo "Testing image: $IMAGE"
-          # On tag pushes this job races the GHCR release build, which publishes
-          # the tag's image 15–35 min after the tag lands (v4.0.169 lesson) —
-          # poll instead of failing on the first pull. :dev / dispatch runs hit
-          # an already-published image and pull on the first attempt.
-          for i in $(seq 1 80); do
-            docker pull "$IMAGE" && break
-            echo "image not pullable yet (attempt $i/80); retrying in 30s..."
-            sleep 30
-          done
-          if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-            echo "::error::$IMAGE never became pullable — check the GHCR build for this ref"
+          echo "Testing immutable image: $IMAGE"
+          # Backend PR images are built and loaded locally in this job. Registry
+          # artifacts remain digest-pinned by the resolver and must be pulled.
+          if ! docker image inspect "$IMAGE" >/dev/null 2>&1 && ! docker pull "$IMAGE"; then
+            echo "::error::$IMAGE resolved but could not be pulled"
             exit 1
           fi
           mkdir -p /tmp/cwn/config /tmp/cwn/ingest
@@ -650,6 +724,67 @@ jobs:
             docker logs cwn-e2e 2>&1 | grep -iE 'ingest|convert|import|error|watch' | tail -40 || true
             exit 1
           fi
+
+      - name: Seed PDF and comic books (spec fixtures)
+        run: |
+          # reader-pdf-viewer.spec.ts needs a book with a PDF format, and the
+          # ingest seed above is EPUB-only — so the spec found no PDF and failed
+          # on the fixture rather than on anything real, exactly the #1130 shape
+          # the shelves seed below exists to prevent.
+          #
+          # calibredb writes the format straight into the library. Ingest is the
+          # wrong instrument here: it converts on the way in, so dropping a PDF
+          # in that folder is not a reliable way to end up with a PDF format.
+          #
+          # The fixture is three pages deliberately. #1584's symptom was "only
+          # the first page is visible", which a one-page PDF cannot detect.
+          docker cp tests/fixtures/sample_books/three_page_sample.pdf \
+            cwn-e2e:/tmp/three_page_sample.pdf
+          added=$(docker exec cwn-e2e calibredb add /tmp/three_page_sample.pdf \
+            --with-library /calibre-library | tee /dev/stderr \
+            | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
+          [ -n "$added" ] || { echo "::error::calibredb add reported no book id"; exit 1; }
+          # Backdate it, because a new book is a NEW book: the default sort is
+          # newest-first, and several specs walk the library from the top to find
+          # something readable. Landing a PDF at position one displaced that and
+          # made reader-phase1 time out — a fixture breaking specs it has nothing
+          # to do with, which is the trap the book-lane convention exists to
+          # avoid. Oldest keeps it out of everyone's way; the PDF spec finds it
+          # by format, not by position.
+          docker exec cwn-e2e calibredb set_metadata \
+            --field timestamp:2001-01-01T00:00:00+00:00 "$added" \
+            --with-library /calibre-library >/dev/null
+
+          # viewer-download-roles.spec.ts exercises the real comic metadata and
+          # page-byte endpoints. A hardcoded id once hid that the harness did not
+          # seed any comic at all; add a deterministic one-page CBZ and let the
+          # spec discover its generated id through the API.
+          docker cp tests/fixtures/sample_books/role_matrix_comic.cbz \
+            cwn-e2e:/tmp/role_matrix_comic.cbz
+          comic_added=$(docker exec cwn-e2e calibredb add /tmp/role_matrix_comic.cbz \
+            --with-library /calibre-library | tee /dev/stderr \
+            | sed -n 's/.*Added book ids: *\([0-9]*\).*/\1/p')
+          [ -n "$comic_added" ] || { echo "::error::calibredb add reported no comic book id"; exit 1; }
+          docker exec cwn-e2e calibredb set_metadata \
+            --field timestamp:2001-01-02T00:00:00+00:00 "$comic_added" \
+            --with-library /calibre-library >/dev/null
+
+          jar=$(mktemp)
+          csrf=$(curl -s -c "$jar" http://localhost:8083/api/v1/auth/csrf \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["csrf_token"])')
+          curl -s -b "$jar" -c "$jar" -X POST http://localhost:8083/api/v1/auth/login \
+            -H 'Content-Type: application/json' -H "X-CSRFToken: $csrf" \
+            -d '{"username":"admin","password":"admin123"}' -o /dev/null
+          # Assert through the same endpoint the spec reads, so a book that was
+          # added but is invisible to the API fails here and not as a spec.
+          pdfs=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?per_page=200' \
+            | python3 -c 'import sys,json;d=json.load(sys.stdin);print(sum(1 for b in d.get("items",[]) if any(str(f).lower()=="pdf" for f in b.get("formats",[]))))')
+          echo "books with a PDF format: $pdfs"
+          [ "${pdfs:-0}" -ge 1 ] || { echo "::error::no PDF-format book after seeding"; exit 1; }
+          comics=$(curl -s -b "$jar" 'http://localhost:8083/api/v1/books?per_page=200' \
+            | python3 -c 'import sys,json;d=json.load(sys.stdin);print(sum(1 for b in d.get("items",[]) if any(str(f).lower() in ("cbz","cbr","cbt") for f in b.get("formats",[]))))')
+          echo "books with a comic format: $comics"
+          [ "${comics:-0}" -ge 1 ] || { echo "::error::no comic-format book after seeding"; exit 1; }
 
       - name: Seed shelves and series
         run: |
@@ -769,22 +904,39 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
 
-      # The whole point of running on a PR: without this the container serves
-      # main's SPA and the suite says nothing about the change under review.
-      - name: Overlay this PR's SPA bundle into the container
-        if: github.event_name == 'pull_request'
+      # Frontend-only PRs intentionally reuse a digest-pinned :dev backend to
+      # avoid a full multi-arch build for a static-bundle change. Overlay their
+      # own bundle/templates. Main and concurrency-shaped PRs already boot the
+      # triggering commit's sha-tagged image and must remain byte-for-byte that
+      # artifact; overlaying them would weaken the image identity proof.
+      - name: Overlay the SPA bundle under test into the container
+        if: >-
+          github.event_name == 'pull_request' &&
+          needs.changed_paths.outputs.build != 'true' &&
+          needs.changed_paths.outputs.concurrency != 'true'
         working-directory: frontend
         run: |
           npm ci
           npm run build          # writes ../cps/static/app
           docker cp ../cps/static/app/. cwn-e2e:/app/calibre-web-automated/cps/static/app/
+          # Jinja templates too. Not every user-facing surface is React: the PDF
+          # reader is a server-rendered pdf.js page the SPA embeds, so a fix that
+          # spans both (#1584) had its SPA half tested here and its template half
+          # silently skipped — the spec guarding it would have failed against the
+          # `:dev` template while passing on the merged result, which teaches the
+          # next author to delete the guard. Templates are read per render and
+          # are not restart-gated, same as the bundle above.
+          docker cp ../cps/templates/. cwn-e2e:/app/calibre-web-automated/cps/templates/
           # The bundle is static; no restart needed. Confirm the shell still
           # answers so a broken overlay fails here rather than as 30 confusing
-          # spec failures.
+          # spec failures. /login is Jinja-rendered, so it also catches a template
+          # that references something this `:dev` backend does not have — the one
+          # real hazard of overlaying templates onto an older API.
           curl -fsS http://localhost:8083/app/ -o /dev/null
-          echo "PR bundle in place"
+          curl -fsS http://localhost:8083/login -o /dev/null
+          echo "PR bundle + templates in place"
 
       - name: Run SPA e2e harness
         working-directory: frontend
@@ -872,6 +1024,12 @@ jobs:
           # fork carve-out mirrors the e2e job's own continue-on-error, so the
           # two cannot disagree about what is being gated.
           IS_FRONTEND_PR: ${{ needs.changed_paths.outputs.frontend == 'true' && github.event.pull_request.head.repo.fork != true }}
+          # Concurrency/engine-shaped PRs are a hard full-stack gate. Their E2E
+          # job waits for the PR head's own sha-tagged image before starting.
+          IS_CONCURRENCY_PR: ${{ needs.changed_paths.outputs.concurrency == 'true' && github.event.pull_request.head.repo.fork != true }}
+          # Every push to main runs and gates on the SPA e2e suite. Keep this
+          # event-scoped so workflow_dispatch continues to honor run_e2e.
+          IS_MAIN_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           echo "Fast Tests:        ${{ needs.fast-tests.result }}"
           echo "Frontend Build:    ${{ needs.frontend-build.result }}"
@@ -880,10 +1038,47 @@ jobs:
           echo "Is tier-2 PR:      $IS_TIER2_PR"
           echo "Is build PR:       $IS_BUILD_PR"
           echo "Is frontend PR:    $IS_FRONTEND_PR"
+          echo "Is concurrency PR: $IS_CONCURRENCY_PR"
+          echo "Is main push:      $IS_MAIN_PUSH"
 
-          if [[ "${{ needs.fast-tests.result }}" == "failure" ]]; then
-            echo "❌ Fast tests failed"
+          # A required summary must positively prove that every hard-gated lane
+          # completed. Reject skipped/cancelled as well as failure; otherwise a
+          # later broken job condition silently turns coverage off while this
+          # required check stays green.
+          #
+          # `fast-tests` and `frontend-build` carry no `if:`, so they run on
+          # EVERY trigger of this workflow. Any result other than success means
+          # the lane vouched for nothing, and neither can this summary.
+          #
+          # `cancelled` is the state that actually bites, and it is not
+          # hypothetical: a job killed by its own `timeout-minutes` is reported
+          # as **cancelled**, never as `failure`. OBSERVED 2026-08-18 on #1725 —
+          # the `Install system dependencies` apt step stalled for 24m46s, the
+          # job's 25-minute cap fired, `Fast Tests` came back `cancelled`, and
+          # this summary exited 0 having executed no tests at all. This
+          # strictness already existed but was scoped to IS_MAIN_PUSH, so it
+          # never covered the pull-request path — which is where every merge is
+          # gated. Scoping a gate to the rarer event is how it goes unnoticed.
+          if [[ "${{ needs.fast-tests.result }}" != "success" ]]; then
+            echo "❌ Fast tests did not succeed"
+            echo "   Actual result: ${{ needs.fast-tests.result }}"
             exit 1
+          fi
+
+          # The SPA bundle is a hard gate: a broken TypeScript/Vite build ships
+          # an empty/broken frontend, so it blocks the merge like fast-tests.
+          if [[ "${{ needs.frontend-build.result }}" != "success" ]]; then
+            echo "❌ Frontend build did not succeed"
+            echo "   Actual result: ${{ needs.frontend-build.result }}"
+            exit 1
+          fi
+
+          if [[ "$IS_MAIN_PUSH" == "true" ]]; then
+            if [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
+              echo "❌ SPA e2e suite did not succeed on a push to main"
+              echo "   Actual result: ${{ needs.e2e-tests.result }}"
+              exit 1
+            fi
           fi
 
           # Both path-derived gates read changed_paths outputs: IS_BUILD_PR
@@ -894,17 +1089,11 @@ jobs:
           # #1130 is about, one level up. Fail loudly instead of inferring
           # "nothing changed" from "we could not tell what changed".
           if [[ "${{ github.event_name }}" == "pull_request" \
-                && "${{ needs.changed_paths.result }}" == "failure" ]]; then
-            echo "❌ Detect changed paths failed — the build and SPA e2e gates"
-            echo "   are both derived from its outputs, so neither can be"
-            echo "   trusted on this run."
-            exit 1
-          fi
-
-          # The SPA bundle is a hard gate: a broken TypeScript/Vite build ships
-          # an empty/broken frontend, so it blocks the merge like fast-tests.
-          if [[ "${{ needs.frontend-build.result }}" == "failure" ]]; then
-            echo "❌ Frontend build failed"
+                && "${{ needs.changed_paths.result }}" != "success" ]]; then
+            echo "❌ Detect changed paths did not succeed — the build and SPA"
+            echo "   e2e gates are both derived from its outputs, so neither"
+            echo "   can be trusted on this run."
+            echo "   Actual result: ${{ needs.changed_paths.result }}"
             exit 1
           fi
 
@@ -931,9 +1120,11 @@ jobs:
           # (#1130). Warning-and-continuing is how a red suite kept satisfying
           # merge-gate condition (a): this summary is the single required
           # check, and auto-merge.yml fires on it, so "just warn" meant the
-          # gate reported its own failure as a pass. Tag and main runs stay
-          # advisory here — the job itself is already non-advisory there, and
-          # failing the summary too would block auto-revert decisions.
+          # gate reported its own failure as a pass. Main pushes are also a
+          # hard gate here: branch protection reads this summary, so relying
+          # only on the failed e2e job would still let the required check pass.
+          # Tag and dev runs stay advisory in the summary; the e2e job itself
+          # remains non-advisory there.
           if [[ "${{ needs.e2e-tests.result }}" == "failure" ]]; then
             if [[ "$IS_FRONTEND_PR" == "true" ]]; then
               echo "❌ SPA e2e suite failed on a frontend PR — this is a hard gate."
@@ -942,6 +1133,16 @@ jobs:
               exit 1
             fi
             echo "⛔ E2E tests failed - do not release! (advisory; not a frontend PR)"
+          fi
+
+          # A concurrency-shaped PR is meaningful only if the full-stack lane
+          # positively completed against its own commit image. Failure,
+          # cancellation, or a skipped job all mean no trustworthy verdict.
+          if [[ "$IS_CONCURRENCY_PR" == "true" \
+                && "${{ needs.e2e-tests.result }}" != "success" ]]; then
+            echo "❌ Full-stack E2E did not succeed on a concurrency-shaped PR."
+            echo "   Actual result: ${{ needs.e2e-tests.result }}"
+            exit 1
           fi
 
           echo "✅ Test suite completed"

@@ -1,0 +1,21 @@
+{
+  "area": "process",
+  "body": "Three open issues from real reporters were found today to have been fully fixed and\nreleased weeks earlier, with the reporter never told:\n\n* #876 (@KucharczykL, CWA_DB.execute_write) — fixed in v4.1.13 (0f03c2784, #901).\n  We wrote \"I'll post back here once it's in a release.\" 26 days, no post.\n* #877 (@yodatak, PDF reload) — fixed in the SAME release, v4.1.13 (986ac8f77, #904),\n  both the parse fix and the new-UI button the reporter also asked for. 26 days, no post.\n* #579 (@uschi1, light design + read mark) — both halves delivered; the reporter had\n  even CONFIRMED the light theme themselves in #351 on 2026-07-27. We wrote \"will follow\n  up here once it lands\" on 07-11 and never did.\n\nThe shape: the `promised` label captures the commitment at the moment it is made, which\nworks. Nothing ever sweeps that label back against shipped releases, so the promise is\ntracked but never discharged. Two of the three trace to one release (v4.1.13), which\nsuggests the failure is per-release-sweep, not per-issue.\n\nWhy it matters: these are the highest-trust threads we have — a user who reported a real\nbug, got a specific diagnosis, and was promised a follow-up. The fix existing and the user\nknowing about it are different things, and only the second one ends their problem. It also\ninflates the promise backlog with items that are actually done, which buries the ones that\nare not.\n\nSuggested mechanism (not implemented here): extend the awaiting-verification sweep in\nscripts/auto-close-awaiting-verification.sh, or the followup-board generator, to also list\nopen `promised` issues whose referenced fix appears in a published release — the same\ncross-reference against CHANGES-vs-upstream.md / CHANGELOG.md that post-release-outreach.sh\nalready does for upstream threads. The board currently reports owe_reply=0 for these\nbecause our comment was last, which is exactly why they were invisible.",
+  "created": "2026-08-09",
+  "id": "F-88da18",
+  "refs": [
+    "#876",
+    "#877",
+    "#579"
+  ],
+  "resolution": {
+    "commit": "1cf1db3",
+    "date": "2026-08-09",
+    "note": "Mechanism implemented: scripts/promise-delivery-scan.sh + skill Phase 0.6.\n\nThe scan sweeps open `promised` issues, finds merged PRs cross-referencing each,\ntests whether the PR carries a resolution phrase naming that exact issue, resolves\nthe earliest release tag containing its merge commit, and compares that tag against\nthe tags WE have already named in our own comments. `shipped_unannounced` is the\nresulting \"fixed, released, never told them\" set. Rulings land in\nstate/promise-delivery-ledger.json so a judged candidate never resurfaces.\n\nIt surfaces only — it never closes or comments. Measured on the live tracker, a bare\ncross-reference is not delivery: #1410 says \"Addresses #1408\" (real), #1413 is\n\"promote F-0a2f72 to #1412\" (the FILING of the issue), #1451 mentions #1425 once in\na test list. Auto-closing on cross-reference would have closed two issues nobody had\nfixed. The judgment stays with the tick.\n\nFirst live run found four beyond the three named here: #1445 (v4.1.33) and #1408\n(v4.1.31), both OPEN with zero comments; #303, where we told @briffaantoine on\n07-11 there was no date and shipped the Goodreads provider three days later in\nv4.1.13 and never came back, 26 days; and #705, correctly ruled partial rather\nthan announced. All four are now dispositioned.\n\nSCOPE LIMIT, stated because it is not covered: the scan reads only issues labeled\n`promised`. The three cases named in this finding (#876, #877, #579) were NOT so\nlabeled and were caught by the awaiting-verification path instead, so a fix promised\nin prose on an unlabeled issue is still invisible to it. Broadening to every open\nissue is ~220 timeline calls per tick against 20 today (61s), which is too slow for\na tick — it would need a different shape, e.g. a per-release sweep keyed off the\nrelease diff, which is what this finding originally suggested.",
+    "release": ""
+  },
+  "severity": "ux",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Fixes ship but the originating issue never gets its close-out, so reporters sit on solved problems"
+}

@@ -8,17 +8,25 @@ import { VisuallyHidden } from '../components/VisuallyHidden';
 import { useT } from '../lib/i18n';
 import styles from './NativeReader.module.css';
 
-const AUDIO = new Set(['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav', 'aac']);
+const AUDIO = new Set(['mp3', 'mp4', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav', 'aac']);
 const COMIC = new Set(['cbz', 'cbr', 'cbt']);
 
-/** Native in-browser reader for non-EPUB formats. PDF renders in the browser's
- *  built-in viewer (iframe), audiobooks in an <audio> player, plain text inline
- *  — all dependency-free. EPUB/KEPUB use the dedicated epub.js reader; comics
- *  and DjVu fall back to the server reader (image extraction needs server help). */
+/** Native in-browser reader for non-EPUB formats. PDF renders through the
+ *  bundled pdf.js viewer (iframe), audiobooks in an <audio> player, plain text
+ *  inline — all dependency-free. EPUB/KEPUB use the dedicated epub.js reader;
+ *  comics and DjVu fall back to the server reader (image extraction needs
+ *  server help). */
 export function NativeReader({ id, format }: { id: string; format: string }) {
   const t = useT();
   const fmt = format.toLowerCase();
   const src = apiUrl(`/show/${id}/${fmt}`);
+  // #1584 — never hand a PDF to the browser's native viewer. WebKit, which is
+  // every browser on iOS and iPadOS, renders only the first page of a PDF
+  // embedded in a subframe, so pointing this iframe at the raw file showed page
+  // one and nothing else on iPad. The bundled pdf.js viewer (what the classic
+  // reader has always used) paints to <canvas> and behaves the same on every
+  // engine. url_for inside that template keeps it correct behind a subpath.
+  const pdfSrc = apiUrl(`/read/${id}/pdf`);
   const [text, setText] = useState<string | null>(null);
   const [textErr, setTextErr] = useState(false);
 
@@ -42,9 +50,20 @@ export function NativeReader({ id, format }: { id: string; format: string }) {
         <span className={styles.fmt}>{fmt.toUpperCase()}</span>
       </div>
 
-      <div className={styles.body}>
+      {/* The reader shell is position:fixed, so THIS div is the scroll container,
+          not the document. A scrollable div with no tabindex and no focusable
+          children is keyboard-unreachable in engines that don't implement
+          keyboard-focusable scrollers -- Safari, i.e. every browser on iPadOS,
+          the platform the PDF path was fixed for in #1584. TXT is the only
+          branch with nothing focusable inside it (PDF has the iframe, audio has
+          <audio controls>, comics have prev/next), so it is the only one that
+          needs the container itself to take focus. F-f8fdc9. */}
+      <div
+        className={styles.body}
+        {...(fmt === 'txt' ? { tabIndex: 0, role: 'region', 'aria-label': t('Book content') } : {})}
+      >
         {fmt === 'pdf' && (
-          <iframe className={styles.pdf} src={src} title={t('PDF reader')} />
+          <iframe className={styles.pdf} src={pdfSrc} title={t('PDF reader')} />
         )}
 
         {AUDIO.has(fmt) && (

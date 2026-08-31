@@ -39,7 +39,7 @@ def test_discovered_sync_handler_emits_changed_not_deleted_entitlement():
     block is outside the store-proxy branch."""
     source = inspect.getsource(HandleSyncRequest)
     tombstone_block = source[source.index("pending_deletions"):source.index(
-        "# If there are MORE pending deletions")]
+        "# Likewise, never set local continuation")]
     assert '"ChangedEntitlement"' in tombstone_block
     assert "create_deleted_book_entitlement" in tombstone_block
     assert "create_deleted_book_metadata" in tombstone_block
@@ -66,12 +66,12 @@ def test_side_loaded_hard_delete_payload_is_removed_hidden_and_not_downloadable(
 
 def test_stock_store_proxy_results_remain_after_local_removal(monkeypatch):
     """Stock-Kobo invariant: local results are extended with store results,
-    never replaced, and only after local continuation has drained."""
+    never replaced, after the local page advances its persisted cursor."""
     handler_source = inspect.getsource(HandleSyncRequest)
     response_source = inspect.getsource(generate_sync_response)
     assert handler_source.index("pending_deletions") < handler_source.index(
-        "return generate_sync_response")
-    assert "if config.config_kobo_proxy and not set_cont" in response_source
+        "response = generate_sync_response")
+    assert "if config.config_kobo_proxy" in response_source
     assert "sync_results += store_sync_results" in response_source
 
     class Token:
@@ -85,13 +85,17 @@ def test_stock_store_proxy_results_remain_after_local_removal(monkeypatch):
 
     store_response = SimpleNamespace(
         json=lambda: [{"NewEntitlement": {"source": "official-store"}}],
-        headers={"x-kobo-sync-mode": "store-mode"},
+        headers={
+            "x-kobo-sync": "continue",
+            "x-kobo-sync-mode": "store-mode",
+            "x-kobo-recent-reads": "recent-reads",
+        },
     )
     from cps import kobo as kobo_module
     monkeypatch.setattr(kobo_module.config, "config_kobo_proxy", True, raising=False)
     monkeypatch.setattr("cps.kobo.make_request_to_kobo_store",
                         lambda _token: store_response)
-    monkeypatch.setattr("scripts.cwa_db.CWA_DB", lambda: SimpleNamespace(
+    monkeypatch.setattr("cwa_db.CWA_DB", lambda: SimpleNamespace(
         log_activity=lambda **_kwargs: None))
     local = [{"ChangedEntitlement": {"source": "local-hard-delete"}}]
     token = Token()
@@ -105,25 +109,29 @@ def test_stock_store_proxy_results_remain_after_local_removal(monkeypatch):
     ]
     assert token.merged is True
     assert response.headers["x-kobo-synctoken"] == "round-tripped-wrapper"
+    assert "x-kobo-sync" not in response.headers
     assert response.headers["x-kobo-sync-mode"] == "store-mode"
+    assert response.headers["x-kobo-recent-reads"] == "recent-reads"
 
 
-def test_local_continuation_does_not_contact_official_store(monkeypatch):
+def test_missing_store_headers_are_omitted(monkeypatch):
     class Token:
+        def merge_from_store_response(self, _response):
+            pass
+
         def to_headers(self, headers):
             headers["x-kobo-synctoken"] = "local-page-token"
 
-    called = []
     from cps import kobo as kobo_module
     monkeypatch.setattr(kobo_module.config, "config_kobo_proxy", True, raising=False)
     monkeypatch.setattr("cps.kobo.make_request_to_kobo_store",
-                        lambda _token: called.append(True))
-    monkeypatch.setattr("scripts.cwa_db.CWA_DB", lambda: SimpleNamespace(
+                        lambda _token: SimpleNamespace(json=lambda: [], headers={}))
+    monkeypatch.setattr("cwa_db.CWA_DB", lambda: SimpleNamespace(
         log_activity=lambda **_kwargs: None))
     app = Flask(__name__)
     with app.test_request_context("/"):
-        response = generate_sync_response(Token(), [
-            {"ChangedEntitlement": {"source": "local-hard-delete"}}
-        ], set_cont=True)
-    assert called == []
-    assert response.headers["x-kobo-sync"] == "continue"
+        response = generate_sync_response(Token(), [])
+
+    assert "x-kobo-sync" not in response.headers
+    assert "x-kobo-sync-mode" not in response.headers
+    assert "x-kobo-recent-reads" not in response.headers

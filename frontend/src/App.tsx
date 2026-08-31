@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
-import { Router, Route, Switch, useLocation } from 'wouter';
+import { Router, Route, Switch, useLocation, useSearch } from 'wouter';
 import { RouteA11y } from './lib/a11y/useRouteA11y';
 import { BASE_PREFIX, type AdvancedSearchParams } from './lib/api';
 import { bodyFontStack, displayFontStack } from './lib/fonts';
@@ -15,10 +15,13 @@ import { Shelves } from './pages/Shelves';
 import { Shelf } from './pages/Shelf';
 import { AdvancedSearch } from './pages/AdvancedSearch';
 import { Account } from './pages/Account';
+import { Devices } from './pages/Devices';
+import { DeviceDetail } from './pages/DeviceDetail';
 import { EditBook } from './pages/EditBook';
 import { CoverPicker } from './pages/CoverPicker';
 import { Upload } from './pages/Upload';
 import { Admin } from './pages/Admin';
+import { AdminDevices } from './pages/AdminDevices';
 import { About } from './pages/About';
 import { Tasks } from './pages/Tasks';
 import { Table } from './pages/Table';
@@ -27,12 +30,14 @@ import { Annotations } from './pages/Annotations';
 import { WhatsNew } from './pages/WhatsNew';
 import { MagicShelf } from './pages/MagicShelf';
 import { MagicShelfView } from './pages/MagicShelfView';
+import { GlobalLibrary } from './pages/GlobalLibrary';
 import { AppShell } from './components/AppShell';
 import { RoutedErrorBoundary } from './components/ErrorBoundary';
 import { SpinnerCentered } from './components/Spinner';
 import { I18nProvider } from './lib/i18n';
 import { usePostAuthRedirect } from './lib/authRedirect';
 import { AUTH_ROUTES, SPA_ROUTES } from './lib/routes';
+import { recordOrigin } from './lib/backLink';
 
 // The reader pulls in epub.js (large) — load it only when a book is opened so it
 // stays out of the initial bundle.
@@ -59,6 +64,13 @@ function RouteBoundary({ children }: { children: ReactNode }) {
   );
 }
 
+function OriginTracker() {
+  const [location] = useLocation();
+  const search = useSearch();
+  useEffect(() => { recordOrigin(location, search); }, [location, search]);
+  return null;
+}
+
 // A saved default view (#498) FILTERS the library; it does not replace it with
 // the search page. Swapping the component here cost the library heading, actions
 // and Discover strip and retitled the home page "Advanced search" (#928).
@@ -70,6 +82,21 @@ function AuthenticatedAuthLanding() {
   const redirectAfterAuth = usePostAuthRedirect();
   useEffect(() => { redirectAfterAuth(); }, [redirectAfterAuth]);
   return <SpinnerCentered size={40} />;
+}
+
+function LibraryLanding({
+  isGuest,
+  defaultFilter,
+}: {
+  isGuest: boolean;
+  defaultFilter?: AdvancedSearchParams;
+}) {
+  const search = useSearch();
+  const hasPostAuthDestination = !!new URLSearchParams(search).get('next');
+  if (hasPostAuthDestination) {
+    return isGuest ? <Login /> : <AuthenticatedAuthLanding />;
+  }
+  return <Library defaultFilter={defaultFilter} />;
 }
 
 export function App() {
@@ -139,6 +166,7 @@ export function App() {
     <I18nProvider locale={me.locale}>
     <Router base={ROUTER_BASE}>
       <RouteA11y instanceName={me.instance_name} />
+      <OriginTracker />
       <RouteBoundary>
       <Switch>
         {/* Full-screen reader — outside the app shell (no sidebar/topbar). */}
@@ -231,14 +259,20 @@ export function App() {
 
           {/* Advanced search */}
           <Route path={SPA_ROUTES.search}>{() => <AdvancedSearch />}</Route>
+          <Route path={SPA_ROUTES.global}>{() => <GlobalLibrary />}</Route>
 
           {/* Account / settings */}
           <Route path={SPA_ROUTES.account}>{() => <Account />}</Route>
+          <Route path={SPA_ROUTES.deviceDetail}>{(p) => <DeviceDetail publicId={p.id} />}</Route>
+          <Route path={SPA_ROUTES.devices}>{() => <Devices />}</Route>
 
           {/* Upload */}
           <Route path={SPA_ROUTES.upload}>{() => <Upload />}</Route>
 
           {/* Admin */}
+          <Route path={SPA_ROUTES.adminDevices}>
+            {() => me.role?.admin ? <AdminDevices /> : <NotFound />}
+          </Route>
           <Route path={SPA_ROUTES.admin}>{() => <Admin />}</Route>
 
           {/* Info pages */}
@@ -251,7 +285,12 @@ export function App() {
           <Route path={SPA_ROUTES.magicView}>{(p) => <MagicShelfView id={p.id} />}</Route>
           <Route path={SPA_ROUTES.magic}>{() => <MagicShelf />}</Route>
 
-          <Route path={SPA_ROUTES.library}>{() => <Library defaultFilter={me.catalog?.default_filter ?? undefined} />}</Route>
+          <Route path={SPA_ROUTES.library}>{() => (
+            <LibraryLanding
+              isGuest={isGuest}
+              defaultFilter={me.catalog?.default_filter ?? undefined}
+            />
+          )}</Route>
 
           {/* Graceful 404 for any unmatched in-shell route (no blank page). */}
           <Route>{() => <NotFound />}</Route>

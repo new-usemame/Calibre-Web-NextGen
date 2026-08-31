@@ -21,6 +21,7 @@ wiki_images
 .editorconfig
 AI_README.md
 babel.cfg
+changelog.d
 CHANGELOG.md
 CHANGES-vs-upstream.md
 CONTRIBUTING.md
@@ -40,6 +41,7 @@ run_tests.sh
 SECURITY.md
 state
 wiki-src
+wikisite
 
 # Test infrastructure (not needed in production image). Dev dependencies now
 # live in pyproject.toml's [project.optional-dependencies].dev extra, which the
@@ -75,6 +77,10 @@ app.db
 *.db-wal
 *.db-shm
 
+# Raw Kobo exchange diagnostics and PATCH recovery bodies can contain private
+# annotation text when a bare source run uses the checkout as CONFIG_DIR.
+.cwng-private-observability/
+
 # Local developer artifacts. All four are git-ignored, so a CI checkout never
 # has them and published images were never affected -- but a local `docker
 # build` copied them straight into /app/calibre-web-automated/. Measured with a
@@ -85,3 +91,9 @@ app.db
 .claude
 .coverage
 calibre-web.log
+
+# Local development stacks and the KOReader emulator. Nothing here is COPY'd
+# into the image, and the emulator's default KOEMU_HOME writes a KOReader home
+# and book library under local-dev/ -- which would otherwise be uploaded as
+# build context on every local image build.
+local-dev/

@@ -1,0 +1,110 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="discover">
+  <h2>{{ _('Reconcile deleted Kobo books for %(user)s', user=user.name) }}</h2>
+  <p>
+    {{ _('Upload this user\'s KoboReader.sqlite to find device books whose UUID no longer exists in this library.') }}
+  </p>
+  <div class="alert alert-warning" role="alert">
+    <p>{{ _('Preview and sample entries are excluded automatically when Kobo marks them with Accessibility -1.') }}</p>
+    <p>{{ _('No genuine Kobo Store purchase was available for validation. Kobo Store books may appear in the preview, and the evidence shown is not proof that this server delivered a book.') }}</p>
+    <p>{{ _('Select only books you know came from this server. Selecting a book schedules its device copy for archival on the next sync.') }}</p>
+    <p>{{ _('Recorded sync means this server retained a UUID-bearing delivery record. No does not prove the book was never delivered by an older version.') }}</p>
+  </div>
+  <p class="text-muted">
+    {{ _('The uploaded database is deleted as soon as the preview is built.') }}
+  </p>
+
+  {% if error %}
+  <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if result %}
+  <div class="alert alert-success" role="status">
+    {{ _('%(count)d deleted books were scheduled to be archived the next time this user\'s Kobo syncs.', count=result.written) }}
+  </div>
+  <ul>
+    <li>{{ _('%(count)d were already scheduled.', count=result.already_scheduled) }}</li>
+    <li>{{ _('%(count)d are currently in the library and were not changed.', count=result.skipped_present) }}</li>
+    <li>{{ _('%(count)d could not be verified and were not changed.', count=result.skipped_unresolved) }}</li>
+  </ul>
+  {% endif %}
+
+  {% if preview %}
+  <h3>{{ _('Preview') }}</h3>
+  <p>
+    {{ _('%(count)d device books are not in the library and require your review.', count=preview.candidates|length) }}
+  </p>
+  {% if preview.candidates %}
+  <form method="POST" action="{{ url_for('admin.kobo_reconcile_confirm', user_id=user.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="confirmation_token" value="{{ confirmation_token }}">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>{{ _('Archive') }}</th>
+        <th>{{ _('Device title') }}</th>
+        <th>{{ _('Author') }}</th>
+        <th>{{ _('ISBN') }}</th>
+        <th>{{ _('Recorded sync') }}</th>
+        <th>{{ _('File size') }}</th>
+        <th>{{ _('Book UUID') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for book in preview.candidates %}
+      <tr>
+        <td>
+          <input type="checkbox" name="book_uuid" value="{{ book.uuid }}"
+                 aria-label="{{ _('Archive %(title)s', title=book.title) }}">
+        </td>
+        <td>{{ book.title }}</td>
+        <td>{{ book.author or _('Unknown') }}</td>
+        <td>
+          {% if book.has_isbn is none %}{{ _('Unknown') }}
+          {% elif book.has_isbn %}{{ _('Yes') }}
+          {% else %}{{ _('No') }}{% endif %}
+        </td>
+        <td>{{ _('Yes') if book.synced else _('No') }}</td>
+        <td>
+          {% if book.file_size is none %}{{ _('Unknown') }}
+          {% else %}{{ _('%(count)d bytes', count=book.file_size) }}{% endif %}
+        </td>
+        <td><code>{{ book.uuid }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+    <button class="btn btn-danger" type="submit" data-confirm="{{ _('Archive the selected books on the next Kobo sync?') }}" onclick="return confirm(this.dataset.confirm);">
+      {{ _('Archive selected books on the next Kobo sync') }}
+    </button>
+  </form>
+  {% endif %}
+
+  <h4>{{ _('Excluded from this action') }}</h4>
+  <ul>
+    <li>{{ _('%(count)d preview or sample entries were excluded.', count=preview.skipped_preview) }}</li>
+    <li>{{ _('%(count)d device entries could not be classified because Accessibility was unavailable.', count=preview.skipped_unclassified) }}</li>
+    <li>{{ _('%(count)d device volume rows had no usable UUID.', count=preview.skipped_invalid) }}</li>
+    <li>{{ _('%(count)d books are still in the library.', count=preview.skipped_present) }}</li>
+    <li>{{ _('%(count)d library lookups could not be completed.', count=preview.skipped_unresolved) }}</li>
+    <li>{{ _('%(count)d books were already scheduled for archival.', count=preview.already_scheduled) }}</li>
+  </ul>
+  {% endif %}
+
+  <hr>
+  <form enctype="multipart/form-data" method="POST"
+        action="{{ url_for('admin.kobo_reconcile', user_id=user.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-group">
+      <label for="kobo-reconcile-file">{{ _('KoboReader.sqlite') }}</label>
+      <input id="kobo-reconcile-file" type="file" name="file"
+             accept=".sqlite,application/x-sqlite3,application/octet-stream" required>
+      <p class="help-block">
+        {{ _('Maximum file size: %(max)d MB.', max=max_upload_mb) }}
+      </p>
+    </div>
+    <button class="btn btn-default" type="submit">{{ _('Build preview') }}</button>
+  </form>
+</div>
+{% endblock %}

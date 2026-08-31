@@ -22,6 +22,7 @@ from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic
 from .usermanagement import requires_basic_auth_if_no_ano, auth
 from .helper import get_download_link, get_book_cover
 from .pagination import Pagination
+from .sort_orders import BOOK_SORT_ORDERS
 from .web import render_read_books
 
 
@@ -185,7 +186,11 @@ OPDS_ROOT_ENTRY_DEFS = {
     },
     'random': {
         'endpoint': 'opds.feed_discover',
-        'title': N_('Random Books'),
+        # Issue #1097: this said 'Random Books' while the sidebar, the new UI,
+        # the route (/opds/discover) and the endpoint all said Discover — and
+        # 'Random Books' is fuzzy in de/km/no, so msgfmt dropped it and those
+        # locales showed an English entry among translated siblings.
+        'title': N_('Discover'),
         'description': N_('Show Random Books'),
         'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_RANDOM),
     },
@@ -448,7 +453,10 @@ def authorize_opds_entity(entity, user=None, entity_type=None):
 
 
 def get_opds_restricted_common_filter(user=None):
-    return calibre_db.common_filters(extra_filter=get_opds_book_filter(user))
+    return calibre_db.common_filters(
+        user=user,
+        extra_filter=get_opds_book_filter(user),
+    )
 
 
 def fill_opds_indexpage(*args, **kwargs):
@@ -521,7 +529,8 @@ def is_opds_book_exposed(book_id, user=None):
 def track_opds_access():
     """Track OPDS feed access for analytics"""
     try:
-        from scripts.cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         from .cw_login import current_user
         import json as json_lib
         
@@ -622,7 +631,7 @@ def feed_new():
         abort(404)
     off = request.args.get("offset") or 0
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
-                                                  db.Books, True, [db.Books.timestamp.desc()],
+                                                  db.Books, True, BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)
 
@@ -647,7 +656,7 @@ def feed_best_rated():
     off = request.args.get("offset") or 0
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books, db.Books.ratings.any(db.Ratings.rating > 9),
-                                                  [db.Books.timestamp.desc()],
+                                                  BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)
 
@@ -659,7 +668,7 @@ def feed_hot():
         abort(404)
     off = request.args.get("offset") or 0
     all_books = ub.session.query(ub.Downloads, func.count(ub.Downloads.book_id)).order_by(
-        func.count(ub.Downloads.book_id).desc()).group_by(ub.Downloads.book_id)
+        *BOOK_SORT_ORDERS["hotdesc"]).group_by(ub.Downloads.book_id)
     hot_books = all_books.offset(off).limit(config.config_books_per_page)
     entries = list()
     for book in hot_books:
@@ -859,7 +868,7 @@ def feed_format(book_id):
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books,
                                                   db.Books.data.any(db.Data.format == book_id.upper()),
-                                                  [db.Books.timestamp.desc()],
+                                                  BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination,
                                feed_title=_feed_title_with_name(book_id.upper()))
@@ -896,7 +905,7 @@ def feed_languages(book_id):
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books,
                                                   db.Books.languages.any(db.Languages.id == book_id),
-                                                  [db.Books.timestamp.desc()],
+                                                  BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination,
                                feed_title=_feed_title_with_name(_language_display_name(book_id)))
@@ -1006,7 +1015,7 @@ def feed_magic_shelf(shelf_id):
 
     per_page = int(config.config_books_per_page) if config.config_books_per_page else 20
     page = int(off) // per_page + 1
-    sort_order = [db.Books.timestamp.desc()]
+    sort_order = BOOK_SORT_ORDERS["new"]
     query, __ = magic_shelf.build_book_query_for_magic_shelf(
         shelf_id,
         sort_order=sort_order,
@@ -1043,7 +1052,9 @@ def opds_download_link(book_id, book_format):
 @opds.route("/ajax/book/<string:uuid>", defaults={'library': ""})
 @requires_basic_auth_if_no_ano
 def get_metadata_calibre_companion(uuid, library):
-    entry = calibre_db.session.query(db.Books).filter(db.Books.uuid.like("%" + uuid + "%")).first()
+    entry = (calibre_db.session.query(db.Books)
+             .filter(db.Books.uuid.like("%" + uuid + "%"))
+             .filter(get_opds_restricted_common_filter()).first())
     if entry is not None and is_opds_book_exposed(entry.id):
         js = render_template('json.txt', entry=entry)
         response = make_response(js)
@@ -1119,7 +1130,7 @@ def feed_currently_reading():
         0,
         db.Books,
         in_progress_filter,
-        [db.Books.timestamp.desc()],
+        BOOK_SORT_ORDERS["new"],
         True,
         config.config_read_column,
         db.books_series_link,
@@ -1274,7 +1285,7 @@ def render_xml_dataset(data_table, book_id):
     entries, __, pagination = fill_opds_indexpage((int(off) / (int(config.config_books_per_page)) + 1), 0,
                                                   db.Books,
                                                   getattr(db.Books, data_table.__tablename__).any(data_table.id == book_id),
-                                                  [db.Books.timestamp.desc()],
+                                                  BOOK_SORT_ORDERS["new"],
                                                   True, config.config_read_column)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination,
                                feed_title=_feed_title_with_name(_dataset_display_name(data_table, book_id)))

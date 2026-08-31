@@ -94,6 +94,103 @@ def test_failed_runtime_initialization_is_not_retried(monkeypatch, tmp_path):
     assert acquire_calls == 1
 
 
+def _process_lock_class(monkeypatch, tmp_path):
+    scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
+    monkeypatch.syspath_prepend(str(scripts_dir))
+    ingest_processor = importlib.import_module("ingest_processor")
+    monkeypatch.setattr(
+        ingest_processor.tempfile,
+        "gettempdir",
+        lambda: str(tmp_path),
+    )
+    return ingest_processor.ProcessLock
+
+
+def test_process_lock_live_holder_cannot_be_stolen(monkeypatch, tmp_path):
+    process_lock_class = _process_lock_class(monkeypatch, tmp_path)
+    lock_path = tmp_path / "live-holder.lock"
+    holder = process_lock_class("live-holder")
+    contenders = []
+
+    try:
+        assert holder.acquire(timeout=0.1)
+
+        contender = process_lock_class("live-holder")
+        contenders.append(contender)
+        assert contender.acquire(timeout=0.1) is False
+        assert lock_path.exists(), "live holder's lock file was unlinked by contender"
+        assert lock_path.read_text() == str(os.getpid())
+
+        second_contender = process_lock_class("live-holder")
+        contenders.append(second_contender)
+        assert second_contender.acquire(timeout=0.1) is False
+    finally:
+        for contender in contenders:
+            contender.release()
+        holder.release()
+
+
+def test_process_lock_invalid_pid_cannot_override_live_flock(monkeypatch, tmp_path):
+    process_lock_class = _process_lock_class(monkeypatch, tmp_path)
+    lock_path = tmp_path / "invalid-pid.lock"
+    holder = process_lock_class("invalid-pid")
+    contender = process_lock_class("invalid-pid")
+
+    try:
+        assert holder.acquire(timeout=0.1)
+        lock_path.write_text("not-a-pid")
+
+        assert contender.acquire(timeout=0.1) is False
+        assert lock_path.exists()
+        assert lock_path.read_text() == "not-a-pid"
+    finally:
+        contender.release()
+        holder.release()
+
+
+def test_process_lock_reclaims_dead_pid_file(monkeypatch, tmp_path):
+    process_lock_class = _process_lock_class(monkeypatch, tmp_path)
+    lock_path = tmp_path / "stale-holder.lock"
+    exited_process = subprocess.Popen([sys.executable, "-c", "pass"])
+    exited_process.wait(timeout=5)
+    dead_pid = exited_process.pid
+    lock_path.write_text(str(dead_pid))
+    lock = process_lock_class("stale-holder")
+
+    try:
+        with pytest.raises(ProcessLookupError):
+            os.kill(dead_pid, 0)
+        assert lock.acquire(timeout=0.1)
+        assert lock_path.read_text() == str(os.getpid())
+    finally:
+        lock.release()
+
+
+def test_process_lock_read_only_file_remains_lockable(monkeypatch, tmp_path):
+    process_lock_class = _process_lock_class(monkeypatch, tmp_path)
+    lock_path = tmp_path / "read-only.lock"
+    original_contents = "previous-holder"
+    lock_path.write_text(original_contents)
+    lock_path.chmod(0o444)
+    holder = process_lock_class("read-only")
+    contender = process_lock_class("read-only")
+
+    try:
+        assert holder.acquire(timeout=0.1)
+        assert lock_path.exists()
+        assert lock_path.read_text() == original_contents
+
+        assert contender.acquire(timeout=0.1) is False
+        assert lock_path.exists()
+        assert lock_path.read_text() == original_contents
+    finally:
+        contender.release()
+        holder.release()
+
+    assert lock_path.exists()
+    assert lock_path.read_text() == original_contents
+
+
 def test_optional_cps_modules_retry_after_partial_load(monkeypatch, tmp_path):
     scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
     monkeypatch.syspath_prepend(str(scripts_dir))

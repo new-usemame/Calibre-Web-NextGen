@@ -10,6 +10,13 @@
   overflow-y: auto;
 }
 
+/* On mobile the wrapper has no box, so the existing fixed drawer remains the
+   positioning surface. The desktop fine-pointer query below turns this into
+   the rail's one fixed-size flex item. */
+.rail {
+  display: contents;
+}
+
 .list {
   display: flex;
   flex-direction: column;
@@ -43,31 +50,6 @@
   flex-shrink: 0;
 }
 
-/* Shelves section */
-.sectionHeader {
-  margin-top: var(--sp-4);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border);
-}
-
-.sectionTitle,
-.sectionTitleActive {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md);
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semi);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.sectionTitle:hover { color: var(--text); background: var(--surface-2); }
-.sectionTitleActive { color: var(--accent-text); background: var(--accent-soft); }
-
 .shelfList {
   display: flex;
   flex-direction: column;
@@ -85,7 +67,10 @@
   border-radius: var(--r-sm);
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    padding-left var(--dur-base) var(--ease-out);
 }
 
 .shelfItem:hover { color: var(--text); background: var(--surface-2); }
@@ -103,9 +88,63 @@
   color: var(--text-faint);
 }
 
+.magicShelfItem {
+  position: relative;
+}
+
+.magicShelfIcon {
+  position: absolute;
+  left: var(--sp-3);
+  top: 50%;
+  width: 18px;
+  transform: translateY(-50%);
+  text-align: center;
+  line-height: 1;
+}
+
+.magicShelfName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Drawer close button — mobile only (the desktop rail has no close affordance). */
 .drawerClose {
   display: none;
+}
+
+.pinRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 32px;
+  margin-bottom: var(--sp-1);
+}
+
+.pinButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 24px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.pinButton:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 /* Mobile scrim behind the drawer */
@@ -114,19 +153,126 @@
 }
 
 /* ---- Desktop (persistent rail) ---- */
-@media (min-width: 768px) {
-  .nav,
-  .navOpen {
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  /* The shell only lays out this 64px rail. The 220px navigation panel is an
+     absolute child, so revealing it never changes the flex sibling's box and
+     cannot relayout <main> or its catalog grid (#1813 item 4). */
+  .rail {
+    display: block;
     position: sticky;
     top: var(--topbar-h);
+    width: 64px;
     height: calc(100vh - var(--topbar-h));
+    flex: 0 0 64px;
+    box-sizing: border-box;
+    background: var(--surface-1);
+    border-right: 1px solid var(--border);
+    z-index: var(--z-overlay);
+  }
+
+  /* Pinning is an explicit persistent layout choice, not a hover animation.
+     Reserve the expanded width in one discrete style change. */
+  .railPinned {
     width: 220px;
-    flex-shrink: 0;
+    flex-basis: 220px;
+  }
+
+  :is(.nav, .navOpen) {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 64px;
+    height: 100%;
+    padding-right: var(--sp-2);
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    box-sizing: border-box;
+    /* The collapsed panel is a real 64px box, not a 220px box clipped to 64px:
+       clip-path removes the clipped strip from hit-testing, so a pointer aimed
+       at a link's centre (x > 64px) fell through to <main> and hover-to-expand
+       could never fire from there. Width is what both users and the e2e specs
+       aim at. The width transition runs layout, but only inside this contained,
+       out-of-flow subtree — the flex sibling (<main>/catalog) never reflows,
+       which is the #1813 item-4 guarantee. */
+    transition: width var(--dur-base) var(--ease-out);
+    contain: layout paint;
+  }
+
+  /* `scrollbar-width: none` above is what every current engine reads. The
+     legacy pseudo-element stays behind the same feature guard as the one in
+     styles/global.css: an engine that honours `::-webkit-scrollbar` but lacks
+     the standard properties gets the fallback, and nothing else does (#1089). */
+  @supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
+    :is(.nav, .navOpen)::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) {
+    width: 220px;
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .pinButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  :is(.item, .itemActive, .customizeBtn) > span,
+  .magicShelfName {
+    opacity: 0;
+    white-space: nowrap;
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+
+  .shelfList :is(.shelfItem, .shelfItemActive) {
+    /* Keep this alignment stable in both reveal states. Animating padding-left
+       would reintroduce per-frame layout work inside the new panel. */
+    padding-left: calc(var(--sp-3) + 18px + var(--sp-3));
+  }
+  .shelfList .shelfCount {
+    display: none;
+  }
+
+  .magicShelfIcon {
+    transform: translate(0, -50%);
+    transition: transform var(--dur-base) var(--ease-out);
+  }
+
+  .magicShelfName {
+    padding-left: calc(18px + var(--sp-2));
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within)
+    :is(.item > span, .itemActive > span, .customizeBtn > span, .magicShelfName) {
+    opacity: 1;
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .shelfList .shelfCount {
+    display: inline;
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .magicShelfIcon {
+    transform: translate(calc(18px + var(--sp-3)), -50%);
+  }
+}
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+  :is(.nav, .navOpen) {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .magicShelfIcon,
+  :is(.shelfItem, .shelfItemActive) {
+    transition: none;
   }
 }
 
 /* ---- Mobile (off-canvas drawer) ---- */
-@media (max-width: 767px) {
+/* Keep this condition identical to DRAWER_MODE_QUERY in
+   ../lib/a11y/drawerMode.ts. unit/structuralPerformance.test.ts pins it. */
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
   .nav,
   .navOpen {
     position: fixed;
@@ -146,6 +292,13 @@
     padding-left: max(var(--sp-3), env(safe-area-inset-left));
     padding-top: max(var(--sp-4), env(safe-area-inset-top));
     padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+  }
+
+  .magicShelfIcon {
+    left: calc(var(--sp-3) + 18px + var(--sp-3));
+  }
+  .magicShelfName {
+    padding-left: calc(18px + var(--sp-2));
   }
 
   .nav {
@@ -215,6 +368,7 @@
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
+.customizeBtn > svg { flex-shrink: 0; }
 .customizeBtn:hover { background: var(--surface-2); color: var(--text); }
 
 /* ── #585 v3: liquid-glass Customize capsule + inline edit list ──────────── */

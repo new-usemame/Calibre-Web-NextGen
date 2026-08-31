@@ -1,22 +1,29 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'wouter';
 import { BookCopy, Check, Plus, Globe, Lock } from 'lucide-react';
-import { useShelves, useBookShelves, useShelfMembership, useMe, useCreateShelf } from '../lib/queries';
+import {
+  useShelves, useBookShelves, useShelfMembership, useMe, useCreateShelf,
+  useAddToMyLibrary,
+} from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { Spinner } from './Spinner';
 import styles from './AddToShelf.module.css';
+import { useAnnouncer } from '../lib/a11y/announcer';
 
 /** "Add to shelf" popover for a book — toggles membership on the user's
  *  editable shelves and can create a new shelf inline. */
-export function AddToShelf({ bookId }: { bookId: number }) {
+export function AddToShelf({ bookId, inLibrary = true }: { bookId: number; inLibrary?: boolean }) {
   const t = useT();
+  const announce = useAnnouncer();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const me = useMe().data;
   const { data: shelvesData, isLoading } = useShelves();
   const { data: membership } = useBookShelves(bookId);
   const { add, remove } = useShelfMembership();
+  const addToLibrary = useAddToMyLibrary();
   const createShelf = useCreateShelf();
 
   const [newName, setNewName] = useState('');
@@ -27,7 +34,11 @@ export function AddToShelf({ bookId }: { bookId: number }) {
     const onDoc = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -42,29 +53,58 @@ export function AddToShelf({ bookId }: { bookId: number }) {
   );
   const onShelf = new Set(membership?.shelf_ids ?? []);
 
-  const toggle = (shelfId: number) => {
-    if (onShelf.has(shelfId)) remove.mutate({ shelfId, bookId });
-    else add.mutate({ shelfId, bookId });
+  const ensureLibraryMembership = async () => {
+    if (inLibrary) return true;
+    try {
+      await addToLibrary.mutateAsync(bookId);
+      return true;
+    } catch {
+      announce(t('Could not add the book. Please try again.'), { assertive: true });
+      return false;
+    }
   };
 
-  const onCreate = (e: React.FormEvent) => {
+  const addBookToShelf = async (
+    shelfId: number, shelfName: string, membershipReady = false,
+  ) => {
+    // The shelf API correctly rejects a non-member. Establish membership
+    // first; the endpoint is idempotent if a stale prop repeats the gesture.
+    if (!membershipReady && !(await ensureLibraryMembership())) return;
+    try {
+      await add.mutateAsync({ shelfId, bookId });
+      if (!inLibrary) announce(t('Added to your library and to {shelf}', { shelf: shelfName }));
+    } catch {
+      announce(t('Could not add this book to the shelf.'), { assertive: true });
+    }
+  };
+
+  const toggle = (shelfId: number) => {
+    if (onShelf.has(shelfId)) remove.mutate({ shelfId, bookId });
+    else {
+      const shelf = editable.find((item) => item.id === shelfId);
+      if (shelf) void addBookToShelf(shelfId, shelf.name);
+    }
+  };
+
+  const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    createShelf.mutate(
-      { name },
-      {
-        onSuccess: (shelf) => {
-          setNewName('');
-          add.mutate({ shelfId: shelf.id, bookId });
-        },
-      },
-    );
+    // Do not create an empty shelf when the implied library add is rejected.
+    if (!(await ensureLibraryMembership())) return;
+    try {
+      const shelf = await createShelf.mutateAsync({ name });
+      setNewName('');
+      await addBookToShelf(shelf.id, shelf.name, true);
+    } catch {
+      announce(t('Could not create shelf.'), { assertive: true });
+    }
   };
 
   return (
     <div className={styles.wrap} ref={wrapRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.trigger}
         onClick={() => setOpen((o) => !o)}
@@ -79,6 +119,7 @@ export function AddToShelf({ bookId }: { bookId: number }) {
         // Disclosure, not an ARIA menu: it holds toggles + a form + a link, which
         // a menu can't contain (S8). Toggles use aria-pressed.
         <div className={styles.panel}>
+          {!inLibrary && <p className={styles.empty}>{t('Adding this book to a shelf also adds it to your library.')}</p>}
           {isLoading ? (
             <div className={styles.loading}>
               <Spinner size={16} />
@@ -96,6 +137,7 @@ export function AddToShelf({ bookId }: { bookId: number }) {
                           className={styles.item}
                           onClick={() => toggle(s.id)}
                           aria-pressed={active}
+                          disabled={add.isPending || addToLibrary.isPending || createShelf.isPending}
                         >
                           <span className={active ? styles.checkOn : styles.checkOff} aria-hidden="true">
                             {active && <Check size={13} strokeWidth={3} />}
@@ -128,7 +170,7 @@ export function AddToShelf({ bookId }: { bookId: number }) {
                 <button
                   type="submit"
                   className={styles.createBtn}
-                  disabled={!newName.trim() || createShelf.isPending}
+                  disabled={!newName.trim() || createShelf.isPending || addToLibrary.isPending || add.isPending}
                   aria-label={t('Create shelf and add book')}
                 >
                   <Plus size={15} aria-hidden="true" focusable={false} />

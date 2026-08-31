@@ -6,7 +6,9 @@ from datetime import date, datetime
 
 from .. import constants
 from ..clean_html import clean_string
+from ..cover_version import COVER_VERSION_ARG, cover_version_token
 from ..ui_themes import theme_slug
+from ..user_preferences import serialize_named_preferences
 
 
 # Fork #585 (@Glennza1962 et al.): map the SPA sidebar's nav entries to the
@@ -74,7 +76,7 @@ def serialize_sidebar_order(user):
 
 
 def serialize_user(user):
-    return {
+    payload = {
         "id": user.id,
         "name": user.name,
         "locale": user.locale,
@@ -89,6 +91,9 @@ def serialize_user(user):
             "delete_books": user.role_delete_books(),
             "edit_shelfs": user.role_edit_shelfs(),
             "viewer": user.role_viewer(),
+            "browse_global": bool(
+                getattr(user, "role_browse_global", lambda: False)()
+            ),
             "passwd": user.role_passwd(),
             "anonymous": user.role_anonymous(),
         },
@@ -96,12 +101,38 @@ def serialize_user(user):
         "sidebar": serialize_sidebar_visibility(user),
         # Fork #585 v2: the user's saved sidebar order ([] = SPA default order).
         "sidebar_order": serialize_sidebar_order(user),
+        # Generic per-user UI preferences. ``None`` means never set, which lets
+        # the SPA adopt a pre-existing local value exactly once.
+        "preferences": serialize_named_preferences(user),
         # Fork #866: marking a shelf "Kobo sync on" is inert until this account
         # setting is on. The shelf page warns about that, so /me carries the
         # flag — otherwise every shelf view would have to fetch the whole
         # account payload (app passwords, locale + language lists) for one bool.
         "kobo_only_shelves_sync": bool(getattr(user, "kobo_only_shelves_sync", False)),
     }
+    mode = getattr(user, "library_mode", None)
+    payload.update({
+        "library_mode": (
+            mode() if callable(mode)
+            else (constants.LIBRARY_MODE_PERSONAL
+                  if bool(getattr(user, "has_own_library", False))
+                  else constants.LIBRARY_MODE_MONOLIBRARY)
+        ),
+        "my_library_seeded": bool(
+            getattr(user, "user_library_seeded", False)
+        ),
+        "can_switch_library_mode": bool(
+            getattr(user, "role_browse_global", lambda: False)()
+        ),
+        "library_mode_managed": not bool(
+            getattr(user, "role_browse_global", lambda: False)()
+        ),
+        "show_my_library_intro": (
+            not user.role_anonymous()
+            and not bool(getattr(user, "my_library_intro_dismissed", False))
+        ),
+    })
+    return payload
 
 
 def serialize_shelf(shelf, count, is_owner):
@@ -123,7 +154,27 @@ def _iso_datetime(value):
     return value.isoformat() if isinstance(value, (datetime, date)) else None
 
 
-def serialize_book_list_item(book, read=False, archived=False, hidden=False):
+def cover_url_for(book, resolution):
+    """Versioned ``/cover/<id>/<resolution>`` URL, or None when there is no cover.
+
+    The SPA used to emit bare cover URLs, which is why cover responses could not
+    be cached at all: with nothing in the URL naming a version, the only way a
+    replaced cover could ever appear was to revalidate on every render. The
+    token comes from ``cps.cover_version`` — the same function the classic UI's
+    jinjia filters use and the same one ``helper`` validates against — so the
+    two UIs and the server-side cache policy cannot drift apart.
+
+    No token (an unusable ``last_modified``) means an UNVERSIONED URL, which the
+    server answers with ``no-cache``. Degraded caching, never a stale image.
+    """
+    if not getattr(book, "has_cover", 0):
+        return None
+    url = f"/cover/{book.id}/{resolution}"
+    version = cover_version_token(book)
+    return f"{url}?{COVER_VERSION_ARG}={version}" if version else url
+
+
+def serialize_book_list_item(book, read=False, archived=False, hidden=False, in_progress=False):
     series = book.series[0].name if getattr(book, "series", None) else None
     return {
         "id": book.id,
@@ -134,7 +185,7 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False):
         "authors": [a.name.replace("|", ",") for a in book.authors] if getattr(book, "authors", None) else [],
         "series": series,
         "series_index": book.series_index,
-        "cover_url": f"/cover/{book.id}/sm" if getattr(book, "has_cover", 0) else None,
+        "cover_url": cover_url_for(book, "sm"),
         "formats": [d.format for d in book.data] if getattr(book, "data", None) else [],
         # Tag names for the table view's Tags column (#725). Flat strings to match
         # the list-item's other flat arrays (authors/formats); the detail
@@ -144,6 +195,7 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False):
         "date_added": _iso_datetime(getattr(book, "timestamp", None)),
         "last_modified": _iso_datetime(getattr(book, "last_modified", None)),
         "read": bool(read),
+        "in_progress": bool(in_progress),
         "archived": bool(archived),
         "hidden": bool(hidden),
     }
@@ -178,7 +230,7 @@ def _serialize_custom_columns(book, definitions):
 
 def serialize_book_detail(book, read=False, archived=False, favorited=False, hidden=False,
                           in_progress=False, custom_column_definitions=None,
-                          original_filename=None):
+                          original_filename=None, annotation_count=0):
     """Full detail serializer — pure, no Flask/DB imports.
 
     Callers must enrich each language object with a ``.language_name`` attribute
@@ -200,8 +252,35 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
     ratings_list = getattr(book, "ratings", None) or []
     rating = ratings_list[0].rating if ratings_list else None
 
-    # Cover
-    cover_url = f"/cover/{bid}/og" if getattr(book, "has_cover", 0) else None
+    # Cover. Deliberately NOT ``og``: ``web.get_cover`` maps ``og`` to
+    # ``constants.COVER_THUMBNAIL_ORIGINAL``, which is 0 — falsy — so
+    # ``helper.get_book_cover_internal``'s ``if resolution:`` branch is skipped
+    # entirely and the raw library ``cover.jpg`` is served. On a real library
+    # that is a ~1250x2000 JPEG (~280 KB) decoded to fill a 280 CSS-px column.
+    #
+    # The detail cover's column is a fixed 280px (BookDetail.module.css
+    # `.layout`), narrowing to at most 34vw on phones. The thumbnail
+    # resolutions ARE density multipliers — constants.COVER_THUMBNAIL_SMALL /
+    # _MEDIUM / _LARGE are literally 1 / 2 / 4, and the classic UI's
+    # `get_cover_srcset` already spells them as `1x`/`2x`/`4x` — so `sm` suits a
+    # 1x screen and `md` a 2x one. The thumbnailer sizes by HEIGHT and keeps each
+    # cover's own ratio, so the widths are approximate, not a guaranteed 280/560:
+    # a 2:3 cover gives sm≈280 / md≈560, a squarer one more. `src` stays `md` as
+    # the no-srcset fallback, since 2x is the common case.
+    #
+    # `lg` is deliberately NOT offered. Its target height is 4x the base (1680px),
+    # which exceeds almost every cover in a real library, and the thumbnail task
+    # only downscales when the source is taller — so for most books `lg` is the
+    # ORIGINAL dimensions re-encoded, and handing it to a 280px column would undo
+    # this fix. Measured on the local library: og 800x1104 JPEG / 104,775 B,
+    # lg 800x1104 WebP / 83,102 B, md 608x840 WebP / 58,740 B.
+    #
+    # `og` remains a working route — this changes only what the page ASKS for.
+    cover_url = cover_url_for(book, "md")
+    cover_srcset = None
+    if cover_url:
+        cover_1x = cover_url_for(book, "sm")
+        cover_srcset = f"{cover_1x} 1x, {cover_url} 2x" if cover_1x else None
 
     # Pubdate — sentinel year <= 101 → null
     pubdate_raw = getattr(book, "pubdate", None)
@@ -259,6 +338,7 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
             "size_bytes": d.uncompressed_size,
             "download_url": f"/download/{bid}/{fmt.lower()}/{d.name}",
             "read_url": f"/read/{bid}/{fmt.lower()}",
+            "content_url": f"/show/{bid}/{fmt.lower()}",
         })
 
     return {
@@ -272,6 +352,7 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "series_index": book.series_index,
         "rating": rating,
         "cover_url": cover_url,
+        "cover_srcset": cover_srcset,
         "pubdate": pubdate_str,
         "date_added": _iso_datetime(getattr(book, "timestamp", None)),
         "last_modified": _iso_datetime(getattr(book, "last_modified", None)),
@@ -288,4 +369,5 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "favorited": bool(favorited),
         "hidden": bool(hidden),
         "in_progress": bool(in_progress),
+        "annotation_count": int(annotation_count or 0),
     }

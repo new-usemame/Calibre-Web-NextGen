@@ -58,6 +58,11 @@ class CoverCandidate:
     height: Optional[int] = None
     candidate_id: Optional[str] = None      # Stable id for the apply step
     flags: Optional[List[str]] = None       # 'low_res', 'squished', etc.
+    # Who actually serves the image, when that differs from the provider that
+    # supplied the metadata. Set only when it adds information: a Hardcover
+    # record whose cover the boost pass swapped for an Amazon image gets
+    # 'Amazon' here, an Amazon record keeps None. Fork #304.
+    image_origin: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -87,10 +92,11 @@ def gather_cover_candidates(
     static_cover: str,
     locale: str,
     is_provider_enabled: Callable[[object], bool] = lambda _p: True,
-    classify_failure: Callable[[Exception], tuple] = lambda exc: ("error", str(exc) or exc.__class__.__name__),
+    classify_failure: Callable[..., tuple] = lambda exc, _provider=None: ("error", str(exc) or exc.__class__.__name__),
     classify_empty: Callable[[object], tuple] = lambda _p: ("empty", "No results"),
     extract_embedded: Optional[Callable[[], "ExtractedCover | None"]] = None,
     book_isbns: Iterable[str] = (),
+    book_asins: Iterable[str] = (),
 ) -> tuple[List[CoverCandidate], List[ProviderStatus]]:
     """Run every enabled provider against ``query`` in parallel, post-process
     through ``cover_booster``, and return a flattened candidate list +
@@ -112,6 +118,9 @@ def gather_cover_candidates(
       * ``book_isbns`` — the editing book's stored ISBN identifiers. These
         can contribute an Amazon-CDN high-resolution cover independently of
         whether the Amazon metadata provider itself is enabled.
+      * ``book_asins`` — the book's stored Amazon identifiers. A Kindle
+        edition often carries an ASIN and no ISBN at all, so without this it
+        gets no high-resolution candidate at all (fork #304).
     """
     runnable, statuses = _filter_runnable(providers, is_provider_enabled)
     candidates: List[CoverCandidate] = []
@@ -131,12 +140,12 @@ def gather_cover_candidates(
                 candidate_id="embedded",
             ))
 
-    amazon_isbn10s = _amazon_candidate_isbn10s(book_isbns)
-    if (not runnable or not query) and not amazon_isbn10s:
+    amazon_keys = _amazon_candidate_keys(book_isbns, book_asins)
+    if (not runnable or not query) and not amazon_keys:
         return candidates, statuses
 
     results_by_provider: Dict[str, list] = {}
-    amazon_urls_by_isbn10: Dict[str, str] = {}
+    amazon_urls_by_key: Dict[str, str] = {}
 
     # Fan out through parallel.fan_out, NOT concurrent.futures: the WSGI server
     # is gevent without monkey-patching, so a stdlib as_completed() wait blocks
@@ -149,8 +158,8 @@ def gather_cover_candidates(
             for p in runnable
         )
     jobs.extend(
-        (("amazon", isbn10), functools.partial(cover_booster._amazon_cdn_cover_for_isbn10, isbn10))
-        for isbn10 in amazon_isbn10s
+        (("amazon", key), functools.partial(cover_booster._amazon_cdn_cover_for_key, key))
+        for key in amazon_keys
     )
 
     for (kind, subject), result in parallel.fan_out(jobs, max_workers=_DEFAULT_WORKERS):
@@ -160,7 +169,7 @@ def gather_cover_candidates(
                           subject, result.exception)
                 continue
             if result.value:
-                amazon_urls_by_isbn10[subject] = result.value
+                amazon_urls_by_key[subject] = result.value
             continue
 
         p = subject
@@ -169,7 +178,10 @@ def gather_cover_candidates(
         # number (fork #954 verification: 10 of 16 all reporting 5316ms).
         elapsed_ms = result.elapsed_ms
         if result.exception is not None:
-            status, message = classify_failure(result.exception)
+            # The provider goes with it: a 403 is a wrong key for a provider
+            # that takes one and plain throttling for a keyless scraper, and
+            # the cover picker must not misadvise either (fork #303).
+            status, message = classify_failure(result.exception, p)
             log.warning("cover-picker provider %s failed (%s) in %dms: %s",
                         p.__class__.__name__, status, elapsed_ms, result.exception)
             statuses.append(ProviderStatus(
@@ -199,10 +211,12 @@ def gather_cover_candidates(
         if not cover_url or _is_generic_cover(cover_url, static_cover):
             continue
         source = record.get("source") or {}
+        source_id = source.get("id") or "unknown"
         candidates.append(CoverCandidate(
-            source_id=source.get("id") or "unknown",
+            source_id=source_id,
             source_name=source.get("description") or "Unknown",
             cover_url=cover_url,
+            image_origin=_image_origin_label(record.get("cover_origin"), source_id),
             title=record.get("title"),
             authors=record.get("authors") or [],
             publisher=record.get("publisher") or None,
@@ -211,15 +225,15 @@ def gather_cover_candidates(
         ))
 
     existing_urls = {candidate.cover_url for candidate in candidates}
-    for isbn10 in amazon_isbn10s:
-        cover_url = amazon_urls_by_isbn10.get(isbn10)
+    for key in amazon_keys:
+        cover_url = amazon_urls_by_key.get(key)
         if not cover_url or cover_url in existing_urls:
             continue
         candidates.append(CoverCandidate(
             source_id="amazon_highres",
             source_name="Amazon (high-res)",
             cover_url=cover_url,
-            candidate_id=f"amazon_highres:{isbn10}",
+            candidate_id=f"amazon_highres:{key}",
         ))
         existing_urls.add(cover_url)
 
@@ -227,20 +241,27 @@ def gather_cover_candidates(
     return candidates, statuses
 
 
-def _amazon_candidate_isbn10s(book_isbns: Iterable[str]) -> List[str]:
-    """Normalize stored book ISBNs for the existing Amazon-CDN probe.
+def _image_origin_label(origin_id: Optional[str], source_id: str) -> Optional[str]:
+    """Display label for who serves the image, or None when it says nothing.
 
-    The booster's flag is deliberately the single kill-switch for both its
-    provider-record upgrade and this independent picker candidate.
+    Suppressed when the image host matches the provider that supplied the
+    record - an Amazon result on an Amazon image needs no second badge.
     """
-    if not cover_booster._AMAZON_CDN_ENABLED:
-        return []
-    isbn10s: List[str] = []
-    for isbn in book_isbns or ():
-        isbn10 = cover_booster._to_isbn10(str(isbn or ""))
-        if isbn10 and isbn10 not in isbn10s:
-            isbn10s.append(isbn10)
-    return isbn10s
+    if not origin_id or origin_id == source_id:
+        return None
+    return cover_booster.IMAGE_ORIGIN_LABELS.get(origin_id)
+
+
+def _amazon_candidate_keys(book_isbns: Iterable[str],
+                           book_asins: Iterable[str] = ()) -> List[str]:
+    """Normalize the book's stored identifiers for the Amazon-CDN probe.
+
+    Delegates to the booster so normalization, ordering and the
+    CWA_COVER_BOOST_AMAZON_CDN kill switch stay in one place - the flag is
+    deliberately the single kill-switch for both the booster's provider-record
+    upgrade and this independent picker candidate.
+    """
+    return cover_booster.amazon_cdn_keys(isbns=book_isbns, asins=book_asins)
 
 
 def _filter_runnable(providers, is_provider_enabled) -> tuple[list, List[ProviderStatus]]:

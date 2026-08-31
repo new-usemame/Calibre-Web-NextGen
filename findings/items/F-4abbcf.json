@@ -1,0 +1,11 @@
+{
+  "area": "frontend-devices",
+  "body": "Operator, 2026-08-30 (verbatim intent): CWNG should be a 'device hub' — a home for KOReader\ndevices and standard Kobo devices — and setting up a family member's device + personal library\nshould be 'super easy' and fully walkable in the UI. Tonight's measured gap: pairing a Kobo still\nrequires the CLASSIC account page (generate sync URL) plus hand-editing api_endpoint in the\ndevice's Kobo eReader.conf; the SPA Devices page literally says 'Manage your Kobo sync URL in the\nclassic account page' (frontend/src/pages/Devices.tsx:217). A first-class SPA pairing flow —\nper-user sync URL generation with copy button, step-by-step device instructions (Kobo conf edit /\nKOReader sync settings), and confirmation when the device first checks in — closes the loop.\nRelated in-flight context: household walkthrough at\nhttps://projects.159trunk-h3q57.tv/pages/cwng-family-library-setup/ and CORPUS.md item 25b.",
+  "created": "2026-08-30",
+  "id": "F-4abbcf",
+  "refs": [],
+  "severity": "feature",
+  "source": "operator",
+  "status": "open",
+  "title": "Device hub: SPA-native Kobo/KOReader pairing flow (sync URL setup still classic-only)"
+}

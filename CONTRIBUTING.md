@@ -25,8 +25,9 @@ Bug reports without a version + repro are still useful — we'll just ask follow
 2. Keep PRs focused on one logical change. Explain the problem, the approach, the user-visible result, and anything deliberately left out.
 3. Include verification that traces the real trigger to the observed result. For UI work, name the browser and input modes tested; screenshots are welcome when appearance changed.
 4. Add or update tests for changed behavior. Python tests live under `tests/`; React end-to-end tests live under `frontend/e2e/`.
-5. CI must pass, including `validate-author`, `Fast Tests (Smoke + Unit)`, `Frontend Build (SPA bundle)`, and `Test Suite Summary`. Docker integration and browser E2E jobs run when the change requires them.
-6. If touching `cps/translations/`, update the relevant `.po`; CI validates translations.
+5. Add a changelog fragment at `changelog.d/<pr-or-slug>.md`; follow [`changelog.d/README.md`](changelog.d/README.md) for the category and symptom-first entry format. New PRs should not edit the shared `CHANGELOG.md` insertion point. CI accepts direct `CHANGELOG.md` edits only as a cutover compatibility path.
+6. CI must pass, including `validate-author`, `Fast Tests (Smoke + Unit)`, `Frontend Build (SPA bundle)`, and `Test Suite Summary`. Docker integration and browser E2E jobs run when the change requires them.
+7. If touching `cps/translations/`, update the relevant `.po`; CI validates translations.
 
 ### Commit identity and `validate-author`
 

@@ -390,7 +390,12 @@ $(function() {
                 $("#publishers_input").val("");
                 $("#comments_input").val("");
 
-                handleListServerResponse;
+                if (booTitles && booTitles.success === false) {
+                    handleListServerResponse([{
+                        type: "danger",
+                        message: booTitles.message
+                    }]);
+                }
             }
         });
     });

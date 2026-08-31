@@ -6,14 +6,15 @@ import { useDiscover, useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import styles from './DiscoverSection.module.css';
+import { canReadBooks } from '../lib/permissions';
 
 const STRIP_COUNT = 12;
 
 /** A boxed, visually-distinct strip of random book picks at the top of the
  *  library. Reshuffle for a fresh set, or dismiss with the × (the parent
  *  persists the hidden state and offers a "Show Discover section" toggle). */
-export function DiscoverSection({ onClose, hideActions = false }:
-  { onClose: () => void; hideActions?: boolean }) {
+export function DiscoverSection({ onClose, closeDisabled = false, hideActions = false }:
+  { onClose: () => void; closeDisabled?: boolean; hideActions?: boolean }) {
   const t = useT();
   const announce = useAnnouncer();
   const [nonce, setNonce] = useState(0);
@@ -58,12 +59,15 @@ export function DiscoverSection({ onClose, hideActions = false }:
             title={t('Shuffle picks')}
             aria-label={t('Shuffle picks')}
           >
-            <Shuffle size={16} className={isFetching ? styles.spin : undefined} aria-hidden="true" focusable={false} />
+            <span className={isFetching ? styles.spin : undefined}>
+              <Shuffle size={16} aria-hidden="true" focusable={false} />
+            </span>
           </button>
           <button
             type="button"
             className={styles.iconBtn}
             onClick={onClose}
+            disabled={closeDisabled}
             title={t('Hide Discover section')}
             aria-label={t('Hide Discover section')}
           >
@@ -78,7 +82,7 @@ export function DiscoverSection({ onClose, hideActions = false }:
         <div className={styles.strip}>
           {books.map((b) => (
             <div className={styles.item} key={b.id}>
-              <BookCard book={b} hideActions={hideActions} />
+              <BookCard book={b} hideActions={hideActions} canRead={canReadBooks(me)} />
             </div>
           ))}
         </div>

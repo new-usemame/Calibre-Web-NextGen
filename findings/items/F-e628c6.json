@@ -1,0 +1,19 @@
+{
+  "area": "kobo",
+  "body": "PARTIALLY FIXED in #1731. Read the two halves separately.\n\n1. WRONG IDENTITY — FIXED. The existence check now includes book_id, matching\n   `uq_annotation_user_book_annotation` (user_id, book_id, annotation_id) and\n   the triple the live PATCH dispatcher upserts on. Red/green: rows for a\n   second book were suppressed (0 of 3 imported) before the change.\n\n2. INSERT-ONLY — STILL OPEN, and this is the substantive half. When the row\n   already exists the import does `skipped_existing += 1; continue`, with no\n   comparison of DateModified, text, note, colour, position or hidden state.\n   So re-importing a NEWER device database can never apply an edit, and a\n   device-side deletion is invisible twice over (hidden rows are skipped\n   earlier still).\n\n   That matters because this import is the ONLY recovery path for annotations\n   the live delta never carried — see F-a66189. A recovery tool that cannot\n   carry an edit only half recovers.\n\n   Fix direction: make the existing-row branch a real merge decided by\n   DateModified, and decide explicitly what a device-side deletion should do\n   to a server row (hide it, or leave it and report the divergence).\n\nThe docstring no longer claims an \"overwrite\" the code does not perform; #1731\nreplaced it with an explicit note that the import is insert-only.",
+  "created": "2026-08-18",
+  "id": "F-e628c6",
+  "refs": [
+    "#1731"
+  ],
+  "resolution": {
+    "commit": "d8fa66267",
+    "date": "2026-08-21",
+    "note": "Both halves now closed. The WRONG IDENTITY half was fixed in #1731 (existence check includes book_id, matching uq_annotation_user_book_annotation). The INSERT-ONLY half -- the substantive one -- is fixed in #1774: the existing-row lookup now retrieves the full canonical row instead of just its id, and the merge is explicit -- an existing row changes only when the imported valid DateModified is strictly later than max(client_modified_at, server_modified_at, last_synced, created_at). Missing, malformed, equal or older device clocks never overwrite; divergence is reported as skipped_newer_server rather than silently resolved. Device-side DELETION remains deliberately out of scope: hidden device rows stay report-only and an uploaded recovery database has no deletion authority (annotation writeback is data-loss-class, F-3b565b, operator-gated). Disclosed caveat: taking the max across device and server clocks is conservative, so significant Kobo clock skew can turn a genuinely newer device edit into a reported conflict -- it cannot cause a silent overwrite of newer server state.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "The KoboReader.sqlite import is insert-only and dedups on the wrong key"
+}

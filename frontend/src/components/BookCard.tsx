@@ -1,4 +1,5 @@
-import { BookOpen, Check, EyeOff, X, Pencil } from 'lucide-react';
+import { memo, useEffect, useId, useRef, useState } from 'react';
+import { BookOpen, BookCheck, BookPlus, Check, EyeOff, X, Pencil, MoreHorizontal } from 'lucide-react';
 import { Link } from 'wouter';
 import type { Book } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -6,6 +7,7 @@ import { BookCover } from './BookCover';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { formatAuthors } from '../lib/authors';
 import styles from './BookCard.module.css';
+import { Spinner } from './Spinner';
 
 interface BookCardProps {
   book: Book;
@@ -34,6 +36,17 @@ interface BookCardProps {
    *  off would keep tabbing through two invisible controls per card. Both
    *  actions remain on the book's own page, which the cover already links to. */
   hideActions?: boolean;
+  /** Global-library surfaces only. The Add action stays visible even when the
+   * user hid ordinary card actions, because adding is this surface's purpose. */
+  membership?: 'owned' | 'unowned';
+  onAddToLibrary?: (book: Book) => void;
+  addPending?: boolean;
+  /** The membership-scoped backend does not expose detail for an unowned book.
+   * Global cards therefore become static until the user adds them. */
+  detailsEnabled?: boolean;
+  /** The authenticated account's viewer role. Kept explicit so a catalog card
+   *  can never infer file access from the formats it happens to receive. */
+  canRead?: boolean;
 }
 
 /** Format a Calibre series_index (a float, e.g. 1.0, 2.5) for display: whole
@@ -44,17 +57,59 @@ function formatSeriesIndex(idx: number | null | undefined): string | null {
   return Number.isInteger(idx) ? String(idx) : String(idx);
 }
 
-export function BookCard({
+function BookCardInner({
   book, style, onRemove, removeLabel = 'Remove',
   selectable = false, selected = false, onToggleSelect,
   showSeriesIndex = false,
   quickEdit = false,
   hideActions = false,
+  membership,
+  onAddToLibrary,
+  addPending = false,
+  detailsEnabled = true,
+  canRead = false,
 }: BookCardProps) {
   const t = useT();
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [actionsAlign, setActionsAlign] = useState<'start' | 'end'>('end');
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const actionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const actionsPanelId = useId();
   const authorStr = formatAuthors(book.authors);
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
-  const readTarget = getPrimaryReadTarget(book.id, book.formats);
+  const readTarget = getPrimaryReadTarget(book.id, book.formats, canRead);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
+        setActionsOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setActionsOpen(false);
+      actionsTriggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [actionsOpen]);
+
+  const toggleActions = () => {
+    if (!actionsOpen) {
+      const trigger = actionsTriggerRef.current?.getBoundingClientRect();
+      if (trigger) {
+        setActionsAlign(
+          trigger.left + trigger.width / 2 < window.innerWidth / 2 ? 'start' : 'end',
+        );
+      }
+    }
+    setActionsOpen((open) => !open);
+  };
 
   // Series name + position under the cover (fork #657, #673, #855). Series-heavy
   // libraries navigate by series and want it visible without clicking into each
@@ -86,18 +141,30 @@ export function BookCard({
             the WCAG pass: it announces the badge once, rather than letting the
             icon and the adjacent text be read as two separate things. Keep it
             even now that the label is visible. */}
-        {book.read && (
+        {book.in_progress ? (
+          <span className={styles.readingBadge} role="img" aria-label={t('Reading')}
+            data-testid="reading-badge">
+            <BookOpen size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
+            {t('Reading')}
+          </span>
+        ) : book.read ? (
           <span className={styles.readBadge} role="img" aria-label={t('Read')}
             data-testid="read-badge">
             <Check size={13} strokeWidth={3} aria-hidden="true" focusable={false} />
             {t('Read')}
           </span>
-        )}
+        ) : null}
         {book.hidden && (
           <span className={styles.hiddenBadge} role="img" aria-label={t('Hidden')}
             data-testid="hidden-book-badge">
             <EyeOff size={12} aria-hidden="true" focusable={false} />
             {t('Hidden')}
+          </span>
+        )}
+        {membership === 'owned' && (
+          <span className={styles.libraryBadge} role="img" aria-label={t('In your library')}>
+            <BookCheck size={12} aria-hidden="true" focusable={false} />
+            {t('In your library')}
           </span>
         )}
         {seriesIndexLabel && (
@@ -118,12 +185,18 @@ export function BookCard({
     </div>
   );
 
+  // dir="auto" per field, not once on the card (#1073, reported by @raphaelbahat).
+  // The browser picks direction from the first strong directional character in
+  // THAT string, so a Hebrew title above an English author renders each the right
+  // way round. A single card-level or book-level flag has to be wrong about one
+  // of them, and keying off the book's language metadata would miss the many
+  // libraries that leave language unset — which is the case in the report.
   const info = (
     <div className={styles.info}>
-      <p className={styles.title}>{book.title}</p>
-      <p className={styles.author}>{authorStr}</p>
+      <p className={styles.title} dir="auto">{book.title}</p>
+      <p className={styles.author} dir="auto">{authorStr}</p>
       {seriesLine && (
-        <p className={styles.series} data-testid="book-card-series">{seriesLine}</p>
+        <p className={styles.series} dir="auto" data-testid="book-card-series">{seriesLine}</p>
       )}
     </div>
   );
@@ -167,14 +240,23 @@ export function BookCard({
   // width, density or locale — the same "impossible by construction" move the
   // badge row above makes. `.removeBtn` stays absolute: it belongs to the cover,
   // not to this row.
-  const hasActionRow = !hideActions && (Boolean(readTarget) || quickEdit);
+  const hasAddAction = membership === 'unowned' && !!onAddToLibrary;
+  const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));
+  const hasCoarseActions = Boolean(onRemove)
+    || (!hideActions && (Boolean(readTarget) || quickEdit));
 
   return (
-    <div className={styles.wrap} style={style}>
-      <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
-        {cover}
-        {info}
-      </Link>
+    <div
+      className={`${styles.wrap} ${actionsOpen ? styles.wrapActionsOpen : ''}`}
+      style={style}
+    >
+      {detailsEnabled ? (
+        <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
+          {cover}{info}
+        </Link>
+      ) : (
+        <div className={styles.card} aria-label={book.title}>{cover}{info}</div>
+      )}
       {onRemove && (
         <button
           type="button"
@@ -186,8 +268,19 @@ export function BookCard({
         </button>
       )}
       {hasActionRow && (
-        <div className={quickEdit ? `${styles.actionRow} ${styles.actionRowEdit}` : styles.actionRow}>
-          {readTarget && (
+        <div className={[
+          styles.actionRow,
+          quickEdit ? styles.actionRowEdit : '',
+        ].filter(Boolean).join(' ')}>
+          {hasAddAction ? (
+            <button type="button" className={`${styles.readNow} ${styles.addToLibrary}`}
+              disabled={addPending}
+              aria-label={t('Add {title} to my library', { title: book.title })}
+              onClick={() => onAddToLibrary?.(book)}>
+              {addPending ? <Spinner size={13} /> : <BookPlus size={15} aria-hidden="true" focusable={false} />}
+              <span className={styles.readNowLabel}>{addPending ? t('Adding…') : t('Add')}</span>
+            </button>
+          ) : readTarget && !hideActions ? (
             <Link
               href={readTarget}
               className={styles.readNow}
@@ -199,8 +292,8 @@ export function BookCard({
                   aria-label above still names the action either way. */}
               <span className={styles.readNowLabel}>{t('Read now')}</span>
             </Link>
-          )}
-          {quickEdit && (
+          ) : null}
+          {quickEdit && !hideActions && (
             <Link
               href={`/book/${book.id}/edit`}
               className={styles.quickEditBtn}
@@ -218,6 +311,74 @@ export function BookCard({
           )}
         </div>
       )}
+      {hasCoarseActions && (
+        <div
+          className={styles.moreActionsWrap}
+          ref={actionsRef}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setActionsOpen(false);
+            }
+          }}
+        >
+          <button
+            ref={actionsTriggerRef}
+            type="button"
+            className={styles.moreActionsTrigger}
+            aria-label={t('More actions for {title}', { title: book.title })}
+            aria-expanded={actionsOpen}
+            aria-controls={actionsOpen ? actionsPanelId : undefined}
+            onClick={toggleActions}
+          >
+            <MoreHorizontal size={22} aria-hidden="true" focusable={false} />
+          </button>
+          {actionsOpen && (
+            <div
+              id={actionsPanelId}
+              role="group"
+              aria-label={t('Actions for {title}', { title: book.title })}
+              className={`${styles.moreActionsPanel} ${
+                actionsAlign === 'start' ? styles.moreActionsPanelStart : styles.moreActionsPanelEnd
+              }`}
+            >
+              {readTarget && !hideActions && (
+                <Link href={readTarget} className={styles.moreActionsItem}
+                  aria-label={t('Read {title}', { title: book.title })}
+                  onClick={() => setActionsOpen(false)}>
+                  <BookOpen size={17} aria-hidden="true" focusable={false} />
+                  <span>{t('Read now')}</span>
+                </Link>
+              )}
+              {quickEdit && !hideActions && (
+                <Link href={`/book/${book.id}/edit`} className={styles.moreActionsItem}
+                  aria-label={t('Edit {title}', { title: book.title })}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setActionsOpen(false);
+                  }}>
+                  <Pencil size={17} aria-hidden="true" focusable={false} />
+                  <span>{t('Edit')}</span>
+                </Link>
+              )}
+              {onRemove && (
+                <button type="button" className={`${styles.moreActionsItem} ${styles.moreActionsDanger}`}
+                  aria-label={t(removeLabel)}
+                  onClick={() => {
+                    setActionsOpen(false);
+                    onRemove(book);
+                  }}>
+                  <X size={17} strokeWidth={2.5} aria-hidden="true" focusable={false} />
+                  <span>{t(removeLabel)}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+/** Grid items re-render only when their own props change: a selection tap or
+ *  settings refetch in a 500-card catalog must not reconcile every card. */
+export const BookCard = memo(BookCardInner);

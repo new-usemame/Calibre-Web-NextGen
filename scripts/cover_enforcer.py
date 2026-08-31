@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 import unicodedata
@@ -23,10 +24,9 @@ import unicodedata
 # so sys.path[0] is scripts/ and the project root that owns the `cps` package is not on
 # the path at all. Put it there before the first cps import, not after: an import that
 # runs earlier in the module body raises ModuleNotFoundError no matter what follows it.
-_this_dir = os.path.dirname(os.path.abspath(__file__))
-_project_root = os.path.abspath(os.path.join(_this_dir, os.pardir))
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
+import app_paths
+
+app_paths.ensure_app_root_on_sys_path()
 
 try:
     from cps import constants
@@ -37,7 +37,7 @@ except Exception:
     # environment where the Flask stack it drags in is not importable -- that is what the
     # inline sanitizer fallback below exists for, and hard-failing here would take it out.
     # Resolve through the same two knobs, in the same order, as cps/constants.py.
-    _config_root = os.environ.get("CALIBRE_DBPATH", "/config")
+    _config_root = str(app_paths.config_dir())
     _CHANGE_LOGS_DIR = os.environ.get(
         "CWA_METADATA_CHANGE_LOGS_DIR", os.path.join(_config_root, "metadata_change_logs"))
     _METADATA_TEMP_DIR = os.environ.get(
@@ -91,27 +91,156 @@ except Exception:
     unidecode = None
 
 # Global Variables
-dirs_json = "/app/calibre-web-automated/dirs.json"
+dirs_json = str(app_paths.dirs_json())
 change_logs_dir = _CHANGE_LOGS_DIR
 metadata_temp_dir = _METADATA_TEMP_DIR
 
+_KEPUB_SERIES_META_NAMES = {"calibre:series", "calibre:series_index"}
+_KEPUB_SERIES_REFINEMENT_PROPERTIES = {"collection-type", "group-position"}
 
-# Creates a lock file unless one already exists meaning an instance of the script is
-# already running, then the script is closed, the user is notified and the program
-# exits with code 2
-try:
-    lock = open(tempfile.gettempdir() + '/cover_enforcer.lock', 'x')
-    lock.close()
-except FileExistsError:
+
+def _local_name(element):
+    tag = element.tag
+    if not isinstance(tag, str):
+        return None
+    return tag.rsplit('}', 1)[-1]
+
+
+def _series_meta_name(element):
+    if _local_name(element) != 'meta':
+        return None
+    return element.get('name') or element.get('property')
+
+
+def _strip_kepub_series_metadata(path):
+    """Remove residual series metadata from one staged KEPUB."""
+    from cps.services.kepub_package_normalizer import rewrite_package_document
+
+    def strip_series(package):
+        metas = [
+            element for element in package.iter()
+            if _local_name(element) == 'meta'
+        ]
+        collection_ids = {
+            element.get('id')
+            for element in metas
+            if element.get('property') == 'belongs-to-collection'
+            and element.get('id')
+        }
+        series_collection_ids = {
+            element.get('refines', '').removeprefix('#')
+            for element in metas
+            if element.get('property') == 'collection-type'
+            and ''.join(element.itertext()).strip().lower() == 'series'
+            and element.get('refines', '').startswith('#')
+        } & collection_ids
+
+        removed = 0
+        for parent in package.iter():
+            for child in list(parent):
+                property_name = child.get('property') if _local_name(child) == 'meta' else None
+                refined_id = child.get('refines', '').removeprefix('#') if property_name else ''
+                remove_epub3_collection = (
+                    property_name == 'belongs-to-collection'
+                    and child.get('id') in series_collection_ids
+                )
+                remove_epub3_refinement = (
+                    property_name in _KEPUB_SERIES_REFINEMENT_PROPERTIES
+                    and refined_id in series_collection_ids
+                )
+                if (
+                    _series_meta_name(child) in _KEPUB_SERIES_META_NAMES
+                    or remove_epub3_collection
+                    or remove_epub3_refinement
+                ):
+                    parent.remove(child)
+                    removed += 1
+        return bool(removed)
+
+    result = rewrite_package_document(path, strip_series)
+    if result is None:
+        raise ValueError("package-document rewrite failed")
+    return result
+
+
+def _lock_path() -> str:
+    # Resolved per call, not once at import: the tempdir is what tests redirect.
+    return os.path.join(tempfile.gettempdir(), 'cover_enforcer.lock')
+
+
+def _pid_is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Running under another user, so it exists. Treat it as a live holder.
+        return True
+    return True
+
+
+def _lock_owner(path: str):
+    """The pid recorded in the lock, or None if it predates this format."""
+    try:
+        with open(path) as handle:
+            recorded = handle.read().strip()
+    except FileNotFoundError:
+        return None
+    return int(recorded) if recorded.isdigit() else None
+
+
+def removeLock():
+    # Tolerant on purpose: cwa-init sweeps /tmp/*.lock at container start, so the
+    # file can legitimately be gone by the time atexit runs.
+    try:
+        os.remove(_lock_path())
+    except FileNotFoundError:
+        pass
+
+
+def _acquire_lock_or_exit():
+    """Take the single-instance lock, reclaiming one left behind by a killed run.
+
+    The lock is released through atexit, which does not run on SIGKILL, so a
+    killed enforcer used to block every later run until something removed the
+    file by hand. Recording the owning pid lets a later run tell "already
+    running" apart from "died holding the lock".
+
+    The pid is written to a temp file and hard-linked into place, so the lock
+    never exists in a readable-but-empty state for another run to misjudge.
+    """
+    path = _lock_path()
+    staging = f"{path}.{os.getpid()}"
+
+    for _ in range(2):
+        with open(staging, 'w') as handle:
+            handle.write(str(os.getpid()))
+        try:
+            os.link(staging, path)
+        except FileExistsError:
+            owner = _lock_owner(path)
+            if owner is None or not _pid_is_alive(owner):
+                # A lock from before this format, or one whose holder is gone.
+                print(f"[cover-metadata-enforcer]: reclaiming a stale lock left by {owner or 'an earlier run'}")
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
+                continue
+            print("[cover-metadata-enforcer]: CANCELLING... cover-metadata-enforcer was initiated but is already running")
+            sys.exit(2)
+        else:
+            atexit.register(removeLock)
+            return
+        finally:
+            try:
+                os.remove(staging)
+            except FileNotFoundError:
+                pass
+
+    # Another run won the reclaim; it holds the lock, so this one still stands down.
     print("[cover-metadata-enforcer]: CANCELLING... cover-metadata-enforcer was initiated but is already running")
     sys.exit(2)
-
-# Defining function to delete the lock on script exit
-def removeLock():
-    os.remove(tempfile.gettempdir() + '/cover_enforcer.lock')
-
-# Will automatically run when the script exits
-atexit.register(removeLock)
 
 
 class Book:
@@ -133,9 +262,7 @@ class Book:
         # CWA #243.
         self.calibre_env = os.environ.copy()
         try:
-            _CPS_ROOT = "/app/calibre-web-automated"
-            if _CPS_ROOT not in sys.path:
-                sys.path.insert(0, _CPS_ROOT)
+            app_paths.ensure_app_root_on_sys_path()
             from cps.services import calibre_user_plugins
             calibre_user_plugins.apply_to_env(self.calibre_env)
         except ImportError:
@@ -155,7 +282,7 @@ class Book:
 
     def get_split_library(self) -> dict[str, str] | None:
         """Checks whether or not the user has split library enabled. Returns None if they don't and the path of the Split Library location if True."""
-        con = sqlite3.connect("/config/app.db", timeout=60)
+        con = sqlite3.connect(str(app_paths.app_db_path()), timeout=60)
         cur = con.cursor()
         split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 
@@ -173,9 +300,7 @@ class Book:
 
     def get_calibre_library(self) -> str:
         """Gets Calibre-Library location from dirs.json"""
-        with open(dirs_json, 'r') as f:
-            dirs = json.load(f)
-        return dirs['calibre_library_dir'] # Returns without / on the end
+        return app_paths.calibre_library_dir(dirs_json) # Returns without / on the end
 
 
     def get_time(self) -> str:
@@ -279,9 +404,7 @@ class Enforcer:
         # CWA #243.
         self.calibre_env = os.environ.copy()
         try:
-            _CPS_ROOT = "/app/calibre-web-automated"
-            if _CPS_ROOT not in sys.path:
-                sys.path.insert(0, _CPS_ROOT)
+            app_paths.ensure_app_root_on_sys_path()
             from cps.services import calibre_user_plugins
             calibre_user_plugins.apply_to_env(self.calibre_env)
         except ImportError:
@@ -294,7 +417,7 @@ class Enforcer:
 
         # Read Calibre-Web setting: config_unicode_filename (True -> transliterate non-English in filenames)
         try:
-            with sqlite3.connect("/config/app.db", timeout=60) as con:
+            with sqlite3.connect(str(app_paths.app_db_path()), timeout=60) as con:
                 cur = con.cursor()
                 self.unicode_filename = bool(cur.execute('SELECT config_unicode_filename FROM settings;').fetchone()[0])
         except Exception:
@@ -328,7 +451,7 @@ class Enforcer:
 
     def get_split_library(self) -> dict[str, str] | None:
         """Checks whether or not the user has split library enabled. Returns None if they don't and the path of the Split Library location if True."""
-        con = sqlite3.connect("/config/app.db", timeout=60)
+        con = sqlite3.connect(str(app_paths.app_db_path()), timeout=60)
         cur = con.cursor()
         split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 
@@ -346,10 +469,53 @@ class Enforcer:
 
 
     def get_calibre_library(self) -> str:
-        with open(dirs_json, 'r') as f:
-            dirs = json.load(f)
-        return dirs['calibre_library_dir'] # Returns without / on the end
+        return app_paths.calibre_library_dir(dirs_json) # Returns without / on the end
 
+
+    def _restat_format_size_after_modification(self, book_id: str, file_format: str, file_path: str) -> None:
+        """Re-stat data.uncompressed_size after rewriting a format in place (#1711).
+
+        cps/kobo.py advertises this column to a paired device verbatim as
+        ``"Size"``, and the device stores it (``content.___FileSize``). Rewriting
+        the file with ebook-polish or ebook-meta changes the byte count, so
+        leaving the column alone advertises a size the server will not serve.
+        Measured on a live library: 8 of 435 format rows stale, and the three
+        stale KEPUB rows were exactly the three books enforced in one pass.
+
+        The two other in-place writers already do this --
+        kepub_package_repair.py sets it from os.path.getsize, and
+        editbooks._refresh_format_sizes re-stats every format inside the same
+        commit boundary. The enforcer was the one that did not.
+
+        Best-effort: a failure here must not fail an enforcement pass that has
+        already written the file correctly.
+        """
+        try:
+            size = os.path.getsize(file_path)
+        except OSError as e:
+            print(f"[cover-metadata-enforcer] Warning: could not stat {file_path} "
+                  f"to refresh its size: {e}", flush=True)
+            return
+        try:
+            metadb_path = os.path.join(
+                (self.split_library or {}).get("db_path", self.calibre_library),
+                "metadata.db"
+            )
+            con = sqlite3.connect(metadb_path, timeout=60)
+            try:
+                cur = con.execute(
+                    "UPDATE data SET uncompressed_size=? WHERE book=? AND format=?",
+                    (size, int(book_id), file_format.upper()),
+                )
+                con.commit()
+                if cur.rowcount:
+                    print(f"[cover-metadata-enforcer] Refreshed size for book {book_id} "
+                          f"format {file_format.upper()} -> {size} bytes", flush=True)
+            finally:
+                con.close()
+        except Exception as e:
+            print(f"[cover-metadata-enforcer] Warning: Failed to refresh format size "
+                  f"for book {book_id}: {e}", flush=True)
 
     def _recalculate_checksum_after_modification(self, book_id: str, file_format: str, file_path: str) -> None:
         """Calculate and store new checksum after modifying a book file."""
@@ -651,10 +817,99 @@ class Enforcer:
                 # --calibre so library files are normally ".kepub", but a file
                 # kepubified outside CWNG keeps the default shape.
                 lower_name = os.path.basename(file).lower()
+                clear_kepub_series = False
+                staged_kepub = None
+                write_completed = False
                 if lower_name.endswith(".kepub") or lower_name.endswith(".kepub.epub"):
                     tool = 'ebook-meta'
                     cmd = [tool, file, '--from-opf', book.new_metadata_path]
-                    if Path(book.cover_path).exists():
+
+                    try:
+                        opf_root = ET.parse(book.new_metadata_path).getroot()
+                        metadata = next(
+                            (element for element in opf_root.iter()
+                             if _local_name(element) == 'metadata'),
+                            None,
+                        )
+                        if metadata is None:
+                            raise ValueError("metadata element is missing")
+                    except (ET.ParseError, OSError, ValueError) as error:
+                        print(
+                            f"[cover-metadata-enforcer] Warning: could not enforce "
+                            f"metadata for '{book.title_author}' ({book.file_format}); "
+                            f"original file preserved because metadata OPF "
+                            f"'{book.new_metadata_path}' could not be parsed: {error}",
+                            flush=True,
+                        )
+                        cmd = None
+                    else:
+                        dc_values = {}
+                        calibre_values = {}
+                        for element in metadata:
+                            local_name = _local_name(element)
+                            value = ''.join(element.itertext()).strip()
+                            if local_name in {
+                                'title', 'creator', 'subject', 'publisher',
+                                'description', 'language', 'date',
+                            }:
+                                dc_values.setdefault(local_name, []).append(value)
+                            elif local_name == 'meta':
+                                name = element.get('name') or element.get('property')
+                                if name in {
+                                    'calibre:series', 'calibre:series_index',
+                                    'calibre:rating',
+                                }:
+                                    calibre_values[name] = (
+                                        element.get('content', value).strip()
+                                    )
+
+                        clear_kepub_series = (
+                            'calibre:series' not in calibre_values
+                        )
+
+                        def first_value(name):
+                            return next((
+                                value for value in dc_values.get(name, []) if value
+                            ), '')
+
+                        series = calibre_values.get('calibre:series', '')
+                        # Passing --series "" records the intended replacement,
+                        # but calibre 9.11.0 treats it as a no-op and leaves an
+                        # existing calibre:series meta in a real kepubify KEPUB.
+                        # Do not "fix" that by sending KEPUBs through ebook-polish:
+                        # polishing re-segments koboSpans and moves every Kobo
+                        # reader's saved position.
+                        cmd += ['--series', series]
+                        series_index = calibre_values.get('calibre:series_index', '')
+                        if series_index:
+                            cmd += ['--index', series_index]
+                        cmd += [
+                            '--tags', ', '.join(
+                                value for value in dc_values.get('subject', []) if value
+                            ),
+                            '--publisher', first_value('publisher'),
+                            '--comments', first_value('description'),
+                        ]
+                        pubdate = first_value('date')
+                        if pubdate:
+                            cmd += ['--date', pubdate]
+                        languages = ', '.join(
+                            value for value in dc_values.get('language', []) if value
+                        )
+                        if languages:
+                            cmd += ['--language', languages]
+                        authors = ' & '.join(
+                            value for value in dc_values.get('creator', []) if value
+                        )
+                        if authors:
+                            cmd += ['--authors', authors]
+                        title = first_value('title')
+                        if title:
+                            cmd += ['--title', title]
+                        rating = calibre_values.get('calibre:rating', '')
+                        if rating:
+                            cmd += ['--rating', rating]
+                    if cmd is not None and Path(book.cover_path).exists():
                         cmd += ['--cover', book.cover_path]
                 else:
                     tool = 'ebook-polish'
@@ -664,24 +919,91 @@ class Enforcer:
                         cmd = [tool, '-o', book.new_metadata_path, '-U', file, file]
 
                 try:
-                    result = subprocess.run(
-                        cmd, capture_output=True, text=True, timeout=120, check=False
-                    )
+                    if cmd is not None and clear_kepub_series:
+                        kepub_suffix = (
+                            ".kepub.epub"
+                            if lower_name.endswith(".kepub.epub")
+                            else ".kepub"
+                        )
+                        descriptor, staged_kepub = tempfile.mkstemp(
+                            dir=os.path.dirname(os.path.abspath(file)),
+                            prefix="." + os.path.basename(file) + ".metadata-",
+                            suffix=kepub_suffix,
+                        )
+                        os.close(descriptor)
+                        shutil.copy2(file, staged_kepub)
+                        cmd[1] = staged_kepub
 
-                    if result.returncode != 0:
-                        print(f"[cover-metadata-enforcer] Warning: {tool} returned {result.returncode} for {file}", flush=True)
-                        if result.stderr:
-                            print(f"[cover-metadata-enforcer] Error output: {result.stderr.strip()}", flush=True)
+                    if cmd is not None:
+                        result = subprocess.run(
+                            cmd, capture_output=True, text=True, timeout=120, check=False
+                        )
+
+                        if result.returncode != 0:
+                            if clear_kepub_series:
+                                print(
+                                    f"[cover-metadata-enforcer] Warning: could not clear "
+                                    f"series for '{book.title_author}' "
+                                    f"({book.file_format}); original file preserved because "
+                                    f"{tool} returned {result.returncode}",
+                                    flush=True,
+                                )
+                            else:
+                                print(f"[cover-metadata-enforcer] Warning: {tool} returned {result.returncode} for {file}", flush=True)
+                            if result.stderr:
+                                print(f"[cover-metadata-enforcer] Error output: {result.stderr.strip()}", flush=True)
+                        elif clear_kepub_series:
+                            try:
+                                _strip_kepub_series_metadata(staged_kepub)
+                            except Exception as error:
+                                print(
+                                    f"[cover-metadata-enforcer] Warning: could not clear "
+                                    f"series for '{book.title_author}' "
+                                    f"({book.file_format}); original file preserved: {error}",
+                                    flush=True,
+                                )
+                            else:
+                                os.replace(staged_kepub, file)
+                                staged_kepub = None
+                                write_completed = True
+                        else:
+                            write_completed = True
                 except subprocess.TimeoutExpired:
-                    print(f"[cover-metadata-enforcer] Error: {tool} timed out for {file}", flush=True)
+                    if clear_kepub_series:
+                        print(
+                            f"[cover-metadata-enforcer] Warning: could not clear series "
+                            f"for '{book.title_author}' ({book.file_format}); original "
+                            f"file preserved because {tool} timed out",
+                            flush=True,
+                        )
+                    else:
+                        print(f"[cover-metadata-enforcer] Error: {tool} timed out for {file}", flush=True)
                 except Exception as e:
-                    print(f"[cover-metadata-enforcer] Error running {tool} for {file}: {e}", flush=True)
+                    if clear_kepub_series:
+                        print(
+                            f"[cover-metadata-enforcer] Warning: could not clear series "
+                            f"for '{book.title_author}' ({book.file_format}); original "
+                            f"file preserved: {e}",
+                            flush=True,
+                        )
+                    else:
+                        print(f"[cover-metadata-enforcer] Error running {tool} for {file}: {e}", flush=True)
+                finally:
+                    if staged_kepub is not None:
+                        try:
+                            os.unlink(staged_kepub)
+                        except OSError:
+                            pass
                 
                 self.empty_metadata_temp()
-                print(f"[cover-metadata-enforcer]: DONE: '{book.title_author}.{book.file_format}': Cover & Metadata updated", flush=True)
+                if write_completed:
+                    print(f"[cover-metadata-enforcer]: DONE: '{book.title_author}.{book.file_format}': Cover & Metadata updated", flush=True)
 
-                # Calculate and store new checksum after modification
-                self._recalculate_checksum_after_modification(book.book_id, book.file_format, file)
+                    # Calculate and store new checksum after modification
+                    self._recalculate_checksum_after_modification(book.book_id, book.file_format, file)
+                    # The bytes on disk just changed; the size Kobo is told must
+                    # change with them (#1711).
+                    self._restat_format_size_after_modification(book.book_id, book.file_format, file)
 
                 book_objects.append(book)
 
@@ -958,6 +1280,11 @@ class Enforcer:
 
 
 def main():
+    # Single-instance guard. Taken here rather than at import so that merely
+    # importing this module -- which nine test modules and several tools do --
+    # cannot exit the interpreter over a lockfile left by a killed run.
+    _acquire_lock_or_exit()
+
     parser = argparse.ArgumentParser(
         prog='cover-enforcer',
         description='Upon receiving a log, valid directory or an "-all" flag, this \

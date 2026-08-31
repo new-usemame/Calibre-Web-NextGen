@@ -26,8 +26,9 @@ def test_favoritebook_model_and_migration():
     assert "__tablename__ = 'favorite_book'" in src
     assert "uq_favorite_book" in src
     # New table is auto-created on startup (idempotent), like the sibling tables.
-    assert 'has_table(engine.connect(), "favorite_book")' in src
-    assert "FavoriteBook.__table__.create(bind=engine, checkfirst=True)" in src
+    assert '("favorite_book", FavoriteBook.__table__)' in src
+    assert "with engine.connect() as connection:" in src
+    assert "table.create(bind=engine, checkfirst=True)" in src
     # Existing users get the new sidebar bit OR'd in (one-time, marker-guarded).
     assert "favorites_sidebar_v1" in src
 

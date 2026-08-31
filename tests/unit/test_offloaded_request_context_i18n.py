@@ -21,6 +21,8 @@ so they fail on the behaviour a user would notice.
 from __future__ import annotations
 
 import ast
+import shutil
+import subprocess
 import threading
 from pathlib import Path
 
@@ -45,9 +47,9 @@ MSGID = "Error Downloading Cover"
 GERMAN = "Fehler beim Herunterladen des Covers"
 
 
-def _app():
+def _app(translations=TRANSLATIONS):
     app = Flask(__name__)
-    app.config["BABEL_TRANSLATION_DIRECTORIES"] = str(TRANSLATIONS)
+    app.config["BABEL_TRANSLATION_DIRECTORIES"] = str(translations)
     app.config["BABEL_DEFAULT_LOCALE"] = "de"
     Babel(app, locale_selector=lambda: "de")
     return app
@@ -66,31 +68,51 @@ def _run_on_worker_thread(fn):
     return box["value"]
 
 
-@pytest.mark.skipif(
-    not (TRANSLATIONS / "de" / "LC_MESSAGES" / "messages.mo").exists(),
-    reason="compiled de catalog absent; run scripts/compile_translations.sh",
-)
+@pytest.fixture(scope="module")
+def german_translations(tmp_path_factory):
+    """Compile into test-owned storage; never depend on suite execution order."""
+    msgfmt = shutil.which("msgfmt")
+    if msgfmt is None:
+        pytest.skip("msgfmt not available on this host")
+    root = tmp_path_factory.mktemp("offloaded-i18n")
+    messages = root / "de" / "LC_MESSAGES"
+    messages.mkdir(parents=True)
+    subprocess.run(
+        [
+            msgfmt,
+            str(TRANSLATIONS / "de" / "LC_MESSAGES" / "messages.po"),
+            "-o",
+            str(messages / "messages.mo"),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return root
+
+
 class TestOffloadedWorkKeepsItsTranslations:
-    def test_the_string_is_actually_translated_in_context(self):
+    def test_the_string_is_actually_translated_in_context(self, german_translations):
         """Guards the guard: if this msgid ever loses its German translation
         the two tests below would both return English and agree for the wrong
         reason."""
-        with _app().test_request_context("/"):
+        with _app(german_translations).test_request_context("/"):
             assert gettext(MSGID) == GERMAN
 
-    def test_unwrapped_offload_silently_falls_back_to_english(self):
+    def test_unwrapped_offload_silently_falls_back_to_english(
+        self, german_translations,
+    ):
         """The failure mode being defended against. gettext does not raise off
         the request context — it returns the msgid, so the regression is
         invisible unless a test looks at a non-English locale."""
-        with _app().test_request_context("/"):
+        with _app(german_translations).test_request_context("/"):
             got = _run_on_worker_thread(lambda: gettext(MSGID))
         assert got == MSGID, (
             "off-context gettext no longer falls back silently; if flask_babel "
             "started raising instead, the wrapper below can be simplified"
         )
 
-    def test_wrapped_offload_keeps_the_users_language(self):
-        with _app().test_request_context("/"):
+    def test_wrapped_offload_keeps_the_users_language(self, german_translations):
+        with _app(german_translations).test_request_context("/"):
             wrapped = copy_current_request_context(lambda: gettext(MSGID))
             got = _run_on_worker_thread(wrapped)
         assert got == GERMAN, (

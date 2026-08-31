@@ -13,7 +13,10 @@
 }
 .scanBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .scanBtn:disabled { opacity: 0.6; cursor: default; }
-.spinning { animation: spin 1s linear infinite; }
+/* wrapper span, not the glyph -- an SVG target does not get a compositor layer
+   in Chrome, so the animation falls back to the main thread. See
+   HelpBanner.module.css `.arrow` for the measurement. */
+.spinning { display: inline-flex; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
 .status:empty { display: none; }

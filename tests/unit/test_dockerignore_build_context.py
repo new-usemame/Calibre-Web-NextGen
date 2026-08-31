@@ -75,7 +75,7 @@ REQUIRED_IN_IMAGE = [
     "scripts/setup-cwa.sh",
     "scripts/auto_library.py",
     "root/etc/s6-overlay/s6-rc.d/cwa-init/run",
-    "koreader/plugins/cwasync.koplugin/main.lua",
+    "koreader/plugins/cwngsync.koplugin/main.lua",
     "empty_library/app.db",
     "empty_library/metadata.db",
     # The image installs its dependencies with `pip install --only-deps` against

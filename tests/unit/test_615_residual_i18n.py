@@ -7,8 +7,10 @@ absent from the SPA catalog, and default smart-shelf names are canonical
 English database values rendered as if they were already display text.
 """
 import ast
+import gettext
 import importlib.util
 import re
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -125,6 +127,43 @@ def _live_catalog(locale):
 COMPLETE_LOCALES = ("fr", "nl")
 
 
+def _word_tokens(value):
+    return set(re.findall(r"[^\W_]+", value.casefold()))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("locale", COMPLETE_LOCALES)
+def test_global_delete_label_is_distinct_from_reversible_removal(locale, tmp_path):
+    """#1939: scope words alone must not distinguish delete from remove."""
+    po = ROOT / "cps" / "translations" / locale / "LC_MESSAGES" / "messages.po"
+    mo = tmp_path / "messages.mo"
+    subprocess.run(["msgfmt", po, "-o", mo], check=True, capture_output=True)
+    with open(mo, "rb") as handle:
+        catalog = gettext.GNUTranslations(handle)
+
+    destructive = catalog.gettext("Delete from the global library")
+    reversible = catalog.gettext("Remove from my library")
+    scope_tokens = set().union(
+        *(
+            _word_tokens(catalog.gettext(msgid))
+            for msgid in ("Global Library", "My Library", "The whole library")
+        )
+    )
+    destructive_signal = (
+        _word_tokens(destructive) - _word_tokens(reversible) - scope_tokens
+    )
+
+    assert destructive_signal, (
+        f"{locale}: the control that permanently deletes a file for every member "
+        "is lexically indistinguishable from reversible My Library removal once "
+        "translated scope words are ignored. Shipping this lets a destructive "
+        "control read like the safe one. Give the destructive label a deletion "
+        "or permanence token that is absent from both the reversible label and "
+        f"the translated scope labels. destructive={destructive!r}, "
+        f"reversible={reversible!r}, scope_tokens={sorted(scope_tokens)!r}"
+    )
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize("locale", COMPLETE_LOCALES)
 def test_completed_locale_spa_chrome_is_fully_translated(locale):
@@ -237,10 +276,13 @@ def test_system_shelf_api_localizes_display_name_without_mutating_identity(monke
         lambda shelf: "Lecture en cours" if shelf.is_system else shelf.name,
     )
 
-    assert magicshelves._shelf_item(system, 3)["name"] == "Lecture en cours"
-    assert magicshelves._shelf_item(system, 3)["is_system"] is True
-    assert magicshelves._shelf_item(custom, 3)["name"] == "Currently Reading"
-    assert magicshelves._shelf_item(custom, 3)["is_system"] is False
+    viewer = SimpleNamespace(id=3, is_authenticated=True,
+                             role_admin=lambda: False,
+                             role_edit_shelfs=lambda: False)
+    assert magicshelves._shelf_item(system, viewer)["name"] == "Lecture en cours"
+    assert magicshelves._shelf_item(system, viewer)["is_system"] is True
+    assert magicshelves._shelf_item(custom, viewer)["name"] == "Currently Reading"
+    assert magicshelves._shelf_item(custom, viewer)["is_system"] is False
     assert system.name == "Currently Reading"
 
 

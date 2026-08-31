@@ -31,6 +31,8 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 
+import app_paths
+
 # cps imports are LAZY (moved inside generate_checksums()) so the
 # disabled-path early-exit doesn't pay the full cps/__init__.py boot
 # cost (~1.5s locally, 30+s under CI worker contention). Importing
@@ -58,7 +60,7 @@ def _check_koreader_sync_enabled_lightweight() -> bool:
     Falls back to False on any error — matches the production
     is_koreader_sync_enabled() fail-closed behavior.
     """
-    cwa_db_dir = os.environ.get("CWA_DB_PATH", "/config/")
+    cwa_db_dir = os.environ.get("CWA_DB_PATH", str(app_paths.config_dir()))
     if not cwa_db_dir.endswith("/"):
         cwa_db_dir += "/"
     cwa_db_path = cwa_db_dir + "cwa.db"
@@ -319,7 +321,7 @@ def get_books_path():
         otherwise None to indicate the library path should be used.
     """
     try:
-        conn = sqlite3.connect("/config/app.db", timeout=30)
+        conn = sqlite3.connect(str(app_paths.app_db_path()), timeout=30)
         cur = conn.cursor()
 
         # Check if split mode is enabled and get split path

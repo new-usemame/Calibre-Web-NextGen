@@ -29,6 +29,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - **New here?** See [Quick start](#quick-start) below.
 - **Want to back the work?** [**Sponsor on GitHub**](https://github.com/sponsors/new-usemame) — no rewards, no paywalled features, one-time or monthly. [Here's what it actually pays for.](#supporting-the-project)
 - **Setting up with an AI assistant** (Claude, ChatGPT, etc.)? Point it at [`AI_README.md`](AI_README.md) — a setup guide written for the assistant to follow, verify, and hand back to you working.
+- **Wondering how AI is used here?** [How AI is used](#how-ai-is-used) — used heavily to develop this fork, not at all in the software you run, and what gates it.
 
 ---
 
@@ -40,6 +41,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - [What's included](#whats-included)
 - [Quick start](#quick-start)
 - [Full Docker Compose setup](#full-docker-compose-setup)
+- [Runtime path overrides for packagers](#runtime-path-overrides-for-packagers)
 - [First run](#first-run)
 - [Migrating](#migrating)
   - [From upstream CWA](#from-upstream-cwa)
@@ -58,6 +60,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - [Differences from upstream](#differences-from-upstream)
 - [Contributing](#contributing)
 - [Supporting the project](#supporting-the-project)
+- [How AI is used](#how-ai-is-used)
 - [Credits](#credits)
 
 ---
@@ -173,6 +176,12 @@ services:
       # limit. Free; sign up at https://comicvine.gamespot.com/api/
       # - COMICVINE_API_KEY=...
 
+      # Optional: override paths inside the container. The matching
+      # volume targets below must use the same paths.
+      # - CWA_INGEST_FOLDER=/cwa-book-ingest
+      # - CWA_CALIBRE_LIBRARY_DIR=/calibre-library
+      # - CWA_TMP_CONVERSION_DIR=/config/.cwa_conversion_tmp
+
     volumes:
       # Settings, user database, logs. Empty folder for new installs;
       # for existing CWA users, point at your existing /config.
@@ -210,6 +219,50 @@ services:
 | `/cwa-book-ingest` | Drop zone for new books | Files here are **deleted** after processing. Don't park books here long-term. |
 
 > Don't nest the binds. All three should be separate top-level folders. Putting `ingest` inside `library` produces recursive ingest behavior.
+
+---
+
+## Runtime path overrides for packagers
+
+Bare-metal and distro packages can configure all three runtime paths from the
+process environment instead of editing `dirs.json` inside the installation:
+
+| Environment variable | `dirs.json` fallback | Compiled-in default |
+|---|---|---|
+| `CWA_INGEST_FOLDER` | `ingest_folder` | `/cwa-book-ingest` |
+| `CWA_CALIBRE_LIBRARY_DIR` | `calibre_library_dir` | `/calibre-library` |
+| `CWA_TMP_CONVERSION_DIR` | `tmp_conversion_dir` | `/config/.cwa_conversion_tmp` |
+
+Each non-blank environment value wins for its key. If it is unset or blank,
+CWNG reads that key from the file selected by `CWA_DIRS_JSON`; a missing or
+malformed file, a non-object document, or a null/blank value falls back to the
+compiled-in default. Existing hand-edited `dirs.json` files therefore remain
+supported.
+
+Runtime path values are trimmed and lexically normalized, and must be absolute,
+non-root paths without a `..` component. Repeated separators, `.` components,
+and trailing separators are collapsed without resolving symlinks. A non-blank
+environment or `dirs.json` value that violates that contract stops the affected
+startup service instead of letting an unsafe path reach file watchers or
+recursive ownership operations.
+
+For example, a systemd unit can load a packager-owned file:
+
+```ini
+[Service]
+EnvironmentFile=/etc/calibre-web-nextgen/paths.env
+```
+
+```bash
+CWA_INGEST_FOLDER=/srv/calibre-web-nextgen/ingest
+CWA_CALIBRE_LIBRARY_DIR=/srv/calibre/library
+CWA_TMP_CONVERSION_DIR=/var/cache/calibre-web-nextgen/conversion
+```
+
+When `CWA_CALIBRE_LIBRARY_DIR` is set, it is authoritative. Automatic library
+discovery will leave `dirs.json` unchanged; if discovery finds a different
+library, startup stops and reports both paths so the environment file can be
+corrected.
 
 ---
 
@@ -356,6 +409,8 @@ After Shelfmark starts, open it and pick **Settings → Security → Authenticat
 
 ### Network shares (NFS, SMB, ZFS)
 
+See [`examples/.env.example`](examples/.env.example) for the complete environment-variable reference and defaults.
+
 If `/config` or `/calibre-library` lives on a network share, set:
 
 ```yaml
@@ -412,7 +467,7 @@ Plugins that need keys or an account (DeDRM wants your device keys, ACSM Input w
 To add another plugin **after** the first batch is registered, drop the zip in the same folder and run:
 
 ```
-docker exec -e HOME=/config calibre-web /app/calibre/calibre-customize -a "/config/.config/calibre/plugins/<plugin file>.zip"
+docker exec -e HOME=/config calibre-web /opt/calibre/calibre-customize -a "/config/.config/calibre/plugins/<plugin file>.zip"
 ```
 
 The feature is off by default because it runs third-party plugin code inside your container — only install plugins you trust, from their official release pages. Which plugins are appropriate to use is your call.
@@ -466,7 +521,22 @@ Behind multiple proxies (e.g. Cloudflare Tunnel then nginx then CWA), set the pr
 - TRUSTED_PROXY_COUNT=2
 ```
 
-Without this, CWA may see different client IPs across requests and trigger Session Protection warnings, forcing re-login on every page load. Default is `1`.
+Without this, CWA may see different client IPs across requests and trigger Session Protection warnings, forcing re-login on every page load. It can also mistake an externally secure OIDC callback for plain HTTP. Default is `1`.
+
+`TRUSTED_PROXY_COUNT` applies one trust depth to `X-Forwarded-For`,
+`X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-Forwarded-Prefix`. If your
+proxy chain appends or replaces those headers at different layers, override the
+first three independently; each falls back to `TRUSTED_PROXY_COUNT`, then `1`:
+
+```yaml
+- PROXYFIX_X_FOR=2
+- PROXYFIX_X_PROTO=1
+- PROXYFIX_X_HOST=1
+```
+
+The corresponding ProxyFix arguments are `x_for`, `x_proto`, and `x_host`.
+Count only proxies you control and that overwrite or sanitize the corresponding
+header.
 
 ### Hardcover metadata provider
 
@@ -510,7 +580,7 @@ CWA has built-in KOReader progress sync; no separate kosync server is needed.
 2. Point the plugin at `http://your-cwa:8083` and log in with your CWA username and password.
 3. Read on any device. Progress syncs back to CWA, and from there to Kobo if Kobo sync is enabled.
 
-**Keeping the plugin updated.** KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) and [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) can both update the plugin in place. Point either at the plugin's own repository, [`new-usemame/cwasync.koplugin`](https://github.com/new-usemame/cwasync.koplugin/releases) — not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version; that alone doesn't mean anything is wrong. With the plugin repository configured, a check that reports no new release means the plugin stream has nothing newer.
+**Keeping the plugin updated.** KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) and [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) can both update the plugin in place. Point either at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases) — not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version; that alone doesn't mean anything is wrong. With the plugin repository configured, a check that reports no new release means the plugin stream has nothing newer.
 
 If your update manager is still pointed at this repository, switch it. That setup keeps working — a release that changes the plugin attaches the plugin download — but the plugin only appears on those releases, which is easy to misread as "no update available". The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
 
@@ -524,6 +594,41 @@ Read your CWA library on a Kobo e-reader, with reading progress syncing both way
 2. Open your user page (Admin → Users → your user, or your own profile) and click **Create/View** next to **Kobo Sync Token**. The dialog shows the exact `api_endpoint=` line for your account.
 3. Plug the Kobo into a computer over USB and open `.kobo/Kobo/Kobo eReader.conf` in a text editor. Add or replace the `api_endpoint=` line with the one from the dialog, save, and eject the device cleanly.
 4. On the Kobo, sync. Books on your Kobo Sync shelves appear on the device, and progress flows back to CWA.
+
+> ### ℹ️ Where your highlights travel, and how to check
+>
+> `api_endpoint` routes **library sync**. Your **highlights and notes** travel over a separate
+> reading-services channel governed by a different key, `reading_services_host`.
+>
+> **You should not normally need to touch that key.** CWA advertises the right value during sync
+> initialization, and a device that performs a full initialization against your server adopts it on
+> its own. That is the supported path.
+>
+> 🚨 **Do not hand-edit `reading_services_host` in the conf file.** Doing so has been measured to
+> break syncing outright on at least one device — a Kobo Clara BW on firmware 4.42.23291 began
+> failing every sync with `FailedSync / WebRequestErr`, and recovered only when the key was set back
+> to `readingservices.kobo.com`. A Kobo Libra Colour on 4.45.23697 is unaffected and routes
+> annotations through CWA happily, so this is **not** universal — but we cannot yet predict which
+> devices tolerate it, and the failure leaves you with a reader that will not sync and no obvious
+> cause.
+>
+> **If your sync has already broken after editing that key:** set `reading_services_host` back to
+> `readingservices.kobo.com`, save, eject cleanly, and sync again.
+>
+> **To see whether annotations are reaching CWA**, make a highlight on the device, sync, and watch:
+>
+> ```bash
+> docker logs -f calibre-web 2>&1 | grep -iE "annotations|reading services"
+> ```
+>
+> Silence means your highlights are going to Kobo's servers rather than yours. The safe way to
+> change that is to get the device to perform a **full initialization** against CWA — re-generate
+> the Kobo Sync Token and re-pair — rather than editing the key by hand.
+>
+> This matters because CWA's protection against a Kobo deleting its own highlights after a sync
+> (upstream [calibre-web#2610](https://github.com/janeczku/calibre-web/issues/2610)) works by
+> answering that channel, and it cannot protect a request it never receives. Until the device is
+> routing annotations through CWA, treat highlights made on it as device-only and back them up.
 
 To confirm the device is reaching your server, watch the logs while you sync — you should see requests to `/kobo/<token>/v1/...`:
 
@@ -643,34 +748,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `████████████████████` 99% | 2622/2645 | 0 |
-| Polish (`pl`) | `████████████████████` 99% | 2609/2645 | 0 |
-| French (`fr`) | `█████████████████░░░` 83% | 2200/2645 | 129 |
-| German (`de`) | `██████████████░░░░░░` 72% | 1891/2645 | 124 |
-| Dutch (`nl`) | `█████████████░░░░░░░` 66% | 1736/2645 | 292 |
-| Hungarian (`hu`) | `████████████░░░░░░░░` 62% | 1646/2645 | 123 |
-| Portuguese (Brazil) (`pt_BR`) | `███████████░░░░░░░░░` 53% | 1409/2645 | 312 |
-| Spanish (`es`) | `██████████░░░░░░░░░░` 52% | 1378/2645 | 196 |
-| Japanese (`ja`) | `██████████░░░░░░░░░░` 50% | 1320/2645 | 249 |
-| Slovenian (`sl`) | `█████████░░░░░░░░░░░` 46% | 1214/2645 | 320 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `█████████░░░░░░░░░░░` 44% | 1175/2645 | 350 |
-| Italian (`it`) | `███████░░░░░░░░░░░░░` 36% | 958/2645 | 269 |
-| Korean (`ko`) | `███████░░░░░░░░░░░░░` 36% | 949/2645 | 269 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `███████░░░░░░░░░░░░░` 35% | 919/2645 | 251 |
-| Arabic (`ar`) | `██████░░░░░░░░░░░░░░` 30% | 791/2645 | 286 |
-| Slovak (`sk`) | `██████░░░░░░░░░░░░░░` 28% | 750/2645 | 315 |
-| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 26% | 702/2645 | 362 |
-| Indonesian (`id`) | `█████░░░░░░░░░░░░░░░` 26% | 679/2645 | 364 |
-| Galician (`gl`) | `█████░░░░░░░░░░░░░░░` 26% | 678/2645 | 363 |
-| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 22% | 585/2645 | 391 |
-| Greek (`el`) | `████░░░░░░░░░░░░░░░░` 19% | 507/2645 | 400 |
-| Czech (`cs`) | `████░░░░░░░░░░░░░░░░` 18% | 478/2645 | 409 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 17% | 443/2645 | 373 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 16% | 431/2645 | 438 |
-| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 16% | 422/2645 | 360 |
-| Finnish (`fi`) | `███░░░░░░░░░░░░░░░░░` 13% | 355/2645 | 389 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 11% | 290/2645 | 386 |
-| Khmer (`km`) | `██░░░░░░░░░░░░░░░░░░` 8% | 207/2645 | 345 |
+| Russian (`ru`) | `██████████████████░░` 92% | 2829/3081 | 0 |
+| Spanish (`es`) | `█████████████████░░░` 85% | 2623/3081 | 0 |
+| Polish (`pl`) | `█████████████████░░░` 84% | 2588/3081 | 0 |
+| French (`fr`) | `█████████████████░░░` 83% | 2558/3081 | 125 |
+| German (`de`) | `██████████████░░░░░░` 70% | 2162/3081 | 12 |
+| Dutch (`nl`) | `██████████████░░░░░░` 68% | 2104/3081 | 289 |
+| Hungarian (`hu`) | `███████████░░░░░░░░░` 53% | 1638/3081 | 119 |
+| Portuguese (Brazil) (`pt_BR`) | `█████████░░░░░░░░░░░` 46% | 1403/3081 | 306 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `█████████░░░░░░░░░░░` 45% | 1377/3081 | 181 |
+| Japanese (`ja`) | `█████████░░░░░░░░░░░` 43% | 1312/3081 | 244 |
+| Slovenian (`sl`) | `████████░░░░░░░░░░░░` 39% | 1206/3081 | 313 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `████████░░░░░░░░░░░░` 38% | 1168/3081 | 343 |
+| Italian (`it`) | `██████░░░░░░░░░░░░░░` 31% | 950/3081 | 266 |
+| Korean (`ko`) | `██████░░░░░░░░░░░░░░` 30% | 941/3081 | 266 |
+| Arabic (`ar`) | `█████░░░░░░░░░░░░░░░` 26% | 786/3081 | 281 |
+| Slovak (`sk`) | `█████░░░░░░░░░░░░░░░` 24% | 746/3081 | 308 |
+| Portuguese (`pt`) | `█████░░░░░░░░░░░░░░░` 23% | 698/3081 | 355 |
+| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 22% | 674/3081 | 356 |
+| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 22% | 675/3081 | 357 |
+| Swedish (`sv`) | `████░░░░░░░░░░░░░░░░` 19% | 582/3081 | 383 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 16% | 504/3081 | 394 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 15% | 475/3081 | 403 |
+| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 14% | 443/3081 | 368 |
+| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 14% | 431/3081 | 431 |
+| Vietnamese (`vi`) | `███░░░░░░░░░░░░░░░░░` 14% | 421/3081 | 352 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 354/3081 | 383 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 9% | 289/3081 | 380 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 7% | 207/3081 | 340 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---
@@ -692,9 +797,9 @@ Governance: [`GOVERNANCE.md`](GOVERNANCE.md). Contributing details: [`CONTRIBUTI
 Since May 2026: **188 releases, 673 merged pull requests, 262 issues closed, and 155 contributors credited by name.**
 <!-- funding-stats:end -->
 
-This build exists because the project it's based on stopped cutting releases in February with a
-queue of community pull requests still sitting in it — real bug fixes, written by real people,
-that weren't going to reach anybody. Shipping them turned out to be a full-time habit.
+This build exists to ship community bug fixes on a fast, regular release cadence — real fixes,
+written by real people, packaged so they reach users quickly. It complements the upstream
+projects it builds on, and their maintainers have our respect and our credits below.
 
 **Nothing here is paywalled and nothing ever will be.** No sponsor-only features, no private
 Discord, no early access, no "pro" tier. Every line is GPL-3.0 and free whether you contribute
@@ -707,6 +812,22 @@ If it hasn't, that's completely fine — it stays free either way.
 - **[Ko-fi](https://ko-fi.com/calibrewebnextgen)** — the same thing, if you already have an account there.
 
 The most useful thing you can do costs nothing: [file a bug](https://github.com/new-usemame/Calibre-Web-NextGen/issues/new?template=bug_report.md) when something breaks. That helps more than a few dollars does.
+
+---
+
+## How AI is used
+
+The codebase itself is Calibre-Web and Calibre-Web-Automated — written over many years by their
+human maintainers and contributors, who are credited in [Credits](#credits). What this fork adds
+on top — its own fixes, their regression tests, the changelog and most issue replies — is largely
+produced by an AI assistant working from a written brief, with human review gates: merges require
+CI plus a regression test verified to fail without the fix, and anything adding a dependency,
+changing a licence or introducing an external URL is decided by a person.
+
+**The shipped application itself contains no AI:** no model dependency, no inference call, no
+telemetry, and your library is not sent anywhere.
+
+[**Read the full disclosure →**](docs/AI-USAGE.md)
 
 ---
 

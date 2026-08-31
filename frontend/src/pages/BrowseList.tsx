@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useDeferredValue } from 'react';
 import { Link } from 'wouter';
 import { LayoutGrid, List, Search, Pencil, Trash2, Check, X, Merge } from 'lucide-react';
 import { useEntityList, useMe, useRenameTag, useDeleteTag, tagConflictOf } from '../lib/queries';
@@ -175,14 +175,23 @@ export function BrowseList({ plural, title }: BrowseListProps) {
   // #1396 — the per-row rename/delete buttons (#973) only render for an editor,
   // and they are what crowds the name out of the track, so the wider track is
   // scoped to the same condition rather than applied to every browse list.
-  const gridClass = canEditTags ? `${styles.grid} ${styles.gridWithActions}` : styles.grid;
+  // For non-editor tag views we apply gridTags (same 300px floor) so the grid
+  // stays at ~4 columns instead of the dense ~6-column default.
+  const gridClass = canEditTags
+    ? `${styles.grid} ${styles.gridWithActions}`
+    : plural === 'tags'
+    ? `${styles.grid} ${styles.gridTags}`
+    : styles.grid;
 
+  // Typing stays responsive on 10k-entity libraries: the filter re-runs at
+  // deferred priority instead of on every keystroke (#1813 item 6).
+  const deferredQ = useDeferredValue(q);
   const items = useMemo(() => {
     const all = data?.items ?? [];
-    if (!q.trim()) return all;
-    const needle = q.trim().toLowerCase();
+    if (!deferredQ.trim()) return all;
+    const needle = deferredQ.trim().toLowerCase();
     return all.filter((e) => e.name.toLowerCase().includes(needle));
-  }, [data, q]);
+  }, [data, deferredQ]);
 
   return (
     <main className={styles.container}>

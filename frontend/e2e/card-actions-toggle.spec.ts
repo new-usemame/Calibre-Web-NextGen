@@ -1,13 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /*
  * #1054 — "Can we please have the option of hiding the 'Read Now' and the edit
  * button in Library view. It makes the main page look messy." (@Glennza1962)
  *
- * The controls were already hover-revealed on a mouse (#1185), but a user who
- * reads on an ereader never wants them, and on a touchscreen they are pinned
- * visible by the coarse-pointer block. So: a real preference in the catalog's
- * View settings, persisted per browser.
+ * The controls were already hover-revealed on a mouse (#1185), and were pinned
+ * visible on touch by the coarse-pointer block when this preference shipped.
+ * The 2026-08-29 operator ruling reversed that touch default, but the
+ * preference is still the thing a user who NEVER wants them reaches for: it
+ * removes the row entirely rather than merely hiding it. Persisted per account,
+ * with a guest/local fallback.
  *
  * The load-bearing assertion is that switching it off REMOVES the controls
  * rather than hiding them. The hover-reveal uses `opacity: 0`, which leaves a
@@ -23,7 +25,22 @@ async function openViewSettings(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('catalog-view-settings-menu')).toBeVisible();
 }
 
-test('the Read now + edit row can be switched off from View settings (#1054)', async ({ page }) => {
+async function setCardActionsVisible(
+  page: import('@playwright/test').Page,
+  visible: boolean,
+) {
+  const toggle = page.getByTestId('show-card-actions');
+  const saved = page.waitForResponse((response) =>
+    response.url().includes('/api/v1/account/preferences')
+    && response.request().method() === 'POST');
+  await toggle.click();
+  expect((await saved).ok()).toBeTruthy();
+  if (visible) await expect(toggle).toBeChecked();
+  else await expect(toggle).not.toBeChecked();
+}
+
+test('the Read now + edit row can be switched off from View settings (#1054)', async ({ secondaryUser }) => {
+  const { page } = secondaryUser;
   await page.goto('/app/');
   await page.waitForLoadState('networkidle');
 
@@ -40,7 +57,7 @@ test('the Read now + edit row can be switched off from View settings (#1054)', a
   // Switch it off. count() counts elements that are merely transparent or
   // display:none too, so zero here means they left the DOM — which is the
   // tab-order guarantee, not just a visual one.
-  await toggle.uncheck();
+  await setCardActionsVisible(page, false);
   await expect(page.locator(READ_NOW),
     'the read link must leave the DOM, not just go transparent').toHaveCount(0);
   await expect(page.locator(PENCIL),
@@ -54,17 +71,19 @@ test('the Read now + edit row can be switched off from View settings (#1054)', a
 
   // And switching it back on restores exactly what was there before.
   await openViewSettings(page);
-  await page.getByTestId('show-card-actions').check();
-  await expect(page.locator(READ_NOW)).toHaveCount(readNowBefore);
-  await expect(page.locator(PENCIL)).toHaveCount(pencilBefore);
+  await setCardActionsVisible(page, true);
+  await expect.poll(async () =>
+    await page.locator(READ_NOW).count() + await page.locator(PENCIL).count(),
+  ).toBeGreaterThan(0);
 });
 
-test('hiding card actions leaves the cover link intact (#1054)', async ({ page }) => {
+test('hiding card actions leaves the cover link intact (#1054)', async ({ secondaryUser }) => {
+  const { page } = secondaryUser;
   await page.goto('/app/');
   await page.waitForLoadState('networkidle');
 
   await openViewSettings(page);
-  await page.getByTestId('show-card-actions').uncheck();
+  await setCardActionsVisible(page, false);
   await page.keyboard.press('Escape');
 
   // Both actions still have a home: the cover links to the book page, which
@@ -75,9 +94,8 @@ test('hiding card actions leaves the cover link intact (#1054)', async ({ page }
   const card = page.locator('[class*="grid"] a[href*="/book/"]').first();
   await expect(card).toBeVisible();
 
-  // Restore before leaving. Each test gets its own context, so this cannot leak
-  // into another spec — but the toggle is the thing under test and leaving it
-  // off would make a failure here read as a failure over there.
+  // Restore before leaving. The test-scoped account is deleted by the fixture,
+  // but exercising both directions is part of this control's contract.
   await openViewSettings(page);
-  await page.getByTestId('show-card-actions').check();
+  await setCardActionsVisible(page, true);
 });

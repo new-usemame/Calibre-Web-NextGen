@@ -1,0 +1,140 @@
+.container { max-width: 900px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
+.back { display: inline-flex; align-items: center; gap: var(--sp-1); margin-bottom: var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); transition: color var(--dur-fast) var(--ease); }
+.back:hover { color: var(--accent); }
+
+/* Device identity — the reader's name is the page title; kind sits under it as
+   a quiet kicker. */
+.header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.header > svg { color: var(--accent); width: 28px; height: 28px; flex: none; }
+.header h1, .header p { margin: 0; }
+.header h1 { font-size: var(--fs-xl); overflow-wrap: anywhere; }
+.header p { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 2px; }
+
+/* Summary stat grid — kicker label over a display-weight number. Toned rows
+   (data-tone from DeviceSummary) colour only the number, so a nonzero
+   quarantine/seed state reads at a glance without shouting when it is zero. */
+.summary { margin: 0 0 var(--sp-4); padding: var(--sp-4) var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--elev-1); }
+.summary dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-4) var(--sp-5); margin: 0; }
+.summary dl div { min-width: 0; }
+.summary dt { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+/* Text values (kind, model) stay at reading size; the counts are the display
+   element (data-num marks numeric rows in DeviceSummary). */
+.summary dd { margin: var(--sp-1) 0 0; font-size: var(--fs-md); font-weight: var(--fw-semi); line-height: var(--lh-tight); overflow-wrap: anywhere; }
+.summary [data-num] dd { font-size: var(--fs-lg); }
+.summary [data-tone='ok'] dd { color: var(--success); }
+.summary [data-tone='info'] dd { color: var(--accent-text); }
+.summary [data-tone='muted'] dd { color: var(--text-muted); }
+.summary [data-tone='warn'] dd { color: var(--danger); }
+/* Seed-coverage meter — the authority rollup as proportion, not just numbers. */
+.summary [data-meter] { display: flex; height: 6px; margin-top: var(--sp-4); border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
+.summary [data-meter] span { display: block; height: 100%; }
+.summary [data-seg='ok'] { background: var(--success); }
+.summary [data-seg='info'] { background: var(--accent); }
+.summary [data-seg='muted'] { background: var(--border-strong); }
+.summary [data-seg='warn'] { background: var(--danger); }
+.summary [data-seg='off'] { background: var(--text-faint); }
+
+.assignedToggle {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: 44px; margin-bottom: var(--sp-3); padding: 0 var(--sp-3) 0 var(--sp-2);
+  border: 1px solid var(--border); border-radius: var(--r-full);
+  color: var(--text-muted); font-size: var(--fs-sm); cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.assignedToggle:hover { border-color: var(--border-strong); color: var(--text); }
+.assignedToggle:has(input:checked) { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+.assignedToggle input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+
+/* Page-level tabs — the app's segmented-switcher idiom, matched exactly to the
+   Catalog / BrowseList .viewToggle: a quiet surface-2 track (2px padding, no
+   border), and the active segment carries the amber "you are here" tint. 44px
+   targets; the strip scrolls horizontally on narrow screens (keyboard focus
+   scrolls the active tab into view natively). */
+.tabs {
+  display: flex; gap: 2px; padding: 2px;
+  background: var(--surface-2); border-radius: var(--r-md);
+  overflow-x: auto; scrollbar-width: none;
+}
+@supports not ((scrollbar-width: thin) and (scrollbar-color: red transparent)) {
+  .tabs::-webkit-scrollbar { display: none; }
+}
+.tabs button {
+  flex: 0 0 auto; min-height: 44px; padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text-muted); font-weight: var(--fw-medium);
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.tabs button:hover { color: var(--text); background: var(--surface-3); }
+.tabs button[aria-selected='true'] { color: var(--accent-text); background: var(--accent-soft); font-weight: var(--fw-semi); }
+
+.panel { min-height: 180px; padding: var(--sp-4) 0; outline-offset: 3px; }
+
+/* Designed async states: the same calm block carries loading, empty, and the
+   row-count status; failures get a quiet danger-tinted callout instead. */
+.panelStatus { margin: 0; padding: var(--sp-6) var(--sp-4); color: var(--text-muted); text-align: center; }
+.panelAlert {
+  margin: 0; padding: var(--sp-3) var(--sp-4);
+  color: var(--danger); background: var(--danger-soft); border: 1px solid var(--danger-border);
+  border-radius: var(--r-md);
+}
+.countLine { margin: 0 0 var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); }
+
+.annotationList, .positionList { display: grid; gap: var(--sp-3); margin: 0; padding: 0; }
+.annotationRow, .positionList li {
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1);
+  overflow-wrap: anywhere;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.annotationRow:hover, .positionList li:hover { border-color: var(--border-strong); }
+.annotationRow > a { display: inline-block; min-height: 24px; color: var(--text); font-weight: var(--fw-medium); }
+.annotationRow > a:hover { color: var(--accent-text); }
+/* Kobo highlight colour as a small swatch beside the book link — readers
+   recognise their own colour coding; the swatch carries an aria-label so the
+   colour is not a visual-only fact. */
+.colorChip {
+  display: inline-block; width: 12px; height: 12px; margin-right: var(--sp-1);
+  border-radius: var(--r-full); border: 1px solid var(--border-strong);
+  vertical-align: -1px;
+}
+.annotationRow blockquote {
+  margin: var(--sp-2) 0 0; padding: var(--sp-1) 0 var(--sp-1) var(--sp-3);
+  border-left: 3px solid var(--accent);
+  color: var(--text); line-height: var(--lh-base);
+}
+.annotationRow p { margin: var(--sp-2) 0 0; color: var(--text-muted); }
+.annotationRow small { display: block; margin-top: var(--sp-2); color: var(--text-faint); font-size: var(--fs-xs); }
+
+.positionRow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.positionRow a { color: var(--text); font-weight: var(--fw-medium); min-height: 24px; }
+.positionRow a:hover { color: var(--accent-text); }
+.positionMeta { display: inline-flex; align-items: baseline; gap: var(--sp-2); flex: none; color: var(--text-muted); font-size: var(--fs-sm); }
+/* rehydrate_needed, surfaced calmly: the position is queued for repair on the
+   device's next sync — informational tint, not an alarm. */
+.repairPill {
+  font-size: var(--fs-xs); white-space: nowrap;
+  color: var(--text); background: var(--accent-soft);
+  border: 1px solid var(--border); border-radius: var(--r-full);
+  padding: 1px var(--sp-2);
+}
+.progressTrack { margin-top: var(--sp-2); height: 6px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
+.progressFill { height: 100%; border-radius: inherit; background: var(--accent); }
+
+.positions { margin-top: var(--sp-5); }
+.positions h2 { margin-bottom: var(--sp-3); font-size: var(--fs-lg); }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-4); }
+.pagination button { min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.pagination button:not(:disabled):hover { background: var(--surface-2); border-color: var(--border-strong); }
+.pagination button:disabled { opacity: .55; cursor: default; }
+.pagination span { color: var(--text-muted); font-size: var(--fs-sm); }
+
+@media (max-width: 600px) {
+  .container { padding: var(--sp-4) var(--sp-3); }
+  .header h1 { font-size: var(--fs-lg); }
+  .summary { padding: var(--sp-4); }
+  .summary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3) var(--sp-4); }
+  .positionRow { flex-direction: column; gap: 2px; }
+  .positionMeta { flex: initial; }
+  .pagination { justify-content: space-between; }
+}

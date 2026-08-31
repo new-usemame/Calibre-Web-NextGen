@@ -1,0 +1,11 @@
+{
+  "area": "ingest",
+  "body": "`wait_for_stable_file` (root/etc/s6-overlay/s6-rc.d/cwa-ingest-service/run:99)\ndecides a file has finished being written when two size samples\nSTABLE_INTERVAL apart are equal. Production defaults are STABLE_INTERVAL=0.5,\nSTABLE_CHECKS=6, STABLE_CONSEC_MATCH=2.\n\nTwo equal samples 0.5s apart do not prove the writer finished — only that it\nwrote nothing in that window. A copy that stalls longer than 0.5s (slow or\ncontended network share, a paused download client, an NFS hiccup) is therefore\nreported as settled, and the startup sweep hands a partially-written file to\nhandle_event. That is the exact symptom\ntest_startup_sweep_leaves_a_still_growing_file_to_the_watcher exists to\nprevent, at production timings rather than test ones.\n\nThe inotify event path is partly protected — a bare CREATE on an nlink==1 file\nis refused anyway — but the startup sweep calls handle_event directly.\n\nFound while de-flaking that test in #1579 (its harness collides the probe\ninterval with its writer period, which is a separate, test-only defect and is\nfixed there). Not fixed in that PR: changing ingest timing needs its own\nevidence and a blast-radius trace across both callers, and no user has\nreported a partial import from this path.\n\nPossible directions, none verified: require more than two consecutive matching\nsamples at production defaults; gate on mtime age as well as size; or require a\nclose_write for sweep candidates the way the event path effectively does.",
+  "created": "2026-08-13",
+  "id": "F-8ebeb7",
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "wait_for_stable_file can declare a stalled copy settled"
+}

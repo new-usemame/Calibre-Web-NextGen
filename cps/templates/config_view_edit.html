@@ -140,6 +140,14 @@
           <input type="checkbox" name="viewer_role" id="viewer_role" {% if conf.role_viewer() %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="viewer_role">{{_('Allow eBook Viewer')}}</label>
         </div>
+
+        <div>
+          <input type="checkbox" name="browse_global_role" id="browse_global_role" {% if conf.role_browse_global() %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="browse_global_role">{{_('Browse global library')}}</label>
+        </div>
+
+        <div>
+        </div>
         
         {% if conf.config_uploading %}
         <div>

@@ -1,0 +1,11 @@
+{
+  "area": "ci",
+  "body": "Found during a harness audit, and confirmed by asking Playwright rather than by\nreading the config.\n\n    npx playwright test --list  ->  459 tests in 66 files\n    ls frontend/e2e/*.spec.ts   ->  67 files\n\nThe missing one is `subpath.spec.ts`.\n\nMECHANISM, all OBSERVED in frontend/playwright.config.ts:\n  desktop  testIgnore: [/subpath\\.spec\\.ts/, /mobile\\.spec\\.ts/]      (line 50)\n  mobile   testIgnore: [/subpath\\.spec\\.ts/, /default-library-view/]  (line 70)\n  ipad     testMatch:  /book-card-actions\\.spec\\.ts/                  (line 76)\n  subpath  exists ONLY when process.env.E2E_SUBPATH_URL is set        (line 88)\n\nand no workflow sets E2E_SUBPATH_URL — .github/workflows/tests.yml sets\nE2E_BASE_URL only. So the project that would match the spec is never\nconstructed, and the spec is ignored by every project that is.\n\nWHY IT MATTERS: this is the suite that guards serving under a reverse-proxy\nprefix, i.e. the documented white-page / reader-404 class. A regression there\nships through a fully green e2e gate with zero sub-path assertions executed.\n\nNOT a config bug in itself — the spec genuinely needs the nginx rig\n(cwn-nginx-571, http://localhost:8087) that ordinary CI does not stand up. The\ndefect is that the exclusion was INVISIBLE: nothing said \"this suite does not\nguard CI\", so the file's existence read as coverage.\n\nHalf-fixed already: tests/unit/test_e2e_specs_are_reachable.py now asks\nPlaywright what it would run and fails if any spec is matched by no project,\nwith subpath recorded in INFRASTRUCTURE_GATED and the reason attached. A NEW\nnever-run spec now fails immediately. This one stays a real gap.\n\nTO CLOSE IT, one of:\n  a) stand the nginx rig up in the E2E job and set E2E_SUBPATH_URL — highest\n     fidelity, costs a container in CI;\n  b) run the suite against the existing app served under a prefix by the test\n     server, without nginx — cheaper, tests less of the real path;\n  c) accept it as a local-only suite and say so in the runbook, so nobody reads\n     a green e2e gate as covering sub-path serving.",
+  "created": "2026-08-19",
+  "id": "F-adaa84",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "The reverse-proxy sub-path e2e suite has never run in CI"
+}

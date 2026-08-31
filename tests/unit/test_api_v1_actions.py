@@ -223,3 +223,100 @@ def test_send_failure_returns_502():
              patch.object(mod, "send_mail", return_value="SMTP exploded"):
             resp = inspect.unwrap(mod.send_book_to_ereader)(5)
     assert resp[1] == 502
+
+
+# ── send to registered device ─────────────────────────────────────────────────
+
+@pytest.mark.unit
+def test_device_send_queues_the_filtered_book_for_owned_target():
+    from cps.api import actions as mod
+    from cps.services import device_delivery
+    book = SimpleNamespace(id=5)
+    delivery = SimpleNamespace(id=9, state=device_delivery.QUEUED, format="EPUB")
+    result = device_delivery.QueueResult(delivery=delivery, created=True)
+    mock_ub = MagicMock()
+    with _ctx("/api/v1/books/5/device-deliveries", body={"device": "public-device"}):
+        with patch.object(mod, "current_user", _user()), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=book), \
+             patch.object(mod.device_delivery, "queue_book_for_device", return_value=result) as queue:
+            resp = inspect.unwrap(mod.queue_book_for_device)(5)
+
+    assert _body(resp) == {
+        "delivery_id": 9,
+        "format": "EPUB",
+        "queued": True,
+        "state": "queued",
+        "message": "Book queued for this device",
+    }
+    queue.assert_called_once_with(
+        session=mock_ub.session,
+        user_id=1,
+        device_public_id="public-device",
+        book=book,
+    )
+    mock_ub.session.commit.assert_called_once()
+
+
+@pytest.mark.unit
+def test_device_send_reports_unsupported_formats_instead_of_silently_skipping():
+    from cps.api import actions as mod
+    from cps.services import device_delivery
+    reason = "Reader has no readable format available (AZW3, KFX)"
+    delivery = SimpleNamespace(id=9, state=device_delivery.FAILED, format=None)
+    result = device_delivery.QueueResult(delivery=delivery, created=True, reason=reason)
+    mock_ub = MagicMock()
+    with _ctx("/api/v1/books/5/device-deliveries", body={"device": "public-device"}):
+        with patch.object(mod, "current_user", _user()), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(id=5)), \
+             patch.object(mod.device_delivery, "queue_book_for_device", return_value=result):
+            resp = inspect.unwrap(mod.queue_book_for_device)(5)
+
+    assert resp[1] == 422
+    body = _body(resp)
+    assert body["error"]["code"] == "no_readable_format"
+    assert body["error"]["message"] == reason
+
+
+@pytest.mark.unit
+def test_device_send_inventory_hit_is_an_idempotent_success():
+    from cps.api import actions as mod
+    from cps.services import device_delivery
+    result = device_delivery.QueueResult(
+        delivery=None, created=False, reason="already_on_device",
+    )
+    mock_ub = MagicMock()
+    with _ctx("/api/v1/books/5/device-deliveries", body={"device": "public-device"}):
+        with patch.object(mod, "current_user", _user()), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(id=5)), \
+             patch.object(mod.device_delivery, "queue_book_for_device", return_value=result):
+            resp = inspect.unwrap(mod.queue_book_for_device)(5)
+
+    assert _body(resp) == {
+        "queued": False,
+        "state": "already_on_device",
+        "message": "This book is already on that device",
+    }
+
+
+@pytest.mark.unit
+def test_device_send_reports_latest_known_insufficient_storage_without_crashing():
+    from cps.api import actions as mod
+    from cps.services import device_delivery
+    result = device_delivery.QueueResult(
+        delivery=None, created=False, reason="insufficient_storage",
+    )
+    mock_ub = MagicMock()
+    with _ctx("/api/v1/books/5/device-deliveries", body={"device": "public-device"}):
+        with patch.object(mod, "current_user", _user()), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(id=5)), \
+             patch.object(mod.device_delivery, "queue_book_for_device", return_value=result):
+            resp = inspect.unwrap(mod.queue_book_for_device)(5)
+
+    assert resp[1] == 409
+    body = _body(resp)
+    assert body["error"]["code"] == "insufficient_storage"
+    assert "space" in body["error"]["message"].lower()

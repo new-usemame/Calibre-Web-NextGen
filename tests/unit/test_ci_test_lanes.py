@@ -25,6 +25,7 @@ previously-invisible file with the gate's own selector and see nothing dropped.
 
 import pathlib
 import re
+import shlex
 import subprocess
 import sys
 
@@ -58,11 +59,20 @@ LANELESS_DIRECTORIES = {
 #: Files under a fast-lane directory that declare a slower lane, and why. A
 #: file added here leaves the Fast Tests gate, so it should be a visible diff.
 SLOW_LANE_OPT_OUTS = {
-    "tests/unit/test_annotation_migration_large_db.py":
-        "builds a large database; too slow for the fast gate",
     "tests/unit/test_book_format_checksums_table_creation.py":
-        "exercises real schema creation against a live database",
+        "one class declares `integration` to stay out of the xdist pool, because "
+        "cps.progress_syncing.models imports cps.db and cps.ub at module level "
+        "and hangs in a worker subprocess "
+        "(notes/xdist-worker-ipc-hang-followup-2026-05-21.md). Run serially by "
+        "the Fast Tests job's 'non-xdist unit tests' step.",
 }
+
+#: An opt-out only tells you a file left the fast gate. It does not tell you any
+#: OTHER job picked it up, and for two files nothing did: the Integration job
+#: selects by PATH (``pytest tests/docker/ tests/integration/``), so a file under
+#: tests/unit/ declaring `slow` or `integration` ran in NEITHER job.
+#: ``test_every_lane_opt_out_is_actually_run_somewhere`` below closes that by
+#: executing the workflow's own invocations against each opt-out file.
 
 
 def _fast_gate_marker_expression():
@@ -74,6 +84,34 @@ def _fast_gate_marker_expression():
         "if the gate moved, this guard has to follow it" % WORKFLOW.name
     )
     return match.group(1)
+
+
+def _workflow_step_block(step_name):
+    """Return one named workflow step without requiring a YAML dependency."""
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    marker = "      - name: %s\n" % step_name
+    assert marker in workflow, "workflow step %r is missing" % step_name
+    return workflow.split(marker, 1)[1].split("\n      - name:", 1)[0]
+
+
+@pytest.mark.parametrize(
+    "step_name",
+    [
+        "Run smoke and unit tests",
+        "Run non-xdist unit tests (lane opt-outs)",
+        "Run Docker integration tests",
+    ],
+)
+def test_ci_pytest_steps_report_skip_reasons(step_name):
+    """A green count is insufficient: CI must name every skip and its reason."""
+    block = re.sub(r"\\\s*\n\s*", " ", _workflow_step_block(step_name))
+    commands = [line.strip() for line in block.splitlines()
+                if line.strip().startswith("pytest ")]
+    assert len(commands) == 1, "%s must contain one pytest command" % step_name
+    assert "-rs" in shlex.split(commands[0]), (
+        "%s must pass -rs so its job log names every skipped test and reason"
+        % step_name
+    )
 
 
 def test_every_test_directory_has_a_lane_or_a_stated_reason():
@@ -273,4 +311,107 @@ def test_previously_invisible_file_is_selected_by_the_fast_gate():
     assert " tests collected" in result.stdout or " test collected" in result.stdout, (
         "collection produced no tests, so this guard proves nothing:\n%s"
         % result.stdout[-2000:]
+    )
+
+
+def _workflow_pytest_invocations():
+    """Every ``pytest`` command the workflow runs, as (paths, marker expression).
+
+    Shell line continuations are joined first, so an invocation split across a
+    dozen lines with trailing backslashes is read as the single command it is.
+    """
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    joined = re.sub(r"\\\s*\n\s*", " ", workflow)
+    invocations = []
+    for line in joined.splitlines():
+        stripped = line.strip()
+        if not re.match(r"^pytest\b", stripped):
+            continue
+        marker = re.search(r'-m\s+"([^"]+)"', stripped)
+        paths = [
+            token for token in re.findall(r"(?<!\S)(tests[^\s\\]*)", stripped)
+        ]
+        invocations.append((paths, marker.group(1) if marker else None))
+    assert invocations, (
+        "no `pytest` invocation found in %s — this guard reads the workflow to "
+        "learn what CI actually runs, so it cannot work if the parse breaks"
+        % WORKFLOW.name
+    )
+    return invocations
+
+
+def _collect_nodeids(paths, marker=None):
+    """The exact set of test nodeids one pytest invocation would run.
+
+    `-o addopts=` is load-bearing. pytest.ini sets `addopts = -v`, and with -v
+    the collector prints a <Module>/<Class> tree instead of nodeids, so a nodeid
+    match finds nothing for EVERY invocation and any guard built on it reports
+    universal coverage. Neutralise the ini options so the output shape is the
+    one being parsed.
+    """
+    command = [sys.executable, "-m", "pytest", "-o", "addopts=",
+               "--collect-only", "-q"]
+    command += list(paths) if paths else ["tests"]
+    if marker:
+        command += ["-m", marker]
+    result = subprocess.run(
+        command, cwd=REPO, capture_output=True, text=True, timeout=900)
+    return set(re.findall(r"^(\S+::\S+)\s*$", result.stdout, re.M))
+
+
+def test_every_test_is_selected_by_some_ci_invocation():
+    """No test may exist that no CI job runs. Checked per TEST, not per file.
+
+    An earlier version of this guard compared whole FILES and was vacuous, which
+    is how it was caught: removing the workflow step that runs the lane opt-outs
+    left it green. `test_book_format_checksums_table_creation.py` holds ten
+    fast-lane tests and one `integration`-marked one, so at file granularity the
+    fast gate "covers" it while the only test that exercises the advertised
+    behaviour is deselected and runs nowhere. Coverage is a property of a test,
+    not of the file it happens to share.
+
+    Everything is derived from the workflow's own invocations, so this stays
+    true when CI changes instead of encoding today's answer.
+    """
+    everything = _collect_nodeids(["tests"])
+    assert len(everything) > 5000, (
+        "only %d tests collected from tests/ — the collector or the parse has "
+        "broken, and this guard would pass vacuously" % len(everything))
+
+    covered = set()
+    for paths, marker in _workflow_pytest_invocations():
+        covered |= _collect_nodeids(paths, marker)
+    assert covered, "no CI invocation collected anything; the parse has drifted"
+
+    uncovered = everything - covered
+    by_file = {}
+    for nodeid in sorted(uncovered):
+        by_file.setdefault(nodeid.split("::", 1)[0], []).append(nodeid)
+    assert not uncovered, (
+        "%d test(s) in %d file(s) are run by NO workflow invocation:\n  %s\n\n"
+        "A test that no job runs is a green gate over nothing. Either give it a "
+        "lane the Fast Tests gate selects, or add a workflow step naming its "
+        "path or marker." % (
+            len(uncovered), len(by_file),
+            "\n  ".join("%s (%d)" % (f, len(v)) for f, v in sorted(by_file.items())))
+    )
+
+
+def test_the_workflow_invocation_parser_sees_the_gate_it_is_built_on():
+    """Vacuity guard for the test above.
+
+    If the parser stopped finding invocations, or found only ones with no
+    selector, every opt-out would trivially look covered. Pin that it recovers
+    the Fast Tests gate specifically.
+    """
+    invocations = _workflow_pytest_invocations()
+    markers = [marker for _paths, marker in invocations if marker]
+    assert _fast_gate_marker_expression() in markers, (
+        "the parser no longer recovers the Fast Tests `-m` expression from %s; "
+        "test_every_lane_opt_out_is_actually_run_somewhere would pass "
+        "vacuously" % WORKFLOW.name
+    )
+    assert len(invocations) >= 2, (
+        "only %d pytest invocation(s) parsed from %s — the workflow runs more "
+        "than that, so the parse has drifted" % (len(invocations), WORKFLOW.name)
     )

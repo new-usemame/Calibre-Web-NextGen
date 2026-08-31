@@ -3,9 +3,9 @@
 
 Fork issue #155 asked for two upstream PRs:
 
-* CWA #1271 — `fix(cwasync): handle no-book sync actions`. Tapping push/pull
+* CWA #1271 — `fix(cwngsync): handle no-book sync actions`. Tapping push/pull
   menu items when no book is open used to crash the plugin or noop silently.
-* CWA #1272 — `feat(cwasync): Add bulk progress pull`. Lets users pull progress
+* CWA #1272 — `feat(cwngsync): Add bulk progress pull`. Lets users pull progress
   for every downloaded book in one action — useful when finishing a book on
   one device and switching to another.
 
@@ -15,7 +15,7 @@ regression that drops a no-book guard, removes the bulk-pull entry point, or
 breaks the sync_logic require would trip the test.
 
 The plugin version gate that used to live here is now derived, in
-tests/unit/test_cwasync_plugin_version_bump_gate.py.
+tests/unit/test_cwngsync_plugin_version_bump_gate.py.
 """
 
 from __future__ import annotations
@@ -27,14 +27,14 @@ import pytest
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwasync.koplugin"
+PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwngsync.koplugin"
 MAIN_LUA = PLUGIN_DIR / "main.lua"
 SYNC_LOGIC_LUA = PLUGIN_DIR / "sync_logic.lua"
 SYNC_LOGIC_TEST_LUA = PLUGIN_DIR / "tests" / "sync_logic_test.lua"
 
 # The plugin version gate used to live here as EXPECTED_PLUGIN_VERSION, a
 # hand-maintained constant that main.lua had to equal. It is now derived in
-# tests/unit/test_cwasync_plugin_version_bump_gate.py. The constant did not
+# tests/unit/test_cwngsync_plugin_version_bump_gate.py. The constant did not
 # survive contact with the failure it was written for: it pins the version
 # against *itself*, so it only ever caught a unilateral edit to one of the two
 # places, and was silent on the case that actually happened — #1427 changed 280
@@ -119,7 +119,7 @@ def test_pull_log_lines_include_current_file_context():
         "with unusable progress field",
     ):
         assert (
-            f'"CWASync: [Pull] end for", current_file, "{tail}"' in body
+            f'"CWNGSync: [Pull] end for", current_file, "{tail}"' in body
         ), f"main.lua must log '[Pull] end for ... {tail}' (CWA #1271)"
 
 

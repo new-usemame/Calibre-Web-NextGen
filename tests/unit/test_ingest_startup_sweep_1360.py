@@ -120,6 +120,44 @@ def harness(tmp_path):
 
 
 # --------------------------------------------------------------------------
+# Driving a file that is still being written
+# --------------------------------------------------------------------------
+#
+# `wait_for_stable_file` samples the size every STABLE_INTERVAL and calls a
+# file settled after two consecutive equal reads. This harness sets
+# STABLE_CHECKS=2 / STABLE_INTERVAL=0.05, so a writer whose own period is ALSO
+# 0.05s races the probe: the two samples sit exactly one writer-period apart
+# and scheduling jitter alone decides whether an append landed between them.
+# Under CI load it sometimes did not, the probe reported a growing file as
+# settled, and the test failed claiming a partial import.
+#
+# That is a defect in the test's sampling relationship, not in the script it
+# tests. It cost real work: on 2026-08-12 it went red on a main push and the
+# auto-revert opened #1575 against an unrelated frontend commit.
+#
+# So fix the relationship rather than the symptom — append an order of
+# magnitude faster than the probe reads, and the size cannot be equal across
+# two samples while the writer lives. The writer is killed the moment the probe
+# returns, so the generous iteration budget costs no wall-clock.
+WRITER_PERIOD = 0.005
+WRITER_ITERATIONS = 4000
+
+
+def _start_busy_writer(path) -> str:
+    """Bash that appends to `path` far faster than the probe samples it."""
+    return (
+        f'( for (( w=0; w<{WRITER_ITERATIONS}; w++ )); do '
+        f'printf "more" >> "{path}"; sleep {WRITER_PERIOD}; done ) & '
+        "WRITER=$!; "
+    )
+
+
+_STOP_BUSY_WRITER = (
+    'kill "$WRITER" 2>/dev/null || true; wait "$WRITER" 2>/dev/null || true'
+)
+
+
+# --------------------------------------------------------------------------
 # Behavioural pins — the user-visible symptom
 # --------------------------------------------------------------------------
 
@@ -137,6 +175,19 @@ def test_startup_sweep_ingests_preexisting_file(harness):
         "a book present in the ingest folder at service start was never "
         "ingested (#1360) — inotify has no initial scan, so without a "
         "startup sweep it stays unimported forever"
+    )
+
+
+def test_startup_sweep_ingests_uppercase_extension(harness):
+    """Fork #1740: Calibre format extensions are case-insensitive on disk;
+    the startup sweep must not silently strand ``Book.EPUB``."""
+    book = harness.watch / "Book.EPUB"
+    book.write_text("a whole book")
+
+    processed = harness("startup_ingest_sweep >/dev/null 2>&1 || true")
+
+    assert str(book) in processed, (
+        "startup sweep silently ignored a supported uppercase extension (#1740)"
     )
 
 
@@ -266,12 +317,12 @@ def test_startup_sweep_leaves_a_still_growing_file_to_the_watcher(harness):
     growing = harness.watch / "still-copying.epub"
     growing.write_text("start")
 
-    # A writer that keeps appending for longer than the stability probe.
+    # A writer that keeps appending for the whole life of the stability probe,
+    # faster than the probe samples — see _start_busy_writer.
     processed = harness(
-        f'( for i in 1 2 3 4 5 6 7 8 9 10; do printf "more" >> "{growing}"; sleep 0.05; done ) & '
-        "WRITER=$!; "
-        "startup_ingest_sweep >/dev/null 2>&1 || true; "
-        "wait $WRITER 2>/dev/null || true"
+        _start_busy_writer(growing)
+        + "startup_ingest_sweep >/dev/null 2>&1 || true; "
+        + _STOP_BUSY_WRITER
     )
 
     assert str(growing) not in processed, (
@@ -285,10 +336,9 @@ def test_wait_for_stable_file_reports_failure_when_never_stable(harness):
     growing.write_text("start")
 
     out = harness(
-        f'( for i in 1 2 3 4 5 6 7 8 9 10; do printf "more" >> "{growing}"; sleep 0.05; done ) & '
-        "WRITER=$!; "
-        f'if wait_for_stable_file "{growing}"; then echo STABLE; else echo UNSTABLE; fi >> "$PROCESSOR_LOG"; '
-        "wait $WRITER 2>/dev/null || true"
+        _start_busy_writer(growing)
+        + f'if wait_for_stable_file "{growing}"; then echo STABLE; else echo UNSTABLE; fi >> "$PROCESSOR_LOG"; '
+        + _STOP_BUSY_WRITER
     )
     assert "UNSTABLE" in out, (
         "wait_for_stable_file reported a continuously growing file as settled"

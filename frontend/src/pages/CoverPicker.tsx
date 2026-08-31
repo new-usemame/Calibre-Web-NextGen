@@ -135,12 +135,12 @@ export function CoverPicker({ id }: { id: string }) {
             <h2 className={styles.gridTitle}>{t('Choose a cover')}</h2>
             <ProviderSummary providers={candidatesQ.data?.providers} loading={candidatesQ.isFetching} />
             <Button variant="ghost" size="sm" onClick={() => candidatesQ.refetch()} disabled={candidatesQ.isFetching}>
-              <RefreshCw size={14} className={candidatesQ.isFetching ? styles.spin : ''} /> {t('Refresh')}
+              <span className={candidatesQ.isFetching ? styles.spin : ''}><RefreshCw size={14} /></span> {t('Refresh')}
             </Button>
           </div>
 
           {candidatesQ.isLoading ? (
-            <div className={styles.gridLoading}><Loader2 size={22} className={styles.spin} /> {t('Searching every source…')}</div>
+            <div className={styles.gridLoading}><span className={styles.spin}><Loader2 size={22} /></span> {t('Searching every source…')}</div>
           ) : candidatesQ.isError ? (
             <EmptyState message={candidatesQ.error instanceof Error ? candidatesQ.error.message : t('Could not load candidates.')} />
           ) : (
@@ -202,7 +202,7 @@ function EreaderPanel({ value, onChange }: {
             </select>
           </label>
           <label className={styles.field}>
-            <span>{t('Border fill style')}</span>
+            <span>{t('Fill style')}</span>
             <select value={value.fill_mode} onChange={(e) => set({ fill_mode: e.target.value })}>
               {EREADER_FILL_MODES.map((o) => <option key={o.value} value={o.value}>{t(o.label)}</option>)}
             </select>
@@ -315,13 +315,19 @@ function CandidateCard({ candidate: c, locked, preview, onPick }: {
           ? <div className={styles.cardFailed}><ImageIcon size={22} /><span>{t('Cover not reachable')}</span></div>
           : <img src={src} alt={c.title || c.source_name} loading="lazy" className={styles.cardImg}
                  onError={() => setFailed(true)} />}
-        {preview === 'loading' && <div className={styles.cardShimmer}><Loader2 size={18} className={styles.spin} /></div>}
+        {preview === 'loading' && <div className={styles.cardShimmer}><span className={styles.spin}><Loader2 size={18} /></span></div>}
         {isEmbedded(c) && <span className={styles.badgeEmbedded}>{t('In your book')}</span>}
         {showPreview && <span className={styles.badgeEreader}><Smartphone size={11} /> {t('e-reader')}</span>}
         {lowRes && <span className={styles.badgeWarn}><AlertTriangle size={11} /> {t('Low-res')}</span>}
       </div>
       <div className={styles.cardInfo}>
         <span className={styles.cardSource}>{c.source_name}</span>
+        {/* The metadata came from source_name, but once we upgrade a cover to a
+            higher-resolution copy the picture itself can come from elsewhere.
+            Say so rather than letting the provider name imply both (#304). */}
+        {c.image_origin && (
+          <span className={styles.cardImageOrigin}>{t('Image from {source}', { source: c.image_origin })}</span>
+        )}
         <span className={styles.cardDims}>{dims || (c.year ? c.year : ' ')}</span>
       </div>
     </button>
@@ -453,7 +459,7 @@ function UrlTab({ id, locked, onApplied, onError }: {
         </div>
       )}
       <Button onClick={apply} disabled={!valid?.valid || checking || valid?.url !== url.trim() || locked || applying} className={styles.fullBtn}>
-        {applying ? <Loader2 size={14} className={styles.spin} /> : <Check size={14} />} {t('Use this cover')}
+        {applying ? <span className={styles.spin}><Loader2 size={14} /></span> : <Check size={14} />} {t('Use this cover')}
       </Button>
       {locked && <p className={styles.lockedHint}>{t('Unlock the cover above to apply a new one.')}</p>}
     </div>
@@ -484,7 +490,7 @@ function UploadTab({ id, locked, onApplied, onError }: {
                onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </label>
       <Button onClick={apply} disabled={!file || locked || applying} className={styles.fullBtn}>
-        {applying ? <Loader2 size={14} className={styles.spin} /> : <UploadIcon size={14} />} {t('Upload as cover')}
+        {applying ? <span className={styles.spin}><Loader2 size={14} /></span> : <UploadIcon size={14} />} {t('Upload as cover')}
       </Button>
       {locked && <p className={styles.lockedHint}>{t('Unlock the cover above to apply a new one.')}</p>}
     </div>
@@ -622,7 +628,7 @@ function ConfirmModal({ id, candidate: c, currentCover, onClose, onApplied, onEr
         <div className={styles.modalFoot}>
           <Button variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
           <Button onClick={apply} disabled={applying}>
-            {applying ? <Loader2 size={14} className={styles.spin} /> : <Check size={14} />} {t('Use this cover')}
+            {applying ? <span className={styles.spin}><Loader2 size={14} /></span> : <Check size={14} />} {t('Use this cover')}
           </Button>
         </div>
       </div>

@@ -189,10 +189,15 @@ _DANGEROUS_PERMS_EXEMPTIONS = {
         "GitHub OIDC for sigstore/cosign attestations on the container image; "
         "required for SLSA provenance. Issued per-job, expires immediately."
     ),
-    ("update-translations.yml", "actions"): (
-        "Workflow re-dispatches itself / downstream workflows after pushing "
-        "translation updates so dependent runs pick up fresh .po files."
-    ),
+    # update-translations.yml used to hold an ("…", "actions") exemption for
+    # its dev-build dispatch step. The dispatch was removed: the dev
+    # workflow's push trigger already builds every image-relevant merge, so
+    # the dispatch could only double-build those — or, having no
+    # paths-ignore of its own, force-build merges the push trigger
+    # deliberately skips. See
+    # tests/unit/test_dev_image_build_once_when_image_relevant_never_when_ignored.py.
+    # The exemption left with it — re-granting actions: write there is a red
+    # flag, not a routine edit.
 }
 
 
@@ -618,6 +623,72 @@ def _e2e_steps() -> list[dict]:
     return [s for s in (job.get("steps") or []) if isinstance(s, dict)]
 
 
+def test_e2e_uses_head_backend_only_for_backend_prs():
+    """Backend PRs need their Python code; frontend-only PRs keep the overlay."""
+    wf = _load(WF_DIR / "tests.yml")
+    jobs = wf.get("jobs") or {}
+    integration = jobs.get("integration-tests") or {}
+    e2e = jobs.get("e2e-tests") or {}
+
+    integration_needs = integration.get("needs") or []
+    integration_needs = [integration_needs] if isinstance(integration_needs, str) else integration_needs
+    assert "integration-tests" not in integration_needs, (
+        "integration-tests depends on itself, creating an invalid workflow cycle"
+    )
+
+    e2e_needs = e2e.get("needs") or []
+    e2e_needs = [e2e_needs] if isinstance(e2e_needs, str) else e2e_needs
+    assert {"changed_paths", "integration-tests"}.issubset(set(e2e_needs)), (
+        "e2e must read the build classification and wait for integration's GHA image cache"
+    )
+
+    steps = [step for step in (e2e.get("steps") or []) if isinstance(step, dict)]
+    full_build = next((step for step in steps if step.get("name") == "Build full-stack PR image"), None)
+    assert full_build is not None, "backend PR e2e no longer builds the checked-out full stack"
+    assert full_build.get("uses") == "docker/build-push-action@v7"
+    assert "needs.changed_paths.outputs.build == 'true'" in str(full_build.get("if") or "")
+    assert "needs.changed_paths.outputs.concurrency != 'true'" in str(full_build.get("if") or ""), (
+        "concurrency-shaped PRs use the exact-sha producer and must not also build a local image"
+    )
+    build_with = full_build.get("with") or {}
+    assert build_with.get("load") is True, "the HEAD image must be loaded for the following docker run"
+    assert str(build_with.get("cache-from") or "").startswith("type=gha")
+    assert str(build_with.get("cache-to") or "").startswith("type=gha")
+
+    ghcr_login = next(
+        (step for step in steps if step.get("uses") == "docker/login-action@v4"),
+        None,
+    )
+    assert ghcr_login is not None, "the e2e full build cannot authenticate to the private pbs-cache mirror"
+    login_with = ghcr_login.get("with") or {}
+    assert "github.repository_owner" in str(login_with.get("username") or "")
+    assert "secrets.GH_PAT || secrets.GITHUB_TOKEN" in str(login_with.get("password") or ""), (
+        "e2e must use the integration job's proven private-mirror credential fallback"
+    )
+
+    resolver = next((step for step in steps if step.get("name") == "Resolve image to test"), None)
+    assert resolver is not None
+    resolver_run = str(resolver.get("run") or "")
+    assert "needs.changed_paths.outputs.build" in resolver_run
+    assert "needs.changed_paths.outputs.concurrency" in resolver_run
+    assert "cwng-e2e-head:local" in resolver_run
+
+    start = next((step for step in steps if step.get("name") == "Start container (SPA enabled)"), None)
+    assert start is not None
+    start_run = str(start.get("run") or "")
+    assert 'docker image inspect "$IMAGE"' in start_run, (
+        "the locally loaded full-stack PR image must not be rejected for being unpullable"
+    )
+
+    overlay = next((step for step in steps if step.get("name") == "Overlay the SPA bundle under test into the container"), None)
+    assert overlay is not None
+    overlay_if = str(overlay.get("if") or "")
+    assert "needs.changed_paths.outputs.build != 'true'" in overlay_if, (
+        "frontend-only PRs must keep the fast :dev + static-overlay path"
+    )
+    assert "needs.changed_paths.outputs.concurrency != 'true'" in overlay_if
+
+
 def test_e2e_job_enables_remote_login_before_running_the_harness():
     steps = _e2e_steps()
     assert steps, "tests.yml has no e2e-tests steps — did the job get renamed?"
@@ -686,20 +757,12 @@ def test_changed_paths_treats_tests_yml_as_frontend_relevant():
     fixture could not be validated by the e2e job — the fix for a red gate
     would not run the gate.
     """
-    wf = _load(WF_DIR / "tests.yml")
-    detect = next(
-        (
-            s
-            for s in ((wf.get("jobs") or {}).get("changed_paths") or {}).get("steps", [])
-            if isinstance(s, dict) and s.get("id") == "detect"
-        ),
-        None,
-    )
-    assert detect is not None, "changed_paths has no `detect` step"
-    run = detect.get("run") or ""
-    assert "workflows/tests" in run.replace("\\", ""), (
-        "changed_paths does not treat .github/workflows/tests.yml as frontend-relevant, "
-        "so a PR that changes the e2e seed/setup will skip the e2e job that it changes."
+    from scripts.ci_path_classification import classify_paths
+
+    result = classify_paths([".github/workflows/tests.yml"], REPO_ROOT)
+    assert result["frontend"] is True, (
+        "the shared classifier does not treat .github/workflows/tests.yml as "
+        "frontend-relevant, so a PR changing the e2e seed/setup would skip the gate"
     )
 
 
@@ -765,12 +828,15 @@ def _run_detect(repo: Path, base: str, head: str) -> dict[str, str]:
     script = _detect_step().get("run") or ""
     out_file = repo / "_gh_output"
     out_file.write_text("")
+    runner_temp = repo / "runner-temp"
+    runner_temp.mkdir()
     env = dict(os.environ)
     env.update(
         {
             "BASE_SHA": base,
             "HEAD_SHA": head,
             "GITHUB_OUTPUT": str(out_file),
+            "RUNNER_TEMP": str(runner_temp),
             "GIT_CONFIG_NOSYSTEM": "1",
             "HOME": str(repo),
         }
@@ -796,7 +862,15 @@ def _repo_touching(repo: Path, paths: list[str]) -> tuple[str, str]:
     """Build a git repo whose PR branch changes exactly `paths`."""
     _git(repo, "init", "-b", "main")
     (repo / "seed.txt").write_text("base\n")
+    classifier = repo / "scripts" / "ci_path_classification.py"
+    classifier.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO_ROOT / "scripts" / "ci_path_classification.py", classifier)
+    package = repo / "cps" / "__init__.py"
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text("", encoding="utf-8")
     _git(repo, "add", "seed.txt")
+    _git(repo, "add", "cps/__init__.py")
+    _git(repo, "add", "scripts/ci_path_classification.py")
     _git(repo, "commit", "-m", "base")
     base = _git(repo, "rev-parse", "HEAD").stdout.strip()
 
@@ -889,6 +963,23 @@ def test_changed_paths_classifies_build_definition_edits(changed, want_build, wa
     assert out["frontend"] == want_frontend, (
         f"changed={changed} → frontend={out['frontend']!r}, expected {want_frontend!r}"
     )
+
+
+def test_pr_cannot_disable_its_gate_by_replacing_its_classifier():
+    """Execute the real detect shell with a deliberately broken PR copy."""
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        base, head = _repo_touching(
+            repo,
+            ["cps/web.py", "scripts/ci_path_classification.py"],
+        )
+        # _repo_touching replaces both files with non-Python text on the PR
+        # branch. The base classifier remains valid and must still identify
+        # web.py as a concurrency root.
+        out = _run_detect(repo, base, head)
+
+    assert out["concurrency"] == "true"
+    assert out["build"] == "true"
 
 
 def test_integration_tests_gate_keys_on_changed_paths():
@@ -1301,10 +1392,13 @@ def test_fork_prs_run_e2e_but_do_not_hard_gate_on_it_yet():
     wf = _load(WF_DIR / "tests.yml")
     job = (wf.get("jobs") or {}).get("e2e-tests")
 
-    condition = str(job.get("if") or "")
-    assert "fork" not in condition, (
-        "e2e-tests must still RUN on fork frontend PRs — surfacing the result "
-        "is the point; only the hard gate is deferred"
+    condition = re.sub(r"\s+", " ", str(job.get("if") or ""))
+    assert "outputs.frontend == 'true' ||" in condition, (
+        "frontend PRs must enter E2E before the concurrency-specific fork carve-out"
+    )
+    assert "outputs.concurrency == 'true'" in condition and "fork != true" in condition, (
+        "only concurrency-triggered image builds exclude forks; frontend fork PRs "
+        "must still run the existing digest-pinned overlay lane"
     )
 
     coe = str(job.get("continue-on-error", ""))

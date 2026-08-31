@@ -1,6 +1,16 @@
 #!/usr/bin/with-contenv bash
+# shellcheck shell=bash
 
 echo "========== STARTING METADATA CHANGE DETECTOR ==========="
+
+# The dispatcher runs cover_enforcer as root, and that script shells out to
+# calibredb/ebook-polish. Give those tools a uid-private config rather than
+# root's implicit home or abc's runtime files. The explicit user-plugin opt-in
+# can still override this in cover_enforcer's per-subprocess environment.
+if [ -z "${CALIBRE_CONFIG_DIRECTORY:-}" ]; then
+        export CALIBRE_CONFIG_DIRECTORY="/tmp/cwa-calibre-config-$(id -u)"
+        install -d -m 0700 "$CALIBRE_CONFIG_DIRECTORY"
+fi
 
 # Folder to monitor. This has to resolve to the same path the writer uses, or the writer
 # writes where nobody is watching and metadata enforcement stops with nothing in the logs

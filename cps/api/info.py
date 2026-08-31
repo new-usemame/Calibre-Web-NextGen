@@ -8,7 +8,7 @@ WorkerThread) so the SPA shows exactly what the Jinja pages show.
 from flask import jsonify
 
 from . import api_v1
-from .. import calibre_db, db
+from .. import calibre_db, constants, db, user_library
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..about import collect_stats
@@ -37,12 +37,37 @@ def about_info():
     as the single source of truth for whether to render the section.
     """
     is_admin = current_user.role_admin()
+    membership_enabled = (
+        user_library.mode_for_user(current_user)
+        == constants.LIBRARY_MODE_PERSONAL
+    )
+    books_query = calibre_db.session.query(db.Books)
+    visible_book_count = (
+        books_query.filter(calibre_db.common_filters()).count()
+        if membership_enabled else books_query.count()
+    )
+    if membership_enabled:
+        visible_filter = calibre_db.common_filters()
+
+        def visible_facets(model, link):
+            return (calibre_db.session.query(model.id)
+                    .join(link).join(db.Books)
+                    .filter(visible_filter).distinct().count())
+
+        author_count = visible_facets(db.Authors, db.books_authors_link)
+        category_count = visible_facets(db.Tags, db.books_tags_link)
+        series_count = visible_facets(db.Series, db.books_series_link)
+    else:
+        # Monolibrary mode preserves the historical About payload exactly.
+        author_count = calibre_db.session.query(db.Authors).count()
+        category_count = calibre_db.session.query(db.Tags).count()
+        series_count = calibre_db.session.query(db.Series).count()
     resp = jsonify({
         "counts": {
-            "books": calibre_db.session.query(db.Books).count(),
-            "authors": calibre_db.session.query(db.Authors).count(),
-            "categories": calibre_db.session.query(db.Tags).count(),
-            "series": calibre_db.session.query(db.Series).count(),
+            "books": visible_book_count,
+            "authors": author_count,
+            "categories": category_count,
+            "series": series_count,
         },
         # collect_stats() returns an ordered {name: version} map. Not called at
         # all for a non-admin, so there is nothing to leak into a log or a
@@ -53,6 +78,7 @@ def about_info():
     # admin's copy to anyone else. Flask sets Vary: Cookie when the session is
     # touched, but reverse-proxy header login resolves the user from
     # g.flask_httpauth_user without touching it, so that is not guaranteed here.
+    user_library.mark_response_user_specific()
     resp.headers["Cache-Control"] = "private, no-store"
     return resp
 

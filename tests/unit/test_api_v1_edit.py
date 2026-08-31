@@ -6,6 +6,7 @@ import inspect
 import json
 import flask
 import pytest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
@@ -111,6 +112,28 @@ def test_delete_book_requires_delete_role():
 
 
 @pytest.mark.unit
+def test_delete_book_requires_edit_role_as_well_as_delete_role():
+    from cps.api import edit as mod
+    with _ctx("/api/v1/books/5/delete"):
+        with patch.object(mod, "current_user", _editor(role_edit=False, role_delete=True)), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(id=5)), \
+             patch.object(mod, "delete_book_from_table") as core:
+            resp = inspect.unwrap(mod.delete_book)(5)
+    assert resp[1] == 403
+    core.assert_not_called()
+
+
+@pytest.mark.unit
+def test_spa_whole_book_delete_controls_require_both_roles():
+    root = Path(__file__).parents[2]
+    detail = (root / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
+    bulk = (root / "frontend" / "src" / "components" / "BulkBar.tsx").read_text()
+    assert "me?.role?.delete_books && me?.role?.edit" in detail
+    assert "!!me?.role?.delete_books && !!me?.role?.edit" in bulk
+    assert "same delete-and-edit policy as the server" in detail
+
+
+@pytest.mark.unit
 def test_delete_book_not_found_404():
     from cps.api import edit as mod
     with _ctx("/api/v1/books/999/delete"):
@@ -158,6 +181,55 @@ def test_delete_book_authorizes_with_visibility_filter():
     # whole-book delete: book_format="" , json_response=True
     assert core.call_args.args[0] == 5 and core.call_args.args[1] == ""
     assert seen == {"archived": True, "hidden": True}
+
+
+@pytest.mark.unit
+def test_delete_book_returns_cleanup_warning_instead_of_empty_204():
+    from cps.api import edit as mod
+    core_result = json.dumps([
+        {"type": "warning", "message": "Database row deleted; files remain"},
+        {"type": "success", "message": "Book Successfully Deleted"},
+    ])
+    with _ctx("/api/v1/books/5/delete"):
+        with patch.object(mod, "current_user", _editor()), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(id=5)), \
+             patch.object(mod, "delete_book_from_table", return_value=core_result):
+            resp = inspect.unwrap(mod.delete_book)(5)
+    assert resp.status_code == 200
+    assert json.loads(resp.get_data()) == {
+        "deleted": True,
+        "warning": {"code": "cleanup_incomplete", "message": "Database row deleted; files remain"},
+    }
+
+
+@pytest.mark.unit
+def test_delete_endpoints_translate_core_danger_to_non_2xx():
+    from cps.api import edit as mod
+    core_result = json.dumps([{"type": "danger", "message": "permission denied"}])
+    for path, call in [
+        ("/api/v1/books/5/delete", lambda: inspect.unwrap(mod.delete_book)(5)),
+        ("/api/v1/books/5/formats/epub/delete", lambda: inspect.unwrap(mod.delete_format)(5, "epub")),
+    ]:
+        with _ctx(path):
+            with patch.object(mod, "current_user", _editor()), \
+                 patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(
+                     id=5, data=[SimpleNamespace(format="EPUB"), SimpleNamespace(format="PDF")])), \
+                 patch.object(mod, "delete_book_from_table", return_value=core_result):
+                resp = call()
+        assert resp[1] == 500
+        assert json.loads(resp[0].get_data())["error"]["message"] == "permission denied"
+
+
+@pytest.mark.unit
+def test_spa_surfaces_delete_warnings_and_format_failures():
+    from pathlib import Path
+    root = Path(__file__).parents[2]
+    queries = (root / "frontend" / "src" / "lib" / "queries.ts").read_text()
+    detail = (root / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
+    edit = (root / "frontend" / "src" / "pages" / "EditBook.tsx").read_text()
+    assert "export interface DeleteResult" in queries
+    assert "result?.warning" in detail and "window.alert(result.warning.message)" in detail
+    assert "onError: (err) => setMsg" in edit
 
 
 @pytest.mark.unit
@@ -232,26 +304,104 @@ def test_delete_format_uses_core_with_uppercased_format():
     from cps.api import edit as mod
     with _ctx("/api/v1/books/5/formats/epub/delete"):
         with patch.object(mod, "current_user", _editor()), \
-             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(id=5)), \
-             patch.object(mod, "delete_book_from_table") as core:
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(
+                 id=5, data=[SimpleNamespace(format="EPUB"), SimpleNamespace(format="PDF")])), \
+             patch.object(mod, "delete_book_from_table", return_value=json.dumps([
+                  {}, {"type": "success", "message": "Book Format Successfully Deleted"}
+              ])) as core:
             resp = inspect.unwrap(mod.delete_format)(5, "epub")
     assert resp[1] == 204
     core.assert_called_once_with(5, "EPUB", True)
 
 
 @pytest.mark.unit
-def test_delete_format_visibility_scoped_404_does_not_delete():
-    """Same IDOR guard as whole-book delete, on the per-format endpoint."""
+def test_delete_format_allows_removing_the_last_format():
     from cps.api import edit as mod
+    book = SimpleNamespace(id=5, data=[SimpleNamespace(format="EPUB")])
+    with _ctx("/api/v1/books/5/formats/epub/delete"):
+        with patch.object(mod, "current_user", _editor()), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=book), \
+             patch.object(mod, "delete_book_from_table", return_value=json.dumps([
+                 {}, {"type": "success", "message": "Book Format Successfully Deleted"}
+             ])) as core:
+            resp = inspect.unwrap(mod.delete_format)(5, "epub")
+    assert resp[1] == 204
+    core.assert_called_once_with(5, "EPUB", True)
+
+
+@pytest.mark.unit
+def test_edit_book_explains_that_deleting_the_last_format_keeps_the_book():
+    component = (Path(__file__).parents[2] / "frontend" / "src" / "pages" / "EditBook.tsx").read_text()
+    assert "disabled={deleteFormat.isPending}" in component
+    assert "The book record, metadata, shelves, and reading state stay available." in component
+
+
+@pytest.mark.unit
+def test_classic_route_allows_removing_a_single_format():
+    """Drive POST /delete/<id>/<format> directly for the reporter's case."""
+    from cps import editbooks as mod
+
+    single_format_book = SimpleNamespace(
+        id=5, data=[SimpleNamespace(format="EPUB")]
+    )
+
+    def delete_core(book_id, book_format, json_response, location):
+        assert single_format_book.id == book_id
+        assert len(single_format_book.data) == 1
+        assert single_format_book.data[0].format == book_format
+        assert json_response is False
+        assert location == "/book/5"
+        return "deleted"
+
+    app = flask.Flask(__name__)
+    with app.test_request_context(
+        "/delete/5/EPUB", method="POST", data={"location": "/book/5"}
+    ):
+        with patch.object(mod, "delete_book_from_table", side_effect=delete_core) as core:
+            response = inspect.unwrap(mod.delete_book_ajax)(5, "EPUB")
+
+    assert response == "deleted"
+    core.assert_called_once()
+
+
+@pytest.mark.unit
+def test_classic_edit_explains_metadata_only_result_and_renders_single_format_control():
+    template = (Path(__file__).parents[2] / "cps" / "templates" / "book_edit.html").read_text()
+    assert "book.data|length > 1" not in template
+    assert "The book record, metadata, shelves, and reading state stay available." in template
+
+
+@pytest.mark.unit
+def test_metadata_only_detail_hides_all_file_delivery_controls():
+    component = (Path(__file__).parents[2] / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
+    assert "book.formats.map((fmt) =>" in component
+    assert "book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0" in component
+
+
+@pytest.mark.unit
+def test_classic_delete_modal_distinguishes_format_from_whole_book_consequences():
+    repo = Path(__file__).parents[2]
+    modal = (repo / "cps" / "templates" / "modal_dialogs.html").read_text()
+    script = (repo / "cps" / "static" / "js" / "main.js").read_text()
+    assert 'id="book_format_details"' in modal
+    assert 'id="book_complete_details"' in modal
+    assert "The book record, metadata, shelves, and reading state stay available." in modal
+    assert '$("#book_format_details").removeClass(\'hidden\')' in script
+    assert '$("#book_complete_details").addClass(\'hidden\')' in script
+
+
+@pytest.mark.unit
+def test_delete_format_visibility_scoped_404_does_not_delete():
+    """The API must rely on the shared core's visibility decision, not drift."""
+    from cps.api import edit as mod
+    from werkzeug.exceptions import NotFound
+
     with _ctx("/api/v1/books/7/formats/epub/delete"):
         with patch.object(mod, "current_user", _editor(role_delete=True)), \
-             patch.object(mod, "calibre_db", SimpleNamespace(
-                 get_book=lambda _id: SimpleNamespace(id=7),          # raw row EXISTS
-                 get_filtered_book=lambda *a, **k: None)), \
-             patch.object(mod, "delete_book_from_table") as core:
-            resp = inspect.unwrap(mod.delete_format)(7, "epub")
-    assert resp[1] == 404
-    core.assert_not_called()
+             patch.object(mod, "delete_book_from_table", side_effect=NotFound) as core, \
+             pytest.raises(NotFound):
+            inspect.unwrap(mod.delete_format)(7, "epub")
+    core.assert_called_once_with(7, "EPUB", True)
 
 
 # ── cover (#27) ──────────────────────────────────────────────────────────────
@@ -275,15 +425,81 @@ def test_set_cover_no_input_400():
     assert resp[1] == 400
 
 
+def _cover_book():
+    return SimpleNamespace(id=5, path="p", has_cover=0, last_modified=None)
+
+
 @pytest.mark.unit
 def test_set_cover_from_url_calls_core_and_returns_cover_url():
     from cps.api import edit as mod
     with _ctx("/api/v1/books/5/cover", body={"url": "http://x/y.jpg"}):
         with patch.object(mod, "current_user", _editor()), \
-             patch.object(mod.calibre_db, "get_filtered_book", return_value=SimpleNamespace(path="p")), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=_cover_book()), \
+             patch.object(mod.calibre_db, "session", MagicMock()), \
+             patch.object(mod, "mark_book_modified"), \
+             patch.object(mod, "log_metadata_change"), \
+             patch.object(mod, "replace_cover_thumbnail_cache"), \
              patch.object(mod, "save_cover_from_url", return_value=(True, "ok")) as core:
             resp = inspect.unwrap(mod.set_cover)(5)
     body = json.loads(resp.get_data())
     assert body["ok"] is True
-    assert body["cover_url"].startswith("/cover/5/og")
+    # `md`, not `og` — `og` is COVER_THUMBNAIL_ORIGINAL == 0 (falsy), so it
+    # serves the unresized library file. Same URL shape the detail serializer
+    # emits, so the preview and the next fetch agree.
+    assert body["cover_url"].startswith("/cover/5/md")
     core.assert_called_once_with("http://x/y.jpg", "p")
+
+
+@pytest.mark.unit
+def test_set_cover_records_the_change_so_every_cover_url_rebusts():
+    """Writing cover.jpg is not the whole job.
+
+    Books.last_modified is what every cover URL is versioned by (jinjia's
+    `last_modified` filter, the /api/v1 serializers) and what Kobo native sync
+    re-selects on. This endpoint used to skip it, so a cover replaced from the
+    new UI stayed invisible everywhere except the one response it returned —
+    and with cover responses now cacheable, a stale image would survive in the
+    browser. cover_picker's apply path has always recorded it; so must this.
+    """
+    from cps.api import edit as mod
+    book = _cover_book()
+    with _ctx("/api/v1/books/5/cover", body={"url": "http://x/y.jpg"}):
+        with patch.object(mod, "current_user", _editor()), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=book), \
+             patch.object(mod.calibre_db, "session", MagicMock()) as session, \
+             patch.object(mod, "mark_book_modified") as marked, \
+             patch.object(mod, "log_metadata_change") as logged, \
+             patch.object(mod, "replace_cover_thumbnail_cache") as thumbs, \
+             patch("cps.kobo_sync_status.remove_synced_book") as unsync, \
+             patch.object(mod, "save_cover_from_url", return_value=(True, "ok")):
+            resp = inspect.unwrap(mod.set_cover)(5)
+    assert json.loads(resp.get_data())["ok"] is True
+    assert book.has_cover == 1
+    marked.assert_called_once_with(book)
+    logged.assert_called_once_with(book, {'cover': True})
+    session.commit.assert_called_once()
+    thumbs.assert_called_once()
+    # Kobo devices have to be told to re-pull the image, exactly as
+    # cover_picker's apply path does — and after the commit, since this writes
+    # to app.db and the commit above writes to metadata.db.
+    unsync.assert_called_once_with(5, all=True)
+
+
+@pytest.mark.unit
+def test_set_cover_reports_failure_when_the_change_cannot_be_recorded():
+    """The bytes are on disk but nothing else can see them — never report
+    success, or the UI shows "saved" for a change no other surface will have."""
+    from cps.api import edit as mod
+    session = MagicMock()
+    session.commit.side_effect = RuntimeError("db gone")
+    with _ctx("/api/v1/books/5/cover", body={"url": "http://x/y.jpg"}):
+        with patch.object(mod, "current_user", _editor()), \
+             patch.object(mod.calibre_db, "get_filtered_book", return_value=_cover_book()), \
+             patch.object(mod.calibre_db, "session", session), \
+             patch.object(mod, "mark_book_modified"), \
+             patch.object(mod, "log_metadata_change"), \
+             patch.object(mod, "replace_cover_thumbnail_cache"), \
+             patch.object(mod, "save_cover_from_url", return_value=(True, "ok")):
+            resp = inspect.unwrap(mod.set_cover)(5)
+    assert resp[1] == 500
+    session.rollback.assert_called_once()

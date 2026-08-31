@@ -1,0 +1,13 @@
+{
+  "area": "container-init",
+  "body": "#1596 removed `cd /app/calibre-web-automated` from both s6 units, so the service\nnow runs with the Dockerfile's WORKDIR /config.\n\nAnything anchored to BASE_DIR, __file__, or CALIBRE_DBPATH is unaffected —\ntemplates, translations, static assets, app.db, gdrive.db, logging and dirs.json\nall still resolve correctly, which is why the container boots and CI is green.\n\nWhat changes is any stored *relative* path, which now resolves against /config\nrather than the app root:\n\n  - config_calibre_dir (cps/db.py) — os.path.join preserves a relative base, so\n    a relative library path points somewhere new\n  - TLS certfile/keyfile (cps/server.py)\n  - a relative CACHE_DIR override\n  - the admin path chooser's os.getcwd() fallback (cps/admin.py), whose starting\n    directory changes from the app root to /config\n  - relative -p/-g/-c/-k/-o CLI values (the units pass none, so not a container\n    concern)\n\nDocker installs overwhelmingly store absolute paths (/calibre-library), so this\nis unlikely to be hit, and no reporter has hit it. Recorded rather than fixed\nbecause the failure mode for anyone who did store a relative library path is a\nlibrary that silently stops resolving after an upgrade, which is expensive to\ndiagnose from the symptom.\n\nIf it ever surfaces: resolve stored relative paths against BASE_DIR at read\ntime, or normalise them to absolute on save.",
+  "created": "2026-08-14",
+  "id": "F-7c3cd9",
+  "refs": [
+    "#1596"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Dropping the s6 chdir moves relative stored paths from the app root to /config"
+}

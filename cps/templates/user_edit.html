@@ -335,7 +335,7 @@
         <div>
           <div class="btn btn-default" id="kobo_full_sync" data-value="{% if current_user.role_admin() %}{{ content.id }}{% else %}0{% endif %}" {% if not content.remote_auth_token.first() %} style="display: none;" {% endif %}>{{_('Force full kobo sync')}}</div>
         </div>
-        {% if current_user.role_admin() %}
+        {% if current_user.role_admin() or current_user.id == content.id %}
         <div id="kobo_resend_book_block" style="margin-top: 10px;{% if not content.remote_auth_token.first() %} display: none;{% endif %}">
           <label for="kobo_resend_book_id" style="display: block; margin-bottom: 4px;">{{_('Resend one book to this Kobo')}}</label>
           <div style="display: flex; gap: 6px; align-items: center;">
@@ -346,18 +346,53 @@
           <small class="help-block">{{_('Clears the sync record for one book so the device re-downloads it on next sync. Find the book ID in the book detail page URL.')}}</small>
         </div>
         {% endif %}
+        {% if current_user.role_admin() %}
+        <div style="margin-top: 10px;">
+          <a class="btn btn-default" href="{{ url_for('admin.kobo_reconcile', user_id=content.id) }}">
+            {{ _('Reconcile books deleted before Kobo archival tracking') }}
+          </a>
+          <small class="help-block">{{ _('Upload this user\'s KoboReader.sqlite, then select only books you know this server delivered and that are no longer in the library.') }}</small>
+        </div>
+        {% endif %}
         {% if kobo_support and not content.role_anonymous() and not simple %}
         <div style="margin-top: 20px;
                     background: #202c34a3;
                     padding: 2rem;">
           <input type="checkbox" name="kobo_only_shelves_sync" id="kobo_only_shelves_sync" {% if content.kobo_only_shelves_sync %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="kobo_only_shelves_sync">{{_('Sync only books in selected shelves with Kobo')}}</label>
+          <div style="margin-top: 12px;">
+            <input type="hidden" name="kobo_two_way_annotation_sync_present" value="1">
+            <input type="checkbox" name="kobo_two_way_annotation_sync" id="kobo_two_way_annotation_sync" {% if content.kobo_two_way_annotation_sync %}checked{% endif %} aria-describedby="kobo-two-way-user-help" style="accent-color: var(--color-secondary);">
+            <label for="kobo_two_way_annotation_sync">{{_('Opt in to Kobo two-way annotation sync')}}</label>
+            <p id="kobo-two-way-user-help" class="help-block">{{_('Defaults off. Stage 0 only captures recovery evidence and does not change annotations returned to your Kobo. The administrator must separately enable the instance-level opt-in.')}}</p>
+          </div>
         </div>
         {% endif %}
       </div>
       {% endif %}
 
       {% if not content.role_anonymous() and not simple %}
+      <div style="margin-top: 25px;">
+        <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('Library contents')}}</label>
+        <div style="background: #202c34a3; padding: 2rem;">
+          <div>
+            <input type="radio" name="library_mode" id="library_mode_monolibrary" value="monolibrary" {% if content.library_mode() == 'monolibrary' %}checked{% endif %} {% if profile and not content.role_browse_global() %}disabled{% endif %} style="accent-color: var(--color-secondary);">
+            <label for="library_mode_monolibrary">{{_('The whole library')}}</label>
+            <p class="help-block">{{_('Everything on the server, including every new book added to it.')}}</p>
+          </div>
+          <div style="margin-top: 12px;">
+            <input type="radio" name="library_mode" id="library_mode_personal" value="personal_library" {% if content.library_mode() == 'personal_library' %}checked{% endif %} {% if profile and not content.role_browse_global() %}disabled{% endif %} style="accent-color: var(--color-secondary);">
+            <label for="library_mode_personal">{{ profile and _('My selection') or _('Own selection') }}</label>
+            <p class="help-block">{{ profile and _('Only the books you choose. Add them from the global library; remove them any time.') or _('Switching a user to their own selection first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.') }}</p>
+          </div>
+          {% if profile and not content.role_browse_global() %}
+          <p class="settings-explanation">{{_('Your library contents are managed by an administrator.')}}</p>
+          {% elif not profile and content.library_mode() == 'personal_library' and not content.role_browse_global() %}
+          <p class="settings-explanation">{{_("Without the global-browse role, only an administrator can add books to this user's library.")}}</p>
+          {% endif %}
+        </div>
+      </div>
+
       <div style="margin-top: 25px;">
         <label style="display: block; margin-bottom: 12px; font-weight: bold;">{{ _('OPDS Shelf Exposure')}}</label>
         <div style="margin-top: 20px;
@@ -446,6 +481,11 @@
         <div>
           <input type="checkbox" name="viewer_role" id="viewer_role" {% if content.role_viewer() %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="viewer_role">{{_('Allow eBook Viewer')}}</label>
+        </div>
+
+        <div>
+          <input type="checkbox" name="browse_global_role" id="browse_global_role" {% if content.role_browse_global() %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="browse_global_role">{{_('Browse global library')}}</label>
         </div>
         
         {% if config.config_uploading %}

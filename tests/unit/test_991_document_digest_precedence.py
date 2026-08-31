@@ -23,9 +23,9 @@ Lua suites that do execute the code, and CI runs no Lua runner, so what these
 buy is a CI-visible alarm when the shipped wiring drifts away from the shape the
 Lua suites assume:
 
-* `koreader/plugins/cwasync.koplugin/tests/sync_logic_test.lua` — the pure
+* `koreader/plugins/cwngsync.koplugin/tests/sync_logic_test.lua` — the pure
   precedence policy.
-* `koreader/plugins/cwasync.koplugin/tests/document_digest_test.lua` — the real
+* `koreader/plugins/cwngsync.koplugin/tests/document_digest_test.lua` — the real
   `getDocumentDigest` source, sliced out of `main.lua` and loaded into a sandbox
   with stubbed `util` / `io` / `DocSettings` / `self.ui`. That one is verified
   red against the pre-fix `main.lua`.
@@ -45,7 +45,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwasync.koplugin"
+PLUGIN_DIR = REPO_ROOT / "koreader" / "plugins" / "cwngsync.koplugin"
 MAIN_LUA = PLUGIN_DIR / "main.lua"
 SYNC_LOGIC_LUA = PLUGIN_DIR / "sync_logic.lua"
 SYNC_LOGIC_TEST_LUA = PLUGIN_DIR / "tests" / "sync_logic_test.lua"
@@ -75,7 +75,7 @@ def _lua_function_body(source: str, header: str) -> str:
 @pytest.fixture(scope="module")
 def digest_fn() -> str:
     return _lua_function_body(
-        _read(MAIN_LUA), "function CWASync:getDocumentDigest(file_path)"
+        _read(MAIN_LUA), "function CWNGSync:getDocumentDigest(file_path)"
     )
 
 

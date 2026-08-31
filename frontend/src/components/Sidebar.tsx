@@ -1,14 +1,16 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
-  Library, BookCopy,
-  Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X,
+  Library, Globe, BookCopy,
+  Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff,
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
 import { useT } from '../lib/i18n';
-import { useIsMobile } from '../lib/a11y/useIsMobile';
+import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import { useMediaQuery } from '../lib/useMediaQuery';
+import { usePersistentBool } from '../lib/usePersistentBool';
 import {
   resolveSidebarOrder, ORDERABLE_ENTRIES, DEFAULT_SIDEBAR_ORDER, type SidebarEntryDef,
 } from '../lib/sidebarEntries';
@@ -21,15 +23,18 @@ const SYSTEM = [
   { href: '/about', label: 'About', icon: Info },
 ];
 
+const DESKTOP_RAIL_QUERY = '(min-width: 768px) and (hover: hover) and (pointer: fine)';
+const SIDEBAR_PIN_KEY = 'cwng:sidebar-pinned';
+
 function isActive(location: string, href: string, exact?: boolean): boolean {
   if (exact) return location === href;
   return location === href || location.startsWith(href + '/');
 }
 
 interface SidebarProps {
-  /** Mobile drawer open state. Ignored on desktop (always visible). */
+  /** Off-canvas drawer open state. Ignored by the persistent desktop rail. */
   open: boolean;
-  /** Close the mobile drawer (Escape, scrim click, close button). */
+  /** Close the drawer (Escape, scrim click, close button). */
   onClose: () => void;
   onNavigate: () => void;
 }
@@ -37,10 +42,14 @@ interface SidebarProps {
 export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const [location] = useLocation();
   const t = useT();
-  const isMobile = useIsMobile();
+  const isDrawerMode = useIsDrawerMode();
   const announce = useAnnouncer();
   const navRef = useRef<HTMLElement>(null);
   const update = useUpdateSidebar();
+  const isDesktopRail = useMediaQuery(DESKTOP_RAIL_QUERY);
+  const [sidebarPinned, setSidebarPinned] = usePersistentBool(SIDEBAR_PIN_KEY, false);
+  const [hoverSuppressed, setHoverSuppressed] = useState(false);
+  const hoverExitObserved = useRef(false);
 
   // #585 v3: inline sidebar edit mode (toggled by the Customize capsule).
   const [editMode, setEditMode] = useState(false);
@@ -62,18 +71,64 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   useEffect(() => {
     const node = navRef.current;
     if (!node) return;
-    if (isMobile && !open) node.setAttribute('inert', '');
+    if (isDrawerMode && !open) node.setAttribute('inert', '');
     else node.removeAttribute('inert');
-  }, [isMobile, open]);
+  }, [isDrawerMode, open]);
 
-  useFocusTrap(navRef, { onClose, active: isMobile && open });
+  useEffect(() => {
+    if (!hoverSuppressed) return;
+
+    // A route click can leave the pointer either inside the 64px rail or over
+    // the overlay strip that is about to disappear. Keep stale hover suppressed
+    // for the pointer's whole journey out; only a later return to the nav is
+    // fresh hover intent. A layout-induced pointerleave is deliberately ignored.
+    const trackPointerJourney = (event: PointerEvent) => {
+      const node = navRef.current;
+      if (!node) return;
+      const pointerInsideNav = event.composedPath().includes(node);
+
+      if (!hoverExitObserved.current) {
+        if (!pointerInsideNav) hoverExitObserved.current = true;
+        return;
+      }
+
+      if (pointerInsideNav) setHoverSuppressed(false);
+    };
+
+    window.addEventListener('pointermove', trackPointerJourney, true);
+    return () => window.removeEventListener('pointermove', trackPointerJourney, true);
+  }, [hoverSuppressed]);
+
+  useFocusTrap(navRef, { onClose, active: isDrawerMode && open });
   const { data: shelvesData } = useShelves();
   const shelves = shelvesData?.items ?? [];
   const magicShelves = useMagicShelves().data?.items ?? [];
   const me = useMe().data;
-  const canUpload = !!me?.role?.upload;
+  const canEdit = !!me?.role?.edit;
   const isAdmin = !!me?.role?.admin;
   const isAuthed = !!me?.id;
+  const personalLibrary = me?.library_mode === 'personal_library';
+  const showGlobalLibrary = personalLibrary && !!me?.role?.browse_global;
+  const pinActive = isDesktopRail && sidebarPinned;
+  const pinLabel = sidebarPinned ? t('Unpin sidebar') : t('Pin sidebar');
+
+  const toggleSidebarPin = () => {
+    const next = !sidebarPinned;
+    setSidebarPinned(next);
+    if (next) {
+      setHoverSuppressed(false);
+    } else {
+      // The unpin click leaves both the pointer and focus inside the rail. Move
+      // focus to the page and suppress hover so it collapses now. Unlike a route
+      // click, shrinking the reserved flow box from 220px to 64px guarantees the
+      // pointer has geometrically exited the rail; record that layout-induced
+      // exit so the next sampled pointermove can restore hover immediately.
+      hoverExitObserved.current = true;
+      setHoverSuppressed(true);
+      document.getElementById('main')?.focus();
+    }
+    announce(next ? t('Sidebar pinned.') : t('Sidebar unpinned.'));
+  };
 
   const sidebarVis = me?.sidebar;
   const isVisible = (v?: string) => !v || sidebarVis?.[v] !== false;
@@ -113,10 +168,10 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   // ── normal-mode ordered region (browse/discovery + Shelves block, in order) ─
   const renderShelvesBlock = () => (
     <Fragment key="shelves-block">
-      <div className={styles.sectionHeader}>
+      <div>
         <Link
           href="/shelves"
-          className={isActive(location, '/shelves', true) ? styles.sectionTitleActive : styles.sectionTitle}
+          className={isActive(location, '/shelves', true) ? styles.itemActive : styles.item}
           onClick={onNavigate}
         >
           <BookCopy size={16} className={styles.icon} aria-hidden="true" focusable={false} />
@@ -191,16 +246,41 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   return (
     <>
       {open && <div className={styles.scrim} onClick={onClose} aria-hidden="true" />}
-      <nav
-        ref={navRef}
-        className={open ? styles.navOpen : styles.nav}
-        aria-label={t('Browse')}
-        tabIndex={-1}
-      >
+      <div className={`${styles.rail}${pinActive ? ` ${styles.railPinned}` : ''}`}>
+        <nav
+          ref={navRef}
+          className={`${open ? styles.navOpen : styles.nav}${hoverSuppressed ? ` ${styles.hoverSuppressed}` : ''}${pinActive ? ` ${styles.pinned}` : ''}`}
+          aria-label={t('Browse')}
+          tabIndex={-1}
+          onClickCapture={(event) => {
+            if (event.target instanceof Element && event.target.closest('a[href]')) {
+              hoverExitObserved.current = false;
+              setHoverSuppressed(true);
+            }
+          }}
+        >
         {/* Mobile-only close affordance (labelled); hidden on the desktop rail. */}
         <button type="button" className={styles.drawerClose} onClick={onClose} aria-label={t('Close menu')}>
           <X size={20} aria-hidden="true" focusable={false} />
         </button>
+
+        {isDesktopRail && (
+          <div className={styles.pinRow}>
+            <button
+              type="button"
+              className={styles.pinButton}
+              onClick={toggleSidebarPin}
+              aria-label={pinLabel}
+              aria-pressed={sidebarPinned}
+              title={pinLabel}
+            >
+              {sidebarPinned
+                ? <PinOff size={16} aria-hidden="true" focusable={false} />
+                : <Pin size={16} aria-hidden="true" focusable={false} />}
+              <span>{pinLabel}</span>
+            </button>
+          </div>
+        )}
 
         {/* #585 v3: liquid-glass Customize capsule, pinned at the top. Tapping it
             turns the sidebar into an editable list (reorder + hide entries). */}
@@ -246,9 +326,20 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   onClick={onNavigate}
                 >
                   <Library size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                  <span>{t('Library')}</span>
+                  <span>{t(personalLibrary ? 'My Library' : 'Library')}</span>
                 </Link>
               </li>
+              {showGlobalLibrary && (
+                <li>
+                  <Link href="/global"
+                    className={isActive(location, '/global') ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/global') ? 'page' : undefined}
+                    onClick={onNavigate}>
+                    <Globe size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Global Library')}</span>
+                  </Link>
+                </li>
+              )}
             </ul>
 
             {/* Customizable region (browse-by + discovery + Shelves), in saved order. */}
@@ -256,19 +347,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
 
             {/* Smart shelves + power features (pinned). */}
             <ul className={styles.list} role="list">
-              {showList && (
-                <li>
-                  <Link
-                    href="/table"
-                    className={isActive(location, '/table', true) ? styles.itemActive : styles.item}
-                    aria-current={isActive(location, '/table', true) ? 'page' : undefined}
-                    onClick={onNavigate}
-                  >
-                    <Table2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
-                    <span>{t('Table view')}</span>
-                  </Link>
-                </li>
-              )}
               <li>
                 <Link
                   href="/magic"
@@ -287,17 +365,32 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   <li key={`ms-${ms.id}`}>
                     <Link
                       href={href}
-                      className={active ? styles.shelfItemActive : styles.shelfItem}
+                      className={`${active ? styles.shelfItemActive : styles.shelfItem} ${styles.magicShelfItem}`}
                       aria-current={active ? 'page' : undefined}
+                      aria-label={ms.name}
                       onClick={onNavigate}
                       title={ms.name}
                     >
-                      <span className={styles.shelfName}>{ms.icon} {ms.name}</span>
+                      <span className={styles.magicShelfIcon} aria-hidden="true">{ms.icon}</span>
+                      <span className={styles.magicShelfName}>{ms.name}</span>
                     </Link>
                   </li>
                 );
               })}
-              {(canUpload || isAdmin) && showDuplicates && (
+              {showList && (
+                <li>
+                  <Link
+                    href="/table"
+                    className={isActive(location, '/table', true) ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/table', true) ? 'page' : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Table2 size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Table view')}</span>
+                  </Link>
+                </li>
+              )}
+              {(canEdit || isAdmin) && showDuplicates && (
                 <li>
                   <Link
                     href="/duplicates"
@@ -348,7 +441,8 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
             )}
           </>
         )}
-      </nav>
+        </nav>
+      </div>
     </>
   );
 }

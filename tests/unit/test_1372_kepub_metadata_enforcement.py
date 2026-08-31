@@ -27,9 +27,12 @@ import shutil
 import sys
 import tempfile
 import types
+import zipfile
 from pathlib import Path
 
 import pytest
+
+from tests.fixtures.kepub_fixture import build_calibre_epub3_series_kepub
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "cover_enforcer.py"
@@ -180,10 +183,16 @@ def test_kepub_uses_ebook_meta_not_ebook_polish(enforcer_module, tmp_path, monke
     book_dir = tmp_path / "Author" / "Title (3)"
     book_dir.mkdir(parents=True)
     kepub = book_dir / "book.kepub"
-    kepub.write_bytes(b"PK\x03\x04stub")
+    build_calibre_epub3_series_kepub(kepub)
     (book_dir / "cover.jpg").write_bytes(b"\xff\xd8stub")
     opf = tmp_path / "new_metadata.opf"
-    opf.write_text("<package/>", encoding="utf-8")
+    opf.write_text(
+        "<package xmlns:dc=\"http://purl.org/dc/elements/1.1/\">"
+        "<metadata><dc:title>Fixture Title</dc:title>"
+        "<dc:creator>Fixture Author</dc:creator>"
+        "<dc:language>eng</dc:language></metadata></package>",
+        encoding="utf-8",
+    )
 
     calls = _patch_enforce_dependencies(enforcer_module, monkeypatch, book_dir, opf)
 
@@ -195,8 +204,14 @@ def test_kepub_uses_ebook_meta_not_ebook_polish(enforcer_module, tmp_path, monke
     assert cmd[0] == "ebook-meta", f"kepub must not be polished; got {cmd[0]}"
     assert "--from-opf" in cmd, f"metadata source OPF not passed: {cmd}"
     assert str(opf) in cmd
-    assert str(kepub) in cmd
+    assert cmd[1] != str(kepub)
+    assert cmd[1].endswith(".kepub")
     assert "ebook-polish" not in cmd
+    with zipfile.ZipFile(kepub) as archive:
+        package = archive.read("OEBPS/content.opf")
+    assert b"Verify Series" not in package
+    assert b'refines="#id-5"' not in package
+    assert b'property="title-type"' in package
 
 
 @pytest.mark.unit
@@ -383,7 +398,12 @@ def test_default_kepubify_output_takes_the_metadata_only_path(
     target = book_dir / "book.kepub.epub"
     target.write_text("x", encoding="utf-8")
     opf = book_dir / "metadata.opf"
-    opf.write_text("<opf/>", encoding="utf-8")
+    opf.write_text(
+        "<package><metadata>"
+        "<meta name=\"calibre:series\" content=\"Existing Series\"/>"
+        "</metadata></package>",
+        encoding="utf-8",
+    )
 
     calls = _patch_enforce_dependencies(module, monkeypatch, str(book_dir), str(opf))
 

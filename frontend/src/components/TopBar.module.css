@@ -13,6 +13,15 @@
   justify-content: space-between;
 }
 
+/* Device inventory pages can contain a bounded 200-row window. Keep the bar in
+   normal document flow there so its interactive search field cannot obscure a
+   row action when the page is scrolled; position:relative preserves the mobile
+   search overlay's containing block. */
+.barInFlow {
+  position: relative;
+  top: auto;
+}
+
 .left {
   display: flex;
   align-items: center;
@@ -23,17 +32,33 @@
   display: none;
   align-items: center;
   justify-content: center;
+  /* The visible button stays at its original 22x28. Sizing the box itself to
+     44x44 met SC 2.5.8 but cost 22px of top-bar width, which at 320px (Galaxy
+     Fold, folded) pushed the account menu 20px past the viewport and gave the
+     page a horizontal scrollbar it did not have before. The hit area is what
+     the success criterion measures, so expand that instead — the same approach
+     the two destructive buttons in this commit use, for the same reason. */
+  position: relative;
   color: var(--text-muted);
   padding: var(--sp-1);
   border-radius: var(--r-sm);
   transition: color var(--dur-fast) var(--ease);
 }
 
+/* 22x28 visual -> 44x44 effective target. */
+.menuBtn::before {
+  content: '';
+  position: absolute;
+  inset: -8px -11px;
+}
+
 .menuBtn:hover {
   color: var(--text);
 }
 
-@media (max-width: 767px) {
+/* Keep this condition identical to DRAWER_MODE_QUERY in
+   ../lib/a11y/drawerMode.ts. unit/structuralPerformance.test.ts pins it. */
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
   .menuBtn {
     display: inline-flex;
   }

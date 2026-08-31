@@ -157,12 +157,25 @@ def _load_editbooks_module(delete_key_calls):
 
     cps = _install_stub("cps")
     logger = _install_stub("cps.logger", {"create": lambda: _Logger()})
-    helper = _install_stub("cps.helper", {"delete_book": lambda *args, **kwargs: (True, None)})
+    staged_format = SimpleNamespace(
+        finalize=lambda: (True, None),
+        restore=lambda: (True, None),
+    )
+    helper = _install_stub(
+        "cps.helper",
+        {
+            "delete_book": lambda *args, **kwargs: (True, None),
+            "stage_book_format_delete": lambda *args, **kwargs: (staged_format, None),
+        },
+    )
     config = _install_stub("cps.config", {"get_book_path": lambda: "/library"})
     calls = []
     calibre_db = _install_stub(
         "cps.calibre_db",
-        {"get_book": lambda book_id: SimpleNamespace(id=book_id), "session": _Session(calls)},
+        {
+            "get_filtered_book": lambda book_id, **kwargs: SimpleNamespace(id=book_id),
+            "session": _Session(calls),
+        },
     )
     data_cls = SimpleNamespace(book=_Field(), format=_Field())
     db = _install_stub("cps.db", {"Data": data_cls})
@@ -223,7 +236,8 @@ def _load_editbooks_module(delete_key_calls):
             "_current_max_book_id": lambda: 1,
         },
     )
-    _install_stub("cwa_db", {"CWA_DB": _CwaDB})
+    cwa_db = _install_stub("cwa_db", {"CWA_DB": _CwaDB})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db})
     _install_stub(
         "sqlalchemy.exc",
         {
@@ -249,7 +263,7 @@ def _load_editbooks_module(delete_key_calls):
     return module, calls
 
 
-def _load_duplicates_module(delete_key_calls):
+def _load_duplicates_module(delete_key_calls, *, user_data_commit_result=True):
     _clear_modules()
     _install_common_web_stubs()
 
@@ -270,7 +284,10 @@ def _load_duplicates_module(delete_key_calls):
         "cps.constants",
         {"SCRIPTS_DIR": str(pathlib.Path(__file__).resolve().parents[2] / "scripts")},
     )
-    helper = _install_stub("cps.helper", {"delete_book": lambda *args, **kwargs: (True, None)})
+    helper = _install_stub(
+        "cps.helper",
+        {"delete_book": lambda book, *args, **kwargs: calls.append(("files", book.id)) or (True, None)},
+    )
     config = _install_stub(
         "cps.config",
         {"config_calibre_dir": "/library", "get_book_path": lambda: "/library"},
@@ -286,11 +303,15 @@ def _load_duplicates_module(delete_key_calls):
     cps.db = db
 
     _install_stub("cps.ub", {"init_db_thread": lambda: calls.append("init-db-thread"),
-                             "session_commit": lambda *a, **k: None})
+                             "session_commit": lambda *a, **k: user_data_commit_result})
     _install_stub(
         "cps.user_book_data",
-        {"migrate_user_book_data": lambda *a, **k: None,
+        {"migrate_user_book_data": lambda source, target: calls.append(("migrate", source, target)),
          "purge_user_book_data": lambda *a, **k: None},
+    )
+    _install_stub(
+        "cps.kobo_sync_status",
+        {"record_book_deletion": lambda book_id, uuid: calls.append(("tombstone", book_id))},
     )
     _install_stub("cps.csrf", {"exempt": _decorator})
     _install_stub("cps.admin", {"admin_required": _decorator})
@@ -318,7 +339,8 @@ def _load_duplicates_module(delete_key_calls):
             "_current_max_book_id": lambda: 1,
         },
     )
-    _install_stub("cwa_db", {"CWA_DB": _CwaDB})
+    cwa_db = _install_stub("cwa_db", {"CWA_DB": _CwaDB})
+    _install_stub("cps.cwa_db_loader", {"load_cwa_db": lambda: cwa_db})
     _install_stub(
         "sqlalchemy",
         {
@@ -450,6 +472,53 @@ def test_auto_resolve_dry_run_does_not_invalidate_duplicate_cache():
     assert ("whole", 2) not in calls
     assert delete_key_calls == []
     assert _CwaDB.instances[-1].invalidated is False
+
+
+def test_auto_resolve_keeps_loser_when_user_data_migration_commit_fails():
+    _CwaDB.instances = []
+    delete_key_calls = []
+    module, calibre_books, calls = _load_duplicates_module(
+        delete_key_calls,
+        user_data_commit_result=False,
+    )
+    kept = SimpleNamespace(
+        id=1,
+        title="Dune",
+        timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        data=[],
+        path="Dune",
+    )
+    deleted = SimpleNamespace(
+        id=2,
+        title="Dune",
+        timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        data=[],
+        path="Dune Copy",
+    )
+    calibre_books[1] = kept
+    calibre_books[2] = deleted
+
+    with patch("os.path.exists", return_value=False), patch("os.makedirs"):
+        result = module.auto_resolve_duplicates(
+            strategy="newest",
+            duplicate_groups=[
+                {
+                    "group_hash": "abc123",
+                    "title": "Dune",
+                    "author": "Frank Herbert",
+                    "books": [kept, deleted],
+                }
+            ],
+        )
+
+    assert ("migrate", 2, 1) in calls
+    assert ("whole", 2) not in calls
+    assert ("files", 2) not in calls
+    assert delete_key_calls == []
+    assert result["success"] is False
+    assert result["resolved_count"] == 0
+    assert result["deleted_count"] == 0
+    assert any("user data migration commit failed" in error for error in result["errors"])
 
 
 _modules_snapshot: dict[str, "ModuleType"] = {}

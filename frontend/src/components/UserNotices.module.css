@@ -1,0 +1,57 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+  color: var(--text);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.content { flex: 1; min-width: 0; }
+.content p, .bookNotice p { margin: var(--sp-1) 0 0; line-height: var(--lh-snug); }
+.details { margin-top: var(--sp-2); }
+.details summary { cursor: pointer; font-weight: var(--fw-medium); }
+.bookList { margin: var(--sp-2) 0 0; padding-left: var(--sp-5); }
+.bookList a { color: var(--accent-text); }
+.error { color: var(--danger); font-weight: var(--fw-medium); }
+
+.dismiss,
+.dismissBook {
+  min-height: 32px;
+  min-width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--surface-1);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.dismiss:disabled, .dismissBook:disabled { opacity: .6; cursor: wait; }
+.dismiss:focus-visible, .dismissBook:focus-visible, .details summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bookNotices { display: grid; gap: var(--sp-3); margin-bottom: var(--sp-5); }
+.bookNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+.bookNotice > div { flex: 1; min-width: 0; }
+
+@media (max-width: 600px) {
+  .banner, .bookNotice { flex-direction: column; padding: var(--sp-3); }
+  .dismiss, .dismissBook { align-self: stretch; }
+}

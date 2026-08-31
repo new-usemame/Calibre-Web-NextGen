@@ -45,10 +45,45 @@ def _newer(a, b):
         b = b.replace(tzinfo=None)
     return a > b
 
-# Models keyed (user_id, book_id) handled by this module, with merge
-# semantics for migrate. BookShelf has no user_id (shelf-scoped) and
-# KoboBookmark/KoboStatistics/AnnotationSyncTarget are children reached
-# through their parents; all are still handled below.
+
+def _annotation_is_newer(candidate, current):
+    """Whether ``candidate`` is the newer coherent annotation version.
+
+    Server and client clocks both record accepted edits, so the newest
+    available clock on each row is authoritative.  Revisions break equal or
+    absent-clock ties.  A complete tie returns False, deterministically
+    retaining ``current`` (the row already attached to the destination book).
+    """
+    candidate_modified = None
+    current_modified = None
+    for timestamp in (candidate.server_modified_at,
+                      candidate.client_modified_at):
+        if _newer(timestamp, candidate_modified):
+            candidate_modified = timestamp
+    for timestamp in (current.server_modified_at,
+                      current.client_modified_at):
+        if _newer(timestamp, current_modified):
+            current_modified = timestamp
+
+    if _newer(candidate_modified, current_modified):
+        return True
+    if _newer(current_modified, candidate_modified):
+        return False
+    return (candidate.content_revision or 0) > (current.content_revision or 0)
+
+
+def _delete_annotation(session, annotation):
+    """Delete an annotation and children SQLite will not cascade itself."""
+    session.query(ub.AnnotationSyncTarget).filter(
+        ub.AnnotationSyncTarget.annotation_id == annotation.id,
+    ).delete(synchronize_session=False)
+    session.delete(annotation)
+
+# Models tied to a user and book handled by this module, with merge semantics
+# for migrate. BookShelf has no user_id (shelf-scoped), the Kobo entitlement
+# ledgers resolve user scope through Device, and KoboBookmark/KoboStatistics/
+# AnnotationSyncTarget are children reached through their parents; all are
+# still handled below.
 PER_USER_BOOK_MODELS = (
     "Annotation",            # + AnnotationSyncTarget children
     "Bookmark",
@@ -61,6 +96,16 @@ PER_USER_BOOK_MODELS = (
     "KoboSyncedBooks",
     "UserHiddenBook",
     "BookCoverPreview",
+    "UserLibraryBook",
+)
+# These ledgers are user-scoped through Device rather than a user_id column.
+# Keep the device-scoped registry extension separate from the flat-model tuple
+# so independently added flat per-user models merge without competing for the
+# tuple's final insertion point.
+PER_USER_BOOK_MODELS += (
+    "KoboDeviceBookEntitlement",
+    "DeviceBookDelivery",
+    "DeviceReadingPosition",
 )
 
 
@@ -78,9 +123,9 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
         return
 
     # Annotations: re-point, but a user may already have the same
-    # annotation_id on the kept book (e.g. the device synced both copies) —
-    # there only the loser row is dropped (ORM delete so sync-target
-    # children go with it).
+    # annotation_id on the kept book (e.g. the device synced both copies).
+    # Keep the newer coherent row; field-level synthesis could combine content,
+    # anchors and lifecycle metadata into a version no client ever authored.
     for ann in session.query(ub.Annotation).filter(
             ub.Annotation.book_id == from_book_id).all():
         clash = session.query(ub.Annotation).filter(
@@ -88,13 +133,12 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
             ub.Annotation.annotation_id == ann.annotation_id,
             ub.Annotation.book_id == to_book_id).first()
         if clash is not None:
-            # sync_targets declares passive_deletes=True (expects DB-level
-            # ON DELETE CASCADE), but SQLite FK enforcement is off — delete
-            # the children explicitly.
-            session.query(ub.AnnotationSyncTarget).filter(
-                ub.AnnotationSyncTarget.annotation_id == ann.id).delete(
-                synchronize_session=False)
-            session.delete(ann)
+            if _annotation_is_newer(ann, clash):
+                _delete_annotation(session, clash)
+                session.flush()  # clear the UNIQUE slot before re-pointing
+                ann.book_id = to_book_id
+            else:
+                _delete_annotation(session, ann)
         else:
             ann.book_id = to_book_id
     session.flush()
@@ -169,7 +213,7 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
 
     # Simple UNIQUE(user, book) flags: keep the kept book's row on clash.
     for model in (ub.ArchivedBook, ub.Downloads, ub.UserHiddenBook,
-                  ub.BookCoverPreview):
+                  ub.BookCoverPreview, ub.UserLibraryBook):
         for row in session.query(model).filter(model.book_id == from_book_id).all():
             clash = session.query(model).filter(
                 model.user_id == row.user_id,
@@ -186,11 +230,81 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
         ub.KoboAnnotationBackup.book_id == from_book_id).update(
         {ub.KoboAnnotationBackup.book_id: to_book_id}, synchronize_session=False)
 
-    # KoboSyncedBooks marks "this book's file already delivered to this
-    # device". The kept book's file is a different file, so the marker must
-    # NOT migrate — drop it and let the next sync deliver the kept copy.
+    # KoboSyncedBooks is a legacy flat (user, book) marker: it says the book
+    # was offered to at least one Kobo for this user, not which device still
+    # has it. The kept book is a different file, so neither this marker nor the
+    # newer per-device payload ledger may migrate; let the next sync deliver it.
     session.query(ub.KoboSyncedBooks).filter(
         ub.KoboSyncedBooks.book_id == from_book_id).delete(synchronize_session=False)
+    session.query(ub.KoboDeviceBookEntitlement).filter(
+        ub.KoboDeviceBookEntitlement.book_id == from_book_id,
+    ).delete(synchronize_session=False)
+    # A pending response embeds immutable metadata and confirmation ids for the
+    # losing book. Invalidate the bounded page rather than promoting stale ids.
+    session.query(ub.KoboDevicePendingSyncPage).delete(
+        synchronize_session=False,
+    )
+
+    # Per-device reading positions survive duplicate merges. A device may
+    # already have observations for both copies, so keep the greater client
+    # clock and use progress as the deterministic equal-clock tie-break. The
+    # rehydrate latch is request state rather than position content: OR it
+    # across the pair so resolving a duplicate cannot silently consume a
+    # pending device repair.
+    for position in session.query(ub.DeviceReadingPosition).filter(
+            ub.DeviceReadingPosition.book_id == from_book_id).all():
+        clash = session.query(ub.DeviceReadingPosition).filter(
+            ub.DeviceReadingPosition.device_id == position.device_id,
+            ub.DeviceReadingPosition.book_id == to_book_id,
+        ).first()
+        if clash is None:
+            position.book_id = to_book_id
+            continue
+        keep_source = _newer(
+            position.client_modified_at, clash.client_modified_at,
+        )
+        if not keep_source and not _newer(
+                clash.client_modified_at, position.client_modified_at):
+            keep_source = (
+                position.progress_percent
+                if position.progress_percent is not None else float("-inf")
+            ) > (
+                clash.progress_percent
+                if clash.progress_percent is not None else float("-inf")
+            )
+        pending_rehydrate = bool(
+            position.rehydrate_needed or clash.rehydrate_needed,
+        )
+        if keep_source:
+            position.rehydrate_needed = pending_rehydrate
+            session.delete(clash)
+            session.flush()
+            position.book_id = to_book_id
+        else:
+            clash.rehydrate_needed = pending_rehydrate
+            session.delete(position)
+
+    # Wanted-book rows are per physical device. Preserve an outstanding claim
+    # when its source book is merged into the kept copy; if that device already
+    # has a destination row, its direct request wins and the duplicate is
+    # discarded. Inventory remains an observation, but its resolved library
+    # match must follow the merge so a recycled numeric id cannot suppress a
+    # future unrelated delivery.
+    for delivery in session.query(ub.DeviceBookDelivery).filter(
+            ub.DeviceBookDelivery.book_id == from_book_id).all():
+        clash = session.query(ub.DeviceBookDelivery).filter(
+            ub.DeviceBookDelivery.device_id == delivery.device_id,
+            ub.DeviceBookDelivery.book_id == to_book_id,
+        ).first()
+        if clash is not None:
+            session.delete(delivery)
+        else:
+            delivery.book_id = to_book_id
+    session.query(ub.DeviceInventoryItem).filter(
+        ub.DeviceInventoryItem.book_id == from_book_id,
+    ).update(
+        {ub.DeviceInventoryItem.book_id: to_book_id}, synchronize_session=False,
+    )
 
     session.flush()
     log.info("[user-book-data] migrated per-user data from book %s to book %s",
@@ -219,14 +333,63 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
             query = query.filter(model.user_id == user_id)
         return query
 
-    # Annotations: delete sync-target children first (bulk deletes bypass
-    # ORM cascade, and SQLite FK enforcement can't be relied on).
+    # Annotations: delete all children first (bulk deletes bypass ORM cascade,
+    # and SQLite FK enforcement can't be relied on). Raw materializations can
+    # contain verbatim annotation text and must leave before ids can recycle.
     ann_ids = _scoped(session.query(ub.Annotation.id), ub.Annotation)
+    session.query(ub.KoboAnnotationMaterialization).filter(
+        ub.KoboAnnotationMaterialization.annotation_id.in_(
+            ann_ids.scalar_subquery())).delete(synchronize_session=False)
     session.query(ub.AnnotationSyncTarget).filter(
         ub.AnnotationSyncTarget.annotation_id.in_(
             ann_ids.scalar_subquery())).delete(synchronize_session=False)
     _scoped(session.query(ub.Annotation), ub.Annotation).delete(
         synchronize_session=False)
+
+    # Stage 0 book authority and immutable seed/page evidence all belong to
+    # the same user/book scope. Children go first because their compressed
+    # payloads may contain annotation data and FK cascades are not active.
+    book_state_ids = _scoped(
+        session.query(ub.KoboAnnotationBookState.id),
+        ub.KoboAnnotationBookState,
+    )
+    capture_ids = session.query(ub.KoboAnnotationSeedCapture.id).filter(
+        ub.KoboAnnotationSeedCapture.book_state_id.in_(
+            book_state_ids.scalar_subquery())
+    )
+    session.query(ub.KoboAnnotationSeedRowBaseline).filter(
+        ub.KoboAnnotationSeedRowBaseline.seed_capture_id.in_(
+            capture_ids.scalar_subquery())
+    ).delete(synchronize_session=False)
+    session.query(ub.KoboAnnotationSeedCapturePage).filter(
+        ub.KoboAnnotationSeedCapturePage.seed_capture_id.in_(
+            capture_ids.scalar_subquery())
+    ).delete(synchronize_session=False)
+    snapshot_ids = session.query(ub.KoboAnnotationPageSnapshot.snapshot_id).filter(
+        ub.KoboAnnotationPageSnapshot.book_state_id.in_(
+            book_state_ids.scalar_subquery())
+    )
+    session.query(ub.KoboAnnotationPageCursor).filter(
+        ub.KoboAnnotationPageCursor.snapshot_id.in_(
+            snapshot_ids.scalar_subquery())
+    ).delete(synchronize_session=False)
+    for child in (
+        ub.KoboDeviceBookAnnotationState,
+        ub.KoboAnnotationSeedCapture,
+        ub.KoboAnnotationPageSnapshot,
+    ):
+        session.query(child).filter(
+            child.book_state_id.in_(book_state_ids.scalar_subquery())
+        ).delete(synchronize_session=False)
+    _scoped(
+        session.query(ub.KoboAnnotationBookState), ub.KoboAnnotationBookState,
+    ).delete(synchronize_session=False)
+    # This durable guard is intentionally removed only by a complete privacy
+    # or book purge; deleting mutable authority state alone retains it.
+    _scoped(
+        session.query(ub.KoboOpaqueContentPresentGuard),
+        ub.KoboOpaqueContentPresentGuard,
+    ).delete(synchronize_session=False)
 
     # Kobo reading state + children.
     krs_ids = _scoped(session.query(ub.KoboReadingState.id), ub.KoboReadingState)
@@ -238,8 +401,93 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
         synchronize_session=False)
 
     for model in (ub.Bookmark, ub.ReadBook, ub.ArchivedBook, ub.Downloads,
-                  ub.KoboSyncedBooks, ub.UserHiddenBook, ub.BookCoverPreview):
+                  ub.KoboSyncedBooks, ub.UserHiddenBook, ub.BookCoverPreview,
+                  ub.UserLibraryBook):
         _scoped(session.query(model), model).delete(synchronize_session=False)
+
+    # Per-device entitlement state has no user_id of its own.  Scope a user
+    # purge through Device, while a book/full purge can filter directly.
+    entitlement_state = session.query(ub.KoboDeviceBookEntitlement)
+    if book_id is not None:
+        entitlement_state = entitlement_state.filter(
+            ub.KoboDeviceBookEntitlement.book_id == book_id)
+    if user_id is not None:
+        device_ids = session.query(ub.Device.id).filter(
+            ub.Device.user_id == user_id).scalar_subquery()
+        entitlement_state = entitlement_state.filter(
+            ub.KoboDeviceBookEntitlement.device_id.in_(device_ids))
+    entitlement_state.delete(synchronize_session=False)
+
+    # Pending pages are deliberately opaque exact-response snapshots. A
+    # book/user purge cannot surgically edit one without breaking retry
+    # identity, so invalidate every page in the affected device scope.
+    pending_state = session.query(ub.KoboDevicePendingSyncPage)
+    if user_id is not None:
+        device_ids = session.query(ub.Device.id).filter(
+            ub.Device.user_id == user_id,
+        ).scalar_subquery()
+        pending_state = pending_state.filter(
+            ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
+        )
+    pending_state.delete(synchronize_session=False)
+
+    position_state = session.query(ub.DeviceReadingPosition)
+    if book_id is not None:
+        position_state = position_state.filter(
+            ub.DeviceReadingPosition.book_id == book_id)
+    if user_id is not None:
+        device_ids = session.query(ub.Device.id).filter(
+            ub.Device.user_id == user_id).scalar_subquery()
+        position_state = position_state.filter(
+            ub.DeviceReadingPosition.device_id.in_(device_ids))
+    position_state.delete(synchronize_session=False)
+
+    # Pull-delivery rows are scoped through Device, just like the Kobo
+    # entitlement ledger. A removed metadata book can never satisfy a queued
+    # download. Inventory rows themselves are historical observations, so a
+    # book/database purge clears only their cross-database match instead of
+    # deleting evidence that the bytes remain on the reader.
+    delivery_state = session.query(ub.DeviceBookDelivery)
+    if book_id is not None:
+        delivery_state = delivery_state.filter(
+            ub.DeviceBookDelivery.book_id == book_id)
+    if user_id is not None:
+        device_ids = session.query(ub.Device.id).filter(
+            ub.Device.user_id == user_id).scalar_subquery()
+        delivery_state = delivery_state.filter(
+            ub.DeviceBookDelivery.device_id.in_(device_ids))
+    delivery_state.delete(synchronize_session=False)
+
+    if user_id is None:
+        inventory_matches = session.query(ub.DeviceInventoryItem)
+        if book_id is not None:
+            inventory_matches = inventory_matches.filter(
+                ub.DeviceInventoryItem.book_id == book_id)
+        inventory_matches.update(
+            {ub.DeviceInventoryItem.book_id: None}, synchronize_session=False,
+        )
+
+    # Hard-delete replay state and the one-time upgrade marker are scoped to a
+    # device rather than a current book id. A user/privacy purge or a complete
+    # database swap must remove them; a single live-book purge must not erase
+    # unrelated deletion history or re-arm migration seeding.
+    if user_id is not None or book_id is None:
+        deleted_entitlement_state = session.query(
+            ub.KoboDeviceDeletedEntitlement,
+        )
+        entitlement_seed_state = session.query(ub.KoboDeviceEntitlementSeed)
+        if user_id is not None:
+            device_ids = session.query(ub.Device.id).filter(
+                ub.Device.user_id == user_id,
+            ).scalar_subquery()
+            deleted_entitlement_state = deleted_entitlement_state.filter(
+                ub.KoboDeviceDeletedEntitlement.device_id.in_(device_ids),
+            )
+            entitlement_seed_state = entitlement_seed_state.filter(
+                ub.KoboDeviceEntitlementSeed.device_id.in_(device_ids),
+            )
+        deleted_entitlement_state.delete(synchronize_session=False)
+        entitlement_seed_state.delete(synchronize_session=False)
 
     # BookShelf has no user_id — shelf membership is shelf-scoped, and the
     # user-delete path removes the user's shelves (with their links)

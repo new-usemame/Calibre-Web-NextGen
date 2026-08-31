@@ -1,0 +1,14 @@
+{
+  "area": "ci",
+  "body": "MEASURED 2026-08-18, and already half-known: tests.yml:45-49 says \"Twice observed\nstalling in the apt step\" and caps the job at timeout-minutes: 25 so a stall cannot run\nto GitHub's 6-hour default. The cap works. What it does not do is stop the stall from\ncosting a full 25 minutes and then presenting as something it is not.\n\nObserved today on run 32169649515 (PR #1743, head 9f9b8ee59), per-step timings:\n  step  7  Install system dependencies   18:12:32 .. 18:36:52  CANCELLED  (24m20s)\n  step 10  Run smoke and unit tests      18:36:52 .. 18:36:52  SKIPPED\nThe tests never executed. Independently on #1745 the same step was still in apt after\n~40 minutes. So four-plus occurrences now, not two.\n\nWhy it costs more than the wasted minutes — the reporting chain launders it into a code\nfailure:\n  apt stalls -> job hits timeout-minutes -> GitHub reports the job CANCELLED (a job killed\n  by its own timeout is never reported as `failure`; tests.yml:1016 documents this) ->\n  Test Suite Summary correctly refuses to pass a non-success result (#1727) -> `gh pr\n  checks` renders the cancelled run as `fail`.\nThe PR therefore shows \"Fast Tests = fail\" for a run in which NO TEST RAN. I read that\ntoday and began investigating whether the PR's own change had broken the suite. It had\nnot, and nothing in the surfaced signal said so.\n\nThe gap: the apt step carries NO step-level timeout and no retry. The pytest step has\nboth (timeout-minutes: 10 plus pytest's own --timeout, tests.yml:111); the two networked\ninstalls that precede it have neither, so the only thing bounding them is the whole-job\ncap they then consume.\n\nFix direction (bound the flaky operation, not the job):\n  - give `Install system dependencies` its own timeout-minutes (~5) so a mirror stall\n    fails in 5 minutes instead of eating 25;\n  - retry apt-get update/install a couple of times with a short backoff — a stalled\n    mirror is the textbook retryable failure;\n  - same treatment for the npm ci step, which is the other networked install the\n    line-45 comment names.\nDo NOT \"fix\" this by raising the job cap; that makes every occurrence more expensive.",
+  "created": "2026-08-18",
+  "id": "F-7bbdd6",
+  "refs": [
+    "#1743",
+    "#1965"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "A stalled apt step burns the whole fast-tests budget and then reads as a TEST failure"
+}

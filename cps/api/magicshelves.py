@@ -14,9 +14,10 @@ from flask_babel import gettext as _
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import api_v1
-from .books import _row_to_item
+from .books import _rows_to_items
 from .. import ub, config, db, calibre_db, logger, magic_shelf
 from ..cw_login import current_user
+from ..sort_orders import BOOK_SORT_ORDERS
 from ..usermanagement import login_required_if_no_ano, user_login_required
 
 log = logger.create()
@@ -30,7 +31,7 @@ def _uid():
     return int(current_user.id) if current_user.is_authenticated else None
 
 
-def _shelf_item(shelf, uid):
+def _shelf_item(shelf, viewer):
     """Serialize a shelf with request-local display text.
 
     Built-in shelf names are canonical English database identity, while custom
@@ -38,14 +39,19 @@ def _shelf_item(shelf, uid):
     them so changing locale never mutates or accidentally translates a user's
     own shelf.
     """
+    is_owner = magic_shelf.is_magic_shelf_owner(shelf, viewer)
     return {
         "id": shelf.id,
         "name": magic_shelf.system_magic_shelf_display_name(shelf),
         "icon": shelf.icon or "🪄",
         "is_public": bool(shelf.is_public),
-        "is_owner": shelf.user_id == uid,
+        "is_owner": is_owner,
         "is_system": bool(getattr(shelf, "is_system", False)),
         "kobo_sync": bool(getattr(shelf, "kobo_sync", False)),
+        "can_edit": magic_shelf.can_edit_magic_shelf(shelf, viewer),
+        "can_delete": magic_shelf.can_delete_magic_shelf(shelf, viewer),
+        "can_duplicate": magic_shelf.can_duplicate_magic_shelf(shelf, viewer),
+        "can_kobo_sync": magic_shelf.can_kobo_sync_magic_shelf(shelf, viewer),
     }
 
 
@@ -67,7 +73,7 @@ def list_magic_shelves():
     else:
         shelves = ub.session.query(ub.MagicShelf).filter(
             ub.MagicShelf.is_public == 1).order_by(ub.MagicShelf.name).all()
-    items = [_shelf_item(s, uid) for s in shelves]
+    items = [_shelf_item(s, current_user) for s in shelves]
     return jsonify({"items": items})
 
 
@@ -97,26 +103,20 @@ def magic_shelf_books(shelf_id):
     except Exception:
         log.error("Bad magic-shelf rules for shelf %s", shelf_id, exc_info=True)
         query_filter = None
-    display_name = magic_shelf.system_magic_shelf_display_name(shelf)
+    shelf_item = _shelf_item(shelf, current_user)
     if query_filter is None:
-        return jsonify({"id": shelf.id, "name": display_name, "icon": shelf.icon or "🪄",
-                        "is_system": bool(getattr(shelf, "is_system", False)),
-                        "is_owner": (shelf.user_id == uid),
-                        "kobo_sync": bool(getattr(shelf, "kobo_sync", False)),
-                        "items": [], "page": 1, "per_page": per_page, "total": 0})
+        return jsonify({**shelf_item, "items": [], "page": 1,
+                        "per_page": per_page, "total": 0})
 
     series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
     entries, _random, pagination = calibre_db.fill_indexpage(
-        page, per_page, db.Books, query_filter, [db.Books.timestamp.desc()],
+        page, per_page, db.Books, query_filter, BOOK_SORT_ORDERS["new"],
         True, config.config_read_column, *series_join)
     return jsonify({
-        "id": shelf.id, "name": display_name, "icon": shelf.icon or "🪄",
-        "is_system": bool(getattr(shelf, "is_system", False)),
-        "is_owner": (shelf.user_id == uid),
-        "kobo_sync": bool(getattr(shelf, "kobo_sync", False)),
+        **shelf_item,
         # rules included so the builder can load this shelf for editing
         "rules": shelf.rules or {"condition": "AND", "rules": []},
-        "items": [_row_to_item(e) for e in entries],
+        "items": _rows_to_items(entries),
         "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total_count,
     })
 
@@ -141,7 +141,7 @@ def set_magic_shelf_kobo_sync(shelf_id):
     shelf = ub.session.query(ub.MagicShelf).get(shelf_id)
     if shelf is None:
         return _err("not_found", "Smart shelf not found", 404)
-    if shelf.user_id != _uid():
+    if not magic_shelf.can_kobo_sync_magic_shelf(shelf, current_user):
         return _err("forbidden", "You are not allowed to edit this shelf", 403)
     if not config.config_kobo_sync:
         return _err("forbidden", "Kobo sync is not enabled on this server", 403)

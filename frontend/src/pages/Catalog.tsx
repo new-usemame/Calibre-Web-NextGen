@@ -9,17 +9,19 @@ import { BulkBar } from '../components/BulkBar';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { DiscoverSection } from '../components/DiscoverSection';
-import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf } from '../lib/queries';
+import { VirtualizedGridRows } from '../components/VirtualizedGridRows';
+import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary } from '../lib/queries';
 import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
 import { saveCatalog, loadCatalog } from '../lib/scrollCache';
-import { usePersistentBool } from '../lib/usePersistentBool';
+import { useNamedPreference } from '../lib/useNamedPreference';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
 import styles from './Catalog.module.css';
 import { canUploadBooks } from '../lib/permissions';
 
@@ -309,19 +311,34 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // #1288: the role is only half the gate — classic also requires the admin's
   // "Enable Uploads" switch. See lib/permissions.ts.
   const canUpload = canUploadBooks(me);
+  const personalLibrary = me?.library_mode === 'personal_library';
+  const removalImpact = useMyLibraryRemovalImpact();
+  const removeFromLibrary = useRemoveFromMyLibrary();
 
-  // Discover section visibility (persisted; toggled by the gear menu or its ×).
-  const [discoverHidden, setDiscoverHidden] = usePersistentBool('cwng_discover_hidden_v1', false);
-  const [showHidden, setShowHidden] = usePersistentBool('cwng_show_hidden_books_v1', false);
+  // Catalog-wide choices follow a signed-in account. Guests stay local-only;
+  // an existing local value is adopted once when the account has no value yet.
+  const catalogPreferenceError = useCallback(
+    () => announce(t('Could not save.'), { assertive: true }), [announce, t]);
+  const [discoverHidden, setDiscoverHidden, discoverPreferenceSaving] = useNamedPreference(
+    'discover_hidden', 'cwng_discover_hidden_v1', false,
+    { onError: catalogPreferenceError },
+  );
+  const [showHidden, setShowHidden, showHiddenPreferenceSaving] = useNamedPreference(
+    'show_hidden_books', 'cwng_show_hidden_books_v1', false,
+    { onError: catalogPreferenceError },
+  );
   // #1054: let a user drop the per-card Read/edit row to calm the grid down.
-  const [cardActionsHidden, setCardActionsHidden] = useCardActionsHidden();
+  const [cardActionsHidden, setCardActionsHidden, cardActionsPreferenceSaving]
+    = useCardActionsHidden({ onError: catalogPreferenceError });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [density, setDensity] = usePersistentChoice(
     'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
   const [rowsChoice, setRowsChoice] = usePersistentChoice(
     'cwng:catalog-rows-v1', ['1', '2', '3', '4', '5', '6'] as const, '2');
   const rowsPerLoad = Number(rowsChoice);
+  const [catalogNode, setCatalogNode] = useState<HTMLElement | null>(null);
   const [gridNode, setGridNode] = useState<HTMLDivElement | null>(null);
+  const [gridTop, setGridTop] = useState(0);
   const fallbackPerPage = me?.display?.books_per_page && me.display.books_per_page > 0
     ? me.display.books_per_page : 24;
   // columnCount starts as a GUESS derived from books_per_page; the real value is
@@ -336,44 +353,86 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [seriesPresentation, setSeriesPresentation] = usePersistentChoice(
     'cwng:series-presentation-v1', ['grid', 'list'] as const, 'grid');
   const settingsRef = useRef<HTMLDivElement>(null);
+  const measureGridRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!gridNode) return;
+    let frame = 0;
+    let cancelled = false;
+
     const measure = () => {
-      const tracks = getComputedStyle(gridNode).gridTemplateColumns.trim();
-      // An empty or 'none' track list means the grid has not been laid out yet
-      // (a hidden ancestor, a panel mid-transition), which is the absence of a
-      // measurement rather than a measurement of one column. Releasing the gate
-      // on it would query at rowsPerLoad x 1 and then correct once the real
-      // layout arrived — reinstating the double fetch this gate exists to stop.
-      // Leave gridMeasured false and let the next observer callback, or the
-      // fail-open timer, resolve it.
-      if (!tracks || tracks === 'none') return;
-      setColumnCount(Math.max(1, tracks.split(/\s+/).length));
-      setGridMeasured(true);
+      const style = getComputedStyle(gridNode);
+      const bounds = gridNode.getBoundingClientRect();
+      const nextColumnCount = measureCatalogColumnCount({
+        gridTemplateColumns: style.gridTemplateColumns,
+        gridWidth: bounds.width,
+        minColumnWidth: Number.parseFloat(style.getPropertyValue('--catalog-grid-min')),
+        columnGap: Number.parseFloat(style.columnGap),
+      });
+      // Zero width or an absent track list is no measurement. Keep the query
+      // gate closed (until its fail-open timer) and retain the last known count;
+      // a later observer/rAF/font sample can still correct it without user input.
+      if (nextColumnCount !== null) {
+        setColumnCount(nextColumnCount);
+        setGridMeasured(true);
+      }
+      setGridTop(bounds.top + window.scrollY);
     };
-    // Measure first, observe second. Without a ResizeObserver the grid stops
-    // reacting to later resizes, but the one measurement that the initial query
-    // waits on still happens — the absence of the observer used to skip it
-    // entirely, which would now mean waiting out the fail-open timer on every
-    // load and then querying at the guessed size anyway.
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(gridNode);
-    return () => observer.disconnect();
-  }, [gridNode, density]);
+    measureGridRef.current = measure;
+    const scheduleMeasure = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    };
+
+    // ResizeObserver remains the owner of live border-box measurement. Its first
+    // delivery can race Safari's resolved grid-track serialization, so every
+    // delivery gets one coalesced next-frame self-heal rather than trusting that
+    // delivery to be the only sample until the window changes again.
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      measure();
+      scheduleMeasure();
+    });
+    observer?.observe(gridNode);
+    // Content above the grid (notably Discover and the settings disclosure) can
+    // change its document offset without changing the grid's own border box.
+    // Observing the stable page container keeps that cached offset current;
+    // scroll handling itself remains layout-read-free.
+    if (catalogNode) observer?.observe(catalogNode);
+
+    // The first post-paint sample also keeps the fail-open path useful when
+    // ResizeObserver is unavailable. Web-font completion can change usable card
+    // geometry without guaranteeing another grid border-box notification.
+    scheduleMeasure();
+    void document.fonts?.ready.then(() => {
+      if (!cancelled) scheduleMeasure();
+    });
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      cancelAnimationFrame(frame);
+      if (measureGridRef.current === measure) measureGridRef.current = () => {};
+    };
+  }, [catalogNode, gridNode, density]);
 
   // Fail-open. The measurement needs the grid element to exist, and a first
   // attempt at this gate deadlocked: no data -> no grid -> no observer -> no
   // measurement -> query stays disabled -> no data. Rendering the loading state
   // inside the grid container (below) is what breaks that cycle, but the gate
   // must not be the only thing standing between a user and their library, so
-  // any path that fails to measure within a frame falls back to the guess and
-  // queries anyway. Worst case is the old redundant fetch; never an empty page.
+  // any path that fails to measure within a short grace window falls back to the
+  // guess and queries anyway. Recheck immediately before opening the gate so a
+  // first-layout race heals even if no second observer delivery arrives. Worst
+  // case is the old redundant fetch; never an empty page.
   useEffect(() => {
     if (gridMeasured) return;
-    const timer = setTimeout(() => setGridMeasured(true), 150);
+    const timer = setTimeout(() => {
+      measureGridRef.current();
+      setGridMeasured(true);
+    }, 150);
     return () => clearTimeout(timer);
   }, [gridMeasured]);
 
@@ -640,8 +699,37 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       : t('{count} books', { count: total })
     : '';
 
+  const removeBook = (book: Book) => {
+    if (removalImpact.isPending || removeFromLibrary.isPending) return;
+    removalImpact.mutate(book.id, {
+      onSuccess: (impact) => {
+        const lines = [
+          t('Remove "{title}" from your library?', { title: book.title }), '',
+          t('It leaves your library and your OPDS feed.'),
+          t("If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. Other e-readers keep downloaded copies, and KOReader progress sync keeps working."),
+        ];
+        if (impact.affected_shelves.length) {
+          lines.push(t('It also leaves these shelves: {shelves}.', { shelves: impact.affected_shelves.join(', ') }));
+        }
+        lines.push(t('Nothing is deleted: the book stays in the global library, and your highlights, notes and reading progress are kept.'));
+        lines.push(me?.role?.browse_global
+          ? t('You can add it back any time from the global library.')
+          : t('Only an administrator can add it back.'));
+        if (!window.confirm(lines.join('\n'))) return;
+        removeFromLibrary.mutate(book.id, {
+          onSuccess: () => {
+            setAllBooks((current) => current.filter((item) => item.id !== book.id));
+            announce(t('Removed from your library'));
+          },
+          onError: () => announce(t('Could not remove the book. Please try again.'), { assertive: true }),
+        });
+      },
+      onError: () => announce(t('Could not remove the book. Please try again.'), { assertive: true }),
+    });
+  };
+
   return (
-    <main className={styles.container} data-testid="catalog-page">
+    <main ref={setCatalogNode} className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`} data-testid="catalog-page">
       {filtered && (
         <Link href={`/${ENTITY_PLURAL[entityKind!]}`} className={styles.back}>
           <ChevronLeft size={16} />
@@ -824,7 +912,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           title={t('Refresh library')}
           aria-label={t('Refresh library')}
         >
-          <RefreshCw size={15} className={libraryRefresh.isRefreshing ? styles.refreshIconSpin : undefined} />
+          <span className={libraryRefresh.isRefreshing ? styles.refreshIconSpin : undefined}>
+            <RefreshCw size={15} />
+          </span>
         </button>
 
         {/* View settings (library landing only) — currently houses the Discover
@@ -849,8 +939,10 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                 <label className={styles.settingsItem}>
                   <input
                     type="checkbox"
+                    data-testid="show-discover-section"
                     className={styles.settingsCheck}
                     checked={!discoverHidden}
+                    disabled={discoverPreferenceSaving}
                     onChange={(e) => setDiscoverHidden(!e.target.checked)}
                   />
                   <span>{t('Show Discover section')}</span>
@@ -862,6 +954,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                       data-testid="show-hidden-books"
                       className={styles.settingsCheck}
                       checked={showHidden}
+                      disabled={showHiddenPreferenceSaving}
                       onChange={(e) => setShowHidden(e.target.checked)}
                     />
                     <span>{t('Show hidden books')}</span>
@@ -873,6 +966,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                     data-testid="show-card-actions"
                     className={styles.settingsCheck}
                     checked={!cardActionsHidden}
+                    disabled={cardActionsPreferenceSaving}
                     onChange={(e) => setCardActionsHidden(!e.target.checked)}
                   />
                   <span>{t('Show Read now and edit buttons')}</span>
@@ -882,7 +976,14 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   {DENSITY_OPTIONS.map((option) => (
                     <label key={option.value} className={styles.settingsItem}>
                       <input type="radio" name="book-density" value={option.value}
-                        checked={density === option.value} onChange={() => setDensity(option.value)} />
+                        checked={density === option.value}
+                        onChange={() => {
+                          // Gate the new page size until ResizeObserver reports
+                          // the tracks for this density; never query on stale
+                          // columns and then immediately refetch.
+                          setGridMeasured(false);
+                          setDensity(option.value);
+                        }} />
                       <span>{t(option.label)}</span>
                     </label>
                   ))}
@@ -917,35 +1018,97 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
       {/* Discover: random picks, library landing only (not while searching). */}
       {!hideLibraryControls && !search && !discoverHidden && (
-        <DiscoverSection onClose={() => setDiscoverHidden(true)} hideActions={cardActionsHidden} />
+        <DiscoverSection
+          onClose={() => setDiscoverHidden(true)}
+          closeDisabled={discoverPreferenceSaving}
+          hideActions={cardActionsHidden}
+        />
       )}
 
-      {isFirstLoad ? (
-        // The loading state renders INSIDE the grid container rather than in
-        // place of it. The column measurement reads gridTemplateColumns off this
-        // element, and a CSS grid reports its tracks even with no cards in it —
-        // so having it on the first paint is what lets the very first query use
-        // the real column count instead of a guess (#1144).
-        <div ref={setGridNode} className={`${styles.grid} ${styles[`density_${density}`]}`}>
-          <div className={styles.gridLoading}>
-            <SpinnerCentered size={36} />
-          </div>
+      {/* One stable grid node spans first-load, loaded, empty, and error states.
+          ResizeObserver is therefore the only owner of column measurement and
+          never has to follow a loading -> loaded ref replacement (#1813 item 8). */}
+      {(usesGrid || isFirstLoad) && (
+        <div
+          ref={setGridNode}
+          data-testid="catalog-grid"
+          data-catalog-column-count={columnCount}
+          data-virtualized-grid={usesGrid ? 'true' : undefined}
+          className={`${styles.grid} ${styles[`density_${density}`]}`}
+        >
+          {isFirstLoad && (
+            <div className={styles.gridLoading}>
+              <SpinnerCentered size={36} />
+            </div>
+          )}
+          {usesGrid && !isFirstLoad && !error && allBooks.length > 0 && (
+            <VirtualizedGridRows
+              items={allBooks}
+              columnCount={columnCount}
+              gridNode={gridNode}
+              gridTop={gridTop}
+              itemKey={(book) => book.id}
+              rowClassName={styles.virtualRow}
+              spacerClassName={styles.virtualSpacer}
+              layoutKey={[density, cardActionsHidden, selecting, isSeries, canEdit, !!me?.role?.viewer].join('|')}
+              renderItem={(book, i) => (
+                <BookCard
+                  book={book}
+                  showSeriesIndex={isSeries}
+                  style={{
+                    animationDelay: i < 24 ? `${i * 35}ms` : '0ms',
+                    // Appended/window-remounted cards must be immediately usable;
+                    // replaying fadeRise while scrolling would hide them again.
+                    animation: i < 24 ? undefined : 'none',
+                  }}
+                  quickEdit={canEdit && !selecting}
+                  canRead={!!me?.role?.viewer}
+                  hideActions={cardActionsHidden}
+                  selectable={selecting}
+                  selected={selected.has(book.id)}
+                  onToggleSelect={(b) =>
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(b.id)) next.delete(b.id);
+                      else next.add(b.id);
+                      return next;
+                    })
+                  }
+                  onRemove={personalLibrary && isPlainLibrary && !search && !filterActive && !selecting ? removeBook : undefined}
+                  removeLabel={t('Remove {title} from my library', { title: book.title })}
+                />
+              )}
+            />
+          )}
         </div>
-      ) : error ? (
+      )}
+
+      {!isFirstLoad && (error ? (
         <EmptyState message={error instanceof Error ? error.message : t('Failed to load books.')} />
       ) : allBooks.length === 0 && !isFetching ? (
-        <EmptyState
+        <>{personalLibrary && isPlainLibrary && !search && !filterActive && readFilter === 'all' ? (
+          <EmptyState title={t('Your library is empty')}
+            message={me?.role?.browse_global
+              ? t('Nothing is missing — the whole library is still on the server. What you see here is your own selection. Add books from the global library; they appear here and on your e-reader.')
+              : t('Your administrator chooses which books are in your library. Ask them to add books, or to let you browse the global library.')}>
+            {me?.role?.browse_global && <Link href="/global" className={styles.uploadLink}>{t('Browse the global library')}</Link>}
+          </EmptyState>
+        ) : <EmptyState
           message={
             search && !filtered
               ? t('No results for "{q}".', { q: search })
               : readFilter !== 'all'
                 ? t('No {filter} books here.', { filter: readFilter })
                 : t('No books here.')
-          }
-        />
-      ) : (
-        <>
-          {isSeries && seriesPresentation === 'list' && !selecting ? (
+          }>
+          {search && !filtered && personalLibrary && me?.role?.browse_global && (
+            <Link href={`/global?q=${encodeURIComponent(search)}`} className={styles.uploadLink}>
+              {t('Search the global library for "{query}" instead', { query: search })}
+            </Link>
+          )}
+        </EmptyState>
+        }</>
+      ) : isSeries && seriesPresentation === 'list' && !selecting ? (
             <ul className={styles.bookList} role="list">
               {allBooks.map((book) => (
                 <li key={book.id}>
@@ -967,32 +1130,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                 </li>
               ))}
             </ul>
-          ) : (
-          <div ref={setGridNode} className={`${styles.grid} ${styles[`density_${density}`]}`}>
-            {allBooks.map((book, i) => (
-              <BookCard
-                key={book.id}
-                book={book}
-                showSeriesIndex={isSeries}
-                style={{ animationDelay: `${Math.min(i, 24) * 35}ms` }}
-                quickEdit={canEdit && !selecting}
-                hideActions={cardActionsHidden}
-                selectable={selecting}
-                selected={selected.has(book.id)}
-                onToggleSelect={(b) =>
-                  setSelected((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(b.id)) next.delete(b.id);
-                    else next.add(b.id);
-                    return next;
-                  })
-                }
-              />
-            ))}
-          </div>
-          )}
+      ) : null)}
 
-          {hasMore && (
+      {!isFirstLoad && !error && allBooks.length > 0 && hasMore && (
             <div ref={sentinelRef} className={styles.loadMore}>
               <button
                 type="button"
@@ -1009,13 +1149,12 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                 </span>
               )}
             </div>
-          )}
-        </>
       )}
 
       {selecting && selected.size > 0 && (
         <BulkBar
           ids={[...selected]}
+          personalLibrary={personalLibrary}
           onClear={() => {
             setSelected(new Set());
             setSelecting(false);

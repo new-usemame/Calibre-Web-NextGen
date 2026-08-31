@@ -12,9 +12,17 @@ receives an image that already matches its target screen and renders
 without letterboxing or pillarboxing.
 
 Supported targets include common Kobo / Kindle / PocketBook / Boox
-models plus a custom W×H fallback. Fill modes are `edge_mirror` (extend
-the artwork), `edge_blur` (blurred extension), `gradient`, `average` or
-`dominant` color, and `manual` solid color.
+models plus a custom W×H fallback.
+
+Fill modes come in two families. Six *pad* the cover out to the target
+ratio, keeping the artwork at its original proportions and filling the
+border: `edge_mirror` (extend the artwork), `edge_blur` (blurred
+extension), `gradient`, `average` or `dominant` color, and `manual` solid
+color. Two *fill the frame with the artwork itself* and leave no border:
+`stretch` (non-uniform scale, nothing cropped, slight distortion) and
+`scale_crop` (centered crop, no distortion, a strip lost off the two long
+edges). Which of the last two is preferable is a genuine matter of taste,
+so both are offered rather than picking one — see issue #1280.
 
 This was originally the Kobo-sync padding pipeline. The engine is
 device-neutral; "Kobo" in the codebase now refers only to the Kobo sync
@@ -60,7 +68,13 @@ except (ImportError, RuntimeError):  # ImageMagick missing → degrade gracefull
 
 
 # Public fill-mode identifiers. Anything else falls through to "edge_mirror".
-FILL_MODES = ("edge_mirror", "edge_blur", "gradient", "average", "dominant", "manual")
+# The first six pad a border around the artwork; the last two fill the frame
+# with the artwork itself. Adding to this tuple is what makes a mode valid at
+# the API boundary (cover_preview_blueprint._validate_fill_mode), so the SPA
+# and Jinja option lists are pinned against it by
+# tests/unit/test_cover_preview_fill_stretch_crop.py.
+FILL_MODES = ("edge_mirror", "edge_blur", "gradient", "average", "dominant", "manual",
+              "stretch", "scale_crop")
 DEFAULT_FILL_MODE = "edge_mirror"
 
 # Aspect-ratio presets grouped by manufacturer. Values are device screen
@@ -141,6 +155,51 @@ PRESET_GROUPS = (
 )
 
 DEFAULT_PRESET = "kobo_libra_color"
+
+# Kobo's `x-kobo-devicemodel` header, normalised, mapped to the preset that
+# names the same hardware.
+#
+# Deliberately an ALLOW-LIST, not a parse. The header is client-controlled, so
+# an unrecognised value resolves to None and the caller keeps the instance
+# setting -- falling back is always correct, guessing a ratio is not. Only
+# families we ship a name-matched preset for appear here; nothing is inferred
+# from a model name we have not seen.
+#
+# Observed values from real hardware on this instance (2026-08-15):
+#   "Kobo Clara BW"      -> kobo_clara_bw
+#   "Kobo Libra Colour"  -> kobo_libra_color   (note Kobo's British spelling)
+_DEVICE_MODEL_PRESETS = {
+    "koboclarabw":    "kobo_clara_bw",
+    "koboclaracolor": "kobo_clara_color",
+    "koboclara2e":    "kobo_clara_2e",
+    "koboclarahd":    "kobo_clara",
+    "kobolibracolor": "kobo_libra_color",
+    "kobolibra2":     "kobo_libra_2",
+    "kobosage":       "kobo_sage",
+    "koboforma":      "kobo_forma",
+    "koboelipsa2e":   "kobo_elipsa_2e",
+}
+
+# Matches the bound device_registry already applies to the same header, and the
+# width of Device.model. A longer value is a client doing something odd, not a
+# device we know.
+_DEVICE_MODEL_MAX_LEN = 160
+
+
+def preset_for_device_model(model):
+    """Resolve a Kobo device-model string to one of our aspect presets.
+
+    Returns None for anything not positively recognised, including None, a
+    non-string, an over-long value, or a known-shaped name we do not ship a
+    preset for. Callers treat None as "keep the configured aspect".
+    """
+    if not model or not isinstance(model, str):
+        return None
+    if len(model) > _DEVICE_MODEL_MAX_LEN:
+        return None
+    key = "".join(ch for ch in model.lower() if ch.isalnum()).replace("colour", "color")
+    return _DEVICE_MODEL_PRESETS.get(key)
+
 
 # How close the source must be to the target ratio to skip padding entirely.
 _RATIO_EPSILON = 0.005
@@ -273,6 +332,33 @@ def _compute_padded_dims(src_w: int, src_h: int, target_ratio: float) -> Tuple[i
         return src_w, int(round(src_w / target_ratio)), "vertical"
     # too tall → pad left + right
     return int(round(src_h * target_ratio)), src_h, "horizontal"
+
+
+def _compute_crop_box(src_w: int, src_h: int, target_ratio: float) -> Tuple[int, int, int, int]:
+    """Centered crop rectangle that puts the source on `target_ratio` without
+    scaling. Returns (left, top, width, height).
+
+    This is the geometry behind the `scale_crop` fill mode. "Scale to fill
+    then crop the overflow" and "crop straight to the target ratio" produce
+    the same visible result, because the consuming surface scales the image
+    to its own screen either way — so we crop and skip a resample rather than
+    upscaling into a larger canvas only to throw the excess away.
+
+    Degenerate inputs return a full-frame box rather than raising; callers
+    treat that as "nothing to do".
+    """
+    if src_w <= 0 or src_h <= 0 or target_ratio <= 0:
+        return 0, 0, src_w, src_h
+    src_ratio = src_w / src_h
+    if abs(src_ratio - target_ratio) < _RATIO_EPSILON:
+        return 0, 0, src_w, src_h
+    if src_ratio > target_ratio:
+        # too wide → trim left + right, keep full height
+        new_w = max(1, min(int(round(src_h * target_ratio)), src_w))
+        return (src_w - new_w) // 2, 0, new_w, src_h
+    # too tall → trim top + bottom, keep full width
+    new_h = max(1, min(int(round(src_w / target_ratio)), src_h))
+    return 0, (src_h - new_h) // 2, src_w, new_h
 
 
 def _composite_solid(img, new_w: int, new_h: int, orient: str, fill_color):
@@ -507,6 +593,32 @@ def _composite_edge_blur(img, new_w: int, new_h: int, orient: str):
     return canvas
 
 
+# ---- frame-filling modes (no border) --------------------------------------
+# Unlike the six compositors above, these do not build a padded canvas around
+# the artwork — they transform the artwork to the target ratio directly.
+
+def _composite_stretch(img, new_w: int, new_h: int):
+    """Non-uniform scale onto the target frame. Nothing is cropped; the
+    artwork is slightly squashed or elongated on one axis.
+
+    Scales up to the padded dimensions rather than down to the cropped ones,
+    so the axis that already matched keeps its full source resolution.
+    Returns a new Image owned by the caller (must close)."""
+    canvas = img.clone()
+    canvas.resize(new_w, new_h)
+    return canvas
+
+
+def _composite_scale_crop(img, target_ratio: float):
+    """Centered crop to the target ratio. Nothing is distorted; a strip comes
+    off each of the two long edges. Returns a new Image owned by the caller
+    (must close)."""
+    left, top, width, height = _compute_crop_box(img.width, img.height, target_ratio)
+    canvas = img.clone()
+    canvas.crop(left=left, top=top, width=width, height=height)
+    return canvas
+
+
 def pad_blob(blob: bytes, settings: CoverPreviewSettings) -> bytes:
     """Top-level pure entry point. JPEG bytes in, JPEG bytes out.
 
@@ -548,6 +660,10 @@ def pad_blob(blob: bytes, settings: CoverPreviewSettings) -> bytes:
                 padded = _composite_edge_blur(img, new_w, new_h, orient)
             elif fill_mode == "gradient":
                 padded = _composite_gradient(img, new_w, new_h, orient)
+            elif fill_mode == "stretch":
+                padded = _composite_stretch(img, new_w, new_h)
+            elif fill_mode == "scale_crop":
+                padded = _composite_scale_crop(img, target_ratio)
             else:  # edge_mirror (default)
                 padded = _composite_edge_mirror(img, new_w, new_h, orient)
 

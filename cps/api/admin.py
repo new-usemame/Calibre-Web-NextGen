@@ -12,8 +12,9 @@ from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from . import api_v1
-from .. import ub, constants, config
+from .. import ub, constants, config, user_library
 from ..cw_login import current_user
+from ..cw_babel import sanitize_locale_for_write
 from .options import locale_options, book_language_options
 from ..usermanagement import login_required_if_no_ano
 from ..helper import (valid_email, check_email, check_username, valid_password,
@@ -45,6 +46,7 @@ ROLE_BITS = {
     "edit_shelfs": constants.ROLE_EDIT_SHELFS,
     "delete_books": constants.ROLE_DELETE_BOOKS,
     "viewer": constants.ROLE_VIEWER,
+    "browse_global": constants.ROLE_BROWSE_GLOBAL,
 }
 
 
@@ -61,7 +63,7 @@ def _require_admin():
 
 
 def _serialize_user(u):
-    return {
+    payload = {
         "id": u.id,
         "name": u.name,
         "email": u.email or "",
@@ -71,6 +73,8 @@ def _serialize_user(u):
         "is_guest": u.name == "Guest",
         "roles": {key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
     }
+    payload.update(user_library.mode_payload(u))
+    return payload
 
 
 def _other_admin_count(exclude_id):
@@ -92,6 +96,82 @@ def admin_list_users():
     items = [_serialize_user(u) for u in users
              if (u.role & constants.ROLE_ANONYMOUS) != constants.ROLE_ANONYMOUS]
     return jsonify({"items": items})
+
+
+@api_v1.route("/admin/my-library/migrate", methods=["POST"])
+@login_required_if_no_ano
+def admin_migrate_my_library():
+    """Seed once for one account or every non-anonymous account."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    query = ub.session.query(ub.User)
+    if user_id is not None:
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            return _err("invalid_request", "user_id must be an integer", 400)
+        query = query.filter(ub.User.id == user_id)
+    users = query.order_by(ub.User.id.asc()).all()
+    if user_id is not None and not users:
+        return _err("not_found", "User not found", 404)
+    skipped = []
+    if user_id is None:
+        anonymous_users = [
+            user for user in users
+            if ((user.role & constants.ROLE_ANONYMOUS)
+                == constants.ROLE_ANONYMOUS)
+        ]
+        users = [
+            user for user in users
+            if ((user.role & constants.ROLE_ANONYMOUS)
+                != constants.ROLE_ANONYMOUS)
+        ]
+        skipped = [{
+            "user_id": int(user.id),
+            "name": user.name,
+            "status": "skipped_anonymous",
+            "seeded_books": 0,
+            "membership_count": user_library.membership_count(user.id),
+            "library_mode": user_library.mode_for_user(user),
+        } for user in anonymous_users]
+    results = user_library.migrate_users_to_personal_library(users)
+    return jsonify({
+        "results": results,
+        "accounts": len(results),
+        "seeded_books": sum(row["seeded_books"] for row in results),
+        "errors": sum(row["status"] == "error" for row in results),
+        "skipped": skipped,
+        "skipped_accounts": len(skipped),
+    })
+
+
+@api_v1.route(
+    "/admin/users/<int:user_id>/my-library/<int:book_id>",
+    methods=["PUT"],
+)
+@login_required_if_no_ano
+def admin_add_book_to_user_library(user_id, book_id):
+    """Add one visible global book to a named managed account."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    target = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
+    if target is None:
+        return _err("not_found", "User not found", 404)
+    try:
+        book = user_library.admin_add_book(target, book_id)
+    except user_library.UserLibraryError as ex:
+        return _err("library_membership_rejected", str(ex), 409)
+    return jsonify({
+        "in_my_library": True,
+        "user_id": int(target.id),
+        "book_id": int(book_id),
+        "book_title": book.title,
+        "membership_count": user_library.membership_count(target.id),
+    })
 
 
 @api_v1.route("/admin/users/<int:user_id>/reset-password", methods=["POST"])
@@ -281,7 +361,13 @@ def admin_create_user():
     else:
         new_user.role = config.config_default_role
 
-    new_user.locale = data.get("locale") or config.config_default_locale or "en"
+    # Hygiene: refuse a request locale we do not ship, and do not let an
+    # unvalidated config_default_locale seed a new account either. Read-time
+    # coercion in get_locale() is the actual boundary (F-011141).
+    new_user.locale = (
+        sanitize_locale_for_write(data.get("locale"))
+        or sanitize_locale_for_write(config.config_default_locale)
+        or "en")
     new_user.default_language = data.get("default_language") or config.config_default_language or "all"
     # Inherit the instance's content-visibility defaults + sidebar, like legacy.
     new_user.allowed_tags = config.config_allowed_tags
@@ -318,6 +404,27 @@ def admin_update_user(user_id):
 
     data = request.get_json(silent=True) or {}
 
+    desired_library_mode = data.get(
+        "library_mode", user_library.mode_for_user(user)
+    )
+    if desired_library_mode not in constants.LIBRARY_MODES:
+        return _err(
+            "invalid_library_mode",
+            "library_mode must be 'monolibrary' or 'personal_library'",
+            400,
+        )
+    library_seed_prepared = False
+    if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
+            and not bool(user.user_library_seeded)):
+        try:
+            # Seed before applying the rest of this multi-field update so its
+            # chunk commits cannot persist half-validated profile changes.
+            user_library.prepare_user_library_seed(user)
+            library_seed_prepared = True
+        except Exception as ex:
+            ub.session.rollback()
+            return _err("library_seed_failed", str(ex), 400)
+
     if "roles" in data and isinstance(data["roles"], dict):
         new_role = user.role
         for key, bit in ROLE_BITS.items():
@@ -340,12 +447,26 @@ def admin_update_user(user_id):
         if "kindle_mail" in data:
             user.kindle_mail = valid_email(data.get("kindle_mail") or "")
         if "locale" in data and data["locale"]:
-            user.locale = data["locale"]
+            validated_locale = sanitize_locale_for_write(data["locale"])
+            if not validated_locale:
+                return _err("invalid_request", "Unsupported locale", 400)
+            user.locale = validated_locale
         if "default_language" in data and data["default_language"]:
             user.default_language = data["default_language"]
+        if "library_mode" in data:
+            user_library.set_library_mode(
+                user,
+                desired_library_mode,
+                seed_rows_prepared=library_seed_prepared,
+                commit=False,
+            )
+            user_library.mark_response_user_specific()
     except Exception as ex:  # validators raise generic Exception with a message
         ub.session.rollback()
-        return _err("invalid_request", str(ex), 400)
+        code = ("library_mode_rejected"
+                if isinstance(ex, user_library.UserLibraryError)
+                else "invalid_request")
+        return _err(code, str(ex), 400)
 
     try:
         ub.session.commit()

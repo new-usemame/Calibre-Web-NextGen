@@ -40,8 +40,7 @@ reads like Claude Code's release notes, but:
    - Label string must go through `t('What's new')` for i18n (see i18n section).
 2. **Optional secondary nudge:** a small "•" unread dot on the Help button (and the
    item) when there's a release the user hasn't opened yet, keyed in `localStorage`
-   to `constants.INSTALLED_VERSION` — same version-keyed pattern as the
-   `cwng_newui_banner_dismissed_<version>` banner. Dot clears once they open the page.
+   to `constants.INSTALLED_VERSION`. Dot clears once they open the page.
    Keep it subtle; this is discovery, not nagging.
 
 ## The page

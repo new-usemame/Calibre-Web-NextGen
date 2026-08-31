@@ -142,7 +142,6 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         
         ub.session.add(user)
         ub.session.commit()
-        
         log.info("Auto-created user '%s' from %s authentication", username, auth_source)
         return user
         

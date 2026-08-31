@@ -25,7 +25,11 @@
   background: none;
   border: none;
   padding: 0;
-  text-align: left;
+  /* `start`, not `left`: the card's text nodes carry dir="auto" (#1073), so an
+     Arabic or Hebrew title computes as RTL. A hardcoded `left` would win over
+     that and pin the text to the wrong edge, leaving the direction correct but
+     the alignment visibly wrong. `start` resolves per element's own direction. */
+  text-align: start;
   text-decoration: none;
   color: inherit;
   transition: transform var(--dur-base) var(--ease-out);
@@ -161,7 +165,7 @@
    the word in the reporter's classic screenshot. Green rather than --accent
    because "done" reads as green far more universally than amber, and because
    the amber circle was competing with the accent-coloured hover actions. */
-.readBadge {
+.readBadge, .readingBadge {
   min-height: 24px;
   padding: 0 var(--sp-2);
   border-radius: var(--r-full);
@@ -172,7 +176,6 @@
      2.20:1: an accessibility regression inside an accessibility fix. This
      pairing is 5.35:1 in every theme, and the shadow separates it from dark
      covers. */
-  background: #1f7a44;
   color: #fff;
   box-shadow: var(--elev-1);
   display: inline-flex;
@@ -185,9 +188,20 @@
   pointer-events: none;
 }
 
+.readBadge {
+  background: #1f7a44;
+}
+
+/* Sync-driven in-progress state (#1702). Amber mirrors the classic Reading
+   badge while remaining distinct from the green finished state. Like Read,
+   this fixed pairing is self-contrasting because it sits over cover artwork. */
+.readingBadge {
+  background: #925700;
+}
+
 /* Personal-library state: quiet but explicit when Show hidden books is on.
    Sits in .badgeRow. */
-.hiddenBadge {
+.hiddenBadge, .libraryBadge {
   min-height: 24px;
   padding: 0 var(--sp-2);
   border-radius: var(--r-full);
@@ -202,6 +216,10 @@
   font-weight: var(--fw-semi);
   line-height: 1;
   pointer-events: none;
+}
+
+.libraryBadge {
+  white-space: nowrap;
 }
 
 /* Series position (#573). Sits in .badgeRow; shown only in a series view. */
@@ -257,8 +275,10 @@
 }
 
 /* Quick-edit pencil (fork #572). Lives in `.actionRow`, in normal flow beside
-   the read link — NOT absolutely positioned over the card (#1166). Hover/
-   focus-reveal like the remove button, but always reachable via keyboard focus. */
+   the read link — NOT absolutely positioned over the card (#1166). It uses
+   on-surface tokens here; --cover-control-* is reserved for controls over
+   unpredictable cover artwork. Hover/focus-reveal like the remove button, but
+   always reachable via keyboard focus. */
 .quickEditBtn {
   flex: 0 0 auto;
   /* A card with no readable format has no "Read now" link, so the pencil is
@@ -269,9 +289,9 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-full);
-  background: var(--cover-control-bg);
-  color: var(--cover-control-fg);
-  border: 1px solid var(--cover-control-border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
   box-shadow: var(--elev-1);
   display: flex;
   align-items: center;
@@ -369,20 +389,114 @@
 .readNow:hover,
 .readNow:focus-visible { background: var(--accent-soft); }
 
-/* `any-pointer` also covers hybrid devices (for example, an iPad with a
-   trackpad): touch must not lose actions merely because a fine pointer exists. */
+.addToLibrary {
+  opacity: 1;
+  pointer-events: auto;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  cursor: pointer;
+}
+
+.addToLibrary:disabled { cursor: wait; opacity: .7; }
+
+.moreActionsWrap {
+  display: none;
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  /* Card chrome must stay below application popovers. The old overlay+1 value
+     let every closed trigger intercept View settings controls above the grid. */
+  z-index: 1;
+}
+
+/* The named query container on every card creates an independent stacking
+   context, so raising only the child panel cannot clear later sibling cards.
+   Lift the entire active card while keeping it below application chrome. */
+.wrapActionsOpen { z-index: calc(var(--z-bar) - 1); }
+
+/* Main's catalog jank pass applies content-visibility:auto to each grid card,
+   which brings paint containment with it. An open disclosure intentionally
+   overflows the card, so release that containment only for the active card.
+   The compound selector outranks Catalog's `.grid > *` regardless of bundle
+   order; closed cards retain the off-screen rendering optimization. */
+.wrap.wrapActionsOpen { content-visibility: visible; }
+
+/* Coarse pointers use one visible disclosure rather than opacity-hidden live
+   controls. A real iPad tap applies synthetic hover before click; that made the
+   old opacity:0 Read link reveal and activate under the same finger. Removing
+   the legacy controls from layout makes invisible activation impossible while
+   preserving the established hover/focus treatment for fine pointers. */
 @media (any-hover: none), (any-pointer: coarse) {
-  .readNow { min-height: 44px; opacity: 1; }
+  .readNow, .removeBtn, .quickEditBtn { display: none; }
+  .addToLibrary { display: flex; min-height: 44px; }
+  .moreActionsWrap { display: block; }
   /* Bigger where legibility is worst — a phone held at arm's length is the
      case the reporter was describing. */
-  .readBadge, .hiddenBadge { min-height: 28px; font-size: var(--fs-sm); }
-  .seriesBadge { min-width: 28px; height: 28px; font-size: var(--fs-sm); }
-  .removeBtn, .quickEditBtn {
-    width: 44px;
-    height: 44px;
-    opacity: 1;
+  .readBadge, .readingBadge, .hiddenBadge, .libraryBadge {
+    min-height: 28px;
+    font-size: var(--fs-sm);
   }
+  .seriesBadge { min-width: 28px; height: 28px; font-size: var(--fs-sm); }
 }
+
+.moreActionsTrigger {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  color: var(--cover-control-fg);
+  background: var(--cover-control-bg);
+  border: 1px solid var(--cover-control-border);
+  box-shadow: var(--elev-2);
+}
+
+.moreActionsTrigger[aria-expanded="true"],
+.moreActionsTrigger:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.moreActionsPanel {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  width: max-content;
+  min-width: 180px;
+  max-width: min(240px, calc(100vw - 2 * var(--sp-4)));
+  padding: var(--sp-1);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--elev-3);
+}
+
+.moreActionsPanelStart { left: 0; }
+.moreActionsPanelEnd { right: 0; }
+
+.moreActionsItem {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+}
+
+.moreActionsItem:hover,
+.moreActionsItem:focus-visible {
+  background: var(--surface-3);
+}
+
+.moreActionsDanger { color: var(--danger); }
+.moreActionsDanger:hover,
+.moreActionsDanger:focus-visible { background: var(--danger-soft); }
 
 /* Narrow cards — the Compact and Dense grids, which are 3 and 4 columns on a
    phone. Measured at 375px: comfortable 164px, compact 106px, dense 82px per

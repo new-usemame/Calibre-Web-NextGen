@@ -11,8 +11,17 @@
   color: var(--text-faint);
 }
 
+.title {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  text-align: center;
+}
+
 .msg {
   color: var(--text-muted);
   font-size: var(--fs-base);
   text-align: center;
 }
+
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); }

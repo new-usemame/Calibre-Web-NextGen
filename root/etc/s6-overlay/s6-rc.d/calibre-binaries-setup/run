@@ -1,4 +1,5 @@
 #!/usr/bin/with-contenv bash
+# shellcheck shell=bash
 
 echo "[calibre-binaries-setup] Starting Calibre binaries setup..."
 
@@ -18,7 +19,17 @@ echo "[calibre-binaries-setup] Non-Ubuntu base detected, exiting..."
 exit 0
 fi
 
+# Keep root-run installation/version probes out of both /root/.config/calibre
+# and the abc runtime config. A uid-private temp config cannot leave root-owned
+# files that later abc conversions are expected to update. This belongs after
+# the Ubuntu-base guard so unsupported minimal images retain their clean exit.
+if [ -z "${CALIBRE_CONFIG_DIRECTORY:-}" ]; then
+    export CALIBRE_CONFIG_DIRECTORY="/tmp/cwa-calibre-config-$(id -u)"
+    install -d -m 0700 "$CALIBRE_CONFIG_DIRECTORY"
+fi
+
 export DEBIAN_FRONTEND="noninteractive"
+CALIBRE_DIR="/opt/calibre"
 
 echo "[calibre-binaries-setup] Checking if Calibre is already installed..."
 
@@ -36,15 +47,15 @@ if [[ ! "$CALIBRE_INSTALLED_TEST" =~ calibredb.*calibre\ [0-9]+\.[0-9]+ ]]; then
     echo "[calibre-binaries-setup] USER NOTE: 'Ignore calibredb: command not found' above, nothing is wrong, this just indicates to CWA that Calibre still needs to be installed"
     
     # Check if calibre_postinstall exists and is executable
-    if [[ ! -f /app/calibre/calibre_postinstall ]]; then
-        echo "[calibre-binaries-setup] ERROR: calibre_postinstall script not found at /app/calibre/calibre_postinstall"
+    if [[ ! -f $CALIBRE_DIR/calibre_postinstall ]]; then
+        echo "[calibre-binaries-setup] ERROR: calibre_postinstall script not found at $CALIBRE_DIR/calibre_postinstall"
         echo "[calibre-binaries-setup] This may indicate a problem with the container image. Exiting with error..."
         exit 1
     fi
     
-    if [[ ! -x /app/calibre/calibre_postinstall ]]; then
+    if [[ ! -x $CALIBRE_DIR/calibre_postinstall ]]; then
         echo "[calibre-binaries-setup] WARNING: calibre_postinstall is not executable, attempting to fix..."
-        chmod +x /app/calibre/calibre_postinstall || {
+        chmod +x $CALIBRE_DIR/calibre_postinstall || {
             echo "[calibre-binaries-setup] ERROR: Could not make calibre_postinstall executable"
             exit 1
         }
@@ -65,7 +76,7 @@ if [[ ! "$CALIBRE_INSTALLED_TEST" =~ calibredb.*calibre\ [0-9]+\.[0-9]+ ]]; then
              /usr/share/mime/packages /usr/share/icons/hicolor || true
 
     # Add timeout protection for the installation
-    if timeout 300 /app/calibre/calibre_postinstall; then
+    if timeout 300 $CALIBRE_DIR/calibre_postinstall; then
         echo "[calibre-binaries-setup] Calibre setup completed successfully!"
         
         # Verify installation worked

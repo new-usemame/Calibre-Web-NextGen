@@ -1,0 +1,19 @@
+{
+  "area": "spa",
+  "body": "Two independent gaps in `cps/api/edit.py:set_cover`:\n\n1. No `helper.book_cover_is_locked` check. `cover_picker.cover_picker_apply` refuses every\n   apply kind with a 409 while the per-book cover lock is set (janeczku/calibre-web#2165), and\n   the classic editor honours it on its cover-URL path. The SPA endpoint writes regardless, so a\n   user who deliberately locked a cover can have it replaced from the new UI's edit page.\n2. It resolves the book with `calibre_db.get_filtered_book(book_id)` using strict defaults,\n   while `cps/api/books.py`'s detail endpoint deliberately passes\n   `allow_show_archived=True, allow_show_hidden=True` so a user can open their OWN hidden or\n   archived book. The neighbouring delete endpoints in the same module pass those flags too.\n   Result: the edit page opens, and replacing the cover 404s.\n\nFound by an adversarial review of PR #1739. Not fixed there: both are behaviour changes\nunrelated to that PR's cache policy, and (1) in particular would newly refuse writes that\ncurrently succeed, which deserves its own change and its own release note.",
+  "created": "2026-08-18",
+  "id": "F-65c93f",
+  "refs": [
+    "#1739"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "SPA cover endpoint ignores the cover lock and 404s on the user's own hidden or archived book",
+  "resolution": {
+    "commit": "8cf366996",
+    "date": "2026-08-29",
+    "release": "",
+    "note": "Both gaps fixed in cps/api/edit.py::set_cover. (1) The book is resolved with allow_show_archived=True, allow_show_hidden=True, matching delete_book (:409) and delete_format (:428) in the same module - both WRITE endpoints, so the precedent transfers directly. Those two flags gate per-user state (ub.ArchivedBook and ub.UserHiddenBook filter on user_id), so the relaxation reaches a book the caller personally hid or archived and is otherwise authorized to see; language, allowed/denied tags, the custom-column ACL and the personal-library membership predicate all still apply, and allow_show_global is deliberately NOT passed. (2) The per-book cover lock is consulted before any write and refused with 409, matching cover_picker_apply in status and meaning (the JSON envelopes differ per endpoint convention). Checking visibility BEFORE the lock is also the right information-disclosure order: a book the caller may not see 404s without revealing its lock state. LIMIT OF THE GUARANTEE, stated rather than implied: helper.book_cover_is_locked returns False on ANY exception, so a failing lock query silently permits the overwrite - filed as F-33dea0, not changed here. A check-to-write race also remains (pre-existing, shared with the picker; every editor can unlock anyway, so it is not a security boundary). TESTS, precisely: 4 tests in test_f65c93f_spa_set_cover_policy.py, all red on the parent. Three are source assertions; the fourth touches the module object and catches the wrong-namespace bug in isolation - VERIFIED by running that test alone against that mutant. The pre-existing executing tests in test_api_v1_edit.py catch it too, so that coverage is redundant, not absent. Mutation-tested 5 ways, all red."
+  }
+}

@@ -42,7 +42,9 @@ def test_sync_page_uses_one_commit_and_inserts_only_missing_user_book_pairs(monk
 
     # Repeated IDs model defensive page input; book 2 already belongs to this
     # user, while book 3 currently belongs only to another user.
-    kobo_sync_status.add_synced_books_batch([1, 2, 2, 3, 4])
+    assert kobo_sync_status.add_synced_books_batch(
+        [1, 2, 2, 3, 4],
+    ) is True
 
     assert commits == 1
     assert statements.count("SELECT") == 1

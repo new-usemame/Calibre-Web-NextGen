@@ -7,7 +7,7 @@
 import os
 import sqlite3
 
-from cps import db, logger
+from cps import constants, db, logger
 
 log = logger.create()
 
@@ -51,7 +51,7 @@ def init_calibre_db_from_config(config, settings_path):
 def init_calibre_db_from_app_db(app_db_path=None):
     """Initialize CalibreDB by reading config from app.db (for background workers)."""
     if app_db_path is None:
-        base_path = os.environ.get("CALIBRE_DBPATH", "/config")
+        base_path = constants.CONFIG_DIR
         if base_path.endswith(".db"):
             if os.path.basename(base_path) != "app.db":
                 app_db_path = os.path.join(os.path.dirname(base_path), "app.db")

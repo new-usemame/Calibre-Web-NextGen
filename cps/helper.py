@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-import glob
 import os
 import random
 import io
@@ -22,11 +21,12 @@ import requests
 import unidecode
 from uuid import uuid4
 
-from flask import send_from_directory, make_response, abort, url_for, Response, after_this_request
+from flask import send_from_directory, make_response, abort, url_for, Response, after_this_request, has_request_context
 from flask_babel import gettext as _
 from flask_babel import lazy_gettext as N_
 from flask_babel import get_locale
 from .cw_login import current_user
+from .cover_version import COVER_VERSION_ARG, cover_version_token
 from sqlalchemy.sql.expression import true, false, and_, or_, text, func
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 from werkzeug.datastructures import Headers
@@ -38,7 +38,7 @@ try:
     from . import cw_advocate
     from .cw_advocate.exceptions import UnacceptableAddressException
     use_advocate = True
-except ImportError as e:
+except ImportError:
     use_advocate = False
     advocate = requests
     UnacceptableAddressException = MissingSchema = BaseException
@@ -50,23 +50,30 @@ from . import logger, config, db, ub, fs
 from . import gdriveutils as gd
 from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBNAIL_TYPE_COVER, THUMBNAIL_TYPE_SERIES,
                         SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_FROM, EXTENSIONS_CONVERT_TO)
-from .subproc_wrapper import process_wait, process_open
+from .subproc_wrapper import process_wait
 from .services.file_move import copy_with_metadata_fallback
 from .services import parallel
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
-from .services.worker import WorkerThread, STAT_FINISH_SUCCESS
-from .tasks.mail import TaskEmail
-from .tasks.thumbnail import TaskClearCoverThumbnailCache, TaskGenerateCoverThumbnails
-from .tasks.metadata_backup import TaskBackupMetadata
-from .file_helper import get_temp_dir
-from .epub_helper import get_content_opf, create_new_metadata_backup, updateEpub, replace_metadata
-from .embed_helper import do_calibre_export
+from cps.cwa_db_loader import load_cwa_db  # noqa: E402
+CWA_DB = load_cwa_db().CWA_DB
+from .services.worker import WorkerThread, STAT_FINISH_SUCCESS  # noqa: E402
+from .tasks.mail import TaskEmail  # noqa: E402
+from .tasks.thumbnail import (  # noqa: E402
+    TaskClearCoverThumbnailCache,
+    TaskGenerateCoverThumbnails,
+)
+from .tasks.metadata_backup import TaskBackupMetadata  # noqa: E402
+from .file_helper import get_temp_dir  # noqa: E402
+from .epub_helper import (  # noqa: E402
+    create_new_metadata_backup,
+    get_content_opf,
+    merge_kepub_metadata,
+    updateEpub,
+)
+from .embed_helper import do_calibre_export  # noqa: E402
 
 log = logger.create()
 
@@ -88,7 +95,25 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
     The caller still owns the ``calibre_db.session.commit()``. ``kobo_sync_status``
     is imported lazily to keep this module's import graph unchanged.
     """
-    book.last_modified = datetime.now(timezone.utc)
+    # Strictly increasing per book. The wall clock has microsecond RESOLUTION
+    # but no uniqueness guarantee — successive datetime.now() calls can return
+    # the same value — and this column is now a cache key: two writes sharing a
+    # timestamp would share a URL, so the first image would stay in a browser's
+    # cache for a year while the file underneath had changed. Nudging past a
+    # same-instant collision costs a microsecond and removes the class.
+    #
+    # Bounded to a one-second window on purpose: a stored timestamp far in the
+    # future is bad data, and chaining +1us off it would keep the book in the
+    # future forever (and it also feeds Kobo's `last_modified > sync_token`
+    # selection). Beyond that window the clock wins.
+    now = datetime.now(timezone.utc)
+    previous = book.last_modified
+    if previous is not None:
+        if previous.tzinfo is None:
+            previous = previous.replace(tzinfo=timezone.utc)
+        if now <= previous < now + timedelta(seconds=1):
+            now = previous + timedelta(microseconds=1)
+    book.last_modified = now
     if set_dirty:
         calibre_db.set_metadata_dirty(book.id)
     if unsync:
@@ -475,9 +500,21 @@ def check_read_formats(entry):
 # 1: If epub file is existing, it's directly send to eReader email,
 # 2: If mobi file is existing, it's converted and send to eReader email,
 # 3: If Pdf file is existing, it's directly send to eReader email
-def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id, subject=None):
+def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
+              subject=None, user=None):
     """Send email with attachments"""
-    book = calibre_db.get_book(book_id)
+    # A direct send action is an access path, so it must use the same policy
+    # funnel as web/OPDS listings. Conversion helpers remain deliberately
+    # global because bulk-edit and rename workflows also call them.
+    filter_user = user if user is not None else (
+        current_user if has_request_context() else None
+    )
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True,
+        user=filter_user,
+    )
+    if not book:
+        return _("Book not found")
 
     if convert == 1:
         # returns None if success, otherwise errormessage
@@ -514,7 +551,8 @@ def get_valid_filename(value, replace_whitespace=True, chars=128):
     except ModuleNotFoundError:
         # Attempt path adjustment (similar to scripts/cover_enforcer)
         try:  # pragma: no cover
-            import sys as _sys, os as _os
+            import os as _os
+            import sys as _sys
             project_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '..'))
             if project_root not in _sys.path:
                 _sys.path.insert(0, project_root)
@@ -600,34 +638,73 @@ def get_sorted_author(value):
     return value2
 
 
-def book_is_in_progress(book_id, read_status_value, read_column_configured, user):
-    """Return True when a book is sync-driven "currently reading".
+# SQLite builds vary in their host-parameter ceiling. Keep IN clauses below the
+# conservative historical limit while leaving ordinary list pages as one query.
+SQLITE_IN_CHUNK_SIZE = 900
+
+
+def book_in_progress_ids(book_read_statuses, read_column_configured, user):
+    """Return the sync-driven "currently reading" ids from a batch of books.
 
     The single source of truth for the tri-state in-progress marker shown on the
-    book detail page (fork #509/#634). Mirrors ``web.show_book``'s
+    classic detail page and in the SPA (fork #509/#634/#1702). Mirrors
+    ``web.show_book``'s
     ``read_status_raw == STATUS_IN_PROGRESS`` derivation so the classic detail
-    page and the new-UI (SPA) book page never disagree — the exact class of
-    read-state drift that fork #579/#637 fixed for the "read" badge.
+    page, SPA detail and SPA list never disagree — the exact class of read-state
+    drift that fork #579/#637 fixed for the "read" badge.
 
+    ``book_read_statuses`` is an iterable of ``(book_id, read_status_value)``.
     ``read_status_value`` is the third column returned by
     ``calibre_db.get_book_read_archived`` — the built-in ``ub.ReadBook.read_status``
     (0/1/2/None) when no custom read column is configured, or the custom column's
     boolean-ish value when one is. In-progress is a tri-state KOReader/Kobo sync
     writes only to ``ub.ReadBook``, so with a custom read column configured the
     flag must be read from ``ub.ReadBook`` regardless of which column is linked.
+
+    The custom-column query is deliberately batch-shaped: one query resolves an
+    ordinary SPA list page, while oversized caller-controlled pages are split
+    into bounded IN clauses. The single-book helper below delegates to the same
+    derivation. A truthy custom value is finished and is filtered out even if an
+    old IN_PROGRESS ``ReadBook`` row remains underneath it.
     """
-    if user is None or not user.is_authenticated or getattr(user, "is_anonymous", False):
-        return False
+    statuses = {int(book_id): value for book_id, value in book_read_statuses}
+    if not statuses:
+        return set()
+    try:
+        authenticated = (user is not None and user.is_authenticated
+                         and not getattr(user, "is_anonymous", False))
+    except (AttributeError, RuntimeError):
+        # Bare Flask unit contexts and startup/reconnect windows may leave the
+        # LocalProxy unresolved. They have no authenticated per-user state.
+        authenticated = False
+    if not authenticated:
+        return set()
     if read_column_configured:
-        # A finished custom-column value is unambiguous — never in-progress.
-        if read_status_value:
-            return False
-        row = ub.session.query(ub.ReadBook).filter(
-            ub.ReadBook.user_id == int(user.id),
-            ub.ReadBook.book_id == book_id,
-            ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
-        return row is not None
-    return read_status_value == ub.ReadBook.STATUS_IN_PROGRESS
+        # A finished custom-column value is unambiguous — never in-progress,
+        # including when a stale sync row still says otherwise.
+        eligible_ids = sorted(
+            book_id for book_id, value in statuses.items() if not value)
+        if not eligible_ids:
+            return set()
+        in_progress_ids = set()
+        for start in range(0, len(eligible_ids), SQLITE_IN_CHUNK_SIZE):
+            chunk = eligible_ids[start:start + SQLITE_IN_CHUNK_SIZE]
+            rows = ub.session.query(ub.ReadBook.book_id).filter(
+                ub.ReadBook.user_id == int(user.id),
+                ub.ReadBook.book_id.in_(chunk),
+                ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).all()
+            in_progress_ids.update(int(row[0]) for row in rows)
+        return in_progress_ids
+    return {
+        book_id for book_id, value in statuses.items()
+        if value == ub.ReadBook.STATUS_IN_PROGRESS
+    }
+
+
+def book_is_in_progress(book_id, read_status_value, read_column_configured, user):
+    """Return True for one book using the shared batch read-state derivation."""
+    return int(book_id) in book_in_progress_ids(
+        ((book_id, read_status_value),), read_column_configured, user)
 
 
 def reset_reading_position(session, user_id, book_id):
@@ -1016,8 +1093,11 @@ def rename_all_files_on_change(one_book, new_path, old_path, all_new_name, gdriv
                 gd.moveGdriveFileRemote(g_file, all_new_name + '.' + file_format.format.lower())
                 gd.updateDatabaseOnEdit(g_file['id'], all_new_name + '.' + file_format.format.lower())
             else:
-                log.error("File {} not found on gdrive"
-                          .format(old_path, file_format.name + '.' + file_format.format.lower()))
+                log.error(
+                    "File %s not found on gdrive path %s",
+                    file_format.name + '.' + file_format.format.lower(),
+                    old_path,
+                )
 
         # change name in Database
         file_format.name = all_new_name
@@ -1256,6 +1336,177 @@ def delete_book_gdrive(book, book_format):
     return error is None, error
 
 
+class _LocalFormatDelete:
+    """A reversible, same-filesystem format deletion staged for a DB commit."""
+
+    def __init__(self, renamed_files):
+        self.renamed_files = renamed_files
+
+    def restore(self):
+        errors = []
+        for original, quarantine in reversed(self.renamed_files):
+            if not os.path.exists(quarantine):
+                continue
+            if os.path.exists(original):
+                errors.append(
+                    "{} already exists; quarantined copy retained at {}".format(
+                        original, quarantine
+                    )
+                )
+                continue
+            try:
+                os.replace(quarantine, original)
+            except OSError as ex:
+                errors.append("{}: {}".format(original, ex))
+        if errors:
+            return False, "; ".join(errors)
+        return True, None
+
+    def finalize(self):
+        failed = False
+        for _original, quarantine in self.renamed_files:
+            try:
+                os.remove(quarantine)
+            except OSError as ex:
+                failed = True
+                log.error(
+                    "Removing quarantined format file %s failed: %s",
+                    quarantine,
+                    ex,
+                )
+        if failed:
+            return False, "One or more quarantined format files could not be removed"
+        return True, None
+
+
+class _GDriveFormatDelete:
+    """A reversible remote rename, finalized by trashing only after DB commit."""
+
+    def __init__(self, g_file, original_title):
+        self.g_file = g_file
+        self.original_title = original_title
+
+    def restore(self):
+        try:
+            gd.moveGdriveFileRemote(self.g_file, self.original_title)
+            gd.updateDatabaseOnEditStrict(self.g_file["id"], self.original_title)
+            return True, None
+        except Exception as ex:
+            return False, str(ex)
+
+    def finalize(self):
+        try:
+            self.g_file.Trash()
+            gd.deleteDatabaseEntryStrict(self.g_file["id"])
+            return True, None
+        except Exception as ex:
+            return False, str(ex)
+
+
+def _format_quarantine_name(filename):
+    return ".{}.cwng-delete-{}.quarantine".format(filename, uuid4().hex)
+
+
+def _restore_gdrive_after_staging_failure(g_file, original_title):
+    """Reconcile an ambiguous Drive rename by ID, then restore cache state."""
+    try:
+        remote_file = gd.getGdriveFileById(g_file["id"])
+    except Exception as ex:
+        log.warning(
+            "Refreshing Google Drive file %s after a staging failure failed; "
+            "attempting compensation with the existing handle: %s",
+            g_file["id"],
+            ex,
+        )
+        remote_file = g_file
+
+    if remote_file.get("title") != original_title:
+        gd.moveGdriveFileRemote(remote_file, original_title)
+    gd.updateDatabaseOnEditStrict(g_file["id"], original_title)
+
+
+def stage_book_format_delete(book, calibrepath, book_format):
+    """Hide one format reversibly until its ``Data`` deletion commits.
+
+    Local files are atomically renamed within their current directory, which
+    keeps the operation on the same filesystem. Google Drive files receive an
+    equivalent reversible remote rename. Callers must invoke ``restore`` when
+    their database transaction fails and ``finalize`` only after it commits.
+    """
+    normalized_format = book_format.upper()
+    if config.config_use_google_drive:
+        name = next(
+            (
+                entry.name + "." + entry.format.lower()
+                for entry in book.data
+                if entry.format.upper() == normalized_format
+            ),
+            "",
+        )
+        g_file = (
+            gd.getFileFromEbooksFolder(book.path, name, nocase=True) if name else None
+        )
+        if not g_file:
+            return None, _(
+                "Book path %(path)s not found on Google Drive", path=book.path
+            )
+        original_title = g_file["title"]
+        quarantine_title = _format_quarantine_name(original_title)
+        try:
+            gd.moveGdriveFileRemote(g_file, quarantine_title)
+            gd.updateDatabaseOnEditStrict(g_file["id"], quarantine_title)
+        except Exception as ex:
+            try:
+                _restore_gdrive_after_staging_failure(g_file, original_title)
+            except Exception as restore_ex:
+                log.error(
+                    "Restoring Google Drive format for book %s after staging "
+                    "failed; remote bytes may remain quarantined: %s",
+                    book.id,
+                    restore_ex,
+                )
+            return None, _(
+                "Deleting book %(id)s failed: %(message)s", id=book.id, message=ex
+            )
+        return _GDriveFormatDelete(g_file, original_title), None
+
+    if book.path.count("/") != 1:
+        log.error(
+            "Deleting format from database only, book path in database not valid: %s",
+            book.path,
+        )
+        return _LocalFormatDelete([]), _(
+            "Deleting book %(id)s from database only, book path in database not valid: %(path)s",
+            id=book.id,
+            path=book.path,
+        )
+
+    path = os.path.join(calibrepath, book.path)
+    renamed_files = []
+    try:
+        filenames = os.listdir(path)
+        for filename in filenames:
+            if not filename.upper().endswith("." + normalized_format):
+                continue
+            original = os.path.join(path, filename)
+            quarantine = os.path.join(path, _format_quarantine_name(filename))
+            os.replace(original, quarantine)
+            renamed_files.append((original, quarantine))
+    except (IOError, OSError) as ex:
+        restored, restore_error = _LocalFormatDelete(renamed_files).restore()
+        if not restored:
+            log.error(
+                "Restoring staged format files for book %s also failed: %s",
+                book.id,
+                restore_error,
+            )
+        log.error("Deleting book %s failed: %s", book.id, ex)
+        return None, _(
+            "Deleting book %(id)s failed: %(message)s", id=book.id, message=ex
+        )
+    return _LocalFormatDelete(renamed_files), None
+
+
 def reset_password(user_id):
     existing_user = ub.session.query(ub.User).filter(ub.User.id == user_id).first()
     if not existing_user:
@@ -1386,6 +1637,120 @@ def delete_book(book, calibrepath, book_format):
         return delete_book_file(book, calibrepath, book_format)
 
 
+# ############################### Cover cache policy ##################################################################
+#
+# A cover response may be cached for a year. What makes that safe is that the
+# URL changes when the cover changes — the stored copy is never invalidated.
+# Two conditions must BOTH hold before the long lifetime is granted, and they
+# are the whole policy:
+#
+#   1. The URL carries a ``c=`` token that MATCHES this book's current cover
+#      version (``cover_version.cover_version_token`` — microsecond-resolution
+#      ``Books.last_modified``, the column ``mark_book_modified`` stamps). A
+#      token is not taken on trust: an arbitrary or stale ``c=`` value names a
+#      version we are not serving, so it gets the ordinary revalidating answer.
+#      This is also what stops a *series* cover URL — whose ``c=`` is a rolling
+#      calendar stamp, not a book version — from pinning a book cover it fell
+#      through to.
+#   2. The bytes being sent are the ones that URL will ALWAYS name. A request
+#      for ``sm``/``md``/``lg`` whose thumbnail does not exist yet is answered
+#      from the original ``cover.jpg`` while generation is queued in the
+#      background; that response is a *stand-in*, and the same URL will serve
+#      the real thumbnail minutes later. Marking it immutable would pin the
+#      full-size original for a year and defeat the resizing entirely, so a
+#      fallback stays revalidating. ``og`` and the bare ``/cover/<id>`` ask for
+#      the original, so for those the original IS canonical.
+#
+# Anything that fails either condition keeps the framework default —
+# ``Cache-Control: no-cache``, i.e. revalidate against the ETag ``send_file``
+# already emits. That is the behaviour on main for every cover URL, so nothing
+# regresses; caching is added only where it can be proven correct.
+#
+# ``private``, never ``public``, plus an explicit ``Vary: Cookie``:
+# ``get_book_cover`` resolves the book through ``get_filtered_book``, which
+# applies the CURRENT USER's visibility (hidden and archived books included).
+# ``private`` keeps shared caches out; ``Vary: Cookie`` keeps one browser
+# profile from reusing user A's cover for user B after a re-login. Flask
+# already adds that ``Vary`` as a side effect of touching the session — it is
+# restated here so the guarantee is the code's, not a side effect's.
+#
+# What this does NOT cover, stated so nobody reads more into it than is there:
+#   * A cover replaced OUTSIDE the app (editing ``cover.jpg`` on disk, or in
+#     Google Drive, without touching the database) does not move
+#     ``last_modified``. Versioning is only as good as the timestamp, and
+#     out-of-band file edits are not supported by it.
+#   * The token comes from a wall clock. ``mark_book_modified`` guarantees it
+#     strictly increases for SEQUENTIAL writes to one book, which is what a
+#     clock's lack of uniqueness would otherwise break; two genuinely CONCURRENT
+#     writes to the same book read the same previous value and can still land on
+#     one token. That race already decides which cover.jpg survives by
+#     last-write-wins, so both clients end up naming the file that won — but it
+#     is a wall clock, not an atomic revision, and this is where that shows.
+#   * An already-open page keeps the URL it rendered with until it re-renders.
+#     Versioning invalidates on the next fetch, it does not push.
+COVER_VERSIONED_CACHE_CONTROL = "private, max-age=31536000, immutable"
+
+
+def cover_cache_control(book, canonical):
+    """The Cache-Control value for this cover response, or None to leave the
+    framework default (``no-cache``) in place.
+
+    ``canonical`` is the caller's answer to condition 2 above: whether the
+    bytes about to be sent are the ones this URL permanently names.
+    """
+    try:
+        if not canonical:
+            return None
+        from flask import has_request_context, request
+        if not has_request_context():
+            return None
+        token = (request.args.get(COVER_VERSION_ARG) or "").strip()
+        if not token:
+            return None
+        expected = cover_version_token(book)
+        if not expected or token != expected:
+            return None
+        return COVER_VERSIONED_CACHE_CONTROL
+    except Exception:  # pragma: no cover - defensive; never fail a cover request
+        return None
+
+
+def apply_cover_cache_headers(response, book, canonical):
+    """Stamp the immutable policy on a cover response when it is earned, and
+    the revalidating default when it is not.
+
+    The default is set EXPLICITLY rather than relied upon. ``send_file`` emits
+    ``no-cache`` on its own, but the Google Drive branch builds a plain
+    ``Response`` with no cache directives at all — which a browser is free to
+    treat as heuristically fresh. "Everything that does not earn the long
+    lifetime revalidates" is a claim this policy makes, so it has to be written
+    down rather than inherited from whichever helper produced the response.
+    """
+    try:
+        cache_control = cover_cache_control(book, canonical)
+        if cache_control:
+            response.headers["Cache-Control"] = cache_control
+            # Explicit rather than inherited: the cover a user may see depends
+            # on their session, so the browser's cache key must include it.
+            response.vary.add("Cookie")
+        elif not response.headers.get("Cache-Control"):
+            response.headers["Cache-Control"] = "no-cache"
+    except Exception:  # pragma: no cover - defensive; never fail a cover request
+        pass
+    return response
+
+
+def send_cover_from_directory(directory, filename, book, canonical):
+    """``send_from_directory`` for cover bytes, with the cache policy applied.
+
+    ETag / Last-Modified / conditional-304 / Range handling is left to
+    ``send_file`` untouched; this only decides how long the client may reuse the
+    answer without asking again.
+    """
+    return apply_cover_cache_headers(send_from_directory(directory, filename),
+                                     book, canonical)
+
+
 def get_cover_on_failure():
     try:
         return send_from_directory(_STATIC_DIR, "generic_cover.svg")
@@ -1404,7 +1769,9 @@ def get_book_cover(book_id, resolution=None):
 
 
 def get_book_cover_with_uuid(book_uuid, resolution=None):
-    book = calibre_db.get_book_by_uuid(book_uuid)
+    # Kobo cover delivery is part of the scoped sync set. Device-trailing
+    # ownership/state endpoints use enforce_policy=False elsewhere.
+    book = calibre_db.get_book_by_uuid_for_kobo(book_uuid, enforce_policy=True)
     if not book:
         return  # allows kobo.HandleCoverImageRequest to proxy request
     return get_book_cover_internal(book, resolution=resolution)
@@ -1422,8 +1789,11 @@ def get_book_cover_internal(book, resolution=None):
         if resolution:
             cache = fs.FileSystem()
             # Check for both webp and jpg thumbnails, generate missing ones
-            webp_thumb = get_book_cover_thumbnail_by_format(book, resolution, 'webp')
-            jpg_thumb = get_book_cover_thumbnail_by_format(book, resolution, 'jpg')
+            thumbnails = get_book_cover_thumbnails_by_formats(
+                book, resolution, ('webp', 'jpg')
+            )
+            webp_thumb = thumbnails.get('webp')
+            jpg_thumb = thumbnails.get('jpg')
 
             # CWA #1339 (@Altycoder): treat content-stale thumbnails as
             # missing. The Thumbnail table keys on `entity_id = book.id`,
@@ -1502,12 +1872,39 @@ def get_book_cover_internal(book, resolution=None):
                     thumbnail_to_serve = jpg_thumb if jpg_exists else (webp_thumb if webp_exists else None)
                 else:
                     thumbnail_to_serve = webp_thumb if webp_exists else (jpg_thumb if jpg_exists else None)
-            except:
+            except Exception:
                 # Fallback if we can't determine request context
                 thumbnail_to_serve = webp_thumb if webp_exists else (jpg_thumb if jpg_exists else None)
             if thumbnail_to_serve:
-                return send_from_directory(cache.get_cache_file_dir(thumbnail_to_serve.filename, CACHE_TYPE_THUMBNAILS),
-                                           thumbnail_to_serve.filename)
+                # Canonical only when BOTH formats are already on disk and both
+                # carry a generation time.
+                #
+                # Both formats: when one is missing, generation was queued above
+                # and the *other* format is being served as a stand-in — a web
+                # request falls back to JPEG, a Kobo one to WebP. Minutes later
+                # the same URL selects the preferred format instead, so pinning
+                # the stand-in would freeze the wrong representation for a year.
+                #
+                # Both generated_at: a row with no generation time cannot be
+                # compared against book.last_modified, so the staleness check
+                # above cannot prove it belongs to the current cover (that is
+                # exactly the CWA #1339 shape — a thumbnail left behind by a
+                # previous book at the same id). Unprovable is not cacheable.
+                canonical_thumbnail = bool(
+                    webp_exists and jpg_exists
+                    and getattr(webp_thumb, "generated_at", None) is not None
+                    and getattr(jpg_thumb, "generated_at", None) is not None)
+                return send_cover_from_directory(
+                    cache.get_cache_file_dir(thumbnail_to_serve.filename, CACHE_TYPE_THUMBNAILS),
+                    thumbnail_to_serve.filename, book, canonical=canonical_thumbnail)
+
+        # Everything below serves the ORIGINAL cover.jpg. That is canonical only
+        # when the URL asked for the original (``og`` -> COVER_THUMBNAIL_ORIGINAL
+        # == 0, or no resolution at all). Reaching here WITH a resolution means
+        # the thumbnail was missing or stale and generation was queued above —
+        # the same URL will serve the real thumbnail shortly, so this response
+        # must stay revalidating or the full-size stand-in gets pinned for a year.
+        canonical = not resolution
 
         # Send the book cover from Google Drive if configured
         if config.config_use_google_drive:
@@ -1516,7 +1913,8 @@ def get_book_cover_internal(book, resolution=None):
                     return get_cover_on_failure()
                 cover_file = gd.get_cover_via_gdrive(book.path)
                 if cover_file:
-                    return Response(cover_file, mimetype='image/jpeg')
+                    return apply_cover_cache_headers(
+                        Response(cover_file, mimetype='image/jpeg'), book, canonical)
                 else:
                     log.error('{}/cover.jpg not found on Google Drive'.format(book.path))
                     return get_cover_on_failure()
@@ -1528,7 +1926,7 @@ def get_book_cover_internal(book, resolution=None):
         else:
             cover_file_path = os.path.join(config.get_book_path(), book.path)
             if os.path.isfile(os.path.join(cover_file_path, "cover.jpg")):
-                return send_from_directory(cover_file_path, "cover.jpg")
+                return send_cover_from_directory(cover_file_path, "cover.jpg", book, canonical)
             else:
                 return get_cover_on_failure()
     else:
@@ -1549,7 +1947,9 @@ def get_kobo_cover_source_path(book_uuid, resolution):
     directly without going through the Response wrapper that
     get_book_cover_internal returns.
     """
-    book = calibre_db.get_book_by_uuid(book_uuid)
+    # This is the zero-copy version of get_book_cover_with_uuid and therefore
+    # has the same sync-set policy boundary.
+    book = calibre_db.get_book_by_uuid_for_kobo(book_uuid, enforce_policy=True)
     if not book or not book.has_cover:
         return None
     if config.config_use_google_drive:
@@ -1596,6 +1996,27 @@ def get_book_cover_thumbnail_by_format(book, resolution, format):
                 .first())
 
 
+def get_book_cover_thumbnails_by_formats(book, resolution, formats):
+    """Get the first non-expired cover thumbnail for each requested format."""
+    if not book or not book.has_cover:
+        return {}
+
+    thumbnails = (ub.session
+                  .query(ub.Thumbnail)
+                  .filter(ub.Thumbnail.type == THUMBNAIL_TYPE_COVER)
+                  .filter(ub.Thumbnail.entity_id == book.id)
+                  .filter(ub.Thumbnail.resolution == resolution)
+                  .filter(ub.Thumbnail.format.in_(formats))
+                  .filter(or_(ub.Thumbnail.expiration.is_(None),
+                              ub.Thumbnail.expiration > datetime.now(timezone.utc)))
+                  .order_by(ub.Thumbnail.format.asc(), ub.Thumbnail.id.asc())
+                  .all())
+    first_by_format = {}
+    for thumbnail in thumbnails:
+        first_by_format.setdefault(thumbnail.format, thumbnail)
+    return first_by_format
+
+
 def get_series_thumbnail_on_failure(series_id, resolution):
     book = (calibre_db.session
         .query(db.Books)
@@ -1603,6 +2024,8 @@ def get_series_thumbnail_on_failure(series_id, resolution):
         .join(db.Series)
         .filter(db.Series.id == series_id)
         .filter(db.Books.has_cover == 1)
+        .filter(calibre_db.common_filters(allow_show_archived=True,
+                                          allow_show_hidden=True))
         .first())
     return get_book_cover_internal(book, resolution=resolution)
 
@@ -1747,7 +2170,7 @@ def save_cover_from_url(url, book_path):
     except MissingDelegateError as ex:
         log.info(u'File Format Error %s', ex)
         return False, _("Cover Format Error")
-    except UnacceptableAddressException as e:
+    except UnacceptableAddressException:
         log.error("Localhost or local network was accessed for cover upload")
         return False, _("You are not allowed to access localhost or the local network for cover uploads")
     finally:
@@ -1910,7 +2333,7 @@ def do_download_file(book, book_format, client, data, headers):
 
     book_name = data.name
     download_name = filename = None
-    metadata_was_embedded = False  # Track if we embedded metadata
+    metadata_was_embedded = False
 
     if config.config_use_google_drive:
         # startTime = time.time()
@@ -2024,7 +2447,13 @@ def do_download_file(book, book_format, client, data, headers):
                         file_path=exported_file
                     )
         except Exception as e:
-            log.error(f"Failed to calculate/store checksum for book {book.id}: {e}")
+            checksum_source = "embedded" if metadata_was_embedded else "original"
+            log.error(
+                "Failed to calculate/store checksum for book %s from %s file: %s",
+                book.id,
+                checksum_source,
+                e,
+            )
             # Don't fail the download if checksum calculation fails
 
     # Clean up staged copies in /tmp/calibre_web after the response is sent
@@ -2057,7 +2486,7 @@ def do_kepubify_metadata_replace(book, file_path):
 
     tree, cf_name = get_content_opf(file_path)
     package = create_new_metadata_backup(book, custom_columns, current_user.locale, _("Cover"), lang_type=2)
-    content = replace_metadata(tree, package)
+    content = merge_kepub_metadata(tree, package)
     tmp_dir = get_temp_dir()
     temp_file_name = str(uuid4())
     # open zipfile and replace metadata block in content.opf

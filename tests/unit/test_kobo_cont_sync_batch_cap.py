@@ -3,163 +3,117 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-"""Regression tests for the Kobo cont_sync paging signal (PR #248).
+"""Source pins for the Kobo local-continuation invariant.
 
-@ikerios captured a Kobo Forma (FW 4.45.23684) stuck in a sync loop after a
-factory reset: ~3 sync requests/sec for 15+ hours against a 393-book
-library, with logs showing 2 changed entries per request — well below
-``SYNC_ITEM_LIMIT = 100`` — yet the server kept emitting
-``x-kobo-sync: continue``.
+PR #248 established the crucial wire behavior on a Kobo Forma running firmware
+4.45.23684: ``x-kobo-sync: continue`` is a paging signal that makes firmware
+keep its request cursor pinned, not a freshness signal.  It changed the books
+writer from ``bool(book_count)`` to ``book_count > SYNC_ITEM_LIMIT``, fixing
+the loop when the pending set fit in one page.
 
-Root cause in ``cps/kobo.py:HandleSyncRequest``: the books branch set
-``cont_sync = bool(book_count)`` — True for any non-zero count — while the
-reading-states branch seventeen lines below correctly used
-``cont_sync |= bool(changed_reading_states.count() > SYNC_ITEM_LIMIT)``.
-The Kobo protocol treats ``x-kobo-sync: continue`` as a paging signal
-("more pages exist, keep your cursor pinned"), not a freshness signal.
-When the current batch is exhaustive, emitting ``continue`` is a contract
-violation: the firmware suppresses synctoken persistence, the device
-re-requests with the same cursor, the server returns the same rows with
-``continue``, and the loop self-perpetuates.
+Fork #1634 exposed the remaining half of that contract.  A pending set larger
+than the cap still emitted ``continue``; firmware therefore retained the old
+token, and the server selected the same full page forever.  A local page can
+advance only when the device persists the returned token, so no books,
+reading-state, or deletion queue in ``HandleSyncRequest`` may set local
+continuation.  The batch limits remain; each response ends the session and the
+device starts its next session using the advanced cursor.
 
-These tests source-pin that both cont_sync assignments in
-``HandleSyncRequest`` use the same ``> SYNC_ITEM_LIMIT`` semantic — so a
-future refactor can't silently drop the books-branch fix back to the
-``bool(book_count)`` shape.
-
-Complementary to fork #220's tests in ``test_kobo_bug_cluster_2026_05_17.py``,
-which fixed the cursor-advance side (``BookShelf.date_added`` folded into
-``new_books_last_modified``). PR #248 fixes the signal side. Both fixes
-are required for the loop to terminate on ``else``-branch users.
+These source pins preserve #248's protocol finding while enforcing the
+stronger invariant proved by #1634.  The real request/response behavior is
+covered separately by ``test_kobo_cont_sync_firmware_cursor.py``.
 """
 
-import inspect
-import re
-import sys
+import ast
 from pathlib import Path
+
+import pytest
+
+
+pytestmark = pytest.mark.unit
 
 
 def _handle_sync_request_source():
-    """Pull ``HandleSyncRequest`` source via sys.modules so blueprint
-    re-exports can't shadow the submodule attribute.
+    source = (Path(__file__).resolve().parents[2] / "cps" / "kobo.py").read_text()
+    tree = ast.parse(source)
+    handler = next(
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "HandleSyncRequest"
+    )
+    return ast.get_source_segment(source, handler)
 
-    Avoids ``from cps import kobo`` which can trigger Flask app boot and
-    is fragile across pytest import modes.
-    """
-    repo_root = Path(__file__).resolve().parents[2]
-    src = (repo_root / "cps" / "kobo.py").read_text()
-    return src
+
+def _cont_sync_writers(source):
+    tree = ast.parse(source)
+    writers = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "cont_sync"
+            for target in node.targets
+        ):
+            writers.append(node)
+        elif (
+            isinstance(node, (ast.AugAssign, ast.AnnAssign))
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "cont_sync"
+        ):
+            writers.append(node)
+    return writers
 
 
-def _cont_sync_lines(src):
-    """Return every line of source that assigns to ``cont_sync``.
-
-    Books branch uses ``=`` (initial assignment); reading-states branch
-    uses ``|=`` (aggregation). Matching to end-of-line dodges the nested-
-    paren trap that ``[^)]+`` falls into (``bool(x.count() > LIMIT)`` has
-    inner parens).
-    """
-    return re.findall(
-        r"^[ \t]*cont_sync\s*(?:=|\|=)\s*[^\n]+$",
-        src,
-        re.MULTILINE,
+def test_handle_sync_has_one_false_local_continuation_writer():
+    """No local queue may pin the device cursor with ``continue``."""
+    source = _handle_sync_request_source()
+    writers = _cont_sync_writers(source)
+    assert len(writers) == 1, (
+        "HandleSyncRequest must initialize cont_sync exactly once and never "
+        f"rewrite or aggregate it from a local queue; found {len(writers)} "
+        f"writers: {[ast.dump(writer) for writer in writers]}"
+    )
+    writer = writers[0]
+    assert isinstance(writer, ast.Assign)
+    assert isinstance(writer.value, ast.Constant) and writer.value.value is False, (
+        "The sole HandleSyncRequest cont_sync writer must be `False`; any "
+        "local `True` value makes Kobo firmware pin the incoming cursor."
     )
 
 
-def test_books_branch_cont_sync_uses_sync_item_limit_compare():
-    """The books-branch ``cont_sync`` assignment must compare against
-    ``SYNC_ITEM_LIMIT`` — not simply ``bool(book_count)``.
-
-    The broken shape is what stranded @ikerios's Forma at 3 req/sec for
-    15 hours. Pin the corrected pattern by source so a refactor can't
-    revert to the bug.
-    """
-    src = _handle_sync_request_source()
-    lines = _cont_sync_lines(src)
-    initial = [l for l in lines if re.match(r"^[ \t]*cont_sync\s*=\s", l)]
-    assert initial, (
-        "Expected a `cont_sync = ...` initial assignment in cps/kobo.py "
-        "(books-branch paging signal). If the assignment shape changed, "
-        "update this test — but keep the > SYNC_ITEM_LIMIT semantic."
-    )
-    line = initial[0]
-    assert "SYNC_ITEM_LIMIT" in line, (
-        f"The books-branch cont_sync assignment must reference "
-        f"SYNC_ITEM_LIMIT (not just bool(book_count)). Current line: "
-        f"{line!r}. Without the cap comparison, any non-zero book_count "
-        f"emits 'x-kobo-sync: continue', the device suppresses synctoken "
-        f"persistence, and the loop self-perpetuates."
-    )
-    assert ">" in line, (
-        f"The books-branch cont_sync assignment must use the > comparison "
-        f"with SYNC_ITEM_LIMIT (mirror the reading-states branch). "
-        f"Current line: {line!r}"
-    )
+def test_books_stay_page_capped_but_never_request_local_continuation():
+    """#248's batch cap remains while #1634 removes its unsafe signal."""
+    source = _handle_sync_request_source()
+    page = "books_list = changed_entries.limit(SYNC_ITEM_LIMIT).all()"
+    count = "book_count = changed_entries.count()"
+    terminal = "cont_sync = False"
+    assert page in source
+    assert count in source
+    assert terminal in source
+    assert source.index(page) < source.index(count) < source.index(terminal)
+    assert "cont_sync = bool(book_count" not in source
 
 
-def test_reading_states_branch_cont_sync_uses_sync_item_limit_compare():
-    """Defense-in-depth: the reading-states branch was already correct
-    before PR #248 — pin it so a future refactor that "unifies" both
-    branches doesn't accidentally regress this one too.
-    """
-    src = _handle_sync_request_source()
-    lines = _cont_sync_lines(src)
-    aggregations = [l for l in lines if re.match(r"^[ \t]*cont_sync\s*\|=", l)]
-    assert aggregations, (
-        "Expected a `cont_sync |= ...` aggregation in cps/kobo.py "
-        "(reading-states branch). If the aggregation shape changed, "
-        "update this test — but keep the > SYNC_ITEM_LIMIT semantic."
-    )
-    line = aggregations[0]
-    assert "SYNC_ITEM_LIMIT" in line and ">" in line, (
-        f"The reading-states cont_sync |= must compare against "
-        f"SYNC_ITEM_LIMIT with the > operator. Current line: {line!r}"
-    )
+def test_reading_states_stay_page_capped_without_continuation_writer():
+    """A full reading-state page must also let its returned cursor persist."""
+    source = _handle_sync_request_source()
+    assert (
+        "for kobo_reading_state in "
+        "changed_reading_states.limit(SYNC_ITEM_LIMIT).all():"
+    ) in source
+    assert "cont_sync |= bool(changed_reading_states" not in source
+    assert "cont_sync = bool(changed_reading_states" not in source
 
 
-def test_both_count_based_cont_sync_assignments_use_same_pattern():
-    """Both ``cont_sync (=|\\|=) bool(<count>)`` sites must use the same
-    ``> SYNC_ITEM_LIMIT`` shape.
-
-    There's a third ``cont_sync = True`` site downstream that's correctly
-    guarded by an outer ``if len(pending_deletions) >= SYNC_ITEM_LIMIT``
-    block (tombstone-pagination path) — that one doesn't need the inline
-    comparison and is intentionally excluded from this pin.
-    """
-    src = _handle_sync_request_source()
-    bool_lines = [
-        l for l in _cont_sync_lines(src)
-        if re.search(r"bool\s*\(", l)
-    ]
-    assert len(bool_lines) >= 2, (
-        f"Expected at least two `cont_sync (=|\\|=) bool(...)` sites in "
-        f"cps/kobo.py (books branch + reading-states branch); found "
-        f"{len(bool_lines)}: {bool_lines}"
-    )
-    for m in bool_lines:
-        assert "SYNC_ITEM_LIMIT" in m and ">" in m, (
-            f"Every count-based cont_sync assignment must reference "
-            f"SYNC_ITEM_LIMIT with the > operator (paging signal "
-            f"semantics, not freshness). Offending line: {m!r}"
-        )
-
-
-def test_broken_pattern_bool_book_count_alone_is_gone():
-    """The literal broken pattern ``bool(book_count)`` (alone, no
-    comparison) must not appear in ``HandleSyncRequest``. Pinning the
-    exact pre-fix string protects against a copy-paste revert.
-    """
-    src = _handle_sync_request_source()
-    # Allow the variable name to appear in unrelated contexts. The check
-    # is "bool(book_count) followed by close-paren and end-of-expression"
-    # — the broken assignment shape exactly.
-    assert not re.search(
-        r"cont_sync\s*=\s*bool\(\s*book_count\s*\)",
-        src,
-    ), (
-        "The pre-fix `cont_sync = bool(book_count)` pattern must not "
-        "reappear. It treats any non-zero count as 'more pages exist', "
-        "which the Kobo firmware honors by pinning the synctoken — "
-        "infinite sync loop. Use `bool(book_count > SYNC_ITEM_LIMIT)` "
-        "to mirror the reading-states branch."
+def test_deletions_stay_page_capped_without_continuation_writer():
+    """Deletion tombstones page via the persisted archive cursor, not a pin."""
+    source = _handle_sync_request_source()
+    pending_start = source.index("pending_deletions = (")
+    pending_end = source.index("for tombstone in pending_deletions:")
+    pending_query = source[pending_start:pending_end]
+    assert ".limit(SYNC_ITEM_LIMIT)" in pending_query
+    assert "cont_sync = True" not in source
+    assert "cont_sync |= " not in source
+    assert "response = generate_sync_response(sync_token, sync_results)" in source
+    assert source.index("response = generate_sync_response") < source.index(
+        "if ub.session_commit() is False:"
     )

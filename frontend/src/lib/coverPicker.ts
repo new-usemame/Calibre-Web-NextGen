@@ -23,6 +23,11 @@ export interface CoverCandidate {
   height: number | null;
   candidate_id: string | null;
   flags: string[] | null;
+  // Who serves the image bytes, when that differs from the provider that
+  // supplied the metadata — a Hardcover record whose cover we upgraded to an
+  // Amazon image reads 'Amazon' here. Null when it would say nothing. The
+  // server decides; there is no host list on this side (fork #304).
+  image_origin?: string | null;
 }
 
 export type ProviderStatusKind =
@@ -89,6 +94,8 @@ export const EREADER_FILL_MODES: { value: string; label: string }[] = [
   { value: 'dominant', label: 'Solid: most-common colour in the cover' },
   { value: 'average', label: 'Solid: average colour of the cover' },
   { value: 'manual', label: 'Solid: custom colour' },
+  { value: 'stretch', label: 'Stretch to fill — no border, slight distortion' },
+  { value: 'scale_crop', label: 'Crop to fill — no border, trims the edges' },
 ];
 
 // ---- low-level fetch (CSRF + envelope parsing) -------------------------------

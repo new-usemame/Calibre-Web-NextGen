@@ -19,11 +19,14 @@ import json
 import base64
 from pathlib import Path
 
+
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 
+@pytest.mark.usefixtures("koreader_sync_enabled")
 @pytest.mark.docker_integration
 @pytest.mark.slow
 class TestKOSyncChecksumLookup:
@@ -141,6 +144,7 @@ class TestKOSyncChecksumLookup:
         assert float(data['percentage']) == 0.75, "Percentage should be persisted correctly"
 
 
+@pytest.mark.usefixtures("koreader_sync_enabled")
 @pytest.mark.docker_integration
 @pytest.mark.slow
 class TestKOSyncBookEnrichment:
@@ -256,6 +260,7 @@ class TestKOSyncHelperFunctions:
         assert callable(enrich_response_with_book_info)
 
 
+@pytest.mark.usefixtures("koreader_sync_enabled")
 @pytest.mark.docker_integration
 @pytest.mark.slow
 class TestKOSyncAuthentication:
@@ -299,6 +304,7 @@ class TestKOSyncAuthentication:
             assert response.status_code in [401, 403, 404]
 
 
+@pytest.mark.usefixtures("koreader_sync_enabled")
 @pytest.mark.docker_integration
 @pytest.mark.slow
 class TestKOSyncDataValidation:

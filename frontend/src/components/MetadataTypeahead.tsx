@@ -68,7 +68,12 @@ export function MetadataTypeahead(props: Props) {
   const delim = multi ? sep.trim() : null;
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
+  // -1 = nothing chosen yet, so what you typed is what Enter commits. Starting
+  // at 0 pre-selected the first row and Enter silently applied it instead of the
+  // text under the caret, which made a value that merely SHARES a substring with
+  // an existing one impossible to type ("foo" became "Fools and Jesters", #1398).
+  // Manual selection is also what the WAI-ARIA combobox pattern asks for.
+  const [activeIndex, setActiveIndex] = useState(-1);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const caretRef = useRef<number>(value.length);
@@ -98,7 +103,8 @@ export function MetadataTypeahead(props: Props) {
         const data = await res.json();
         const list: string[] = Array.isArray(data?.suggestions) ? data.suggestions : [];
         setSuggestions(list.filter((s) => !currentTokens.has(s.toLowerCase())));
-        setActiveIndex(0);
+        // A fresh list must not silently re-arm Enter on a row nobody picked.
+        setActiveIndex(-1);
       } catch {
         /* aborted or offline — leave the last list, dropdown just won't update */
       }
@@ -179,10 +185,12 @@ export function MetadataTypeahead(props: Props) {
       case 'ArrowUp':
         e.preventDefault();
         if (!open) { openAndFetch(); return; }
-        setActiveIndex((i) => Math.max(i - 1, 0));
+        // From nothing, wrap to the last option; from the first, step back out
+        // to your own text rather than sticking on row 0.
+        setActiveIndex((i) => (i === -1 ? suggestions.length - 1 : i - 1));
         break;
       case 'Enter':
-        if (open && suggestions[activeIndex]) {
+        if (open && activeIndex >= 0 && suggestions[activeIndex]) {
           e.preventDefault();
           choose(suggestions[activeIndex]);
         }

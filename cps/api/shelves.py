@@ -16,8 +16,8 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import api_v1
 from .serializers import serialize_shelf
-from .books import _row_to_item
-from .. import calibre_db, config, db, ub
+from .books import _rows_to_items
+from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
@@ -26,6 +26,8 @@ from ..shelf import (
     check_shelf_is_unique,
     delete_shelf_helper,
     add_book_to_shelf,
+    prepare_user_shelf_add,
+    revert_prepared_user_shelf_add,
     remove_book_from_shelf,
     compute_shelf_positions,
     queue_hardcover_sync,
@@ -34,6 +36,9 @@ from ..shelf import (
     SHELF_OK,
     SHELF_ALREADY_PRESENT,
     SHELF_INVALID_BOOK,
+    SHELF_NOT_IN_LIBRARY,
+    SHELF_MANAGED_MEMBERSHIP_REFUSAL,
+    SHELF_ADD_REFUSAL_INVALID_OWNER,
     SHELF_NOT_PRESENT,
 )
 
@@ -45,6 +50,16 @@ def _uid():
 
 def _err(code, message, status):
     return jsonify({"error": {"code": code, "message": message}}), status
+
+
+def _shelf_add_refusal(ex):
+    message = str(ex) or SHELF_MANAGED_MEMBERSHIP_REFUSAL
+    code = (
+        "invalid_shelf_owner"
+        if getattr(ex, "reason", None) == SHELF_ADD_REFUSAL_INVALID_OWNER
+        else "library_membership_rejected"
+    )
+    return _err(code, message, 403)
 
 
 # ── List ─────────────────────────────────────────────────────────────────────
@@ -95,7 +110,7 @@ def shelf_detail(shelf_id):
 
     body = serialize_shelf(shelf, pagination.total_count, is_owner=(shelf.user_id == _uid()))
     body.update({
-        "items": [_row_to_item(e) for e in entries],
+        "items": _rows_to_items(entries),
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total_count,
@@ -235,14 +250,36 @@ def add_book_to_shelf_api(shelf_id, book_id):
     if not check_shelf_edit_permissions(shelf):
         return _err("forbidden", "You are not allowed to add to this shelf", 403)
 
+    book_was_on_shelf = (ub.session.query(ub.BookShelf)
+                         .filter(ub.BookShelf.shelf == shelf.id,
+                                 ub.BookShelf.book_id == book_id)
+                         .first()) is not None
+    prepared_owner_id = None
+    try:
+        prepared_owner_id = prepare_user_shelf_add(shelf, book_id)
+    except user_library.UserLibraryBookNotFound as ex:
+        return _err("not_found", str(ex), 404)
+    except user_library.UserLibraryError as ex:
+        return _shelf_add_refusal(ex)
+
     try:
         status, message = add_book_to_shelf(shelf, book_id)
+    except user_library.UserLibraryError as ex:
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
+        return _shelf_add_refusal(ex)
     except (OperationalError, InvalidRequestError) as e:
         ub.session.rollback()
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
         return _err("db_error", "Database error: %s" % getattr(e, "orig", e), 500)
+
+    if status != SHELF_OK and (
+            status != SHELF_ALREADY_PRESENT or book_was_on_shelf):
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
 
     if status == SHELF_INVALID_BOOK:
         return _err("not_found", message, 404)
+    if status == SHELF_NOT_IN_LIBRARY:
+        return _err("library_membership_required", message, 409)
     if status == SHELF_ALREADY_PRESENT:
         return _err("conflict", message, 409)
     return jsonify({"shelf_id": shelf_id, "book_id": book_id, "on_shelf": True})

@@ -23,8 +23,8 @@ import json
 import shutil
 from typing import Optional, Tuple
 
-import pwd
-import grp
+import app_paths
+import service_user
 
 from cwa_db import CWA_DB
 from library_paths import get_calibre_metadata_db_path
@@ -46,13 +46,13 @@ except Exception:
 LANGUAGE_TAG_PATTERN = re.compile(r'^[a-z]{2,3}(-[a-z]{2,4})?$', re.IGNORECASE)
 
 ### Global Variables
-dirs_json = "/app/calibre-web-automated/dirs.json"
+dirs_json = str(app_paths.dirs_json())
 # `change_logs_dir` / `metadata_temp_dir` used to be declared here and were never read by
 # anything in this module. Importing cps.constants just to define them pulled the whole
 # Flask web stack into a script that convert_library.py imports at module scope, so both
 # the globals and the import are gone rather than relocated (#995).
 # Log file path
-epub_fixer_log_file = "/config/epub-fixer.log"
+epub_fixer_log_file = str(app_paths.config_dir() / "epub-fixer.log")
 
 ### LOGGING
 # Define the logger
@@ -67,42 +67,27 @@ try:
     file_handler.setFormatter(formatter)
     # Add the handler to the logger
     logger.addHandler(file_handler)
-except FileNotFoundError:
-    # Fallback for test environments where /config might not exist
+except OSError:
+    # Fallback when the log file cannot be opened. This caught only
+    # FileNotFoundError, which was enough while the path was /config: a
+    # missing directory was the only way it failed. The config dir now
+    # resolves to the app root off Docker, which usually exists and may be
+    # read-only (a distro package installs the tree root-owned), so the
+    # failure mode is PermissionError. Importing this module must not depend
+    # on the log file being writable either way.
     stream_handler = logging.StreamHandler()
     LOG_FORMAT = '%(message)s'
     formatter = logging.Formatter(LOG_FORMAT)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
-# Define user and group
-USER_NAME = "abc"
-GROUP_NAME = "abc"
-
 # Kill trigger path
 KILL_TRIGGER_PATH = os.path.join(tempfile.gettempdir(), ".kill_epub_fixer_trigger")
 
-# Get UID and GID (skip if user doesn't exist, e.g., in CI environments)
-uid = None
-gid = None
-try:
-    uid = pwd.getpwnam(USER_NAME).pw_uid
-    gid = grp.getgrnam(GROUP_NAME).gr_gid
-except KeyError:
-    # User/group doesn't exist (e.g., in CI/test environments)
-    # This is okay - just skip ownership operations
-    pass
-
-# Set permissions for log file (skip on network shares or if uid/gid not available)
-if uid is not None and gid is not None:
-    try:
-        nsm = os.getenv("NETWORK_SHARE_MODE", "false").strip().lower() in ("1", "true", "yes", "on")
-        if not nsm:
-            subprocess.run(["chown", f"{uid}:{gid}", epub_fixer_log_file], check=True)
-        else:
-            print(f"[cwa-kindle-epub-fixer] NETWORK_SHARE_MODE=true detected; skipping chown of {epub_fixer_log_file}", flush=True)
-    except subprocess.CalledProcessError as e:
-        print(f"[cwa-kindle-epub-fixer] An error occurred while attempting to set ownership of {epub_fixer_log_file} to abc:abc. See the following error:\n{e}", flush=True)
+# Hand the log file to the service account. service_user skips this when there
+# is no such account, which is the normal case outside the container.
+service_user.chown_to_service_user(
+    epub_fixer_log_file, "[cwa-kindle-epub-fixer]", recursive=False)
 
 
 def print_and_log(string, log=True) -> None:
@@ -370,7 +355,7 @@ class EPUBFixer:
     def _get_metadata_db_path(self) -> str:
         """Get the path to metadata.db considering split library configuration."""
         try:
-            app_db = "/config/app.db"
+            app_db = str(app_paths.app_db_path())
             if not os.path.isfile(app_db):
                 return get_calibre_metadata_db_path(dirs_json)
             con = sqlite3.connect(Path(app_db).as_uri() + "?mode=ro", uri=True, timeout=30)
@@ -445,7 +430,10 @@ class EPUBFixer:
         """Backup original file"""
         if self.cwa_settings['auto_backup_epub_fixes']:
             try:
-                output_path = f"/config/processed_books/fixed_originals/"
+                output_path = str(
+                    app_paths.processed_books_dir() / "fixed_originals"
+                )
+                os.makedirs(output_path, exist_ok=True)
                 shutil.copy2(epub_path, output_path)
             except Exception as e:
                 print_and_log(f"[cwa-kindle-epub-fixer] ERROR - Error occurred when backing up {epub_path} to {output_path}:\n{e}", log=self.manually_triggered)
@@ -1249,7 +1237,7 @@ class EPUBFixer:
 
 
 def get_library_location() -> str:
-    con = sqlite3.connect("/config/app.db", timeout=30)
+    con = sqlite3.connect(str(app_paths.app_db_path()), timeout=30)
     cur = con.cursor()
     split_library = cur.execute('SELECT config_calibre_split FROM settings;').fetchone()[0]
 
@@ -1258,11 +1246,11 @@ def get_library_location() -> str:
         con.close()
         return split_path
     else:
-        dirs = {}
-        with open('/app/calibre-web-automated/dirs.json', 'r') as f:
-            dirs: dict[str, str] = json.load(f)
-        library_dir = f"{dirs['calibre_library_dir']}/"
-        return library_dir
+        # The module-level `dirs_json`, not a fresh app_paths lookup: it is the
+        # same value, and it is the seam the rest of this module (and its tests)
+        # already resolve through. app_paths adds the per-key environment and
+        # safe default layers while preserving this function's trailing slash.
+        return f"{app_paths.calibre_library_dir(dirs_json)}/"
 
 # Calibre's own bookkeeping directories inside the library root. Matched by
 # exact name so that a book whose author or title legitimately begins with a

@@ -53,8 +53,15 @@ function gridBookLinks(page: Page) {
 
 test.describe('library infinite scroll', () => {
   test.beforeEach(async ({ page }) => {
-    // Keep the optional Discover links out of the book-grid count.
-    await page.addInitScript(() => localStorage.setItem('cwng_discover_hidden_v1', '1'));
+    // Keep the optional Discover links out of the book-grid count. Authenticated
+    // preferences are server-authoritative, so make /me explicit for this page
+    // instead of seeding a local key that may correctly be ignored.
+    await page.route('**/api/v1/auth/me', async (route) => {
+      const response = await route.fetch();
+      const me = await response.json();
+      me.preferences = { ...(me.preferences ?? {}), discover_hidden: true };
+      await route.fulfill({ response, json: me });
+    });
   });
 
   test('Load more fetches the next page when IntersectionObserver never fires (#704)', async ({ page }) => {
@@ -191,6 +198,97 @@ test.describe('library infinite scroll', () => {
       firstPageSizes,
       'page 1 is fetched once, at the measured column count — not once per guess and once per measurement',
     ).toHaveLength(1);
+    assertNoPageErrors(errors);
+  });
+
+  test('deep scrolling windows whole catalog rows while preserving scroll reach (#1813)', async ({ page }) => {
+    await page.addInitScript(() => {
+      class NeverIntersectingObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+        takeRecords() { return []; }
+      }
+      window.IntersectionObserver = NeverIntersectingObserver as unknown as typeof IntersectionObserver;
+    });
+
+    const total = 600;
+    let perPage = 0;
+    let highestPage = 0;
+    let releaseFirstPage!: () => void;
+    const firstPageGate = new Promise<void>((resolve) => { releaseFirstPage = resolve; });
+    await page.route('**/api/v1/books?**', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const url = new URL(route.request().url());
+      if (url.pathname !== '/api/v1/books') return route.continue();
+      const requestedPage = Number(url.searchParams.get('page'));
+      perPage = Number(url.searchParams.get('per_page'));
+      highestPage = Math.max(highestPage, requestedPage);
+      const firstId = (requestedPage - 1) * perPage + 1;
+      const lastId = Math.min(requestedPage * perPage, total);
+      if (requestedPage === 1) await firstPageGate;
+      await route.fulfill({
+        json: {
+          items: Array.from({ length: lastId - firstId + 1 }, (_, index) => fakeBook(firstId + index)),
+          page: requestedPage,
+          per_page: perPage,
+          total,
+        },
+      });
+    });
+
+    const errors = collectPageErrors(page);
+    await page.goto('/app');
+    const grid = page.getByTestId('catalog-grid');
+    await expect(grid).toHaveAttribute('data-virtualized-grid', 'true');
+
+    // Prove the loading/loaded conditional no longer replaces the grid node: a
+    // property attached while page 1 is held at the network boundary survives
+    // the response, every appended page, and every window move.
+    await grid.evaluate((element) => { element.dataset.stableNodeProbe = 'kept'; });
+    releaseFirstPage();
+    await expect(gridBookLinks(page).first()).toBeVisible();
+
+    const loadMore = page.getByRole('button', { name: 'Load more' });
+    for (let pageNumber = 2; pageNumber <= 20; pageNumber += 1) {
+      await loadMore.click();
+      await expect.poll(() => highestPage, { message: `catalog requested page ${pageNumber}` })
+        .toBe(pageNumber);
+      await expect(loadMore).toBeEnabled();
+    }
+
+    const accumulated = perPage * highestPage;
+    expect(accumulated).toBeGreaterThan(100);
+    const mountedNearTop = await gridBookLinks(page).count();
+    expect(mountedNearTop, 'window should mount far fewer cards than the accumulator holds')
+      .toBeLessThan(accumulated / 2);
+    await expect(grid).toHaveAttribute('data-stable-node-probe', 'kept');
+
+    const deepestLoaded = page.getByRole('link', {
+      name: `Open details for Mock pagination book ${accumulated}`,
+      exact: true,
+    });
+    // Row measurements refine the initial scrollbar estimate. Repeat the
+    // bottom jump a few times so the assertion follows that settling geometry
+    // instead of depending on the first estimate being exact.
+    for (let attempt = 0; attempt < 5 && !(await deepestLoaded.count()); attempt += 1) {
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.waitForTimeout(100);
+    }
+    await expect(deepestLoaded).toBeVisible();
+    await expect(page.getByRole('link', {
+      name: 'Open details for Mock pagination book 1',
+      exact: true,
+    })).toHaveCount(0);
+    expect(await grid.getByTestId('catalog-grid-spacer-before').evaluate((element) =>
+      element.getBoundingClientRect().height)).toBeGreaterThan(0);
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(page.getByRole('link', {
+      name: 'Open details for Mock pagination book 1',
+      exact: true,
+    })).toBeVisible();
+    await expect(grid).toHaveAttribute('data-stable-node-probe', 'kept');
     assertNoPageErrors(errors);
   });
 });

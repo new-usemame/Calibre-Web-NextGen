@@ -10,7 +10,7 @@ from flask import jsonify, request
 from sqlalchemy import func
 
 from . import api_v1
-from .books import SORT_MAP, _row_to_item
+from .books import SORT_MAP, _rows_to_items
 from .. import calibre_db, config, db
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
@@ -120,7 +120,7 @@ def advanced_search():
                     .replace("Read Status = 'False'", "Unread"))
 
     return jsonify({
-        "items": [_row_to_item(r) for r in rows],
+        "items": _rows_to_items(rows),
         "page": page,
         "per_page": per_page,
         "total": total,

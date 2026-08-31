@@ -131,7 +131,11 @@ test('a permitted user gets a delete action that confirms, calls the delete endp
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
 
-  const del = page.getByRole('button', { name: 'Delete book' });
+  // #1939 renamed the accessible name to disambiguate irreversible global
+  // deletion from "remove from my library". The flow this test guards (#803) -
+  // confirm dialog, whole-book delete endpoint, return to the library - is
+  // unchanged.
+  const del = page.getByRole('button', { name: 'Delete from the global library' });
   await expect(del).toBeVisible({ timeout: 10_000 });
 
   // Clicking fires the confirm dialog, then a POST to the whole-book delete
@@ -169,7 +173,10 @@ test('the delete action is hidden for a user without the delete role (#803)', as
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
   // The page has rendered (an existing action is present) but delete is absent.
   await expect(page.getByRole('button', { name: /Mark as (read|unread)/ })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole('button', { name: 'Delete book' })).toHaveCount(0);
+  // #1939 renamed the book-detail destructive control's accessible name. This
+  // absence assertion MUST track the rename: against the old name it would now
+  // pass whether or not the control is hidden, i.e. prove nothing.
+  await expect(page.getByRole('button', { name: 'Delete from the global library' })).toHaveCount(0);
 });
 
 test('book detail with a "More by" strip has no horizontal overflow on mobile', async ({ page }) => {
@@ -290,4 +297,73 @@ test('long title, author and series tokens add no horizontal overflow', async ({
   // is the measurement that localised the bug, so pin it directly.
   const titleExcess = await page.locator('main h1').evaluate((el) => el.scrollWidth - el.clientWidth);
   expect(titleExcess, 'the title must wrap inside its column, not overflow it').toBeLessThanOrEqual(1);
+});
+
+// #1828 — the mobile book page buried the description under ~two screens of
+// action chips, a heavy delete block and the attribute list. The redesign puts
+// the description directly under the title/author on narrow viewports, with
+// the action row, tags and metadata after it. Desktop keeps its historical
+// order (actions first, description last) — pinned by the second test.
+//
+// The description and a publisher row are stubbed into the detail payload so
+// the assertions do not depend on what the seed library happens to carry.
+
+async function stubDescription(page: Page, bookId: number) {
+  await page.route(`**/api/v1/books/${bookId}`, async (route) => {
+    const res = await route.fetch();
+    const book = await res.json();
+    book.description_html = '<p>Reading-order sentinel description.</p>';
+    book.publishers = [{ id: 990201, name: 'Sentinel Publisher' }];
+    await route.fulfill({ response: res, json: book });
+  });
+}
+
+test('mobile reading order: description precedes the action row and the attribute list (#1828)', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/app');
+  const bookId = await firstBookId(page);
+  test.skip(bookId == null, 'seed has no books');
+  await stubDescription(page, bookId!);
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const description = page.getByText('Reading-order sentinel description.');
+  await expect(description).toBeVisible({ timeout: 10_000 });
+  const actions = page.getByTestId('book-actions');
+  await expect(actions).toBeVisible();
+  const metaList = page.locator('main dl');
+  await expect(metaList).toContainText('Sentinel Publisher');
+
+  const descBox = (await description.boundingBox())!;
+  const actionsBox = (await actions.boundingBox())!;
+  const metaBox = (await metaList.boundingBox())!;
+
+  expect(
+    descBox.y + descBox.height,
+    'the description must end above the action row on mobile, not follow it',
+  ).toBeLessThanOrEqual(actionsBox.y + 1);
+  expect(
+    actionsBox.y + actionsBox.height,
+    'the action row must end above the attribute list on mobile',
+  ).toBeLessThanOrEqual(metaBox.y + 1);
+});
+
+test('desktop layout is unchanged: the action row still precedes the description (#1828)', async ({ page, isMobile }) => {
+  test.skip(isMobile === true, 'desktop layout assertion — the mobile project emulates a handset');
+  await page.goto('/app');
+  const bookId = await firstBookId(page);
+  test.skip(bookId == null, 'seed has no books');
+  await stubDescription(page, bookId!);
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const description = page.getByText('Reading-order sentinel description.');
+  await expect(description).toBeVisible({ timeout: 10_000 });
+  const actions = page.getByTestId('book-actions');
+  await expect(actions).toBeVisible();
+
+  const descBox = (await description.boundingBox())!;
+  const actionsBox = (await actions.boundingBox())!;
+  expect(
+    actionsBox.y + actionsBox.height,
+    'desktop must keep the action row above the description',
+  ).toBeLessThanOrEqual(descBox.y + 1);
 });

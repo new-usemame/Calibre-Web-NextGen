@@ -6,3 +6,13 @@
 Dockerfile text eol=lf
 *.yml text eol=lf
 **/run text eol=lf
+
+# Append-only bookkeeping files: every squash-merge to main re-poisons every
+# open PR at the same append point (OBSERVED 2026-08-24: one CHANGELOG commit
+# put nine PRs into CONFLICTING; 10 of 11 blocked PRs had zero code conflict).
+# `union` is git's built-in keep-both-sides driver — correct for this file
+# class because entries are an unordered set of appends with no competing line.
+# See state/rollback/FINDING-20260824-changelog-serializes-the-merge-queue.md
+# in the project tree. Undo = delete these two lines.
+CHANGELOG.md merge=union
+findings/INDEX.md merge=union

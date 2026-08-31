@@ -39,7 +39,13 @@ See https://github.com/adobe-type-tools/cmap-resources
 	  <script src="{{ url_for('static', filename='js/libs/pdf.mjs') }}" type="module"></script>
 
     <script type="text/javascript">
-    window.addEventListener('webviewerloaded', function() {
+    (function () {
+      function configureViewer() {
+        // Delivered on a shared target (see below), so this can be woken by a
+        // sibling viewer's load before our own script has run. Setting options
+        // that do not exist yet would throw and, worse, consume the one-shot
+        // registration — leaving this viewer unconfigured. Wait for the next.
+        if (typeof PDFViewerApplicationOptions === 'undefined') { return; }
         PDFViewerApplicationOptions.set('disableAutoFetch', true);
         PDFViewerApplicationOptions.set('disableRange', false);
         PDFViewerApplicationOptions.set('disableStream', true);
@@ -49,7 +55,37 @@ See https://github.com/adobe-type-tools/cmap-resources
         PDFViewerApplicationOptions.set('imageResourcesPath', "{{ url_for('static', filename='css/images/') }}");
         PDFViewerApplicationOptions.set('workerSrc', "{{ url_for('static', filename='js/libs/pdf.worker.mjs') }}");
         PDFViewerApplicationOptions.set('defaultUrl',"{{ url_for('web.serve_book', book_id=pdffile, book_format='pdf') }}")
-    });
+        // Configured — stop listening. Done here rather than with `once` so an
+        // early wake-up above does not spend the registration.
+        target.removeEventListener('webviewerloaded', configureViewer);
+        if (target !== document) {
+          document.removeEventListener('webviewerloaded', configureViewer);
+        }
+      }
+
+      // pdf.js fires 'webviewerloaded' on parent.document whenever it can reach
+      // it — that is its hook for an embedding page — and only falls back to its
+      // own document when the parent is cross-origin. Embedded same-origin (the
+      // new UI's reader iframe) the event therefore never arrives here, every
+      // option above was skipped, and the viewer fell back to its packaged
+      // default workerSrc of '../build/pdf.worker.mjs', which this app does not
+      // ship. The worker 404'd, the fake-worker fallback 404'd with it, and the
+      // document rendered zero pages. Listen wherever the event will actually be
+      // delivered — and, when that is the parent, on our own document too, since
+      // pdf.js falls back there if reaching the parent ever fails. The handler
+      // unregisters itself once it has configured a viewer, so a long-lived
+      // parent (the SPA shell) does not accumulate a handler per PDF opened.
+      var target = document;
+      try {
+        if (window.parent && window.parent !== window && window.parent.document) {
+          target = window.parent.document;
+        }
+      } catch (e) { /* cross-origin parent: pdf.js will dispatch on our document */ }
+      target.addEventListener('webviewerloaded', configureViewer);
+      if (target !== document) {
+        document.addEventListener('webviewerloaded', configureViewer);
+      }
+    })();
     </script>
 
     <script src="{{ url_for('static', filename='js/libs/viewer.mjs') }}" type="module"></script>

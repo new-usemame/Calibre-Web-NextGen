@@ -82,8 +82,19 @@
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
+/* #1396 — non-editor tags view: the default 220px minimum fills 5-6 columns
+   at typical desktop widths, leaving tag names too narrow to display without
+   ellipsis. Raise the floor to 300px (~4 columns) so names have room to
+   breathe without collapsing other browse lists (authors, series, etc.). */
+.gridTags {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
 .grid > * {
   animation: fadeRise var(--dur-base) var(--ease-out) both;
+  /* 10k-entity libraries: off-screen cells cost no render work (#1813). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
 }
 
 /* #1396 — the name is the content of this page, so let it take a second line
@@ -99,7 +110,11 @@
 }
 
 .list { display: flex; flex-direction: column; gap: var(--sp-1); max-width: 760px; }
-.list > * { animation: fadeRise var(--dur-base) var(--ease-out) both; }
+.list > * {
+  animation: fadeRise var(--dur-base) var(--ease-out) both;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
+}
 .list .item { min-height: 40px; padding-block: var(--sp-2); border-radius: var(--r-sm); }
 
 @media (max-width: 600px) {

@@ -1,0 +1,54 @@
+# A CWNG dev instance that runs THIS worktree's code.
+#
+# docker-compose.dev-live.yml bind-mounts ../repo/cps, so every worktree that
+# uses it silently runs whatever branch the shared repo/ checkout happens to be
+# on -- which is not necessarily yours, and changes under you when another
+# session switches branches. This file mounts ../cps instead, so it always runs
+# the tree it is launched from.
+#
+# State lives outside the repo so two worktrees can run at once without fighting
+# over one config dir, and so a 250 MB library never lands on the boot volume:
+#
+#   export CWNG_DEV_STATE="/Volumes/Crucial X8/cwng-koreader-dev"
+#   docker compose -f local-dev/docker-compose.worktree.yml up -d
+#
+# Port and container name are overridable so several worktrees can be up
+# simultaneously: CWNG_DEV_PORT=8088 CWNG_DEV_NAME=cwn-wt-other docker compose ...
+# The explicit project name is load-bearing, not cosmetic. Compose derives the
+# project from the directory, so without it this file shares project "local-dev"
+# with docker-compose.local.yml -- and because both declare a service named
+# calibre-web-nextgen, bringing this one up DESTROYS the other's container even
+# though the container_name differs. That is exactly what happened once.
+name: cwng-worktree
+
+services:
+  calibre-web-nextgen:
+    image: calibre-web-nextgen:local
+    container_name: ${CWNG_DEV_NAME:-cwn-worktree}
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=America/New_York
+      - NETWORK_SHARE_MODE=false
+      - CWNG_SPA=1
+    volumes:
+      - ${CWNG_DEV_STATE:?set CWNG_DEV_STATE to a directory holding config/ library/ ingest/}/config:/config
+      - ${CWNG_DEV_STATE}/ingest:/cwa-book-ingest
+      - ${CWNG_DEV_STATE}/library:/calibre-library
+      - ../cps:/app/calibre-web-automated/cps
+      - ../scripts:/app/calibre-web-automated/scripts
+    ports:
+      - "${CWNG_DEV_PORT:-8087}:8083"
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-fL", "http://localhost:8083/"]
+      interval: 15s
+      timeout: 10s
+      start_period: 45s
+      retries: 4
+    networks:
+      - default
+
+networks:
+  default:
+    name: ${CWNG_DEV_NETWORK:-cwng-worktree-dev}

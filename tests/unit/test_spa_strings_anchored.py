@@ -28,6 +28,21 @@ pytestmark = pytest.mark.unit
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _SCRIPT = os.path.join(_REPO, "scripts", "extract_spa_strings.py")
 _FUZZY_SCRIPT = os.path.join(_REPO, "scripts", "check_spa_fuzzy.py")
+_USER_NOTICES = os.path.join(_REPO, "frontend", "src", "components", "UserNotices.tsx")
+
+_KOBO_REPAIR_NOTICE_MSGIDS = (
+    "We repaired this book for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove the book from your Kobo and let it download again.",
+    "We repaired this book for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove the book from your Kobo and let it download again. If you read it some other way, download it again to get the repaired copy.",
+    "We repaired {count} books for your Kobo. If you were having trouble highlighting, try after sync — and if it still doesn’t work, remove them from your Kobo and let them download again.",
+)
+
+_SUPERSEDED_KOBO_REPAIR_CAVEATS = (
+    "Older highlights may still need to be recreated",
+    "Highlights you made before the repair may not come back",
+    "highlights created before the repair may remain invisible",
+    "highlights may not come back",
+    "highlights may not return",
+)
 
 
 def _load_extractor():
@@ -51,6 +66,37 @@ def test_every_static_spa_translation_key_is_anchored():
         f"and will render untranslated (issue #719). Run "
         f"`python scripts/extract_spa_strings.py --write`. Missing: {missing[:20]}"
     )
+
+
+def test_operator_chosen_kobo_repair_notices_are_exact_and_anchored():
+    """#1748's final English is a fixed invariant, not editable chrome.
+
+    The generic extraction gate follows whatever the frontend currently says,
+    so it cannot reject a coordinated reword. Pin each exact call and anchor;
+    the e2e coverage separately proves each complete sentence is rendered.
+    """
+    with open(_USER_NOTICES, encoding="utf-8") as source_file:
+        frontend = source_file.read()
+    with open(extractor.SPA_STRINGS, encoding="utf-8") as source_file:
+        anchors = source_file.read()
+
+    for msgid in _KOBO_REPAIR_NOTICE_MSGIDS:
+        assert frontend.count(f"t('{msgid}'") == 1, (
+            f"operator-chosen Kobo repair notice changed or is not a single t() call: {msgid!r}")
+        assert anchors.count(f'_("{msgid}")') == 1, (
+            f"operator-chosen Kobo repair notice lacks its exact extraction anchor: {msgid!r}")
+
+
+def test_operator_chosen_kobo_repair_notices_omit_superseded_caveats():
+    """The final #1748 decision deliberately removed every earlier caveat."""
+    with open(_USER_NOTICES, encoding="utf-8") as source_file:
+        frontend = source_file.read()
+    with open(extractor.SPA_STRINGS, encoding="utf-8") as source_file:
+        active_copy = frontend + source_file.read()
+
+    for caveat in _SUPERSEDED_KOBO_REPAIR_CAVEATS:
+        assert caveat.casefold() not in active_copy.casefold(), (
+            f"superseded Kobo repair caveat returned: {caveat!r}")
 
 
 @pytest.mark.parametrize(

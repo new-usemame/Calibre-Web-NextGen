@@ -13,14 +13,79 @@ import sys
 # This guard cares about heading identity, not date typography.
 RELEASE_HEADING = re.compile(r"^## \[(v\d+\.\d+\.\d+)\]", re.MULTILINE)
 ENTRY_LEAD = re.compile(r"^- \*\*", re.MULTILINE)
+FRAGMENT_PATH = re.compile(r"^changelog\.d/[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
+NON_SHIPPING_PATH_PREFIXES = (
+    # Translation refreshes ship, but a .po/.pot-only diff is not a release-note
+    # event an outside translator should have to author (operator ruling
+    # 2026-08-27; #1896 was forced to invent a fragment).
+    "cps/translations/",
+    "docs/",
+    # Example configuration files document; they do not ship.
+    "examples/",
+    "findings/",
+    "frontend/e2e/",
+    # The runtime image deletes frontend/ and copies only the Vite-built bundle
+    # from cps/static/app, so frontend test sources never ship (Dockerfile
+    # steps 6 and 6.1).
+    "frontend/tests/",
+    "notes/",
+    # Agent mission records. Unreachable until PR #2034, because every earlier
+    # `state/`-only commit rode inside a PR that also carried shipping code and
+    # was covered by that PR's fragment. The first state-only PR went red, and
+    # the only way to satisfy the guard would have been to invent a user-facing
+    # entry for a note recording which SHAs merged.
+    "state/",
+    "tests/",
+    "wiki-src/",
+)
+NON_SHIPPING_PATHS = frozenset(
+    {
+        # The upstream-comparison ledger records changes that have ALREADY
+        # shipped, with their squash SHA and containing release tag. A
+        # post-release backfill of those fields is bookkeeping about the past,
+        # so demanding a release-note fragment for it can only be satisfied by
+        # inventing a duplicate entry for a change the changelog already
+        # carries (OBSERVED 2026-08-28: the v4.1.42 backfill PR went red here).
+        "CHANGES-vs-upstream.md",
+        "changelog.d/README.md",
+        "messages.pot",
+        "scripts/check_changelog_diff.py",
+    }
+)
+
+
+def _distinct_entries(text: str) -> set[str]:
+    """The set of distinct top-level release-note bullets in ``text``.
+
+    A bullet runs from its ``- **`` line to the next bullet or heading, and is
+    normalised on whitespace so that a re-wrap is not read as a different entry.
+
+    DISTINCT, not a count, because two concurrent PRs can each move the same
+    entry into the same section: git merges both insertions cleanly and the file
+    ends up carrying one bullet twice. Removing the copy takes the raw count
+    down by one while losing nothing, and a count-based guard fires on that
+    repair -- red on the correct fix, with no way to say so. Comparing distinct
+    bodies keeps every case the count caught: swallowing two entries into one
+    still drops a distinct body, and a pure re-wording still contributes exactly
+    one body before and after.
+    """
+    entries: set[str] = set()
+    for block in re.split(r"^(?=- \*\*)|^(?=#)", text, flags=re.MULTILINE):
+        if not block.startswith("- **"):
+            continue
+        entries.add(" ".join(block.split()))
+    return entries
 
 
 def structural_regressions(base: str, proposed: str) -> list[str]:
     """Return user-facing errors for structure lost from ``base``."""
     errors: list[str] = []
 
-    base_entries = len(ENTRY_LEAD.findall(base))
-    proposed_entries = len(ENTRY_LEAD.findall(proposed))
+    # Counts, not a set difference: re-wording an entry replaces one body with
+    # another, so every body in `base` legitimately disappears on a re-word and
+    # a set difference would reject the edit this guard exists to allow.
+    base_entries = len(_distinct_entries(base))
+    proposed_entries = len(_distinct_entries(proposed))
     if proposed_entries < base_entries:
         errors.append(
             "CHANGELOG.md loses "
@@ -51,6 +116,50 @@ def pull_request_regressions(
     return structural_regressions(target, proposed)
 
 
+def _is_non_shipping_path(path: str) -> bool:
+    return path in NON_SHIPPING_PATHS or path.startswith(
+        NON_SHIPPING_PATH_PREFIXES
+    )
+
+
+def changelog_requirement_errors(changed_paths: list[str]) -> list[str]:
+    """Require a changelog entry unless every changed path is non-shipping."""
+    if not changed_paths:
+        # A pull request that changes no file ships nothing, so there is
+        # nothing to announce. This is not hypothetical: a `-s ours`
+        # back-merge that reconnects a hotfix tag to main has an empty tree
+        # diff by design, and the `changed_paths and` guard below (added so
+        # that all([]) could not vacuously pass) sent it here instead, where
+        # it was refused for "changing shipping paths" it had not touched.
+        return []
+    if "CHANGELOG.md" in changed_paths:
+        return []
+    if any(
+        FRAGMENT_PATH.fullmatch(path) and path != "changelog.d/README.md"
+        for path in changed_paths
+    ):
+        return []
+    if changed_paths and all(_is_non_shipping_path(path) for path in changed_paths):
+        return []
+    return [
+        "This PR changes shipping paths but neither CHANGELOG.md nor "
+        "changelog.d/<pr-or-slug>.md. Add a categorized changelog fragment; "
+        "changelog.d/README.md documents the format."
+    ]
+
+
+def pull_request_errors(
+    changed_paths: list[str],
+    target: str,
+    branch_point: str,
+    proposed: str,
+) -> list[str]:
+    """Return every requirement and structural error for a pull request."""
+    errors = changelog_requirement_errors(changed_paths)
+    errors.extend(pull_request_regressions(target, branch_point, proposed))
+    return errors
+
+
 def _file_at(ref: str) -> str:
     result = subprocess.run(
         ["git", "show", f"{ref}:CHANGELOG.md"],
@@ -79,6 +188,34 @@ def _merge_base(base_ref: str, head_ref: str) -> str:
     return result.stdout.strip()
 
 
+def _changed_paths(branch_point: str, head_ref: str, cwd=None) -> list[str]:
+    # --no-renames, deliberately. With rename detection on, `git mv` out of a
+    # shipping directory is reported by its DESTINATION only, so
+    # `git mv cps/thing.py docs/thing.py` reaches the classifier as a lone
+    # `docs/` path -- non-shipping -- and a module that vanished from the
+    # application merges with no release note. Splitting the rename into its
+    # delete and its add keeps the shipping side visible to the guard.
+    result = subprocess.run(
+        ["git", "diff", "--no-renames", "--name-only", "-z", branch_point, head_ref],
+        check=False,
+        capture_output=True,
+        # `cwd` exists so a test can point this at a throwaway repository
+        # WITHOUT chdir()ing the process. A test-local chdir is global to the
+        # interpreter and perturbs anything running on a background thread.
+        cwd=cwd,
+    )
+    if result.returncode:
+        detail = result.stderr.decode(errors="replace").strip() or "git diff failed"
+        raise RuntimeError(
+            f"cannot list PR paths between {branch_point} and {head_ref}: {detail}"
+        )
+    return [
+        raw.decode("utf-8", errors="surrogateescape")
+        for raw in result.stdout.split(b"\0")
+        if raw
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Reject structural CHANGELOG.md loss between two git refs."
@@ -89,7 +226,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         branch_point = _merge_base(args.base_ref, args.head_ref)
-        errors = pull_request_regressions(
+        errors = pull_request_errors(
+            _changed_paths(branch_point, args.head_ref),
             _file_at(args.base_ref),
             _file_at(branch_point),
             _file_at(args.head_ref),
@@ -106,7 +244,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         "CHANGELOG integrity guard passed: "
-        "no PR-authored release structure was lost."
+        "the entry requirement is satisfied or every changed path is "
+        "non-shipping, and no PR-authored release structure was lost."
     )
     return 0
 

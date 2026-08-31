@@ -43,6 +43,14 @@
    still has a visible edge. Matches the shared BookCover frame and EditBook. */
 .cover {
   width: 100%;
+  height: auto;
+  /* Reserve the cover's box before the image arrives, the way .coverFallback
+     below already does. `auto 2 / 3` is the two-value form: a replaced element
+     that HAS a natural ratio keeps its own, so a cover that isn't 2:3 is never
+     stretched or letterboxed — the 2/3 applies only while there is no image
+     yet. (A browser that doesn't parse the two-value form drops the whole
+     declaration and behaves exactly as before.) */
+  aspect-ratio: auto 2 / 3;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--cover-shadow);
@@ -428,7 +436,35 @@
   background: var(--surface-2);
 }
 
-/* Destructive whole-book delete (fork #803). Same shape as .downloadBtn, danger-tinted. */
+.highlightCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Whole-book deletion stays separate from the ordinary-actions row (#1046),
+   but the region itself is intentionally quiet; danger emphasis belongs to
+   the control that performs the destructive action (#1862). */
+.dangerZone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding: var(--sp-4) 0 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+}
+
 .actionDanger {
   display: inline-flex;
   align-items: center;
@@ -439,7 +475,7 @@
   padding: var(--sp-2) var(--sp-3);
   height: 38px;
   border-radius: var(--r-md);
-  background: transparent;
+  background: var(--surface-1);
   border: 1px solid var(--danger);
   color: var(--danger);
   cursor: pointer;
@@ -457,10 +493,32 @@
 }
 
 .deleteErr {
+  flex-basis: 100%;
   color: var(--danger);
   font-size: var(--fs-sm);
-  margin-top: var(--sp-2);
+  margin: 0;
 }
+
+/* Narrow-layout icon-level delete (#1828). The component renders this button
+   only at ≤700px (useMediaQuery — the bordered dangerZone region renders at
+   wider widths instead), so this rule styles an element that only exists in
+   the narrow layout; no display toggling lives here on purpose: a hidden
+   interactive element in the DOM is an a11y/sweep hazard, not a solution. */
+.deleteIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--danger);
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.deleteIconButton:hover:not(:disabled) { background: var(--danger-soft); }
+.deleteIconButton:disabled { opacity: 0.6; cursor: default; }
 
 /* Tags row */
 .tags {
@@ -503,8 +561,14 @@
   margin: 0;
 }
 
-/* Description prose */
+/* Description prose. Since #1828 this sits directly under the title/author
+   header IN THE DOM — the correct reading order, and the mobile visual order.
+   Desktop keeps its historical arrangement (actions and metadata first,
+   description last) by ordering it after the other info-column items; the
+   mobile media query below resets that to 0 so the grid's auto-placement
+   follows the DOM. */
 .description {
+  order: 10;
   color: var(--text);
   line-height: var(--lh-base);
   max-width: 70ch;
@@ -529,6 +593,36 @@
   .title {
     font-size: var(--fs-xl);
   }
+
+  /* #1828 reading order: the description's desktop `order: 10` must not carry
+     into the grid, where every item keeps order 0 and auto-placement follows
+     the DOM — header beside the cover, then description, then everything else. */
+  .description { order: 0; }
+
+  /* #1828: whole-book deletion trades its bordered region for an icon-level
+     button at the end of the action row (both are conditionally rendered in
+     the component — the region never exists in the narrow DOM). The confirm
+     dialog is the guard; the region's box was the loudest element between the
+     reader and the book. */
+
+  /* #1828 chip compression: the action row was a wall of 38px chips with wide
+     gaps, pushing the description off the first two screens. 34px keeps the
+     SC 2.5.8 24px floor with margin; labels shrink one step. */
+  .actions { gap: var(--sp-2); }
+  .actionPrimary,
+  .readToggleActive,
+  .readToggleGhost {
+    height: 34px;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-sm);
+  }
+  .downloadBtn {
+    height: 34px;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+  }
+  .twoWayChip { min-height: 34px; padding: var(--sp-1) var(--sp-3); }
+  .tags { gap: var(--sp-1); }
 
   .coverCol {
     position: static;
@@ -585,6 +679,15 @@
 .sendField select:focus,
 .sendField input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 
+.sendPanel select,
+.deviceSendButton {
+  min-height: 44px;
+}
+
+.deviceSendButton {
+  height: auto;
+}
+
 .sendActions {
   display: flex;
   align-items: center;
@@ -604,3 +707,16 @@
 .sendOk { color: var(--success); font-size: var(--fs-sm); }
 .sendErr { color: var(--danger); font-size: var(--fs-sm); }
 .sendHint { color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* Stage 0 Kobo two-way sync state chip (read-only; managed on Account) */
+.twoWayChip {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+  font-size: var(--fs-sm); color: var(--text-muted);
+  padding: var(--sp-2) var(--sp-3); min-height: 38px;
+  text-decoration: none; white-space: nowrap;
+}
+.twoWayBlocked {
+  font-size: var(--fs-xs); color: var(--text);
+  background: var(--danger-soft); border: 1px solid var(--danger-border);
+  border-radius: var(--r-full); padding: 2px var(--sp-2);
+}

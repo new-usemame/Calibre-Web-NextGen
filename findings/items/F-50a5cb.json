@@ -1,0 +1,13 @@
+{
+  "area": "editbooks",
+  "body": "`helper.save_cover_from_filestorage` opens the final target (`<book path>/cover.jpg`) with\n`wb` and writes into it. A disk-full, a short write, or an interrupted network-share write\ntherefore truncates a previously valid cover, with no backup and no way back.\n\nEvery cover-write surface shares this: the classic editor's upload, the cover picker's apply,\nthe SPA's `POST /api/v1/books/<id>/cover`, and the ingest auto-metadata fetch. The same shape\nalso makes the whole operation non-transactional — the file is replaced BEFORE the database\ncommit, so a commit failure leaves new bytes on disk with old `has_cover`/`last_modified`.\n\nSmallest fix: write to a temporary sibling on the same filesystem, validate it, then\n`os.replace()` into position after the metadata transaction succeeds; keep the previous file\nuntil the rename lands so a failure can be compensated. Google Drive needs the equivalent.\n\nFound by an adversarial review of PR #1739. Deliberately NOT fixed there: it is shared by every\ncover path and is a restructuring of the write, not of the caching that PR is about.",
+  "created": "2026-08-18",
+  "id": "F-50a5cb",
+  "refs": [
+    "#1739"
+  ],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "Cover writes replace the library file in place with no staging, so an I/O failure destroys the old cover"
+}

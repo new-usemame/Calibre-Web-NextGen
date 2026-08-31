@@ -39,15 +39,26 @@ async function probeSeed(page: Page): Promise<Probe> {
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
-    const tags = (await j('/api/v1/tags'))?.items ?? [];
-    // A tag with enough characters to type a meaningful prefix of.
-    const tag = tags.find((t: any) => typeof t?.name === 'string' && t.name.length >= 4);
-    const bookId = (await j('/api/v1/books?per_page=1'))?.items?.[0]?.id ?? null;
+    const names: string[] = ((await j('/api/v1/tags'))?.items ?? [])
+      .map((t: any) => t?.name).filter((n: any) => typeof n === 'string');
+    const lower = new Set(names.map((n) => n.toLowerCase()));
+    // Two constraints the earlier probe missed, both of which made these specs
+    // fail on a seed where the first book happens to be well-tagged:
+    //  - the field hides tags the book ALREADY has, so a candidate already on
+    //    that book yields an empty menu and no listbox to assert on. Picking an
+    //    untagged book removes the whole class.
+    //  - a prefix that is itself a tag now ranks first (#1398), so accepting
+    //    the top suggestion would legitimately leave the field unchanged and
+    //    the "suggestion is longer than what I typed" assertions would fail.
+    const books = (await j('/api/v1/books?per_page=50'))?.items ?? [];
+    const bookId = books.find((b: any) => (b?.tags ?? []).length === 0)?.id ?? null;
+
+    const tag = names.find((n) => n.length >= 4 && !lower.has(n.slice(0, 3).toLowerCase()));
 
     return {
       bookId,
-      tagName: tag?.name ?? null,
-      prefix: tag?.name ? tag.name.slice(0, 3) : null,
+      tagName: tag ?? null,
+      prefix: tag ? tag.slice(0, 3) : null,
     };
   });
 }

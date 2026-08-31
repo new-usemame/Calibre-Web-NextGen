@@ -38,17 +38,22 @@ Reference: https://github.com/koreader/koreader-sync-server
 """
 
 import base64
+import os
+import re
 from datetime import datetime, timezone
 from typing import Dict, Optional, Any, Tuple
+from urllib.parse import quote
 
 from ...services import SyncToken as SyncToken, hardcover
+from ...services import device_capabilities, device_delivery
 from ...kobo import push_reading_state_to_hardcover
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_from_directory
 from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
 from sqlalchemy import func, desc, cast, String
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
+from werkzeug.exceptions import BadRequest
 
 from ... import logger, ub, csrf, config, constants, services, usermanagement
 from ...render_template import render_title_template
@@ -80,6 +85,11 @@ MAX_DOCUMENT_LENGTH = 255  # Maximum document identifier length
 MAX_PROGRESS_LENGTH = 255  # Maximum progress string length
 MAX_DEVICE_LENGTH = 100    # Maximum device name length
 MAX_DEVICE_ID_LENGTH = 100 # Maximum device ID length
+MAX_INVENTORY_BYTES = 2 * 1024 * 1024
+MAX_INVENTORY_ITEMS = 5000
+MAX_INVENTORY_PATH_LENGTH = 1024
+MAX_DELIVERY_BYTES = 64 * 1024
+_CHECKSUM_RE = re.compile(r"^[0-9a-fA-F]{32}$")
 
 # Sentinel stored in ``KOSyncProgress.progress`` by producers that know a
 # reading percentage but cannot express a position KOReader can seek to — the
@@ -87,7 +97,7 @@ MAX_DEVICE_ID_LENGTH = 100 # Maximum device ID length
 #
 # It has to be a sentinel rather than an empty/absent value because the column
 # is NOT NULL and, more importantly, because of what the client does with it.
-# ``CWASync:syncToProgress`` feeds this column straight to ``GotoXPointer`` for
+# ``CWNGSync:syncToProgress`` feeds this column straight to ``GotoXPointer`` for
 # any non-numeric value, and ``applyProgressToBook`` writes it to
 # ``last_xpointer``. The plugin's only guard is ``body.progress == nil``, and in
 # Lua ``"" ~= nil`` — so an empty string would sail past it and store a
@@ -358,13 +368,20 @@ def handle_sync_error(error: KOSyncError) -> tuple:
         error: KOSyncError with error code and message
 
     Returns:
-        JSON error response with 400 status code
+        JSON error response, 401 for an authentication failure and 400 otherwise
     """
     log.error(f"KOSync Error {error.error_code}: {error.message}")
+    # Every KOSyncError used to become a 400, including this one -- so an
+    # unauthenticated request was answered "Bad Request" while its own body said
+    # {"error": 2001, "message": "Unauthorized"}. A client cannot tell "log in
+    # again" from "your request was malformed" by status, which is the one thing
+    # the status line is for, and other kosync handlers already answer 401
+    # directly for the same condition.
+    status = 401 if error.error_code == ERROR_UNAUTHORIZED_USER else 400
     return create_sync_response({
         "error": error.error_code,
         "message": error.message
-    }, 400)
+    }, status)
 
 
 def get_book_by_checksum(document_checksum: str, version: str = None):
@@ -629,11 +646,10 @@ def _mark_custom_read_column(book_id: int) -> None:
     from ... import calibre_db, db  # lazy: calibre_db instance + reflected cc_classes
     cfg = config.config_read_column
     try:
-        # get_book, not get_filtered_book: kosync auths via headers, so flask-login's
-        # current_user is the ANONYMOUS user here — get_filtered_book would apply the
-        # anonymous content/language/tag restrictions (and the restricted-column error
-        # path even calls flash()), silently filtering the book to None and dropping
-        # the marker. The syncing user's access was already established by the sync flow.
+        # This is a book-level metadata marker write after an authenticated progress
+        # update, not a content read. Keep the raw lookup so a later visibility change
+        # cannot silently discard the already-reported finished state. Byte-serving
+        # paths must instead re-authorize with get_filtered_book(..., user=user).
         book = calibre_db.get_book(book_id)
         if book is None:
             log.error("kosync read-status: book %s not found in calibre database", book_id)
@@ -960,6 +976,665 @@ def get_progress(document: str):
         return handle_sync_error(KOSyncError(ERROR_INTERNAL, "Internal server error"))
 
 
+def _inventory_error(message, status_code=400, error="invalid_inventory"):
+    return create_sync_response({"error": error, "message": message}, status_code)
+
+
+def _validate_inventory_entry(entry):
+    if not isinstance(entry, dict):
+        raise ValueError("Every inventory entry must be an object")
+    allowed = {"lpath", "checksum", "book_id", "size", "mtime"}
+    if set(entry) - allowed:
+        raise ValueError("Inventory entry contains unexpected fields")
+
+    lpath = entry.get("lpath")
+    checksum = entry.get("checksum")
+    size = entry.get("size")
+    mtime = entry.get("mtime")
+    if not isinstance(lpath, str) or not lpath or len(lpath) > MAX_INVENTORY_PATH_LENGTH:
+        raise ValueError("Invalid lpath")
+    if lpath.startswith(("/", "\\")) or "\x00" in lpath:
+        raise ValueError("lpath must be relative")
+    if any(part in ("", ".", "..") for part in lpath.replace("\\", "/").split("/")):
+        raise ValueError("lpath must be a normalized relative path")
+    if not isinstance(checksum, str) or not _CHECKSUM_RE.fullmatch(checksum):
+        raise ValueError("Invalid checksum")
+    if isinstance(size, bool) or not isinstance(size, int) or size < 0 or size > 2**63 - 1:
+        raise ValueError("Invalid size")
+    if isinstance(mtime, bool) or not isinstance(mtime, int) or mtime < 0 or mtime > 2**63 - 1:
+        raise ValueError("Invalid mtime")
+    book_id = entry.get("book_id")
+    if book_id is not None and (
+            isinstance(book_id, bool) or not isinstance(book_id, int) or book_id <= 0):
+        raise ValueError("Invalid book_id")
+
+    return {
+        "lpath": lpath,
+        "checksum": checksum.lower(),
+        "size": size,
+        "mtime": mtime,
+    }
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/inventory", methods=["PUT"])
+def update_inventory():
+    """Record a complete device-library observation without inferring deletion."""
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+
+    user = authenticate_user()
+    if not user:
+        return create_sync_response({
+            "error": ERROR_UNAUTHORIZED_USER,
+            "message": "Unauthorized",
+        }, 401)
+
+    if request.content_length is not None and request.content_length > MAX_INVENTORY_BYTES:
+        return _inventory_error("Inventory payload is too large", 413, "inventory_too_large")
+    try:
+        data = request.get_json()
+    except BadRequest:
+        return _inventory_error("Malformed JSON")
+    if not isinstance(data, dict):
+        return _inventory_error("Inventory payload must be an object")
+
+    has_free = "free_space" in data
+    has_total = "total_space" in data
+    if has_free != has_total:
+        return _inventory_error("free_space and total_space must be reported together")
+    if has_free:
+        try:
+            device_capabilities.validate_storage(
+                data.get("free_space"), data.get("total_space"),
+            )
+        except device_capabilities.CapabilityValidationError as error:
+            return _inventory_error(str(error))
+
+    device_name = data.get("device")
+    raw_device_id = data.get("device_id")
+    entries = data.get("inventory")
+    if (not is_valid_field(device_name) or len(device_name) > MAX_DEVICE_LENGTH
+            or not is_valid_field(raw_device_id)
+            or len(raw_device_id) > MAX_DEVICE_ID_LENGTH):
+        return _inventory_error("Invalid device identity")
+    if not isinstance(entries, list):
+        return _inventory_error("inventory must be an array")
+    if len(entries) > MAX_INVENTORY_ITEMS:
+        return _inventory_error("Inventory contains too many entries", 413, "inventory_too_large")
+
+    try:
+        normalized = [_validate_inventory_entry(entry) for entry in entries]
+    except ValueError as error:
+        return _inventory_error(str(error))
+    observations = {(entry["lpath"], entry["checksum"]) for entry in normalized}
+    if len(observations) != len(normalized):
+        return _inventory_error("Inventory contains duplicate observations")
+
+    from ...services.device_registry import register_koreader_device_best_effort
+    internal_device_id = register_koreader_device_best_effort(
+        user_id=user.id,
+        device_id=raw_device_id,
+        device_name=device_name,
+    )
+    if internal_device_id is None:
+        return _inventory_error(
+            "Device identity could not be registered for this account",
+            409,
+            "device_identity_unavailable",
+        )
+
+    try:
+        device = ub.session.query(ub.Device).filter_by(
+            id=internal_device_id, user_id=user.id,
+        ).one_or_none()
+        if device is None:
+            return _inventory_error(
+                "Device identity could not be registered for this account",
+                409,
+                "device_identity_unavailable",
+            )
+
+        if has_free:
+            device_capabilities.record_storage(
+                session=ub.session, user_id=user.id, device_id=device.id,
+                free_bytes=data["free_space"], total_bytes=data["total_space"],
+            )
+
+        now = datetime.now(timezone.utc)
+        resolved = []
+        matched_count = 0
+        for entry in normalized:
+            book_id, _fmt, _title, _path, _version = get_book_by_checksum(entry["checksum"])
+            if book_id is not None:
+                matched_count += 1
+            resolved.append((entry, book_id))
+
+        report = ub.DeviceInventoryReport(
+            device_id=device.id,
+            observed_at=now,
+            item_count=len(resolved),
+            matched_count=matched_count,
+        )
+        ub.session.add(report)
+        ub.session.flush()
+
+        for entry, book_id in resolved:
+            item = ub.session.query(ub.DeviceInventoryItem).filter_by(
+                device_id=device.id,
+                lpath=entry["lpath"],
+                checksum=entry["checksum"],
+            ).one_or_none()
+            if item is None:
+                item = ub.DeviceInventoryItem(
+                    device_id=device.id,
+                    lpath=entry["lpath"],
+                    checksum=entry["checksum"],
+                    first_seen_at=now,
+                )
+                ub.session.add(item)
+            item.book_id = book_id
+            item.size = entry["size"]
+            item.mtime = entry["mtime"]
+            item.last_seen_at = now
+            item.last_report_id = report.id
+
+        ub.session.commit()
+        return create_sync_response({
+            "accepted": len(resolved),
+            "matched": matched_count,
+            "unmatched": len(resolved) - matched_count,
+            "report_id": report.id,
+            "device": device.public_id,
+        })
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.error("Device inventory could not be stored", exc_info=True)
+        return _inventory_error("Inventory could not be stored", 503, "inventory_unavailable")
+
+
+def _delivery_error(message, status_code=400, error="invalid_delivery"):
+    return create_sync_response({"error": error, "message": message}, status_code)
+
+
+def _delivery_identity(data, allowed_fields):
+    if not isinstance(data, dict):
+        raise device_delivery.DeliveryValidationError("Delivery payload must be an object")
+    if set(data) - set(allowed_fields):
+        raise device_delivery.DeliveryValidationError(
+            "Delivery payload contains unexpected fields"
+        )
+    device_name = data.get("device")
+    raw_device_id = data.get("device_id")
+    if (not is_valid_field(device_name) or len(device_name) > MAX_DEVICE_LENGTH
+            or not is_valid_field(raw_device_id)
+            or len(raw_device_id) > MAX_DEVICE_ID_LENGTH):
+        raise device_delivery.DeliveryValidationError("Invalid device identity")
+    return device_name, raw_device_id
+
+
+def _registered_delivery_device(user, device_name, raw_device_id):
+    from ...services.device_registry import register_koreader_device_best_effort
+    internal_id = register_koreader_device_best_effort(
+        user_id=user.id,
+        device_id=raw_device_id,
+        device_name=device_name,
+    )
+    if internal_id is None:
+        raise device_delivery.DeliveryValidationError(
+            "Device identity could not be registered for this account"
+        )
+    return internal_id
+
+
+def _delivery_payload(row):
+    return {
+        "id": row.id,
+        "book_id": row.book_id,
+        "format": row.format,
+        "filename": row.filename,
+        "size": row.expected_size,
+        "checksum": row.expected_checksum,
+        "claim_token": row.claim_token,
+        "claim_expires_at": (
+            _aware_datetime(row.claim_expires_at).isoformat()
+            if row.claim_expires_at else None
+        ),
+        "attempt": row.attempt_count,
+        "download_path": f"/syncs/deliveries/{row.id}/download",
+    }
+
+
+def _aware_datetime(value):
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=timezone.utc)
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/deliveries/claim", methods=["POST"])
+def claim_delivery():
+    """Lease the oldest wanted book to the authenticated registered device."""
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+    user = authenticate_user()
+    if not user:
+        return _delivery_error("Unauthorized", 401, "unauthorized")
+    if not getattr(user, "role_download", lambda: False)():
+        return _delivery_error("Download permission is required", 403, "forbidden")
+    if request.content_length is not None and request.content_length > MAX_DELIVERY_BYTES:
+        return _delivery_error(
+            "Delivery payload is too large", 413, "delivery_too_large",
+        )
+    try:
+        data = request.get_json()
+        device_name, raw_device_id = _delivery_identity(
+            data, {"device", "device_id", "free_space", "total_space"},
+        )
+        device_capabilities.validate_storage(
+            data.get("free_space"), data.get("total_space"),
+        )
+        internal_id = _registered_delivery_device(user, device_name, raw_device_id)
+        device_capabilities.record_storage(
+            session=ub.session, user_id=user.id, device_id=internal_id,
+            free_bytes=data["free_space"], total_bytes=data["total_space"],
+        )
+        row = device_delivery.claim_next_delivery(
+            session=ub.session,
+            user_id=user.id,
+            device_id=internal_id,
+            available_bytes=data["free_space"],
+        )
+        refusal = None
+        if row is None:
+            oversized = (
+                ub.session.query(ub.DeviceBookDelivery)
+                .join(ub.Device, ub.Device.id == ub.DeviceBookDelivery.device_id)
+                .filter(
+                    ub.DeviceBookDelivery.device_id == internal_id,
+                    ub.DeviceBookDelivery.state == device_delivery.QUEUED,
+                    ub.DeviceBookDelivery.expected_size > data["free_space"],
+                    ub.Device.user_id == user.id,
+                )
+                .order_by(ub.DeviceBookDelivery.id)
+                .first()
+            )
+            if oversized is not None:
+                refusal = {
+                    "reason": "insufficient_storage",
+                    "required_bytes": oversized.expected_size,
+                    "available_bytes": data["free_space"],
+                }
+        ub.session.commit()
+        response = {"delivery": _delivery_payload(row) if row is not None else None}
+        if refusal is not None:
+            response["refusal"] = refusal
+        return create_sync_response(response)
+    except BadRequest:
+        ub.session.rollback()
+        return _delivery_error("Malformed JSON")
+    except device_delivery.DeliveryValidationError as error:
+        ub.session.rollback()
+        message = str(error)
+        if message == "Device identity could not be registered for this account":
+            return _delivery_error(message, 409, "device_identity_unavailable")
+        return _delivery_error(message)
+    except device_capabilities.CapabilityValidationError as error:
+        ub.session.rollback()
+        return _delivery_error(str(error))
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.error("Device delivery claim could not be stored", exc_info=True)
+        return _delivery_error("Delivery queue is unavailable", 503, "delivery_unavailable")
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/deliveries/refuse", methods=["PUT"])
+def refuse_device_delivery():
+    """Release a lease after the final device-side disk preflight loses."""
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+    user = authenticate_user()
+    if not user:
+        return _delivery_error("Unauthorized", 401, "unauthorized")
+    try:
+        data = request.get_json()
+        device_name, raw_device_id = _delivery_identity(data, {
+            "device", "device_id", "delivery_id", "claim_token", "reason",
+            "free_space", "total_space",
+        })
+        device_capabilities.validate_storage(data.get("free_space"), data.get("total_space"))
+        internal_id = _registered_delivery_device(user, device_name, raw_device_id)
+        device_capabilities.record_storage(
+            session=ub.session, user_id=user.id, device_id=internal_id,
+            free_bytes=data["free_space"], total_bytes=data["total_space"],
+        )
+        row = device_delivery.refuse_delivery(
+            session=ub.session, user_id=user.id, device_id=internal_id,
+            delivery_id=data.get("delivery_id"), claim_token=data.get("claim_token"),
+            reason=data.get("reason"), available_bytes=data.get("free_space"),
+        )
+        ub.session.commit()
+        return create_sync_response({"requeued": True, "delivery_id": row.id})
+    except BadRequest:
+        ub.session.rollback()
+        return _delivery_error("Malformed JSON")
+    except (device_delivery.DeliveryValidationError,
+            device_capabilities.CapabilityValidationError) as error:
+        ub.session.rollback()
+        return _delivery_error(str(error), 409, "invalid_delivery_claim")
+    except SQLAlchemyError:
+        ub.session.rollback()
+        return _delivery_error("Delivery queue is unavailable", 503, "delivery_unavailable")
+
+
+def _capability_identity(data, extra=()):
+    return _delivery_identity(data, {"device", "device_id", *extra})
+
+
+def _deletion_payload(row):
+    return {
+        "id": row.id, "book_id": row.book_id, "lpath": row.lpath,
+        "checksum": row.checksum, "claim_token": row.claim_token,
+    }
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/deletions/claim", methods=["POST"])
+def claim_device_deletion():
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+    user = authenticate_user()
+    if not user:
+        return _delivery_error("Unauthorized", 401, "unauthorized")
+    try:
+        data = request.get_json()
+        device_name, raw_device_id = _capability_identity(data)
+        internal_id = _registered_delivery_device(user, device_name, raw_device_id)
+        row = device_capabilities.claim_next_deletion(
+            session=ub.session, user_id=user.id, device_id=internal_id,
+        )
+        ub.session.commit()
+        return create_sync_response({
+            "deletion": _deletion_payload(row) if row is not None else None,
+        })
+    except (BadRequest, device_delivery.DeliveryValidationError) as error:
+        ub.session.rollback()
+        return _delivery_error(str(error))
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/deletions/complete", methods=["PUT"])
+def complete_device_deletion():
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+    user = authenticate_user()
+    if not user:
+        return _delivery_error("Unauthorized", 401, "unauthorized")
+    try:
+        data = request.get_json()
+        device_name, raw_device_id = _capability_identity(data, {
+            "deletion_id", "claim_token", "deleted", "failure_reason",
+        })
+        internal_id = _registered_delivery_device(user, device_name, raw_device_id)
+        row = device_capabilities.complete_deletion(
+            session=ub.session, user_id=user.id, device_id=internal_id,
+            deletion_id=data.get("deletion_id"), claim_token=data.get("claim_token"),
+            deleted=data.get("deleted"), failure_reason=data.get("failure_reason"),
+        )
+        ub.session.commit()
+        return create_sync_response({"completed": True, "deletion_id": row.id})
+    except BadRequest:
+        ub.session.rollback()
+        return _delivery_error("Malformed JSON")
+    except (device_delivery.DeliveryValidationError,
+            device_capabilities.CapabilityValidationError) as error:
+        ub.session.rollback()
+        return _delivery_error(str(error), 409, "invalid_deletion_claim")
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/collections", methods=["POST"])
+def get_device_collections():
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+    user = authenticate_user()
+    if not user:
+        return _delivery_error("Unauthorized", 401, "unauthorized")
+    try:
+        data = request.get_json()
+        device_name, raw_device_id = _capability_identity(data)
+        internal_id = _registered_delivery_device(user, device_name, raw_device_id)
+        snapshot = device_capabilities.collection_snapshot(
+            session=ub.session, user_id=user.id, device_id=internal_id,
+        )
+        ub.session.commit()
+        return create_sync_response(snapshot)
+    except (BadRequest, device_delivery.DeliveryValidationError,
+            device_capabilities.CapabilityValidationError) as error:
+        ub.session.rollback()
+        return _delivery_error(str(error), 409, "collections_unavailable")
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/collections/complete", methods=["PUT"])
+def complete_device_collections():
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+    user = authenticate_user()
+    if not user:
+        return _delivery_error("Unauthorized", 401, "unauthorized")
+    try:
+        data = request.get_json()
+        device_name, raw_device_id = _capability_identity(data, {"revision"})
+        internal_id = _registered_delivery_device(user, device_name, raw_device_id)
+        row = device_capabilities.acknowledge_collections(
+            session=ub.session, user_id=user.id, device_id=internal_id,
+            revision=data.get("revision"),
+        )
+        ub.session.commit()
+        return create_sync_response({"completed": True, "revision": row.revision})
+    except (BadRequest, device_delivery.DeliveryValidationError,
+            device_capabilities.CapabilityValidationError) as error:
+        ub.session.rollback()
+        return _delivery_error(str(error), 409, "invalid_collection_revision")
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/deliveries/complete", methods=["PUT"])
+def complete_device_delivery():
+    """Acknowledge an installed file; repeating an acknowledgement is safe."""
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+    user = authenticate_user()
+    if not user:
+        return _delivery_error("Unauthorized", 401, "unauthorized")
+    if request.content_length is not None and request.content_length > MAX_DELIVERY_BYTES:
+        return _delivery_error(
+            "Delivery payload is too large", 413, "delivery_too_large",
+        )
+    try:
+        data = request.get_json()
+        device_name, raw_device_id = _delivery_identity(data, {
+            "device", "device_id", "delivery_id", "claim_token",
+            "lpath", "checksum", "size", "mtime",
+        })
+        delivery_id = data.get("delivery_id")
+        if isinstance(delivery_id, bool) or not isinstance(delivery_id, int) or delivery_id <= 0:
+            raise device_delivery.DeliveryValidationError("Invalid delivery id")
+        token = data.get("claim_token")
+        if not isinstance(token, str) or not token or len(token) > 96:
+            raise device_delivery.DeliveryValidationError("Invalid delivery token")
+        internal_id = _registered_delivery_device(user, device_name, raw_device_id)
+        row = device_delivery.complete_delivery(
+            session=ub.session,
+            user_id=user.id,
+            device_id=internal_id,
+            delivery_id=delivery_id,
+            claim_token=token,
+            lpath=data.get("lpath"),
+            checksum=data.get("checksum"),
+            size=data.get("size"),
+            mtime=data.get("mtime"),
+        )
+        ub.session.commit()
+        return create_sync_response({"completed": True, "delivery_id": row.id})
+    except BadRequest:
+        ub.session.rollback()
+        return _delivery_error("Malformed JSON")
+    except device_delivery.DeliveryValidationError as error:
+        ub.session.rollback()
+        # A well-shaped completion with the wrong owner/token is a claim
+        # conflict; malformed fields remain a 400 and never become a 500.
+        message = str(error)
+        if message in (
+                "Delivery claim is not valid for this device",
+                "Delivery is not currently claimed"):
+            return _delivery_error(message, 409, "invalid_delivery_claim")
+        return _delivery_error(message)
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.error("Device delivery completion could not be stored", exc_info=True)
+        return _delivery_error("Delivery queue is unavailable", 503, "delivery_unavailable")
+
+
+def _delivery_file_unavailable(row, message):
+    row.state = device_delivery.FAILED
+    row.failure_reason = message
+    row.claim_expires_at = None
+    ub.session.commit()
+    return _delivery_error(message, 410, "delivery_file_unavailable")
+
+
+@csrf.exempt
+@kosync.route("/kosync/syncs/deliveries/<int:delivery_id>/download", methods=["GET"])
+def download_device_delivery(delivery_id):
+    """Stream only the exact format leased to this authenticated device."""
+    blocked = _require_kosync_enabled()
+    if blocked:
+        return blocked
+    user = authenticate_user()
+    if not user:
+        return _delivery_error("Unauthorized", 401, "unauthorized")
+    if not getattr(user, "role_download", lambda: False)():
+        return _delivery_error("Download permission is required", 403, "forbidden")
+
+    raw_device_id = request.headers.get("X-CWNG-Device-ID")
+    device_name = request.headers.get("X-CWNG-Device-Name") or "KOReader"
+    claim_token = request.headers.get("X-CWNG-Claim-Token")
+    try:
+        _delivery_identity(
+            {"device": device_name, "device_id": raw_device_id},
+            {"device", "device_id"},
+        )
+        internal_id = _registered_delivery_device(user, device_name, raw_device_id)
+        row = device_delivery.get_delivery_for_download(
+            session=ub.session,
+            user_id=user.id,
+            device_id=internal_id,
+            delivery_id=delivery_id,
+            claim_token=claim_token,
+        )
+        if row is None:
+            return _delivery_error(
+                "Delivery claim is not valid for this device",
+                409,
+                "invalid_delivery_claim",
+            )
+
+        from ... import calibre_db
+        # A claim can outlive library membership or content restrictions. Recheck
+        # the header-authenticated user at the last point before bytes leave; an
+        # unqualified lookup would filter against flask-login's anonymous user.
+        book = calibre_db.get_filtered_book(
+            row.book_id,
+            allow_show_archived=True,
+            allow_show_hidden=True,
+            user=user,
+        )
+        if book is None:
+            return _delivery_file_unavailable(
+                row, "Delivery is no longer available",
+            )
+        data = (
+            calibre_db.get_book_format(row.book_id, row.format)
+            if row.format else None
+        )
+        if data is None:
+            return _delivery_file_unavailable(
+                row, f"{row.format or 'Requested'} format is no longer available",
+            )
+
+        library_filename = data.name + "." + row.format.lower()
+        if bool(getattr(config, "config_use_google_drive", False)):
+            from ... import gdriveutils as gd
+            remote = gd.getFileFromEbooksFolder(book.path, library_filename)
+            if remote is None:
+                return _delivery_file_unavailable(
+                    row, f"{row.format} file is no longer available",
+                )
+            headers = {
+                "Content-Disposition": (
+                    "attachment; filename*=UTF-8''" + quote(row.filename)
+                ),
+                "Content-Type": "application/octet-stream",
+            }
+            response = gd.do_gdrive_download(remote, headers)
+            file_size = remote.metadata.get("fileSize")
+            if file_size is not None:
+                row.expected_size = int(file_size)
+            ub.session.commit()
+            return response
+
+        library_root = os.path.realpath(config.get_book_path())
+        directory = os.path.realpath(os.path.join(library_root, book.path))
+        try:
+            inside_library = os.path.commonpath((library_root, directory)) == library_root
+        except ValueError:
+            inside_library = False
+        path = os.path.join(directory, library_filename)
+        if not inside_library or not os.path.isfile(path):
+            return _delivery_file_unavailable(
+                row, f"{row.format} file is no longer available",
+            )
+
+        file_size = os.path.getsize(path)
+        row.expected_size = file_size
+        try:
+            from ..checksums.koreader import calculate_koreader_partial_md5
+            checksum = calculate_koreader_partial_md5(path)
+        except OSError:
+            checksum = None
+        if checksum:
+            row.expected_checksum = checksum
+        ub.session.commit()
+
+        response = send_from_directory(
+            directory,
+            library_filename,
+            as_attachment=True,
+            download_name=row.filename,
+        )
+        if checksum:
+            response.headers["X-CWNG-Checksum"] = checksum
+        return response
+    except device_delivery.DeliveryValidationError as error:
+        ub.session.rollback()
+        return _delivery_error(str(error), 409, "invalid_delivery_claim")
+    except SQLAlchemyError:
+        ub.session.rollback()
+        log.error("Device delivery download lookup failed", exc_info=True)
+        return _delivery_error("Delivery queue is unavailable", 503, "delivery_unavailable")
+
+
 def _is_ascii_book_id(document: str) -> bool:
     """True if ``document`` is a plain ASCII-decimal Calibre book id.
 
@@ -1101,10 +1776,10 @@ def export_progress():
             # non-empty key verbatim), so without the per-user visibility filter
             # a restricted account could seed ids 1..N and enumerate the title +
             # authors of books hidden from it by denied tags, hidden-book, the
-            # restricted custom column, or a language filter. get_common_filters
-            # is the same single-source-of-truth predicate the duplicate scanner
-            # uses off the request context (current_user is not populated on this
-            # Basic-auth path). strict=True makes it FAIL CLOSED — if the filter
+            # restricted custom column, a language filter, or personal-library
+            # membership. get_common_filters delegates to CalibreDB's canonical
+            # policy with this explicit user because current_user is not populated
+            # on the Basic-auth path. strict=True makes it FAIL CLOSED — if the filter
             # can't be built we want the enclosing except to return an error,
             # never a silently-unrestricted dump.
             visibility_filter = get_common_filters(user_id=user.id, strict=True)
@@ -1392,6 +2067,9 @@ def update_progress():
 
                 # Push to Hardcover
                 from ... import calibre_db
+                # Hardcover receives the authenticated progress marker rather than
+                # book bytes. Preserve that write even if visibility changes after
+                # the progress event; delivery endpoints re-authorize separately.
                 book = calibre_db.get_book(book_id)
 
                 if user is not None:

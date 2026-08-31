@@ -9,6 +9,21 @@ echo "[svc-calibre-web-automated] Starting Calibre-Web server on port ${CWA_PORT
 
 export CALIBRE_DBPATH=/config
 
+# s6-setuidgid/cwa-as-abc changes uid/gid but deliberately does not rewrite
+# HOME. Without an explicit Calibre config path the abc process therefore
+# falls back to /root/.config/calibre and cannot write files created there by
+# root. Keep the normal runtime config separate from the operator plugin dir;
+# calibre_user_plugins.apply_to_env() overrides this only when that opt-in is
+# enabled.
+export CALIBRE_CONFIG_DIRECTORY="${CALIBRE_CONFIG_DIRECTORY:-/config/.config/calibre-runtime}"
+
+# -P keeps the current directory off sys.path. This unit no longer chdirs into
+# the app root, so it inherits cwd /config (the Dockerfile WORKDIR) -- and
+# /config is a volume the user mounts and writes. `python -m` puts cwd at
+# sys.path[0], so without -P a stray /config/cps.py or /config/cps/ is imported
+# in place of the application and the server never starts. The package itself
+# resolves from anywhere because the image installs it editable (Dockerfile
+# STEP 6), which is what makes dropping the chdir safe in the first place.
 exec \
     s6-notifyoncheck -d -n 300 -w 1000 -c "nc -z localhost ${CWA_PORT_OVERRIDE:-8083}" \
-        cd /app/calibre-web-automated cwa-as-abc python3 /app/calibre-web-automated/cps.py
+        cwa-as-abc python3 -P -m cps

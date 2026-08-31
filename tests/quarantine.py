@@ -31,6 +31,12 @@ _SHIM_ROT = (
     "went unseen for as long as the test was deselected. " + TRIAGE_ISSUE
 )
 
+_EDITBOOKS_SHIM_ROT = (
+    "spec_from_file_location editbooks shim is stale: its Flask stub does not "
+    "provide copy_current_request_context, so cps/editbooks.py fails during "
+    "module import before either test can execute. " + TRIAGE_ISSUE
+)
+
 _NEVER_RAN = (
     "asserts against oauth_bb.{github,google,generic}_logged_in as module "
     "attributes, but all three are nested inside init_oauth_blueprints() "
@@ -41,10 +47,9 @@ _NEVER_RAN = (
 
 #: node id -> why it is skipped. Every reason must name an issue.
 QUARANTINED = {
-    # --- shim rot: the duplicate-detection module loaders (30) -------------
-    "tests/unit/test_duplicate_delete_index_maintenance.py::test_auto_resolve_duplicates_deletes_duplicate_keys_and_refreshes_cache": _SHIM_ROT,
-    "tests/unit/test_duplicate_delete_index_maintenance.py::test_delete_book_from_table_format_only_keeps_duplicate_keys_and_invalidates_cache": _SHIM_ROT,
-    "tests/unit/test_duplicate_delete_index_maintenance.py::test_delete_book_from_table_whole_book_deletes_duplicate_keys_and_refreshes_cache": _SHIM_ROT,
+    # --- shim rot: the duplicate-detection module loaders (29) -------------
+    "tests/unit/test_duplicate_delete_index_maintenance.py::test_delete_book_from_table_format_only_keeps_duplicate_keys_and_invalidates_cache": _EDITBOOKS_SHIM_ROT,
+    "tests/unit/test_duplicate_delete_index_maintenance.py::test_delete_book_from_table_whole_book_deletes_duplicate_keys_and_refreshes_cache": _EDITBOOKS_SHIM_ROT,
     "tests/unit/test_duplicate_index.py::test_build_book_key_parts_matches_python_duplicate_fallbacks": _SHIM_ROT,
     "tests/unit/test_duplicate_index.py::test_cache_merge_deletes_key_rows_for_missing_candidate_ids": _SHIM_ROT,
     "tests/unit/test_duplicate_index.py::test_cache_merge_keeps_serialization_shape": _SHIM_ROT,

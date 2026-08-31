@@ -12,6 +12,7 @@ dir via ``calibre_user_plugins.apply_to_env`` when the opt-in
 pin that the convert subprocess now gets the same plugin-bearing env when the
 feature is enabled, and is left untouched when it is disabled.
 """
+import io
 import os
 import types
 
@@ -26,20 +27,26 @@ pytestmark = pytest.mark.unit
 
 
 class _FakeProc:
+    """A child whose pipes behave like real pipes.
+
+    The streams are real binary file objects rather than a stub exposing
+    only ``readline``/``readlines``: the converter drains them with the
+    ordinary file-object protocol (iterate to EOF, then close), so a stub
+    that answers only the old call shape would pin the shape instead of
+    the semantics and let a pipe-handling regression through (#1110).
+    """
+
     returncode = 0
+
+    def __init__(self):
+        self.stdout = io.BytesIO(b"")
+        self.stderr = io.BytesIO(b"")
 
     def poll(self):
         return 0
 
-    class _Stream:
-        def readline(self):
-            return b""
-
-        def readlines(self):
-            return []
-
-    stdout = _Stream()
-    stderr = _Stream()
+    def wait(self, timeout=None):
+        return self.returncode
 
 
 def _run_convert_capture_env(monkeypatch, plugins_enabled):

@@ -2,6 +2,8 @@ import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 're
 import { LifeBuoy, ArrowUpRight, X } from 'lucide-react';
 import { useT, type TFunction } from '../lib/i18n';
 import { prioritizeAnnouncements } from '../lib/announcementQueue';
+import { useDismissMyLibraryIntro, useMe } from '../lib/queries';
+import type { Me } from '../lib/api';
 import { KofiMark, KOFI_URL } from './KofiMark';
 import styles from './HelpBanner.module.css';
 
@@ -16,12 +18,14 @@ interface Announcement {
   id: string;
   priority: number;
   channel?: string;
-  content: (t: TFunction) => ReactNode;
+  content: (t: TFunction, me?: Me | null) => ReactNode;
   variant: AnnouncementVariant;
   dismissLabel: string;
   legacyDismissKey?: string;
   clickAction?: AnnouncementClickAction;
   url?: string;
+  eligible?: (me?: Me | null) => boolean;
+  serverDismiss?: boolean;
 }
 
 /** Add future top-slot announcements here.
@@ -35,6 +39,26 @@ interface Announcement {
  * later `kofi-support-v2`; the new ID gets its own fresh showing and queues at its
  * own priority. */
 const ANNOUNCEMENTS: readonly Announcement[] = [
+  {
+    id: 'library-intro-v1',
+    priority: 300,
+    variant: 'help',
+    dismissLabel: 'Dismiss library introduction',
+    serverDismiss: true,
+    eligible: (me) => !!me?.id && !me.role?.anonymous
+      && me.library_mode === 'personal_library' && me.show_my_library_intro === true,
+    content: (t, me) => (
+      <>
+        <span className={styles.iconWrap} aria-hidden="true"><LifeBuoy size={17} focusable={false} /></span>
+        <span className={styles.text}>
+          <strong>{t('New: your own library')}</strong>{' '}
+          {me?.role?.browse_global
+            ? t('The library is shared and holds every book once — what you keep is your own selection. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.')
+            : t('The library is shared and holds every book once — what you keep is your own selection. Nothing you had is gone. Your administrator manages what enters your selection.')}
+        </span>
+      </>
+    ),
+  },
   {
     id: 'kofi-support-v1',
     priority: 100,
@@ -67,7 +91,14 @@ const ANNOUNCEMENTS: readonly Announcement[] = [
         </span>
         <span className={styles.text}>
           {t('Need to report an issue? Try the new')} <strong>{t('Help menu')}</strong>
-          <ArrowUpRight size={15} className={styles.arrow} aria-hidden="true" focusable={false} />
+          {/* The nudge belongs on this wrapper, NOT on the icon: in Chrome a
+              transform animation targeting an SVG element cannot be composited
+              and runs on the main thread on every route. See HelpBanner.module.css
+              `.arrow`, and frontend/tests/unit/iconAnimationCompositing.test.ts
+              which fails if the class moves back onto the SVG. */}
+          <span className={styles.arrow}>
+            <ArrowUpRight size={15} aria-hidden="true" focusable={false} />
+          </span>
         </span>
       </>
     ),
@@ -88,6 +119,9 @@ function initialDismissals() {
   const dismissed = new Set<string>();
 
   for (const announcement of ANNOUNCEMENTS) {
+    // Server-backed announcements deliberately ignore browser storage. The
+    // account preference is the single source of truth across every device.
+    if (announcement.serverDismiss) continue;
     try {
       const currentKeyDismissed = localStorage.getItem(dismissalKey(announcement.id)) === '1';
       const legacyKeyDismissed = announcement.legacyDismissKey
@@ -108,20 +142,30 @@ function initialDismissals() {
 
 export function AnnouncementBanner() {
   const t = useT();
+  const me = useMe().data;
+  const dismissIntro = useDismissMyLibraryIntro();
   const [dismissedIds, setDismissedIds] = useState(initialDismissals);
-  const announcement = PRIORITIZED_ANNOUNCEMENTS.find(({ id }) => !dismissedIds.has(id));
+  const eligible = PRIORITIZED_ANNOUNCEMENTS.filter((item) => item.eligible?.(me) !== false);
+  const announcement = eligible.find(({ id }) => !dismissedIds.has(id));
 
   if (!announcement) return null;
 
   const dismiss = (restoreKeyboardFocus = false) => {
-    const hasNextAnnouncement = PRIORITIZED_ANNOUNCEMENTS.some(
+    const hasNextAnnouncement = eligible.some(
       ({ id }) => id !== announcement.id && !dismissedIds.has(id),
     );
-    persistDismissal(announcement.id);
-    setDismissedIds((current) => new Set(current).add(announcement.id));
-    if (restoreKeyboardFocus && !hasNextAnnouncement) {
-      requestAnimationFrame(() => document.getElementById('main')?.focus());
+    const finish = () => {
+      if (!announcement.serverDismiss) persistDismissal(announcement.id);
+      setDismissedIds((current) => new Set(current).add(announcement.id));
+      if (restoreKeyboardFocus && !hasNextAnnouncement) {
+        requestAnimationFrame(() => document.getElementById('main')?.focus());
+      }
+    };
+    if (announcement.serverDismiss) {
+      dismissIntro.mutate(undefined, { onSuccess: finish });
+      return;
     }
+    finish();
   };
 
   const activate = (event: ReactMouseEvent<HTMLAnchorElement>) => {
@@ -135,7 +179,7 @@ export function AnnouncementBanner() {
     if (event.button === 1) activate(event);
   };
 
-  const content = announcement.content(t);
+  const content = announcement.content(t, me);
   const variantClass = announcement.variant === 'support' ? styles.supportBanner : '';
 
   return (
@@ -162,6 +206,7 @@ export function AnnouncementBanner() {
         type="button"
         className={styles.close}
         onClick={(event) => dismiss(event.detail === 0)}
+        disabled={announcement.serverDismiss && dismissIntro.isPending}
         aria-label={t(announcement.dismissLabel)}
       >
         <X size={16} aria-hidden="true" focusable={false} />

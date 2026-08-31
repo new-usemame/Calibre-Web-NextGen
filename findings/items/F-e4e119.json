@@ -1,0 +1,17 @@
+{
+  "area": "kobo",
+  "body": "VERIFIED against the code.\n\n`cps/annotations.py` `ingest_bookmarks` ends:\n\n    try:\n        commit()\n    except Exception as e:\n        ... imported = 0\n    return {\"imported\": imported, ...}\n\nOnly a RAISED exception is handled. The production `commit` is\n`ub.session_commit`, whose documented contract is to catch\nOperationalError/InvalidRequestError, roll back, and RETURN FALSE rather than\nraise. That path leaves `imported` at its pre-commit count, so the endpoint\nanswers HTTP 200 with `{\"imported\": N}` after writing nothing.\n\nSame root cause as #1318 and as the reading-state PUT (#1729): the boolean\nreturn of `session_commit` is the failure channel and this caller ignores it.\n\nThe existing test covers only a commit function that RAISES, which is the case\nproduction does not take — so the suite is structurally unable to see this.",
+  "created": "2026-08-18",
+  "id": "F-e4e119",
+  "refs": [],
+  "resolution": {
+    "commit": "08a44a980",
+    "date": "2026-08-18",
+    "note": "Fixed in #1731: ingest_bookmarks now routes through this module's own _commit_required, so a commit that returns False takes the same path as one that raises. Red/green: the rolled-back import reported 3 rows imported before the change.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "The KoboReader.sqlite import reports rows imported after a rolled-back commit"
+}

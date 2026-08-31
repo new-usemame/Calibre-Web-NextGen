@@ -27,10 +27,16 @@ _CPS = _ROOT / "cps"
 def test_backend_sort_map_has_series_index():
     """The read-only books API must map seriesasc/seriesdesc to a series_index
     order (not fall back to newest-first), or the SPA's Series-order sort is a
-    no-op server-side."""
-    src = (_CPS / "api" / "books.py").read_text()
-    assert '"seriesasc": [db.Books.series_index.asc()]' in src
-    assert '"seriesdesc": [db.Books.series_index.desc()]' in src
+    no-op server-side.
+
+    Asserted against the map itself rather than the source text it used to be
+    spelled in: #1331 moved the orders into cps/sort_orders.py and gave each one
+    a Books.id tiebreaker, which a substring pin reads as the sort disappearing.
+    """
+    from cps.api.books import SORT_MAP
+
+    assert str(SORT_MAP["seriesasc"][0]) == "books.series_index ASC"
+    assert str(SORT_MAP["seriesdesc"][0]) == "books.series_index DESC"
 
 
 @pytest.mark.unit

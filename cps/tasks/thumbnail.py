@@ -6,6 +6,8 @@
 # See CONTRIBUTORS for full list of authors.
 
 import os
+import queue
+import threading
 from shutil import copyfile, copyfileobj
 from urllib.request import urlopen
 from io import BytesIO
@@ -14,7 +16,8 @@ from dataclasses import dataclass
 
 from .. import constants
 from cps import config, db, fs, gdriveutils, logger, ub
-from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
+from cps.services.worker import (CalibreTask, STAT_CANCELLED, STAT_ENDED,
+                                 STAT_FAIL, STAT_FINISH_SUCCESS)
 from sqlalchemy import func, text, or_
 from flask_babel import lazy_gettext as N_
 try:
@@ -25,6 +28,28 @@ except (ImportError, RuntimeError) as e:
 
 
 _BASE_THUMBNAIL_HEIGHT = int(os.environ.get("CWA_THUMBNAIL_BASE_HEIGHT", "420"))
+
+
+def _positive_timeout(raw, default):
+    try:
+        timeout = float(raw if raw is not None else default)
+    except (TypeError, ValueError):
+        return float(default)
+    return timeout if timeout > 0 else float(default)
+
+
+# Wand/ImageMagick can block indefinitely on a malformed image or an unhealthy
+# filesystem. Cover work therefore runs outside the one-and-only Calibre worker
+# thread and is joined for a bounded interval. Three consecutive timeouts are
+# treated as systemic so a broken image stack cannot leave an unbounded number
+# of abandoned daemon threads behind it.
+_COVER_TIMEOUT_SECONDS = _positive_timeout(
+    os.environ.get("CWA_THUMBNAIL_COVER_TIMEOUT"), 60)
+_TIMEOUT_BREAKER_LIMIT = 3
+
+
+class CoverThumbnailTimeout(TimeoutError):
+    """One cover exceeded the task's bounded processing interval."""
 
 
 @dataclass(frozen=True)
@@ -75,46 +100,182 @@ class TaskGenerateCoverThumbnails(CalibreTask):
         self.last_modified = last_modified
         self.app_db_session = ub.get_new_session_instance()
         self.cache = fs.FileSystem()
+        self.generated = 0
+        self.skipped = 0
+        self.failed = 0
+        self.processed = 0
         self.resolutions = [
             constants.COVER_THUMBNAIL_SMALL,
             constants.COVER_THUMBNAIL_MEDIUM,
             constants.COVER_THUMBNAIL_LARGE
         ]
 
+    def _status_message(self, total):
+        return N_(
+            '%(processed)d/%(total)d processed: %(generated)d generated, '
+            '%(skipped)d skipped, %(failed)d failed',
+            processed=self.processed,
+            total=total,
+            generated=self.generated,
+            skipped=self.skipped,
+            failed=self.failed,
+        )
+
+    def _run_cover_with_timeout(self, book):
+        """Run one cover without allowing it to monopolise the worker.
+
+        ``app_db_session`` is a SQLAlchemy ``scoped_session``. Calling the
+        existing cover method in this dedicated thread therefore gives it a
+        session separate from both the worker and any earlier timed-out cover.
+        A timed-out daemon may eventually unwind, but it cannot hold the task
+        queue hostage or make a later cover share its Session.
+        """
+        outcome = queue.Queue(maxsize=1)
+
+        def generate():
+            try:
+                outcome.put((True, self.create_book_cover_thumbnails(book)))
+            except Exception as error:
+                outcome.put((False, error))
+            finally:
+                # Remove this cover thread's scoped Session. On timeout this
+                # runs when (and only when) the blocked operation returns.
+                self.app_db_session.remove()
+
+        thread = threading.Thread(
+            target=generate,
+            name="cover-thumbnail-{}".format(book.id),
+            daemon=True,
+        )
+        thread.start()
+        thread.join(_COVER_TIMEOUT_SECONDS)
+        if thread.is_alive():
+            raise CoverThumbnailTimeout(
+                "cover {} exceeded {:.1f}s".format(
+                    book.id, _COVER_TIMEOUT_SECONDS))
+
+        succeeded, result = outcome.get_nowait()
+        if not succeeded:
+            raise result
+        return result
+
+    @staticmethod
+    def _terminal_label(stat):
+        return {
+            STAT_FINISH_SUCCESS: "success",
+            STAT_FAIL: "failed",
+            STAT_CANCELLED: "cancelled",
+            STAT_ENDED: "ended",
+        }.get(stat, "incomplete")
+
     def run(self, worker_thread):
+        total = 0
+        started = False
         try:
-            if use_IM and self.stat != STAT_CANCELLED and self.stat != STAT_ENDED:
-                self.message = 'Scanning Books'
-                books_with_covers = self.get_cover_sources()
-                count = len(books_with_covers)
+            if self.stat in (STAT_CANCELLED, STAT_ENDED):
+                return
 
-                total_generated = 0
-                for i, book in enumerate(books_with_covers):
+            if not use_IM:
+                self.failed = 1
+                self.message = self._status_message(total)
+                self._handleError(
+                    "Cover thumbnail generation cannot run because ImageMagick is unavailable; "
+                    + str(self.message))
+                return
 
-                    # Generate new thumbnails for missing covers
-                    generated = self.create_book_cover_thumbnails(book)
+            self.message = 'Scanning Books'
+            books_with_covers = self.get_cover_sources()
+            total = len(books_with_covers)
+            started = True
+            self.log.info(
+                "Cover thumbnail generation started: total=%d, per-cover timeout=%.1fs",
+                total,
+                _COVER_TIMEOUT_SECONDS,
+            )
 
-                    # Increment the progress
-                    self.progress = (1.0 / count) * i
+            consecutive_timeouts = 0
+            abort_reason = None
+            for index, book in enumerate(books_with_covers):
+                if self.stat in (STAT_CANCELLED, STAT_ENDED):
+                    self.message = self._status_message(total)
+                    return
 
-                    if generated > 0:
-                        total_generated += generated
-                        self.message = N_('Generated %(count)s cover thumbnails', count=total_generated)
+                try:
+                    generated = self._run_cover_with_timeout(book)
+                except CoverThumbnailTimeout as error:
+                    self.failed += 1
+                    consecutive_timeouts += 1
+                    self.log.error(
+                        "Cover thumbnail generation timed out for book %s "
+                        "(%d/%d consecutive): %s",
+                        book.id,
+                        consecutive_timeouts,
+                        _TIMEOUT_BREAKER_LIMIT,
+                        error,
+                    )
+                    if consecutive_timeouts >= _TIMEOUT_BREAKER_LIMIT:
+                        abort_reason = (
+                            "{} consecutive cover timeouts".format(
+                                _TIMEOUT_BREAKER_LIMIT))
+                except Exception as error:
+                    # A corrupt/missing cover is an item failure. It is honest
+                    # terminal evidence, but it must not prevent later books
+                    # from being attempted or advance the timeout breaker.
+                    consecutive_timeouts = 0
+                    self.failed += 1
+                    self.log.error_or_exception(
+                        "Cover thumbnail generation failed for book {}: {}".format(
+                            book.id, error))
+                else:
+                    consecutive_timeouts = 0
+                    if generated:
+                        self.generated += 1
+                    else:
+                        self.skipped += 1
+                finally:
+                    self.processed += 1
+                    self.progress = (index + 1) / total if total else 1
+                    self.message = self._status_message(total)
 
-                    # Check if job has been cancelled or ended
-                    if self.stat == STAT_CANCELLED:
-                        self.log.info(f'GenerateCoverThumbnails task has been cancelled.')
-                        return
+                if abort_reason is not None:
+                    break
 
-                    if self.stat == STAT_ENDED:
-                        self.log.info(f'GenerateCoverThumbnails task has been ended.')
-                        return
+            if abort_reason is not None:
+                self._handleError(
+                    "Cover thumbnail generation aborted after {}; {}".format(
+                        abort_reason, self.message))
+                return
 
-                if total_generated == 0:
-                    self.self_cleanup = True
+            if self.failed:
+                self._handleError(
+                    "Cover thumbnail generation finished with failures; {}".format(
+                        self.message))
+                return
 
+            if self.generated == 0:
+                self.self_cleanup = True
             self._handleSuccess()
+        except Exception as error:
+            # Failures before the per-cover loop (for example, a database scan
+            # failure) still receive one terminal state and one finish record.
+            self.failed += 1
+            self.message = self._status_message(total)
+            self.log.error_or_exception(
+                "Cover thumbnail generation could not start: {}".format(error))
+            self._handleError(
+                "Cover thumbnail generation failed; {}".format(self.message))
         finally:
+            self.log.info(
+                "Cover thumbnail generation finished: status=%s, total=%d, "
+                "processed=%d, generated=%d, skipped=%d, failed=%d%s",
+                self._terminal_label(self.stat),
+                total,
+                self.processed,
+                self.generated,
+                self.skipped,
+                self.failed,
+                "" if started else ", scan_started=no",
+            )
             # CRITICAL: Clear book from pending set on ALL exit paths (success, cancel, end, error)
             # This must run even if task is cancelled, ended, or errors out
             if self.book_id != -1:
@@ -204,6 +365,7 @@ class TaskGenerateCoverThumbnails(CalibreTask):
                     self.update_book_cover_thumbnail(book, thumbnail)
             except Exception as ex:
                 self.log.debug(f"Thumbnail migration/update issue for book {book.id}: {ex}")
+                raise
         return generated
 
     def create_book_cover_single_thumbnail_format(self, book, resolution, fmt):
@@ -219,8 +381,8 @@ class TaskGenerateCoverThumbnails(CalibreTask):
             self.generate_book_thumbnail(book, thumbnail)
         except Exception as ex:
             self.log.debug(f'Error creating {fmt.upper()} book thumbnail: ' + str(ex))
-            self._handleError(f'Error creating {fmt.upper()} book thumbnail: ' + str(ex))
             self.app_db_session.rollback()
+            raise
 
     def create_book_cover_single_thumbnail(self, book, resolution):
         # Generate WebP thumbnail (for web UI)
@@ -236,8 +398,8 @@ class TaskGenerateCoverThumbnails(CalibreTask):
             self.generate_book_thumbnail(book, thumbnail_webp)
         except Exception as ex:
             self.log.debug('Error creating WebP book thumbnail: ' + str(ex))
-            self._handleError('Error creating WebP book thumbnail: ' + str(ex))
             self.app_db_session.rollback()
+            raise
 
         # Generate JPEG thumbnail (for Kobo/devices)
         thumbnail_jpg = ub.Thumbnail()
@@ -252,8 +414,8 @@ class TaskGenerateCoverThumbnails(CalibreTask):
             self.generate_book_thumbnail(book, thumbnail_jpg)
         except Exception as ex:
             self.log.debug('Error creating JPEG book thumbnail: ' + str(ex))
-            self._handleError('Error creating JPEG book thumbnail: ' + str(ex))
             self.app_db_session.rollback()
+            raise
 
     def update_book_cover_thumbnail(self, book, thumbnail):
         thumbnail.generated_at = datetime.now(timezone.utc)
@@ -264,8 +426,8 @@ class TaskGenerateCoverThumbnails(CalibreTask):
             self.generate_book_thumbnail(book, thumbnail)
         except Exception as ex:
             self.log.debug('Error updating book thumbnail: ' + str(ex))
-            self._handleError('Error updating book thumbnail: ' + str(ex))
             self.app_db_session.rollback()
+            raise
 
     def generate_book_thumbnail(self, book, thumbnail):
         if book and thumbnail:

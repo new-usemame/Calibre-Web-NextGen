@@ -1,0 +1,11 @@
+{
+  "area": "docker",
+  "body": "The Dockerfile removes two trees that `COPY . /app/calibre-web-automated/`\n(STEP 6) brought in: `frontend/` in the RUN right after the COPY, and\n`koreader/` at the end of STEP 7 (#1478). Neither reclaims anything.\n\n`docker history` on the published image shows the COPY as its own 61.8 MB\nlayer. A path removed in any later layer is only whiteout-ed: the bytes stay\nin the COPY layer and are still pulled and still stored on disk. Both removals\nmake the path invisible inside a running container, which is worth having, but\nneither is a size win, and the frontend/ comment already says it \"should be in\n.dockerignore\".\n\nTo actually drop them, either add them to `.dockerignore` (frontend/ cannot be,\nit is consumed by STAGE 0 from the build context) or restructure so the final\nstage `COPY --from=`s only what it needs — for koreader/ that is just\n`koplugin.zip` into `cps/static/`.\n\nNot urgent: the combined saving is ~188 KB for koreader/ plus whatever\nfrontend/ weighs, against a 61.8 MB layer. Worth folding into a future pass\nthat reworks the COPY/stage layout rather than doing on its own.",
+  "created": "2026-08-09",
+  "id": "F-8cc0a0",
+  "refs": [],
+  "severity": "chore",
+  "source": "audit",
+  "status": "open",
+  "title": "Deleting a COPYed path in a later RUN layer never reclaims image bytes"
+}

@@ -23,7 +23,7 @@ Coverage:
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
 
@@ -360,6 +360,17 @@ class TestMigrationPreservesAllUserData:
         engine = create_engine("sqlite:///:memory:", future=True)
         with engine.connect() as conn:
             conn.exec_driver_sql("PRAGMA foreign_keys = OFF")
+            # The production app DB always has these parent users.  Keep the
+            # synthetic fixture foreign-key-clean so later additive migrations
+            # can enforce their documented PRAGMA foreign_key_check postcondition.
+            conn.exec_driver_sql(
+                "CREATE TABLE user (id INTEGER PRIMARY KEY, name VARCHAR(64))"
+            )
+            for user_id in range(1, 6):
+                conn.exec_driver_sql(
+                    "INSERT INTO user (id, name) VALUES (?, ?)",
+                    (user_id, f"fixture-user-{user_id}"),
+                )
             conn.exec_driver_sql(PRE_H1_SCHEMA)
             conn.exec_driver_sql(PRE_H1_INDEX_USER_ANN)
             conn.exec_driver_sql(PRE_H1_INDEX_USER_BOOK)
@@ -515,6 +526,37 @@ class TestMigrationPreservesAllUserData:
             "unsynced row — that would lie about its origin"
         )
 
+    def test_annotation_migration_sequence_matches_production(self):
+        """This class hand-lists the annotation migrations; production doesn't.
+
+        The list above claims to match ``migrate_Database()``'s flow, and that
+        claim silently went stale: two migrations were added to production and
+        not here, so a pre-H1 fixture kept a schema the ORM had already moved
+        past and the failure surfaced as an unrelated ``no such column``.
+
+        Pin the correspondence so the next added migration fails HERE, naming
+        itself, instead of somewhere confusing three tests away.
+        """
+        import inspect
+        import re
+        from cps import ub
+
+        production = re.findall(
+            r"^\s*(migrate_annotation_\w+|migrate_kobo_annotation_\w+|"
+            r"migrate_kobo_two_way_annotation_\w+|"
+            r"migrate_multi_device_annotation_\w+|migrate_device_management_\w+)\(",
+            inspect.getsource(ub.migrate_Database), re.M,
+        )
+        replayed = re.findall(
+            r"ub\.(migrate_\w+)\(engine, session\)",
+            inspect.getsource(self.test_orm_can_still_read_old_rows_after_migration),
+        )
+        missing = [m for m in production if m not in replayed]
+        assert not missing, (
+            "migrate_Database() runs annotation migrations this test never replays, "
+            f"so its fixture drifts from production: {missing}"
+        )
+
     def test_orm_can_still_read_old_rows_after_migration(self):
         """A pre-H1 row inserted by the Hardcover sync code path must
         be readable through the ORM after the migration runs.
@@ -532,6 +574,10 @@ class TestMigrationPreservesAllUserData:
         ub.migrate_annotation_polymorphic_position(engine, session)
         ub.migrate_annotation_device_origin(engine, session)
         ub.migrate_annotation_koreader_identity(engine, session)
+        ub.migrate_multi_device_annotation_safe_slice(engine, session)
+        ub.migrate_device_management_slice(engine, session)
+        ub.migrate_kobo_annotation_seed_pipeline(engine, session)
+        ub.migrate_kobo_two_way_annotation_sync(engine, session)
 
         # Fresh session: ORM read must work on every row.
         s2 = session_maker()

@@ -1,0 +1,11 @@
+{
+  "area": "spa",
+  "body": "OBSERVED in source, 2026-08-23. Runtime confirmation of the queues themselves is ASSUMED — the\nseed instance had nothing scheduled, so I saw the classic tables render empty, not populated.\n\nClassic's Tasks page carries two admin-only queues besides the running-task table:\n\"Upcoming scheduled sends\" (`cps/templates/tasks.html:31-50`) and \"Upcoming scheduled\noperations\" (`cps/templates/tasks.html:53-75`), each showing scheduled time and state with a\ncancel action. The SPA's Tasks page (`frontend/src/pages/Tasks.tsx`) renders only the running\nworker queue.\n\nThis is NOT the scheduled-task *editor* — that gap is counted separately. These are\nobservation-and-cancellation surfaces, and losing them means an admin cannot see or stop\nalready-scheduled work from the new UI.\n\nThe data already exists as JSON, admin-gated:\n- `GET  /cwa-scheduled/upcoming`      -> `{\"items\": [...]}`  (`cps/cwa_functions.py:1736-1748`)\n- `GET  /cwa-scheduled/upcoming-ops`  -> `{\"items\": [...]}`  (`cps/cwa_functions.py:1750-1764`)\n- `POST /cwa-scheduled/cancel`                               (`cps/cwa_functions.py:699-736`)\n\nThey live on the `cwa_stats` blueprint rather than `/api/v1`, so this needs a thin API surface\nplus the SPA tables — larger than F-57c90e, and it is the piece that actually blocks calling the\nnew Tasks page a replacement.\n\nConsequence for the retirement audit: surface 54 (Tasks) is Partial, not Native. The audit notes\nrecorded it as Native with only schedule *editing* carved out, which understated the gap.",
+  "created": "2026-08-24",
+  "id": "F-f61640",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "New UI Tasks has no equivalent of classic's two scheduled-work queues"
+}

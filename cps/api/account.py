@@ -14,12 +14,16 @@ from flask import jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
-from .. import config, logger, ub
+from .. import config, constants, logger, ub, user_library
 from ..cw_login import current_user
+from ..cw_babel import sanitize_locale_for_write, effective_locale
 from .options import locale_options, book_language_options
 from ..helper import valid_password, valid_email, check_email
 from ..kobo_sync_status import needs_shelf_reconciliation, reconcile_shelves_safely
 from ..ui_themes import ALLOWED_THEME_SLUGS, theme_slug, theme_code
+from ..user_preferences import (NAMED_BOOLEAN_PREFERENCE_PATHS,
+                                serialize_named_preferences,
+                                set_named_preferences)
 from .serializers import (SIDEBAR_VISIBILITY_BITS, ORDERABLE_SIDEBAR_KEYS,
                           serialize_sidebar_visibility, serialize_sidebar_order)
 
@@ -67,7 +71,7 @@ def _serialize_account():
     # Shared with the admin form (#886) — same two selects, one builder.
     locales = locale_options()
     lang_options = book_language_options()
-    return {
+    payload = {
         "name": current_user.name,
         "email": current_user.email or "",
         "kindle_mail": current_user.kindle_mail or "",
@@ -77,7 +81,13 @@ def _serialize_account():
         "mail_body_text": (config.mail_body_text or "") if current_user.role_admin() else None,
         "kobo_only_shelves_sync": bool(current_user.kobo_only_shelves_sync),
         "opds_only_shelves_sync": bool(current_user.opds_only_shelves_sync),
-        "locale": current_user.locale,
+        # Report the locale the user will actually GET, not the raw row.
+        # The React form seeds its <select> from this and posts it back on
+        # every save, so returning an unshippable legacy value made the
+        # control display "English" while holding the bad string -- and the
+        # next save 400d the whole payload for exactly the users this fix
+        # exists to rescue (F-011141).
+        "locale": effective_locale(current_user.locale),
         "default_language": current_user.default_language,
         "theme": theme_slug(current_user.theme),
         "ui_font_body": current_user.ui_font_body or "",
@@ -98,6 +108,8 @@ def _serialize_account():
         "languages": lang_options,
         "app_passwords": _app_passwords(),
     }
+    payload.update(user_library.mode_payload(current_user))
+    return payload
 
 
 @api_v1.route("/account")
@@ -105,7 +117,47 @@ def get_account():
     guard = _require_real_user()
     if guard:
         return guard
+    user_library.mark_response_user_specific()
     return jsonify(_serialize_account())
+
+
+@api_v1.route("/account/library-mode", methods=["POST"])
+def update_library_mode():
+    """Switch this account between monolibrary and personal-library modes."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    data = request.get_json(silent=True) or {}
+    mode = data.get("mode")
+    if mode not in constants.LIBRARY_MODES:
+        return _err(
+            "invalid_library_mode",
+            "mode must be 'monolibrary' or 'personal_library'",
+            400,
+        )
+    if not current_user.role_browse_global():
+        return _err(
+            "library_mode_managed",
+            "Your library contents are managed by an administrator.",
+            403,
+        )
+    try:
+        user_library.set_library_mode(current_user, mode)
+    except user_library.UserLibraryError as ex:
+        ub.session.rollback()
+        return _err("library_mode_rejected", str(ex), 409)
+    user_library.mark_response_user_specific()
+    return jsonify(user_library.mode_payload(current_user))
+
+
+@api_v1.route("/account/my-library-intro/dismiss", methods=["POST"])
+def dismiss_my_library_intro():
+    """Persist this account's introductory-card dismissal."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.dismiss_intro(current_user)
+    return jsonify(user_library.mode_payload(current_user))
 
 
 @api_v1.route("/account/profile", methods=["POST"])
@@ -145,7 +197,12 @@ def update_profile():
         if "opds_only_shelves_sync" in data:
             current_user.opds_only_shelves_sync = 1 if data.get("opds_only_shelves_sync") else 0
         if "locale" in data and data["locale"]:
-            current_user.locale = data["locale"]
+            # Hygiene only — get_locale() coerces on read, so a bad value here
+            # cannot break resolution. Refusing it keeps the row clean (F-011141).
+            validated_locale = sanitize_locale_for_write(data["locale"])
+            if not validated_locale:
+                return _err("invalid_request", "Unsupported locale", 400)
+            current_user.locale = validated_locale
         if "default_language" in data and data["default_language"]:
             current_user.default_language = data["default_language"]
         if "theme" in data:
@@ -335,3 +392,44 @@ def update_sidebar():
         "sidebar": serialize_sidebar_visibility(current_user),
         "sidebar_order": serialize_sidebar_order(current_user),
     })
+
+
+@api_v1.route("/account/preferences", methods=["POST"])
+def update_named_preferences():
+    """Persist allowlisted boolean UI preferences for the logged-in user.
+
+    Body: ``{"preferences": {name: bool, ...}}``. All keys and values are
+    validated before any mutation; the endpoint owns one transaction across the
+    whole map and rolls it back on failure.
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+
+    data = request.get_json(silent=True) or {}
+    updates = data.get("preferences")
+    if not isinstance(updates, dict) or not updates:
+        return _err(
+            "invalid_request", "preferences must be a non-empty object", 400)
+
+    for name, value in updates.items():
+        if name not in NAMED_BOOLEAN_PREFERENCE_PATHS:
+            return _err(
+                "invalid_request", "Unknown preference: %s" % name, 400)
+        if type(value) is not bool:
+            return _err(
+                "invalid_request", "Preference %s must be a boolean" % name, 400)
+
+    try:
+        set_named_preferences(current_user, updates)
+    except Exception as ex:
+        ub.session.rollback()
+        return _err("invalid_request", str(ex), 400)
+
+    try:
+        ub.session.commit()
+    except Exception as ex:
+        ub.session.rollback()
+        return _err("db_error", "Could not save preferences: %s" % ex, 500)
+
+    return jsonify({"preferences": serialize_named_preferences(current_user)})

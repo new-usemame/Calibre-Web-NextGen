@@ -9,7 +9,6 @@ import os
 import re
 import json
 import operator
-import time
 import sys
 import string
 import requests
@@ -17,16 +16,18 @@ from datetime import datetime, timedelta, timezone
 from datetime import time as datetime_time
 from functools import wraps
 from urllib.parse import urlparse
-import shutil
+import shutil  # noqa: F401 -- test/extension monkeypatch compatibility
 import subprocess
 import tempfile
 import fcntl
+import errno
 
-from flask import Blueprint, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
+from flask import Blueprint, current_app, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
 from markupsafe import Markup
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from .cw_login import current_user
 from flask_babel import gettext as _
-from flask_babel import get_locale, format_time, format_datetime, format_timedelta, LazyString
+from flask_babel import get_locale, format_time, format_timedelta, LazyString
 from sqlalchemy import and_
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
@@ -42,11 +43,25 @@ from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config
 from .services.worker import WorkerThread
+from .services.kobo_import import (
+    KoboContentDatabaseError,
+    KoboUploadError,
+    MAX_KOBO_DATABASE_UPLOAD_BYTES,
+    ParsedKoboBook,
+    parse_kobo_device_books,
+    temporary_kobo_database,
+)
+from .services.kobo_reconcile import (
+    build_reconciliation_preview,
+    scan_from_candidates,
+)
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
-from .cw_babel import get_available_translations, get_available_locale, get_user_locale_language
+from .cw_babel import (get_available_locale,
+                       get_user_locale_language, sanitize_locale_for_write)
 from . import debug_info
 from .string_helper import strip_whitespaces
+from .sqlite_utils import copy_sqlite_database
 
 log = logger.create()
 
@@ -62,7 +77,7 @@ feature_support = {
 }
 
 try:
-    import rarfile  # pylint: disable=unused-import
+    import rarfile  # noqa: F401  # pylint: disable=unused-import
 
     feature_support['rar'] = True
 except (ImportError, SyntaxError):
@@ -255,10 +270,8 @@ def trigger_hardcover_auto_fetch():
             return json.dumps(show_text), 400
         
         # Get settings
-        import sys as _sys
-        if constants.SCRIPTS_DIR not in _sys.path:
-            _sys.path.insert(1, constants.SCRIPTS_DIR)
-        from cwa_db import CWA_DB
+        from cps.cwa_db_loader import load_cwa_db
+        CWA_DB = load_cwa_db().CWA_DB
         from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
         from cps.services.worker import WorkerThread
         
@@ -657,6 +670,10 @@ def configuration():
                                  config=config,
                                  provider=oauth_bb.oauthblueprints,
                                  feature_support=feature_support,
+                                 kobo_two_way_emergency_disabled=(
+                                     os.environ.get("CWNG_KOBO_TWO_WAY_ANNOTATIONS", "").strip().lower()
+                                     in {"0", "false", "off", "no"}
+                                 ),
                                  hardcover_token_status=hardcover_status,
                                  title=_("Basic Configuration"), page="config")
 
@@ -875,7 +892,7 @@ def edit_list_user(param):
         vals['field_index'] = vals['field_index'][0]
     if 'value' in vals:
         vals['value'] = vals['value'][0]
-    elif not ('value[]' in vals):
+    elif 'value[]' not in vals:
         return _("Malformed request"), 400
     for user in users:
         try:
@@ -900,6 +917,9 @@ def edit_list_user(param):
                         kobo_shelf_sync_users.append(user.id)
                 elif param == 'opds_only_shelves_sync':
                     user.opds_only_shelves_sync = int(vals['value'] == 'true')
+                elif param == 'has_own_library':
+                    from . import user_library
+                    user_library.set_enabled(user, vals['value'] == 'true')
                 elif param == 'kindle_mail':
                     user.kindle_mail = valid_email(vals['value']) if vals['value'] else ""
                 elif param == 'kindle_mail_subject':
@@ -910,7 +930,7 @@ def edit_list_user(param):
                       [constants.ROLE_ADMIN, constants.ROLE_PASSWD, constants.ROLE_EDIT_SHELFS]:
                         raise Exception(_("Guest can't have this role"))
                     # check for valid value, last on checks for power of 2 value
-                    if value > 0 and value <= constants.ROLE_VIEWER and (value & value - 1 == 0 or value == 1):
+                    if value > 0 and value <= constants.ROLE_BROWSE_GLOBAL and (value & value - 1 == 0 or value == 1):
                         if vals['value'] == 'true':
                             user.role |= value
                         elif vals['value'] == 'false':
@@ -944,8 +964,11 @@ def edit_list_user(param):
                 elif param == 'locale':
                     if user.name == "Guest":
                         raise Exception(_("Guest's Locale is determined automatically and can't be set"))
-                    if vals['value'] in get_available_translations():
-                        user.locale = vals['value']
+                    # One mechanism for every locale write, so the four sites
+                    # cannot drift apart again (F-011141).
+                    validated_locale = sanitize_locale_for_write(vals['value'])
+                    if validated_locale:
+                        user.locale = validated_locale
                     else:
                         raise Exception(_("No Valid Locale Given"))
                 elif param == 'default_language':
@@ -1410,6 +1433,20 @@ def ajax_pathchooser():
 
 
 def do_full_kobo_sync(userid):
+    device_ids = ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == userid).scalar_subquery()
+    ub.session.query(ub.KoboDeviceBookEntitlement).filter(
+        ub.KoboDeviceBookEntitlement.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
+    ub.session.query(ub.KoboDeviceDeletedEntitlement).filter(
+        ub.KoboDeviceDeletedEntitlement.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
+    ub.session.query(ub.KoboDeviceEntitlementSeed).filter(
+        ub.KoboDeviceEntitlementSeed.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
+    ub.session.query(ub.KoboDevicePendingSyncPage).filter(
+        ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
     count = ub.session.query(ub.KoboSyncedBooks).filter(userid == ub.KoboSyncedBooks.user_id).delete()
     message = _("{} sync entries deleted").format(count)
     ub.session_commit(message)
@@ -1418,29 +1455,76 @@ def do_full_kobo_sync(userid):
 
 @admi.route("/ajax/kobo_resend/<int:userid>/<int:bookid>", methods=["POST"])
 @user_login_required
-@admin_required
 def ajax_kobo_resend(userid, bookid):
+    # Same IDOR guard as the Kobo token routes: a user may act only on their
+    # own device state, while admins retain the existing targeted action.
+    if current_user.id != userid and not current_user.role_admin():
+        abort(403)
     return do_kobo_resend(userid, bookid)
 
 
 def do_kobo_resend(userid, bookid):
     # Force re-delivery of one book to one user's Kobo on the next sync.
-    # Clears the (user_id, book_id) row from kobo_synced_books so the
-    # sync emits NewEntitlement, and bumps Books.last_modified so the
-    # sync filter (Books.last_modified > sync_token.books_last_modified)
-    # picks the book up regardless of where the device's cursor is.
+    #
+    # Three writes across the two databases, and only the timestamp bump does
+    # what it says on its own:
+    #
+    #   * bump Books.last_modified, so the sync filter
+    #     (Books.last_modified > sync_token.books_last_modified) picks the book
+    #     up regardless of where the device's cursor sits;
+    #   * clear the (user_id, book_id) row from kobo_synced_books;
+    #   * clear every per-device entitlement fingerprint for this user/book,
+    #     otherwise Layer 2 can suppress the requested replay as an exact
+    #     match even though last_modified selected it for delivery.
+    #
+    # ⚠️ This comment used to say the deletion is what makes the sync emit
+    # NewEntitlement. It is not, and believing so is what made the only
+    # regression test for this helper assert a causal chain the code cannot
+    # perform (F-cc5efb). get_kobo_created_ts (cps/kobo.py) derives the
+    # NewEntitlement / ChangedEntitlement choice from Books.timestamp and the
+    # joined date_added ONLY — it never reads kobo_synced_books, and the sync
+    # query deliberately does not filter on that table either because it is
+    # user-keyed and doing so would break multi-device sync (cps/kobo.py, see
+    # the comments around the changed-book query).
+    #
+    # The deletion still matters, by a different route: HandleSyncRequest resets
+    # the WHOLE sync token — books_last_created included — to datetime.min when
+    # the user has no kobo_synced_books rows left at all (cps/kobo.py, "if no
+    # books synced don't respect sync_token"). So removing the user's LAST row
+    # does produce NewEntitlement, which is the single-book case anyone would
+    # test by hand and is presumably how the wrong explanation survived. With
+    # any other synced row remaining, this emits ChangedEntitlement.
+    #
+    # 🚨 Whether a Kobo re-downloads the file on a ChangedEntitlement is
+    # UNOBSERVED (F-3e383a). The success message below tells the requester the
+    # device "will re-receive the book"; that claim is only established for the
+    # empty-table case above. Do not strengthen it without measuring on
+    # hardware.
     book = calibre_db.session.query(db.Books).filter(db.Books.id == bookid).first()
     if book is None:
         message = _("Book {} not found").format(bookid)
         return Response(json.dumps([{"type": "danger", "message": message}]),
                         mimetype='application/json')
+    device_ids = ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == userid,
+    ).scalar_subquery()
+    ledger_deleted = ub.session.query(ub.KoboDeviceBookEntitlement).filter(
+        ub.KoboDeviceBookEntitlement.device_id.in_(device_ids),
+        ub.KoboDeviceBookEntitlement.book_id == bookid,
+    ).delete(synchronize_session=False)
+    # The bounded pending body may contain this book. It cannot be rewritten
+    # without violating byte-identical retry, so invalidate the user's page and
+    # let the next request build a fresh NewEntitlement after the ledger clear.
+    ub.session.query(ub.KoboDevicePendingSyncPage).filter(
+        ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
+    ).delete(synchronize_session=False)
     deleted = ub.session.query(ub.KoboSyncedBooks).filter(
         ub.KoboSyncedBooks.user_id == userid,
         ub.KoboSyncedBooks.book_id == bookid,
     ).delete()
     book.last_modified = datetime.now(timezone.utc)
     calibre_db.session.commit()
-    if deleted:
+    if deleted or ledger_deleted:
         message = _("Cleared sync state for book {0} (user {1}); the device "
                     "will re-receive the book on next sync").format(bookid, userid)
     else:
@@ -1450,6 +1534,147 @@ def do_kobo_resend(userid, bookid):
     ub.session_commit(message)
     return Response(json.dumps([{"type": "success", "message": message}]),
                     mimetype='application/json')
+
+
+_KOBO_RECONCILE_TOKEN_SALT = "kobo-stranded-entitlement-preview"
+_KOBO_RECONCILE_TOKEN_MAX_AGE = 30 * 60
+
+
+def _kobo_reconcile_serializer():
+    return URLSafeTimedSerializer(
+        current_app.config["SECRET_KEY"], salt=_KOBO_RECONCILE_TOKEN_SALT)
+
+
+def _kobo_reconcile_user(user_id):
+    return ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first()
+
+
+def _kobo_reconciliation_preview(user_id, scan):
+    tombstone_uuids = {
+        row.book_uuid for row in
+        ub.session.query(ub.KoboDeletedBook.book_uuid).filter(
+            ub.KoboDeletedBook.user_id == user_id).all()
+    }
+    synced_book_uuids = {
+        row.book_uuid for row in
+        ub.session.query(ub.KoboSyncedBooks.book_uuid).filter(
+            ub.KoboSyncedBooks.user_id == user_id,
+            ub.KoboSyncedBooks.book_uuid.isnot(None),
+        ).all()
+    }
+    return build_reconciliation_preview(
+        scan,
+        existing_tombstone_uuids=tombstone_uuids,
+        synced_book_uuids=synced_book_uuids,
+        book_lookup=calibre_db.get_book_by_uuid,
+    )
+
+
+def _render_kobo_reconcile(user, preview=None, confirmation_token=None,
+                           result=None, error=None):
+    return render_title_template(
+        "kobo_reconcile.html",
+        user=user,
+        preview=preview,
+        confirmation_token=confirmation_token,
+        result=result,
+        error=error,
+        max_upload_mb=MAX_KOBO_DATABASE_UPLOAD_BYTES // (1024 * 1024),
+        title=_("Reconcile deleted Kobo books for %(user)s", user=user.name),
+        page="edituser",
+    )
+
+
+@admi.route("/admin/user/<int:user_id>/kobo-reconcile", methods=["GET", "POST"])
+@user_login_required
+@admin_required
+def kobo_reconcile(user_id):
+    user = _kobo_reconcile_user(user_id)
+    if user is None or user.role_anonymous():
+        abort(404)
+    if request.method == "GET":
+        return _render_kobo_reconcile(user)
+
+    try:
+        with temporary_kobo_database(
+                request.files.get("file"), request.content_length or 0) as sqlite_path:
+            scan = parse_kobo_device_books(sqlite_path)
+    except KoboUploadError as upload_error:
+        messages = {
+            "no_file": _("Choose a KoboReader.sqlite file."),
+            "not_sqlite": _("The uploaded file is not a SQLite database."),
+            "too_large": _(
+                "The file is larger than %(max)d MB.",
+                max=MAX_KOBO_DATABASE_UPLOAD_BYTES // (1024 * 1024),
+            ),
+        }
+        return _render_kobo_reconcile(user, error=messages[upload_error.code]), \
+            upload_error.status_code
+    except KoboContentDatabaseError as database_error:
+        return _render_kobo_reconcile(user, error=str(database_error)), 400
+
+    preview = _kobo_reconciliation_preview(user.id, scan)
+    confirmation_token = None
+    if preview.candidates:
+        confirmation_token = _kobo_reconcile_serializer().dumps({
+            "user_id": user.id,
+            "books": [
+                [book.uuid, book.title]
+                for book in preview.candidates
+            ],
+        })
+    return _render_kobo_reconcile(
+        user, preview=preview, confirmation_token=confirmation_token)
+
+
+@admi.route("/admin/user/<int:user_id>/kobo-reconcile/confirm", methods=["POST"])
+@user_login_required
+@admin_required
+def kobo_reconcile_confirm(user_id):
+    user = _kobo_reconcile_user(user_id)
+    if user is None or user.role_anonymous():
+        abort(404)
+    try:
+        payload = _kobo_reconcile_serializer().loads(
+            request.form.get("confirmation_token", ""),
+            max_age=_KOBO_RECONCILE_TOKEN_MAX_AGE,
+        )
+        if payload.get("user_id") != user.id:
+            raise BadSignature("preview belongs to another user")
+        preview_books = {
+            str(book_uuid): ParsedKoboBook(uuid=str(book_uuid), title=str(title))
+            for book_uuid, title in payload.get("books", [])
+        }
+    except (BadSignature, SignatureExpired, TypeError, ValueError):
+        return _render_kobo_reconcile(
+            user,
+            error=_("This preview is invalid or expired. Upload the device database again."),
+        ), 400
+
+    selected_uuids = list(dict.fromkeys(request.form.getlist("book_uuid")))
+    if not selected_uuids:
+        return _render_kobo_reconcile(
+            user, error=_("Select at least one book to archive.")), 400
+    if any(book_uuid not in preview_books for book_uuid in selected_uuids):
+        return _render_kobo_reconcile(
+            user,
+            error=_("The selected books do not match this preview. Upload the device database again."),
+        ), 400
+    candidates = tuple(preview_books[book_uuid] for book_uuid in selected_uuids)
+
+    preview = _kobo_reconciliation_preview(user.id, scan_from_candidates(candidates))
+    written = kobo_sync_status.record_user_book_deletions(
+        user.id,
+        [book.uuid for book in preview.candidates],
+        session=ub.session,
+    )
+    result = {
+        "written": written,
+        "already_scheduled": preview.already_scheduled,
+        "skipped_present": preview.skipped_present,
+        "skipped_unresolved": preview.skipped_unresolved,
+    }
+    return _render_kobo_reconcile(user, result=result)
 
 
 def check_valid_read_column(column):
@@ -1472,7 +1697,7 @@ def restriction_addition(element, list_func):
     elementlist = list_func()
     if elementlist == ['']:
         elementlist = []
-    if not element['add_element'] in elementlist:
+    if element['add_element'] not in elementlist:
         elementlist += [element['add_element']]
     return ','.join(elementlist)
 
@@ -2241,7 +2466,7 @@ def edit_user(user_id):
     all_public_shelves = ub.session.query(ub.MagicShelf).filter(
         ub.MagicShelf.is_public == 1,
         ub.MagicShelf.user_id != content.id,
-        ub.MagicShelf.is_system == False
+        ub.MagicShelf.is_system.is_(False)
     ).all()
     
     # Separate into hidden and visible
@@ -2652,9 +2877,11 @@ def _configuration_update_helper():
         _config_checkbox_int(to_save, "config_register_email")
         prev_kobo_sync = bool(config.config_kobo_sync)
         reboot_required |= _config_checkbox_int(to_save, "config_kobo_sync")
+        _config_checkbox_int(to_save, "config_kobo_two_way_annotation_sync")
         _config_int(to_save, "config_external_port")
         _config_checkbox_int(to_save, "config_kobo_proxy")
         _config_checkbox(to_save, "config_kobo_prefer_kepub")
+        _config_checkbox_int(to_save, "config_kobo_suppress_replayed_entitlements")
 
         # Kobo cover aspect-ratio padding (server-side letterbox elimination)
         _config_checkbox_int(to_save, "config_kobo_cover_padding_enabled")
@@ -2787,6 +3014,7 @@ def _configuration_update_helper():
 
         # security configuration
         _config_checkbox(to_save, "config_disable_standard_login")
+        _config_checkbox(to_save, "config_enable_oauth_auto_forward")
         _config_checkbox(to_save, "config_enable_oauth_group_admin_management")
         _config_checkbox(to_save, "config_check_extensions")
         _config_checkbox(to_save, "config_use_https")
@@ -2826,7 +3054,8 @@ def _configuration_update_helper():
                   category="warning")
     # Keep the retired cwa.db auto-fetch flag synchronized solely for safe
     # rollback. Runtime consumers use ConfigSQL.hardcover_sync_enabled().
-    effective_hardcover_sync, _ = schedule.reconcile_hardcover_configuration()
+    effective_hardcover_sync, _hardcover_sync_changed = \
+        schedule.reconcile_hardcover_configuration()
     hardcover_token_available = bool(config.resolved_hardcover_token())
     if (effective_hardcover_sync != prev_hardcover_sync
             or hardcover_token_available != prev_hardcover_token_available):
@@ -2876,6 +3105,7 @@ def _db_configuration_result(error_flash=None, gdrive_error=None):
 
     return render_title_template("config_db.html",
                                  config=config,
+                                 backup_root=constants.config_path("backup"),
                                  show_authenticate_google_drive=gdrive_authenticate,
                                  gdriveError=gdrive_error,
                                  gdrivefolders=gdrivefolders,
@@ -2885,7 +3115,11 @@ def _db_configuration_result(error_flash=None, gdrive_error=None):
 
 def _handle_new_user(to_save, content, languages, translations, kobo_support):
     content.default_language = to_save["default_language"]
-    content.locale = to_save.get("locale", content.locale)
+    # Only a locale we ship may be stored: get_locale() returns it verbatim
+    # on every later request (F-011141).
+    validated_locale = sanitize_locale_for_write(to_save.get("locale"))
+    if validated_locale:
+        content.locale = validated_locale
 
     content.sidebar_view = sum(int(key[5:]) for key in to_save if key.startswith('show_'))
     if "show_detail_random" in to_save:
@@ -2933,6 +3167,9 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.denied_column_value = config.config_denied_column_value
         # No default value for kobo sync shelf setting
         content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync", 0) == "on"
+        content.kobo_two_way_annotation_sync = (
+            to_save.get("kobo_two_way_annotation_sync", 0) == "on"
+        )
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
         ub.session.add(content)
         ub.session.commit()
@@ -2959,7 +3196,9 @@ def _delete_user(content):
             # here left the user's annotation rows and backup gzips behind
             # (PII surviving the account deletion).
             user_book_data.purge_user_book_data(user_id=content.id)
-            # User-scoped (not per-book) rows + the user itself stay here.
+            # UserLibraryBook is included in that enumerator because SQLite
+            # foreign-key cascades are not enabled. User-scoped (not
+            # per-book) rows + the user itself stay here.
             for us in ub.session.query(ub.Shelf).filter(content.id == ub.Shelf.user_id):
                 ub.session.query(ub.BookShelf).filter(us.id == ub.BookShelf.shelf).delete()
             ub.session.query(ub.Shelf).filter(content.id == ub.Shelf.user_id).delete()
@@ -2992,6 +3231,28 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         flash(_("No admin user remaining, can't remove admin role"), category="error")
         return redirect(url_for('admin.admin'))
 
+    from . import user_library
+    desired_library_mode = to_save.get(
+        "library_mode", user_library.mode_for_user(content)
+    )
+    if desired_library_mode not in constants.LIBRARY_MODES:
+        flash(_("Invalid library mode"), category="error")
+        return "", 400
+    library_seed_prepared = False
+    if (desired_library_mode == constants.LIBRARY_MODE_PERSONAL
+            and not bool(content.user_library_seeded)):
+        try:
+            # Seed before mutating the rest of the combined admin form. Its
+            # bounded commits must never make unrelated half-validated edits
+            # durable; the membership rows remain dormant if a later field
+            # fails validation.
+            user_library.prepare_user_library_seed(content)
+            library_seed_prepared = True
+        except Exception as ex:
+            ub.session.rollback()
+            flash(str(ex), category="error")
+            return "", 400
+
     val = [int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_')]
     sidebar, __ = get_sidebar_config()
     for element in sidebar:
@@ -3013,6 +3274,10 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         # the setting, so the two cannot disagree.
         kobo_sync_status.update_on_sync_shelfs(content.id)
     content.opds_only_shelves_sync = int(to_save.get("opds_only_shelves_sync") == "on") or 0
+    if "kobo_two_way_annotation_sync_present" in to_save:
+        content.kobo_two_way_annotation_sync = int(
+            to_save.get("kobo_two_way_annotation_sync") == "on"
+        ) or 0
     # Auto-send and metadata fetch settings
     content.auto_send_enabled = to_save.get("auto_send_enabled") == "on"
     content.auto_metadata_fetch = to_save.get("auto_metadata_fetch") == "on"
@@ -3120,7 +3385,7 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         all_public_shelves = ub.session.query(ub.MagicShelf).filter(
             ub.MagicShelf.is_public == 1,
             ub.MagicShelf.user_id != content.id,
-            ub.MagicShelf.is_system == False
+            ub.MagicShelf.is_system.is_(False)
         ).all()
         
         # Check which ones should be visible (checked)
@@ -3145,7 +3410,10 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
     if to_save.get("default_language"):
         content.default_language = to_save["default_language"]
     if to_save.get("locale"):
-        content.locale = to_save["locale"]
+        # Same rule as the ajax field editor above: assign only when we ship it.
+        validated_locale = sanitize_locale_for_write(to_save["locale"])
+        if validated_locale:
+            content.locale = validated_locale
     try:
         anonymous = content.is_anonymous
         content.role = constants.selected_roles(to_save)
@@ -3155,7 +3423,6 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             content.role &= ~constants.ROLE_ANONYMOUS
             if to_save.get("password", ""):
                 content.password = generate_password_hash(helper.valid_password(to_save.get("password", "")))
-
         new_email = valid_email(to_save.get("email", content.email))
         if not new_email:
             raise Exception(_("Email can't be empty and has to be a valid Email"))
@@ -3198,8 +3465,18 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
                                      title=_("Edit User %(nick)s", nick=content.name),
                                      page="edituser")
     try:
-        ub.session_commit()
+        user_library.set_library_mode(
+            content,
+            desired_library_mode,
+            seed_rows_prepared=library_seed_prepared,
+            commit=False,
+        )
+        ub.session.commit()
         flash(_("User '%(nick)s' updated", nick=content.name), category="success")
+    except user_library.UserLibraryError as ex:
+        ub.session.rollback()
+        log.error(ex)
+        flash(str(ex), category="error")
     except IntegrityError as ex:
         ub.session.rollback()
         log.error("An unknown error occurred while changing user: {}".format(str(ex)))
@@ -3339,18 +3616,71 @@ def test_metadata():
         log.error("Metadata test failed: %s", e)
         return json.dumps({'success': False, 'message': _('An unknown error occurred.')}), 200
 
+def _acquire_restore_file_lock(lock_name):
+    """Acquire a persistent, non-truncating lock file or return None if held."""
+    lock_path = os.path.join(tempfile.gettempdir(), lock_name)
+    lock_handle = open(lock_path, "a+", encoding="utf-8")
+    try:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as error:
+        lock_handle.close()
+        if error.errno in (errno.EACCES, errno.EAGAIN):
+            return None
+        raise
+    except Exception:
+        lock_handle.close()
+        raise
+    return lock_handle
+
+
+def _release_restore_locks(lock_handles):
+    for handle in lock_handles:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except Exception:
+            pass
+        try:
+            handle.close()
+        except Exception:
+            pass
+
+
+def _acquire_restore_lock():
+    return _acquire_restore_file_lock("restore_calibre_db.lock")
+
+
+def _acquire_restore_service_locks():
+    """Pause restore-sensitive services, returning the blocker if one is active."""
+    lock_handles = []
+    try:
+        for lock_name, service_name in (
+            ("ingest_processor.lock", "ingest"),
+            ("cover_enforcer.lock", "cover_enforcer"),
+        ):
+            handle = _acquire_restore_file_lock(lock_name)
+            if handle is None:
+                _release_restore_locks(lock_handles)
+                return [], service_name
+            lock_handles.append(handle)
+    except Exception:
+        _release_restore_locks(lock_handles)
+        raise
+    return lock_handles, None
+
+
 # --- Last Resort Calibre DB Restore ---
 @admi.route("/admin/restore_calibre_db", methods=["POST"])
 @user_login_required
 @admin_required
 def restore_calibre_db():
     """Restore Calibre metadata.db and clean app.db book-linked tables (last resort recovery)."""
-    lock_path = "/tmp/restore_calibre_db.lock"
-    service_lock_handles = []
+    lock_handles = []
     try:
-        if os.path.exists(lock_path):
+        restore_lock = _acquire_restore_lock()
+        if restore_lock is None:
             flash(_("Restore already in progress."), category="error")
             return redirect(url_for("admin.db_configuration"))
+        lock_handles.append(restore_lock)
 
         if not config.config_calibre_dir:
             flash(_("Restore failed: Calibre library path is not configured."), category="error")
@@ -3361,45 +3691,35 @@ def restore_calibre_db():
             flash(_("Restore failed: metadata.db not found at %(path)s", path=metadata_path), category="error")
             return redirect(url_for("admin.db_configuration"))
 
-        app_db_path = ub.app_DB_path or cli_param.settings_path or "/config/app.db"
+        app_db_path = (
+            ub.app_DB_path
+            or cli_param.settings_path
+            or constants.config_path("app.db")
+        )
         if not os.path.exists(app_db_path):
             flash(_("Restore failed: app.db not found at %(path)s", path=app_db_path), category="error")
             return redirect(url_for("admin.db_configuration"))
 
-        # Create lock file
-        with open(lock_path, "w", encoding="utf-8") as lock_file:
-            lock_file.write(str(os.getpid()))
+        service_lock_handles, blocking_service = _acquire_restore_service_locks()
+        if blocking_service == "ingest":
+            flash(_("An ingest run is in progress; try again when it finishes."), category="error")
+            return redirect(url_for("admin.db_configuration"))
+        if blocking_service == "cover_enforcer":
+            flash(_("Cover enforcement is in progress; try again when it finishes."), category="error")
+            return redirect(url_for("admin.db_configuration"))
+        lock_handles.extend(service_lock_handles)
 
         # 1. Backup both DBs
-        backup_dir = f"/config/backup/restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        backup_dir = constants.config_path(
+            "backup", f"restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
         os.makedirs(backup_dir, exist_ok=True)
-        shutil.copy2(metadata_path, os.path.join(backup_dir, "metadata.db.bak"))
-        shutil.copy2(app_db_path, os.path.join(backup_dir, "app.db.bak"))
+        copy_sqlite_database(metadata_path, os.path.join(backup_dir, "metadata.db.bak"))
+        copy_sqlite_database(app_db_path, os.path.join(backup_dir, "app.db.bak"))
 
         log_path = os.path.join(backup_dir, "restore.log")
         with open(log_path, "a", encoding="utf-8") as log_file:
             log_file.write(f"Restore started at {datetime.now().isoformat()}\n")
-
-        # Pause background services and close active sessions to reduce lock contention
-        try:
-            ingest_lock_path = os.path.join(tempfile.gettempdir(), "ingest_processor.lock")
-            ingest_lock = open(ingest_lock_path, "w")
-            fcntl.flock(ingest_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            ingest_lock.write("restore_calibre_db")
-            ingest_lock.flush()
-            service_lock_handles.append(ingest_lock)
-        except Exception as e:
-            log.warning("Failed to lock ingest processor: %s", e)
-
-        try:
-            cover_lock_path = os.path.join(tempfile.gettempdir(), "cover_enforcer.lock")
-            cover_lock = open(cover_lock_path, "w")
-            fcntl.flock(cover_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            cover_lock.write("restore_calibre_db")
-            cover_lock.flush()
-            service_lock_handles.append(cover_lock)
-        except Exception as e:
-            log.warning("Failed to lock cover enforcer: %s", e)
 
         # Close active sessions to reduce lock contention
         try:
@@ -3481,20 +3801,4 @@ def restore_calibre_db():
         flash(_("Restore failed: %(err)s", err=str(e)), category="error")
         return redirect(url_for("admin.db_configuration"))
     finally:
-        try:
-            if os.path.exists(lock_path):
-                os.remove(lock_path)
-        except Exception:
-            pass
-        try:
-            for handle in service_lock_handles:
-                try:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-                except Exception:
-                    pass
-                try:
-                    handle.close()
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        _release_restore_locks(lock_handles)

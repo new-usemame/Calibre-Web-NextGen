@@ -10,7 +10,8 @@ device-native fields (KoboReader.sqlite Bookmark columns, etc.).
     (pull: server → device).
   - :func:`apply_portable` — upsert an Annotation from a pushed wire dict
     (push: device → server), recording ``device_origin_id`` for feedback-loop
-    suppression and soft-deleting on ``hidden``.
+    suppression and soft-deleting on ``hidden`` only when the calling protocol
+    authorizes the stored provenance.
 
 Kept dependency-light + explicit so it's unit-testable without a Flask
 request context (mirrors cps/annotations.py's pure helpers).
@@ -21,17 +22,25 @@ See notes/2026-05-25-annotation-two-way-phase1-phase2-DESIGN.md §4.1.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Collection, Optional, Tuple
 
 from sqlalchemy import exc
+
+from .. import logger
+from .annotation_colors import to_display_name, to_storage_color
+from .annotation_types import to_storage_type
+
+log = logger.create()
 
 _VALID_SOURCES = {"kobo", "webreader", "koreader"}
 
 
-def validate_portable_payload(payload) -> Optional[str]:
+def validate_portable_payload(payload, *, book_uuid=None) -> Optional[str]:
     """Return a validation error for fields that would make an upsert unsafe."""
     if not isinstance(payload, dict):
         return None  # non-object entries are deliberately counted as skipped
+    if "source" in payload and payload.get("source") not in _VALID_SOURCES:
+        return "source must be one of: " + ", ".join(sorted(_VALID_SOURCES))
     for field in ("annotation_id", "highlighted_text", "note_text", "color",
                   "content_id", "context_string", "position_type",
                   "start_xpointer", "end_xpointer", "device_origin_id"):
@@ -48,6 +57,12 @@ def validate_portable_payload(payload) -> Optional[str]:
             return f"{field} must be an integer or null"
     if "hidden" in payload and not isinstance(payload.get("hidden"), bool):
         return "hidden must be a boolean"
+    if "content_id" in payload and payload.get("content_id") is not None:
+        from .annotation_content_id import ContentIdError, normalize_content_id
+        try:
+            normalize_content_id(payload.get("content_id"), book_uuid=book_uuid)
+        except ContentIdError as error:
+            return f"content_id: {error}"
     return None
 
 
@@ -62,7 +77,14 @@ def to_portable(row) -> dict:
         "annotation_id": row.annotation_id,
         "highlighted_text": row.highlighted_text,
         "note_text": row.note_text,
-        "color": row.highlight_color,
+        # The portable wire speaks display names (the KOReader plugin's own
+        # provider builds and consumes names); the column speaks canonical hex.
+        # Normalise on the way out so a device never sees "#A0A0A0". A colour
+        # this app cannot name is passed through as the stored token rather
+        # than dropped — the receiving provider is then the one deciding what
+        # to do with a word it does not know, which is better than us deleting
+        # the user's colour on its behalf.
+        "color": to_display_name(row.highlight_color),
         "content_id": row.content_id,
         "start_kobospan": _extract_kobospan_id(row.start_container_path or ""),
         "start_offset": row.start_offset,
@@ -73,6 +95,10 @@ def to_portable(row) -> dict:
         "position_type": row.position_type,
         "start_xpointer": row.start_xpointer,
         "end_xpointer": row.end_xpointer,
+        # Additive since F-9de049: without it a KOReader export -> import round
+        # trip silently dropped the type, because neither side ever mentioned it.
+        # A receiver that does not understand the key ignores it.
+        "type": row.annotation_type,
         "source": row.source,
         "hidden": bool(row.hidden),
         "device_origin_id": row.device_origin_id,
@@ -80,12 +106,18 @@ def to_portable(row) -> dict:
     }
 
 
-def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional[object], str]:
+def apply_portable(payload, *, user_id, book, session, commit,
+                   origin_device_id=None,
+                   deletable_sources: Collection[str] = (),
+                   ) -> Tuple[Optional[object], str]:
     """Upsert an Annotation from a device-pushed portable dict.
 
-    Find-or-create keyed on ``(user_id, book_id, annotation_id)``. New rows take the
-    payload's ``source`` (coerced to ``koreader`` if absent/invalid). Position
-    fields are built from the KoboSpan anchors like the web-reader create path.
+    Find-or-create keyed on ``(user_id, book_id, annotation_id)``. New rows take
+    a recognized payload ``source`` and default a missing source to ``koreader``;
+    existing rows retain their stored provenance. ``deletable_sources`` is the
+    calling protocol's authority for soft-deleting an existing row; the helper
+    defaults to allowing none. Position fields are built from the KoboSpan
+    anchors like the web-reader create path.
     ``device_origin_id`` is recorded so the next pull won't echo the row back to
     the device. ``hidden: true`` soft-deletes.
 
@@ -99,6 +131,13 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
     if not isinstance(annotation_id, str) or not annotation_id.strip():
         return None, "skipped"
     annotation_id = annotation_id.strip()
+    source = payload.get("source", "koreader")
+    if source not in _VALID_SOURCES:
+        # The HTTP boundary rejects this with a reason. Keep the core helper
+        # defensive as well: coercing an unrecognised observation to
+        # ``koreader`` invents provenance and grants KOReader delete authority
+        # over a row whose origin it did not establish.
+        return None, "skipped"
 
     row = (
         session.query(ub.Annotation)
@@ -109,21 +148,48 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
     )
     created = False
     if row is None:
-        source = payload.get("source")
-        if source not in _VALID_SOURCES:
-            source = "koreader"
         row = ub.Annotation(
             user_id=user_id, annotation_id=annotation_id,
-            book_id=book.id, source=source,
+            book_id=book.id, source=source, origin_device_id=origin_device_id,
+            # Preserved, never chosen: a sender that omits it leaves NULL rather
+            # than being assigned a type this side invented (F-9de049).
+            annotation_type=to_storage_type(payload.get("type")),
         )
         session.add(row)
         created = True
-    elif row.hidden and not payload.get("hidden"):
-        # A complete-list retry has no mutation clock, so it cannot prove an
-        # intentional recreation. Preserve the tombstone and every stored field.
-        return row, "skipped"
-    elif payload.get("source") in _VALID_SOURCES:
-        row.source = payload.get("source")
+    else:
+        if "source" in payload and payload.get("source") != row.source:
+            # Keep the 200 response for compatibility, but never let a refused
+            # authority claim disappear without the details needed to diagnose
+            # why the device's requested change did not land.
+            log.warning(
+                "Portable annotation push ignored source change: user=%s book=%s "
+                "annotation_id=%r stored_source=%r claimed_source=%r",
+                user_id, getattr(book, "id", "?"), annotation_id,
+                row.source, payload.get("source"),
+            )
+        if row.hidden and not payload.get("hidden"):
+            # A complete-list retry has no mutation clock, so it cannot prove an
+            # intentional recreation. Preserve the tombstone and every stored field.
+            return row, "skipped"
+    # ``source`` is provenance, not editable content. Every legitimate origin
+    # is assigned at creation by its ingest route (Kobo PATCH, web reader, the
+    # KoboReader.sqlite import, or this KOReader bridge). No ordinary annotation
+    # push carries authority to migrate an existing row between those origins;
+    # such a migration would need its own operator-gated operation. In
+    # particular, accepting a claimed ``koreader`` source here would let the
+    # next named-delete push bypass _DELETABLE_SOURCES and erase a Kobo/web-
+    # reader row (F-1927e0).
+
+    hidden_requested = bool(payload.get("hidden"))
+    hidden_permitted = created or row.source in deletable_sources
+    if hidden_requested and not hidden_permitted and not bool(row.hidden):
+        log.warning(
+            "Portable annotation push refused hidden: user=%s book=%s "
+            "annotation_id=%r stored_source=%r deletable_sources=%s",
+            user_id, getattr(book, "id", "?"), annotation_id, row.source,
+            sorted(deletable_sources),
+        )
 
     before = None if created else (
         row.source, row.highlighted_text, row.note_text, row.highlight_color,
@@ -140,9 +206,16 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
     if "note_text" in payload:
         row.note_text = payload.get("note_text")
     if "color" in payload:
-        row.highlight_color = payload.get("color")
+        # Accepts a name (what KOReader and older backups send) or a hex, and
+        # stores the canonical form. A legacy-name row rewritten to its hex
+        # counts as an update on the first push after this change; that is the
+        # normalisation landing, not a content change.
+        row.highlight_color = to_storage_color(payload.get("color"))
     if payload.get("content_id"):
-        row.content_id = payload.get("content_id")
+        from .annotation_content_id import normalize_content_id
+        row.content_id = normalize_content_id(
+            payload.get("content_id"), book_uuid=getattr(book, "uuid", None),
+        )
     if payload.get("context_string"):
         row.context_string = payload.get("context_string")
     if payload.get("chapter_progress") is not None:
@@ -170,9 +243,14 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
     if payload.get("device_origin_id"):
         row.device_origin_id = payload.get("device_origin_id")
 
-    if payload.get("hidden"):
+    if hidden_requested and hidden_permitted:
         row.hidden = True
         action = "deleted"
+    elif hidden_requested:
+        # Preserve the stored state. If no permitted content field changed,
+        # the before/after check below reports this as ``skipped`` and the
+        # protocol performs no fan-out of any kind.
+        action = "updated"
     else:
         row.hidden = False
         action = "created" if created else "updated"
@@ -190,7 +268,11 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
 
     row.last_synced = _now()
     try:
-        commit()
+        # Keep the commit contract shared with every annotation writer. Import
+        # at call time so this dependency-light service does not pull in the
+        # Flask blueprint merely to project rows on the read path.
+        from cps.annotations import _commit_required
+        _commit_required(commit)
     except exc.IntegrityError:
         # A parallel device may have inserted the same canonical identity
         # after our SELECT. Roll back this losing INSERT and replay as an
@@ -207,5 +289,7 @@ def apply_portable(payload, *, user_id, book, session, commit) -> Tuple[Optional
             raise
         return apply_portable(
             payload, user_id=user_id, book=book, session=session, commit=commit,
+            origin_device_id=origin_device_id,
+            deletable_sources=deletable_sources,
         )
     return row, action

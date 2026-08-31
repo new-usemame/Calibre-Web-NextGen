@@ -1,11 +1,8 @@
 /* Cool teal heads-up banner — intentionally off-palette from the amber accent so
    it reads as a distinct, friendly notice. Sits directly under the top bar. */
 .banner {
-  --hb-edge: #3a8f86;
-  --hb-text: #d7f1ed;
-  --hb-icon: #6fd8cb;
   position: relative;
-  background: linear-gradient(90deg, #173842 0%, #18484a 60%, #1a4f49 100%);
+  background: linear-gradient(90deg, var(--hb-bg-start) 0%, var(--hb-bg-mid) 60%, var(--hb-bg-end) 100%);
   border-bottom: 1px solid var(--hb-edge);
   box-shadow: inset 3px 0 0 var(--hb-icon);
   color: var(--hb-text);
@@ -33,7 +30,7 @@
 }
 
 .clickableSurface:focus-visible {
-  outline: 2px solid #dff7ff;
+  outline: 2px solid var(--hb-focus);
   outline-offset: -3px;
 }
 
@@ -49,10 +46,18 @@
 }
 
 .supportBanner {
-  --hb-text: #e9f9ff;
-  --hb-icon: #13c3ff;
-  background: linear-gradient(90deg, #07384d 0%, #08465e 58%, #06445e 100%);
+  --hb-bg-start: var(--hb-support-bg-start);
+  --hb-bg-mid: var(--hb-support-bg-mid);
+  --hb-bg-end: var(--hb-support-bg-end);
+  --hb-edge: var(--hb-support-edge);
+  --hb-text: var(--hb-support-text);
+  --hb-strong: var(--hb-support-strong);
+  --hb-icon: var(--hb-support-icon);
+  --hb-link-hover: var(--hb-support-link-hover);
+  background: linear-gradient(90deg, var(--hb-bg-start) 0%, var(--hb-bg-mid) 58%, var(--hb-bg-end) 100%);
   border-bottom: none;
+  outline: 1px solid var(--hb-edge);
+  outline-offset: -1px;
   box-shadow: none;
 }
 
@@ -75,7 +80,7 @@
 }
 
 .text strong {
-  color: #ffffff;
+  color: var(--hb-strong);
   font-weight: var(--fw-semi);
 }
 
@@ -107,11 +112,25 @@
 }
 
 .supportLink:hover {
-  color: #a5ecff;
+  color: var(--hb-link-hover);
   text-decoration-color: currentColor;
 }
 
+/* Lives on a WRAPPER element, never on the icon itself. A keyframe animation
+   whose target is an SVG element does not get a compositor layer (measured in
+   Chrome), so it falls back to the main thread for as long as it is mounted --
+   style recalc,
+   prepaint, layerize and commit every frame, on every route, whether or not
+   anything is on screen. Measured on this nudge, mobile 390x844@3 at 20x CPU
+   throttle over one identical 20s scroll: 1,169 style recalcs and 22 dropped
+   frames with it running, and 0 recalcs / 1 dropped frame with it cancelled.
+   A separate control ran the SAME keyframes on a plain <div>: Chrome reported
+   has_compositor_animation on 809/809 frames and 1 main-thread frame in 13.5s.
+   `display: inline-flex` is what makes this box shrink-wrap the glyph, so the
+   rendered geometry is unchanged. */
 .arrow {
+  display: inline-flex;
+  align-items: center;
   color: var(--hb-icon);
   flex: none;
   animation: hbNudge 1.8s var(--ease) infinite;
@@ -144,8 +163,27 @@
 }
 
 .close:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--hb-close-hover);
   opacity: 1;
+}
+
+/* Target expander for the 28x28 dismiss button. Hit-tested with
+   elementFromPoint rather than computed from this inset, because a pseudo-element
+   expander is only real if it actually receives the click.
+
+   MEASURED, not claimed: 43x44 at 390px, and 43x40 at 1440px — where the top 4px
+   fall under the 56px sticky top bar, which wins the hit test. Both clear the
+   24x24 SC 2.5.8 AA floor and both improve on the bare 28x28.
+
+   The desktop height is bounded by the layout, not by this rule: the banner is
+   only 37px tall there, so a full 44px of vertical target cannot fit without
+   reaching either into the top bar (which steals the hit, as above) or below the
+   banner into page content (which would steal hits FROM that content — a worse
+   defect than the 4px). Do not "fix" the 40 by growing this inset. */
+.close::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
 }
 
 @media (max-width: 600px) {

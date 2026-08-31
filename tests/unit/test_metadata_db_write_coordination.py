@@ -171,6 +171,45 @@ class TestReconnectEndpointIsSynchronousAndLightweight:
             "engine-recreating and racy."
         )
 
+    def test_refresh_helper_reports_partial_failure_after_sweeping_instances(
+        self, monkeypatch
+    ):
+        """A failed session is not silently treated as a complete refresh."""
+        from cps.db import CalibreDB
+
+        calls = []
+
+        class GoodSession:
+            def expire_all(self):
+                calls.append("good-expire")
+
+            def rollback(self):
+                calls.append("good-rollback")
+
+        class BadSession:
+            def expire_all(self):
+                calls.append("bad-expire")
+                raise RuntimeError("expire failed")
+
+            def rollback(self):
+                calls.append("bad-rollback")
+
+        good = CalibreDB()
+        good.session = GoodSession()
+        bad = CalibreDB()
+        bad.session = BadSession()
+        monkeypatch.setattr(CalibreDB, "instances", {good, bad})
+
+        with pytest.raises(RuntimeError, match="Could not refresh 1"):
+            CalibreDB.refresh_for_new_data()
+
+        assert set(calls) == {
+            "good-expire",
+            "good-rollback",
+            "bad-expire",
+            "bad-rollback",
+        }
+
 
 # ---------------------------------------------------------------------------
 # Contributor 2 — process-shared advisory flock for metadata.db writers

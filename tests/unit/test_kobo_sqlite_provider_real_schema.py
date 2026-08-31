@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Phase 2 schema-fit guard for the KOReader bridge's KoboReader.sqlite provider.
 
-The provider (`koreader/plugins/cwasync.koplugin/kobo_sqlite_provider.lua`) writes
+The provider (`koreader/plugins/cwngsync.koplugin/kobo_sqlite_provider.lua`) writes
 web-created highlights straight into a Kobo's `Bookmark` table so the stock reader
 (Nickel) renders them. That table is Lua-side, so the busted tests can only cover
 the *pure* helpers (colour codes, selector escaping, row building) — they cannot
@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pytest
 
-PLUGIN_DIR = Path(__file__).resolve().parents[2] / "koreader" / "plugins" / "cwasync.koplugin"
+PLUGIN_DIR = Path(__file__).resolve().parents[2] / "koreader" / "plugins" / "cwngsync.koplugin"
 PROVIDER_LUA = PLUGIN_DIR / "kobo_sqlite_provider.lua"
 
 # The real Kobo `Bookmark` schema (column layout only — public, no user data).
@@ -108,7 +108,13 @@ def _provider_shaped_row(bookmark_id="cwn-web-abc123", volume_id="vol-uuid-1"):
         "Type": "highlight",
         "DateCreated": "2026-05-30T12:00:00Z",
         "DateModified": "2026-05-30T12:00:00Z",
-        "Hidden": 0,
+        # The string, not 0 — this is what the provider itself writes
+        # (kobo_sqlite_provider.lua: `Hidden = "false"`) and what Nickel
+        # writes. The column is declared BOOL, but SQLite keeps the word as
+        # TEXT because it is not numeric-convertible. This file exists to
+        # replay the provider's EXACT insert, so the value has to be exact
+        # too; an integer here is the drift it is meant to catch.
+        "Hidden": "false",
     }
 
 

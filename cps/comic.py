@@ -148,6 +148,58 @@ def _extract_cover(tmp_file_name, original_file_extension, rar_executable):
     return cover.cover_processing(tmp_file_name, cover_data, extension)
 
 
+def flatten_comicinfo_to_root(archive_path):
+    """Move a misplaced ComicInfo.xml to the archive root, in place.
+
+    The ComicInfo.xml standard requires the file at the archive root;
+    comicapi's has_metadata/read_metadata do an exact-name lookup against
+    the archive's file list and only ever match a root-level entry, so a
+    real-world .cbz that packages it one folder down (a common scan-group
+    convention) never gets its metadata read at all, root or not. This is
+    consistent with every other reader we checked (ComicTagger, Komga) - it's
+    not a comicapi bug, it's the file that's out of spec. Rewriting the copy
+    fixes it for every future reader, not just this one import.
+
+    Only rewrites zip-based archives (.cbz) - .cbr/.cb7/.cbt aren't zip
+    containers and there's no free Python writer for RAR, so those are left
+    untouched. No-ops (returns False) when ComicInfo.xml is already at root,
+    absent entirely, or the archive isn't a zip - callers don't need to
+    check any of that first.
+
+    :returns: True if the archive was rewritten, False if left untouched.
+    """
+    if not zipfile.is_zipfile(archive_path):
+        return False
+
+    with zipfile.ZipFile(archive_path, "r") as archive:
+        names = archive.namelist()
+        if "ComicInfo.xml" in names:
+            return False  # already at root
+
+        nested_name = next(
+            (name for name in names if os.path.basename(name).lower() == "comicinfo.xml"),
+            None,
+        )
+        if nested_name is None:
+            return False  # no ComicInfo.xml anywhere in the archive
+
+        entries = archive.infolist()
+        contents = {info.filename: archive.read(info) for info in entries}
+
+    tmp_path = archive_path + ".comicinfo-flatten.tmp"
+    with zipfile.ZipFile(tmp_path, "w") as out:
+        for info in entries:
+            data = contents[info.filename]
+            name = "ComicInfo.xml" if info.filename == nested_name else info.filename
+            new_info = zipfile.ZipInfo(name, date_time=info.date_time)
+            new_info.compress_type = info.compress_type
+            new_info.external_attr = info.external_attr
+            out.writestr(new_info, data)
+
+    os.replace(tmp_path, archive_path)
+    return True
+
+
 def get_comic_info(tmp_file_path, original_file_name, original_file_extension, rar_executable, no_cover_processing):
     if use_comic_meta:
         try:

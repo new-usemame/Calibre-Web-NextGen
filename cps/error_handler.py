@@ -16,6 +16,7 @@ except ImportError:
 
 from . import config, app, logger, services
 from .cw_login import current_user
+from .report_link import build_issue_url
 from .url_policy import trailing_slash_redirect_url
 
 
@@ -59,11 +60,24 @@ def internal_error(error):
             error_stack = traceback.format_exc().split("\n")
     except Exception:
         pass
+    error_name = ('The server encountered an internal error and was unable to complete your '
+                  'request. There is an error in the application.')
+    # Precomposed report link. This page asks the user to "report this issue
+    # with all related information" while already holding the error, and until
+    # now handed them a blank form and asked them to type the version by hand.
+    # Composed, never sent: only the user clicking through posts anything.
+    try:
+        issue_url = build_issue_url("500 Internal Server Error", error_name)
+    except Exception:
+        # An error page that errors is the worst possible outcome here, so the
+        # link is strictly best-effort — the template falls back to the plain
+        # new-issue URL when this is empty.
+        issue_url = ""
     return render_template('http_error.html',
                            error_code="500 Internal Server Error",
-                           error_name='The server encountered an internal error and was unable to complete your '
-                                      'request. There is an error in the application.',
+                           error_name=error_name,
                            issue=True,
+                           issue_url=issue_url,
                            unconfigured=False,
                            error_stack=error_stack,
                            instance=config.config_calibre_web_title

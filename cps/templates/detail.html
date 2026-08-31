@@ -714,6 +714,13 @@
                                                 <span id="archive-icon" class="glyphicon {{ entry.is_archived and 'glyphicon-folder-open' or 'glyphicon-folder-close' }}"></span>
                                             </button>
                                         {% endif %}
+                                        {% if current_user.library_mode() == 'personal_library' %}
+                                            <button type="button" class="btn btn-default action-icon-btn" id="remove-from-my-library-btn"
+                                                    data-toggle="modal" data-target="#removeFromMyLibraryModal"
+                                                    title="{{ _('In your library') }}" aria-label="{{ _('Remove from my library') }}">
+                                                <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>
+                                            </button>
+                                        {% endif %}
                                     {% endif %}
 
                                     {% if current_user.role_edit() %}
@@ -829,8 +836,32 @@
                             </div>
                         </div>
 
-                        <h2 id="title">{{ entry.title }}</h2>
-                        <p class="author">
+                        {% if current_user.library_mode() == 'personal_library' %}
+                        <div class="modal fade" id="removeFromMyLibraryModal" role="dialog" aria-labelledby="removeFromMyLibraryLabel">
+                          <div class="modal-dialog"><div class="modal-content">
+                            <div class="modal-header bg-info text-center"><h4 id="removeFromMyLibraryLabel">{{ _('Remove "%(title)s" from your library?', title=entry.title) }}</h4></div>
+                            <div class="modal-body text-center">
+                              <p>{{ _("It leaves your library and your OPDS feed.") }}</p>
+                              <p>{{ _("If you use Kobo's built-in sync, it also leaves your Kobo at its next sync. Other e-readers keep downloaded copies, and KOReader progress sync keeps working.") }}</p>
+                              {% set shelf_names = [] %}
+                              {% for shelf in g.shelves_access if shelf.id in books_shelfs %}{% if shelf_names.append(shelf.name) %}{% endif %}{% endfor %}
+                              {% if shelf_names %}<p>{{ _('It also leaves these shelves: %(shelves)s.', shelves=shelf_names|join(', ')) }}</p>{% endif %}
+                              <p>{{ _('Nothing is deleted: the book stays in the global library, and your highlights, notes and reading progress are kept.') }}</p>
+                              <p>{{ current_user.role_browse_global() and _('You can add it back any time from the global library.') or _('Only an administrator can add it back.') }}</p>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-default" id="remove-from-my-library-confirm">{{ _('Remove') }}</button>
+                              <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('Cancel') }}</button>
+                            </div>
+                          </div></div>
+                        </div>
+                        {% endif %}
+
+                        {# dir="auto" per field (#1073): direction resolves from each
+                           string's own first strong character, so RTL titles and authors
+                           render right-to-left without the library needing a language set. #}
+                        <h2 id="title" dir="auto">{{ entry.title }}</h2>
+                        <p class="author" dir="auto">
                             {% for author in entry.ordered_authors %}
                                 <a href="{{ url_for('web.books_list',  data='author', sort_param='stored', book_id=author.id ) }}">{{ author.name.replace('|',',') }}</a>
                                 {% if not loop.last %}
@@ -874,7 +905,7 @@
                             {% endif %}
                         </div>
                         {% if entry.series|length > 0 %}
-                            <p id="book_of">{{ _("Book %(index)s of %(range)s", index=entry.series_index|formatfloat(2), range=(url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id)|escapedlink(entry.series[0].name))|safe) }}</p>
+                            <p id="book_of" dir="auto">{{ _("Book %(index)s of %(range)s", index=entry.series_index|formatfloat(2), range=(url_for('web.books_list', data='series', sort_param='stored', book_id=entry.series[0].id)|escapedlink(entry.series[0].name))|safe) }}</p>
                         {% endif %}
 
                         <div class="book-metadata">
@@ -1098,7 +1129,7 @@
                 {% if entry.comments|length > 0 and entry.comments[0].text|length > 0 %}
                     <div class="book-detail-description">
                         <h3 id="decription">{{ _('Description:') }}</h3>
-                        {{ entry.comments[0].text|clean_string|safe }}
+                        <div dir="auto">{{ entry.comments[0].text|clean_string|safe }}</div>
                     </div>
                 {% endif %}
                 <div id="shelf-action-errors" class="pull-left" role="alert"></div>
@@ -1225,6 +1256,18 @@
 <script type="text/javascript">
     $(function () {
         var toastTimer;
+        $('#remove-from-my-library-confirm').on('click', function () {
+            var button = $(this).prop('disabled', true).text({{ _('Removing…')|tojson }});
+            $.ajax({
+                url: {{ url_for('web.remove_from_my_library', book_id=entry.id)|tojson }},
+                method: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token() }}'},
+                success: function () {
+                    window.location.href = {{ (url_for('web.global_library') if current_user.role_browse_global() else url_for('web.index'))|tojson }};
+                },
+                error: function () { button.prop('disabled', false).text({{ _('Remove')|tojson }}); }
+            });
+        });
         function showActionToast(message, anchor) {
             if (!message) {
                 return;

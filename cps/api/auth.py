@@ -6,11 +6,12 @@ from datetime import datetime
 
 from flask import jsonify, request, url_for
 from sqlalchemy import func
+from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
 from .serializers import serialize_user
-from .. import ub, config, constants, limiter
+from .. import ub, config, constants, limiter, services, logger
 from ..config_sql import uploads_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
@@ -19,6 +20,8 @@ from ..helper import (
     check_username, check_email, check_valid_domain, reset_password,
     send_registration_mail, generate_random_password,
 )
+
+log = logger.create()
 
 
 def _err(code, message, status):
@@ -83,16 +86,78 @@ except ImportError:  # flask_wtf is optional/container-only
     generate_csrf = None
 
 try:
+    from flask_limiter import RateLimitExceeded
     from flask_limiter.util import get_remote_address
 except ImportError:  # flask_limiter is optional/container-only
+    class RateLimitExceeded(Exception):
+        pass
+
     get_remote_address = lambda: "127.0.0.1"  # noqa: E731
 
 
+def _request_data():
+    """Return a mapping for auth payloads; non-object JSON is an empty form."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else request.form
+
+
+def _normalized_username(data):
+    """Canonical username for lookup and limiter keys; invalid types are missing."""
+    username = data.get("username")
+    return username.strip().lower() if isinstance(username, str) else ""
+
+
 def _login_key_func():
-    """Rate-limit key: posted username (lower-stripped), falling back to remote IP."""
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip().lower()
-    return username or get_remote_address()
+    """Rate-limit one normalized username from one remote client address."""
+    # Username-only buckets let anyone lock out any named account. Include the
+    # client address while retaining a per-account bound for this client; JSON
+    # encoding makes the two components unambiguous even if either contains a
+    # delimiter. Missing/malformed usernames stay in a stable per-client bucket.
+    return json.dumps(
+        [get_remote_address() or "", _normalized_username(_request_data())],
+        separators=(",", ":"),
+    )
+
+
+def _check_rate_limit():
+    """Evaluate this endpoint's decorators and return a JSON 429 when breached.
+
+    The application-wide limiter deliberately uses ``auto_check=False`` because
+    other blueprints explicitly decide where checks belong. Keep that model here:
+    each decorated public auth view calls this helper before doing useful work.
+    Backend failures are logged for the administrator and fail open so a broken
+    limiter store cannot lock everyone out of the instance.
+    """
+    if limiter is None:
+        return None
+    try:
+        limiter.check()
+    except RateLimitExceeded as ex:
+        breached_limit = getattr(getattr(ex, "limit", None), "limit", None)
+        window = str(breached_limit) if breached_limit is not None else "the current limit"
+        return _err(
+            "rate_limit_exceeded",
+            "Too many requests: limit is {}. Try again after that window resets.".format(window),
+            429,
+        )
+    except HTTPException:
+        # RateLimitExceeded is handled above. Other Werkzeug control-flow
+        # exceptions are application responses, not storage outages.
+        raise
+    except Exception as ex:
+        log.error("Rate limiter backend error: %s", ex)
+    return None
+
+
+def _clear_current_rate_limits():
+    """Clear every bucket evaluated for the successful request, best-effort."""
+    if limiter is None:
+        return
+    try:
+        for request_limit in limiter.current_limits:
+            limiter.limiter.storage.clear(request_limit.key)
+    except Exception as ex:
+        log.error("Connection error clearing limiter backend after login: %s", ex)
 
 
 @api_v1.route("/auth/csrf")
@@ -129,6 +194,12 @@ def _server_features():
         # per-shelf toggle that would otherwise store inert intent (#870).
         "kobo_sync_magic_shelves": bool(
             getattr(config, "config_kobo_sync_magic_shelves", False)),
+        # Stage 0 two-way annotation sync, instance-gated and default off.
+        # Surfaced so the SPA never calls the preference endpoint on a server
+        # that does not have it: an older backend answers 404, which the book
+        # page would otherwise raise as a console error on every single view.
+        "kobo_two_way_annotations": bool(
+            getattr(config, "config_kobo_two_way_annotation_sync", False)),
         # The admin's "Enable Uploads" switch. Classic gates its navbar upload
         # button on this (layout.html: role_upload() and g.allow_upload); the
         # SPA had no way to see it and offered Upload regardless (#1288).
@@ -138,14 +209,6 @@ def _server_features():
     }
 
 
-# Written by cps.cwa_functions.set_profile_picture (the profile_pictures
-# blueprint): a {username: "data:image/…;base64,…"} map. The classic UI reads
-# the whole map via /profile_pictures/user_profiles.json and looks the name up
-# client-side; the SPA gets only the current user's picture on /me instead, so
-# it never downloads every user's avatar. Path is kept in sync with that writer.
-_USER_PROFILES_JSON = "/config/user_profiles.json"
-
-
 def _user_avatar(name):
     """Return the profile-picture data-URI set for ``name`` in the classic
     profile-pictures panel, or None. A missing file, malformed JSON, absent
@@ -153,7 +216,7 @@ def _user_avatar(name):
     back to a neutral glyph. The ``data:image/`` guard keeps a corrupted entry
     from becoming an arbitrary URL the frontend would render."""
     try:
-        with open(_USER_PROFILES_JSON, "r") as fh:
+        with open(constants.USER_PROFILES_JSON, "r") as fh:
             data = json.load(fh)
     except (OSError, ValueError):
         return None
@@ -164,6 +227,8 @@ def _user_avatar(name):
 def _me_payload(user):
     """Single source of truth for the /me-shaped payload the SPA consumes across
     login, magic-link, and /auth/me. Keeps the three sites from drifting."""
+    from .. import user_library
+    user_library.mark_response_user_specific()
     payload = serialize_user(user)
     payload["features"] = _server_features()
     payload["instance_name"] = _instance_name()
@@ -205,18 +270,74 @@ def auth_me():
 @limiter.limit("40/day", key_func=_login_key_func)
 @limiter.limit("3/minute", key_func=_login_key_func)
 def auth_login():
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
+
     # I2: Honour config_disable_standard_login.
-    # LDAP/OAuth login routing is deferred to the auth-bridge sub-project (sub-project 2).
     if config.config_disable_standard_login:
         return jsonify({"error": {"code": "standard_login_disabled",
                                   "message": "Standard login is disabled"}}), 403
 
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip().lower()
+    data = _request_data()
+    username = _normalized_username(data)
     password = data.get("password") or ""
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
+
+    # ── LDAP authentication ────────────────────────────────────────────
+    # When the instance is configured for LDAP login, authenticate against
+    # the directory service first.  This mirrors the classic UI flow in
+    # usermanagement.verify_password():  existing users are LDAP-bound;
+    # users who exist in the directory but not yet locally are auto-created
+    # (matching the OPDS/API auto-creation path in the same file).
+    login_type = getattr(config, "config_login_type", constants.LOGIN_STANDARD)
+    if login_type == constants.LOGIN_LDAP and services.ldap:
+        if user and not user.role_anonymous():
+            # Existing local user — bind against LDAP to validate the password.
+            try:
+                login_result, error = services.ldap.bind_user(user.name, password)
+                if login_result:
+                    login_user(user, remember=bool(data.get("remember")))
+                    return jsonify(_me_payload(user))
+                if error is not None:
+                    log.error("LDAP bind error for '%s': %s", username, error)
+            except Exception as ex:
+                log.error("LDAP authentication error for '%s': %s", username, ex)
+            # LDAP bind failed — fall through to 401 below.
+        elif getattr(config, 'config_ldap_auto_create_users', True):
+            # User not found locally — try LDAP bind and auto-create if
+            # the directory recognises the credentials (needed for OPDS /
+            # API clients that bypass the classic login page).
+            try:
+                login_result, error = services.ldap.bind_user(username, password)
+                if login_result:
+                    ldap_user_details = services.ldap.get_object_details(username)
+                    if ldap_user_details:
+                        from . import admin as admin_mod
+                        create_result, error_msg = admin_mod.ldap_import_create_user(
+                            username, ldap_user_details)
+                        if create_result:
+                            user = ub.session.query(ub.User).filter(
+                                func.lower(ub.User.name) == username.lower()).first()
+                            if user:
+                                log.info("LDAP auto-created user '%s' via SPA login",
+                                         username)
+                                login_user(user, remember=bool(data.get("remember")))
+                                return jsonify(_me_payload(user))
+                    log.warning("LDAP auth succeeded but user creation failed for '%s'",
+                                username)
+                elif error:
+                    log.debug("LDAP auth failed for new user '%s': %s", username, error)
+            except Exception as ex:
+                log.error("LDAP auto-creation error for '%s': %s", username, ex)
+        # Either LDAP bind failed or user creation failed — return 401.
+        return jsonify({"error": {"code": "invalid_credentials",
+                                  "message": "Invalid username or password"}}), 401
+
+    # ── Local password authentication ──────────────────────────────────
     if user and not user.role_anonymous() and check_password_hash(str(user.password), password):
         login_user(user, remember=bool(data.get("remember")))
+        _clear_current_rate_limits()
         return jsonify(_me_payload(user))
     return jsonify({"error": {"code": "invalid_credentials",
                               "message": "Invalid username or password"}}), 401
@@ -283,6 +404,9 @@ def auth_magic_link_start():
     polls /auth/magic-link/poll while an already-signed-in device authorises the
     token by visiting verify_url (/verify/<token>, login-gated). Same mechanism
     the classic /remote/login page uses; gated on the same config_remote_login."""
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
     if not bool(getattr(config, "config_remote_login", False)):
         return _err("magic_link_disabled", "Magic-link login is disabled", 403)
     if current_user.is_authenticated:
@@ -303,12 +427,19 @@ def auth_magic_link_start():
 
 
 @api_v1.route("/auth/magic-link/poll", methods=["POST"])
-@limiter.limit("240/hour", key_func=lambda: get_remote_address())
+# The SPA waits 3 seconds before its first poll, then polls every 3 seconds for
+# a 10-minute token: 600 / 3 = 200 requests per full session. 1000/hour allows
+# four full sessions from one shared IP (800 requests) plus 200 for scheduling
+# overlap/retries, while keeping token guessing bounded per client address.
+@limiter.limit("1000/hour", key_func=lambda: get_remote_address())
 def auth_magic_link_poll():
     """Poll a magic-link token. Returns one of: not_verified | success | expired |
     not_found. On success the waiting device is logged in (session cookie set) and
     the token is consumed. Mirrors remotelogin.token_verified, JSON-shaped for the
     SPA (serialized user instead of a flash + redirect)."""
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
     if not bool(getattr(config, "config_remote_login", False)):
         return _err("magic_link_disabled", "Magic-link login is disabled", 403)
     data = request.get_json(silent=True) or request.form
@@ -345,6 +476,9 @@ def auth_register():
     """Public self-registration. Mirrors web.register_post: gated on
     config_public_reg, requires a configured mail server, validates the
     username/email + allowed-domain, then emails the generated password."""
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
     if not config.config_public_reg:
         return _err("registration_disabled", "Public registration is disabled", 403)
     if not config.get_mail_server_configured():
@@ -403,8 +537,11 @@ def auth_register():
 def auth_forgot():
     """Email a reset password. Always returns ok (never reveals whether the
     account exists) — an improvement over the legacy flash that leaked it."""
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip().lower()
+    rate_limit_error = _check_rate_limit()
+    if rate_limit_error is not None:
+        return rate_limit_error
+    data = _request_data()
+    username = _normalized_username(data)
     if username:
         user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
         if user is not None and user.name != "Guest":

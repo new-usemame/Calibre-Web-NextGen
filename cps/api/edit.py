@@ -15,14 +15,16 @@ from flask import jsonify, request, Response
 from flask_babel import get_locale
 
 from . import api_v1
-from .serializers import serialize_book_detail
-from .. import calibre_db, config, db, ub, isoLanguages
+from .serializers import serialize_book_detail, cover_url_for
+from .. import calibre_db, config, db, ub, isoLanguages, logger
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 import time
 
 from ..editbooks import edit_book_param, delete_book_from_table, modify_identifiers
-from ..helper import convert_book_format, save_cover, save_cover_from_url, tags_filters, get_convert_options
+from ..helper import (convert_book_format, save_cover, save_cover_from_url, tags_filters,
+                     get_convert_options, mark_book_modified, log_metadata_change,
+                     replace_cover_thumbnail_cache, book_cover_is_locked)
 
 # Fields the SPA edit form can change, applied in this order. Title/authors come
 # first because they may restructure the book's directory; the rest follow.
@@ -31,9 +33,22 @@ EDITABLE_FIELDS = [
     "tags", "publishers", "languages", "comments", "rating", "pubdate",
 ]
 
+# ``list_mode`` is request-level and deliberately not part of EDITABLE_FIELDS:
+# it changes how relationship fields are prepared, never what fields are
+# writable. Omission remains the historical replace behaviour for every
+# existing API client.
+LIST_FIELD_SEPARATORS = {
+    "authors": "&",
+    "tags": ",",
+    "publishers": ",",
+    "languages": ",",
+}
+
 # Custom columns (#pages, #status, …) are addressed by their calibre table name,
 # the same key the classic editor's form fields and inline table editor use.
 CUSTOM_COLUMN_PREFIX = "custom_column_"
+
+log = logger.create()
 
 
 def _err(code, message, status):
@@ -62,6 +77,72 @@ def _parse_edit_result(result):
     if isinstance(result, tuple):  # (message, status) — an error
         return False, str(result[0])
     return True, ""  # "" / None — success with no body
+
+
+def _book_list_values(book, field):
+    """Return one relationship field in the spelling/order shown to editors."""
+    if field == "authors":
+        # Calibre stores commas in author names as ``|``. edit_book_param's
+        # author parser reverses this display form before it writes.
+        return [author.name.replace("|", ",") for author in (book.authors or [])]
+    if field == "languages":
+        return [
+            isoLanguages.get_language_name(get_locale(), language.lang_code)
+            for language in (getattr(book, "languages", None) or [])
+        ]
+    return [
+        item.name
+        for item in (getattr(book, field, None) or [])
+    ]
+
+
+def _add_list_values(book, field, raw):
+    """Merge a list-field input, returning the editor value or ``None``.
+
+    Existing values are emitted first and unchanged. Incoming values are
+    stripped, compared with Unicode-aware case folding, and appended in input
+    order only once. ``None`` means the request adds no relationship and the
+    caller must skip the write entirely.
+    """
+    separator = LIST_FIELD_SEPARATORS[field]
+    existing = _book_list_values(book, field)
+    seen = {value.strip().casefold() for value in existing}
+    additions = []
+    for part in ("" if raw is None else str(raw)).split(separator):
+        value = part.strip()
+        folded = value.casefold()
+        if not value or folded in seen:
+            continue
+        seen.add(folded)
+        additions.append(value)
+    if not additions:
+        return None
+    joiner = " & " if field == "authors" else ", "
+    return joiner.join(existing + additions)
+
+
+def _delete_api_response(result):
+    """Translate the legacy delete core's message list into an API contract."""
+    try:
+        payload = json.loads(result or "[]")
+    except (TypeError, ValueError):
+        return _err("delete_failed", "Deleting the book failed", 500)
+    messages = payload if isinstance(payload, list) else [payload]
+    danger = next((item for item in messages
+                   if isinstance(item, dict) and item.get("type") == "danger"), None)
+    if danger:
+        return _err("delete_failed", str(danger.get("message") or "Deleting the book failed"), 500)
+    warning = next((item for item in messages
+                    if isinstance(item, dict) and item.get("type") == "warning"), None)
+    if warning:
+        return jsonify({
+            "deleted": True,
+            "warning": {
+                "code": "cleanup_incomplete",
+                "message": str(warning.get("message") or "File cleanup was incomplete"),
+            },
+        })
+    return "", 204
 
 
 def _custom_column_defs():
@@ -331,12 +412,21 @@ def update_metadata(book_id):
         return _err("not_found", "Book not found", 404)
 
     data = request.get_json(silent=True) or {}
+    list_mode = data.get("list_mode", "replace")
+    if list_mode not in ("add", "replace"):
+        return _err("invalid_request", "list_mode must be 'add' or 'replace'", 400)
+
     errors = {}
     for field in EDITABLE_FIELDS:
         if field not in data:
             continue
         raw = data[field]
-        value = "" if raw is None else str(raw)
+        if list_mode == "add" and field in LIST_FIELD_SEPARATORS:
+            value = _add_list_values(book, field, raw)
+            if value is None:
+                continue  # A no-op add must not touch modified time or metadata.
+        else:
+            value = "" if raw is None else str(raw)
         # edit_book_param reads vals['pk'] + vals['value']; checkA auto-syncs the
         # author sort key from the authors string (the inline-editor default).
         vals = {"pk": str(book_id), "value": value, "checkA": "true"}
@@ -407,7 +497,7 @@ def update_metadata(book_id):
 def delete_book(book_id):
     if not current_user.is_authenticated or current_user.is_anonymous:
         return _err("unauthorized", "You must be signed in", 401)
-    if not current_user.role_delete_books():
+    if not current_user.role_delete_books() or not current_user.role_edit():
         return _err("forbidden", "You are not allowed to delete books", 403)
     # Authorize against the caller's VISIBLE library, not the raw table: a user
     # with the (global) delete role but a language/tag/custom-column visibility
@@ -418,24 +508,22 @@ def delete_book(book_id):
         return _err("not_found", "Book not found", 404)
     # delete_book_from_table re-checks the role and does the data-safe (DB-first,
     # files-last) whole-book delete + shelf cleanup. book_format="" = whole book.
-    delete_book_from_table(book_id, "", True)
-    return "", 204
+    return _delete_api_response(delete_book_from_table(book_id, "", True))
 
 
 @api_v1.route("/books/<int:book_id>/formats/<fmt>/delete", methods=["POST"])
 @login_required_if_no_ano
 def delete_format(book_id, fmt):
-    """Delete a single format from a book (keeps the book). Reuses the data-safe
-    delete core (re-checks role, DB-first/files-last)."""
+    """Delete a single format from a book while keeping its metadata record.
+
+    The shared core re-checks the role, performs the sole visibility-scoped
+    lookup, and stages storage deletion reversibly across the metadata commit.
+    """
     if not current_user.is_authenticated or current_user.is_anonymous:
         return _err("unauthorized", "You must be signed in", 401)
     if not current_user.role_delete_books():
         return _err("forbidden", "You are not allowed to delete books", 403)
-    # Same visibility-scoped authorization as whole-book delete above.
-    if not calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True):
-        return _err("not_found", "Book not found", 404)
-    delete_book_from_table(book_id, fmt.upper(), True)
-    return "", 204
+    return _delete_api_response(delete_book_from_table(book_id, fmt.upper(), True))
 
 
 @api_v1.route("/books/<int:book_id>/convert", methods=["POST"])
@@ -478,9 +566,26 @@ def set_cover(book_id):
     guard = _require_edit()
     if guard:
         return guard
-    book = calibre_db.get_filtered_book(book_id)
+    # Match the sibling endpoints in this module (and the detail endpoint the
+    # edit page is opened from): a user may edit their OWN hidden or archived
+    # book, so resolving with strict defaults 404s a page that opened fine.
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True
+    )
     if not book:
         return _err("not_found", "Book not found", 404)
+
+    # The per-book cover lock is a deliberate user decision, and every other
+    # write path honours it -- the cover picker refuses with 409, the classic
+    # editor skips the cover, and so does the ingest metadata fetch. Checked
+    # BEFORE any bytes are written, so a refusal cannot leave a replaced file
+    # on disk behind an error response.
+    if book_cover_is_locked(book_id):
+        return _err(
+            "locked",
+            "This book's cover is locked. Unlock it first.",
+            409,
+        )
 
     if request.files.get("file"):
         ok, message = save_cover(request.files["file"], book.path)
@@ -491,7 +596,80 @@ def set_cover(book_id):
             return _err("invalid_request", "Provide an image file or a cover URL", 400)
         ok, message = save_cover_from_url(url, book.path)
 
-    if ok:
-        # Cache-bust so the browser refetches the replaced image immediately.
-        return jsonify({"ok": True, "cover_url": "/cover/%d/og?t=%d" % (book_id, int(time.time()))})
-    return _err("cover_failed", str(message), 400)
+    if not ok:
+        return _err("cover_failed", str(message), 400)
+
+    # A new cover IS a book change and has to be recorded as one. Writing
+    # cover.jpg alone leaves Books.last_modified untouched, and that column is
+    # what every cover URL is versioned by (jinjia's `last_modified` filter, the
+    # /api/v1 serializers) AND what Kobo native sync re-selects on. Without this
+    # the classic UI and every already-rendered SPA page kept asking for the old
+    # cover URL, so the replaced cover only appeared on the one response below —
+    # and with cover responses now cacheable, a stale image would survive in the
+    # browser until it was evicted. cover_picker's apply path has always done
+    # this; this one did not. Single source of truth: helper.mark_book_modified.
+    #
+    # NOT held under services.calibre_db_lock.metadata_db_write_lock, which
+    # editbooks.do_edit_book and api.browse do take. That lock hard-codes
+    # /config for its lock file rather than resolving the configured config dir,
+    # so on an install without /config (any bare-metal deployment) acquiring it
+    # raises — and adopting it here would turn a working cover upload into a 500
+    # on exactly those installs. Recorded as a finding rather than papered over;
+    # the fix belongs in the lock's path resolution, not in this caller.
+    try:
+        book.has_cover = 1
+        mark_book_modified(book)
+        calibre_db.session.commit()
+    except Exception as exc:
+        # The bytes are already on disk — save_cover writes the library file
+        # before anything touches the database — so this is a PARTIALLY APPLIED
+        # change: the library file has changed, while has_cover/last_modified/
+        # Kobo state still describe the old cover. Which of the two a client
+        # then sees depends on the book: for a replacement, a fresh fetch gets
+        # the new image under the old version token; for a book that had no
+        # cover, the rolled-back has_cover=0 makes the route answer with the
+        # placeholder even though the file exists. Reporting success would hide
+        # either, so the caller is told the save failed and can retry.
+        log.error("set_cover: failed to record cover change for book %s: %s", book_id, exc)
+        try:
+            calibre_db.session.rollback()
+        except Exception:
+            pass
+        return _err("cover_failed", "Cover save failed", 500)
+
+    # Post-commit housekeeping, mirroring cover_picker's apply path. Runs AFTER
+    # the commit on purpose: remove_synced_book writes to app.db, so doing it
+    # first would leave it applied against a metadata.db change that never
+    # landed. Separate try blocks — these are unrelated, and one failing must not
+    # skip the other. Both are best-effort: the committed last_modified bump
+    # already drives the cache-bust and Kobo's own re-selection
+    # (Books.last_modified > sync_token.books_last_modified), and a resolution
+    # request whose thumbnail is missing is answered from the original AND left
+    # revalidating, so a browser does pick the regenerated thumbnail up.
+    # #707: the cover should also be embedded into the book file, not only
+    # written to cover.jpg. This QUEUES that work — log_metadata_change writes an
+    # enforcement record for the metadata enforcer to consume, and it swallows
+    # its own failures by design, so it expresses intent and cannot report
+    # delivery. Written AFTER the commit: the enforcer reads the book back out
+    # of metadata.db and re-embeds from it, so a record published ahead of the
+    # transaction can be consumed against the pre-commit row — or survive a
+    # rollback that means there is nothing to enforce.
+    try:
+        log_metadata_change(book, {'cover': True})
+    except Exception as exc:
+        log.error("set_cover: enforcement record failed for book %s: %s", book_id, exc)
+    try:
+        from .. import kobo_sync_status
+        kobo_sync_status.remove_synced_book(book_id, all=True)
+    except Exception as exc:
+        log.error("set_cover: Kobo unsync failed for book %s: %s", book_id, exc)
+    try:
+        replace_cover_thumbnail_cache(book_id, book_path=book.path,
+                                      last_modified=book.last_modified)
+    except Exception as exc:
+        log.error("set_cover: thumbnail refresh failed for book %s: %s", book_id, exc)
+
+    # Answer with the same versioned URL shape the serializers emit, so the
+    # SPA's optimistic preview and the next detail fetch agree on one URL.
+    return jsonify({"ok": True, "cover_url": cover_url_for(book, "md") or
+                    "/cover/%d/md?t=%d" % (book_id, int(time.time()))})

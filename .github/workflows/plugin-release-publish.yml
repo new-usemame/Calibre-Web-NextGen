@@ -1,7 +1,7 @@
-name: Publish cwasync plugin
+name: Publish cwngsync plugin
 
 # Publishes the bundled KOReader plugin to its dedicated repository
-# (new-usemame/cwasync.koplugin) when — and only when — the plugin actually
+# (new-usemame/cwngsync.koplugin) when — and only when — the plugin actually
 # changed. That repository is what KOReader's Updates Manager and
 # appstore.koplugin point at, so it going stale strands every device on an old
 # plugin (fork #400).
@@ -21,7 +21,7 @@ name: Publish cwasync plugin
 # current without reintroducing the false-update problem.
 #
 # Why a workflow instead of a runbook step: the publish used to be a manual
-# `scripts/publish-cwasync-plugin.sh --publish` tracked as prose in
+# `scripts/publish-cwngsync-plugin.sh --publish` tracked as prose in
 # notes/org/LEDGER.md. It was missed for v4.1.12, v4.1.13 and v4.1.14 — the
 # plugin repository sat three plugin-changing fixes behind while the release
 # notes implied it was current. A release step that depends on someone
@@ -81,4 +81,4 @@ jobs:
         run: |
           set -euo pipefail
           git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
-          bash scripts/publish-cwasync-plugin.sh --tag "$TAG" --auto
+          bash scripts/publish-cwngsync-plugin.sh --tag "$TAG" --auto

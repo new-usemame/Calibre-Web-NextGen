@@ -68,7 +68,11 @@ class TestSpineParse:
         from cps.services.kobo_position import parse_spine
 
         spine = parse_spine(synthetic_kepub)
-        assert spine == ["chapter1.html", "chapter2.html", "chapter3.html"]
+        assert spine == [
+            "OEBPS/chapter1.html",
+            "OEBPS/chapter2.html",
+            "OEBPS/chapter3.html",
+        ]
 
     def test_spine_empty_for_nonexistent_file(self, tmp_path):
         from cps.services.kobo_position import parse_spine
@@ -116,7 +120,7 @@ class TestComputeCfiRangeKepub:
         from cps.services.kobo_position import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
-            content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter1.html",
+            content_id="00000000-0000-0000-0000-deadbeefcafe!!OEBPS/chapter1.html",
             start_container_path="span#kobo\\.1\\.1",
             start_container_child_index=-99,
             start_offset=0,
@@ -291,7 +295,7 @@ class TestCfiRoundTrip:
         # epubcfi(common,start,end) — common reaches the span.
         common = cfi[len("epubcfi("):-1].split(",")[0].split("!", 1)[1]
         cache_key = (str(synthetic_kepub), synthetic_kepub.stat().st_mtime_ns)
-        tree = _get_chapter_dom(cache_key, synthetic_kepub, "chapter1.html")
+        tree = _get_chapter_dom(cache_key, synthetic_kepub, "OEBPS/chapter1.html")
         span = _walk_cfi_element_path(tree, common)
         assert span.get("id") == "kobo.1.1"
         # /1:0 .. /1:15 over the span's text → the exact highlighted run.
@@ -303,7 +307,7 @@ class TestCfiRoundTrip:
         )
 
         pos = KoboPosition(
-            content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter1.html",
+            content_id="00000000-0000-0000-0000-deadbeefcafe!!OEBPS/chapter1.html",
             start_container_path="span#kobo\\.1\\.1",
             start_container_child_index=-99,
             start_offset=0,
@@ -315,7 +319,7 @@ class TestCfiRoundTrip:
         parts = cfi[len("epubcfi("):-1].split(",")
         common = parts[0].split("!", 1)[1]
         cache_key = (str(synthetic_kepub), synthetic_kepub.stat().st_mtime_ns)
-        tree = _get_chapter_dom(cache_key, synthetic_kepub, "chapter1.html")
+        tree = _get_chapter_dom(cache_key, synthetic_kepub, "OEBPS/chapter1.html")
         # Common ancestor is the <p>; start/end paths are relative to it.
         common_el = _walk_cfi_element_path(tree, common)
         assert common_el.tag == "p"
@@ -438,7 +442,11 @@ class TestCacheInvalidation:
         build_synthetic_kepub(epub)
 
         spine_v1 = parse_spine(epub)
-        assert spine_v1 == ["chapter1.html", "chapter2.html", "chapter3.html"]
+        assert spine_v1 == [
+            "OEBPS/chapter1.html",
+            "OEBPS/chapter2.html",
+            "OEBPS/chapter3.html",
+        ]
 
         # Wait at least one filesystem tick + replace with the minimal
         # fixture (single chapter) so the cache key changes.

@@ -85,7 +85,11 @@ function detail(title: string): BookDetail {
     archived: false,
     favorited: false,
     hidden: false,
-  } as BookDetail;
+    in_progress: false,
+    kosync_progress: null,
+    kosync_progress_timestamp: null,
+    kosync_progress_created_at: null,
+  };
 }
 
 /** Two pages of library, with the book under test first on page 1. The grid
@@ -141,6 +145,22 @@ function targetCard(page: Page) {
   return page.locator(`main a[href$="/book/${TARGET_ID}"]`);
 }
 
+/** Enter the edit flow through the control exposed by the active pointer
+ * contract. Fine pointers retain the hover pencil; coarse pointers expose the
+ * same edit destination as a labelled item in the card disclosure. */
+async function openQuickEdit(page: Page) {
+  const card = targetCard(page).first().locator('..');
+  if (test.info().project.use.hasTouch === true) {
+    await card.getByRole('button', { name: /^More actions for / }).click();
+    const actions = card.getByRole('group', { name: /^Actions for / });
+    await actions.getByRole('link', { name: /^Edit / }).click();
+    return;
+  }
+
+  await card.hover();
+  await card.locator(`a[href$="/book/${TARGET_ID}/edit"]`).click();
+}
+
 /** Where the book under test sits among the loaded cards — the thing the
  *  reporter actually notices. -1 when it isn't rendered at all. */
 async function targetIndex(page: Page): Promise<number> {
@@ -152,8 +172,15 @@ async function targetIndex(page: Page): Promise<number> {
 
 test.describe('#1169 an edited book stays in the library listing', () => {
   test.beforeEach(async ({ page }) => {
-    // Keep the optional Discover strip's links out of the grid counts.
-    await page.addInitScript(() => localStorage.setItem('cwng_discover_hidden_v1', '1'));
+    // Keep the optional Discover strip's links out of the grid counts. A real
+    // account's server preference wins over localStorage, so override /me for
+    // this isolated paging harness rather than relying on a local-only seed.
+    await page.route('**/api/v1/auth/me', async (route) => {
+      const response = await route.fetch();
+      const me = await response.json();
+      me.preferences = { ...(me.preferences ?? {}), discover_hidden: true };
+      await route.fulfill({ response, json: me });
+    });
     // Deterministic paging: drive page 2 through the explicit Load more button
     // instead of racing the sentinel's observer.
     await page.addInitScript(() => {
@@ -187,12 +214,9 @@ test.describe('#1169 an edited book stays in the library listing', () => {
     const indexBefore = await targetIndex(page);
     expect(indexBefore, 'the book under test starts at the top of the grid').toBe(0);
 
-    // Client-side into the edit form via the card's own quick-edit control
-    // (hover-revealed on desktop, always shown for touch).
-    const card = targetCard(page).first();
-    await card.hover();
-    const quickEdit = page.locator(`main a[href$="/book/${TARGET_ID}/edit"]`).first();
-    await quickEdit.click();
+    // Client-side into the edit form via the card's own quick-edit control,
+    // using the hover row on fine pointers and its touch disclosure equivalent.
+    await openQuickEdit(page);
     await page.waitForURL(`**/book/${TARGET_ID}/edit`);
 
     const titleField = page.getByLabel(/^title$/i).first();
@@ -246,9 +270,7 @@ test.describe('#1169 an edited book stays in the library listing', () => {
     await loadMore.click();
     await expect(gridBookLinks(page)).toHaveCount(firstPageCount * 2);
 
-    const card = targetCard(page).first();
-    await card.hover();
-    await page.locator(`main a[href$="/book/${TARGET_ID}/edit"]`).first().click();
+    await openQuickEdit(page);
     await page.waitForURL(`**/book/${TARGET_ID}/edit`);
     await page.getByLabel(/^title$/i).first().fill(NEW_TITLE);
     await page.getByRole('button', { name: /save changes/i }).click();

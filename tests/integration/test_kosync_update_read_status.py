@@ -16,11 +16,14 @@ import sys
 import base64
 from pathlib import Path
 
+
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 
+@pytest.mark.usefixtures("koreader_sync_enabled")
 @pytest.mark.docker_integration
 @pytest.mark.slow
 class TestUpdateBookReadStatusThresholds:
@@ -144,6 +147,7 @@ class TestUpdateBookReadStatusThresholds:
         assert response.status_code == 200
 
 
+@pytest.mark.usefixtures("koreader_sync_enabled")
 @pytest.mark.docker_integration
 @pytest.mark.slow
 class TestUpdateBookReadStatusRecordManagement:
@@ -212,6 +216,7 @@ class TestUpdateBookReadStatusRecordManagement:
         assert float(data['percentage']) == 0.60  # Returns as decimal
 
 
+@pytest.mark.usefixtures("koreader_sync_enabled")
 @pytest.mark.docker_integration
 @pytest.mark.slow
 class TestUpdateBookReadStatusEdgeCases:

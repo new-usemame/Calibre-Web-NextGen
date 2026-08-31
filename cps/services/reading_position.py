@@ -31,7 +31,7 @@ pulls from ``KOSyncProgress`` and never looks at the Kobo bookmark.  What we
 must **not** do is write a CFI into that table's ``progress`` column: KOReader
 consumes it as an engine-private crengine xpointer (numeric values become a
 page number, anything else is applied as an xpointer —
-``koreader/plugins/cwasync.koplugin/main.lua``), so a CFI there is an
+``koreader/plugins/cwngsync.koplugin/main.lua``), so a CFI there is an
 unresolvable position.  Instead the row is written with an explicit
 percentage-only sentinel and served as ``position_kind: "percentage"``, which
 the plugin acts on with ``GotoPercent`` — an event both of KOReader's engines
@@ -55,9 +55,11 @@ finished-book guard below stays clearable on a custom-read-column install too
 """
 
 import math
+from datetime import datetime, timezone
 from typing import Optional
 
 from .. import logger, ub
+from .device_reading_position import stage_position
 
 log = logger.create()
 
@@ -85,11 +87,14 @@ def coerce_percentage(raw) -> Optional[float]:
     return value
 
 
-def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
+def record_web_reader_progress(user, book_id: int, percentage: float,
+                               *, origin_device_id=None, cfi=None) -> bool:
     """Advance the shared progress carrier from a web-reader position.
 
     Returns ``True`` when the carrier was advanced.  The caller is responsible
-    for committing the session — both bookmark routes already do.
+    for committing the session — both bookmark routes already do. M1 carries
+    ``origin_device_id`` through this write boundary; M3 adds the per-device
+    position row that can persist it without changing the resolved carrier.
 
     Skipped without a write when:
       * ``percentage`` is not a positive number.  A 0% sample is what the
@@ -104,6 +109,28 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
         user_id = int(user.id)
     except (AttributeError, TypeError, ValueError):
         return False
+
+    # Direct service callers inside a browser request get the same identity as
+    # both routes. Non-request unit callers deliberately stay side-effect free.
+    if origin_device_id is None:
+        try:
+            from flask import g, has_request_context, request
+            if has_request_context():
+                from .device_registry import (
+                    WEBREADER_INSTALLATION_ID_HEADER,
+                    ensure_webreader_device_best_effort,
+                )
+                origin_device_id = getattr(g, "annotation_origin_device_id", None)
+                if origin_device_id is None:
+                    origin_device_id = ensure_webreader_device_best_effort(
+                        user_id=user_id,
+                        installation_id=request.headers.get(
+                            WEBREADER_INSTALLATION_ID_HEADER,
+                        ),
+                    )
+                    g.annotation_origin_device_id = origin_device_id
+        except Exception:
+            log.warning("Best-effort web-reader device observation failed", exc_info=True)
 
     # ``ub.session`` is a single long-lived Session shared across requests
     # (``init_db`` builds it once), so a plain query can answer from the identity
@@ -149,6 +176,28 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
         if state is not None and state.current_bookmark is not None:
             ub.session.refresh(state.current_bookmark)
             stored = state.current_bookmark.progress_percent
+
+    # The device journal records what this browser actually reported even when
+    # its percentage loses the resolved furthest-wins comparison below. Its
+    # exact epub.js CFI is intentionally private to this browser row; Kobo and
+    # KOReader continue to receive only the portable percentage.
+    if origin_device_id:
+        observed_at = datetime.now(timezone.utc)
+        try:
+            with ub.begin_contained_nested(ub.session):
+                stage_position(
+                    device_id=origin_device_id,
+                    book_id=book_id,
+                    progress_percent=percentage,
+                    cfi=cfi,
+                    client_modified_at=observed_at,
+                )
+        except Exception as e:
+            log.warning(
+                "Could not record web-reader device position for user %s "
+                "book %s: %s", user_id, book_id, e,
+            )
+            return False
 
     # Imported lazily: the KOSync protocol module pulls in cps.kobo, and this
     # service is imported from cps.web / cps.api.reader at request time.
@@ -208,13 +257,13 @@ def record_web_reader_progress(user, book_id: int, percentage: float) -> bool:
     # write raising inside this best-effort helper, where the routes' broad
     # handler logs it as an optional progress-sharing failure and answers success
     # anyway. Both bookmark routes settle before calling in.
-    # Both carriers go in the one savepoint: the Kobo bookmark that
+    # Both resolved carriers go in the one savepoint: the Kobo bookmark that
     # ``update_book_read_status`` maintains, and the KOSync row KOReader pulls
     # from (#1366). They describe the same position, so a partial write would
     # leave the two devices disagreeing about where the user is — worse than
     # neither being updated, which is a state the next save corrects.
     try:
-        with ub.session.begin_nested():
+        with ub.begin_contained_nested(ub.session):
             update_book_read_status(user, book_id, percentage)
             record_percentage_only_progress(
                 user_id, book_id, percentage, device="Web reader",

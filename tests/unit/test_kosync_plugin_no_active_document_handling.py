@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Regression coverage for the cwasync no-active-document guards (CWA #1074).
+"""Regression coverage for the cwngsync no-active-document guards (CWA #1074).
 
 Backport of CWA #1074 by @SethMilliken. Prior behavior: the Push / Pull
 menu entries and the auto-sync toggle stayed enabled whenever a password
@@ -31,7 +31,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MAIN_LUA = REPO_ROOT / "koreader" / "plugins" / "cwasync.koplugin" / "main.lua"
+MAIN_LUA = REPO_ROOT / "koreader" / "plugins" / "cwngsync.koplugin" / "main.lua"
 
 
 def _read() -> str:
@@ -41,8 +41,8 @@ def _read() -> str:
 
 def test_has_active_document_helper_defined():
     body = _read()
-    assert "function CWASync:hasActiveDocument()" in body, (
-        "main.lua must define CWASync:hasActiveDocument() (CWA #1074)"
+    assert "function CWNGSync:hasActiveDocument()" in body, (
+        "main.lua must define CWNGSync:hasActiveDocument() (CWA #1074)"
     )
     assert "(self.ui and self.ui.document) ~= nil" in body, (
         "hasActiveDocument must check both self.ui and self.ui.document — "
@@ -52,8 +52,8 @@ def test_has_active_document_helper_defined():
 
 def test_status_text_helper_defined():
     body = _read()
-    assert "function CWASync:statusTextIfActionUnavailable()" in body, (
-        "main.lua must define CWASync:statusTextIfActionUnavailable() (CWA #1074)"
+    assert "function CWNGSync:statusTextIfActionUnavailable()" in body, (
+        "main.lua must define CWNGSync:statusTextIfActionUnavailable() (CWA #1074)"
     )
     assert '_(" (Password Not Set)")' in body, (
         "statusTextIfActionUnavailable must surface the missing-password reason"

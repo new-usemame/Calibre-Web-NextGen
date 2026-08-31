@@ -1,4 +1,4 @@
-import { usePersistentBool } from './usePersistentBool';
+import { useNamedPreference, type NamedPreferenceOptions } from './useNamedPreference';
 
 /** Storage key for the book-card action-row preference (fork #1054). Exported
  *  so every card surface and its tests name it in exactly one place — the key
@@ -12,9 +12,11 @@ export const CARD_ACTIONS_HIDDEN_KEY = 'cwng:card-actions-hidden-v1';
  *  many users are reading on their ereaders, so Read Now is redundant". Default
  *  false, so the row stays on unless a user turns it off.
  *
- *  Owned by the PAGE, never by BookCard itself: usePersistentBool seeds useState
- *  from localStorage once, so a per-card copy would keep its stale value when the
- *  toggle flips and the grid would only update on reload. */
-export function useCardActionsHidden() {
-  return usePersistentBool(CARD_ACTIONS_HIDDEN_KEY, false);
+ *  Owned by the PAGE, never by BookCard itself: one named-preference hook keeps
+ *  every card on that page in sync, follows a real user's account, and retains
+ *  the original localStorage behavior for guests and one-time adoption. */
+export function useCardActionsHidden(options: NamedPreferenceOptions = {}) {
+  return useNamedPreference(
+    'card_actions_hidden', CARD_ACTIONS_HIDDEN_KEY, false, options,
+  );
 }

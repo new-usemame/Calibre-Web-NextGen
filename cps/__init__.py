@@ -5,8 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-__package__ = "cps"
-
 import sys
 import os
 import mimetypes
@@ -21,7 +19,6 @@ from . import constants
 from .cli import CliParameter
 from .reverseproxy import ReverseProxied
 from .server import WebServer
-from .dep_check import dependency_check
 from .updater import Updater
 from . import config_sql
 from . import cache_buster
@@ -67,6 +64,7 @@ mimetypes.add_type('text/css', '.css')
 mimetypes.add_type('application/x-ms-reader', '.lit')
 mimetypes.add_type('text/javascript; charset=UTF-8', '.js')
 mimetypes.add_type('application/vnd.adobe.adept+xml', '.acsm')
+mimetypes.add_type('application/vnd.readium.lcp.license.v1.0+json', '.lcpl')
 mimetypes.add_type('application/vnd.amazon.ebook', '.kfx')
 mimetypes.add_type('application/zip', '.kfx-zip')
 
@@ -83,13 +81,42 @@ app.config.update(
     REMEMBER_COOKIE_NAME=os.environ.get('COOKIE_PREFIX', "") + "remember_token"
 )
 
+
+@app.after_request
+def protect_user_specific_catalog_responses(response):
+    """Prevent a shared cache from crossing account-specific catalog views."""
+    if not getattr(g, "_common_filters_user_specific", False):
+        return response
+    response.headers["Cache-Control"] = "private, no-store"
+    response.vary.add("Cookie")
+    response.vary.add("Authorization")
+    if getattr(config, "config_allow_reverse_proxy_header_login", False):
+        header_name = getattr(config, "config_reverse_proxy_login_header_name", "")
+        if header_name:
+            response.vary.add(header_name)
+    return response
+
 # Fix for running behind reverse proxy (e.g. nginx, apache, caddy, ...)
 # Without it, url_for will generate http:// urls even if https:// is used
-# Set TRUSTED_PROXY_COUNT to the number of proxies in your chain (default: 1)
-# For CF Tunnel + reverse proxy, use TRUSTED_PROXY_COUNT=2
+# Set TRUSTED_PROXY_COUNT to the number of proxies in your chain (default: 1).
+# PROXYFIX_X_FOR / _X_PROTO / _X_HOST override it for header-specific chains.
 num_proxies = int(os.environ.get('TRUSTED_PROXY_COUNT', '1'))
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=num_proxies, x_proto=num_proxies, x_host=num_proxies, x_prefix=num_proxies)
-log.info(f'ProxyFix configured to trust {num_proxies} proxy(ies) for X-Forwarded-* headers')
+proxyfix_hops = {
+    'x_for': int(os.environ.get('PROXYFIX_X_FOR', num_proxies)),
+    'x_proto': int(os.environ.get('PROXYFIX_X_PROTO', num_proxies)),
+    'x_host': int(os.environ.get('PROXYFIX_X_HOST', num_proxies)),
+    # Preserve the existing shared-count behavior for X-Forwarded-Prefix.
+    'x_prefix': num_proxies,
+}
+app.wsgi_app = ProxyFix(app.wsgi_app, **proxyfix_hops)
+if len(set(proxyfix_hops.values())) == 1:
+    log.info(f'ProxyFix configured to trust {num_proxies} proxy(ies) for X-Forwarded-* headers')
+else:
+    log.info(
+        'ProxyFix configured with trusted proxy hops: '
+        f'x_for={proxyfix_hops["x_for"]}, x_proto={proxyfix_hops["x_proto"]}, '
+        f'x_host={proxyfix_hops["x_host"]}, x_prefix={proxyfix_hops["x_prefix"]}'
+    )
 
 lm = MyLoginManager()
 
@@ -133,6 +160,18 @@ _MAGIC_SHELF_COUNTS_LOGGED = {}
 # (user_id, shelf_id) pairs already warned about an orphaned system shelf,
 # so that WARNING fires once per user+shelf instead of on every request.
 _ORPHANED_SYSTEM_SHELF_WARNED = set()
+
+
+def _ensure_user_profiles_json():
+    """Create the classic profile-picture map without making startup depend on it."""
+    json_path = constants.USER_PROFILES_JSON
+    if os.path.exists(json_path):
+        return
+    try:
+        with open(json_path, 'w+') as f:
+            f.write('{\n}')
+    except OSError as e:
+        log.warning("Could not create user profiles file %s: %s", json_path, e)
 
 
 def _log_magic_shelf_counts(user_id, total_shelves, visible_shelves,
@@ -193,9 +232,18 @@ def create_app():
     lm.anonymous_user = ub.Anonymous
     lm.session_protection = 'strong' if config.config_session == 1 else "basic"
 
+    _ensure_user_profiles_json()
+
     from .calibre_init import init_calibre_db_from_config
     init_calibre_db_from_config(config, cli_param.settings_path)
     calibre_db.init_db()
+    # The annotation content-id backfill needs both databases: app.db owns the
+    # annotation, while metadata.db is authoritative for book UUID. Running it
+    # earlier would let a filename choose the book and can cross-link rows.
+    ub.backfill_annotation_content_ids(
+        ub.session.bind,
+        lambda book_id: getattr(calibre_db.get_book(book_id), "uuid", None),
+    )
 
     updater_thread.init_updater(config, web_server)
     # Perform dry run of updater and exit afterward
@@ -203,21 +251,6 @@ def create_app():
         updater_thread.dry_run()
         sys.exit(0)
     updater_thread.start()
-    requirements = dependency_check()
-    for res in requirements:
-        if res['found'] == "not installed":
-            message = ('Cannot import {name} module, it is needed to run calibre-web, '
-                       'please install it using "pip install {name}"').format(name=res["name"])
-            log.info(message)
-            print("*** " + message + " ***")
-            web_server.stop(True)
-            sys.exit(8)
-    for res in requirements + dependency_check(True):
-        log.info('*** "{}" version does not meet the requirements. '
-                 'Should: {}, Found: {}, please consider installing required version ***'
-                 .format(res['name'],
-                         res['target'],
-                         res['found']))
     app.wsgi_app = ReverseProxied(app.wsgi_app)
 
     if os.environ.get('FLASK_DEBUG'):

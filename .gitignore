@@ -23,6 +23,11 @@ replit.nix
 cwa-wiki/
 docs/*
 !docs/install/
+# Wiki article sources. generate-wiki.py transcludes these into wiki-src
+# pages, so a doc that is ignored renders fine locally and then fails on a
+# clean clone or in CI with 'no such file'. Track the markdown; keep
+# ignoring everything else that lands in docs/.
+!docs/*.md
 .venv-activate.sh
 test_venv
 cwa.code-workspace
@@ -109,6 +114,10 @@ cover/
 
 # Django stuff:
 *.log
+# Rotated logs. `*.log` does not match `calibre-web.log.1` — logrotate puts the
+# number AFTER the extension — so a bare-metal run's rotated log stayed
+# untracked-but-visible and a `git add -A` swept 5 MB of it into a commit.
+*.log.[0-9]*
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -233,6 +242,14 @@ metadata_temp/
 # Claude Code workspace cache (per-developer local skill state).
 .claude/
 
+# Git worktrees created inside the checkout. A worktree here is untracked, so
+# it makes `git status --porcelain` non-empty, which trips the autopilot
+# preflight's clean-tree gate (scripts/preflight.sh) and fails every tick until
+# someone removes it. Ignoring is also strictly safer than leaving it visible:
+# while untracked, a plain `git clean -fd` in the checkout would DELETE a live
+# worktree along with any uncommitted work in it.
+.worktrees/
+
 # Playwright MCP capture artifacts (per-session page/console snapshots).
 # These can incidentally contain auth headers, CSRF tokens, or API keys
 # from whatever page was open at capture time. Never commit.
@@ -250,3 +267,54 @@ cps/static/app/
 # Local output from the no-argument wiki generator. The published wiki is
 # rendered into a temporary clone by scripts/sync-wiki.sh.
 wiki-generated/
+
+# Runtime artifacts of a BARE-METAL run from the source checkout. In Docker the
+# app writes these under /config, but running `cps` directly from a clone puts
+# them in the repo root. `.key` is a real secret, so an accidental `git add -A`
+# by a contributor would publish it.
+#
+# This is not hypothetical: on 2026-08-08 an autopilot tick ran the app from the
+# checkout while working on bare-metal path handling, left both files behind, and
+# every subsequent tick aborted at the preflight clean-tree gate — four ticks in a
+# row drained nothing before anyone noticed.
+#
+# Root-anchored on purpose. `empty_library/app.db` is a TRACKED file — the starter
+# database auto_library.py seeds a new install from — so a bare `app.db` pattern
+# would match it too. Tracked files ignore .gitignore, so nothing breaks today,
+# but it would silently swallow that file the moment anyone re-added it.
+/.key
+/app.db
+/app.db-journal
+/app.db-wal
+/app.db-shm
+#
+# Same shape, found 2026-08-17: annotation_backup.get_backup_root() resolves
+# `Path(constants.CONFIG_DIR) / "annotation-backups"`, and under the unit suite
+# CONFIG_DIR is the checkout, so a plain `pytest tests/unit` leaves 22 real
+# gzipped annotation payloads at `<repo>/annotation-backups/<user>/<book>/`.
+# Those are user highlight data, they were untracked and unignored, and any
+# `git add -A` after a local test run would have committed them.
+# tests/unit/test_1712_annotation_backup_not_committable.py derives the name
+# from the service so this entry cannot drift away from what the code writes.
+/annotation-backups/
+
+# Raw Kobo Reading Services exchanges and pre-dispatch PATCH recovery records.
+# These contain private annotation text. In Docker they live under /config;
+# a bare source run falls back to the repository root, so make the entire
+# private-observability parent structurally uncommittable.
+.cwng-private-observability/
+
+# Local development instance state. docker-compose.worktree.yml accepts any
+# CWNG_DEV_STATE path, and pointing it inside the checkout writes databases,
+# secrets, annotation backups, and repaired book copies below an unpredictable
+# rig directory. Naming each known state directory has failed repeatedly, so
+# keep local-dev closed by default: new children are ignored without another
+# .gitignore edit. Only the Compose definitions and KOReader emulator image
+# sources below are repository source and must remain committable.
+/local-dev/*
+!/local-dev/docker-compose.koreader.yml
+!/local-dev/docker-compose.worktree.yml
+!/local-dev/koreader-emulator/
+/local-dev/koreader-emulator/*
+!/local-dev/koreader-emulator/Dockerfile
+!/local-dev/koreader-emulator/entrypoint.sh

@@ -2,11 +2,12 @@ import './styles/tokens.css';
 import './styles/global.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { AnnouncerProvider } from './lib/a11y/announcer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthTransitionError, navigateToLogout, BASE_PREFIX } from './lib/api';
+import { createQueryClient } from './lib/queryClient';
 
 // Protected wrappers normalize every auth-loss shape and start the canonical
 // top-level logout navigation. Keep the cache transition here so no stale
@@ -18,10 +19,7 @@ function onUnauthorized(err: unknown) {
   }
 }
 
-const queryClient = new QueryClient({
-  queryCache: new QueryCache({ onError: onUnauthorized }),
-  mutationCache: new MutationCache({ onError: onUnauthorized }),
-});
+const queryClient = createQueryClient({ onError: onUnauthorized });
 
 // #855: last-resort render/lifecycle boundary for failures in the providers or
 // in App before the router-level boundary (App.tsx, which also resets on

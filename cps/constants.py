@@ -6,9 +6,14 @@
 # See CONTRIBUTORS for full list of authors.
 
 from importlib import metadata
+import json
+import logging
+import posixpath
 import sys
 import os
+import threading
 from collections import namedtuple
+from pathlib import Path
 
 from flask_babel import gettext as _
 
@@ -31,7 +36,108 @@ TRANSLATIONS_DIR    = os.path.join(BASE_DIR, 'cps', 'translations')
 
 SCRIPTS_DIR         = os.path.join(BASE_DIR, 'scripts')
 
-DIRS_JSON           = os.path.join(BASE_DIR, 'dirs.json')
+# Honour CWA_DIRS_JSON, the knob scripts/app_paths.py already reads. scripts/
+# and cps have to agree on which dirs.json is authoritative: it names the
+# library directory, and a packager pointing scripts/ at an out-of-tree copy
+# (so an upgrade that replaces the checkout cannot clobber it) while cps kept
+# reading BASE_DIR/dirs.json would put the ingest and the app on two different
+# libraries. Unset in the image, so Docker resolves to BASE_DIR as before.
+# A relative value is anchored to BASE_DIR, matching app_paths.dirs_json().
+# The two run with different working directories -- scripts/ from scripts/,
+# cps.py from the app root under systemd -- so an unanchored relative path
+# names two different files and splits the ingest from the app.
+_dirs_json_override = (os.environ.get('CWA_DIRS_JSON') or '').strip()
+DIRS_JSON           = (os.path.join(BASE_DIR, _dirs_json_override) if _dirs_json_override
+                       else os.path.join(BASE_DIR, 'dirs.json'))
+
+DEFAULT_INGEST_FOLDER = '/cwa-book-ingest'
+DEFAULT_LIBRARY_DIR = '/calibre-library'
+DEFAULT_TMP_CONVERSION_DIR = '/config/.cwa_conversion_tmp'
+
+_DIRS_JSON_LOGGED_KEYS = set()
+_DIRS_JSON_LOG_LOCK = threading.Lock()
+_dirs_logger = logging.getLogger(__name__)
+_dirs_environ = os.environ
+
+
+class RuntimePathError(ValueError):
+    """A configured runtime directory is unsafe or cannot name one path."""
+
+
+def _validated_runtime_dir(value, source):
+    """Mirror scripts/app_paths.py's runtime-directory safety contract."""
+    configured = value.strip()
+    path = Path(configured)
+    normalised = posixpath.normpath(
+        '/' + configured.lstrip('/') if path.is_absolute() else configured
+    )
+    if (
+        not configured
+        or '\x00' in configured
+        or '\n' in configured
+        or '\r' in configured
+        or not path.is_absolute()
+        or '..' in path.parts
+        or normalised == '/'
+    ):
+        raise RuntimePathError(
+            f"{source} must be a non-root absolute path without '..' components; "
+            f"got {value!r}"
+        )
+    return normalised
+
+
+def _configured_dir(key, env_name, default):
+    """Resolve one runtime directory through environment, file, then default."""
+    override = _dirs_environ.get(env_name)
+    if override is not None and override.strip():
+        return _validated_runtime_dir(override, env_name)
+
+    try:
+        with open(DIRS_JSON, 'r', encoding='utf-8') as config_file:
+            configured_dirs = json.load(config_file)
+    except (OSError, ValueError, TypeError):
+        configured_dirs = {}
+
+    configured = configured_dirs.get(key) if isinstance(configured_dirs, dict) else None
+    if isinstance(configured, str) and configured.strip():
+        configured = _validated_runtime_dir(
+            configured, f"{key} in {DIRS_JSON}"
+        )
+        with _DIRS_JSON_LOG_LOCK:
+            if key not in _DIRS_JSON_LOGGED_KEYS:
+                _DIRS_JSON_LOGGED_KEYS.add(key)
+                _dirs_logger.info(
+                    "Using dirs.json fallback %s=%s from %s",
+                    key,
+                    configured,
+                    DIRS_JSON,
+                )
+        return configured
+    return _validated_runtime_dir(default, f"compiled-in default for {key}")
+
+
+def ingest_folder():
+    """Configured ingest directory, without adding a trailing separator."""
+    return _configured_dir(
+        'ingest_folder', 'CWA_INGEST_FOLDER', DEFAULT_INGEST_FOLDER
+    )
+
+
+def calibre_library_dir():
+    """Configured Calibre library directory, without a trailing separator."""
+    return _configured_dir(
+        'calibre_library_dir', 'CWA_CALIBRE_LIBRARY_DIR', DEFAULT_LIBRARY_DIR
+    )
+
+
+def tmp_conversion_dir():
+    """Configured conversion scratch directory, without a trailing separator."""
+    return _configured_dir(
+        'tmp_conversion_dir',
+        'CWA_TMP_CONVERSION_DIR',
+        DEFAULT_TMP_CONVERSION_DIR,
+    )
 
 # Cache dir - use CACHE_DIR environment variable, otherwise use the default directory: cps/cache
 DEFAULT_CACHE_DIR   = os.path.join(BASE_DIR, 'cps', 'cache')
@@ -49,6 +155,16 @@ else:
     if getattr(sys, 'frozen', False):
         CONFIG_DIR = os.path.abspath(os.path.join(CONFIG_DIR, os.pardir))
 
+
+def config_path(*parts, _join=os.path.join):
+    """Return a path beneath the resolved writable config root."""
+    return _join(CONFIG_DIR, *parts)
+
+
+def processed_books_dir():
+    """Root for retained originals, failed conversions and backup archives."""
+    return config_path("processed_books")
+
 # Where the metadata/cover enforcer (scripts/cover_enforcer.py, driven by the
 # metadata-change-detector s6 service) watches for change logs. Env-overridable
 # for tests.
@@ -63,6 +179,24 @@ CWA_METADATA_TEMP_DIR = os.environ.get(
 # Folder where the log files are stored
 LOG_ARCHIVE = os.path.join(CONFIG_DIR, "log_archive")
 
+# Where the "update available" banner remembers the date it last fired, so it
+# can hold itself to once per calendar day.
+#
+# This has to live under /config. That is the declared VOLUME; /app is part of
+# the image and its writable layer is thrown away whenever the container is
+# recreated, which is precisely what a user does when they pull a new image.
+# Keeping the throttle there reset it at the one moment the banner had most
+# likely already been shown (#1333, @chloeroform). Siblings on the same volume:
+# cwa_ingest_status, cwa_ingest_retry_queue, and the logs.
+CWA_UPDATE_NOTICE_PATH = os.path.join(CONFIG_DIR, "cwa_update_notice")
+
+# Written by cps.cwa_functions.set_profile_picture (the profile_pictures
+# blueprint): a {username: "data:image/…;base64,…"} map. The classic UI reads
+# the whole map via /profile_pictures/user_profiles.json and looks the name up
+# client-side; the SPA gets only the current user's picture on /me instead, so
+# it never downloads every user's avatar. Path is kept in sync with that writer.
+USER_PROFILES_JSON = os.path.join(CONFIG_DIR, "user_profiles.json")
+
 DEFAULT_SETTINGS_FILE = "app.db"
 DEFAULT_GDRIVE_FILE = "gdrive.db"
 
@@ -76,6 +210,16 @@ ROLE_ANONYMOUS          = 1 << 5
 ROLE_EDIT_SHELFS        = 1 << 6
 ROLE_DELETE_BOOKS       = 1 << 7
 ROLE_VIEWER             = 1 << 8
+# The single whole-archive capability. It gates both Global Library and a
+# user's ability to switch their own account between the two library modes.
+ROLE_BROWSE_GLOBAL      = 1 << 9
+
+# #1939 user-facing library modes. ``has_own_library`` is the persisted
+# selector, but false is not "feature disabled": it is the named monolibrary
+# mode where the account continuously follows the global Calibre library.
+LIBRARY_MODE_MONOLIBRARY = "monolibrary"
+LIBRARY_MODE_PERSONAL = "personal_library"
+LIBRARY_MODES = frozenset((LIBRARY_MODE_MONOLIBRARY, LIBRARY_MODE_PERSONAL))
 
 ALL_ROLES = {
                 "admin_role": ROLE_ADMIN,
@@ -86,6 +230,7 @@ ALL_ROLES = {
                 "edit_shelf_role": ROLE_EDIT_SHELFS,
                 "delete_role": ROLE_DELETE_BOOKS,
                 "viewer_role": ROLE_VIEWER,
+                "browse_global_role": ROLE_BROWSE_GLOBAL,
             }
 
 DETAIL_RANDOM           = 1 <<  0
@@ -167,7 +312,7 @@ EXTENSIONS_CONVERT_TO = ['pdf', 'epub', 'mobi', 'azw3', 'docx', 'rtf', 'fb2',
                          'lit', 'lrf', 'txt', 'htmlz', 'rtf', 'odt']
 EXTENSIONS_UPLOAD = {'txt', 'pdf', 'epub', 'kepub', 'mobi', 'azw', 'azw3', 'cbr', 'cbz', 'cbt', 'cb7', 'djvu', 'djv',
                      'prc', 'doc', 'docx', 'fb2', 'html', 'rtf', 'lit', 'odt', 'mp3', 'mp4', 'ogg',
-                     'opus', 'wav', 'flac', 'm4a', 'm4b', 'acsm', 'kfx', 'kfx-zip'}
+                     'opus', 'wav', 'flac', 'm4a', 'm4b', 'acsm', 'lcpl', 'kfx', 'kfx-zip'}
 
 _extension = ""
 if sys.platform == "win32":

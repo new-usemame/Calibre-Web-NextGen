@@ -50,6 +50,15 @@ _HISTORICAL_DEFAULTS = {
         r"\b(Authorization\s*[:=]|app\.secret_key|csrf\.exempt|"
         r"@csrf_exempt|secret_key|alembic|eval\s*\(|exec\s*\()"
     ),
+    # EMPTY on purpose, unlike every other key here. The rest of this table
+    # reproduces the historical behaviour when the config file is absent;
+    # doing that for the base allowlist would mean synthesising an
+    # authorisation nobody wrote down. A missing or misspelled key would
+    # then silently authorise `main` on the strength of a default, and the
+    # claim "main is protected" is an external fact about the ruleset that
+    # this file cannot check. Empty means every base is refused, which is
+    # the safe direction for an unattended-merge authorisation.
+    "AUTOMERGE_ALLOWED_BASE_BRANCHES": "",
     "TIER1_REQUIRED_CHECKS": "validate-author,Fast Tests (Smoke + Unit)",
     "TIER2_REQUIRED_CHECKS": (
         "validate-author,Fast Tests (Smoke + Unit),Integration Tests (Docker)"
@@ -80,6 +89,7 @@ class Policy:
     forbidden_diff_content_regex: re.Pattern[str]
     tier1_required_checks: tuple[str, ...]
     tier2_required_checks: tuple[str, ...]
+    automerge_allowed_base_branches: tuple[str, ...]
     raw: dict[str, str]
 
 
@@ -87,7 +97,9 @@ class Policy:
 class ValidationResult:
     ok: bool
     reason: str = ""
-    category: str = ""  # forbidden_path | forbidden_diff | tier_caps | ok
+    # forbidden_path | tier1_paths | forbidden_diff | tier_caps |
+    # unprotected_base | ok
+    category: str = ""
 
     def to_dict(self) -> dict:
         return {"ok": self.ok, "reason": self.reason, "category": self.category}
@@ -175,6 +187,11 @@ def load_policy(config_path: str | Path | None = None) -> Policy:
         tier2_required_checks=tuple(
             s.strip() for s in merged["TIER2_REQUIRED_CHECKS"].split(",") if s.strip()
         ),
+        automerge_allowed_base_branches=tuple(
+            s.strip()
+            for s in merged["AUTOMERGE_ALLOWED_BASE_BRANCHES"].split(",")
+            if s.strip()
+        ),
         raw=merged,
     )
 
@@ -258,6 +275,53 @@ def validate_fork_pr(
             category="input_error",
         )
 
+    # 0. Base branch must be one the required-status-checks ruleset covers.
+    #
+    # This runs first because it is decisive on its own, and because it is
+    # the assumption every later check silently rests on. auto-merge.yml
+    # does not poll required checks; it arms `gh pr merge --auto` and lets
+    # branch protection hold the line. On a base the ruleset does not
+    # cover, the required-check list is EMPTY — and GitHub treats an empty
+    # list as satisfied, so the PR merges immediately with nothing having
+    # run. tests.yml does not even fire there (its pull_request trigger is
+    # filtered to [main, dev]), so the checks are absent, not red.
+    #
+    # Fail closed on a missing/blank base: if we cannot prove the base is
+    # protected, we must not arm. An absent ruleset is not a passing one.
+    base = (pr.get("baseRefName") or "").strip()
+    allowed = policy.automerge_allowed_base_branches
+    if not allowed:
+        return ValidationResult(
+            ok=False,
+            reason=(
+                "AUTOMERGE_ALLOWED_BASE_BRANCHES is empty or missing from "
+                "tier-policy.config, so no base is authorised for auto-merge. "
+                "Refusing rather than assuming a default."
+            ),
+            category="unprotected_base",
+        )
+    if not base:
+        return ValidationResult(
+            ok=False,
+            reason=(
+                "cannot determine the PR's base branch, so cannot confirm it is "
+                "covered by branch protection; refusing to arm auto-merge."
+            ),
+            category="unprotected_base",
+        )
+    if base not in allowed:
+        return ValidationResult(
+            ok=False,
+            reason=(
+                f"base branch `{base}` is not covered by the required-status-checks "
+                f"ruleset (covered: {', '.join(allowed)}). Auto-merge delegates check "
+                "enforcement to branch protection, so arming here would merge with no "
+                "required checks at all. Re-target this PR at a protected base once "
+                "the branch it stacks on has landed."
+            ),
+            category="unprotected_base",
+        )
+
     paths = _paths_from_pr(pr)
 
     # 1. Forbidden paths (filename).
@@ -272,6 +336,42 @@ def validate_fork_pr(
             ),
             category="forbidden_path",
         )
+
+    # 1b. Tier-1 path allowlist.
+    #
+    # TIER1_PATHS_REGEX has been in tier-policy.config and on the Policy
+    # dataclass since the module was written, and until now it was never
+    # consulted -- loaded, exposed in `describe`, and enforced nowhere. Tier-1
+    # is defined as ".po under cps/translations, *.md, README*, no code", and
+    # that definition was carried entirely by whoever applied the label.
+    #
+    # Nothing else covers the gap. tier-label-guard.yml gates WHO may apply the
+    # label, not WHAT the PR touches. The forbidden-path check above covers only
+    # auth/csrf/session/admin/migrations/deps/container, so the whole of `cps/`
+    # outside those areas passed. And auto-merge.yml's CHANGES-vs-upstream
+    # requirement explicitly *exempts* tier-1 on the stated grounds that it is
+    # ".po + *.md only" -- a premise nothing established.
+    #
+    # Observed 2026-08-10: #1529, an auto-revert labelled `safe-tier-1`,
+    # reverted cps/opds.py and deleted a 194-line regression test. It was
+    # eligible to auto-merge without human eyes and nothing in this path would
+    # have stopped it.
+    #
+    # Fails closed: an unrecognised path demotes to needs-review rather than
+    # merging. Widening tier-1 is a config edit, which is the point.
+    if tier == "safe-tier-1":
+        off_allowlist = [p for p in paths if not policy.tier1_paths_regex.search(p)]
+        if off_allowlist:
+            shown = ", ".join(off_allowlist[:5])
+            more = f" (+{len(off_allowlist) - 5} more)" if len(off_allowlist) > 5 else ""
+            return ValidationResult(
+                ok=False,
+                reason=(
+                    f"safe-tier-1 allows only translations and docs, but this PR "
+                    f"changes {shown}{more}; demoted to needs-review."
+                ),
+                category="tier1_paths",
+            )
 
     # 2. Tier-2 size caps. Tier-1 has no LOC cap because translations can
     # legitimately span many files / many lines.
@@ -367,6 +467,7 @@ def _cmd_dump(args: argparse.Namespace) -> int:
         "tier2_max_files": policy.tier2_max_files,
         "tier1_required_checks": list(policy.tier1_required_checks),
         "tier2_required_checks": list(policy.tier2_required_checks),
+        "automerge_allowed_base_branches": list(policy.automerge_allowed_base_branches),
         "tier1_paths_regex": policy.tier1_paths_regex.pattern,
         "forbidden_paths_regex": policy.forbidden_paths_regex.pattern,
         "forbidden_diff_content_regex": policy.forbidden_diff_content_regex.pattern,

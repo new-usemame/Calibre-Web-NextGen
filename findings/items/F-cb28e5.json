@@ -1,0 +1,11 @@
+{
+  "area": "spa",
+  "body": "On a library whose metadata.db defines a custom column of datatype `rating` (e.g. label `myrating`,\nname \"My Rating\"), the SPA renders TWO `role=\"slider\"` controls that both carry `aria-label=\"Rating\"`.\nThe group labels differ (\"Rating\" vs \"My Rating\") but the controls' own accessible names are identical.\n\nTwo consequences.\n\n1. **Accessibility, which is the real one.** A screen-reader user hears \"Rating\" twice on the same page\n   with nothing distinguishing them, and cannot tell the built-in rating from the custom column. The\n   accessible name should incorporate the column's own name.\n\n2. **It breaks three e2e specs on any such library** — `edit-rating.spec.ts:55` and `sp1-ux.spec.ts:3`\n   (desktop) fail with `strict mode violation: locator('[role=\"slider\"][aria-label=\"Rating\"]') resolved\n   to 2 elements`. The specs are not wrong; the DOM is ambiguous.\n\nOBSERVED 2026-08-28 against an image built from feat/1939-my-library, running the repo's own\n`local-dev` seed library, which defines `6|myrating|My Rating|rating`. NOT caused by that branch: its\ndiff touches no rating source file (`git diff origin/main...HEAD -- frontend/src | grep -i rating`\nreturns nothing), and CI is green on these specs because the CI seed has no rating custom column.\n\nThat divergence is itself worth noting: the local seed exercises a configuration CI never sees, so this\nclass of defect can only be caught locally today.",
+  "created": "2026-08-28",
+  "id": "F-cb28e5",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "A rating-type custom column renders a second control with the identical accessible name 'Rating'"
+}

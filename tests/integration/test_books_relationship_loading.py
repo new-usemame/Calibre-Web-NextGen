@@ -33,8 +33,12 @@ from typing import Iterator
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EMPTY_LIBRARY = REPO_ROOT / "empty_library"
-sys.path.insert(0, str(REPO_ROOT))
+
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+
+sys.path.insert(0, str(SCRIPTS_DIR))
+
+from auto_library import create_appdb, create_metadb
 
 # We import cps.db lazily inside fixtures so we can switch the strategy at
 # import time without polluting other tests' module cache.
@@ -44,11 +48,8 @@ sys.path.insert(0, str(REPO_ROOT))
 def fresh_metadata_db(tmp_path: Path) -> Iterator[Path]:
     """Copy the canonical empty calibre metadata.db to a tmp path so each test
     starts with a clean schema."""
-    src = EMPTY_LIBRARY / "metadata.db"
-    if not src.exists():
-        pytest.skip(f"empty_library/metadata.db missing from {src}")
     dst = tmp_path / "metadata.db"
-    shutil.copy(src, dst)
+    create_metadb(str(dst))
     yield dst
 
 

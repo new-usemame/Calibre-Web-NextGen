@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Behavioural coverage for fork #1253 — which invocations may touch a release.
 
-``scripts/publish-cwasync-plugin.sh`` decides two things that users feel
+``scripts/publish-cwngsync-plugin.sh`` decides two things that users feel
 directly: whether the KOReader plugin gets published to its dedicated
-repository, and whether ``cwasync.koplugin.zip`` gets attached to the
+repository, and whether ``cwngsync.koplugin.zip`` gets attached to the
 application release (the channel a device configured before the plugin moved
 still reads). Getting either wrong is silent — a missing asset looks exactly
 like "you are up to date", which is how v4.1.17 through v4.1.25 shipped with no
 asset while three plugin fixes went out.
 
-The sibling module ``test_cwasync_updates_manager_compat.py`` pins the script's
+The sibling module ``test_cwngsync_updates_manager_compat.py`` pins the script's
 *text*. Text pins cannot distinguish "the upload sits inside the changed-plugin
 path" from "a differently-spelled upload runs unconditionally", so this module
 executes the real script against recording fakes for ``gh`` and ``git`` and
@@ -29,9 +29,9 @@ import pytest
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PUBLISH_SCRIPT = REPO_ROOT / "scripts" / "publish-cwasync-plugin.sh"
+PUBLISH_SCRIPT = REPO_ROOT / "scripts" / "publish-cwngsync-plugin.sh"
 APP_REPO = "new-usemame/Calibre-Web-NextGen"
-DEDICATED_REPO = "new-usemame/cwasync.koplugin"
+DEDICATED_REPO = "new-usemame/cwngsync.koplugin"
 TAG = "v9.9.9"
 PLUGIN_VERSION = "9.9.9"
 
@@ -64,8 +64,8 @@ if [[ "${1:-}" == "clone" ]]; then
     "$REAL_GIT" -C "$dest" config user.email test@example.invalid
     "$REAL_GIT" -C "$dest" config user.name test
     if [[ -n "${SHIPPED_DIR:-}" && -d "${SHIPPED_DIR:-}" ]]; then
-        mkdir -p "$dest/cwasync.koplugin"
-        cp -R "$SHIPPED_DIR/." "$dest/cwasync.koplugin/"
+        mkdir -p "$dest/cwngsync.koplugin"
+        cp -R "$SHIPPED_DIR/." "$dest/cwngsync.koplugin/"
     fi
     "$REAL_GIT" -C "$dest" add -A
     "$REAL_GIT" -C "$dest" commit --quiet --allow-empty -m seed
@@ -103,7 +103,7 @@ if [[ "${1:-}" == "release" ]]; then
             if [[ "$repo" == "$APP_REPO" ]]; then
                 [[ "${FAKE_APP_RELEASE_EXISTS:-1}" == "1" ]] || exit 1
                 if ((wants_json)) && [[ "${FAKE_APP_ASSET_PRESENT:-0}" == "1" ]]; then
-                    printf 'cwasync.koplugin.zip\n'
+                    printf 'cwngsync.koplugin.zip\n'
                 fi
                 exit 0
             fi
@@ -121,7 +121,7 @@ if [[ "${1:-}" == "release" ]]; then
             ;;
         download)
             mkdir -p "$dir"
-            printf 'fake-zip' > "$dir/cwasync.koplugin.zip"
+            printf 'fake-zip' > "$dir/cwngsync.koplugin.zip"
             exit "${FAKE_DOWNLOAD_RC:-0}"
             ;;
     esac
@@ -132,7 +132,7 @@ exit 0
 
 def _plugin_files(version: str, extra: str = "") -> dict[str, str]:
     return {
-        "_meta.lua": f'return {{ name = "cwasync", version = "{version}", }}\n{extra}',
+        "_meta.lua": f'return {{ name = "cwngsync", version = "{version}", }}\n{extra}',
         "main.lua": f'local M = {{ version = "{version}" }}\nreturn M\n{extra}',
     }
 
@@ -143,7 +143,7 @@ def sandbox(tmp_path):
     root = tmp_path / "checkout"
     (root / "scripts").mkdir(parents=True)
     shutil.copy(PUBLISH_SCRIPT, root / "scripts" / PUBLISH_SCRIPT.name)
-    source = root / "koreader" / "plugins" / "cwasync.koplugin"
+    source = root / "koreader" / "plugins" / "cwngsync.koplugin"
     source.mkdir(parents=True)
     for name, body in _plugin_files(PLUGIN_VERSION).items():
         (source / name).write_text(body)
@@ -287,7 +287,7 @@ def test_changed_plugin_publishes_and_attaches_to_the_application_release(sandbo
     assert len(_dedicated_creates(calls)) == 1, calls
     uploads = _app_uploads(calls)
     assert len(uploads) == 1, f"expected exactly one application upload, got {uploads}"
-    assert "cwasync.koplugin.zip" in uploads[0]
+    assert "cwngsync.koplugin.zip" in uploads[0]
 
 
 # --- the failure that used to strand a release forever ------------------------
@@ -337,7 +337,7 @@ def test_primary_path_announces_replacing_an_existing_application_asset(sandbox)
     sandbox.ships(_plugin_files(PLUGIN_VERSION, extra="-- previously shipped\n"))
     proc, calls = sandbox.run("--auto", FAKE_APP_ASSET_PRESENT=1)
     assert proc.returncode == 0, proc.stderr
-    assert "replacing the existing cwasync.koplugin.zip" in proc.stdout, (
+    assert "replacing the existing cwngsync.koplugin.zip" in proc.stdout, (
         "a publish that overwrites an existing public asset must say so"
     )
     assert len(_app_uploads(calls)) == 1
@@ -352,7 +352,7 @@ def test_no_workflow_attaches_a_release_asset_outside_the_publish_script():
     would attach the plugin on every application tag and reproduce the
     false-update problem with the script untouched and every test green.
 
-    The older guard in test_cwasync_updates_manager_compat.py only asserts that
+    The older guard in test_cwngsync_updates_manager_compat.py only asserts that
     one specific filename (plugin-release-asset.yml) stays deleted, which a file
     with any other name walks straight past. This pins the behaviour instead of
     the filename.
@@ -366,7 +366,7 @@ def test_no_workflow_attaches_a_release_asset_outside_the_publish_script():
             if needle in body:
                 offenders.append(f"{wf.name}: {needle}")
     assert offenders == [], (
-        "release assets must be attached only by scripts/publish-cwasync-plugin.sh, "
+        "release assets must be attached only by scripts/publish-cwngsync-plugin.sh, "
         "which attaches the plugin exclusively on releases that changed it; these "
         f"workflows attach assets directly: {offenders}"
     )

@@ -26,3 +26,13 @@ import type { Me } from './api';
 export function canUploadBooks(me: Me | undefined | null): boolean {
   return !!me?.role?.upload && me?.features?.uploading !== false;
 }
+
+/** May this user open book content in a browser reader? Mirrors viewer_required. */
+export function canReadBooks(me: Me | undefined | null): boolean {
+  return !!me?.role?.viewer;
+}
+
+/** May this user receive book files as downloads? Mirrors download_required. */
+export function canDownloadBooks(me: Me | undefined | null): boolean {
+  return !!me?.role?.download;
+}

@@ -6,8 +6,8 @@
 
 from flask import Blueprint, jsonify, request, abort
 from flask_babel import gettext as _
-from sqlalchemy import func, and_, case, or_
-from sqlalchemy.sql.expression import true, false
+from sqlalchemy import func, case, or_
+from sqlalchemy.sql.expression import true
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timezone
 from functools import wraps
@@ -20,7 +20,7 @@ import threading
 import time
 from shutil import copyfile
 
-from . import db, calibre_db, constants, logger, ub, csrf, config, helper, user_book_data
+from . import db, calibre_db, logger, ub, csrf, config, constants, helper, user_book_data
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 from .admin import admin_required  
 from .usermanagement import login_required_if_no_ano
@@ -28,9 +28,8 @@ from .render_template import render_title_template
 from .duplicate_notice import duplicate_setup_notice_file
 from .cw_login import current_user
 
-import sys
-sys.path.insert(1, constants.SCRIPTS_DIR)
-from cwa_db import CWA_DB
+from cps.cwa_db_loader import load_cwa_db
+CWA_DB = load_cwa_db().CWA_DB
 
 duplicates = Blueprint('duplicates', __name__)
 log = logger.create()
@@ -55,6 +54,24 @@ log = logger.create()
 # request) for the holder's entire run. Preview (dry_run=True) is read-only and
 # never acquires this lock.
 _AUTO_RESOLVE_LOCK = threading.Lock()
+
+
+def duplicate_resolution_root():
+    """Directory where destructive duplicate resolution retains originals."""
+    config_root = getattr(constants, "CONFIG_DIR", None)
+    if not config_root:
+        configured = (os.environ.get("CALIBRE_DBPATH") or "").strip()
+        if configured:
+            config_root = (
+                os.path.dirname(configured)
+                if configured.endswith(".db")
+                else configured
+            )
+        else:
+            config_root = os.path.dirname(os.path.dirname(__file__))
+    return os.path.join(
+        config_root, "processed_books", "duplicate_resolutions"
+    )
 
 
 class _DeletedBookFileRef:
@@ -458,7 +475,14 @@ def _visible_duplicate_book_ids(book_ids, user_id):
         chunk = ids[start:start + 900]
         rows = (calibre_db.session.query(db.Books.id)
                 .filter(db.Books.id.in_(chunk))
-                .filter(get_common_filters(user_id=user_id))
+                # Duplicate discovery is deliberately global with respect to
+                # My Library membership: dormant/non-member books can still be
+                # true archive duplicates. All other per-user restrictions
+                # remain canonical through CalibreDB.common_filters().
+                .filter(get_common_filters(
+                    user_id=user_id,
+                    allow_show_global=True,
+                ))
                 .all())
         visible.update(int(row[0]) for row in rows)
     return visible
@@ -593,6 +617,7 @@ def show_duplicates():
                                      duplicate_groups=duplicate_groups,
                                      duplicate_index_needs_full_scan=duplicate_index_needs_full_scan,
                                      next_scan_run=next_scan_run,
+                                     duplicate_backup_dir=f"{duplicate_resolution_root()}{os.sep}",
                                      title=_("Duplicate Books"), 
                                      page="duplicates")
                                      
@@ -604,6 +629,7 @@ def show_duplicates():
                                      duplicate_groups=[],
                                      duplicate_index_needs_full_scan=False,
                                      next_scan_run=None,
+                                     duplicate_backup_dir=f"{duplicate_resolution_root()}{os.sep}",
                                      title=_("Duplicate Books"), 
                                      page="duplicates")
 
@@ -828,7 +854,12 @@ def find_duplicate_candidate_ids_sql(use_title, use_author, user_id=None, min_bo
                 max_id_field
             )
             .select_from(db.Books)
-            .filter(get_common_filters(user_id=user_id))
+            # Duplicate discovery deliberately spans the global archive; the
+            # helper still applies every other restriction for this user.
+            .filter(get_common_filters(
+                user_id=user_id,
+                allow_show_global=True,
+            ))
             .group_by(*group_by_fields)
             .having(func.count(func.distinct(db.Books.id)) > 1))
 
@@ -896,8 +927,13 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
     # Get all books with proper user filtering - this is much simpler and more reliable
     # than trying to do complex joins for duplicate detection
     books_query = (calibre_db.session.query(db.Books)
-                   .filter(get_common_filters(user_id=user_id))  # Respect user permissions and library filtering
-                   .order_by(db.Books.title, db.Books.timestamp.desc()))
+                   # Duplicate discovery deliberately spans My Library sets
+                   # while retaining the canonical non-membership policy.
+                   .filter(get_common_filters(
+                       user_id=user_id,
+                       allow_show_global=True,
+                   ))
+                   .order_by(db.Books.title, db.Books.timestamp.desc(), db.Books.id.desc()))
 
     if candidate_ids is not None:
         if not candidate_ids:
@@ -1053,10 +1089,14 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
 
 
 def get_common_filters(user_id=None, allow_show_archived=False, return_all_languages=False,
-                       allow_show_hidden=False, strict=False):
-    """Build common filters using either current_user or a specific user_id.
+                       allow_show_hidden=False, allow_show_global=False,
+                       strict=False):
+    """Delegate the one visibility policy for current or explicit users.
 
-    Falls back to no-op filters if user context is unavailable.
+    ``CalibreDB.common_filters`` is the single implementation. This adapter
+    exists only for jobs and Basic-auth routes that have a user id but no
+    Flask ``current_user``. Duplicate discovery explicitly opts into
+    ``allow_show_global``; authorization boundaries such as KOSync do not.
 
     ``strict`` changes that fallback for the ``user_id`` path: when the user
     cannot be reloaded or filter construction fails, raise instead of returning
@@ -1067,73 +1107,23 @@ def get_common_filters(user_id=None, allow_show_archived=False, return_all_langu
     permissive default unchanged.
     """
     try:
-        if user_id is None:
-            return calibre_db.common_filters(allow_show_archived=allow_show_archived,
-                                             return_all_languages=return_all_languages,
-                                             allow_show_hidden=allow_show_hidden)
-    except Exception:
-        # No request context; fall back to permissive filter
-        return true()
-
-    try:
-        user = ub.session.query(ub.User).filter(ub.User.id == int(user_id)).first()
-        if not user:
-            if strict:
-                raise ValueError(f"get_common_filters(strict): user {user_id!r} not found")
-            return true()
-
-        if not allow_show_archived:
-            archived_books = (ub.session.query(ub.ArchivedBook)
-                              .filter(ub.ArchivedBook.user_id == int(user.id))
-                              .filter(ub.ArchivedBook.is_archived == True)
-                              .all())
-            archived_book_ids = [archived_book.book_id for archived_book in archived_books]
-            archived_filter = db.Books.id.notin_(archived_book_ids)
-        else:
-            archived_filter = true()
-
-        # D10: mirror calibre_db.common_filters' UserHiddenBook exclusion. The
-        # user explicitly hid these books; without this they reappeared in
-        # their duplicate scan and could be fed to destructive auto-resolve.
-        if not allow_show_hidden:
-            hidden_books = (ub.session.query(ub.UserHiddenBook)
-                            .filter(ub.UserHiddenBook.user_id == int(user.id))
-                            .all())
-            hidden_book_ids = [hidden.book_id for hidden in hidden_books]
-            hidden_filter = db.Books.id.notin_(hidden_book_ids)
-        else:
-            hidden_filter = true()
-
-        if user.filter_language() == "all" or return_all_languages:
-            lang_filter = true()
-        else:
-            lang_filter = db.Books.languages.any(db.Languages.lang_code == user.filter_language())
-
-        negtags_list = user.list_denied_tags()
-        postags_list = user.list_allowed_tags()
-        neg_content_tags_filter = false() if negtags_list == [''] else db.Books.tags.any(db.Tags.name.in_(negtags_list))
-        pos_content_tags_filter = true() if postags_list == [''] else db.Books.tags.any(db.Tags.name.in_(postags_list))
-
-        if config.config_restricted_column:
-            try:
-                pos_cc_list = (user.allowed_column_value or '').split(',')
-                pos_content_cc_filter = true() if pos_cc_list == [''] else \
-                    getattr(db.Books, 'custom_column_' + str(config.config_restricted_column)). \
-                    any(db.cc_classes[config.config_restricted_column].value.in_(pos_cc_list))
-                neg_cc_list = (user.denied_column_value or '').split(',')
-                neg_content_cc_filter = false() if neg_cc_list == [''] else \
-                    getattr(db.Books, 'custom_column_' + str(config.config_restricted_column)). \
-                    any(db.cc_classes[config.config_restricted_column].value.in_(neg_cc_list))
-            except Exception:
-                pos_content_cc_filter = false()
-                neg_content_cc_filter = true()
-        else:
-            pos_content_cc_filter = true()
-            neg_content_cc_filter = false()
-
-        return and_(lang_filter, pos_content_tags_filter, ~neg_content_tags_filter,
-                    pos_content_cc_filter, ~neg_content_cc_filter, archived_filter,
-                    hidden_filter)
+        user = None
+        if user_id is not None:
+            user = (ub.session.query(ub.User)
+                    .filter(ub.User.id == int(user_id)).first())
+            if not user:
+                if strict:
+                    raise ValueError(
+                        f"get_common_filters(strict): user {user_id!r} not found"
+                    )
+                return true()
+        return calibre_db.common_filters(
+            allow_show_archived=allow_show_archived,
+            return_all_languages=return_all_languages,
+            allow_show_hidden=allow_show_hidden,
+            allow_show_global=allow_show_global,
+            user=user,
+        )
     except Exception:
         if strict:
             # Fail closed for authorization callers: a construction error must
@@ -1904,7 +1894,10 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                 book_to_keep = book_to_keep_ref
 
                 deleted_ids = []
-                backup_dir = f"/config/processed_books/duplicate_resolutions/{datetime.now().strftime('%Y%m%d_%H%M%S')}_group_{group['group_hash'][:8]}"
+                backup_dir = os.path.join(
+                    duplicate_resolution_root(),
+                    f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_group_{group['group_hash'][:8]}",
+                )
                 os.makedirs(backup_dir, exist_ok=True)
 
                 if strategy == 'merge':
@@ -1957,8 +1950,9 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                         # #708: record the Kobo deletion tombstone BEFORE anything
                         # touches kobo_synced_books. record_book_deletion reads this
                         # book's kobo_synced_books rows to learn which users had it on
-                        # a device (so their next sync emits a DeletedEntitlement that
-                        # removes it), but migrate_user_book_data below deletes exactly
+                        # a device (so their next sync emits an archived
+                        # ChangedEntitlement that removes it), but
+                        # migrate_user_book_data below deletes exactly
                         # those rows — and delete_whole_book's own tombstone call runs
                         # even later. Run in that order the tombstone is silently
                         # skipped and the removed duplicate lingers on the Kobo forever.
@@ -1973,7 +1967,16 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
                         # not just 'merge'. A keep-newest resolution otherwise
                         # silently deletes highlights made on the older copy.
                         user_book_data.migrate_user_book_data(deleted_book_id, book_to_keep_id)
-                        ub.session_commit()
+                        # User data lives in app.db while the book row below lives
+                        # in metadata.db, so no transaction can make these writes
+                        # atomic. Fail closed at the database boundary: when the
+                        # migration rolls back, keep the loser (and its files) so
+                        # the unresolved group can be retried instead of deleting
+                        # the only row still carrying the user's annotations.
+                        if not ub.session_commit():
+                            raise RuntimeError(
+                                "user data migration commit failed; duplicate book was not deleted"
+                            )
 
                         print(f"[cwa-duplicates-auto] Cleaning up database for book {deleted_book_id}...", flush=True)
                         from cps.editbooks import delete_whole_book
@@ -2166,6 +2169,12 @@ def merge_duplicate_group(book_to_keep, books_to_merge):
                                         element.format,
                                         element.uncompressed_size,
                                         to_name))
+        if any(
+                element.format.upper() in {'KEPUB', 'EPUB'}
+                for _filepath_old, _filepath_new, element in staged):
+            # Added formats change Kobo DownloadUrls/Size selection, so the
+            # keeper must cross the same cursor boundary as other book edits.
+            helper.mark_book_modified(to_book, set_dirty=False)
         calibre_db.session.commit()
     except Exception:
         calibre_db.session.rollback()

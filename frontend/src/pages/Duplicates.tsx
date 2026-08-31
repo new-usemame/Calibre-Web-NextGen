@@ -35,8 +35,9 @@ export function Duplicates() {
         <button type="button" className={styles.scanBtn}
           onClick={() => scan.mutate()}
           disabled={scan.isPending}>
-          <RefreshCw size={15} className={scan.isPending ? styles.spinning : undefined}
-            aria-hidden="true" focusable={false} />
+          <span className={scan.isPending ? styles.spinning : undefined}>
+            <RefreshCw size={15} aria-hidden="true" focusable={false} />
+          </span>
           <span>{scan.isPending ? t('Starting scan…') : t('Scan for duplicates')}</span>
         </button>
       </div>

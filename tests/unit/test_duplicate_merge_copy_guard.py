@@ -25,6 +25,7 @@ importlib so there is exactly one copy of the stub harness).
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import importlib.util
 import pathlib
 import re
@@ -79,7 +80,14 @@ def _load_merge_world(tmp_path):
     harness = _harness()
     module, calibre_books, calls = harness._load_duplicates_module([])
     # merge_duplicate_group needs pieces the shared loader doesn't stub:
-    sys.modules["cps.helper"].get_valid_filename = lambda value, chars=128: value
+    helper = sys.modules["cps.helper"]
+    helper.get_valid_filename = lambda value, chars=128: value
+
+    def mark_book_modified(book, *, set_dirty=True, unsync=False):
+        book.last_modified += timedelta(seconds=1)
+        calls.append("mark-book-modified")
+
+    helper.mark_book_modified = mark_book_modified
     sys.modules["cps.db"].Data = _FakeData
     sys.modules["cps.config"].get_book_path = lambda: str(tmp_path)
     return module, calibre_books, calls
@@ -92,6 +100,7 @@ def _book(book_id, title, path, data):
         path=path,
         authors=[SimpleNamespace(name="Author")],
         data=data,
+        last_modified=datetime(2020, 1, 1, tzinfo=timezone.utc),
     )
 
 
@@ -209,18 +218,21 @@ class TestD8HappyPathStillMerges:
         to_book, _ = _setup_pair(
             tmp_path, calibre_books,
             keep_data=[_fmt("Title - Author", "EPUB")],
-            merge_data=[_fmt("dupfile", "EPUB"), _fmt("dupfile", "PDF")],
+            merge_data=[_fmt("dupfile", "EPUB"), _fmt("dupfile", "KEPUB")],
         )
         (tmp_path / "dup" / "dupfile.epub").write_bytes(b"epub bytes")
-        (tmp_path / "dup" / "dupfile.pdf").write_bytes(b"pdf bytes")
+        (tmp_path / "dup" / "dupfile.kepub").write_bytes(b"kepub bytes")
 
+        old_modified = to_book.last_modified
         module.merge_duplicate_group(SimpleNamespace(id=1), [SimpleNamespace(id=2)])
 
-        # EPUB already on the kept book -> only PDF merges.
-        assert [d.format for d in to_book.data if isinstance(d, _FakeData)] == ["PDF"]
-        copied = tmp_path / "keep" / "Title - Author.pdf"
-        assert copied.read_bytes() == b"pdf bytes"
+        # EPUB already on the kept book -> only the Kobo-visible KEPUB merges.
+        assert [d.format for d in to_book.data if isinstance(d, _FakeData)] == ["KEPUB"]
+        copied = tmp_path / "keep" / "Title - Author.kepub"
+        assert copied.read_bytes() == b"kepub bytes"
         assert not (tmp_path / "keep" / "Title - Author.epub").exists() or True
+        assert to_book.last_modified > old_modified
+        assert calls.index("mark-book-modified") < calls.index("commit")
         assert calls.count("commit") == 1
 
 

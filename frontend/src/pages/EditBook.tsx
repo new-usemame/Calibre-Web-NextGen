@@ -5,18 +5,20 @@ import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as Upl
 import {
   useBookMetadata, useUpdateMetadata, useBook, useMe, useDeleteFormat, useConvertFormat,
   useSetCover, useMetadataSearch, useMetadataProviders, useSetMetadataProviderActive, useAddFormat,
+  useDeleteBook,
 } from '../lib/queries';
 import { Button } from '../components/Button';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { StarRating } from '../components/StarRating';
+import { RichTextEditor } from '../components/RichTextEditor';
 import type { MetadataUpdate, MetaResult, EditableCustomColumn } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './EditBook.module.css';
-import { canUploadBooks } from '../lib/permissions';
+import { canDownloadBooks, canUploadBooks } from '../lib/permissions';
 
 interface Ident { type: string; val: string }
 
@@ -98,11 +100,14 @@ export function EditBook({ id }: { id: string }) {
   const { data: meta, isLoading, error } = useBookMetadata(id);
   const update = useUpdateMetadata(id);
   const setCover = useSetCover(id);
+  const me = useMe().data;
+  const deleteBook = useDeleteBook(id);
   const [, navigate] = useLocation();
 
   const [form, setForm] = useState<FormState | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!meta) return;
@@ -222,12 +227,35 @@ export function EditBook({ id }: { id: string }) {
     });
   };
 
+  const onDeleteBook = () => {
+    if (deleteBook.isPending) return;
+    if (!window.confirm(
+      t('Delete "{title}"? This permanently removes the book and all its files from your library. This cannot be undone.', { title: form.title })
+    )) return;
+    setDeleteError(null);
+    deleteBook.mutate(undefined, {
+      onSuccess: () => navigate('/'),
+      onError: (err) =>
+        setDeleteError(err instanceof ApiError ? err.message : t('Could not delete this book.')),
+    });
+  };
+
   return (
     <main className={styles.container}>
       <Link href={`/book/${id}`} className={styles.back}>
         <ChevronLeft size={16} /> {t('Back to book')}
       </Link>
-      <h1 className={styles.title}>{t('Edit metadata')}</h1>
+      <div className={styles.pageHeader}>
+        <h1 className={styles.title}>{t('Edit metadata')}</h1>
+        {me?.role?.delete_books && (
+          <Button type="button" variant="danger" data-testid="edit-book-delete"
+            aria-label={t('Delete book')} disabled={deleteBook.isPending} onClick={onDeleteBook}>
+            <Trash2 size={16} aria-hidden="true" focusable={false} />
+            {deleteBook.isPending ? t('Deleting…') : t('Delete book')}
+          </Button>
+        )}
+      </div>
+      {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
 
       <CoverManager id={id} />
 
@@ -280,10 +308,18 @@ export function EditBook({ id }: { id: string }) {
           </Field>
         </div>
 
-        <Field label={t('Description')} error={fieldErrors.comments}>
-          <textarea className={styles.textarea} rows={8} value={form.comments}
-            onChange={(e) => set('comments', e.target.value)} />
-          <span className={styles.hint}>{t('HTML is allowed and sanitized on display.')}</span>
+        {/* #919 — the classic edit page has a formatting editor here (TinyMCE on
+            #comments); the New UI shipped a bare textarea, so descriptions read
+            as raw HTML with no preview. */}
+        {/* composite: the editor owns its own buttons, and a wrapping <label>
+            forwards clicks to its first labellable descendant — the same
+            destructive activation that made the rating widget look dead in
+            #1061. It also polluted the toolbar buttons' accessible names with
+            the whole field's text. */}
+        <Field label={t('Description')} error={fieldErrors.comments} composite>
+          <RichTextEditor value={form.comments} onChange={(html) => set('comments', html)}
+            ariaLabel={t('Description')} />
+          <span className={styles.hint}>{t('Formatting is kept where the book page supports it.')}</span>
         </Field>
 
         {/* Identifiers table (ISBN/ASIN/…) — fork #580. */}
@@ -366,16 +402,17 @@ function MetadataFetch({ defaultQuery, onApply }:
   const seq = useRef(0);
 
   // Single search path for the normal form, the editions drill-down, and Back.
-  // `ed` is the title-level snapshot captured before drilling in; when present we
-  // keep only Hardcover edition rows (a `hardcover-id:<id>` query still fans out
-  // to every enabled provider, so other providers return noise for that string).
+  // `ed` is the title-level snapshot captured before drilling in; when present
+  // the search is restricted server-side to Hardcover, because `hardcover-id:<id>`
+  // is that provider's own syntax and reads as a literal search string to every
+  // other one (#303). The row filter below stays as a belt-and-braces guard.
   const doSearch = (q: string, ed?: { prevQuery: string; prevResults: MetaResult[] }) => {
     const term = q.trim();
     if (!term) return;
     const mine = ++seq.current;
     setErr(null);
     setQuery(term);
-    search.mutate(term, {
+    search.mutate({ query: term, providers: ed ? ['hardcover'] : undefined }, {
       onSuccess: (r) => {
         if (mine !== seq.current) return; // superseded/abandoned — ignore
         if (ed) {
@@ -687,9 +724,11 @@ function CoverManager({ id }: { id: string }) {
     });
   };
 
-  // setCover.data is the response to the most recent successful replacement,
-  // which carries a ?t=<ts> cache-buster. Falls back to the book's stable URL
-  // before any upload has happened, so a normal page load stays cacheable.
+  // setCover.data is the response to the most recent successful replacement. It
+  // carries the book's NEW ?c=<cover version>, because the endpoint now bumps
+  // last_modified — so it differs from the URL this page was rendered with.
+  // Falls back to the book's own URL before any upload, which is versioned too
+  // and therefore cacheable on a normal page load.
   const previewUrl = setCover.data?.cover_url ?? book?.cover_url;
 
   const onUrl = () => {
@@ -704,12 +743,15 @@ function CoverManager({ id }: { id: string }) {
   return (
     <section className={styles.coverSection}>
       <div className={styles.coverPreview}>
-        {/* Prefer the URL the upload returned. The cover lives at a stable
-            path (/cover/<id>/og), so after a replacement the refetched book
-            hands back a byte-identical src — React re-renders, the browser
-            serves its cached copy, and the upload looks like it did nothing
-            (#989, reported by @chloeroform). The API already answers with a
-            cache-busted URL for exactly this; it was simply being discarded. */}
+        {/* Prefer the URL the upload returned. The cover used to live at a
+            stable path, so after a replacement the refetched book handed back a
+            byte-identical src — React re-renders, the browser serves its cached
+            copy, and the upload looks like it did nothing (#989, reported by
+            @chloeroform). The API already answered with a cache-busted URL for
+            exactly this; it was simply being discarded. Cover URLs now carry
+            ?c=<version> and the endpoint bumps it, so the refetched book changes
+            too — this still prefers the response so the preview updates without
+            waiting for the refetch. */}
         {previewUrl
           ? <img src={resourceUrl(previewUrl)} alt={t('Current cover')} className={styles.coverImg} />
           : <div className={styles.coverPlaceholder}><ImageIcon size={28} /></div>}
@@ -802,22 +844,38 @@ function FormatsManager({ id }: { id: string }) {
         {book!.formats.map((f) => (
           <li key={f.format} className={styles.formatItem}>
             <span className={styles.formatName}>{f.format}</span>
-            <a className={styles.formatDownload} href={resourceUrl(f.download_url)} download target="_blank" rel="noopener">{t('Download')}</a>
+            {canDownloadBooks(me) && (
+              <a className={styles.formatDownload} href={resourceUrl(f.download_url)} download target="_blank" rel="noopener">{t('Download')}</a>
+            )}
             {canDelete && (
               <button className={styles.formatDelete}
                 onClick={() => {
-                  if (window.confirm(t('Delete the {fmt} file? The book stays; only this format is removed.', { fmt: f.format }))) {
-                    deleteFormat.mutate(f.format);
+                  if (window.confirm(t('Delete the {fmt} file? The book record, metadata, shelves, and reading state stay available.', { fmt: f.format }))) {
+                    setMsg(null);
+                    deleteFormat.mutate(f.format, {
+                      onSuccess: (result) => setMsg(result?.warning
+                        ? { ok: false, text: result.warning.message }
+                        : { ok: true, text: t('Format deleted.') }),
+                      onError: (err) => setMsg({
+                        ok: false,
+                        text: err instanceof ApiError ? err.message : t('Could not delete this format.'),
+                      }),
+                    });
                   }
                 }}
                 disabled={deleteFormat.isPending}
                 aria-label={t('Delete {fmt}', { fmt: f.format })}>
-                <Trash2 size={14} />
+                <Trash2 size={14} aria-hidden="true" focusable={false} />
               </button>
             )}
           </li>
         ))}
       </ul>
+      {canDelete && book.formats.length > 0 && (
+        <p className={styles.formatDeleteReason}>
+          {t('The book record, metadata, shelves, and reading state stay available. If this is the last format, you can add a replacement later.')}
+        </p>
+      )}
 
       {sources.length > 0 && availableTargets.length > 0 && (
         <form className={styles.convertForm} onSubmit={onConvert}>

@@ -15,6 +15,17 @@
   padding: var(--sp-6) var(--sp-5);
 }
 
+/* #1756 — while a multi-selection is active the bulk bar floats fixed over the
+   bottom of the viewport. Without extra bottom room the last cover row can
+   never scroll out from under it (and neither can the sentinel behind it).
+   --bulk-bar-h is published by the floating bar itself via ResizeObserver, so
+   the clearance is the bar's real wrapped height plus its bottom offset
+   (var(--sp-5)) plus a small gap — never a guessed constant. The 56px fallback
+   covers a single-row bar if the variable is somehow absent. */
+.containerBulkActive {
+  padding-bottom: calc(var(--bulk-bar-h, 56px) + var(--sp-5) + var(--sp-2));
+}
+
 .back {
   display: inline-flex;
   align-items: center;
@@ -97,13 +108,27 @@
 }
 
 .grid {
+  --catalog-grid-gap: var(--sp-5);
+  --catalog-grid-min: 150px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: var(--sp-5);
+  grid-template-columns: repeat(auto-fill, minmax(var(--catalog-grid-min), 1fr));
+  column-gap: var(--catalog-grid-gap);
+  row-gap: 0;
 }
-.grid.density_comfortable { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-.grid.density_compact { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-4); }
-.grid.density_dense { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--sp-3); }
+.grid.density_comfortable { --catalog-grid-min: 180px; }
+.grid.density_compact { --catalog-grid-gap: var(--sp-4); --catalog-grid-min: 140px; }
+.grid.density_dense { --catalog-grid-gap: var(--sp-3); --catalog-grid-min: 110px; }
+.virtualRow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  padding-bottom: var(--catalog-grid-gap);
+}
+.virtualSpacer {
+  grid-column: 1 / -1;
+  min-width: 0;
+  pointer-events: none;
+}
 .bookList { display: flex; flex-direction: column; gap: var(--sp-2); max-width: 860px; }
 .bookListItem { display: flex; align-items: center; gap: var(--sp-3); min-height: 72px; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); color: var(--text); }
 .bookListItem:hover { background: var(--surface-2); border-color: var(--border-strong); }
@@ -116,8 +141,12 @@
 .densityField { border: 0; padding: var(--sp-2) 0 0; margin: var(--sp-2) 0 0; border-top: 1px solid var(--border); }
 .densityField legend { padding: var(--sp-2) 0 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semi); }
 
-.grid > * {
+.virtualRow > * {
   animation: fadeRise var(--dur-slow) var(--ease-out) both;
+  /* Kept as a belt around the window: cards just outside the painted viewport
+     can still skip rendering, while row spacers preserve scroll geometry. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
 }
 
 /* The first-load spinner is a grid child (it is what gives the column
@@ -268,9 +297,12 @@
 }
 @media (max-width: 600px) {
   .container { padding-inline: var(--sp-3); }
+  /* Doubled class beats the density selectors above (0,2,0), so the 0px
+     minimum actually lands on the fixed-track mobile layouts. */
+  .grid.grid { --catalog-grid-min: 0px; }
   .grid.density_comfortable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid.density_compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .grid.density_dense { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); }
+  .grid.density_dense { --catalog-grid-gap: var(--sp-2); grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .bookList { max-width: none; }
   .bookListIndex { font-size: var(--fs-xs); }
 }
@@ -449,7 +481,11 @@
 
 /* Spin the RefreshCw glyph while a scan is in flight (same cadence as the
    CoverPicker refresh spinner). */
+/* wrapper span, not the glyph -- an SVG target does not get a compositor layer
+   in Chrome, so the animation falls back to the main thread. See
+   HelpBanner.module.css `.arrow` for the measurement. */
 .refreshIconSpin {
+  display: inline-flex;
   animation: cpspin 1s linear infinite;
 }
 @keyframes cpspin {

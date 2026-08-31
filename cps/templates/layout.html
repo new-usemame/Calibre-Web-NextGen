@@ -146,8 +146,7 @@
   <body class="{{ page }} {{ bodyClass }}{% if g.current_theme == 1 %} blur{% endif %}{% if cwa_settings and cwa_settings.get('enable_mobile_blur') %} allow-mobile-blur{% endif %}{% if _cover_hide_shelf_badges %} cover-hide-shelf-badges{% endif %}" data-text="{{_('Home')}}" data-textback="{{_('Back')}}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% if cwng_spa_enabled %}
-    {# "Switch to New UI" — entry point into the React SPA at /app. Amber pill so
-       it stands out in the caliBlur navbar without a stylesheet edit. #}
+    {# Quiet return path from Classic-only surfaces into the React SPA at /app. #}
     <style>
       #main-nav > li.cwng-switch-li { padding: 8px 6px; display: flex; align-items: center; }
       a.cwng-switch-ui {
@@ -193,115 +192,6 @@
         a.cwng-switch-ui { width: 100%; justify-content: center; }
       }
 
-      /* Opt-in nudge banner — dismissible, reappears on each update (dismissal is
-         keyed to the running version in localStorage). Theme-agnostic light-amber
-         bar so it reads on both caliBlur (dark) and the standard (light) theme. */
-      .cwng-newui-banner {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 100000;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 12px 20px;
-        background: #fff7ec;
-        color: #3a2a12;
-        border-top: 3px solid #cc7b19;
-        box-shadow: 0 -4px 20px rgba(0,0,0,.35);
-        font-size: 14px;
-        animation: cwngNewuiUp .28s cubic-bezier(.2,.7,.2,1);
-      }
-      @keyframes cwngNewuiUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-      @media (prefers-reduced-motion: reduce) { .cwng-newui-banner { animation: none; } }
-      .cwng-newui-banner[hidden] { display: none !important; }
-      .cwng-newui-banner .cwng-newui-icon { color: #cc7b19; top: 1px; }
-      .cwng-newui-banner .cwng-newui-text { flex: 1 1 auto; }
-      .cwng-newui-banner .cwng-newui-text strong { font-weight: 700; }
-      a.cwng-newui-try {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 15px;
-        border-radius: 999px;
-        background: linear-gradient(180deg, #e0902a 0%, #cc7b19 100%);
-        color: #1a1206 !important;
-        font-weight: 600;
-        white-space: nowrap;
-        text-decoration: none;
-        box-shadow: 0 2px 8px rgba(204,123,25,.32), inset 0 1px 0 rgba(255,255,255,.25);
-        transition: transform .12s cubic-bezier(.2,.7,.2,1), box-shadow .12s ease;
-      }
-      a.cwng-newui-try:hover, a.cwng-newui-try:focus {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 14px rgba(204,123,25,.45), inset 0 1px 0 rgba(255,255,255,.3);
-        text-decoration: none;
-        color: #1a1206 !important;
-      }
-      .cwng-newui-banner .cwng-newui-dismiss {
-        background: transparent;
-        border: 0;
-        color: #8a6a3a;
-        font-size: 24px;
-        line-height: 1;
-        cursor: pointer;
-        padding: 0 4px;
-        opacity: .85;
-      }
-      .cwng-newui-banner .cwng-newui-dismiss:hover { color: #3a2a12; opacity: 1; }
-      @media (max-width: 600px) {
-        .cwng-newui-banner { flex-wrap: wrap; gap: 8px; font-size: 13px; padding: 10px 14px; }
-        .cwng-newui-banner .cwng-newui-text { flex-basis: 100%; }
-      }
-      /* The banner is fixed to the bottom, so without reserving its height it
-         overlaps anything else anchored there — notably caliBlur's fixed-bottom
-         toast/alert stack (the "Duplicate scanning…" notice was being clipped) —
-         and hides the last rows of the scrolling content. The banner script
-         measures its real height into --cwng-banner-h (wrap/locale-safe) and adds
-         the .cwng-has-newui-banner class to <body>; everything below is scoped to
-         that class, so dismissers are unaffected. env(safe-area-inset-bottom)
-         keeps it clear of mobile home indicators; the 56px fallback covers the
-         no-JS case. */
-      .cwng-newui-banner { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
-      body.cwng-has-newui-banner {
-        /* --cwng-banner-h is measured from offsetHeight, which ALREADY includes the
-           banner's own safe-area padding above — so do NOT add the inset again here
-           (it would be counted twice on home-indicator phones). Only the no-JS
-           fallback adds it, since there's no measured height to include it. */
-        --cwng-banner-gap: var(--cwng-banner-h, calc(56px + env(safe-area-inset-bottom, 0px)));
-      }
-      /* 1. Lift the fixed-bottom toasts/alerts above the banner so they're never
-            clipped. caliBlur turns every .alert into a fixed bottom:20px toast and
-            stacks the persistent ones in .cwa-toast-stack (bottom:20px). DESKTOP
-            ONLY: on mobile (<=767px) mobile-alert-toast-position.css relocates
-            toasts to the TOP, so there's no overlap there and a bottom offset would
-            fight that rule. */
-      @media (min-width: 768px) {
-        body.cwng-has-newui-banner .cwa-toast-stack { bottom: calc(20px + var(--cwng-banner-gap)) !important; }
-        body.cwng-has-newui-banner .alert { bottom: calc(20px + var(--cwng-banner-gap)) !important; }
-      }
-      /* 2. Reserve scroll space so the last content rows / sidebar items clear the
-            banner. caliBlur (body.blur) scrolls the content column (.col-sm-10) and
-            the sidebar list (#scnd-nav, inside .col-sm-2) as separate panes —
-            #main-nav is the top navbar, not the sidebar, so pad #scnd-nav.
-            ALL WIDTHS, deliberately: this reserve used to sit inside the desktop-only
-            block above, so phones got none at all — and there the banner wraps to
-            ~133px and buried the whole of a trailing button, not just its bottom edge.
-            The ::after is load-bearing, not a cosmetic clearfix. caliBlur's content
-            column is a float (div.col-md-10) inside a static .discover wrapper that
-            never clears it, so the wrapper collapses to height 0 and the pane's
-            scrollable extent comes entirely from an *overflowing float*. A scroll
-            container's bottom padding does not extend the scrollable region past
-            overflowing floats, so padding-bottom here computed as "applied" while
-            reserving nothing: 0px, 63px and 200px all produced an identical
-            scrollHeight. Clearing the float puts the padding back in normal flow,
-            where it does what it says. Fork #1310. */
-      body.cwng-has-newui-banner.blur > div.container-fluid > div.row-fluid > div.col-sm-10 { padding-bottom: var(--cwng-banner-gap) !important; }
-      body.cwng-has-newui-banner.blur > div.container-fluid > div.row-fluid > div.col-sm-10::after { content: ''; display: block; clear: both; }
-      body.cwng-has-newui-banner.blur #scnd-nav { padding-bottom: var(--cwng-banner-gap) !important; }
-      /* Standard (non-caliBlur) theme scrolls <body>; reserve there at all widths. */
-      body.cwng-has-newui-banner:not(.blur) { padding-bottom: var(--cwng-banner-gap); }
     </style>
     {% endif %}
     <!-- Static navbar -->
@@ -341,11 +231,9 @@
             {% if current_user.is_authenticated or g.allow_anonymous %}
               {% if cwng_spa_enabled %}
               <li class="cwng-switch-li">
-                <a class="cwng-switch-ui" href="{{ url_for('spa.spa_shell') }}" title="{{_('Switch to the new Calibre-Web NextGen interface')}}">
+                <a class="cwng-switch-ui" href="{{ cwng_spa_choice_url() }}" title="{{_('Switch to the new Calibre-Web NextGen interface')}}">
                   <span class="glyphicon glyphicon-flash"></span>
-                  {# #739: once the browser has chosen the new UI the pill becomes a
-                     "go back" affordance instead of the opt-in nudge. #}
-                  <span class="cwng-switch-label">{% if request.cookies.get('cwng_prefer_spa') == '1' %}{{_('Back to New UI')}}{% else %}{{_('Switch to New UI')}}{% endif %}</span>
+                  <span class="cwng-switch-label">{{_('Back to New UI')}}</span>
                 </a>
               </li>
               {% endif %}
@@ -409,58 +297,10 @@
       </div>
     </div>
 
-    {% if cwng_spa_enabled and (current_user.is_authenticated or g.allow_anonymous) and request.cookies.get('cwng_prefer_spa') != '1' %}
-    {# Opt-in nudge into the React SPA. A dismissal is durable: this adoption cue
-       is not release news, and repeatedly resurfacing it punished updaters. #}
-    <div id="cwng-newui-banner" class="cwng-newui-banner" data-version="{{ cwng_app_version }}"
-         role="region" aria-label="{{_('New interface available')}}" hidden>
-      <span class="cwng-newui-icon glyphicon glyphicon-flash" aria-hidden="true"></span>
-      <span class="cwng-newui-text">{{_('A faster, redesigned Calibre-Web NextGen interface is ready.')}} <strong>{{_('Your classic view stays the default until you switch.')}}</strong></span>
-      <a class="cwng-newui-try" href="{{ url_for('spa.spa_shell') }}">
-        <span class="glyphicon glyphicon-flash" aria-hidden="true" style="font-size:11px;top:1px;"></span>
-        {{_('Try the new UI')}}
-      </a>
-      <button type="button" class="cwng-newui-dismiss" aria-label="{{_('Dismiss')}}">&times;</button>
-    </div>
-    <script>
-      (function () {
-        var b = document.getElementById('cwng-newui-banner');
-        if (!b) return;
-        var key = 'cwng_newui_banner_dismissed_v1';
-        try {
-          if (window.localStorage && localStorage.getItem(key) === '1') return;
-          // Carry forward any dismissal written by the old per-version scheme,
-          // so the first update containing this fix does not nag once more.
-          for (var i = 0; window.localStorage && i < localStorage.length; i++) {
-            var oldKey = localStorage.key(i) || '';
-            if (oldKey.indexOf('cwng_newui_banner_dismissed_') === 0 &&
-                localStorage.getItem(oldKey) === '1') {
-              localStorage.setItem(key, '1');
-              return;
-            }
-          }
-        } catch (e) {}
-        var root = document.documentElement;
-        // Publish the banner's real height so the CSS offsets above can reserve
-        // exactly its space (it wraps to two lines on narrow/long-locale layouts).
-        function syncHeight() { root.style.setProperty('--cwng-banner-h', b.offsetHeight + 'px'); }
-        b.hidden = false;
-        document.body.classList.add('cwng-has-newui-banner');
-        syncHeight();
-        if (window.ResizeObserver) { new ResizeObserver(syncHeight).observe(b); }
-        else { window.addEventListener('resize', syncHeight); }
-        var x = b.querySelector('.cwng-newui-dismiss');
-        if (x) x.addEventListener('click', function () {
-          b.hidden = true;
-          document.body.classList.remove('cwng-has-newui-banner');
-          root.style.removeProperty('--cwng-banner-h');
-          try { localStorage.setItem(key, '1'); } catch (e) {}
-        });
-      })();
-    </script>
+    {% if cwng_spa_enabled and (current_user.is_authenticated or g.allow_anonymous) %}
     {# #60: on returning to the classic view from the new UI, offer a short,
-       anonymous "what made you switch back?" prompt. Same gate as the nudge
-       above (SPA present + a real session); the partial self-activates only when
+       anonymous "what made you switch back?" prompt. SPA present + a real
+       session; the partial self-activates only when
        the ?cwng_feedback marker is on the URL. #}
     {% include 'cwng_feedback_popup.html' %}
     {% endif %}
@@ -639,6 +479,11 @@
           <nav class="navigation">
             <ul class="list-unstyled" id="scnd-nav" intent in-standard-append="nav.navigation" in-mobile-after="#main-nav" in-mobile-class="nav navbar-nav">
               <li class="nav-head hidden-xs">{{_('Browse')}}</li>
+              {% if current_user.is_authenticated and not current_user.is_anonymous and current_user.library_mode() == 'personal_library' and current_user.role_browse_global() %}
+                <li id="nav_global_library" {% if page == 'global_library' %}class="active"{% endif %}>
+                  <a href="{{ url_for('web.global_library') }}"><span class="glyphicon glyphicon-globe"></span> {{ _('Global Library') }}</a>
+                </li>
+              {% endif %}
               {% for element in sidebar %}
                 {% if current_user.check_visibility(element['visibility']) and element['public'] %}
                     <li id="nav_{{element['id']}}" {% if page == element['page'] %}class="active"{% endif %} style="{% if element['id'] == 'duplicates' %}position: relative;{% endif %}">

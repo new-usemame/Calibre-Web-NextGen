@@ -194,6 +194,16 @@
         {{_("Aggressive mode applies more invasive fixes and will attempt lower-confidence encoding conversions. Safe mode is recommended for most libraries.")}}
       </p>
 
+      {% if cwa_settings.get('comic_flatten_comicinfo') %}
+      <input type="checkbox" id="comic_flatten_comicinfo" name="comic_flatten_comicinfo" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% else %}
+      <input type="checkbox" id="comic_flatten_comicinfo" name="comic_flatten_comicinfo" value="True" style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Does NOT require restart for changes to take effect">
+      {% endif %}
+      <label for="comic_flatten_comicinfo" style="padding-left: 10px;">{{_('Move a misplaced ComicInfo.xml to the archive root on ingest')}}</label><br>
+      <p class="cwa-settings-tooltip">
+        {{_("The ComicInfo.xml standard requires the file to sit at the root of the archive; comicapi (and every other reader we're aware of) only looks there. Some real-world .cbz releases package it one folder down instead, so their title/series/author/publisher never get picked up. When enabled, ingest rewrites a copy of the archive with ComicInfo.xml moved to the root before it's imported — only when it's present but misplaced, never touching an already-correct file. Zip-based archives (.cbz) only; .cbr/.cb7/.cbt are not zip containers and are left as-is. Your original download is never modified, only the copy that gets imported.")}}
+      </p>
+
       {% if cwa_settings['archived_cleanup_enabled'] %}
       <input type="checkbox" id="archived_cleanup_enabled" name="archived_cleanup_enabled" value="True" checked style="accent-color: var(--color-secondary);" data-toggle="tooltip" data-placement="right" title="Runs daily by default">
       {% else %}
@@ -818,7 +828,7 @@
       {% endif %}
       <label for="auto_backup_imports" style="padding-left: 10px;">{{_('Enable NextGen Import Auto-Backup')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When active, a copy of all imported files will be stored in <i>/config/processed_books/imported</i>') | safe }}
+        {{_('When active, a copy of all imported files will be stored in')}} <code>{{ processed_books_dir }}/imported</code>
       </p>
 
       {% if cwa_settings['auto_backup_conversions'] %}
@@ -828,7 +838,7 @@
       {% endif %}
       <label for="auto_backup_conversions" style="padding-left: 10px;">{{_('Enable NextGen Conversion Auto-Backup')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When active, the originals of ingested files that undergo conversion will be stored in /config/processed_books/converted')}}
+        {{_('When active, the originals of ingested files that undergo conversion will be stored in')}} <code>{{ processed_books_dir }}/converted</code>
       </p>
 
       {% if cwa_settings['auto_backup_epub_fixes'] %}
@@ -838,7 +848,7 @@
       {% endif %}
       <label for="auto_backup_epub_fixes" style="padding-left: 10px;">{{_('Enable NextGen EPUB Fixer Auto-Backup')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When active, the originals of EPUBs processed by the NextGen Kindle EPUB Fixer service will be stored in /config/processed_books/fixed_originals')}}
+        {{_('When active, the originals of EPUBs processed by the NextGen Kindle EPUB Fixer service will be stored in')}} <code>{{ processed_books_dir }}/fixed_originals</code>
       </p>
 
       <hr class="settings-divider">
@@ -850,7 +860,7 @@
       {% endif %}
       <label for="auto_zip_backups" style="padding-left: 10px;">{{_('Enable NextGen Auto-Zip Backups')}}</label><br>
       <p class="cwa-settings-tooltip">
-        {{_('When active, just before midnight each day, the cwa-auto-zipper service will make zip archives of all the backed up converted, imported and failed files from that day. This is to help keep the subdirectories of /config/processed_books organised and to minimise disk space usage.')}}
+        {{_('When active, just before midnight each day, the cwa-auto-zipper service will make zip archives of all the backed up converted, imported and failed files from that day. This helps keep the backup subdirectories organised and minimises disk space usage.')}} <code>{{ processed_books_dir }}</code>
       </p>
     </div>
     
@@ -1197,7 +1207,7 @@
         <label for="duplicate_auto_resolve_enabled" style="margin-left: 1rem;">{{_('Enable Automatic Duplicate Resolution')}} ⚠️</label>
       </div>
       <p class="cwa-settings-tip" style="background: #e74c3c57; border-color: #e74c3c; font-size: small;">
-        <strong>{{_('Warning:')}}</strong> {{_('This will automatically delete books based on the strategy below. Original files will be backed up to')}} <code>/config/processed_books/</code>
+        <strong>{{_('Warning:')}}</strong> {{_('This will automatically delete books based on the strategy below. Original files will be backed up to')}} <code>{{ processed_books_dir }}/</code>
       </p>
 
       <div class="form-group" style="padding: 2rem 3rem 2rem 3rem; background: #151e2680;">
@@ -1244,9 +1254,9 @@
     <br>
 
     <br>
-    <div style="margin-top: -2rem; max-width: 900px; justify-self: center; margin-bottom: 1rem; display: flex; flex-direction: row; flex-wrap: wrap; width: -webkit-fill-available; justify-content: space-between; margin-left: 2rem; margin-right: 2rem;">
-      <input type="submit" name="submit_button" value="Submit" class="btn btn-default">
-      <input type="submit" name="submit_button" value="Apply Default Settings" class="btn btn-danger">
+    <div class="cwa-settings-actions" style="margin-top: -2rem; max-width: 900px; justify-self: center; margin-bottom: 1rem; display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.75rem; width: -webkit-fill-available; justify-content: flex-end; margin-left: 2rem; margin-right: 2rem;">
+      <button type="submit" name="settings_action" value="save" class="btn cwa-settings-save-action">{{ _('Save') }}</button>
+      <button type="submit" name="settings_action" value="reset" class="btn cwa-settings-reset-action" data-confirm="{{ _('Reset every CWA setting to its default? All of your current CWA settings will be permanently lost.') }}" onclick="return confirm(this.dataset.confirm);">{{ _('Reset All CWA Settings') }}</button>
     </div>
     <br>
 

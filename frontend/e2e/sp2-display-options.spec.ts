@@ -43,7 +43,11 @@ test('book detail exposes imported name, tag disclosure, and semantic progress',
     detail.original_filename = 'reader-selected-name.epub';
     detail.in_progress = true;
     detail.kosync_progress = 42.4;
-    detail.tags = Array.from({ length: 10 }, (_, i) => ({ id: i + 1000, name: `SP2 tag ${i + 1}` }));
+    // 25 tags, not 10: the disclosure now only collapses when it hides at
+    // least three tags, and its cap is 20 above the 700px cutover (#2080).
+    // This spec is about the control's accessible name and expand behaviour,
+    // so it needs a list that genuinely collapses in BOTH projects.
+    detail.tags = Array.from({ length: 25 }, (_, i) => ({ id: i + 1000, name: `SP2 tag ${i + 1}` }));
     await route.fulfill({ response, json: detail });
   });
   await page.goto(`/app/book/${book.id}`);
@@ -51,11 +55,11 @@ test('book detail exposes imported name, tag disclosure, and semantic progress',
   const progress = page.getByRole('progressbar', { name: 'Reading progress' });
   await expect(progress).toHaveAttribute('aria-valuenow', '42');
   const disclosure = page.locator('button[aria-controls="book-tags"]');
-  await expect(disclosure).toHaveAccessibleName('Show all 10 tags');
-  await expect(page.getByText('SP2 tag 10')).toHaveCount(0);
+  await expect(disclosure).toHaveAccessibleName('Show all 25 tags');
+  await expect(page.getByText('SP2 tag 25')).toHaveCount(0);
   await disclosure.click();
   await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByText('SP2 tag 10')).toBeVisible();
+  await expect(page.getByText('SP2 tag 25')).toBeVisible();
 });
 
 test('Customize panel can restore hidden Table view', async ({ page }) => {
@@ -65,6 +69,14 @@ test('Customize panel can restore hidden Table view', async ({ page }) => {
   // click times out at 45s. Open the drawer first when it is there. (Same
   // shape as the collapsed search field; the suite's sidebar spec already
   // drives the hamburger this way.)
+  //
+  // Wait for catalog content BEFORE probing for the hamburger: the TopBar
+  // mounts asynchronously after goto resolves, and isVisible() is a one-shot
+  // probe — under CI load it ran before the hamburger existed, skipped the
+  // click, and the Customize click then retried against a closed drawer for
+  // the full 45s (first attempt on #2006's run; the retry, warm, took 1.1s).
+  // mobile.spec.ts's drawer spec uses this same content-first ordering.
+  await expect(page.locator('a[href*="/book/"]').first()).toBeVisible();
   const hamburger = page.getByRole('button', { name: /open navigation/i });
   if (await hamburger.isVisible().catch(() => false)) await hamburger.click();
   await page.getByRole('button', { name: 'Customize navigation' }).click();

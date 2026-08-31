@@ -1,0 +1,11 @@
+{
+  "area": "docs",
+  "body": "`README.md:531` tells a user debugging Kobo sync to run:\n\n    docker logs -f calibre-web 2>&1 | grep /kobo/\n\nTwo independent defects, and the combination means the command prints nothing even\nwhen sync is working perfectly:\n\n1. Wrong container name. The shipped compose sets `container_name: calibre-web-nextgen`\n   (`docker-compose.yml:7`), so the command fails outright with \"No such container\".\n\n2. Even with the name corrected, the grep cannot match. HTTP access logging is OFF by\n   default (`config_access_log`, `cps/config_sql.py:88`, `default=0`) and when enabled\n   it writes to `<config>/access.log` (`cps/logger.py:24`), not stdout. No INFO-level\n   line in `cps/kobo.py` contains the string `/kobo/` — the sync entry point logs\n   \"Kobo library sync request received\" (`cps/kobo.py:287`), and the only lines\n   carrying a URL are `log.debug`.\n\nThis is worse than a broken command: it appears in the section whose entire purpose is\ndistinguishing \"the device isn't reaching the server\" from \"the server isn't sending\nthe collection\", so empty output reads as a diagnosis when it means nothing at all.\n\nWorking form:\n\n    docker logs -f calibre-web-nextgen 2>&1 | grep -i \"Kobo library sync request\"\n\nFound while fact-checking a new docs page against the code; the same corrected form is\nused in `docs/kobo-shelves.md`.",
+  "created": "2026-08-09",
+  "id": "F-79cac0",
+  "refs": [],
+  "severity": "docs",
+  "source": "audit",
+  "status": "open",
+  "title": "README's Kobo troubleshooting command shows nothing on a default install"
+}

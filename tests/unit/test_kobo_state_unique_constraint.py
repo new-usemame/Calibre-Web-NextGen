@@ -122,7 +122,8 @@ def memory_db_session_no_unique_indexes(memory_db_session):
             CREATE TABLE kobo_synced_books (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
-                book_id INTEGER
+                book_id INTEGER,
+                book_uuid VARCHAR(64)
             )
         """,
         "archived_book": """

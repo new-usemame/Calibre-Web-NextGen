@@ -24,7 +24,8 @@ def _ctx(files=None):
 
 def _uploader(role_upload=True, anon=False):
     return SimpleNamespace(is_authenticated=True, is_anonymous=anon,
-                           role_upload=lambda: role_upload, id=1, name="alice")
+                           role_upload=lambda: role_upload, id=1,
+                           name="uploader", has_own_library=True)
 
 
 def _cfg(uploading=1):
@@ -95,6 +96,11 @@ def test_upload_valid_file_queued():
     assert body["errors"] == []
     assert mock_os.replace.called and worker.add.called
     manifest_open.assert_called_once_with("/ingest/new/book.epub.cwa.json", "w", encoding="utf-8")
+    manifest = json.loads("".join(
+        call.args[0] for call in manifest_open().write.call_args_list
+    ))
+    assert manifest["uploader_user_id"] == 1
+    assert manifest["uploader_personal_library"] is True
 
 
 @pytest.mark.unit

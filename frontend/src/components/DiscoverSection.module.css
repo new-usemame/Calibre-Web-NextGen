@@ -95,7 +95,10 @@
 }
 .iconBtn:disabled { opacity: 0.6; cursor: default; }
 
-.spin { animation: discoverSpin 0.8s linear infinite; }
+/* wrapper span, not the glyph -- an SVG target does not get a compositor layer
+   in Chrome, so the animation falls back to the main thread. See
+   HelpBanner.module.css `.arrow` for the measurement. */
+.spin { display: inline-flex; animation: discoverSpin 0.8s linear infinite; }
 @keyframes discoverSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 
@@ -122,6 +125,12 @@
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
+
+/* A horizontal scroll container clips descendants on both axes. Temporarily
+   release the rail while a card disclosure is open; closing it restores the
+   scroll/snap contract without moving the menu into a detached portal. */
+.box:has([aria-expanded="true"]),
+.strip:has([aria-expanded="true"]) { overflow: visible; }
 /* Legacy fallback only. `scrollbar-width`/`scrollbar-color` above already theme
    this strip in every current engine; an engine that also honours the webkit
    pseudo-elements would swap the strip's overlay scrollbar for an always-visible

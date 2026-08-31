@@ -20,9 +20,10 @@ Calibre code path that derives dotfile locations from the home
 directory. (The image used to set a misspelled ``CALIBRE_CONFIG_DIR``
 globally in the Dockerfile — Calibre ignores that name, which is why
 plugin loading historically only worked through the HOME override.
-Diagnosed by @jasonobrien in fork PR #434. A global
-``CALIBRE_CONFIG_DIRECTORY`` would defeat this module's off-state, so
-the variable is set here, per-subprocess, gated on the opt-in.)
+Diagnosed by @jasonobrien in fork PR #434. A global config pointing at
+the *plugin-bearing* directory would defeat this module's off-state, so
+the s6 services default to a separate plugin-free runtime directory and
+this module overrides it per subprocess only when the opt-in is enabled.)
 
 The default is **off**. Plugin loading is the operator's explicit
 choice — it activates third-party Python code from a user-controlled
@@ -76,10 +77,11 @@ def apply_to_env(env: dict[str, str]) -> dict[str, str]:
         env = calibre_user_plugins.apply_to_env(env)
         subprocess.run(["ebook-convert", ...], env=env, check=True)
 
-    When disabled, the subprocess inherits whatever HOME is already set
-    in the parent (typically the abc service user's home), and Calibre
-    looks for plugins in that user's home — usually empty, so plugins
-    do not load. That is the intended off-state.
+    When disabled, the subprocess environment is unchanged. In the container,
+    each s6 service supplies a writable plugin-free
+    ``CALIBRE_CONFIG_DIRECTORY`` appropriate to its execution uid; outside the
+    container the caller's normal Calibre environment is preserved. That is
+    the intended off-state.
     """
     if is_enabled():
         env["HOME"] = _HOME

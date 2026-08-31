@@ -168,6 +168,7 @@ RUN \
   libxdamage1 \
   libgl1 \
   libglx-mesa0 \
+  libxcb-cursor0 \
   xz-utils \
   binutils && \
   echo "**** install lsof 4.99.5 from source (fixes hanging issue with 4.95, #654) ****" && \
@@ -230,26 +231,11 @@ COPY --from=kepubify_mirror /kepubify /usr/bin/kepubify
 
 # STEP 5 - Install Calibre
 RUN \
-  # STEP 5.1 - Make the /app/calibre directory for the installed files
-  mkdir -p /app/calibre && \
-  # STEP 5.2 - Download the desired version of Calibre, determined by the CALIBRE_RELEASE variable and the architecture of the build environment
-  if [ "$(uname -m)" == "x86_64" ]; then \
   curl -fL --retry 30 --retry-delay 15 --retry-all-errors -o \
-  /calibre.txz \
-  "https://download.calibre-ebook.com/${CALIBRE_RELEASE}/calibre-${CALIBRE_RELEASE}-x86_64.txz"; \
-  elif [ "$(uname -m)" == "aarch64" ]; then \
-  curl -fL --retry 30 --retry-delay 15 --retry-all-errors -o \
-  /calibre.txz \
-  "https://download.calibre-ebook.com/${CALIBRE_RELEASE}/calibre-${CALIBRE_RELEASE}-arm64.txz"; \
-  fi && \
-  # STEP 5.3 - Extract the downloaded file to /app/calibre
-  tar xf \
-  /calibre.txz -C \
-  /app/calibre && \
-  # STEP 5.3.1 - Remove the ABI tag from the extracted libQt6* files to allow them to be used on older kernels
-  # Removed in V3.1.4 because it was breaking Calibre features that require Qt6. Replaced with a kernel check in the cwa-init service
-  # STEP 5.4 - Delete the extracted calibre.txz to save space in final image
-  rm /calibre.txz
+  /linux-installer.sh \
+  https://download.calibre-ebook.com/linux-installer.sh && \
+  sh /linux-installer.sh version=${CALIBRE_RELEASE} && \
+  rm /linux-installer.sh
 
 # ============================================================================
 # STAGE 2: Final - Build the final runtime image
@@ -307,7 +293,7 @@ SHELL ["/bin/bash", "-c"]
 # Copy installed dependencies from the dependencies stage
 COPY --from=dependencies /lsiopy /lsiopy
 COPY --from=dependencies /usr/bin/kepubify /usr/bin/kepubify
-COPY --from=dependencies /app/calibre /app/calibre
+COPY --from=dependencies /opt/calibre /opt/calibre
 COPY --from=dependencies /usr/bin/lsof /usr/bin/lsof
 # Self-contained Python 3.13 from python-build-standalone — no PPA needed at runtime
 COPY --from=dependencies /opt/python /opt/python
@@ -366,12 +352,11 @@ RUN \
 COPY --chown=abc:abc . /app/calibre-web-automated/
 
 RUN \
-  # The `frontend/` directory should be in `.dockerignore` but is used during
-  # STAGE 0 to build the SPA. We therefore manually remove it.
-  rm -Rf /app/calibre-web-automated/frontend && \
   # Install our Python package. The dependencies were installed in STEP 3.1.
   /lsiopy/bin/pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ \
-    -e /app/calibre-web-automated
+    -e /app/calibre-web-automated && \
+  # These files were necessary to build the image, we can remove them now.
+  rm -Rf /app/calibre-web-automated/{frontend,pyproject.toml,VERSION}
 
 # STEP 6.1 - Copy the Vite-built SPA bundle from the frontend-build stage.
 # The source tree's cps/static/app is .dockerignore'd, so this COPY is the
@@ -389,21 +374,21 @@ RUN \
   /app/calibre-web-automated/scripts/setup-cwa.sh && \
   # STEP 7.3 - Create koplugin.zip from KOReader plugin folder
   echo "~~~~ Creating koplugin.zip from KOReader plugin folder... ~~~~" && \
-  if [ -d "/app/calibre-web-automated/koreader/plugins/cwasync.koplugin" ]; then \
+  if [ -d "/app/calibre-web-automated/koreader/plugins/cwngsync.koplugin" ]; then \
   cd /app/calibre-web-automated/koreader/plugins && \
   # Calculate digest of all files in the plugin for debugging purposes
   echo "Calculating digest of plugin files..." && \
-  PLUGIN_DIGEST=$(find cwasync.koplugin -type f -name "*.lua" -o -name "*.json" | sort | xargs sha256sum | sha256sum | cut -d' ' -f1) && \
+  PLUGIN_DIGEST=$(find cwngsync.koplugin -type f -name "*.lua" -o -name "*.json" | sort | xargs sha256sum | sha256sum | cut -d' ' -f1) && \
   echo "Plugin digest: $PLUGIN_DIGEST" && \
   # Create a file named after the digest inside the plugin folder
-  echo "Plugin files digest: $PLUGIN_DIGEST" > cwasync.koplugin/${PLUGIN_DIGEST}.digest && \
-  echo "Build date: $(date)" >> cwasync.koplugin/${PLUGIN_DIGEST}.digest && \
-  echo "Files included:" >> cwasync.koplugin/${PLUGIN_DIGEST}.digest && \
-  find cwasync.koplugin -type f -name "*.lua" -o -name "*.json" | sort >> cwasync.koplugin/${PLUGIN_DIGEST}.digest && \
-  zip -r koplugin.zip cwasync.koplugin/ && \
-  echo "Created koplugin.zip from cwasync.koplugin folder with digest file: ${PLUGIN_DIGEST}.digest"; \
+  echo "Plugin files digest: $PLUGIN_DIGEST" > cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  echo "Build date: $(date)" >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  echo "Files included:" >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  find cwngsync.koplugin -type f -name "*.lua" -o -name "*.json" | sort >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  zip -r koplugin.zip cwngsync.koplugin/ && \
+  echo "Created koplugin.zip from cwngsync.koplugin folder with digest file: ${PLUGIN_DIGEST}.digest"; \
   else \
-  echo "Warning: cwasync.koplugin folder not found, skipping zip creation"; \
+  echo "Warning: cwngsync.koplugin folder not found, skipping zip creation"; \
   fi && \
   # STEP 7.4 - Move koplugin.zip to static directory
   if [ -f "/app/calibre-web-automated/koreader/plugins/koplugin.zip" ]; then \
@@ -412,14 +397,31 @@ RUN \
   echo "Moved koplugin.zip to static directory"; \
   else \
   echo "Warning: koplugin.zip not found, skipping move to static directory"; \
-  fi
+  fi && \
+  # Once the koplugin zip is built and copied into cps/static, the `koreader/`
+  # tree is a second copy of the same plugin that nothing in the running
+  # container reads — the download button serves static/koplugin.zip. Hide it
+  # so nobody edits that copy inside a container and wonders why the download
+  # is unchanged.
+  #
+  # This does NOT reclaim the ~188 KB. `COPY . /app/calibre-web-automated/`
+  # above is its own layer (61.8 MB in the published image), so removing a path
+  # in this later layer only writes a whiteout: the bytes still ship and are
+  # still pulled. Actually dropping them needs a .dockerignore entry or a build
+  # stage that COPY --from's just koplugin.zip. Same caveat as the frontend/
+  # removal in STEP 6, whose comment already points at .dockerignore.
+  #
+  # -f because every other step in this RUN degrades to a warning rather than
+  # failing the build; this one should not be the exception if the tree is
+  # ever absent.
+  rm -rf "/app/calibre-web-automated/koreader/"
 
 # Add unrar from unrar stage
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 
 # Bake Calibre's /usr/bin symlinks into the image (#875; original patch by
 # @chloeroform in #1014). The binaries themselves already ship in the image
-# (COPY --from=dependencies /app/calibre above), but the /usr/bin entry
+# (COPY --from=dependencies /opt/calibre above), but the /usr/bin entry
 # points did not, so `calibredb --version` failed on a cold boot and the
 # calibre-binaries-setup s6 service ran calibre_postinstall on EVERY start --
 # ~12s of a ~60s startup. With the links present that check passes and the
@@ -427,7 +429,7 @@ COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 # where the links are missing (e.g. a non-Ubuntu base).
 #
 # The link set mirrors the entry points calibre_postinstall itself creates:
-# every executable at the top level of /app/calibre except the installer
+# every executable at the top level of /opt/calibre except the installer
 # itself and calibre-complete (the bash-completion helper, which upstream
 # reaches through the completion scripts rather than through PATH).
 # `test -x` resolves the symlink without executing the binary, so this stays
@@ -436,17 +438,16 @@ COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 # Nothing else that ran at boot moves here: the Qt6 / kernel ABI check and
 # the PUID/PGID ownership pass live in the cwa-init service, which runs
 # before this one and is gated on its own sentinel.
-RUN find /app/calibre -maxdepth 1 -type f -perm -u+x \
+RUN find /opt/calibre -maxdepth 1 -type f -perm -u+x \
   ! -name 'calibre_postinstall' ! -name 'calibre-complete' \
   -exec ln -sf {} /usr/bin/ \; && \
   test -x /usr/bin/calibredb
 
 # Deliberately NO global CALIBRE_CONFIG_DIRECTORY here. (A misspelled
-# CALIBRE_CONFIG_DIR lived here for a while -- Calibre ignores that name,
-# and setting the real one globally would force user-plugin loading on for
-# every Calibre subprocess. Plugin loading is opt-in via
-# CWA_CALIBRE_USER_PLUGINS; cps/services/calibre_user_plugins.py sets
-# CALIBRE_CONFIG_DIRECTORY per-subprocess when the operator enables it.)
+# CALIBRE_CONFIG_DIR lived here for a while -- Calibre ignores that name.) The
+# s6 units that can launch Calibre choose a writable, plugin-free config for
+# their execution uid; cps/services/calibre_user_plugins.py overrides it with
+# /config/.config/calibre only when CWA_CALIBRE_USER_PLUGINS is enabled.
 
 # Ports and volumes
 WORKDIR /config
@@ -457,9 +458,13 @@ VOLUME /cwa-book-ingest
 VOLUME /calibre-library
 
 # Health check for container orchestration
-# Targets the /health endpoint (cps/web.py:1051) which verifies the
+# Targets the /health endpoint (cps/web.py) which verifies the
 # Calibre metadata.db is reachable and returns 503 on database failure.
 # The helper auto-switches to HTTPS when app.db has a valid cert/key
 # configured, which avoids spurious HTTP-on-HTTPS warnings from gevent.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=120s --retries=3 \
+# Slow ARM/VM hosts need room for bounded scheduler/fork variance (#1799).
+# HTTPS detection gets <=1s, then curl gets <=5s total (including its connect
+# timeout); this 7s outer cap covers the sequential <=6s plus shell scheduling
+# while still failing a truly dead app quickly.
+HEALTHCHECK --interval=30s --timeout=7s --start-period=120s --retries=3 \
   CMD /usr/local/bin/cwa-healthcheck || exit 1

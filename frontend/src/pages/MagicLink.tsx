@@ -10,11 +10,13 @@ import { BrandName } from '../components/BrandName';
 import { useMagicLinkStart, useMagicLinkPoll, useAuthConfig } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { usePostAuthRedirect } from '../lib/authRedirect';
+import { useAnnouncer } from '../lib/a11y/announcer';
+import { classifyMagicLinkPollError } from '../lib/magicLinkPolling';
 import styles from './MagicLink.module.css';
 
 const POLL_MS = 3000;
 
-type Phase = 'starting' | 'waiting' | 'success' | 'expired' | 'error';
+type Phase = 'starting' | 'waiting' | 'success' | 'expired' | 'error' | 'poll_error';
 
 function fmtCountdown(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -25,6 +27,7 @@ function fmtCountdown(ms: number): string {
 
 export function MagicLink() {
   const t = useT();
+  const announce = useAnnouncer();
   const redirectAfterAuth = usePostAuthRedirect();
   const start = useMagicLinkStart();
   const poll = useMagicLinkPoll();
@@ -37,6 +40,7 @@ export function MagicLink() {
   const [expiresAt, setExpiresAt] = useState(0);
   const [remaining, setRemaining] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [pollErrorMessage, setPollErrorMessage] = useState('');
 
   // Ref so the countdown reads the live expiry without re-subscribing.
   const expiresRef = useRef(expiresAt);
@@ -45,6 +49,7 @@ export function MagicLink() {
   const begin = useCallback(() => {
     setPhase('starting');
     setCopied(false);
+    setPollErrorMessage('');
     start.mutate(undefined, {
       onSuccess: (s) => {
         setToken(s.token);
@@ -102,8 +107,19 @@ export function MagicLink() {
           setPhase('expired');
           return;
         }
-      } catch {
-        /* transient — fall through to reschedule */
+      } catch (error) {
+        if (cancelled) return;
+        const action = classifyMagicLinkPollError(error);
+        if (action !== 'retry') {
+          const message = action === 'rate_limited'
+            ? t('Too many magic-link checks were made from this network. Generate a new link or try again later.')
+            : t('This magic link can’t be checked. Generate a new one to try again.');
+          setPollErrorMessage(message);
+          setPhase('poll_error');
+          announce(message, { assertive: true });
+          return;
+        }
+        /* network failure / 5xx — fall through to reschedule */
       }
       if (!cancelled) timer = setTimeout(tick, POLL_MS);
     };
@@ -186,12 +202,14 @@ export function MagicLink() {
           </div>
         )}
 
-        {(phase === 'expired' || phase === 'error') && (
+        {(phase === 'expired' || phase === 'error' || phase === 'poll_error') && (
           <div className={styles.center}>
             <p className={styles.muted}>
               {phase === 'expired'
                 ? t('This magic link expired. Generate a new one to try again.')
-                : t('Couldn’t start a magic link. Please try again.')}
+                : phase === 'poll_error'
+                  ? pollErrorMessage
+                  : t('Couldn’t start a magic link. Please try again.')}
             </p>
             <Button variant="primary" className={styles.retryBtn} onClick={begin} disabled={start.isPending}>
               <RefreshCw size={15} /> {t('Generate a new link')}

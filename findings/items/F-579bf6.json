@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "MEASURED 2026-08-18 on a Clara BW during an authorised, contained writeback experiment.\n\nThe documented device-wipe paths were a **503** or a **hang** on\n`GET /api/v3/content/<id>/annotations`. There is a third and it is easier to hit by accident:\n\n**If `checkforchanges` names a ContentId, and the GET that follows is answered with a `304`, the\ndevice empties its entire local annotation set for that book.**\n\nObserved, server-side log:\n\n    ZZWB: naming ['d83c9bfd-...'] in checkforchanges to trigger the GET\n    ZZWB upstream GET status=304 query=limit=100 body=\n    ZZWB: no authored payload staged; forwarding upstream unchanged\n       -> the device's rows for that book were WIPED\n\nA 304 means \"unchanged since your etag\" — but the device has just been told by checkforchanges that\nthe content DID change, so it applies the empty body as the new complete set. **Naming an id and\nserving its payload are one decision, not two.**\n\nWHY PRODUCTION IS SAFE TODAY: `handle_check_for_changes` filters every owned book out of the answer,\nso the destructive GET is never triggered for content CWNG owns. This finding does not describe a\nlive defect. It describes the trap waiting for any writeback implementation.\n\nREQUIRED OF ANY WRITEBACK DESIGN:\n1. Stage the authored payload BEFORE naming the id in checkforchanges.\n2. Never forward an upstream 304 for an id we named — answer from the local store with a complete\n   200, or do not name the id at all.\n3. Never refuse the GET (503/hang are the other two wipes). A refusal is indistinguishable from\n   \"the server has none\".\n\nRelated: F-3b565b (writeback is gated), F-5c1146, F-30d264.",
+  "created": "2026-08-18",
+  "id": "F-579bf6",
+  "refs": [],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "Naming a ContentId in checkforchanges and then answering its GET with a 304 wipes that book's annotations on the device"
+}

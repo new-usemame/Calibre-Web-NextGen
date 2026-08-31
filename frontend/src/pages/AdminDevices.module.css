@@ -1,0 +1,92 @@
+.container { max-width: 1100px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
+.back { display: inline-flex; align-items: center; gap: var(--sp-1); margin-bottom: var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); transition: color var(--dur-fast) var(--ease); }
+.back:hover { color: var(--accent); }
+.heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.heading > svg { color: var(--accent); width: 26px; height: 26px; }
+.heading h1, .card h2, .card h3, .card p { margin: 0; }
+.heading h1 { font-size: var(--fs-xl); }
+.countLine { margin: 0 0 var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); }
+
+.list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: var(--sp-4); margin: 0; padding: 0; }
+
+/* Per-account group divider — spans the full grid row so the fleet reads as
+   "user → their readers" instead of one undifferentiated card field. The
+   header carries the per-account rollup (readers · active) so the count is
+   answered without scanning cards; cards drop their own Account line while a
+   header is present. */
+.groupHeader {
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
+  margin-top: var(--sp-3); padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+.groupHeader:first-child { margin-top: 0; }
+.groupHeader h2 { display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
+.groupHeader h2 svg { flex: none; color: var(--accent); }
+.groupMeta { margin: 0; flex: none; color: var(--text-muted); font-size: var(--fs-sm); white-space: nowrap; }
+
+.card {
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  box-shadow: var(--elev-1);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.card:hover { border-color: var(--border-strong); }
+/* Inactive readers stay visible but recede — the pill says why. */
+.card[data-active='false'] { background: color-mix(in srgb, var(--surface-1) 60%, transparent); }
+.card[data-active='false'] h2, .card[data-active='false'] h3 { color: var(--text-muted); }
+
+.card header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.card header > div { min-width: 0; }
+.card h2, .card h3 { font-size: var(--fs-md); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.card .account { display: inline-flex; align-items: center; gap: var(--sp-1); margin-top: 2px; color: var(--text-muted); font-size: var(--fs-sm); }
+.account svg { flex: none; }
+
+/* Active / inactive as state pills (the Account-page idiom: the tint carries
+   the tone, the label text keeps full AA contrast). */
+.stateOk, .stateMuted {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  border-radius: var(--r-full);
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.stateOk { color: var(--text); background: var(--success-soft); border-color: var(--success-border); }
+.stateMuted { color: var(--text-muted); background: var(--surface-3); }
+
+/* Same stat-grid treatment as the per-device page, two columns per card. */
+.card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3) var(--sp-4); margin: 0; }
+.card dl div { min-width: 0; }
+.card dt { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
+.card dd { margin: 2px 0 0; font-size: var(--fs-base); font-weight: var(--fw-semi); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.card [data-tone='ok'] dd { color: var(--success); }
+.card [data-tone='info'] dd { color: var(--accent-text); }
+.card [data-tone='muted'] dd { color: var(--text-muted); }
+.card [data-tone='warn'] dd { color: var(--danger); }
+
+/* Seed-coverage meter — the authority rollup as proportion, not raw numbers. */
+.card [data-meter] { display: flex; height: 6px; margin: var(--sp-3) 0 0; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
+.card [data-meter] span { display: block; height: 100%; }
+.card [data-seg='ok'] { background: var(--success); }
+.card [data-seg='info'] { background: var(--accent); }
+.card [data-seg='muted'] { background: var(--border-strong); }
+.card [data-seg='warn'] { background: var(--danger); }
+.card [data-seg='off'] { background: var(--text-faint); }
+
+.card .lastSeen { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--fs-sm); }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-4); }
+.pagination button { min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.pagination button:not(:disabled):hover { background: var(--surface-2); border-color: var(--border-strong); }
+.pagination button:disabled { opacity: .55; cursor: default; }
+.pagination span { color: var(--text-muted); font-size: var(--fs-sm); }
+
+@media (max-width: 600px) {
+  .container { padding: var(--sp-4) var(--sp-3); }
+  .card { padding: var(--sp-4); }
+  .card dl { gap: var(--sp-2) var(--sp-3); }
+  .pagination { justify-content: space-between; }
+}

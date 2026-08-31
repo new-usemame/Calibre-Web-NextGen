@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+import zipfile
 
 import pytest
 from flask import Flask, has_app_context, has_request_context
@@ -39,6 +40,9 @@ def test_download_selection_honours_off_but_keeps_existing_kepub(monkeypatch):
     monkeypatch.setattr(kobo, "get_subtitle", lambda book: None)
     monkeypatch.setattr(kobo.config, "config_kepubifypath", "/bin/kepubify", raising=False)
     monkeypatch.setattr(kobo.config, "config_kobo_prefer_kepub", False, raising=False)
+    # This assertion covers an exact stored KEPUB.  Metadata embedding rewrites
+    # the download and intentionally makes its stored Data-row size inexact.
+    monkeypatch.setattr(kobo.config, "config_embed_metadata", False, raising=False)
 
     epub = SimpleNamespace(format="EPUB", uncompressed_size=10)
     kepub = SimpleNamespace(format="KEPUB", uncompressed_size=12)
@@ -164,6 +168,8 @@ def test_backfill_is_composite_idempotent_preserves_sync_rows_and_skips_gdrive(m
 def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
     from cps.tasks import kepub_backfill
 
+    database_instances = []
+
     class Query:
         def distinct(self): return self
         def all(self): return [(1,), (2,)]
@@ -173,7 +179,9 @@ def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
         def close(self): pass
 
     class CalibreDB:
-        def __init__(self, **_): self.session = SimpleNamespace(close=lambda: None)
+        def __init__(self, **_):
+            self.session = SimpleNamespace(close=lambda: None)
+            database_instances.append(self)
         def get_book(self, book_id): return SimpleNamespace(id=book_id, path=str(book_id), title=str(book_id))
         def get_book_format(self, book_id, fmt):
             return SimpleNamespace(format=fmt, name="book") if fmt == "EPUB" else None
@@ -197,16 +205,23 @@ def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
     monkeypatch.setattr(kepub_backfill.config, "config_kepubifypath", "/bin/kepubify", raising=False)
     monkeypatch.setattr(kepub_backfill.config, "config_kobo_kepub_backfill_completed", False, raising=False)
     monkeypatch.setattr(kepub_backfill.config, "get_book_path", lambda: "/books", raising=False)
-    monkeypatch.setattr(kepub_backfill.config, "save", lambda: saved.append(True), raising=False)
+    monkeypatch.setattr(
+        kepub_backfill.config,
+        "save",
+        lambda: saved.append(
+            kepub_backfill.config.config_kobo_kepub_backfill_completed),
+        raising=False,
+    )
 
     task = kepub_backfill.TaskKepubBackfill()
     task.run(None)
 
     assert attempted == [1, 2]
+    assert len(database_instances) == 1
     assert task.failed == 1
     assert task.converted == 1
-    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is True
-    assert saved == [True]
+    assert kepub_backfill.config.config_kobo_kepub_backfill_completed is False
+    assert saved == [False]
 
 
 def test_conversion_advances_modified_without_touching_synced_rows(monkeypatch):
@@ -254,6 +269,73 @@ def test_conversion_advances_modified_without_touching_synced_rows(monkeypatch):
     assert book.last_modified > old_modified
     assert synced_rows == [(1, 1), (2, 1)]
     assert len(merged) == 1
+
+
+def test_conversion_recovery_adoption_advances_modified(monkeypatch, tmp_path):
+    """Adopting a valid orphan KEPUB crosses the same Kobo cursor boundary."""
+    from cps.tasks import convert
+
+    old_modified = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    book = SimpleNamespace(
+        id=1,
+        title="Book",
+        path="Author/Book",
+        last_modified=old_modified,
+        data=[SimpleNamespace(name="book")],
+    )
+    merged = []
+    commits = []
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def one_or_none(self):
+            return None
+
+    class Session:
+        def query(self, *_args):
+            return Query()
+
+        def merge(self, row):
+            merged.append(row)
+
+        def commit(self):
+            commits.append(True)
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    class LocalDB:
+        def __init__(self, **_kwargs):
+            self.session = Session()
+
+        def get_book(self, _book_id):
+            return book
+
+        def get_book_format(self, *_args):
+            return None
+
+    file_path = tmp_path / "book"
+    with zipfile.ZipFile(str(file_path) + ".kepub", "w") as archive:
+        archive.writestr("mimetype", "application/epub+zip")
+
+    monkeypatch.setattr(convert.db, "CalibreDB", LocalDB)
+    task = convert.TaskConvert(
+        str(file_path),
+        1,
+        "convert",
+        {"old_book_format": "EPUB", "new_book_format": "KEPUB"},
+        None,
+    )
+
+    assert task._convert_ebook_format() == "book.kepub"
+    assert book.last_modified > old_modified
+    assert len(merged) == 1
+    assert commits == [True]
 
 
 def test_truncated_kepub_is_not_adopted_as_database_format(monkeypatch, tmp_path):

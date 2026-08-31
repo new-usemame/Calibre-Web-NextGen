@@ -20,12 +20,30 @@ except ImportError:
     bleach = False
 
 
+# Structural tags Calibre descriptions rely on that bleach's default allowlist
+# does not carry. Hoisted to a module constant so the set a description is
+# sanitized against can be inspected rather than re-derived: the New UI's
+# description editor (#919) only offers formatting that survives this filter,
+# and tests/unit/test_description_editor_allowlist_ssot.py round-trips the
+# editor's tags through clean_string to keep the two from drifting apart.
+#
+# This matters more than a normal allowlist because bleach ESCAPES a disallowed
+# tag rather than dropping it: an editor button emitting <u> would not fail
+# quietly, it would print "&lt;u&gt;" into the reader's description.
+_EXTRA_ALLOWED_TAGS = ("p", "span", "div", "pre", "br", "h1", "h2", "h3", "h4", "h5", "h6")
+
+if bleach:
+    DESCRIPTION_ALLOWED_TAGS = frozenset(ALLOWED_TAGS) | frozenset(_EXTRA_ALLOWED_TAGS)
+else:
+    # nh3 applies its own (broader) built-in allowlist and takes no tag argument
+    # on this path, so there is no explicit set to expose.
+    DESCRIPTION_ALLOWED_TAGS = None
+
+
 def clean_string(unsafe_text, book_id=0):
     try:
         if bleach:
-            allowed_tags = list(ALLOWED_TAGS)
-            allowed_tags.extend(["p", "span", "div", "pre", "br", "h1", "h2", "h3", "h4", "h5", "h6"])
-            safe_text = clean_html(unsafe_text, tags=set(allowed_tags))
+            safe_text = clean_html(unsafe_text, tags=set(DESCRIPTION_ALLOWED_TAGS))
         else:
             safe_text = clean_html(unsafe_text)
     except ParserError as e:

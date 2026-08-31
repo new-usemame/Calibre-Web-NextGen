@@ -126,11 +126,11 @@ def test_two_parallel_devices_with_distinct_highlights_never_clobber(tmp_path):
 
 def test_plugin_native_provider_and_handshake_are_wired():
     root = Path(__file__).parents[2]
-    provider = (root / "koreader/plugins/cwasync.koplugin/koreader_annotations_provider.lua").read_text()
-    main = (root / "koreader/plugins/cwasync.koplugin/main.lua").read_text()
-    client = (root / "koreader/plugins/cwasync.koplugin/CWASyncClient.lua").read_text()
+    provider = (root / "koreader/plugins/cwngsync.koplugin/koreader_annotations_provider.lua").read_text()
+    main = (root / "koreader/plugins/cwngsync.koplugin/main.lua").read_text()
+    client = (root / "koreader/plugins/cwngsync.koplugin/CWNGSyncClient.lua").read_text()
     assert 'ui.annotation.annotations' in provider
     assert 'position_type = rolling and "koreader_xpointer"' in provider
     assert "push_all_local = true" in provider
     assert "client:pull_annotations" in main and "client:push_annotations" in main
-    assert "function CWASyncClient:authorize" in client
+    assert "function CWNGSyncClient:authorize" in client

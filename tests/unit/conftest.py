@@ -30,12 +30,29 @@ SQLAlchemy / scheduler heavy startup that import-time test code can't afford.
 """
 
 import importlib.util
+import os
 import sys
+import tempfile
 import types
 from pathlib import Path
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# Point CONFIG_DIR somewhere disposable before cps.constants is ever imported
+# (#1712). constants.py resolves CONFIG_DIR = os.environ.get('CALIBRE_DBPATH',
+# BASE_DIR) at import time, so under pytest it was the checkout itself, and
+# production write paths deposited production artifacts into the source tree --
+# annotation_backup.get_backup_root() left real gzipped highlight payloads at
+# <repo>/annotation-backups/<user>/<book>/, untracked, on every full run.
+#
+# Set here rather than in a fixture because _preload_real_constants() below
+# imports constants during collection, long before any fixture runs. Tests that
+# care about this value (test_1474_cwa_db_config_dir_ssot.py) monkeypatch
+# CALIBRE_DBPATH themselves and are unaffected; an explicit value already in the
+# environment is left alone so a caller can still choose one.
+if not os.environ.get("CALIBRE_DBPATH"):
+    os.environ["CALIBRE_DBPATH"] = tempfile.mkdtemp(prefix="cwng-test-config-")
 
 
 def _preload_real_constants() -> None:

@@ -95,7 +95,12 @@ def upload_books():
             # staging. Carry the browser-selected basename explicitly so ingest
             # never has to guess which part of that internal name is user data.
             with open(final_path + ".cwa.json", "w", encoding="utf-8") as mf:
-                json.dump({"action": "import", "original_filename": uploaded.filename},
+                json.dump({"action": "import",
+                           "original_filename": uploaded.filename,
+                           "uploader_user_id": int(current_user.id),
+                           "uploader_personal_library": bool(
+                               current_user.has_own_library
+                           )},
                           mf, ensure_ascii=False)
             # The atomic rename into the watched ingest dir is what triggers import.
             os.replace(tmp_path, final_path)

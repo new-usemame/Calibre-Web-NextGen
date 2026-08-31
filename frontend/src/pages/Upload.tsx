@@ -71,7 +71,7 @@ export function Upload() {
         onDrop={onDrop}
       >
         {upload.isPending ? (
-          <Loader2 className={styles.spin} size={40} aria-hidden="true" focusable={false} />
+          <span className={styles.spin}><Loader2 size={40} aria-hidden="true" focusable={false} /></span>
         ) : (
           <UploadCloud size={40} className={styles.dropIcon} aria-hidden="true" focusable={false} />
         )}

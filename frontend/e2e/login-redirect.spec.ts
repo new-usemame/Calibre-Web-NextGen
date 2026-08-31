@@ -8,6 +8,34 @@ async function expectLibrary(page: import('@playwright/test').Page) {
 }
 
 test.describe('SPA post-auth destination', () => {
+  test('classic deep-link login bridge preserves next for the SPA', async ({
+    page, browser, baseURL,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'one real password login is sufficient for this bridge');
+    await page.goto('/app');
+    const bookHref = await page.locator('a[href*="/app/book/"]').first().getAttribute('href');
+    expect(bookHref).toBeTruthy();
+    const anonymous = await browser.newContext({
+      baseURL,
+      storageState: { cookies: [], origins: [] },
+    });
+    try {
+      const loginPage = await anonymous.newPage();
+      await loginPage.goto(`/login?next=${encodeURIComponent(bookHref!)}`);
+      const bridged = new URL(loginPage.url());
+      expect(bridged.pathname).toBe('/app/');
+      expect(bridged.searchParams.get('next')).toBe(bookHref);
+      await loginPage.locator('input[autocomplete="username"]').fill(process.env.E2E_USER || 'admin');
+      await loginPage.locator('input[autocomplete="current-password"]').fill(process.env.E2E_PASS || 'admin123');
+      await loginPage.getByRole('button', { name: /sign in/i }).click();
+
+      await expect(loginPage).toHaveURL(new RegExp(`${bookHref!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`));
+      await expect(loginPage.locator('main h1')).toBeVisible();
+    } finally {
+      await anonymous.close();
+    }
+  });
+
   test('password login at /app/login?next=%2F lands on the library, not the in-app 404', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'one real password login is sufficient for this redirect contract');
     await page.context().clearCookies();
@@ -89,5 +117,57 @@ test.describe('SPA post-auth destination', () => {
     await expect(page).toHaveURL(new RegExp(`${bookHref!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`));
     await expect(page.locator('main h1')).toBeVisible();
     await verifierContext.close();
+  });
+
+  test('magic-link polling retries a 5xx, then stops visibly on a 429', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'poll scheduling is viewport-independent');
+    await page.context().clearCookies();
+    let polls = 0;
+
+    await page.route('**/api/v1/auth/magic-link/start', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          token: 'poll-error-token',
+          verify_url: 'http://example.test/verify/poll-error-token',
+          qrcode: '',
+          expires_in_minutes: 10,
+        }),
+      });
+    });
+    await page.route('**/api/v1/auth/magic-link/poll', async (route) => {
+      polls += 1;
+      if (polls === 1) {
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'unavailable', message: 'Try again' } }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: {
+            code: 'rate_limit_exceeded',
+            message: 'Too many requests',
+          },
+        }),
+      });
+    });
+
+    const fatalMessage = 'Too many magic-link checks were made from this network. Generate a new link or try again later.';
+    await page.goto('/app/magic-link');
+    const visibleMessage = page.locator('p', { hasText: fatalMessage });
+    await expect(visibleMessage).toHaveText(fatalMessage, { timeout: 12_000 });
+    await expect(visibleMessage).toBeVisible();
+    await expect(page.locator('[role="alert"][aria-live="assertive"][aria-atomic="true"]'))
+      .toHaveText(fatalMessage);
+    expect(polls).toBe(2);
+
+    await page.waitForTimeout(4_000);
+    expect(polls, 'a fatal 429 must end the poll loop').toBe(2);
   });
 });

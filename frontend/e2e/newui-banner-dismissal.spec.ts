@@ -1,40 +1,87 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 
-async function openClassic(page: Page, context: BrowserContext) {
-  await page.goto('/app');
-  await context.addCookies([{ name: 'cwng_prefer_spa', value: '0', url: new URL(page.url()).origin }]);
-  await page.goto('/');
+async function preferenceCookies(context: BrowserContext) {
+  return Object.fromEntries(
+    (await context.cookies())
+      .filter((cookie) => cookie.name.startsWith('cwng_prefer_'))
+      .map((cookie) => [cookie.name, cookie.value]),
+  );
 }
 
-async function clearDismissals(page: Page) {
-  await page.evaluate(() => {
-    for (const key of Object.keys(localStorage)) {
-      if (key.startsWith('cwng_newui_banner_dismissed_')) localStorage.removeItem(key);
-    }
-  });
+async function openClassicNav(page: Page, isMobile: boolean) {
+  if (isMobile) await page.locator('.navbar-toggle').click();
+  return page.locator('.cwng-switch-ui');
 }
 
-test('closing the classic New-UI nudge keeps it dismissed after reload (#907)', async ({ page, context }) => {
-  await openClassic(page, context);
-  await clearDismissals(page);
-  await page.reload();
+function isRootClassicFallback(url: URL) {
+  const feedback = url.pathname === '/'
+    && url.searchParams.get('cwng_feedback') === 'newui'
+    && [...url.searchParams].length === 1;
+  const login = url.pathname === '/login'
+    && url.searchParams.get('next') === '/?cwng_feedback=newui'
+    && [...url.searchParams].length === 1;
+  return feedback || login;
+}
 
-  const banner = page.locator('#cwng-newui-banner');
-  await expect(banner).toBeVisible();
-  await page.locator('.cwng-newui-dismiss').click();
-  await expect(banner).toBeHidden();
-  expect(await page.evaluate(() => localStorage.getItem('cwng_newui_banner_dismissed_v1'))).toBe('1');
+test('a cookie-less browser opens the SPA and Classic remains an explicit opt-out', async ({
+  page, context,
+}) => {
+  await context.clearCookies({ name: /^cwng_prefer_(spa|classic)$/ });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/app\/?$/);
 
-  await page.reload();
-  await expect(banner).toBeHidden();
+  const cookies = await preferenceCookies(context);
+  expect(cookies.cwng_prefer_classic).toBeUndefined();
+  expect(cookies.cwng_prefer_spa).toBe('1');
 });
 
-test('an old per-version dismissal migrates without one more nudge (#907)', async ({ page, context }) => {
-  await openClassic(page, context);
-  await clearDismissals(page);
-  await page.evaluate(() => localStorage.setItem('cwng_newui_banner_dismissed_v4.1.13', '1'));
+test('a JavaScript-disabled browser self-heals to Classic', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({
+    baseURL,
+    javaScriptEnabled: false,
+    storageState: { cookies: [], origins: [] },
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto('/app');
+    await page.waitForURL((url) => isRootClassicFallback(url));
+    const terminal = new URL(page.url());
+    if (terminal.pathname === '/login') {
+      // Classic's own login field. `input[autocomplete="username"]` belongs to
+      // the SPA's React form, which renders nothing with JavaScript disabled --
+      // asserting it here could never pass, and "not found" would look the same
+      // whether the fallback worked or served an inert SPA shell.
+      await expect(page.locator('input#username[name="username"]')).toBeVisible();
+    } else {
+      await expect(page.locator('#books').first()).toBeVisible();
+    }
+    const cookies = await preferenceCookies(context);
+    expect(cookies.cwng_prefer_classic).toBe('1');
+    expect(cookies.cwng_prefer_spa).toBeUndefined();
+  } finally {
+    await context.close();
+  }
+});
 
-  await page.reload();
-  await expect(page.locator('#cwng-newui-banner')).toBeHidden();
-  expect(await page.evaluate(() => localStorage.getItem('cwng_newui_banner_dismissed_v1'))).toBe('1');
+test('SPA to Classic to SPA round-trips and the removed nudge stays absent', async ({
+  page, context, isMobile,
+}) => {
+  await page.goto('/app');
+  await page.getByRole('button', { name: /^Account:/ }).click();
+  await page.getByText('Back to the classic view', { exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  expect((await preferenceCookies(context)).cwng_prefer_classic).toBe('1');
+  await expect(page.locator('#cwng-newui-banner')).toHaveCount(0);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/$/);
+
+  const returnToSpa = await openClassicNav(page, isMobile);
+  await expect(returnToSpa).toContainText('Back to New UI');
+  await returnToSpa.click();
+  await expect(page).toHaveURL(/\/app\/?$/);
+  expect((await preferenceCookies(context)).cwng_prefer_classic).toBeUndefined();
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/app\/?$/);
 });

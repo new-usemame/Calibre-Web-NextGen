@@ -1,0 +1,17 @@
+{
+  "area": "i18n",
+  "body": "`frontend/src/pages/Catalog.tsx:105-106` offers `Compact` and `Dense` as adjacent\noptions in one density select. In `nl` BOTH msgids are translated \"Compact\", so the\ndropdown shows the same label twice and one option is unreachable by name.\n\nFound by auditing SPA-anchored msgids for the tell CWNG READER named: **one\ntranslation serving two different msgids**. That check needs no knowledge of the\nlanguage, which is what makes it usable — the same session found `Black` translated\nas \"Back\" in eight locales and `One column` as \"Invalid read column\".\n\nPre-existing on main; not introduced by the multi-device annotation work, which only\nsurfaced it by anchoring the msgids. The fix is a reviewed Dutch string for one of the\ntwo (e.g. \"Compact\" / \"Dicht\"), NOT clearing a fuzzy flag — no flag is set here, so\nthe gate is silent and correct while the output is wrong.\n\nThe general trap: reusing a classic msgid looks like free translation coverage, and\nthe fuzzy gate only catches entries someone marked. A confidently-wrong translation\nthat nobody flagged passes every gate.",
+  "created": "2026-08-10",
+  "id": "F-4079f1",
+  "refs": [],
+  "resolution": {
+    "commit": "a23fcf7dd9",
+    "date": "2026-08-30",
+    "note": "Dutch translated both Compact and Dense as 'Compact', so two of three mutually exclusive density options were indistinguishable. Dense now reads 'Zeer compact'. Guard added over the option SET (coverage gates cannot see two msgids colliding on one msgstr); it went red on nl and green on fr before the fix. Merged in #2036.",
+    "release": ""
+  },
+  "severity": "ux",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Dutch renders the Compact and Dense density options identically"
+}

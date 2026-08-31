@@ -1,0 +1,11 @@
+{
+  "area": "spa-layout",
+  "body": "Measured across 30 SPA routes x 5 themes x 390/1440, plus a narrow pass at\n320/360/430. Horizontal page overflow is **zero everywhere except two routes at\n320px**:\n\n    /duplicates  scrollWidth 351 vs viewport 320  (31px past)\n    /admin       scrollWidth 322 vs viewport 320  ( 2px past)\n\nCulprits, measured in-page:\n\n- `/duplicates` — `.scanBtn` (\"Scan for duplicates\") is `white-space: nowrap`\n  (inherited from the `Button` primitive's `.btn`) and lays out at 151px wide,\n  right edge 352. A single unbreakable label is the whole overflow.\n- `/admin` — the per-user `.userActions` / `.deleteBtn` column reaches 323.\n  Marginal, but it is real and it is the same width bucket.\n\nBoth are narrow-width-only; 360, 390, 430 and 1440 are all clean, as is every\nother route. Worth doing in one pass with F-5a225c (the hamburger's glyph\ncollapsing at the same 320px), since both are the top bar / narrow-layout story\nrather than component styling.\n\nMethod + full inventory: `notes/UI-SWEEP-INVENTORY.md` (outer workspace).",
+  "created": "2026-08-09",
+  "id": "F-a4eae9",
+  "refs": [],
+  "severity": "ux",
+  "source": "audit",
+  "status": "open",
+  "title": "Two routes overflow horizontally at 320px"
+}

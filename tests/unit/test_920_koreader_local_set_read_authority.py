@@ -36,7 +36,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-PLUGIN = Path(__file__).parents[2] / "koreader/plugins/cwasync.koplugin"
+PLUGIN = Path(__file__).parents[2] / "koreader/plugins/cwngsync.koplugin"
 
 
 def _lua() -> str | None:

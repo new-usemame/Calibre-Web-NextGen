@@ -12,6 +12,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+from calibre_library_target import library_arguments
 import sys
 import tempfile
 import time
@@ -337,7 +338,7 @@ class Book:
                 # fresh volume.
                 os.makedirs(metadata_temp_dir, exist_ok=True)
                 result = subprocess.run(
-                    ["calibredb", "export", "--with-library", self.calibre_library, "--to-dir", metadata_temp_dir, self.book_id],
+                    ["calibredb", "export", "--to-dir", metadata_temp_dir, self.book_id] + library_arguments(self.calibre_library),
                     env=self.calibre_env, check=False, capture_output=True, text=True, timeout=60
                 )
                 
@@ -1143,7 +1144,7 @@ class Enforcer:
 
     def print_library_list(self) -> None:
         """Uses the calibredb command line utility to list the books in the library"""
-        subprocess.run(["calibredb", "list", "--with-library", self.calibre_library], env=self.calibre_env, check=True)
+        subprocess.run(["calibredb", "list"] + library_arguments(self.calibre_library), env=self.calibre_env, check=True)
 
 
     def delete_log(self, auto=True, log_path="None"):

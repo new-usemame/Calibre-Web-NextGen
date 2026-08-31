@@ -27,6 +27,14 @@ log = logger.create()
 _process = None
 
 
+def library_arguments():
+    """calibredb arguments addressing the library through the content server, empty when it is not running."""
+    if not config.config_calibre_server_enabled or not config.config_calibre_dir:
+        return []
+    return ["--with-library", "http://127.0.0.1:{}/#{}".format(
+        config.config_calibre_server_port, os.path.basename(config.config_calibre_dir.rstrip("/")))]
+
+
 def start():
     global _process
     stop()

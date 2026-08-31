@@ -56,6 +56,146 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.44',
+    date: '2026-08-30',
+    summary: 'Personal libraries and a new device hub give every reader more control over a shared collection.',
+    items: [
+      {
+        title: 'Keep your own selection inside a shared library',
+        body: 'An account can now show only the books that reader wants while the server keeps one shared copy of every file. Switching to My Library starts with everything you can already see, changes nothing during an upgrade, and lets eligible readers browse the wider collection from Global Library; administrators can manage the mode for other accounts without changing Guest by accident.',
+        category: 'Library',
+        link: { to: '/global', label: 'Explore your library' },
+      },
+      {
+        title: 'Remove books from your library without deleting them',
+        body: 'In My Library mode, the primary bulk action now removes selected books only from your account, OPDS feed and regular shelves; the shared files and your highlights, notes, bookmarks and progress stay intact. Confirmations explain what happens on Kobo, KOReader and OPDS, and a refused removal now tells you why. Adding a global book to a shelf or uploading it adds it to your library first.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'See what each of your reading devices knows',
+        body: 'Every Kobo, KOReader installation and browser now has its own page for highlights, notes, dog-ears, reading positions and reported books. Large inventories load in manageable pages, and per-device positions stay separate so one browser or reader no longer masks another.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Send and remove books on a specific KOReader',
+        body: 'Queue a compatible book from its detail page and that KOReader collects it on the next sync without duplicates or half-finished transfers. The device page also shows reported free space and inventory, refuses books that will not fit, and can request an exact file deletion while rechecking that the reader may still access every queued book.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Inspect the device fleet without exposing private identifiers',
+        body: 'Administrators get a cross-account board with device status, annotation and position totals, Kobo authority coverage, storage and bounded inventories. Every view applies the owner\'s current library restrictions at request time, fails closed if that view cannot be established, and recovers cleanly when the last item on a page disappears.',
+        category: 'Admin',
+        link: { to: '/admin/devices', label: 'Open Admin' },
+      },
+      {
+        title: 'Keep Kobo highlights complete when CWNG takes charge',
+        body: 'CWNG can now capture a Kobo\'s complete annotation set and become the safe source for that book without a database edit. Incomplete, oversized, malformed or conflicting sets remain retryable or continue through Kobo instead of being acknowledged as saved, replaced with an empty set or allowed to overwrite newer highlights.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Large Kobo libraries finish syncing and recover missing books',
+        body: 'Kobo delivery tracking now follows the physical device, so libraries continue beyond the first sync page and devices already affected receive missing books on their next sync. Failed KEPUB conversions, database refreshes and interrupted response updates are isolated and remain retryable instead of stopping later books or re-delivering unchanged ones. A Kobo owner can also resend one book from the Classic account page without asking an administrator.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Bring shelves to KOReader with a clearer setup path',
+        body: 'Your CWNG shelves now sync as account-specific KOReader collections, so one reader cannot overwrite another\'s organisation. The New UI links to the plugin setup from Devices; after updating, remove the old cwasync.koplugin directory and use cwngsync.koplugin, which carries your existing settings forward and refuses to run beside the old copy. Sync authentication failures now correctly tell the plugin to sign in again.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage sync & app passwords' },
+      },
+      {
+        title: 'Spot books with saved highlights at a glance',
+        body: 'A book\'s Highlights button now shows how many highlights and notes you have there. Books with none keep the same quiet button, without a distracting zero.',
+        category: 'Reading',
+      },
+      {
+        title: 'Write polished book descriptions without raw HTML',
+        body: 'The New UI description editor has formatting controls for emphasis, headings, lists, quotes, code and links, plus an HTML source toggle and live preview. Pasting a blurb from the web keeps useful paragraphs and lists while dropping its styling clutter.',
+        category: 'Library',
+      },
+      {
+        title: 'Add bulk metadata without erasing what is already there',
+        body: 'Bulk editing Tags, Authors, Publishers or Languages now defaults to Add to existing, preserving each selected book\'s current values. Replace existing remains available and warns how many books will lose values before it proceeds.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Keep the desktop sidebar open—or out of the way',
+        body: 'Pin the New UI rail to reserve its full width across navigation and reloads, then unpin it for hover expansion. The sidebar and large catalog now avoid page-wide layout work, while off-screen covers, loading icons, long annotation lists and reader progress animate with much less main-thread work. Large batches of notices also dismiss reliably and report any failure instead of appearing to do nothing.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Use the library more comfortably on phones and keyboards',
+        body: 'Mobile book pages put the description before secondary controls, selection bars no longer cover the last books or metadata fields, and every touch card has one clear More actions menu. Text files can receive keyboard focus and scroll again, while hidden desktop-only controls stay out of the screen-reader tree.',
+        category: 'Reading',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Start in the New UI with more sign-in setups',
+        body: 'Fresh browsers now open the New UI by default, including LDAP and reverse-proxy single sign-on installations. Choosing Classic stays remembered across tabs, restarts and shared New UI links until you deliberately switch back.',
+        category: 'Account',
+      },
+      {
+        title: 'Carry your catalog choices between browsers',
+        body: 'For signed-in readers, Discover visibility, hidden-book visibility and the Read/edit row on each card now follow the account instead of one browser. Guest browsing remains local to that browser.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'Remove the final file without losing the book record',
+        body: 'Classic and New UI can now delete a book\'s last format while keeping its metadata, shelves and reading state, ready for a replacement file later. If file cleanup fails, deletion now reports the error or remaining files instead of claiming an empty success.',
+        category: 'Library',
+      },
+      {
+        title: 'Trust library controls to match permissions and locks',
+        body: 'The New UI now hides download, edit, delete and Duplicates controls from accounts that cannot use them, and whole-book deletion follows the same combined permissions as Classic. Cover replacement works for your hidden or archived books but respects a locked cover, and dangerous actions use clearer wording and accessible context.',
+        category: 'Library',
+        link: { to: '/duplicates', label: 'Review duplicates' },
+      },
+      {
+        title: 'Reset CWA settings only when you mean to',
+        body: 'Reset All CWA Settings no longer sits where a primary Save action belongs, and it asks for confirmation that names the full loss before changing anything.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Import more files without losing the failed ones',
+        body: 'Ingest now recognises supported uppercase extensions such as Book.EPUB. Failed ACSM and LCPL fulfilments reach the recovery backup with useful guidance, temporary sidecars are cleaned up, and raw licence files are never mistaken for book formats.',
+        category: 'Library',
+        link: { to: '/upload', label: 'Go to Upload' },
+      },
+      {
+        title: 'Let long library maintenance finish honestly',
+        body: 'Cover-thumbnail generation continues past a damaged image or stuck filesystem operation and finishes with accurate generated, skipped and failed totals. Kindle EPUB backups keep every original, while repair and conversion services get writable Calibre settings and bare-metal jobs put backups, logs and locks under the configured data directory instead of Docker-only paths.',
+        category: 'Admin',
+        link: { to: '/tasks', label: 'Open Tasks' },
+      },
+      {
+        title: 'Recover from invalid language settings',
+        body: 'A language value the server does not ship now falls back safely instead of locking you out of the page needed to fix it, and regional tags such as pt-BR are understood. Dutch density and permanent-delete labels are distinct again, and French now calls a personal selection what readers expect.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'Start and run cleanly across more installations',
+        body: 'Fresh bare-metal setups now create the complete settings database before their first library write, and upgrades apply user-table columns before features try to read them. Reverse proxies can configure the trusted address, protocol and host hop counts independently without breaking login or OIDC callbacks.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Protect sign-in without locking out the right reader',
+        body: 'New UI login, registration, magic-link and password-reset requests now enforce their rate limits without revealing whether an account exists. Limits are scoped to both the client address and normalized username, successful sign-ins clear earlier attempts, and magic-link polling distinguishes retryable interruptions from fatal errors.',
+        category: 'Account',
+      },
+    ],
+  },
+  {
     version: 'v4.1.43',
     date: '2026-08-28',
     items: [

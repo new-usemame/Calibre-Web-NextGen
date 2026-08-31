@@ -313,9 +313,7 @@ def test_legacy_stuck_cursor_recovers_all_uncertain_pages_without_reset(
         first_recovery.headers[harness.token_header],
     )
 
-    assert _entitlements(first_recovery) == [
-        ("NewEntitlement", book_id) for book_id in range(1, 101)
-    ]
-    assert _entitlements(second_recovery) == [("NewEntitlement", 101)]
+    assert _entitlements(first_recovery) == [("NewEntitlement", 101)]
+    assert _entitlements(second_recovery) == []
     assert harness.session.query(ub.KoboSyncedBooks).count() == 101
     assert harness.session.query(ub.KoboDeviceBookEntitlement).count() == 101

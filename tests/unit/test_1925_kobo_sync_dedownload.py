@@ -1149,7 +1149,11 @@ def test_upgrade_reannounces_divergent_device_histories_without_starvation(
         device_id: [len(_entitlements(response)) for response in responses]
         for device_id, responses in pages_by_device.items()
     } == {
-        sync_harness.device.id: [100, 100, 18],
+        # Device A's first-page rows intersect the reconstructed legacy New
+        # page, so they remain protected; its 118 missing rows still drain.
+        sync_harness.device.id: [100, 18, 0],
+        # Device B has no row from that New page. None of its divergent
+        # history can suppress a first copy, so all 218 drain without famine.
         second_device.id: [100, 100, 18],
     }
     assert all(
@@ -1183,8 +1187,9 @@ def test_upgrade_reannounces_divergent_device_histories_without_starvation(
         record.getMessage() for record in caplog.records
         if record.getMessage().startswith("Kobo Sync ledger seed:")
     ]
-    # Pre-existing version-0 markers bypass the initial marker insert, but the
-    # one classification audit must still have cleared both divergent sets.
+    # Pre-existing version-0 markers bypass the initial marker insert. The
+    # audit retains only device A's intersection with the legacy New page and
+    # clears device B's 118 legacy Changed rows.
     assert seed_lines == []
     migration_lines = [
         record.getMessage() for record in caplog.records
@@ -1193,7 +1198,89 @@ def test_upgrade_reannounces_divergent_device_histories_without_starvation(
         )
     ]
     assert len(migration_lines) == 1
-    assert "devices=2 device_proven=0 rearmed=218" in migration_lines[0]
+    assert "devices=2 legacy_new=100 rearmed=118" in migration_lines[0]
+
+
+def test_upgrade_does_not_replay_fully_synced_multi_page_library(
+    sync_harness, caplog, monkeypatch,
+):
+    """Legacy pages that were all deliverable remain suppressed on upgrade."""
+    from cps import db, kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_cover_padding_enabled", True, raising=False,
+    )
+    caplog.set_level(logging.DEBUG, logger="cps.kobo")
+
+    delivered = [sync_harness.book]
+    base = sync_harness.book.last_modified
+    # Under the legacy classifier, every page is New when each later page's
+    # date-added clocks are newer than the previous page's maximum. This is a
+    # fully deliverable 218-book history, unlike #1735's poisoned-watermark
+    # shape where only the first page could reach an empty device.
+    sync_harness.book.timestamp = base
+    for number in range(2, 219):
+        clock = base + timedelta(seconds=number - 1)
+        book = db.Books(
+            f"Fully Synced Upgrade Book {number}",
+            f"Fully Synced Upgrade Book {number}",
+            "Author",
+            clock,
+            db.Books.DEFAULT_PUBDATE,
+            "1.0",
+            clock,
+            f"fully-synced-upgrade-book-{number}",
+            0,
+            [],
+            [],
+        )
+        sync_harness.session.add(book)
+        sync_harness.session.flush()
+        book.uuid = f"00000000-0000-0000-0001-{number:012d}"
+        sync_harness.session.add(db.Data(
+            book.id,
+            "EPUB",
+            1_000_000 + number,
+            f"fully-synced-upgrade-book-{number}",
+        ))
+        delivered.append(book)
+    sync_harness.session.add_all([
+        ub.KoboSyncedBooks(
+            user_id=sync_harness.user.id,
+            book_id=book.id,
+            book_uuid=str(book.uuid),
+        )
+        for book in delivered
+    ])
+    sync_harness.session.commit()
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    responses = []
+    for _page in range(3):
+        response = sync_harness.sync(token)
+        responses.append(response)
+        token = response.headers[sync_harness.token_header]
+
+    assert all(_entitlements(response) == [] for response in responses), (
+        "an existing Kobo whose legacy pages were all New must not receive "
+        "its fully synced library again after the classification upgrade"
+    )
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 218
+    seed = sync_harness.session.query(ub.KoboDeviceEntitlementSeed).one()
+    assert seed.classification_version == kobo.ENTITLEMENT_CLASSIFICATION_VERSION
+    summaries = [
+        record.getMessage() for record in caplog.records
+        if record.getMessage().startswith("Kobo Sync summary:")
+    ]
+    assert sum(
+        int(line.split("suppressed_unchanged=")[1].split()[0])
+        for line in summaries
+    ) == 218
 
 
 def test_upgrade_seed_skips_null_archived_last_modified(
@@ -1226,8 +1313,7 @@ def test_upgrade_seed_skips_null_archived_last_modified(
     replay = sync_harness.sync(stale_token)
 
     assert replay.status_code == 200
-    assert len(_entitlements(replay)) == 1
-    assert "NewEntitlement" in _entitlements(replay)[0]
+    assert _entitlements(replay) == []
     row = sync_harness.session.query(
         ub.KoboDeviceBookEntitlement,
     ).one()

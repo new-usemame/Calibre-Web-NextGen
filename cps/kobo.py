@@ -285,16 +285,16 @@ def _acknowledge_pending_page(page, requesting_device_id):
 
 
 def _seed_existing_device_entitlement_ledgers(user_id):
-    """Mark the conservative pre-ack upgrade boundary for known Kobos.
+    """Stage pre-#1925 replay ledgers for the one-shot classifier audit.
 
-    ``KoboSyncedBooks`` is user-wide and proves only that this server once
-    emitted something for a book.  It cannot prove which physical device
-    received a response, so copying it into a device's confirmed ledger can
-    permanently starve that device.  Existing rows therefore remain
-    unconfirmed and drain through the normal bounded missing-ledger query.
+    Existing installs have only the flat ``KoboSyncedBooks`` history. Build
+    each known Kobo's current payload hashes before the classification audit
+    below removes books the legacy handler emitted as Changed. This protects
+    legacy New pages from #1925 while leaving dropped #1735 pages recoverable.
 
-    The marker still distinguishes a pre-existing device from a device added
-    later, and all writes remain staged for HandleSyncRequest's checked commit.
+    All writes remain staged for HandleSyncRequest's single checked commit.
+    A 503 therefore rolls the seed and its marker back together and the next
+    sync retries the complete transition.
     """
     device_ids = kobo_sync_status.get_unseeded_kobo_device_ids(user_id)
     if not device_ids:
@@ -302,6 +302,144 @@ def _seed_existing_device_entitlement_ledgers(user_id):
 
     started = monotonic()
     try:
+        # Once any Kobo crossed the upgrade boundary, an unmarked device was
+        # registered later. It must build its own ledger from its own delivery
+        # acknowledgments rather than inherit another device's flat history.
+        existing_user_seed = \
+            kobo_sync_status.user_has_completed_entitlement_seed(user_id)
+        if existing_user_seed:
+            kobo_sync_status.mark_device_entitlement_ledgers_seeded(device_ids)
+            elapsed_ms = round((monotonic() - started) * 1000, 1)
+            log.debug(
+                "Kobo Sync ledger seed: user=%s devices=%d books=0 deleted=0 "
+                "new_devices=%d elapsed_ms=%.1f",
+                user_id, len(device_ids), len(device_ids), elapsed_ms,
+            )
+            return True
+
+        synced_book_ids = sorted({
+            row.book_id for row in ub.session.query(
+                ub.KoboSyncedBooks.book_id,
+            ).filter(
+                ub.KoboSyncedBooks.user_id == int(user_id),
+            ).all()
+        })
+        archived = {
+            row.book_id: row
+            for row in ub.session.query(ub.ArchivedBook).filter(
+                ub.ArchivedBook.user_id == int(user_id),
+            ).all()
+        }
+
+        seed_books = []
+        for offset in range(0, len(synced_book_ids), 250):
+            chunk = synced_book_ids[offset:offset + 250]
+            seed_books.extend(
+                calibre_db.session.query(db.Books)
+                .filter(db.Books.id.in_(chunk))
+                .options(
+                    joinedload(db.Books.authors),
+                    joinedload(db.Books.publishers),
+                    joinedload(db.Books.series),
+                    joinedload(db.Books.languages),
+                    joinedload(db.Books.comments),
+                    joinedload(db.Books.data),
+                )
+                .all()
+            )
+        seed_books.sort(key=lambda book: book.id)
+
+        device_models = dict(ub.session.query(
+            ub.Device.id, ub.Device.model,
+        ).filter(ub.Device.id.in_(device_ids)).all())
+        original_device_id = getattr(g, "annotation_origin_device_id", None)
+        aspect_cache_present = hasattr(g, _REQUESTING_DEVICE_ASPECT_G_KEY)
+        original_aspect_cache = getattr(
+            g, _REQUESTING_DEVICE_ASPECT_G_KEY, None,
+        )
+        book_fingerprints_by_device = {}
+        try:
+            common_payloads = {}
+            for book in seed_books:
+                archived_row = archived.get(book.id)
+                common_payloads[book.id] = (
+                    create_book_entitlement(
+                        book,
+                        archived=bool(
+                            archived_row and archived_row.is_archived
+                        ),
+                    ),
+                    get_metadata(book),
+                )
+            book_change_bases = {
+                book.id: _book_entitlement_change_basis(
+                    book.last_modified,
+                    archived[book.id].last_modified
+                    if book.id in archived else None,
+                )
+                for book in seed_books
+            }
+            for device_id in device_ids:
+                g.annotation_origin_device_id = device_id
+                setattr(
+                    g,
+                    _REQUESTING_DEVICE_ASPECT_G_KEY,
+                    cover_preview.preset_for_device_model(
+                        device_models.get(device_id),
+                    ),
+                )
+                book_fingerprints = {}
+                for book in seed_books:
+                    book_entitlement, common_metadata = common_payloads[book.id]
+                    metadata = dict(common_metadata)
+                    metadata["CoverImageId"] = _get_cover_image_id(book)
+                    payload = {
+                        "BookEntitlement": book_entitlement,
+                        "BookMetadata": metadata,
+                    }
+                    book_fingerprints[book.id] = \
+                        _entitlement_fingerprint(payload)
+                book_fingerprints_by_device[device_id] = book_fingerprints
+        finally:
+            g.annotation_origin_device_id = original_device_id
+            if aspect_cache_present:
+                setattr(
+                    g, _REQUESTING_DEVICE_ASPECT_G_KEY, original_aspect_cache,
+                )
+            else:
+                g.pop(_REQUESTING_DEVICE_ASPECT_G_KEY, None)
+
+        deleted_fingerprints = {}
+        deleted_change_bases = {}
+        for tombstone in ub.session.query(ub.KoboDeletedBook).filter(
+            ub.KoboDeletedBook.user_id == int(user_id),
+        ).all():
+            payload = {
+                "BookEntitlement": create_deleted_book_entitlement(
+                    tombstone.book_uuid, tombstone.deleted_at,
+                ),
+                "BookMetadata": create_deleted_book_metadata(
+                    tombstone.book_uuid,
+                ),
+            }
+            deleted_fingerprints[str(tombstone.book_uuid)] = \
+                _entitlement_fingerprint(payload)
+            deleted_change_bases[str(tombstone.book_uuid)] = \
+                _deleted_entitlement_change_basis(tombstone.deleted_at)
+
+        for device_id in device_ids:
+            kobo_sync_status.stage_device_entitlement_fingerprints(
+                device_id,
+                book_fingerprints_by_device[device_id],
+                book_change_bases,
+                ENTITLEMENT_PAYLOAD_SCHEMA_VERSION,
+            )
+            kobo_sync_status.stage_device_deleted_entitlement_fingerprints(
+                device_id,
+                deleted_fingerprints,
+                deleted_change_bases,
+                ENTITLEMENT_PAYLOAD_SCHEMA_VERSION,
+            )
         kobo_sync_status.mark_device_entitlement_ledgers_seeded(device_ids)
     except Exception:
         ub.session.rollback()
@@ -313,26 +451,55 @@ def _seed_existing_device_entitlement_ledgers(user_id):
 
     elapsed_ms = round((monotonic() - started) * 1000, 1)
     log.debug(
-        "Kobo Sync ledger seed: user=%s devices=%d books=0 deleted=0 "
-        "unconfirmed_devices=%d elapsed_ms=%.1f",
+        "Kobo Sync ledger seed: user=%s devices=%d books=%d deleted=%d "
+        "new_devices=0 elapsed_ms=%.1f",
         user_id,
         len(device_ids),
-        len(device_ids),
+        len(seed_books),
+        len(deleted_fingerprints),
         elapsed_ms,
     )
     return True
 
 
-def _migrate_device_entitlement_classification(user_id):
-    """Reclassify every pre-ack device row as unconfirmed exactly once.
+def _legacy_new_entitlement_book_ids(books):
+    """Reconstruct the legacy pages that an empty Kobo could accept.
 
-    Historical per-device entitlement rows record a committed server emission,
-    not device receipt. No timestamp reconstruction can restore that missing
-    fact, so those rows are removed and conservatively reannounced as New.
-    A device-authored reading-position observation is the narrow durable proof
-    that the physical Kobo possessed that book; those books retain only a
-    non-matching classification sentinel so they fail open as Changed rather
-    than being byte-suppressed from reconstructed present-day metadata.
+    The old handler ordered by ``(last_modified, id)`` but compared every row
+    in a page against the previous page's maximum ``timestamp``. Replaying
+    that state machine retains only hashes for NewEntitlements; hashes for the
+    ChangedEntitlements dropped by an empty device are removed for recovery.
+
+    Flat state has no historical shelf clocks. Current library clocks are the
+    best available reconstruction; a mismatch fails open to one extra New
+    entitlement instead of leaving a book permanently missing.
+    """
+    ordered = sorted(
+        books,
+        key=lambda book: (books_cursor_datetime(book.last_modified), book.id),
+    )
+    confirmed = set()
+    watermark = datetime.min
+    for offset in range(0, len(ordered), SYNC_ITEM_LIMIT):
+        page = ordered[offset:offset + SYNC_ITEM_LIMIT]
+        created_times = []
+        for book in page:
+            created = book.timestamp or book.last_modified or datetime.min
+            created = books_cursor_datetime(created)
+            created_times.append(created)
+            if created > watermark:
+                confirmed.add(book.id)
+        if created_times:
+            watermark = max(watermark, max(created_times))
+    return confirmed
+
+
+def _migrate_device_entitlement_classification(user_id):
+    """Remove rows that only prove a legacy Changed entitlement emission.
+
+    The versioned audit keeps reconstructable New pages suppressible for
+    #1925, removes only legacy Changed rows for #1735 recovery, and stages its
+    marker in the same checked request transaction as the replacement page.
     """
     device_ids = kobo_sync_status.get_kobo_device_ids_requiring_classification(
         user_id, ENTITLEMENT_CLASSIFICATION_VERSION,
@@ -342,37 +509,41 @@ def _migrate_device_entitlement_classification(user_id):
 
     started = monotonic()
     try:
+        synced_book_ids = sorted({
+            row.book_id for row in ub.session.query(
+                ub.KoboSyncedBooks.book_id,
+            ).filter(
+                ub.KoboSyncedBooks.user_id == int(user_id),
+            ).all()
+        })
+        books = []
+        for offset in range(0, len(synced_book_ids), 250):
+            books.extend(
+                calibre_db.session.query(db.Books).filter(
+                    db.Books.id.in_(synced_book_ids[offset:offset + 250]),
+                ).all()
+            )
+        confirmed_book_ids = _legacy_new_entitlement_book_ids(books)
+
         removed = 0
-        device_proven = 0
         for device_id in device_ids:
-            removed += ub.session.query(
-                ub.KoboDeviceBookEntitlement,
-            ).filter(
-                ub.KoboDeviceBookEntitlement.device_id == int(device_id),
-            ).delete(synchronize_session=False)
-            removed += ub.session.query(
-                ub.KoboDeviceDeletedEntitlement,
-            ).filter(
-                ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
-            ).delete(synchronize_session=False)
-            proven_book_ids = {
+            recorded_ids = {
                 row.book_id for row in ub.session.query(
-                    ub.DeviceReadingPosition.book_id,
+                    ub.KoboDeviceBookEntitlement.book_id,
                 ).filter(
-                    ub.DeviceReadingPosition.device_id == int(device_id),
-                    ub.DeviceReadingPosition.client_modified_at.isnot(None),
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
                 ).all()
             }
-            if proven_book_ids:
-                kobo_sync_status.stage_device_entitlement_fingerprints(
-                    device_id,
-                    {
-                        book_id: "legacy-position-receipt"
-                        for book_id in proven_book_ids
-                    },
-                    payload_schema_version=0,
-                )
-                device_proven += len(proven_book_ids)
+            unconfirmed_ids = sorted(recorded_ids - confirmed_book_ids)
+            for offset in range(0, len(unconfirmed_ids), 250):
+                removed += ub.session.query(
+                    ub.KoboDeviceBookEntitlement,
+                ).filter(
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                    ub.KoboDeviceBookEntitlement.book_id.in_(
+                        unconfirmed_ids[offset:offset + 250]
+                    ),
+                ).delete(synchronize_session=False)
 
         kobo_sync_status.mark_device_entitlement_classification(
             device_ids, ENTITLEMENT_CLASSIFICATION_VERSION,
@@ -387,10 +558,10 @@ def _migrate_device_entitlement_classification(user_id):
 
     log.debug(
         "Kobo Sync classification migration: user=%s devices=%d "
-        "device_proven=%d rearmed=%d elapsed_ms=%.1f",
+        "legacy_new=%d rearmed=%d elapsed_ms=%.1f",
         user_id,
         len(device_ids),
-        device_proven,
+        len(confirmed_book_ids),
         removed,
         round((monotonic() - started) * 1000, 1),
     )

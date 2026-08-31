@@ -119,6 +119,24 @@ def user_library_membership_filter(app_session, metadata_session, user_id,
     return Books.id.notin_(membership_ids)
 
 
+def public_shelf_book_filter(app_session, metadata_session):
+    """Build a cross-database predicate for books on explicit public shelves."""
+    public_books = (app_session.query(ub.BookShelf.book_id)
+                    .join(ub.Shelf, ub.Shelf.id == ub.BookShelf.shelf)
+                    .filter(ub.Shelf.is_public == 1))
+    if _sqlite_json_available(app_session, metadata_session):
+        book_ids_json = (public_books.with_entities(
+            func.json_group_array(ub.BookShelf.book_id)
+        ).scalar() or "[]")
+        values = (func.json_each(book_ids_json)
+                  .table_valued("value")
+                  .alias("public_shelf_books"))
+        book_ids = select(values.c.value)
+    else:
+        book_ids = [int(row.book_id) for row in public_books.all()]
+    return Books.id.in_(book_ids)
+
+
 def _register_sqlite_udfs(dbapi_connection, _connection_record):
     """Register Python UDFs (lower, uuid4, title_sort) once per SQLite
     connection — installed as a SQLAlchemy ``connect`` event listener.
@@ -1752,6 +1770,7 @@ class CalibreDB:
         allow_show_hidden=False,
         extra_filter=None,
         allow_show_global=False,
+        allow_public_shelf_books=False,
         user=None,
     ):
         filter_user = user or current_user
@@ -1860,6 +1879,19 @@ class CalibreDB:
                 )
                 if cache is not None:
                     cache[user_id] = membership_filter
+            if allow_public_shelf_books:
+                public_shelf_filter = None
+                if has_request_context():
+                    public_shelf_filter = getattr(
+                        g, "_public_shelf_book_filter_cache", None
+                    )
+                if public_shelf_filter is None:
+                    public_shelf_filter = public_shelf_book_filter(
+                        ub.session, self.session
+                    )
+                    if has_request_context():
+                        g._public_shelf_book_filter_cache = public_shelf_filter
+                membership_filter = or_(membership_filter, public_shelf_filter)
         if extra_filter is None:
             extra_filter = true()
         return and_(lang_filter, pos_content_tags_filter, ~neg_content_tags_filter,
@@ -1923,6 +1955,7 @@ class CalibreDB:
         viewing_tag_id = kwargs.get('viewing_tag_id')
         allow_show_hidden = kwargs.get('allow_show_hidden', False)
         allow_show_global = kwargs.get('allow_show_global', False)
+        allow_public_shelf_books = kwargs.get('allow_public_shelf_books', False)
         extra_filter = kwargs.get('extra_filter')
         pagesize = pagesize or self.config.config_books_per_page
         if current_user.show_detail_random():
@@ -1941,6 +1974,7 @@ class CalibreDB:
                                                              viewing_tag_id=viewing_tag_id,
                                                              allow_show_hidden=allow_show_hidden,
                                                              allow_show_global=allow_show_global,
+                                                             allow_public_shelf_books=allow_public_shelf_books,
                                                              extra_filter=extra_filter))
                      .order_by(func.random())
                      .limit(self.config.config_random_books).all())
@@ -1984,6 +2018,7 @@ class CalibreDB:
                                         viewing_tag_id=viewing_tag_id,
                                         allow_show_hidden=allow_show_hidden,
                                         allow_show_global=allow_show_global,
+                                        allow_public_shelf_books=allow_public_shelf_books,
                                         extra_filter=extra_filter))
         entries = list()
         pagination = list()

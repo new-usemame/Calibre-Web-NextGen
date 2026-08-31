@@ -94,6 +94,7 @@ def shelf_detail(shelf_id):
         [ub.BookShelf.order.asc()],
         True, config.config_read_column,
         ub.BookShelf, ub.BookShelf.book_id == db.Books.id,
+        allow_public_shelf_books=bool(shelf.is_public),
     )
 
     body = serialize_shelf(shelf, pagination.total_count, is_owner=(shelf.user_id == _uid()))

@@ -736,7 +736,8 @@ def render_show_shelf(shelf_type, shelf_id, page_no, sort_param):
                                                            ub.BookShelf.shelf == shelf_id,
                                                            [ub.BookShelf.order.asc()],
                                                            True, config.config_read_column,
-                                                           ub.BookShelf, ub.BookShelf.book_id == db.Books.id)
+                                                           ub.BookShelf, ub.BookShelf.book_id == db.Books.id,
+                                                           allow_public_shelf_books=bool(shelf.is_public))
         # delete shelf entries where book is not existent anymore, can happen if book is deleted outside calibre-web
         wrong_entries = calibre_db.session.query(ub.BookShelf) \
             .join(db.Books, ub.BookShelf.book_id == db.Books.id, isouter=True) \
@@ -988,6 +989,20 @@ def _shelf_book_count(shelf, user=None):
     if books is None:
         return 0
     shelf_id = getattr(shelf, 'id', None)
+    if user is not None and shelf_id is not None:
+        try:
+            shelf_book_ids = [int(row.book_id) for row in (
+                ub.session.query(ub.BookShelf.book_id)
+                .filter(ub.BookShelf.shelf == shelf_id).all()
+            )]
+            return int(calibre_db.session.query(db.Books.id)
+                       .filter(db.Books.id.in_(shelf_book_ids))
+                       .filter(calibre_db.common_filters(
+                           allow_public_shelf_books=bool(shelf.is_public),
+                           user=user,
+                       )).count())
+        except Exception:
+            pass  # preserve the historical app-db-only fallback below
     if user is not None and not getattr(user, 'is_anonymous', False) and shelf_id is not None:
         try:
             archived_ids = (ub.session.query(ub.ArchivedBook.book_id)

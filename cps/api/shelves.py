@@ -239,13 +239,14 @@ def add_book_to_shelf_api(shelf_id, book_id):
         return _err("forbidden", "You are not allowed to add to this shelf", 403)
 
     try:
-        prepare_user_shelf_add(book_id)
+        prepare_user_shelf_add(shelf, book_id)
     except user_library.UserLibraryBookNotFound as ex:
         return _err("not_found", str(ex), 404)
-    except user_library.UserLibraryError:
+    except user_library.UserLibraryError as ex:
+        message = str(ex) or SHELF_MANAGED_MEMBERSHIP_REFUSAL
         return _err(
             "library_membership_rejected",
-            SHELF_MANAGED_MEMBERSHIP_REFUSAL,
+            message,
             403,
         )
 

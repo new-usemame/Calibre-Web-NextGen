@@ -84,31 +84,52 @@ SHELF_MANAGED_MEMBERSHIP_REFUSAL = (
     "This book is not in your library. Ask an administrator to add it to "
     "My Library before adding it to a shelf."
 )
+SHELF_OWNER_MANAGED_MEMBERSHIP_REFUSAL = (
+    "This book is not in the shelf owner's library. The shelf owner cannot "
+    "browse the global library; an administrator must add it to their My "
+    "Library first."
+)
 SHELF_MEMBERSHIP_REQUIRED = (
     "This book is not in your library. Add it to My Library before adding "
     "it to a shelf."
 )
 
 
-def prepare_user_shelf_add(book_id):
-    """Establish membership for an explicit user shelf-add gesture.
+def prepare_user_shelf_add(shelf_obj, book_id):
+    """Establish owner membership for an explicit regular-shelf add gesture.
 
     This deliberately lives above ``add_book_to_shelf``: the core is reused by
     non-gesture transports where an implicit My Library grant would be a wire
-    side effect. Existing members (including administrator-managed users) pass
-    without needing global browse permission; only a missing membership asks
-    ``user_library.add_book`` to apply the normal self-service add policy.
+    side effect. A shelf-add gesture follows the shelf owner rather than the
+    actor. Smart shelves never reach this path, and the type guard keeps that
+    invariant intact if a future caller passes one explicitly. Ownerless or
+    dangling-owner shelves remain usable without granting anyone membership.
     """
-    if user_library.mode_for_user(current_user) != constants.LIBRARY_MODE_PERSONAL:
+    if not isinstance(shelf_obj, ub.Shelf) or shelf_obj.user_id is None:
+        return
+    try:
+        owner_id = int(shelf_obj.user_id)
+    except (TypeError, ValueError):
+        return
+    shelf_owner = (ub.session.query(ub.User)
+                   .filter(ub.User.id == owner_id).first())
+    if shelf_owner is None:
+        return
+    if user_library.mode_for_user(shelf_owner) != constants.LIBRARY_MODE_PERSONAL:
         return
     membership = (ub.session.query(ub.UserLibraryBook)
-                  .filter(ub.UserLibraryBook.user_id == int(current_user.id),
+                  .filter(ub.UserLibraryBook.user_id == owner_id,
                           ub.UserLibraryBook.book_id == int(book_id)).first())
     if membership is not None:
         return
-    if not current_user.role_browse_global():
-        raise user_library.UserLibraryError(SHELF_MANAGED_MEMBERSHIP_REFUSAL)
-    user_library.add_book(current_user, book_id)
+    if not shelf_owner.role_browse_global():
+        message = (
+            SHELF_MANAGED_MEMBERSHIP_REFUSAL
+            if owner_id == int(current_user.id)
+            else SHELF_OWNER_MANAGED_MEMBERSHIP_REFUSAL
+        )
+        raise user_library.UserLibraryError(message)
+    user_library.add_book(shelf_owner, book_id)
 
 
 def add_book_to_shelf(shelf_obj, book_id):
@@ -122,9 +143,18 @@ def add_book_to_shelf(shelf_obj, book_id):
                                              ub.BookShelf.book_id == book_id).first():
         return SHELF_ALREADY_PRESENT, "Book is already part of the shelf: %s" % shelf_obj.name
 
+    actor_owns_shelf = (
+        shelf_obj.user_id is not None
+        and int(shelf_obj.user_id) == int(current_user.id)
+    )
+    visibility_filter = (
+        calibre_db.common_filters()
+        if actor_owns_shelf
+        else calibre_db.common_filters(allow_show_global=True)
+    )
     book = (calibre_db.session.query(db.Books)
             .filter(db.Books.id == book_id)
-            .filter(calibre_db.common_filters()).one_or_none())
+            .filter(visibility_filter).one_or_none())
     if not book:
         visible_global_book = (calibre_db.session.query(db.Books.id)
                                .filter(db.Books.id == book_id)
@@ -184,20 +214,28 @@ def add_to_shelf(shelf_id, book_id):
         return "Sorry you are not allowed to add a book to the that shelf", 403
 
     try:
-        prepare_user_shelf_add(book_id)
+        prepare_user_shelf_add(shelf, book_id)
     except user_library.UserLibraryBookNotFound:
         message = "Book not found in the visible global library."
         if not xhr:
             flash(_("Book not found in the visible global library."), category="error")
             return redirect(request.environ.get("HTTP_REFERER") or url_for('web.index'))
         return message, 404
-    except user_library.UserLibraryError:
-        message = SHELF_MANAGED_MEMBERSHIP_REFUSAL
+    except user_library.UserLibraryError as ex:
+        message = str(ex) or SHELF_MANAGED_MEMBERSHIP_REFUSAL
+        if message == SHELF_OWNER_MANAGED_MEMBERSHIP_REFUSAL:
+            message = _(
+                "This book is not in the shelf owner's library. The shelf owner "
+                "cannot browse the global library; an administrator must add it "
+                "to their My Library first."
+            )
+        else:
+            message = _(
+                "This book is not in your library. Ask an administrator to add it "
+                "to My Library before adding it to a shelf."
+            )
         if not xhr:
-            flash(_(
-                "This book is not in your library. Ask an administrator to add it to "
-                "My Library before adding it to a shelf."
-            ), category="error")
+            flash(message, category="error")
             return redirect(request.environ.get("HTTP_REFERER") or url_for('web.index'))
         return message, 403
 

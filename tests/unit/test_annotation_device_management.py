@@ -297,7 +297,9 @@ def test_device_list_exposes_the_latest_storage_snapshot(session):
 
     assert listed["storage_free"] == 800
     assert listed["storage_total"] == 2000
-    assert listed["storage_observed"] == latest.observed_at.isoformat()
+    assert listed["storage_observed"] == latest.observed_at.replace(
+        tzinfo=timezone.utc,
+    ).isoformat()
 
 
 def test_user_can_request_deletion_only_for_a_named_item_on_their_device(
@@ -601,7 +603,9 @@ def test_device_list_uses_latest_inventory_report_without_deleting_history(sessi
     listed = list_annotation_devices(user_id=7, session=session)[0]
 
     assert listed["inventory_count"] == 1
-    assert listed["inventory_observed"] == latest.observed_at.isoformat()
+    assert listed["inventory_observed"] == latest.observed_at.replace(
+        tzinfo=timezone.utc,
+    ).isoformat()
     assert session.query(ub.DeviceInventoryItem).count() == 2
 
 
@@ -812,7 +816,7 @@ def test_device_summary_counts_only_visible_origin_rows_positions_and_seed_cover
         "notes": 1,
         "dogears": 1,
         "books_with_position": 1,
-        "last_position_at": now.replace(tzinfo=None).isoformat(),
+        "last_position_at": now.astimezone(timezone.utc).isoformat(),
         "seeded_books": 1,
         "unseeded_books": 1,
     }

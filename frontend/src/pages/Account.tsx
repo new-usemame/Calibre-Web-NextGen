@@ -237,7 +237,12 @@ export function Account() {
             {devices.data.devices.map((device) => <li key={device.public_id}>{device.label} · {t('{n} highlights and notes', { n: device.annotation_count })}</li>)}
           </ul>
         ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
-        <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
+        <div className={styles.deviceLinks}>
+          <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
+          <Link href="/account/devices#kobo-pairing" className={styles.manageDevices}>
+            {t('Pair a Kobo or KOReader')}
+          </Link>
+        </div>
       </section>
 
       <section className={styles.card} aria-labelledby="library-contents-title">

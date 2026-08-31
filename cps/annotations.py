@@ -191,6 +191,22 @@ def _device_kind_label(kind):
     }.get(kind, "E-reader")
 
 
+def _device_timestamp_json(value):
+    """Serialize database datetimes as unambiguous UTC API instants.
+
+    SQLite returns naive values for these columns. They represent UTC, so
+    attaching UTC here prevents JavaScript from interpreting them in the
+    browser's local timezone. Aware values are normalized to the same contract.
+    """
+    if value is None or not isinstance(value, datetime):
+        return value
+    if value.tzinfo is None or value.utcoffset() is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+    return value.isoformat()
+
+
 def _empty_authority_rollup():
     return {**{status: 0 for status in AUTHORITY_STATUSES}, "books_partially_seeded": 0}
 
@@ -208,8 +224,8 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
         "kind_label": _device_kind_label(device.kind),
         "model": device.model,
         "firmware": device.firmware_version,
-        "first_seen": device.first_seen_at.isoformat() if device.first_seen_at else None,
-        "last_seen": device.last_seen_at.isoformat() if device.last_seen_at else None,
+        "first_seen": _device_timestamp_json(device.first_seen_at),
+        "last_seen": _device_timestamp_json(device.last_seen_at),
         "annotation_count": int(annotation_count),
         "highlights": int(annotation_counts.get("highlight", 0)),
         "notes": int(annotation_counts.get("note", 0)),
@@ -218,23 +234,18 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
             inventory_count if inventory_count is not None
             else inventory_report.item_count if inventory_report else 0
         ),
-        "inventory_observed": (
-            inventory_report.observed_at.isoformat()
-            if inventory_report and inventory_report.observed_at else None
+        "inventory_observed": _device_timestamp_json(
+            inventory_report.observed_at if inventory_report else None
         ),
         "storage_free": storage_snapshot.free_bytes if storage_snapshot else None,
         "storage_total": storage_snapshot.total_bytes if storage_snapshot else None,
-        "storage_observed": (
-            storage_snapshot.observed_at.isoformat()
-            if storage_snapshot and storage_snapshot.observed_at else None
+        "storage_observed": _device_timestamp_json(
+            storage_snapshot.observed_at if storage_snapshot else None
         ),
         "seeded_books": int(seeded_books),
         "unseeded_books": int(unseeded_books),
         "books_with_position": int(books_with_position),
-        "last_position_at": (
-            last_position_at.isoformat()
-            if hasattr(last_position_at, "isoformat") else last_position_at
-        ),
+        "last_position_at": _device_timestamp_json(last_position_at),
         "authority": authority_rollup or _empty_authority_rollup(),
         "can_receive_books": device.kind in ("kobo", "koreader"),
         "active": bool(device.active),

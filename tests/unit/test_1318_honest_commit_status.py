@@ -217,6 +217,7 @@ def _returns_error_status_on_failed_commit(node):
     ("cps/web.py", "set_bookmark"),
     ("cps/api/reader.py", "save_bookmark"),
     ("cps/kobo_auth.py", "delete_auth_token"),
+    ("cps/api/kobo_pairing.py", "delete_kobo_sync_token"),
     ("cps/admin.py", "edit_domain"),
 ])
 def test_write_routes_answer_an_error_when_the_write_did_not_land(module_path, func_name):
@@ -263,6 +264,28 @@ def test_save_bookmark_answers_500_when_the_commit_fails(monkeypatch):
                                    json={"bookmark": "epubcfi(/6/2)", "format": "epub"})
 
     assert response.status_code == 500
+
+
+@pytest.mark.unit
+def test_delete_auth_token_answers_500_when_the_revocation_commit_fails(monkeypatch):
+    """The shared helper stages the deletion, but the classic route owns the
+    success response and therefore must check whether its commit landed."""
+    import flask
+    from cps import kobo_auth
+
+    staged = MagicMock()
+    monkeypatch.setattr(kobo_auth, "revoke_auth_token", staged)
+    monkeypatch.setattr(kobo_auth.ub, "session_commit", lambda *a, **k: False)
+
+    app = flask.Flask(__name__)
+    with app.test_request_context("/kobo_auth/deleteauthtoken/7", method="POST"), \
+            patch.object(kobo_auth, "current_user", SimpleNamespace(
+                id=7, role_admin=lambda: False,
+            )):
+        response = inspect.unwrap(kobo_auth.delete_auth_token)(7)
+
+    assert response == ("", 500)
+    staged.assert_called_once_with(7)
 
 
 @pytest.mark.unit

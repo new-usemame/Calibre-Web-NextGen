@@ -7661,6 +7661,186 @@ msgstr "← Terug naar inloggen"
 msgid "← Library"
 msgstr "← Bibliotheek"
 
+#: cps/spa_strings.py
+msgid "Add or replace this line in the [OneStoreServices] section:"
+msgstr ""
+"Voeg deze regel toe aan de sectie [OneStoreServices], of vervang de "
+"bestaande regel:"
+
+#: cps/spa_strings.py
+msgid "Check again"
+msgstr "Opnieuw controleren"
+
+#: cps/spa_strings.py
+msgid ""
+"Choose Login and sign in with this NextGen account or one of its app "
+"passwords."
+msgstr ""
+"Kies ‘Login’ en meld je aan met dit NextGen-account of een van de app-"
+"wachtwoorden."
+
+#: cps/spa_strings.py
+msgid ""
+"Connect the Kobo to a computer and open .kobo/Kobo/Kobo eReader.conf in a "
+"text editor."
+msgstr ""
+"Sluit de Kobo aan op een computer en open .kobo/Kobo/Kobo eReader.conf in "
+"een teksteditor."
+
+#: cps/spa_strings.py
+msgid ""
+"Connect this account to an e-reader, then sync once to confirm it reached "
+"your library."
+msgstr ""
+"Koppel dit account aan een e-reader en synchroniseer eenmaal om te "
+"controleren of de e-reader verbinding met je bibliotheek kan maken."
+
+#: cps/spa_strings.py
+msgid "Copied"
+msgstr "Gekopieerd"
+
+#: cps/spa_strings.py
+msgid "Copied to clipboard."
+msgstr "Naar het klembord gekopieerd."
+
+#: cps/spa_strings.py
+msgid "Copy server address"
+msgstr "Serveradres kopiëren"
+
+#: cps/spa_strings.py
+msgid "Copy sync URL"
+msgstr "Synchronisatie-URL kopiëren"
+
+#: cps/spa_strings.py
+msgid "Could not copy. Select the address and copy it manually."
+msgstr "Kopiëren mislukt. Selecteer het adres en kopieer het handmatig."
+
+#: cps/spa_strings.py
+msgid "Could not delete the Kobo sync URL."
+msgstr "De Kobo-synchronisatie-URL kon niet worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Could not load pairing details."
+msgstr "De koppelingsgegevens konden niet worden geladen."
+
+#: cps/spa_strings.py
+msgid "Delete sync URL"
+msgstr "Synchronisatie-URL verwijderen"
+
+#: cps/spa_strings.py
+msgid ""
+"Delete this Kobo sync URL? The current URL will stop working on every paired "
+"Kobo."
+msgstr ""
+"Deze Kobo-synchronisatie-URL verwijderen? De huidige URL werkt daarna niet "
+"meer op gekoppelde Kobo’s."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Device seen: {name}, last synced {when}. Pairing is working."
+msgstr ""
+"Apparaat gedetecteerd: {name}, voor het laatst gesynchroniseerd {when}. De "
+"koppeling werkt."
+
+#: cps/spa_strings.py
+msgid ""
+"Generate a private sync URL for this account. You can delete it at any time."
+msgstr ""
+"Genereer een privé-synchronisatie-URL voor dit account. Je kunt deze op elk "
+"moment verwijderen."
+
+#: cps/spa_strings.py
+msgid "Generate sync URL"
+msgstr "Synchronisatie-URL genereren"
+
+#: cps/spa_strings.py
+msgid "Generating…"
+msgstr "Genereren…"
+
+#: cps/spa_strings.py
+msgid "In KOReader, open NextGen Progress Sync and choose Set NextGen Server."
+msgstr "Open in KOReader NextGen Progress Sync en kies ‘Set NextGen Server’."
+
+#: cps/spa_strings.py
+msgid "Install or update the NextGen Sync plugin."
+msgstr "Installeer de NextGen Sync-plug-in of werk deze bij."
+
+#: cps/spa_strings.py
+msgid "Kobo sync is not enabled on this server."
+msgstr "Kobo-synchronisatie is niet ingeschakeld op deze server."
+
+#: cps/spa_strings.py
+msgid "Kobo sync URL deleted."
+msgstr "Kobo-synchronisatie-URL verwijderd."
+
+#: cps/spa_strings.py
+msgid "Kobo sync URL ready."
+msgstr "Kobo-synchronisatie-URL is klaar."
+
+#: cps/spa_strings.py
+msgid "Loading pairing details…"
+msgstr "Koppelingsgegevens laden…"
+
+#: cps/spa_strings.py
+msgid ""
+"Open NextGen using an address your e-reader can reach before copying these "
+"settings. Localhost only points back to the device itself."
+msgstr ""
+"Open NextGen via een adres dat je e-reader kan bereiken voordat je deze "
+"instellingen kopieert. Localhost verwijst alleen naar het apparaat zelf."
+
+#: cps/spa_strings.py
+msgid "Pair a Kobo or KOReader"
+msgstr "Een Kobo of KOReader koppelen"
+
+#: cps/spa_strings.py
+msgid "Pair an e-reader"
+msgstr "Een e-reader koppelen"
+
+#: cps/spa_strings.py
+msgid "Paste this server address (the plugin adds /kosync itself):"
+msgstr "Plak dit serveradres (de plug-in voegt zelf /kosync toe):"
+
+#: cps/spa_strings.py
+msgid "Run a sync from the plugin."
+msgstr "Start een synchronisatie vanuit de plug-in."
+
+#: cps/spa_strings.py
+msgid "Save the file, safely eject the Kobo, then restart it."
+msgstr ""
+"Sla het bestand op, werp de Kobo veilig uit en start de Kobo daarna opnieuw "
+"op."
+
+#: cps/spa_strings.py
+msgid "Stock Kobo"
+msgstr "Kobo met standaardsoftware"
+
+#: cps/spa_strings.py
+msgid "Stock Kobo sync URL"
+msgstr "Synchronisatie-URL voor Kobo met standaardsoftware"
+
+#: cps/spa_strings.py
+msgid "Tap Sync on the Kobo. Your NextGen books should appear."
+msgstr ""
+"Tik op ‘Synchroniseren’ op de Kobo. Je NextGen-boeken zouden moeten "
+"verschijnen."
+
+#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
+msgid "Try again"
+msgstr "Opnieuw proberen"
+
+#: cps/spa_strings.py
+msgid "Waiting for a Kobo or KOReader to sync with this account."
+msgstr "Wachten tot een Kobo of KOReader met dit account synchroniseert."
+
+#: cps/spa_strings.py
+msgid "Could not update pairing details."
+msgstr "De koppelingsgegevens konden niet worden bijgewerkt."
+
+#: cps/spa_strings.py
+msgid "No new device check-in yet."
+msgstr "Nog geen nieuwe apparaatactiviteit."
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Wachten"
@@ -11712,10 +11892,6 @@ msgstr ""
 msgid ""
 "No problem — your feedback wasn’t saved anywhere. You can close this or try "
 "again."
-msgstr ""
-
-#: cps/templates/cwng_feedback_popup.html
-msgid "Try again"
 msgstr ""
 
 #: cps/templates/cwng_feedback_popup.html

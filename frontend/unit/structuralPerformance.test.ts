@@ -47,6 +47,7 @@ test('catalog owns one stable measured grid node and delegates its cards to the 
   assert.equal(gridTestIds.length, 1);
   assert.match(catalog, /new ResizeObserver\(\(\) => \{[\s\S]*?measure\(\);[\s\S]*?scheduleMeasure\(\);/);
   assert.match(catalog, /measureCatalogColumnCount\(\{[\s\S]*?gridTemplateColumns:[\s\S]*?gridWidth:/);
+  assert.match(catalog, /columnGap: Number\.parseFloat\(style\.columnGap\)/);
   assert.match(catalog, /requestAnimationFrame\([\s\S]*?document\.fonts\?\.ready/);
   assert.match(catalog, /setTimeout\(\(\) => \{[\s\S]*?measureGridRef\.current\(\);[\s\S]*?setGridMeasured\(true\)/);
   assert.match(catalog, /<VirtualizedGridRows[\s\S]*?columnCount=\{columnCount\}/);

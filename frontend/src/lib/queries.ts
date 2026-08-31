@@ -17,6 +17,7 @@ import type {
   NoticeInbox, KoboTwoWaySettings, KoboTwoWayBookState, KoboTwoWayUpdate,
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
   DeviceDeliveryResult,
+  KoboSyncToken,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
@@ -1291,6 +1292,37 @@ export function useRevokeAppPassword() {
   return useMutation({
     mutationFn: (id: number) => apiPost(`/api/v1/account/app-passwords/${id}/delete`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['account'] }),
+  });
+}
+
+// ── Kobo / KOReader pairing ─────────────────────────────────────────────────
+
+const KOBO_SYNC_TOKEN_KEY = ['kobo-sync-token'] as const;
+
+export function useKoboSyncToken(enabled = true) {
+  return useQuery<KoboSyncToken>({
+    queryKey: KOBO_SYNC_TOKEN_KEY,
+    queryFn: () => apiGet<KoboSyncToken>('/api/v1/account/kobo-sync-token'),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useCreateKoboSyncToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<KoboSyncToken>('/api/v1/account/kobo-sync-token'),
+    onSuccess: (data) => qc.setQueryData(KOBO_SYNC_TOKEN_KEY, data),
+  });
+}
+
+export function useDeleteKoboSyncToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete('/api/v1/account/kobo-sync-token'),
+    onSuccess: () => qc.setQueryData<KoboSyncToken>(KOBO_SYNC_TOKEN_KEY, (old) => (
+      old ? { ...old, configured: false, sync_url: null } : old
+    )),
   });
 }
 

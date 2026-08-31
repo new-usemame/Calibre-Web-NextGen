@@ -3,7 +3,7 @@
 .back:hover { color: var(--accent); }
 .heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .heading svg { color: var(--accent); }
-.heading h1, .card h2, .setup h2, .empty h2 { margin: 0; }
+.heading h1, .card h2, .empty h2 { margin: 0; }
 .list { list-style: none; display: grid; gap: var(--sp-3); margin: 0; padding: 0; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-4); }
 .pagination button { min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
@@ -90,10 +90,63 @@
 .renameForm button { padding: 0 var(--sp-3); border: 1px solid var(--border); color: var(--text); }
 .renameForm button[type='submit'] { color: var(--accent-text); background: var(--accent-soft); }
 .renameForm button:disabled { opacity: .55; cursor: default; }
-.setup, .empty { margin-top: var(--sp-5); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); }
-.setup p, .empty p { color: var(--text-muted); }
-.setup a, .empty a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: 3px; }
-.setup a:hover, .empty a:hover { color: var(--accent-hover); }
+.empty { margin-top: var(--sp-5); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); }
+.empty p { color: var(--text-muted); }
+.empty a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: 3px; }
+.empty a:hover { color: var(--accent-hover); }
+.pairing {
+  margin-top: var(--sp-5); padding: var(--sp-5); border: 1px solid var(--border);
+  border-radius: var(--r-lg); background: var(--surface-1);
+}
+.pairing h2 { margin: 0; }
+.pairing h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-md); }
+.pairingIntro, .pairingStart p { color: var(--text-muted); line-height: var(--lh-base); }
+.pairingStatus { color: var(--text-muted); }
+.pairingAlert {
+  padding: var(--sp-3) var(--sp-4); color: var(--text); background: var(--danger-soft);
+  border: 1px solid var(--danger-border); border-radius: var(--r-md); line-height: var(--lh-base);
+}
+.primaryButton, .pairingUrlRow button, .deleteTokenButton, .deviceSeen button, .deviceWaiting button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border);
+  border-radius: var(--r-md); color: var(--text); font-weight: var(--fw-medium);
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.primaryButton { color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent); }
+.primaryButton:hover, .pairingUrlRow button:hover, .deviceSeen button:hover, .deviceWaiting button:hover { background: var(--surface-3); border-color: var(--border-strong); }
+.primaryButton:disabled, .deleteTokenButton:disabled { opacity: .6; cursor: default; }
+.pairingUrlBlock { margin-top: var(--sp-4); }
+.pairingLabel { margin: 0 0 var(--sp-2); font-weight: var(--fw-bold); }
+.pairingUrlRow { display: flex; align-items: stretch; gap: var(--sp-2); min-width: 0; }
+.pairingUrlRow code, .configLine {
+  display: block; min-width: 0; padding: var(--sp-3); color: var(--text);
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--r-md);
+  overflow-wrap: anywhere; user-select: all;
+}
+.pairingUrlRow code { flex: 1; }
+.pairingUrlRow button { flex: 0 0 auto; }
+.pairingColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); margin-top: var(--sp-5); }
+.pairingColumns > div { min-width: 0; padding: var(--sp-4); background: var(--surface-2); border-radius: var(--r-md); }
+.pairingColumns ol { margin: var(--sp-2) 0; padding-left: var(--sp-5); color: var(--text-muted); line-height: var(--lh-relaxed); }
+.pairingColumns li + li { margin-top: var(--sp-2); }
+.pairingColumns a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
+.configLine { margin: var(--sp-3) 0; }
+.deleteTokenButton {
+  /* --danger is 4.15:1 on this card's --surface-2 in the dark palette, so it
+     remains the non-text destructive cue while the small label uses AA text. */
+  margin-top: var(--sp-4); color: var(--text); border-color: var(--danger);
+}
+.deleteTokenButton svg { color: var(--danger); }
+.deleteTokenButton:hover { background: var(--danger-soft); border-color: var(--danger); }
+.deviceSeen, .deviceWaiting {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+  gap: var(--sp-3); margin-top: var(--sp-5); padding: var(--sp-4);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2);
+}
+.deviceSeen { border-color: var(--success-border); background: var(--success-soft); }
+.deviceSeen > svg { color: var(--success); }
+.deviceSeen p, .deviceWaiting p { margin: 0; line-height: var(--lh-base); }
+.copyError { min-height: 1.5em; margin: var(--sp-2) 0 0; color: var(--danger); font-size: var(--fs-sm); }
 .scrim { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: var(--sp-4); background: var(--overlay-backdrop); }
 .dialog { width: min(520px, 100%); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--elev-3); }
 .dialog h2 { font-size: var(--fs-lg); }
@@ -116,5 +169,11 @@
   .dialogActions { flex-direction: column-reverse; }
   .dialogActions button { width: 100%; }
   .pagination { justify-content: space-between; }
+  .pairing { padding: var(--sp-4); }
+  .pairingColumns { grid-template-columns: 1fr; }
+  .pairingUrlRow { flex-direction: column; }
+  .pairingUrlRow button { width: 100%; }
+  .deviceSeen, .deviceWaiting { grid-template-columns: auto minmax(0, 1fr); }
+  .deviceSeen button, .deviceWaiting button { grid-column: 1 / -1; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

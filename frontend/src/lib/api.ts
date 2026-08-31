@@ -372,6 +372,15 @@ export interface Account {
   library_mode_managed: boolean;
 }
 
+/** Stock-Kobo credential plus the non-secret server address KOReader expects. */
+export interface KoboSyncToken {
+  user_id: number;
+  configured: boolean;
+  sync_url: string | null;
+  server_url: string;
+  is_localhost: boolean;
+}
+
 export interface ProfileUpdate {
   email?: string;
   kindle_mail?: string;

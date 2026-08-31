@@ -34,6 +34,7 @@
 .deviceSummary { margin: 0 0 var(--sp-3); padding-left: var(--sp-5); color: var(--text-muted); }
 .deviceSummary li + li { margin-top: var(--sp-1); }
 .muted { margin: 0 0 var(--sp-3); color: var(--text-muted); }
+.deviceLinks { display: flex; flex-wrap: wrap; gap: 0 var(--sp-4); }
 .manageDevices { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: var(--fw-medium); }
 
 /* Identity */

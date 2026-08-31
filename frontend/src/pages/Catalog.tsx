@@ -367,6 +367,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         gridTemplateColumns: style.gridTemplateColumns,
         gridWidth: bounds.width,
         minColumnWidth: Number.parseFloat(style.getPropertyValue('--catalog-grid-min')),
+        columnGap: Number.parseFloat(style.columnGap),
       });
       // Zero width or an absent track list is no measurement. Keep the query
       // gate closed (until its fail-open timer) and retain the last known count;

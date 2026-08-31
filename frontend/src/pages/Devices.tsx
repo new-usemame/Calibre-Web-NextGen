@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { ChevronLeft, MoreHorizontal, Pencil, Smartphone } from 'lucide-react';
-import { apiDelete, apiGet, apiPatch, apiPost, apiUrl } from '../lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
+import { useMe } from '../lib/queries';
 import { clampOffset } from '../lib/pagination';
-import { relativeWhen } from '../lib/relativeTime';
+import { parseApiTimestamp, relativeWhen } from '../lib/relativeTime';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { useT } from '../lib/i18n';
 import { EmptyState } from '../components/EmptyState';
 import { SpinnerCentered } from '../components/Spinner';
 import { DeviceInventory, type Device } from '../components/DeviceInventory';
+import { KoboPairing } from '../components/KoboPairing';
 import styles from './Devices.module.css';
 
 interface Counts { origin_count: number; assigned_count: number }
@@ -21,6 +23,12 @@ function formatStorage(bytes: number): string {
   const gibibytes = bytes / (1024 ** 3);
   if (gibibytes >= 1) return `${gibibytes.toFixed(1)} GB`;
   return `${(bytes / (1024 ** 2)).toFixed(1)} MB`;
+}
+
+function isDeviceStale(lastSeen: string | null): boolean {
+  if (!lastSeen) return false;
+  const timestamp = parseApiTimestamp(lastSeen);
+  return timestamp !== null && Date.now() - timestamp > 30 * 86400000;
 }
 
 function RemoveDialog({ device, counts, onCancel, onRemove }: {
@@ -67,6 +75,7 @@ export function Devices() {
   const t = useT();
   const announce = useAnnouncer();
   const queryClient = useQueryClient();
+  const me = useMe().data;
   const [editing, setEditing] = useState<string | null>(null);
   const [label, setLabel] = useState('');
   const [menu, setMenu] = useState<string | null>(null);
@@ -145,7 +154,7 @@ export function Devices() {
         <section className={styles.empty}>
           <h2>{t('No e-readers yet.')}</h2>
           <p>{t('Devices appear here after their first sync.')}</p>
-          <a href={apiUrl('/me')}>{t('Set up Kobo sync')}</a>
+          <a href="#kobo-pairing">{t('Pair an e-reader')}</a>
         </section>
       ) : (
         <>
@@ -168,7 +177,7 @@ export function Devices() {
                 ) : <h2><Link href={`/account/devices/${device.public_id}`}>{device.label}</Link></h2>}
                 <p className={styles.deviceMeta}>{[device.model, device.firmware && `FW ${device.firmware}`].filter(Boolean).join(' · ')}</p>
                 <p className={styles.deviceStats}>{t('{n} highlights and notes', { n: device.annotation_count })} · {t('Last seen {when}', { when: relativeWhen(device.last_seen) })}
-                  {device.last_seen && Date.now() - new Date(device.last_seen).getTime() > 30 * 86400000 && <> <span className={styles.stalePill}>{t('Not seen lately')}</span></>}</p>
+                  {isDeviceStale(device.last_seen) && <> <span className={styles.stalePill}>{t('Not seen lately')}</span></>}</p>
                 <p className={styles.deviceMeta}>{t('{n} books in latest inventory', { n: device.inventory_count })}</p>
                 {device.storage_free !== null && device.storage_total !== null && (
                   <p className={styles.storage}>
@@ -249,20 +258,7 @@ export function Devices() {
           )}
         </>
       )}
-      <section className={styles.setup}>
-        <h2>{t('Kobo setup')}</h2>
-        <p>{t('Manage your Kobo sync URL in the classic account page.')}</p>
-        <a href={apiUrl('/me')}>{t('Set up Kobo sync')}</a>
-      </section>
-      {/* The KOReader plugin reports the inventory and storage figures this page
-          displays, but its setup page was reachable only from the classic admin
-          screen. Now that the SPA is the default surface, a KOReader user could
-          land here with no route to the plugin download or install steps. Both
-          strings are existing catalog entries, so this ships translated. */}
-      <section className={styles.setup}>
-        <h2>{t('KOReader Sync Plugin')}</h2>
-        <a href={apiUrl('/kosync')}>{t('Setup KOReader Sync')}</a>
-      </section>
+      <KoboPairing devices={devices} enabled={!!me?.features?.kobo_sync} />
       {undoDevice && <div className={styles.toast} role="status">
         <span>{t('{name} removed.', { name: undoDevice.label })}</span>
         <button type="button" onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>

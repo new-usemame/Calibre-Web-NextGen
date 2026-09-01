@@ -19,6 +19,7 @@ from types import SimpleNamespace
 import flask
 import jinja2
 import pytest
+from lxml import html
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -811,7 +812,67 @@ def test_settings_writer_silently_preserves_schedule_when_field_is_absent(
     assert "Ignoring unrecognized Hardcover auto-fetch schedule" not in caplog.text
 
 
+def _rendered_auto_fetch_schedule_value(cwa_settings):
+    template = (REPO_ROOT / "cps/templates/cwa_settings.html").read_text(
+        encoding="utf-8"
+    )
+    select_start = template.index(
+        '<select name="hardcover_auto_fetch_schedule"'
+    )
+    select_end = template.index("</select>", select_start) + len("</select>")
+    select_template = jinja2.Environment(autoescape=True).from_string(
+        template[select_start:select_end]
+    )
+    rendered = select_template.render(
+        _=lambda text: text,
+        cwa_settings=cwa_settings,
+        hardcover_token_available=True,
+    )
+    select = html.fromstring(rendered)
+    options = select.xpath(".//option")
+    explicitly_selected = select.xpath(".//option[@selected]")
+    effective_option = explicitly_selected[0] if explicitly_selected else options[0]
+    return (
+        [option.get("value") for option in explicitly_selected],
+        effective_option.get("value"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("stored_value", "remove_stored_key"),
+    [
+        pytest.param("fortnightly", False, id="unrecognized"),
+        pytest.param(None, True, id="missing"),
+    ],
+)
+def test_rendered_auto_fetch_schedule_matches_scheduler_fallback(
+    schedule_settings_client, stored_value, remove_stored_key
+):
+    from cps import schedule
+
+    client, settings_db = schedule_settings_client
+    if remove_stored_key:
+        settings_db.stored.pop("hardcover_auto_fetch_schedule")
+    else:
+        settings_db.stored["hardcover_auto_fetch_schedule"] = stored_value
+
+    response = client.get("/cwa-settings")
+
+    assert response.status_code == 200
+    rendered_settings = response.get_json()["settings"]
+    explicitly_selected, effective_value = _rendered_auto_fetch_schedule_value(
+        rendered_settings
+    )
+    assert effective_value == schedule.DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE
+    assert effective_value == schedule.resolve_hardcover_auto_fetch_schedule(
+        stored_value
+    )
+    assert explicitly_selected == [effective_value]
+
+
 def test_auto_fetch_ui_has_first_off_option_and_truthful_status_combinations():
+    from cps import schedule
+
     template = (REPO_ROOT / "cps/templates/cwa_settings.html").read_text(
         encoding="utf-8"
     )
@@ -820,7 +881,15 @@ def test_auto_fetch_ui_has_first_off_option_and_truthful_status_combinations():
     )[1].split("</select>", 1)[0]
     option_values = re.findall(r'<option value="([^"]+)"', select)
     assert option_values[0] == "never"
+    assert frozenset(option_values) == schedule.HARDCOVER_AUTO_FETCH_SCHEDULES
     assert "{{_('Never (auto-fetch off)')}}" in select
+
+    for schedule_value in ("weekly", "never"):
+        explicitly_selected, effective_value = _rendered_auto_fetch_schedule_value(
+            {"hardcover_auto_fetch_schedule": schedule_value}
+        )
+        assert effective_value == schedule_value
+        assert explicitly_selected == [schedule_value]
 
     status_source = template.split(
         '<p class="cwa-settings-tooltip" role="status">', 1

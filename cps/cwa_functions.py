@@ -46,7 +46,7 @@ JSON_SETTINGS = _cwa_db_module.JSON_SETTINGS
 from .services.background_scheduler import BackgroundScheduler, DateTrigger
 from .schedule import (
     DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE,
-    HARDCOVER_AUTO_FETCH_SCHEDULES,
+    resolve_hardcover_auto_fetch_schedule,
 )
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 # TaskReconnectDatabase deliberately not imported here — the post-ingest
@@ -859,7 +859,7 @@ def set_cwa_settings():
                             setting,
                             DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE,
                         )
-                    elif value not in HARDCOVER_AUTO_FETCH_SCHEDULES:
+                    elif resolve_hardcover_auto_fetch_schedule(value) != value:
                         log.warning(
                             "Ignoring unrecognized Hardcover auto-fetch schedule %r",
                             value,
@@ -1146,9 +1146,15 @@ def set_cwa_settings():
 
 
     next_scan_run = get_next_duplicate_scan_run(cwa_settings)
+    rendered_cwa_settings = dict(cwa_settings)
+    rendered_cwa_settings['hardcover_auto_fetch_schedule'] = (
+        resolve_hardcover_auto_fetch_schedule(
+            cwa_settings.get('hardcover_auto_fetch_schedule')
+        )
+    )
 
     return render_title_template("cwa_settings.html", title=_("Calibre-Web NextGen User Settings"), page="cwa-settings",
-                                    cwa_settings=cwa_settings, ignorable_formats=ignorable_formats, target_formats=target_formats,
+                                    cwa_settings=rendered_cwa_settings, ignorable_formats=ignorable_formats, target_formats=target_formats,
                                     automerge_options=automerge_options, autoingest_options=autoingest_options,
                                     hardcover_token_available=hardcover_token_available,
                                     next_duplicate_scan_run=next_scan_run,

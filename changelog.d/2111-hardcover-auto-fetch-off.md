@@ -6,5 +6,5 @@
   Hardcover Sync, which turned off all three. Reported by @magdalar.
 - **An unrecognized Hardcover auto-fetch schedule is now diagnosed instead of silently doing
   nothing.** A stored value the scheduler does not recognize is logged and falls back to the weekly
-  default, and the settings page refuses to persist an unrecognized value in place of the one you
-  already had.
+  default, the Run Schedule control displays that effective weekly fallback, and the settings page
+  refuses to persist an unrecognized value in place of the one you already had.

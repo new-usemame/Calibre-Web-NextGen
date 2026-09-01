@@ -572,13 +572,13 @@
       <div style="margin-top: 20px;">
         <p class="cwa-settings-tooltip" role="status">
           {% if config.hardcover_sync_enabled() %}
-            {% if cwa_settings.get('hardcover_auto_fetch_schedule', 'weekly') == 'never' %}
+            {% if cwa_settings['hardcover_auto_fetch_schedule'] == 'never' %}
               {{_('Hardcover auto-fetch is off. Reading-progress and annotation sync are unaffected.')}}
             {% else %}
               {{_('Hardcover sync is enabled. The schedule below controls automatic ID fetching.')}}
             {% endif %}
           {% else %}
-            {% if cwa_settings.get('hardcover_auto_fetch_schedule', 'weekly') == 'never' %}
+            {% if cwa_settings['hardcover_auto_fetch_schedule'] == 'never' %}
               {{_('Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync separately in Basic Configuration when you want reading-progress or annotation sync.')}}
             {% else %}
               {{_('Hardcover sync is disabled, so auto-fetch, reading-progress sync, and annotation sync are off.')}}

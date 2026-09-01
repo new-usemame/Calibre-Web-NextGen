@@ -37,6 +37,13 @@ HARDCOVER_AUTO_FETCH_SCHEDULES = frozenset({
 })
 
 
+def resolve_hardcover_auto_fetch_schedule(stored_value):
+    """Return the schedule the crawler will use for a persisted value."""
+    if stored_value in HARDCOVER_AUTO_FETCH_SCHEDULES:
+        return stored_value
+    return DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE
+
+
 def reconcile_hardcover_configuration():
     """Migrate the former two enable flags and maintain a rollback mirror."""
     try:
@@ -307,20 +314,20 @@ def _schedule_hardcover_auto_fetch(scheduler, timezone_info, configuration=None)
             )
             return
 
-        schedule_type = cwa_settings.get(
+        stored_schedule_type = cwa_settings.get(
             'hardcover_auto_fetch_schedule',
             DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE,
         )
+        schedule_type = resolve_hardcover_auto_fetch_schedule(stored_schedule_type)
         if schedule_type == 'never':
             log.info("Hardcover auto-fetch is off by configuration")
             return
-        if schedule_type not in HARDCOVER_AUTO_FETCH_SCHEDULES:
+        if stored_schedule_type != schedule_type:
             log.warning(
                 "Unrecognized Hardcover auto-fetch schedule %r; falling back to %s",
+                stored_schedule_type,
                 schedule_type,
-                DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE,
             )
-            schedule_type = DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE
 
         if not enabled or not token_available:
             return

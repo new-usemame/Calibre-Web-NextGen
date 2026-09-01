@@ -100,26 +100,78 @@ test.describe('account menu — no Classic switch', () => {
       await trigger.locator('xpath=ancestor::div[1]')
         .getByRole('button', { name: 'Sign out', exact: true }).click();
 
-      // This rig permits anonymous browsing, so /logout returns to the SPA
-      // library as Guest instead of forcing the login route. Prove the identity
-      // transition itself: the account control and its actions must switch from
-      // the authenticated user/Sign out to Guest/Sign in, and remember-me must
-      // be gone.
+      // Anonymous browsing is an instance setting, not an invariant of either
+      // E2E rig. Ask /auth/me after logout because its Guest-vs-401 contract is
+      // the server truth; inferring the setting from whichever control happens
+      // to render would let a broken UI choose the assertion it can pass.
       await expect(page).toHaveURL(/\/app\/?(\?|$)/, { timeout: 20_000 });
-      const guestTrigger = page.getByRole('button', { name: /account: guest/i });
-      await expect(guestTrigger).toBeVisible();
-      await guestTrigger.click();
-      const guestMenu = guestTrigger.locator('xpath=ancestor::div[1]');
-      await expect(guestMenu.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
-      await expect(guestMenu.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+      const postSignOutMeResponse = await page.request.get('/api/v1/auth/me');
+      const postSignOutMe = await postSignOutMeResponse.json() as {
+        role?: { anonymous?: boolean };
+        features?: { anon_browse?: boolean };
+        error?: { code?: string };
+      };
+      const anonymousBrowsingEnabled = postSignOutMeResponse.status() === 200
+        && postSignOutMe.role?.anonymous === true
+        && postSignOutMe.features?.anon_browse === true;
+      const anonymousBrowsingDisabled = postSignOutMeResponse.status() === 401
+        && postSignOutMe.error?.code === 'unauthenticated';
+      expect(
+        Number(anonymousBrowsingEnabled) + Number(anonymousBrowsingDisabled),
+        `post-sign-out /auth/me must report exactly one server configuration; observed status ${postSignOutMeResponse.status()}, anonymous=${String(postSignOutMe.role?.anonymous)}, anon_browse=${String(postSignOutMe.features?.anon_browse)}, error=${String(postSignOutMe.error?.code)}`,
+      ).toBe(1);
 
-      // Signing out never leaves a Classic selection behind, and the next visit
-      // to the root still opens the new UI.
+      // These are configuration-independent consequences of logout. Keep them
+      // ahead of the UI branch so neither server mode can bypass session and
+      // new-UI persistence checks that are the subject of this test.
+      await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
       const cookies = await context.cookies();
       expect(cookies.find((c) => c.name === 'remember_token')).toBeUndefined();
       expect(cookies.find((c) => c.name === 'cwng_prefer_classic')).toBeUndefined();
       await page.goto('/', { waitUntil: 'domcontentloaded' });
       await expect(page).toHaveURL(/\/app\/?(\?|$)/);
+
+      const guestTrigger = page.getByRole('button', { name: /account: guest/i });
+      const loginButton = page.getByRole('button', { name: 'Sign in', exact: true });
+      const expectedPostSignOutState = anonymousBrowsingEnabled
+        ? 'Guest account menu'
+        : 'login form';
+
+      // Wait for either legitimate tree before describing what rendered. This
+      // keeps a slow app bootstrap from being mislabeled as a third state, while
+      // the message makes a genuine neither-state failure actionable.
+      await expect(
+        guestTrigger.or(loginButton),
+        `post-sign-out state mismatch: server expected ${expectedPostSignOutState}; observed neither the Guest account menu nor the login form`,
+      ).toBeVisible({ timeout: 20_000 });
+      const guestTriggerVisible = await guestTrigger.isVisible();
+      const loginButtonVisible = await loginButton.isVisible();
+      const observedPostSignOutState = guestTriggerVisible && loginButtonVisible
+        ? 'both the Guest account menu and the login form'
+        : guestTriggerVisible
+          ? 'Guest account menu'
+          : loginButtonVisible
+            ? 'login form'
+            : 'neither the Guest account menu nor the login form';
+
+      if (anonymousBrowsingEnabled) {
+        expect(
+          observedPostSignOutState,
+          `post-sign-out state mismatch: server expected Guest account menu; observed ${observedPostSignOutState}`,
+        ).toBe('Guest account menu');
+        await guestTrigger.click();
+        const guestMenu = guestTrigger.locator('xpath=ancestor::div[1]');
+        await expect(guestMenu.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
+        await expect(guestMenu.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+      } else {
+        expect(
+          observedPostSignOutState,
+          `post-sign-out state mismatch: server expected login form; observed ${observedPostSignOutState}`,
+        ).toBe('login form');
+        await expect(page.locator('input[autocomplete="username"]')).toBeVisible();
+        await expect(loginButton).toBeVisible();
+        await expect(guestTrigger).toHaveCount(0);
+      }
     } finally {
       await context.close();
     }

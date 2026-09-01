@@ -121,7 +121,7 @@
 .virtualRow {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: subgrid;
+  column-gap: var(--catalog-grid-gap);
   padding-bottom: var(--catalog-grid-gap);
 }
 .virtualSpacer {

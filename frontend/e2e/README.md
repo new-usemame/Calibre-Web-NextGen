@@ -23,6 +23,60 @@ Env knobs: `E2E_BASE_URL` (default `http://localhost:8086`), `E2E_USER`/`E2E_PAS
 `admin`/`admin123`), `E2E_SUBPATH_URL` (set to the `cwn-nginx-571` rig `http://localhost:8087` to run the
 reverse-proxy project).
 
+The catalog layout watchdog runs in normal Chromium and WebKit lanes. Besides the parent track/count
+invariant, it checks the first virtual row's rendered card coordinates so an engine can never collapse
+the row to one internal column behind a healthy parent grid. Its hostile-load matrix is opt-in so the
+broad suite stays fast: set `E2E_HOSTILE_LOAD=1` and select one or more
+`hostile-{css-slow,script-slow}-{chromium,webkit}` projects. The profiles delay fulfilled stylesheet and
+JavaScript responses in opposite orders through `page.route`, so the same settling-window reproduction
+works in both engines. CWNG currently uses system fonts and requests no webfont, so this lane makes no
+font-delay claim. The watchdog measures grid state transitions directly. Around every synchronous
+test-realm DOM, CSSOM, declaration, class/dataset, and CSS Typed OM write, it evaluates each invariant
+immediately before and after the outermost browser call. A write may establish measured evidence only when
+that invariant's healthy/bad truth flips across the call. The transition gate and the recorder share the
+same predicate: resolved tracks must equal the width formula's expected count, and an accepted column value
+must be absent or equal that count. Ownership, selector matching, property names, and raw input movement
+never license duration. An irrelevant `color` write stays diagnostic; a width/minimum class swap that keeps
+seven tracks correct also stays diagnostic; and a write that really flips seven correct tracks to one is
+measured without a guessable property allowlist or input-vector comparison. Bad-to-differently-bad writes
+update diagnostics without splitting or resetting the episode.
+
+CSSOM `insertRule`, `deleteRule`, `replaceSync`, declaration `setProperty`/`removeProperty`/`cssText`,
+direct declaration assignments, selector and stylesheet-state setters, `document.adoptedStyleSheets`,
+element attributes/classes/datasets, and CSS Typed OM `set`/`delete`/`clear` all use this truth-flip gate.
+No computed-style reads occur until a catalog grid is attached, and nested hooks for one browser write
+reuse the outermost measurement instead of forcing duplicate reads. A grid-scoped MutationObserver remains
+a diagnostic fallback for cross-realm or browser-internal mutations; ResizeObserver supplies the geometry
+change boundary. Matching stylesheet lifecycle and relevant-family FontFaceSet notifications are also
+diagnostic because their asynchronous callbacks have no synchronous pre-change endpoint. Selector checks
+that throw, opaque/cross-origin sheets, and container-query activation that the browser cannot answer remain
+diagnostic rather than guessed causal. Each exactly measured bad-to-healthy transition contributes its
+actual duration to a per-invariant total for the whole convergence window, so brief heals do not discard
+bad time and genuinely healthy stalls are never charged.
+
+The rAF safety sample is diagnostic only. If it is the only surface that observes an episode, the snapshot
+records `durationEvidence: "unmeasured-safety-net"` and zero duration; it never infers what happened between
+two samples and therefore cannot create either a scheduler-starvation false red or a sample-spacing false
+green. A violation still active at settle fails unconditionally. A CSS animation, media/container-query
+reevaluation, cross-realm stylesheet mutation, or other browser-internal recalculation that triggers no
+grid insertion/resize or synchronously state-changing DOM/CSSOM/Typed-OM write can therefore heal before
+settle as diagnostic-only evidence. Asynchronous stylesheet replacement and font application are included
+in that residual when no synchronous state-changing write brackets them. This named gap is intentional: CI
+reports what it observed but does not turn coincident or unknowable time into a pass/fail duration.
+
+The `CSSStyleDeclaration`, `style`, `dataset`, and `classList` interception is installed at DOM/CSSOM
+prototype boundaries in the Playwright test realm. Named CSS declaration properties have no configurable
+per-property descriptors in Chromium or WebKit, so declarations use stable proxies. This placement obtains
+the synchronous before/after state pair before asynchronous discovery or observer delivery can coalesce
+changes; it has no production consumer or production bundle effect.
+The private rig already passes all arguments after the worktree through to Playwright:
+
+```bash
+E2E_HOSTILE_LOAD=1 /absolute/path/to/local-dev/private-e2e-rig.sh test /absolute/path/to/worktree \
+  --project=hostile-css-slow-chromium --project=hostile-css-slow-webkit \
+  --project=hostile-script-slow-chromium --project=hostile-script-slow-webkit
+```
+
 In CI, a same-repository PR whose concurrency/engine dependency closure changed runs this suite as a
 hard gate against `sha-<PR head>` — the dev-image workflow builds that exact commit and the test workflow
 waits for, then pins, its manifest digest. Frontend-only PRs retain the cheaper SPA-overlay route. To run
@@ -52,6 +106,9 @@ protecting `cps/api/` added zero historical gate runs in that sample.
 | Project | Axis | Guards |
 |---|---|---|
 | `setup` | — | logs in once via the real UI, saves session |
+| `catalog-layout-chromium` | 768/1280/1440 + scheduler-gap probe | continuous CSS + accepted-column invariant watchdog without starvation false reds |
+| `catalog-layout-webkit` | 768/1280/1440 | rendered virtual-row placement matches the healthy parent grid in Safari's engine |
+| `hostile-*-{chromium,webkit}` | opt-in staggered CSS/JS arrival | first-load layout convergence under hostile resource order |
 | `desktop` | 1280×800 | full flow + a11y baseline |
 | `mobile` | 375×667 (chromium emulation) | drawer reachability + scroll-lock (#576), no h-overflow (#288) |
 | `ipad-touch` | 1024×1366 (touch/no hover) | persistent card actions + drawer inert/trap/Escape contract |

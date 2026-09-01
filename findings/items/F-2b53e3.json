@@ -1,0 +1,11 @@
+{
+  "area": "kobo-annotations",
+  "body": "The /annotations/import KoboReader.sqlite recovery path drops real highlights whose device\nContentID is a BARE chapter path with no uuid prefix (e.g. 'OPS/../OPS/chapter-003.xml',\n'OEBPS/../OEBPS/chapter001.html') - a shape newer Libra Colour firmware (4.46.23836) writes for\nsome annotations. normalize_content_id has no branch for it, so ingest_bookmarks counts\nskipped_invalid_content_id and loses the row even though the book was already resolved via\nVolumeID. MEASURED 2026-08-31 on a real device import: 88/90 highlights in one book and 9/72 in\nanother were dropped; prefixing '<book_uuid>!!' onto those ContentIDs in a copy made all import\ncleanly (the _chapter validator already accepts the contained traversal). Fix shape: in the\nimporter (allow_kobo_device_content_id call site), when the raw ContentID fails the grammar AND\nthe book is resolved, retry normalize_content_id(book_uuid + '!!' + raw). The live PATCH path\nlikely faces the same shape and should be checked with the same fixture.",
+  "created": "2026-08-31",
+  "id": "F-2b53e3",
+  "refs": [],
+  "severity": "bug",
+  "source": "audit",
+  "status": "open",
+  "title": "Kobo import drops annotations with bare-chapter-path ContentIDs (newer firmware shape)"
+}

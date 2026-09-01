@@ -21,15 +21,9 @@ test('Classic catalog and detail checkboxes stay state-consistent before and aft
   });
   test.skip(bookId == null, 'seed has no books');
 
-  // The shared e2e setup intentionally opens the SPA. Set the real Classic
-  // opt-out while preserving the authenticated session, then prove the cookie
-  // controls the preference-routed index before testing direct Classic routes.
-  await page.context().addCookies([{
-    name: 'cwng_prefer_classic',
-    value: '1',
-    url: new URL(page.url()).origin,
-  }]);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  // The shared e2e setup intentionally opens the SPA. Enter the real transient
+  // Classic fallback before testing its direct routes.
+  await page.goto('/?cwng_feedback=newui', { waitUntil: 'domcontentloaded' });
   await expect.poll(() => new URL(page.url()).pathname).toBe('/');
 
   const errors = collectPageErrors(page);

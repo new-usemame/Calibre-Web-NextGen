@@ -1,0 +1,213 @@
+.rail {
+  position: sticky;
+  top: var(--topbar-h);
+  width: 240px;
+  height: var(--context-sidebar-available-height, calc(100dvh - var(--topbar-h)));
+  flex: 0 0 240px;
+  box-sizing: border-box;
+  background: var(--surface-1);
+  border-right: 1px solid var(--border);
+}
+
+.nav,
+.navOpen {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  background: var(--surface-1);
+  padding: 0 var(--sp-2) var(--sp-3);
+}
+
+.topControls {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--sp-3) 0 var(--sp-2);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.drawerClose {
+  display: none;
+}
+
+.libraryLink,
+.item,
+.itemActive {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 34px;
+  box-sizing: border-box;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-snug);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.libraryLink {
+  color: var(--text);
+}
+
+.libraryLink:hover,
+.item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.itemActive {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+}
+
+.group {
+  min-width: 0;
+}
+
+.groupLabel {
+  margin: 0 0 2px;
+  padding: 0 var(--sp-2);
+  color: var(--text-faint);
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-base);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.icon {
+  flex: 0 0 auto;
+}
+
+.itemLabel {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.classic {
+  flex: 0 0 auto;
+  padding: 2px var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  color: var(--text-faint);
+  font-size: 0.625rem;
+  font-weight: var(--fw-semi);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.scrim {
+  display: none;
+}
+
+/* Keep this condition identical to DRAWER_MODE_QUERY in
+   ../lib/a11y/drawerMode.ts. */
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
+  .rail {
+    display: contents;
+  }
+
+  .nav,
+  .navOpen {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 240px;
+    height: auto;
+    z-index: var(--z-overlay);
+    padding-right: var(--sp-3);
+    padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+    padding-left: max(var(--sp-3), env(safe-area-inset-left));
+    background: var(--surface-1);
+    box-shadow: var(--elev-3);
+    transition: transform var(--dur-base) var(--ease-out);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: auto;
+  }
+
+  .nav {
+    transform: translateX(-100%);
+  }
+
+  .navOpen {
+    transform: translateX(0);
+  }
+
+  .topControls {
+    padding-top: max(var(--sp-4), env(safe-area-inset-top));
+  }
+
+  .drawerClose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin: 0 0 var(--sp-2) auto;
+    border-radius: var(--r-md);
+    color: var(--text-muted);
+  }
+
+  .drawerClose:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-overlay);
+    background: rgba(0, 0, 0, 0.55);
+    touch-action: none;
+    overscroll-behavior: contain;
+    animation: scrimIn var(--dur-fast) var(--ease) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav,
+  .navOpen {
+    transition: none;
+  }
+}
+
+@keyframes scrimIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

@@ -1,10 +1,10 @@
 {# ────────────────────────────────────────────────────────────────────────────
-   CWNG #60 — "Back to the classic view" feedback popup.
+   CWNG #60 — new-UI fallback feedback popup.
 
-   Shown on the CLASSIC (legacy) page when a user has just switched back from the
-   new UI. The new-UI TopBar "Back to the classic view" item navigates here with
-   ?cwng_feedback=newui; this partial's script detects that marker, shows a short,
-   two-step, fully anonymous feedback prompt, then strips the marker from the URL.
+   Shown on the CLASSIC (legacy) page when the SPA shell's capability fallback
+   navigates here with ?cwng_feedback=newui. This partial's script detects that
+   marker, shows a short, two-step, fully anonymous feedback prompt, then strips
+   the marker from the URL.
 
    Anonymity ("unmarked mail"): only { type, reasons, comment } is POSTed to the
    feedback endpoint, which stores nothing identifying — no account, name, IP,

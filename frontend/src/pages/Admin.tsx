@@ -1,43 +1,22 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
-import { Shield, Trash2, Mail, UserPlus, ChevronRight, Settings, Database, Server, Clock, FileText, Sliders, BarChart3, Files, Lock, RefreshCw, KeyRound } from 'lucide-react';
+import { Shield, Trash2, Mail, UserPlus, Settings, Lock, RefreshCw, KeyRound, Info, AlertTriangle } from 'lucide-react';
 import { useEffect } from 'react';
 import {
   useAdminUsers, useUpdateAdminUser, useDeleteAdminUser, useCreateAdminUser, useMe,
   useResetAdminUserPassword,
   useAdminConfig, useUpdateAdminConfig, useMailConfig, useUpdateMailConfig,
   useSecurityConfig, useUpdateSecurityConfig,
-  useMigrateMyLibrary,
   useAdminAddBookToLibrary,
 } from '../lib/queries';
 import type { SecurityConfig, SecurityUpdate } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { MyLibraryIntro } from '../components/MyLibraryIntro';
 import type { AdminUser } from '../lib/api';
-import { ApiError, resourceUrl } from '../lib/api';
+import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { THEMES, DEFAULT_THEME } from '../lib/themes';
 import styles from './Admin.module.css';
-
-// Remaining legacy server-configuration pages — these are the deep, rarely-touched
-// infrastructure surfaces (DB path, ingest/convert internals, scheduled tasks)
-// that are not part of the day-to-day user/auth flows. Login/authentication
-// security (LDAP/OAuth/SSL/reverse-proxy) and SMTP are rebuilt natively below.
-const SERVER_SETTINGS: { href: string; label: string; icon: typeof Settings; spa?: boolean }[] = [
-  { href: '/admin/devices', label: 'Device administration', icon: Server, spa: true },
-  { href: '/admin/view', label: 'Full user table & restrictions', icon: Shield },
-  { href: '/admin/config', label: 'Basic configuration', icon: Settings },
-  { href: '/admin/viewconfig', label: 'UI / display configuration', icon: Sliders },
-  { href: '/admin/dbconfig', label: 'Database & library path', icon: Database },
-  { href: '/admin/scheduledtasks', label: 'Scheduled tasks', icon: Clock },
-  { href: '/cwa-settings', label: 'CWA settings (ingest/convert)', icon: Server },
-  { href: '/cwa-stats-show', label: 'Statistics dashboard', icon: BarChart3 },
-  { href: '/admin/logfile', label: 'Logs', icon: FileText },
-  // #1048 — this row used to link to /duplicates, i.e. the exact page the
-  // sidebar already opens. From the admin panel the useful destination is the
-  // duplicate-detection *configuration*, so it deep-links to that section.
-  { href: '/cwa-settings#duplicate-detection', label: 'Duplicate detection settings', icon: Files },
-];
 
 // Default-role checkboxes auto-granted to new OAuth users. Keys MUST match
 // _OAUTH_DEFAULT_ROLE_BITS in cps/api/admin_security.py.
@@ -71,7 +50,6 @@ export function Admin() {
   const deleteUser = useDeleteAdminUser();
   const createUser = useCreateAdminUser();
   const resetPassword = useResetAdminUserPassword();
-  const migrateLibraries = useMigrateMyLibrary();
   const addBookToLibrary = useAdminAddBookToLibrary();
   const me = useMe().data;
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
@@ -79,13 +57,14 @@ export function Admin() {
   const [form, setForm] = useState({ name: '', password: '', email: '', upload: false });
   const [libraryBookIds, setLibraryBookIds] = useState<Record<number, string>>({});
   const [libraryBookErrors, setLibraryBookErrors] = useState<Record<number, string>>({});
+  const [modeHelpOpen, setModeHelpOpen] = useState<Record<number, boolean>>({});
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !data) {
     return (
-      <main className={styles.container}>
+      <div className={styles.container}>
         <EmptyState message={error instanceof Error ? error.message : t('Could not load users.')} />
-      </main>
+      </div>
     );
   }
 
@@ -147,35 +126,16 @@ export function Admin() {
   const setLibraryMode = (user: AdminUser, mode: 'monolibrary' | 'personal_library') => {
     if (mode === user.library_mode || updateUser.isPending) return;
     const message = mode === 'monolibrary'
-      ? t('Show {name} the whole library again? Their selection is kept but no longer used, and their e-reader syncs the whole library at the next update.', { name: user.name })
+      ? t('Show {name} the global library again? Their selection is kept but no longer used, and their e-reader syncs the global library at the next update.', { name: user.name })
       : user.my_library_seeded
-        ? t('Switch {name} back to their own selection? Their chosen books are restored.', { name: user.name })
-        : t('Give {name} their own selection? It starts as a copy of everything they can see now — nothing changes for them yet.', { name: user.name });
+        ? t('Switch {name} back to My Library? Their chosen books are restored.', { name: user.name })
+        : t('Give {name} My Library? It starts as a copy of everything they can see now — nothing changes for them yet.', { name: user.name });
     if (!window.confirm(message)) return;
     setBanner(null);
     updateUser.mutate({ id: user.id, library_mode: mode }, {
       onSuccess: () => setBanner({ ok: true, text: mode === 'monolibrary'
-        ? t('{name} sees the whole library again.', { name: user.name })
-        : t('{name} now keeps their own selection.', { name: user.name }) }),
-      onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Update failed.') }),
-    });
-  };
-
-  const migrateAll = () => {
-    if (!window.confirm(t('Set up My Library for every non-anonymous user? Each account switches to its own selection after it is filled with everything that account can currently see. Anonymous accounts such as Guest are left unchanged; use their per-user controls to set up a curated public library. Accounts set up before are never reseeded.'))) return;
-    setBanner(null);
-    migrateLibraries.mutate(undefined, {
-      onSuccess: (result) => {
-        const summary = t('Set up {accounts} accounts with {books} books. {errors} errors.', {
-          accounts: result.accounts, books: result.seeded_books, errors: result.errors,
-        });
-        const skippedSummary = result.skipped_accounts > 0
-          ? ` ${t('Left anonymous accounts unchanged: {accounts}. Use their per-user controls to set up a curated public library.', {
-            accounts: result.skipped.map((row) => row.name).join(', '),
-          })}`
-          : '';
-        setBanner({ ok: result.errors === 0, text: `${summary}${skippedSummary}` });
-      },
+        ? t('{name} sees the global library again.', { name: user.name })
+        : t('{name} now uses My Library.', { name: user.name }) }),
       onError: (err) => setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Update failed.') }),
     });
   };
@@ -209,19 +169,22 @@ export function Admin() {
   };
 
   return (
-    <main className={styles.container}>
+    <div id="user-administration" className={`${styles.container} ${styles.anchorSection}`}>
+      {/* Server-wide rollout card: bulk-enables My Library with a real undo.
+          Its bulk action replaces the old header button entirely. */}
+      <MyLibraryIntro />
       <div className={styles.header}>
-        <Shield size={22} className={styles.headerIcon} />
+        <Shield size={22} className={styles.headerIcon} aria-hidden="true" focusable={false} />
         <h1 className={styles.title}>{t('User administration')}</h1>
-        <button
-          type="button"
-          className={styles.addBtn}
-          onClick={() => { setShowNew((v) => !v); setBanner(null); }}
-        >
-          <UserPlus size={16} /> {t('New user')}
-        </button>
-        <button type="button" className={styles.addBtn} onClick={migrateAll}
-          disabled={migrateLibraries.isPending}>{t('Set up My Library for all users')}</button>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.addBtn}
+            onClick={() => { setShowNew((v) => !v); setBanner(null); }}
+          >
+            <UserPlus size={16} aria-hidden="true" focusable={false} /> {t('New user')}
+          </button>
+        </div>
       </div>
 
       <p className={banner ? (banner.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{banner?.text}</p>
@@ -278,7 +241,7 @@ export function Admin() {
                     {isSelf && <span className={styles.youBadge}>{t('you')}</span>}
                   </p>
                   {user.email && (
-                    <p className={styles.email}><Mail size={12} /> {user.email}</p>
+                    <p className={styles.email}><Mail size={12} aria-hidden="true" focusable={false} /> {user.email}</p>
                   )}
                 </div>
                 {!isSelf && !user.is_guest && (
@@ -311,24 +274,47 @@ export function Admin() {
                 ))}
               </div>
               {!user.is_guest && (
-                <fieldset className={styles.libraryMode}>
-                  <legend>{t('Library contents')}</legend>
-                  <label className={styles.roleToggle}>
-                    <input type="radio" name={`library-mode-${user.id}`}
-                      checked={user.library_mode === 'monolibrary'} disabled={updateUser.isPending}
-                      onChange={() => setLibraryMode(user, 'monolibrary')} />
-                    <span><strong>{t('The whole library')}</strong><small>{t('Everything on the server, including every new book added to it.')}</small></span>
-                  </label>
-                  <label className={styles.roleToggle}>
-                    <input type="radio" name={`library-mode-${user.id}`}
-                      checked={user.library_mode === 'personal_library'} disabled={updateUser.isPending}
-                      onChange={() => setLibraryMode(user, 'personal_library')} />
-                    <span><strong>{t('Own selection')}</strong><small>{t('Only the books chosen for this account.')}</small></span>
-                  </label>
-                  <p className={styles.settingsHint}>{t('Switching a user to their own selection first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.')}</p>
+                <fieldset className={styles.libraryMode}
+                  aria-labelledby={`library-mode-title-${user.id}`}>
+                  {/* The toggle lives INSIDE the legend's flex row so it rides
+                      the legend band regardless of fieldset layout quirks; the
+                      fieldset's aria-labelledby keeps the group's accessible
+                      name exactly "Library contents" (no button label bleed). */}
+                  <legend className={styles.legendRow}>
+                    <span id={`library-mode-title-${user.id}`}>{t('Library contents')}</span>
+                    {/* The seed/no-data-loss explanation stays one tap away
+                        behind a real toggle (aria-expanded + aria-controls) —
+                        touch reveals AND activates, so no hover-only affordance. */}
+                    <button type="button" className={styles.infoToggle}
+                      aria-expanded={!!modeHelpOpen[user.id]}
+                      aria-controls={`library-mode-howto-${user.id}`}
+                      aria-label={t('How switching between the global library and My Library works')}
+                      onClick={() => setModeHelpOpen((open) => ({ ...open, [user.id]: !open[user.id] }))}>
+                      <Info size={14} aria-hidden="true" focusable={false} />
+                    </button>
+                  </legend>
+                  <div className={styles.modeOptions}>
+                    <label className={styles.modeOption}>
+                      <input type="radio" name={`library-mode-${user.id}`}
+                        checked={user.library_mode === 'monolibrary'} disabled={updateUser.isPending}
+                        onChange={() => setLibraryMode(user, 'monolibrary')} />
+                      <span className={styles.modeText}><strong>{t('The global library')}</strong><small>{t('Everything on the server, including every new book added to it.')}</small></span>
+                    </label>
+                    <label className={styles.modeOption}>
+                      <input type="radio" name={`library-mode-${user.id}`}
+                        checked={user.library_mode === 'personal_library'} disabled={updateUser.isPending}
+                        onChange={() => setLibraryMode(user, 'personal_library')} />
+                      <span className={styles.modeText}><strong>{t('My Library')}</strong><small>{t('Only the books chosen for this account.')}</small></span>
+                    </label>
+                  </div>
+                  <p id={`library-mode-howto-${user.id}`} className={styles.settingsHint}
+                    hidden={!modeHelpOpen[user.id]}>{t('Switching a user to My Library first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.')}</p>
                   {user.library_mode === 'personal_library' && !user.roles.browse_global &&
                     <>
-                      <p className={styles.modeWarning}>{t("Without the global-browse role, only an administrator can add books to this user's library.")}</p>
+                      <p className={styles.modeWarning}>
+                        <AlertTriangle size={13} aria-hidden="true" focusable={false} />
+                        {t("Without the global-browse role, only an administrator can add books to this user's library.")}
+                      </p>
                       <form className={styles.libraryAddForm} onSubmit={(e) => addBookForUser(e, user)}>
                         <label className={styles.field}>
                           <span>{t('Book ID')}</span>
@@ -367,31 +353,7 @@ export function Admin() {
       <AdminConfigForm />
       <MailConfigForm />
       <SecurityConfigForm />
-
-      <div className={styles.settingsHead}>
-        <Settings size={18} className={styles.headerIcon} />
-        <h2 className={styles.settingsTitle}>{t('More server configuration')}</h2>
-      </div>
-      <p className={styles.settingsHint}>
-        {t('Pages marked below open in the classic view. Changes there apply to the whole server.')}
-      </p>
-      <div className={styles.settingsGrid}>
-        {/* Same-tab on purpose: these are in-app pages, not external sites (#738). */}
-        {SERVER_SETTINGS.map(({ href, label, icon: Icon, spa }) => {
-          const content = <>
-            <Icon size={18} className={styles.settingsIcon} aria-hidden="true" focusable={false} />
-            <span className={styles.settingsLabel}>
-              <span>{t(label)}</span>
-              {!spa && <small>{t('Opens in classic view')}</small>}
-            </span>
-            <ChevronRight size={13} className={styles.settingsExt} aria-hidden="true" focusable={false} />
-          </>;
-          return spa
-            ? <Link key={href} href={href} className={styles.settingsCard}>{content}</Link>
-            : <a key={href} href={resourceUrl(href)} className={styles.settingsCard}>{content}</a>;
-        })}
-      </div>
-    </main>
+    </div>
   );
 }
 
@@ -432,7 +394,7 @@ function AdminConfigForm() {
   };
 
   return (
-    <form className={styles.newForm} onSubmit={onSubmit}>
+    <form id="library-settings" className={`${styles.newForm} ${styles.anchorSection}`} onSubmit={onSubmit}>
       <div className={styles.settingsHead} style={{ marginTop: 0 }}>
         <Settings size={18} className={styles.headerIcon} />
         <h2 className={styles.settingsTitle}>{t('Library settings')}</h2>
@@ -531,7 +493,7 @@ function MailConfigForm() {
   };
 
   return (
-    <form className={styles.newForm} onSubmit={onSubmit}>
+    <form id="email-settings" className={`${styles.newForm} ${styles.anchorSection}`} onSubmit={onSubmit}>
       <div className={styles.settingsHead} style={{ marginTop: 0 }}>
         <Mail size={18} className={styles.headerIcon} />
         <h2 className={styles.settingsTitle}>{t('Email (SMTP) server')}</h2>
@@ -655,7 +617,7 @@ function SecurityConfigForm() {
   };
 
   return (
-    <form className={styles.newForm} onSubmit={onSubmit}>
+    <form id="security-settings" className={`${styles.newForm} ${styles.anchorSection}`} onSubmit={onSubmit}>
       <div className={styles.settingsHead} style={{ marginTop: 0 }}>
         <Lock size={18} className={styles.headerIcon} />
         <h2 className={styles.settingsTitle}>{t('Authentication & security')}</h2>

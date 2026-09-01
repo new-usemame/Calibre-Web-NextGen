@@ -1,13 +1,14 @@
-.container { max-width: 1100px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
+.container { max-width: 1400px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
 .back { display: inline-flex; align-items: center; gap: var(--sp-1); margin-bottom: var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); transition: color var(--dur-fast) var(--ease); }
 .back:hover { color: var(--accent); }
 .heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
-.heading > svg { color: var(--accent); width: 26px; height: 26px; }
+/* Same page-header idiom as User administration: 22px accent icon, display h1. */
+.heading > svg { color: var(--accent); width: 22px; height: 22px; }
 .heading h1, .card h2, .card h3, .card p { margin: 0; }
-.heading h1 { font-size: var(--fs-xl); }
+.heading h1 { font-family: var(--font-display); font-size: var(--fs-xl); }
 .countLine { margin: 0 0 var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); }
 
-.list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: var(--sp-4); margin: 0; padding: 0; }
+.list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); align-items: start; gap: var(--sp-4); margin: 0; padding: 0; }
 
 /* Per-account group divider — spans the full grid row so the fleet reads as
    "user → their readers" instead of one undifferentiated card field. The
@@ -26,7 +27,8 @@
 .groupMeta { margin: 0; flex: none; color: var(--text-muted); font-size: var(--fs-sm); white-space: nowrap; }
 
 .card {
-  padding: var(--sp-4) var(--sp-5);
+  align-self: start;
+  padding: var(--sp-4);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface-1);
@@ -38,7 +40,7 @@
 .card[data-active='false'] { background: color-mix(in srgb, var(--surface-1) 60%, transparent); }
 .card[data-active='false'] h2, .card[data-active='false'] h3 { color: var(--text-muted); }
 
-.card header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.card header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); margin-bottom: var(--sp-2); }
 .card header > div { min-width: 0; }
 .card h2, .card h3 { font-size: var(--fs-md); line-height: var(--lh-snug); overflow-wrap: anywhere; }
 .card .account { display: inline-flex; align-items: center; gap: var(--sp-1); margin-top: 2px; color: var(--text-muted); font-size: var(--fs-sm); }
@@ -57,8 +59,44 @@
 .stateOk { color: var(--text); background: var(--success-soft); border-color: var(--success-border); }
 .stateMuted { color: var(--text-muted); background: var(--surface-3); }
 
+.compactSummary { min-width: 0; }
+.identity { color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.card .lastSeen { margin-top: 2px; color: var(--text-muted); font-size: var(--fs-xs); }
+
+.summaryCounts {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+  margin: var(--sp-3) 0 0; padding: 0;
+}
+.summaryCounts li {
+  padding: 3px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+}
+
+.seedProgress { margin-top: var(--sp-3); }
+.seedProgress p { display: flex; justify-content: space-between; gap: var(--sp-2); color: var(--text-muted); font-size: var(--fs-xs); }
+.seedProgress p span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+.seedMeter { height: 6px; margin-top: var(--sp-2); overflow: hidden; border-radius: var(--r-full); background: var(--surface-3); }
+.seedMeter > span { display: block; height: 100%; border-radius: inherit; background: var(--success); }
+
+.disclosure {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  width: 100%; min-height: 44px; margin-top: var(--sp-3); padding: var(--sp-2) 0 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted); font-size: var(--fs-sm); text-align: left;
+  transition: color var(--dur-fast) var(--ease);
+}
+.disclosure:hover { color: var(--accent-text); }
+.disclosure svg { flex: none; transition: transform var(--dur-fast) var(--ease); }
+.card[data-expanded='true'] .disclosure svg { transform: rotate(180deg); }
+.details { padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+
 /* Same stat-grid treatment as the per-device page, two columns per card. */
-.card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3) var(--sp-4); margin: 0; }
+.details dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3) var(--sp-4); margin: 0; }
 .card dl div { min-width: 0; }
 .card dt { color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
 .card dd { margin: 2px 0 0; font-size: var(--fs-base); font-weight: var(--fw-semi); line-height: var(--lh-snug); overflow-wrap: anywhere; }
@@ -76,8 +114,6 @@
 .card [data-seg='warn'] { background: var(--danger); }
 .card [data-seg='off'] { background: var(--text-faint); }
 
-.card .lastSeen { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--fs-sm); }
-
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-4); }
 .pagination button { min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .pagination button:not(:disabled):hover { background: var(--surface-2); border-color: var(--border-strong); }
@@ -87,6 +123,6 @@
 @media (max-width: 600px) {
   .container { padding: var(--sp-4) var(--sp-3); }
   .card { padding: var(--sp-4); }
-  .card dl { gap: var(--sp-2) var(--sp-3); }
+  .details dl { gap: var(--sp-2) var(--sp-3); }
   .pagination { justify-content: space-between; }
 }

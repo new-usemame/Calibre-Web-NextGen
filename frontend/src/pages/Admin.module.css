@@ -4,11 +4,32 @@
   padding: var(--sp-6) var(--sp-5);
 }
 
+.anchorSection {
+  scroll-margin-top: calc(var(--topbar-h) + var(--sp-4));
+}
+
+/* Same mobile gutters as the other settings pages (Devices, DeviceDetail). */
+@media (max-width: 600px) {
+  .container { padding: var(--sp-4) var(--sp-3); }
+}
+
 .header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-3);
   margin-bottom: var(--sp-5);
+}
+
+/* One action group absorbing the free space, not an auto margin per button —
+   two auto margins split the space and stranded "New user" mid-page, and on
+   narrow viewports crushed the second button into a one-word-per-line column. */
+.headerActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
 }
 
 .headerIcon { color: var(--accent); }
@@ -20,7 +41,6 @@
 }
 
 .addBtn {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -117,12 +137,88 @@
   padding: var(--sp-4);
 }
 
-.libraryMode { margin: var(--sp-4) 0 0; padding: var(--sp-3) 0 0; border: 0; border-top: 1px solid var(--border); }
-.libraryMode legend { color: var(--text); font-weight: var(--fw-semi); padding-right: var(--sp-2); }
-.libraryMode label { display: flex; align-items: flex-start; gap: var(--sp-2); margin-top: var(--sp-2); }
-.libraryMode label span { display: flex; flex-direction: column; gap: 2px; }
-.libraryMode small { color: var(--text-muted); }
-.modeWarning { color: var(--warning, var(--accent-text)); font-size: var(--fs-sm); margin-top: var(--sp-2); }
+.libraryMode { margin: var(--sp-4) 0 0; padding: 0; border: 0; position: relative; }
+/* The separator rule lives on the legend, not the fieldset border. Punched into
+   the fieldset's border-top it only became visible AFTER the legend text, at a
+   different inset than the card's other separators (e.g. .roles); drawn on a
+   full-width legend it starts at the same content edge. */
+.libraryMode legend {
+  width: 100%;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-weight: var(--fw-semi);
+}
+.legendRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+/* The "how switching works" toggle sits at the right end of the legend row. */
+.infoToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.infoToggle:hover { color: var(--accent); background: var(--accent-soft); }
+.infoToggle:focus-visible { outline: 2px solid var(--accent-ring, var(--accent)); outline-offset: 2px; }
+
+/* Two option cards, same checked-tint idiom as Account's .scopeOption, laid
+   out side by side when the card is wide enough. */
+.modeOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.modeOption {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-height: 44px; /* touch target */
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-0, var(--bg));
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.modeOption:hover { border-color: var(--border-strong); }
+.modeOption:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.modeOption input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  margin-top: var(--sp-1);
+  cursor: pointer;
+  flex: none;
+}
+.modeText { display: flex; flex-direction: column; gap: 2px; }
+.modeText strong { color: var(--text); font-size: var(--fs-sm); }
+.modeText small { color: var(--text-muted); font-size: var(--fs-sm); }
+/* The explanation is collapsed behind .infoToggle; when open it sits flush
+   with the option cards' content edge. */
+.libraryMode .settingsHint { margin: var(--sp-2) 0 0; }
+.modeWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  color: var(--warning, var(--accent-text));
+  font-size: var(--fs-sm);
+  margin: var(--sp-2) 0 0;
+}
+.modeWarning svg { flex: none; margin-top: 2px; }
 .libraryAddForm {
   display: flex;
   align-items: end;
@@ -194,8 +290,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  /* Same 32px square as .resetBtn next to it — one icon-button size per row. */
+  width: 32px;
+  height: 32px;
   border-radius: var(--r-md);
   color: var(--text-muted);
   transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);

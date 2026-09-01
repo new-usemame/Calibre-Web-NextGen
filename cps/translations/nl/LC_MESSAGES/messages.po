@@ -2208,7 +2208,8 @@ msgid ""
 "can run after imports and metadata changes. "
 msgstr ""
 
-#: cps/render_template.py cps/spa_strings.py
+#: cps/render_template.py cps/spa_strings.py cps/templates/user_edit.html
+#: cps/templates/user_table.html
 msgid "My Library"
 msgstr "Mijn bibliotheek"
 
@@ -2358,6 +2359,28 @@ msgid "Advanced Search"
 msgstr "Geavanceerd zoeken"
 
 #: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in the shelf owner's library. The shelf owner cannot browse "
+"the global library; an administrator must add it to their My Library first."
+msgstr ""
+
+#: cps/shelf.py
+msgid "This book cannot be added to this shelf. Ask an administrator for help."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This shelf has an invalid owner. Ask an administrator to repair it before "
+"adding books."
+msgstr ""
+
+#: cps/shelf.py
 msgid "Invalid shelf specified"
 msgstr "Ongeldige boekenplank opgegeven"
 
@@ -2367,12 +2390,6 @@ msgstr "Sorry, je mag geen boeken toevoegen aan de boekenplank"
 
 #: cps/shelf.py
 msgid "Book not found in the visible global library."
-msgstr ""
-
-#: cps/shelf.py
-msgid ""
-"This book is not in your library. Ask an administrator to add it to My "
-"Library before adding it to a shelf."
 msgstr ""
 
 #: cps/shelf.py
@@ -2928,11 +2945,11 @@ msgstr "Inhoud van de bibliotheek"
 msgid "Library scope"
 msgstr "Bereik van de bibliotheek"
 
-#: cps/spa_strings.py cps/templates/user_edit.html
+#: cps/spa_strings.py
 msgid "My selection"
 msgstr "Mijn selectie"
 
-#: cps/spa_strings.py cps/templates/index.html
+#: cps/spa_strings.py
 msgid "New: your own library"
 msgstr "Nieuw: je eigen bibliotheek"
 
@@ -2948,7 +2965,7 @@ msgstr ""
 "Er wordt niets verwijderd: het boek blijft in de globale bibliotheek en je "
 "markeringen, notities en leesvoortgang worden bewaard."
 
-#: cps/spa_strings.py cps/templates/index.html
+#: cps/spa_strings.py
 msgid ""
 "Nothing is missing — the whole library is still on the server. What you see "
 "here is your own selection. Add books from the global library; they appear "
@@ -2974,8 +2991,7 @@ msgstr ""
 "Alleen de boeken die je kiest. Voeg ze toe vanuit de globale bibliotheek en "
 "verwijder ze wanneer je wilt."
 
-#: cps/spa_strings.py cps/templates/user_edit.html
-#: cps/templates/user_table.html
+#: cps/spa_strings.py
 msgid "Own selection"
 msgstr "Eigen selectie"
 
@@ -3081,7 +3097,7 @@ msgstr ""
 "{name} terugschakelen naar een eigen selectie? De gekozen boeken worden "
 "hersteld."
 
-#: cps/spa_strings.py cps/templates/user_edit.html
+#: cps/spa_strings.py
 msgid ""
 "Switching a user to their own selection first fills it with everything they "
 "can see now, so nothing changes for them until they remove books themselves. "
@@ -3092,7 +3108,7 @@ msgstr ""
 "totdat die zelf boeken verwijdert. Terugschakelen bewaart de selectie intact "
 "maar ongebruikt."
 
-#: cps/spa_strings.py cps/templates/index.html
+#: cps/spa_strings.py
 msgid ""
 "The library is shared and holds every book once — what you keep is your own "
 "selection. Nothing you had is gone. Every book, new arrivals included, is "
@@ -3102,7 +3118,7 @@ msgstr ""
 "je eigen selectie. Niets wat je had is verdwenen. Elk boek, ook nieuwe "
 "aanwinsten, staat onder Globale bibliotheek in het menu."
 
-#: cps/spa_strings.py cps/templates/index.html
+#: cps/spa_strings.py
 msgid ""
 "The library is shared and holds every book once — what you keep is your own "
 "selection. Nothing you had is gone. Your administrator manages what enters "
@@ -3131,7 +3147,7 @@ msgstr ""
 msgid "The whole archive. Add books to your library from here."
 msgstr "Het hele archief. Voeg vanaf hier boeken aan je bibliotheek toe."
 
-#: cps/spa_strings.py cps/templates/user_edit.html
+#: cps/spa_strings.py
 msgid "The whole library"
 msgstr "De hele bibliotheek"
 
@@ -4540,6 +4556,12 @@ msgid "Add note"
 msgstr "Notitie toevoegen"
 
 #: cps/spa_strings.py
+msgid "Add or replace this line in the [OneStoreServices] section:"
+msgstr ""
+"Voeg deze regel toe aan de sectie [OneStoreServices], of vervang de "
+"bestaande regel:"
+
+#: cps/spa_strings.py
 msgid "Add to existing"
 msgstr "Toevoegen aan bestaande waarden"
 
@@ -4550,6 +4572,10 @@ msgstr "Toevoegen aan favorieten"
 #: cps/spa_strings.py
 msgid "Admin group"
 msgstr "Beheerdersgroep"
+
+#: cps/spa_strings.py
+msgid "Admin navigation"
+msgstr "Beheernavigatie"
 
 #: cps/spa_strings.py
 msgid "Advanced"
@@ -4686,16 +4712,12 @@ msgid "Back to library"
 msgstr "Terug naar bibliotheek"
 
 #: cps/spa_strings.py
-msgid "Back to the classic view"
-msgstr "Terug naar de klassieke weergave"
-
-#: cps/spa_strings.py
 msgid "Base DN"
 msgstr "Basis DN"
 
 #: cps/spa_strings.py
-msgid "Basic configuration"
-msgstr "Basisconfiguratie"
+msgid "Basic settings"
+msgstr "Basisinstellingen"
 
 #: cps/spa_strings.py
 msgid "Beta"
@@ -4769,8 +4791,8 @@ msgid "CA certificate path"
 msgstr "CA-certificaatpad"
 
 #: cps/spa_strings.py
-msgid "CWA settings (ingest/convert)"
-msgstr "CWA-instellingen (importeren/converteren)"
+msgid "CWA settings"
+msgstr "CWA-instellingen"
 
 #: cps/spa_strings.py
 msgid "Can upload books"
@@ -4816,8 +4838,20 @@ msgid "Change cover"
 msgstr "Omslag wijzigen"
 
 #: cps/spa_strings.py
+msgid "Check again"
+msgstr "Opnieuw controleren"
+
+#: cps/spa_strings.py
 msgid "Checking…"
 msgstr "Controleren…"
+
+#: cps/spa_strings.py
+msgid ""
+"Choose Login and sign in with this NextGen account or one of its app "
+"passwords."
+msgstr ""
+"Kies ‘Login’ en meld je aan met dit NextGen-account of een van de app-"
+"wachtwoorden."
 
 #: cps/spa_strings.py
 msgid "Choose a cover"
@@ -4838,6 +4872,10 @@ msgstr "Kies velden"
 #: cps/spa_strings.py
 msgid "Choose your theme"
 msgstr "Kies je thema"
+
+#: cps/spa_strings.py
+msgid "Classic"
+msgstr "Klassiek"
 
 #: cps/spa_strings.py
 msgid "Clear default"
@@ -4884,6 +4922,10 @@ msgid "Compact"
 msgstr "Compact"
 
 #: cps/spa_strings.py
+msgid "Configuration"
+msgstr "Configuratie"
+
+#: cps/spa_strings.py
 msgid "Configured"
 msgstr "Geconfigureerd"
 
@@ -4898,6 +4940,22 @@ msgstr "Verwijderen van label {name} bevestigen"
 msgid "Confirm new password"
 msgstr "Nieuw wachtwoord bevestigen"
 
+#: cps/spa_strings.py
+msgid ""
+"Connect the Kobo to a computer and open .kobo/Kobo/Kobo eReader.conf in a "
+"text editor."
+msgstr ""
+"Sluit de Kobo aan op een computer en open .kobo/Kobo/Kobo eReader.conf in "
+"een teksteditor."
+
+#: cps/spa_strings.py
+msgid ""
+"Connect this account to an e-reader, then sync once to confirm it reached "
+"your library."
+msgstr ""
+"Koppel dit account aan een e-reader en synchroniseer eenmaal om te "
+"controleren of de e-reader verbinding met je bibliotheek kan maken."
+
 #: cps/spa_strings.py cps/tasks/convert.py
 msgid "Convert"
 msgstr "Overzetten"
@@ -4911,16 +4969,40 @@ msgid "Convert from"
 msgstr "Converteren van"
 
 #: cps/spa_strings.py
+msgid "Copied"
+msgstr "Gekopieerd"
+
+#: cps/spa_strings.py
 msgid "Copied to clipboard"
 msgstr "Gekopieerd naar klembord"
+
+#: cps/spa_strings.py
+msgid "Copied to clipboard."
+msgstr "Naar het klembord gekopieerd."
 
 #: cps/spa_strings.py
 msgid "Copy link"
 msgstr "Link kopiëren"
 
 #: cps/spa_strings.py
+msgid "Copy server address"
+msgstr "Serveradres kopiëren"
+
+#: cps/spa_strings.py
+msgid "Copy sync URL"
+msgstr "Synchronisatie-URL kopiëren"
+
+#: cps/spa_strings.py
 msgid "Could not assign."
 msgstr "Toewijzen is mislukt."
+
+#: cps/spa_strings.py
+msgid "Could not complete the action."
+msgstr "De actie kon niet worden voltooid."
+
+#: cps/spa_strings.py
+msgid "Could not copy. Select the address and copy it manually."
+msgstr "Kopiëren mislukt. Selecteer het adres en kopieer het handmatig."
 
 #: cps/spa_strings.py
 msgid "Could not create shelf."
@@ -4937,6 +5019,10 @@ msgstr "Kan boekenplank niet verwijderen."
 #: cps/spa_strings.py
 msgid "Could not delete tag"
 msgstr "Kan label niet verwijderen"
+
+#: cps/spa_strings.py
+msgid "Could not delete the Kobo sync URL."
+msgstr "De Kobo-synchronisatie-URL kon niet worden verwijderd."
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
@@ -4957,6 +5043,10 @@ msgstr "E-readers konden niet worden geladen."
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
 msgstr "Kan markeringen en notities niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not load pairing details."
+msgstr "De koppelingsgegevens konden niet worden geladen."
 
 #: cps/spa_strings.py
 msgid "Could not load reading positions."
@@ -5051,6 +5141,10 @@ msgid "Could not start the duplicate scan."
 msgstr "Kan de duplicatenscan niet starten."
 
 #: cps/spa_strings.py
+msgid "Could not update pairing details."
+msgstr "De koppelingsgegevens konden niet worden bijgewerkt."
+
+#: cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Kan boekenplank niet bijwerken."
 
@@ -5138,8 +5232,12 @@ msgid "Custom columns"
 msgstr "Aangepaste kolommen"
 
 #: cps/spa_strings.py
-msgid "Database & library path"
-msgstr "Database- & bibliotheekpad"
+msgid "Data hoarder? This will help users organize their accounts!"
+msgstr "Dataverzamelaar? Dit helpt gebruikers hun accounts te organiseren!"
+
+#: cps/spa_strings.py
+msgid "Database path"
+msgstr "Databasepad"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Date added"
@@ -5192,6 +5290,10 @@ msgstr ""
 "Boekenplank \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
 
 #: cps/spa_strings.py
+msgid "Delete sync URL"
+msgstr "Synchronisatie-URL verwijderen"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete tag {name}"
 msgstr "Label {name} verwijderen"
@@ -5204,6 +5306,14 @@ msgid ""
 msgstr ""
 "Het bestand {fmt} verwijderen? De boekvermelding, metadata, boekenplanken en "
 "leesstatus blijven beschikbaar."
+
+#: cps/spa_strings.py
+msgid ""
+"Delete this Kobo sync URL? The current URL will stop working on every paired "
+"Kobo."
+msgstr ""
+"Deze Kobo-synchronisatie-URL verwijderen? De huidige URL werkt daarna niet "
+"meer op gekoppelde Kobo’s."
 
 #: cps/spa_strings.py
 msgid "Delete this smart shelf? Your books are not affected."
@@ -5282,6 +5392,13 @@ msgid "Device restored."
 msgstr "Apparaat hersteld."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Device seen: {name}, last synced {when}. Pairing is working."
+msgstr ""
+"Apparaat gedetecteerd: {name}, voor het laatst gesynchroniseerd {when}. De "
+"koppeling werkt."
+
+#: cps/spa_strings.py
 msgid "Device summary"
 msgstr "Apparaatoverzicht"
 
@@ -5289,6 +5406,10 @@ msgstr "Apparaatoverzicht"
 #, python-brace-format
 msgid "Device: {name}"
 msgstr "Apparaat: {name}"
+
+#: cps/spa_strings.py
+msgid "Devices"
+msgstr "Apparaten"
 
 #: cps/spa_strings.py
 msgid "Devices appear here after their first sync."
@@ -5316,8 +5437,16 @@ msgid "Dismiss"
 msgstr "Afwijzen"
 
 #: cps/spa_strings.py
+msgid "Dismiss introduction"
+msgstr "Introductie sluiten"
+
+#: cps/spa_strings.py
 msgid "Dismiss this group"
 msgstr "Deze groep afwijzen"
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Display"
+msgstr "Weergeven"
 
 #: cps/spa_strings.py
 msgid "Documentation"
@@ -5347,10 +5476,6 @@ msgstr "Duplicaat"
 #: cps/spa_strings.py
 msgid "Duplicate books"
 msgstr "Dubbele boeken"
-
-#: cps/spa_strings.py
-msgid "Duplicate detection settings"
-msgstr "Instellingen voor duplicatendetectie"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5435,6 +5560,10 @@ msgid "Email me a reset"
 msgstr "Stuur me een herstellink"
 
 #: cps/spa_strings.py
+msgid "Email server"
+msgstr "E-mailserver"
+
+#: cps/spa_strings.py
 msgid "Email settings saved."
 msgstr "E-mailinstellingen opgeslagen."
 
@@ -5472,6 +5601,10 @@ msgstr "Volledig scherm verlaten"
 #: cps/spa_strings.py
 msgid "Expires in"
 msgstr "Verloopt over"
+
+#: cps/spa_strings.py
+msgid "Explore the changes, you can always undo later."
+msgstr "Verken de wijzigingen, je kunt het later altijd ongedaan maken."
 
 #: cps/spa_strings.py
 msgid "Export"
@@ -5577,16 +5710,36 @@ msgid "Full screen"
 msgstr "Volledig scherm"
 
 #: cps/spa_strings.py
-msgid "Full user table & restrictions"
-msgstr "Volledige gebruikerstabel & beperkingen"
-
-#: cps/spa_strings.py
 msgid "Generate a new link"
 msgstr "Genereer een nieuwe link"
 
 #: cps/spa_strings.py
+msgid ""
+"Generate a private sync URL for this account. You can delete it at any time."
+msgstr ""
+"Genereer een privé-synchronisatie-URL voor dit account. Je kunt deze op elk "
+"moment verwijderen."
+
+#: cps/spa_strings.py
+msgid "Generate sync URL"
+msgstr "Synchronisatie-URL genereren"
+
+#: cps/spa_strings.py
+msgid "Generating…"
+msgstr "Genereren…"
+
+#: cps/spa_strings.py
 msgid "Give your smart shelf a name."
 msgstr "Geef je slimme boekenplank een naam."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} My Library? It starts as a copy of everything they can see now — "
+"nothing changes for them yet."
+msgstr ""
+"Mijn bibliotheek geven aan {name}? Het begint als een kopie van alles wat "
+"dit account nu kan zien — er verandert nog niets."
 
 #: cps/spa_strings.py
 msgid "Go to this highlight"
@@ -5658,6 +5811,10 @@ msgid "Hide Discover section"
 msgstr "Verkennen-sectie verbergen"
 
 #: cps/spa_strings.py
+msgid "Hide device details"
+msgstr "Apparaatgegevens verbergen"
+
+#: cps/spa_strings.py
 msgid "Hide device library"
 msgstr "Apparaatbibliotheek verbergen"
 
@@ -5682,13 +5839,13 @@ msgid "Highlights"
 msgstr "Markeringen"
 
 #: cps/spa_strings.py
+msgid "Highlights and notes"
+msgstr "Markeringen en notities"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Highlights, {count} saved annotations"
 msgstr "Markeringen, {count} opgeslagen annotaties"
-
-#: cps/spa_strings.py
-msgid "Highlights and notes"
-msgstr "Markeringen en notities"
 
 #: cps/spa_strings.py
 msgid "Hot"
@@ -5701,6 +5858,10 @@ msgstr "Populair — Meest gedownload"
 #: cps/spa_strings.py
 msgid "How should multi-value fields be applied?"
 msgstr "Hoe moeten velden met meerdere waarden worden toegepast?"
+
+#: cps/spa_strings.py
+msgid "How switching between the global library and My Library works"
+msgstr "Hoe schakelen tussen de globale bibliotheek en Mijn bibliotheek werkt"
 
 #: cps/spa_strings.py
 msgid "Icon"
@@ -5737,6 +5898,10 @@ msgid "Imported as"
 msgstr "Geïmporteerd als"
 
 #: cps/spa_strings.py
+msgid "In KOReader, open NextGen Progress Sync and choose Set NextGen Server."
+msgstr "Open in KOReader NextGen Progress Sync en kies ‘Set NextGen Server’."
+
+#: cps/spa_strings.py
 msgid "In your book"
 msgstr "In je boek"
 
@@ -5755,6 +5920,18 @@ msgstr "Inactief"
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Inbegrepen"
+
+#: cps/spa_strings.py
+msgid "Install or update the NextGen Sync plugin."
+msgstr "Installeer de NextGen Sync-plug-in of werk deze bij."
+
+#: cps/spa_strings.py
+msgid ""
+"Instead of forcing all of your books on friends, they can pick which ones "
+"they want!"
+msgstr ""
+"In plaats van al je boeken aan vrienden op te dringen, kunnen ze zelf kiezen "
+"welke ze willen!"
 
 #: cps/spa_strings.py
 msgid "Issuer / base URL"
@@ -5777,10 +5954,6 @@ msgstr "KOReader"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr "KOReader-voortgang"
-
-#: cps/progress_syncing/protocols/kosync.py cps/spa_strings.py
-msgid "KOReader Sync Plugin"
-msgstr "KOReader Synchronisatie Plugin"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -5807,8 +5980,16 @@ msgid "Kobo Libra Color / Libra 2 (1264×1680)"
 msgstr "Kobo Libra Color / Libra 2 (1264×1680)"
 
 #: cps/spa_strings.py
-msgid "Kobo setup"
-msgstr "Kobo-instelling"
+msgid "Kobo sync URL deleted."
+msgstr "Kobo-synchronisatie-URL verwijderd."
+
+#: cps/spa_strings.py
+msgid "Kobo sync URL ready."
+msgstr "Kobo-synchronisatie-URL is klaar."
+
+#: cps/spa_strings.py
+msgid "Kobo sync is not enabled on this server."
+msgstr "Kobo-synchronisatie is niet ingeschakeld op deze server."
 
 #: cps/spa_strings.py
 msgid "Kobo sync on"
@@ -5885,6 +6066,10 @@ msgid "Loading new Discover picks."
 msgstr "Nieuwe Verkennen-keuzes worden geladen."
 
 #: cps/spa_strings.py
+msgid "Loading pairing details…"
+msgstr "Koppelingsgegevens laden…"
+
+#: cps/spa_strings.py
 msgid "Loading reading positions…"
 msgstr "Leesposities laden…"
 
@@ -5952,10 +6137,6 @@ msgstr "E-readers beheren"
 msgid "Manage shelves"
 msgstr "Boekenplanken beheren"
 
-#: cps/spa_strings.py
-msgid "Manage your Kobo sync URL in the classic account page."
-msgstr "Beheer je Kobo-synchronisatie-URL op de klassieke accountpagina."
-
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/book_table.html
 msgid "Mark as read"
@@ -6022,16 +6203,24 @@ msgid "More cover options (search providers, e-reader preview)"
 msgstr "Meer omslagopties (zoekproviders, e-reader voorbeeld)"
 
 #: cps/spa_strings.py
-msgid "More server configuration"
-msgstr "Meer serverconfiguratie"
-
-#: cps/spa_strings.py
 msgid "Move down"
 msgstr "Naar beneden"
 
 #: cps/spa_strings.py
 msgid "Move up"
 msgstr "Naar boven"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "My Library is now on for {accounts} accounts."
+msgstr "Mijn bibliotheek is nu actief voor {accounts} accounts."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+msgstr ""
+"Mijn bibliotheek is actief voor {accounts} accounts; bij {errors} accounts "
+"is het mislukt."
 
 #: cps/spa_strings.py
 msgid "My account"
@@ -6052,6 +6241,10 @@ msgstr "Nooit"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "New"
 msgstr "Nieuw"
+
+#: cps/spa_strings.py
+msgid "New Feature!"
+msgstr "Nieuwe functie!"
 
 #: cps/spa_strings.py
 msgid ""
@@ -6084,6 +6277,10 @@ msgstr "Nieuwe slimme boekenplank"
 #: cps/spa_strings.py
 msgid "New user"
 msgstr "Nieuwe gebruiker"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "New: My Library"
+msgstr "Nieuw: Mijn bibliotheek"
 
 #: cps/spa_strings.py
 msgid "Newest"
@@ -6152,6 +6349,10 @@ msgstr "Geen resultaten gevonden in dit boek."
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "Geen overeenkomende {items} voor \"{query}\"."
+
+#: cps/spa_strings.py
+msgid "No new device check-in yet."
+msgstr "Nog geen nieuwe apparaatactiviteit."
 
 #: cps/spa_strings.py
 msgid "No pages found in this comic."
@@ -6247,6 +6448,16 @@ msgstr ""
 msgid "Nothing in this category yet."
 msgstr "Nog niets in deze categorie."
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"Nothing is missing — the global library is still on the server. What you see "
+"here is your selection in My Library. Add books from the global library; "
+"they appear here and on your e-reader."
+msgstr ""
+"Er ontbreekt niets — de globale bibliotheek staat nog steeds op de server. "
+"Wat je hier ziet is je selectie in Mijn bibliotheek. Voeg boeken toe vanuit "
+"de globale bibliotheek; ze verschijnen hier en op je e-reader."
+
 #: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr "Nog niets om te tonen."
@@ -6298,6 +6509,14 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Open Account"
 msgstr "Account openen"
+
+#: cps/spa_strings.py
+msgid ""
+"Open NextGen using an address your e-reader can reach before copying these "
+"settings. Localhost only points back to the device itself."
+msgstr ""
+"Open NextGen via een adres dat je e-reader kan bereiken voordat je deze "
+"instellingen kopieert. Localhost verwijst alleen naar het apparaat zelf."
 
 #: cps/spa_strings.py
 msgid "Open administration"
@@ -6352,6 +6571,14 @@ msgstr ""
 "ingesteld en gecontroleerd — de echte status wordt hier getoond."
 
 #: cps/spa_strings.py
+msgid ""
+"Organize your library, your way. Checkout books from the Global Library to "
+"bring them into My Library."
+msgstr ""
+"Organiseer je bibliotheek op jouw manier. Kies boeken uit de Globale "
+"bibliotheek om ze in Mijn bibliotheek te zetten."
+
+#: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "PDF-lezer"
 
@@ -6374,12 +6601,12 @@ msgid "Page {page} of {pages}"
 msgstr "Pagina {page} van {pages}"
 
 #: cps/spa_strings.py
-msgid ""
-"Pages marked below open in the classic view. Changes there apply to the "
-"whole server."
-msgstr ""
-"Hieronder gemarkeerde pagina's openen in de klassieke weergave. Wijzigingen "
-"daar gelden voor de hele server."
+msgid "Pair a Kobo or KOReader"
+msgstr "Een Kobo of KOReader koppelen"
+
+#: cps/spa_strings.py
+msgid "Pair an e-reader"
+msgstr "Een e-reader koppelen"
 
 #: cps/spa_strings.py
 msgid "Partially seeded books"
@@ -6395,8 +6622,16 @@ msgid "Password (leave blank to keep)"
 msgstr "Wachtwoord (laat leeg om te behouden)"
 
 #: cps/spa_strings.py
+msgid "Paste this server address (the plugin adds /kosync itself):"
+msgstr "Plak dit serveradres (de plug-in voegt zelf /kosync toe):"
+
+#: cps/spa_strings.py
 msgid "Paused after a problem"
 msgstr "Gepauzeerd na een probleem"
+
+#: cps/spa_strings.py
+msgid "People & devices"
+msgstr "Mensen en apparaten"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid ""
@@ -6422,6 +6657,10 @@ msgstr "Zijbalk vastzetten"
 #: cps/spa_strings.py
 msgid "Pink"
 msgstr "Roze"
+
+#: cps/spa_strings.py
+msgid "Please give this a try, you can easily undo later."
+msgstr "Probeer het gerust, je kunt het later eenvoudig ongedaan maken."
 
 #: cps/spa_strings.py cps/templates/admin.html
 msgid "Port"
@@ -6654,6 +6893,11 @@ msgstr ""
 "meer en er wordt een vervangend wachtwoord gemaild."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored the previous library mode for {accounts} accounts."
+msgstr "De vorige bibliotheekmodus is hersteld voor {accounts} accounts."
+
+#: cps/spa_strings.py
 msgid "Retry"
 msgstr "Opnieuw proberen"
 
@@ -6673,6 +6917,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Rows per load"
 msgstr "Rijen per keer laden"
+
+#: cps/spa_strings.py
+msgid "Run a sync from the plugin."
+msgstr "Start een synchronisatie vanuit de plug-in."
 
 #: cps/spa_strings.py
 msgid "Run time"
@@ -6720,6 +6968,12 @@ msgid "Save settings"
 msgstr "Instellingen opslaan"
 
 #: cps/spa_strings.py
+msgid "Save the file, safely eject the Kobo, then restart it."
+msgstr ""
+"Sla het bestand op, werp de Kobo veilig uit en start de Kobo daarna opnieuw "
+"op."
+
+#: cps/spa_strings.py
 msgid "Saved. Restart the server for the login changes to take effect."
 msgstr ""
 "Opgeslagen. Herstart de server om de aanmeldingswijzigingen door te voeren."
@@ -6763,6 +7017,10 @@ msgstr "Dit boek wordt doorzocht…"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
 msgstr "Zoeken…"
+
+#: cps/spa_strings.py
+msgid "Security"
+msgstr "Beveiliging"
 
 #: cps/spa_strings.py
 msgid "Security settings saved."
@@ -6856,6 +7114,10 @@ msgid "Server host"
 msgstr "Server host"
 
 #: cps/spa_strings.py
+msgid "Server tools"
+msgstr "Serverhulpmiddelen"
+
+#: cps/spa_strings.py
 msgid "Service account (DN)"
 msgstr "Serviceaccount (DN)"
 
@@ -6875,10 +7137,6 @@ msgstr ""
 "vullen, of voer ze handmatig in."
 
 #: cps/spa_strings.py
-msgid "Set up Kobo sync"
-msgstr "Kobo-synchronisatie instellen"
-
-#: cps/spa_strings.py
 msgid "Set up Kobo sync first — then this preference becomes available."
 msgstr ""
 "Stel eerst Kobo-synchronisatie in — daarna wordt deze voorkeur beschikbaar."
@@ -6890,10 +7148,6 @@ msgstr "Instellen…"
 #: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Instellingen opgeslagen."
-
-#: cps/spa_strings.py cps/templates/admin.html
-msgid "Setup KOReader Sync"
-msgstr "KOReader-synchronisatie instellen"
 
 #: cps/spa_strings.py
 msgid "Shelf name"
@@ -6934,6 +7188,10 @@ msgid "Show books in language"
 msgstr "Boeken in taal tonen"
 
 #: cps/spa_strings.py
+msgid "Show device details"
+msgstr "Apparaatgegevens tonen"
+
+#: cps/spa_strings.py
 msgid "Show e-reader previews on each candidate"
 msgstr "E-reader-voorvertoningen tonen bij elke kandidaat"
 
@@ -6948,6 +7206,26 @@ msgstr "Verborgen boeken tonen"
 #: cps/spa_strings.py
 msgid "Show password"
 msgstr "Wachtwoord tonen"
+
+#: cps/spa_strings.py
+msgid ""
+"Show the global library again? Your selection is kept exactly as you left it "
+"— switch back any time and it is still there. At its next update, your e-"
+"reader syncs the global library."
+msgstr ""
+"De globale bibliotheek weer tonen? Je selectie blijft precies zoals je hem "
+"achterliet — schakel gerust terug, hij blijft bewaard. Bij de volgende "
+"update synchroniseert je e-reader de globale bibliotheek."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Show {name} the global library again? Their selection is kept but no longer "
+"used, and their e-reader syncs the global library at the next update."
+msgstr ""
+"De globale bibliotheek weer tonen aan {name}? De selectie blijft bewaard "
+"maar wordt niet meer gebruikt, en de e-reader synchroniseert de globale "
+"bibliotheek bij de volgende update."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7035,6 +7313,16 @@ msgid "Source details"
 msgstr "Brondetails"
 
 #: cps/spa_strings.py
+msgid ""
+"Start My Library? It begins as everything you can see now, so nothing "
+"changes until you remove books yourself. Your e-reader keeps the same books "
+"at its next update."
+msgstr ""
+"Mijn bibliotheek starten? Het begint met alles wat je nu kunt zien, dus er "
+"verandert niets totdat je zelf boeken verwijdert. Je e-reader behoudt "
+"dezelfde boeken bij de volgende update."
+
+#: cps/spa_strings.py
 msgid "Start the only OAuth provider automatically"
 msgstr "Start de enige OAuth-provider automatisch"
 
@@ -7046,13 +7334,17 @@ msgstr "Begonnen met lezen"
 msgid "Starting scan…"
 msgstr "Scan starten…"
 
-#: cps/spa_strings.py
-msgid "Statistics dashboard"
-msgstr "Statistiekendashboard"
-
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "Status"
 msgstr "Status"
+
+#: cps/spa_strings.py
+msgid "Stock Kobo"
+msgstr "Kobo met standaardsoftware"
+
+#: cps/spa_strings.py
+msgid "Stock Kobo sync URL"
+msgstr "Synchronisatie-URL voor Kobo met standaardsoftware"
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -7066,6 +7358,34 @@ msgstr "Subkop"
 #: cps/spa_strings.py
 msgid "Support on Ko-fi →"
 msgstr "Steunen op Ko-fi →"
+
+#: cps/spa_strings.py
+msgid ""
+"Switch back to My Library? Your library goes back to the books you had "
+"chosen — nothing was lost while you saw everything. At its next update, your "
+"e-reader returns to your selection."
+msgstr ""
+"Terug naar Mijn bibliotheek? Je bibliotheek gaat terug naar de boeken die je "
+"had gekozen — er is niets verloren gegaan terwijl je alles zag. Bij de "
+"volgende update keert je e-reader terug naar je selectie."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Switch {name} back to My Library? Their chosen books are restored."
+msgstr ""
+"Mijn bibliotheek weer inschakelen voor {name}? De gekozen boeken worden "
+"hersteld."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Switching a user to My Library first fills it with everything they can see "
+"now, so nothing changes for them until they remove books themselves. "
+"Switching back keeps the selection intact but unused."
+msgstr ""
+"Als je een gebruiker overschakelt naar Mijn bibliotheek, wordt deze eerst "
+"gevuld met alles wat dat account nu kan zien, dus er verandert niets totdat "
+"die gebruiker zelf boeken verwijdert. Terugschakelen bewaart de selectie, "
+"maar gebruikt die niet."
 
 #: cps/spa_strings.py
 msgid "Sync only my selected shelves"
@@ -7095,6 +7415,12 @@ msgstr "Labels — uitsluiten"
 #: cps/spa_strings.py
 msgid "Tags — include"
 msgstr "Labels — opnemen"
+
+#: cps/spa_strings.py
+msgid "Tap Sync on the Kobo. Your NextGen books should appear."
+msgstr ""
+"Tik op ‘Synchroniseren’ op de Kobo. Je NextGen-boeken zouden moeten "
+"verschijnen."
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -7127,6 +7453,29 @@ msgstr ""
 "De boekvermelding, metadata, boekenplanken en leesstatus blijven "
 "beschikbaar. Als dit het laatste formaat is, kun je later een vervangend "
 "formaat toevoegen."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "The global library"
+msgstr "De globale bibliotheek"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The library is shared and holds every book once — what you keep is My "
+"Library. Nothing you had is gone. Every book, new arrivals included, is "
+"under Global Library in the menu."
+msgstr ""
+"De bibliotheek is gedeeld en bevat elk boek maar één keer — wat je bewaart "
+"is Mijn bibliotheek. Niets dat je had is weg. Elk boek, ook nieuwe "
+"aanwinsten, vind je onder Globale bibliotheek in het menu."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The library is shared and holds every book once — what you keep is My "
+"Library. Nothing you had is gone. Your administrator manages what enters it."
+msgstr ""
+"De bibliotheek is gedeeld en bevat elk boek maar één keer — wat je bewaart "
+"is Mijn bibliotheek. Niets dat je had is weg. Je beheerder beheert wat erin "
+"komt."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7216,6 +7565,14 @@ msgstr "Best beoordeeld"
 msgid "Trust authentication header"
 msgstr "Authenticatie-header vertrouwen"
 
+#: cps/spa_strings.py
+msgid "Try My Library"
+msgstr "Mijn bibliotheek proberen"
+
+#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
+msgid "Try again"
+msgstr "Opnieuw proberen"
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
 msgstr "Twee kolommen"
@@ -7228,10 +7585,6 @@ msgstr "Synchronisatie in twee richtingen actief"
 msgid "Two-way sync preference saved."
 msgstr "Voorkeur voor synchronisatie in twee richtingen opgeslagen."
 
-#: cps/spa_strings.py
-msgid "UI / display configuration"
-msgstr "UI / weergave-configuratie"
-
 #: cps/spa_strings.py cps/templates/book_table.html
 msgid "Unarchive"
 msgstr "Dearchiveren"
@@ -7239,6 +7592,10 @@ msgstr "Dearchiveren"
 #: cps/spa_strings.py
 msgid "Undo"
 msgstr "Ongedaan maken"
+
+#: cps/spa_strings.py
+msgid "Undoing…"
+msgstr "Ongedaan maken…"
 
 #: cps/spa_strings.py
 msgid "Unhide"
@@ -7321,6 +7678,10 @@ msgid "User object filter"
 msgstr "Gebruikersobject filter"
 
 #: cps/spa_strings.py
+msgid "User restrictions"
+msgstr "Beperkingen"
+
+#: cps/spa_strings.py
 msgid "Userinfo URL"
 msgstr "Userinfo URL"
 
@@ -7333,6 +7694,10 @@ msgstr "Gebruikersnaam"
 #: cps/spa_strings.py
 msgid "Username claim"
 msgstr "Gebruikersnaam claim"
+
+#: cps/spa_strings.py
+msgid "Users"
+msgstr "Gebruikers"
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -7353,6 +7718,10 @@ msgstr "Weergave-instellingen"
 #: cps/spa_strings.py
 msgid "Viewer"
 msgstr "Viewer"
+
+#: cps/spa_strings.py
+msgid "Waiting for a Kobo or KOReader to sync with this account."
+msgstr "Wachten tot een Kobo of KOReader met dit account synchroniseert."
 
 #: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
@@ -7432,6 +7801,14 @@ msgstr "Een notitie schrijven"
 #: cps/spa_strings.py
 msgid "Write a note…"
 msgstr "Schrijf een notitie…"
+
+#: cps/spa_strings.py
+msgid ""
+"You're probably a long time user of calibre-web. Please let us know your "
+"feedback on this, why or why not this works with your flow."
+msgstr ""
+"Je gebruikt calibre-web waarschijnlijk al heel lang. Laat ons weten wat je "
+"ervan vindt: waarom dit wel of niet past bij jouw manier van werken."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7585,8 +7962,18 @@ msgstr "{free} vrij van {total}"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{name} now uses My Library."
+msgstr "{name} gebruikt nu Mijn bibliotheek."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{name} removed."
 msgstr "{name} verwijderd."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} sees the global library again."
+msgstr "{name} ziet weer de globale bibliotheek."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7656,6 +8043,11 @@ msgid "{percent}% read"
 msgstr "{percent}% gelezen"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "{seeded} of {total} books seeded"
+msgstr "{seeded} van {total} boeken geïnitialiseerd"
+
+#: cps/spa_strings.py
 msgid "…or paste an image URL"
 msgstr "…of plak een afbeelding-URL"
 
@@ -7674,186 +8066,6 @@ msgstr "← Terug naar inloggen"
 #: cps/spa_strings.py
 msgid "← Library"
 msgstr "← Bibliotheek"
-
-#: cps/spa_strings.py
-msgid "Add or replace this line in the [OneStoreServices] section:"
-msgstr ""
-"Voeg deze regel toe aan de sectie [OneStoreServices], of vervang de "
-"bestaande regel:"
-
-#: cps/spa_strings.py
-msgid "Check again"
-msgstr "Opnieuw controleren"
-
-#: cps/spa_strings.py
-msgid ""
-"Choose Login and sign in with this NextGen account or one of its app "
-"passwords."
-msgstr ""
-"Kies ‘Login’ en meld je aan met dit NextGen-account of een van de app-"
-"wachtwoorden."
-
-#: cps/spa_strings.py
-msgid ""
-"Connect the Kobo to a computer and open .kobo/Kobo/Kobo eReader.conf in a "
-"text editor."
-msgstr ""
-"Sluit de Kobo aan op een computer en open .kobo/Kobo/Kobo eReader.conf in "
-"een teksteditor."
-
-#: cps/spa_strings.py
-msgid ""
-"Connect this account to an e-reader, then sync once to confirm it reached "
-"your library."
-msgstr ""
-"Koppel dit account aan een e-reader en synchroniseer eenmaal om te "
-"controleren of de e-reader verbinding met je bibliotheek kan maken."
-
-#: cps/spa_strings.py
-msgid "Copied"
-msgstr "Gekopieerd"
-
-#: cps/spa_strings.py
-msgid "Copied to clipboard."
-msgstr "Naar het klembord gekopieerd."
-
-#: cps/spa_strings.py
-msgid "Copy server address"
-msgstr "Serveradres kopiëren"
-
-#: cps/spa_strings.py
-msgid "Copy sync URL"
-msgstr "Synchronisatie-URL kopiëren"
-
-#: cps/spa_strings.py
-msgid "Could not copy. Select the address and copy it manually."
-msgstr "Kopiëren mislukt. Selecteer het adres en kopieer het handmatig."
-
-#: cps/spa_strings.py
-msgid "Could not delete the Kobo sync URL."
-msgstr "De Kobo-synchronisatie-URL kon niet worden verwijderd."
-
-#: cps/spa_strings.py
-msgid "Could not load pairing details."
-msgstr "De koppelingsgegevens konden niet worden geladen."
-
-#: cps/spa_strings.py
-msgid "Delete sync URL"
-msgstr "Synchronisatie-URL verwijderen"
-
-#: cps/spa_strings.py
-msgid ""
-"Delete this Kobo sync URL? The current URL will stop working on every paired "
-"Kobo."
-msgstr ""
-"Deze Kobo-synchronisatie-URL verwijderen? De huidige URL werkt daarna niet "
-"meer op gekoppelde Kobo’s."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Device seen: {name}, last synced {when}. Pairing is working."
-msgstr ""
-"Apparaat gedetecteerd: {name}, voor het laatst gesynchroniseerd {when}. De "
-"koppeling werkt."
-
-#: cps/spa_strings.py
-msgid ""
-"Generate a private sync URL for this account. You can delete it at any time."
-msgstr ""
-"Genereer een privé-synchronisatie-URL voor dit account. Je kunt deze op elk "
-"moment verwijderen."
-
-#: cps/spa_strings.py
-msgid "Generate sync URL"
-msgstr "Synchronisatie-URL genereren"
-
-#: cps/spa_strings.py
-msgid "Generating…"
-msgstr "Genereren…"
-
-#: cps/spa_strings.py
-msgid "In KOReader, open NextGen Progress Sync and choose Set NextGen Server."
-msgstr "Open in KOReader NextGen Progress Sync en kies ‘Set NextGen Server’."
-
-#: cps/spa_strings.py
-msgid "Install or update the NextGen Sync plugin."
-msgstr "Installeer de NextGen Sync-plug-in of werk deze bij."
-
-#: cps/spa_strings.py
-msgid "Kobo sync is not enabled on this server."
-msgstr "Kobo-synchronisatie is niet ingeschakeld op deze server."
-
-#: cps/spa_strings.py
-msgid "Kobo sync URL deleted."
-msgstr "Kobo-synchronisatie-URL verwijderd."
-
-#: cps/spa_strings.py
-msgid "Kobo sync URL ready."
-msgstr "Kobo-synchronisatie-URL is klaar."
-
-#: cps/spa_strings.py
-msgid "Loading pairing details…"
-msgstr "Koppelingsgegevens laden…"
-
-#: cps/spa_strings.py
-msgid ""
-"Open NextGen using an address your e-reader can reach before copying these "
-"settings. Localhost only points back to the device itself."
-msgstr ""
-"Open NextGen via een adres dat je e-reader kan bereiken voordat je deze "
-"instellingen kopieert. Localhost verwijst alleen naar het apparaat zelf."
-
-#: cps/spa_strings.py
-msgid "Pair a Kobo or KOReader"
-msgstr "Een Kobo of KOReader koppelen"
-
-#: cps/spa_strings.py
-msgid "Pair an e-reader"
-msgstr "Een e-reader koppelen"
-
-#: cps/spa_strings.py
-msgid "Paste this server address (the plugin adds /kosync itself):"
-msgstr "Plak dit serveradres (de plug-in voegt zelf /kosync toe):"
-
-#: cps/spa_strings.py
-msgid "Run a sync from the plugin."
-msgstr "Start een synchronisatie vanuit de plug-in."
-
-#: cps/spa_strings.py
-msgid "Save the file, safely eject the Kobo, then restart it."
-msgstr ""
-"Sla het bestand op, werp de Kobo veilig uit en start de Kobo daarna opnieuw "
-"op."
-
-#: cps/spa_strings.py
-msgid "Stock Kobo"
-msgstr "Kobo met standaardsoftware"
-
-#: cps/spa_strings.py
-msgid "Stock Kobo sync URL"
-msgstr "Synchronisatie-URL voor Kobo met standaardsoftware"
-
-#: cps/spa_strings.py
-msgid "Tap Sync on the Kobo. Your NextGen books should appear."
-msgstr ""
-"Tik op ‘Synchroniseren’ op de Kobo. Je NextGen-boeken zouden moeten "
-"verschijnen."
-
-#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
-msgid "Try again"
-msgstr "Opnieuw proberen"
-
-#: cps/spa_strings.py
-msgid "Waiting for a Kobo or KOReader to sync with this account."
-msgstr "Wachten tot een Kobo of KOReader met dit account synchroniseert."
-
-#: cps/spa_strings.py
-msgid "Could not update pairing details."
-msgstr "De koppelingsgegevens konden niet worden bijgewerkt."
-
-#: cps/spa_strings.py
-msgid "No new device check-in yet."
-msgstr "Nog geen nieuwe apparaatactiviteit."
 
 #: cps/tasks_status.py
 msgid "Waiting"
@@ -8307,6 +8519,10 @@ msgstr "Ongeldige boek ID."
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
 msgstr ""
+
+#: cps/progress_syncing/protocols/kosync.py
+msgid "KOReader Sync Plugin"
+msgstr "KOReader Synchronisatie Plugin"
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -8847,6 +9063,10 @@ msgstr ""
 #: cps/templates/admin.html
 msgid "Check NextGen Status"
 msgstr ""
+
+#: cps/templates/admin.html
+msgid "Setup KOReader Sync"
+msgstr "KOReader-synchronisatie instellen"
 
 #: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"
@@ -13229,10 +13449,6 @@ msgid "Flip Image"
 msgstr "Afbeelding omdraaien"
 
 #: cps/templates/readcbr.html
-msgid "Display"
-msgstr "Weergeven"
-
-#: cps/templates/readcbr.html
 msgid "Single Page"
 msgstr "Enkele pagina"
 
@@ -14204,6 +14420,55 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#~ msgid "You now see the global library."
+#~ msgstr "Je ziet nu de globale bibliotheek."
+
+#~ msgid "Basic configuration"
+#~ msgstr "Basisconfiguratie"
+
+#~ msgid "CWA settings (ingest/convert)"
+#~ msgstr "CWA-instellingen (importeren/converteren)"
+
+#~ msgid "Database & library path"
+#~ msgstr "Database- & bibliotheekpad"
+
+#~ msgid "Device admin"
+#~ msgstr "Apparaatbeheer"
+
+#~ msgid "Duplicate detection settings"
+#~ msgstr "Instellingen voor duplicatendetectie"
+
+#~ msgid "Full user table & restrictions"
+#~ msgstr "Volledige gebruikerstabel & beperkingen"
+
+#~ msgid "Statistics dashboard"
+#~ msgstr "Statistiekendashboard"
+
+#~ msgid "UI / display configuration"
+#~ msgstr "UI / weergave-configuratie"
+
+#~ msgid "User admin"
+#~ msgstr "Gebruikersbeheer"
+
+#~ msgid "Kobo setup"
+#~ msgstr "Kobo-instelling"
+
+#~ msgid "Manage your Kobo sync URL in the classic account page."
+#~ msgstr "Beheer je Kobo-synchronisatie-URL op de klassieke accountpagina."
+
+#~ msgid "More server configuration"
+#~ msgstr "Meer serverconfiguratie"
+
+#~ msgid ""
+#~ "Pages marked below open in the classic view. Changes there apply to the "
+#~ "whole server."
+#~ msgstr ""
+#~ "Hieronder gemarkeerde pagina's openen in de klassieke weergave. "
+#~ "Wijzigingen daar gelden voor de hele server."
+
+#~ msgid "Set up Kobo sync"
+#~ msgstr "Kobo-synchronisatie instellen"
+
 #~ msgid "HTML is allowed and sanitized on display."
 #~ msgstr "HTML is toegestaan en wordt bij weergave opgeschoond."
 
@@ -14867,9 +15132,6 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #, fuzzy
 #~ msgid "Value must be an iterable."
 #~ msgstr "Waarde moet Waar of Onwaar zijn"
-
-#~ msgid "Users"
-#~ msgstr "Gebruikers"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Klik op de omslag om de metagegevens in het formulier te laden"

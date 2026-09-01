@@ -1,8 +1,8 @@
-/* CWNG #60 — "Back to the classic view" feedback popup controller.
+/* CWNG #60 — new-UI fallback feedback popup controller.
  *
  * Shows a short, two-step, fully anonymous feedback prompt on the classic page
- * when a user has just switched back from the new UI (the new-UI menu navigates
- * here with ?cwng_feedback=newui). Only { type, reasons, comment } is POSTed to
+ * when the SPA shell's capability fallback navigates here with
+ * ?cwng_feedback=newui. Only { type, reasons, comment } is POSTed to
  * the feedback endpoint, which stores nothing identifying. See the partial
  * cwng_feedback_popup.html and notes/FEEDBACK-SERVER-DESIGN.md.
  *

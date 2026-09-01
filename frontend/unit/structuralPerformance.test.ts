@@ -40,6 +40,27 @@ test('drawer-mode CSS stays synchronized with the JavaScript accessibility query
   }
 });
 
+test('the account disclosure keeps core actions and has no persistent Classic selector', () => {
+  const topBar = source('src/components/TopBar.tsx');
+  const userMenuStart = topBar.indexOf('function UserMenu(');
+  const userMenuEnd = topBar.indexOf('export function TopBar(', userMenuStart);
+  const userMenu = topBar.slice(userMenuStart, userMenuEnd);
+
+  assert.notEqual(userMenuStart, -1);
+  assert.notEqual(userMenuEnd, -1);
+  for (const label of ['My account', 'Admin', 'Sign out']) {
+    assert.match(userMenu, new RegExp(`label=\\{t\\('${label}'\\)\\}`));
+  }
+  assert.doesNotMatch(userMenu, /Back to the classic view|backToClassicView|cwng_feedback/);
+});
+
+test('the SPA 404 Classic deep link is one-off and cannot set UI preference', () => {
+  const notFound = source('src/pages/NotFound.tsx');
+
+  assert.match(notFound, /href=\{legacyPath\}/);
+  assert.doesNotMatch(notFound, /cwng_feedback|cwng_switch|cwng_prefer/);
+});
+
 test('catalog owns one stable measured grid node and delegates its cards to the row window', () => {
   const catalog = source('src/pages/Catalog.tsx');
   const gridTestIds = catalog.match(/data-testid="catalog-grid"/g) ?? [];

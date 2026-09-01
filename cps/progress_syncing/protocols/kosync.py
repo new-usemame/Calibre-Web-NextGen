@@ -2056,6 +2056,27 @@ def update_progress():
             ub.session.rollback()
             raise KOSyncError(ERROR_INTERNAL, "Failed to save sync progress")
 
+        # Progress-only clients never reach the inventory, delivery, capability,
+        # or annotation paths that otherwise register their KOReader identity.
+        # Observe it only after the progress transaction is durable, and keep
+        # this optional side effect outside that session and outside the endpoint
+        # contract. A missing device_id has no stable identity to fingerprint.
+        if device_id:
+            try:
+                from ...services.device_registry import (
+                    register_koreader_device_best_effort,
+                )
+                register_koreader_device_best_effort(
+                    user_id=user.id,
+                    device_id=device_id,
+                    device_name=device,
+                )
+            except Exception:
+                log.warning(
+                    "Best-effort KOReader device registration from progress failed",
+                    exc_info=True,
+                )
+
         # Update user's ReadBook status if we matched a book
         # This is done AFTER kosync_progress is committed, so sync location is always safe
         if book_id:

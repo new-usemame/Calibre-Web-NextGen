@@ -51,10 +51,10 @@ const ANNOUNCEMENTS: readonly Announcement[] = [
       <>
         <span className={styles.iconWrap} aria-hidden="true"><LifeBuoy size={17} focusable={false} /></span>
         <span className={styles.text}>
-          <strong>{t('New: your own library')}</strong>{' '}
+          <strong>{t('New: My Library')}</strong>{' '}
           {me?.role?.browse_global
-            ? t('The library is shared and holds every book once — what you keep is your own selection. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.')
-            : t('The library is shared and holds every book once — what you keep is your own selection. Nothing you had is gone. Your administrator manages what enters your selection.')}
+            ? t('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.')
+            : t('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Your administrator manages what enters it.')}
         </span>
       </>
     ),

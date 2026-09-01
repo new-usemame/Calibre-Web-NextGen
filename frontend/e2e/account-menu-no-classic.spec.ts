@@ -48,14 +48,46 @@ test.describe('account menu — no Classic switch', () => {
 
   test('signing out from the menu ends the session and returns to the new UI', async ({
     browser, baseURL,
-  }) => {
+  }, testInfo) => {
     // A DEDICATED context that logs itself in. The shared storageState session is
     // reused by every other spec running in parallel; clicking Sign out on it
     // logs those specs out mid-run, which is a real failure this suite already
     // caused once and which looks exactly like an unrelated login regression.
-    const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    //
+    // A separate context is NOT enough, and that is the whole reason for the
+    // userAgent below. The server keys its session rows on Flask-Login's `_id`,
+    // which is sha512(remote address | User-Agent) -- a browser fingerprint, not
+    // a per-context id. An explicit browser.newContext() does not inherit the
+    // project's `use` block, so it runs with the engine default UA, which is
+    // byte-identical to the one global.setup.ts seeded storageState with. Same
+    // address + same UA => same session key, and cps/logout.py deletes by
+    // (user_id, session_key), so Sign out here would delete the shared seeded
+    // row and 401 every spec still running. Giving this context its own UA gives
+    // it its own key. The assertion below is the guard: drop the userAgent and
+    // THIS test fails by name, instead of ~150 unrelated specs failing later.
+    // tests/unit/test_e2e_session_fingerprint_isolation.py pins the mechanism.
+    const defaultContext = await browser.newContext({
+      baseURL,
+      storageState: { cookies: [], origins: [] },
+    });
+    const defaultPage = await defaultContext.newPage();
+    const defaultUserAgent = await defaultPage.evaluate(() => navigator.userAgent);
+    await defaultContext.close();
+    const isolatedUserAgent = `${defaultUserAgent} CWNG-E2E-signout/${testInfo.project.name}`;
+
+    const context = await browser.newContext({
+      baseURL,
+      storageState: { cookies: [], origins: [] },
+      userAgent: isolatedUserAgent,
+    });
     try {
       const page = await context.newPage();
+      const actualUserAgent = await page.evaluate(() => navigator.userAgent);
+      expect(
+        actualUserAgent,
+        'sign-out context must use its own server-side session fingerprint',
+      ).toBe(isolatedUserAgent);
+
       await page.goto('/app/login');
       await page.locator('input[autocomplete="username"]').fill(process.env.E2E_USER || 'admin');
       await page.locator('input[autocomplete="current-password"]').fill(process.env.E2E_PASS || 'admin123');

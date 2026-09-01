@@ -718,29 +718,35 @@ def test_missing_auto_fetch_schedule_keeps_existing_weekly_default(monkeypatch):
     assert "hour='2'" in str(trigger)
 
 
-def test_settings_writer_keeps_previous_schedule_for_invalid_post(monkeypatch):
+class _ScheduleSettingsDB:
+    stored = {
+        "auto_convert_target_format": "epub",
+        "hardcover_auto_fetch_schedule": "daily",
+    }
+    updates = []
+
+    def __init__(self):
+        self.cwa_default_settings = dict(self.stored)
+        self.cwa_settings = dict(self.stored)
+
+    def update_cwa_settings(self, settings):
+        self.__class__.updates.append(dict(settings))
+        self.__class__.stored.update(settings)
+
+    def get_cwa_settings(self):
+        return dict(self.__class__.stored)
+
+
+@pytest.fixture
+def schedule_settings_client(monkeypatch):
     from cps import cwa_functions, schedule
 
-    class SettingsDB:
-        stored = {
-            "auto_convert_target_format": "epub",
-            "hardcover_auto_fetch_schedule": "daily",
-        }
-        updates = []
-
-        def __init__(self):
-            self.cwa_default_settings = dict(self.stored)
-            self.cwa_settings = dict(self.stored)
-
-        def update_cwa_settings(self, settings):
-            self.__class__.updates.append(dict(settings))
-            self.__class__.stored.update(settings)
-
-        def get_cwa_settings(self):
-            return dict(self.__class__.stored)
-
-    SettingsDB.updates = []
-    monkeypatch.setattr(cwa_functions, "CWA_DB", SettingsDB)
+    _ScheduleSettingsDB.stored = {
+        "auto_convert_target_format": "epub",
+        "hardcover_auto_fetch_schedule": "daily",
+    }
+    _ScheduleSettingsDB.updates = []
+    monkeypatch.setattr(cwa_functions, "CWA_DB", _ScheduleSettingsDB)
     monkeypatch.setattr(cwa_functions, "INTEGER_SETTINGS", ())
     monkeypatch.setattr(cwa_functions, "FLOAT_SETTINGS", ())
     monkeypatch.setattr(cwa_functions, "JSON_SETTINGS", ())
@@ -748,7 +754,7 @@ def test_settings_writer_keeps_previous_schedule_for_invalid_post(monkeypatch):
     monkeypatch.setattr(cwa_functions.config, "config_kobo_sync_magic_shelves", False, raising=False)
     monkeypatch.setattr(cwa_functions.config, "config_hardcover_sync", True, raising=False)
     monkeypatch.setattr(cwa_functions.config, "save", lambda: None)
-    monkeypatch.setattr(cwa_functions.config, "resolved_hardcover_token", lambda: "token")
+    monkeypatch.setattr(cwa_functions.config, "resolved_hardcover_token", lambda: None)
     monkeypatch.setattr(schedule, "refresh_hardcover_auto_fetch", lambda: None)
     monkeypatch.setattr(cwa_functions, "get_next_duplicate_scan_run", lambda _settings: None)
     monkeypatch.setattr(
@@ -763,8 +769,15 @@ def test_settings_writer_keeps_previous_schedule_for_invalid_post(monkeypatch):
     app.view_functions["cwa_settings.set_cwa_settings"] = inspect.unwrap(
         cwa_functions.set_cwa_settings
     )
+    return app.test_client(), _ScheduleSettingsDB
 
-    response = app.test_client().post(
+
+def test_settings_writer_keeps_previous_schedule_for_invalid_post(
+    schedule_settings_client, caplog
+):
+    client, settings_db = schedule_settings_client
+
+    response = client.post(
         "/cwa-settings",
         data={
             "settings_action": "save",
@@ -774,8 +787,28 @@ def test_settings_writer_keeps_previous_schedule_for_invalid_post(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert SettingsDB.updates[-1]["hardcover_auto_fetch_schedule"] == "daily"
-    assert SettingsDB.stored["hardcover_auto_fetch_schedule"] == "daily"
+    assert settings_db.updates[-1]["hardcover_auto_fetch_schedule"] == "daily"
+    assert settings_db.stored["hardcover_auto_fetch_schedule"] == "daily"
+    assert "Ignoring unrecognized Hardcover auto-fetch schedule 'typo-value'" in caplog.text
+
+
+def test_settings_writer_silently_preserves_schedule_when_field_is_absent(
+    schedule_settings_client, caplog
+):
+    client, settings_db = schedule_settings_client
+
+    response = client.post(
+        "/cwa-settings",
+        data={
+            "settings_action": "save",
+            "auto_convert_target_format": "epub",
+        },
+    )
+
+    assert response.status_code == 200
+    assert settings_db.updates[-1]["hardcover_auto_fetch_schedule"] == "daily"
+    assert settings_db.stored["hardcover_auto_fetch_schedule"] == "daily"
+    assert "Ignoring unrecognized Hardcover auto-fetch schedule" not in caplog.text
 
 
 def test_auto_fetch_ui_has_first_off_option_and_truthful_status_combinations():

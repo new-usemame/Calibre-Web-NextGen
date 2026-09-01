@@ -331,7 +331,9 @@ def _git(repo: Path, *args: str, committer_email: str = _NEW_USEMAME_COMMITTER):
         }
     )
     return subprocess.run(
-        ["git", "-C", str(repo), *args],
+        # Synthetic remote-less repositories must bypass the operator's
+        # identity-firewall wrapper; these commits never leave the temp tree.
+        ["/usr/bin/git", "-C", str(repo), *args],
         env=env,
         check=True,
         capture_output=True,

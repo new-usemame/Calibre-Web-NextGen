@@ -6,8 +6,14 @@
   "refs": [
     "#1318"
   ],
+  "resolution": {
+    "commit": "bae46d9d4e",
+    "date": "2026-09-01",
+    "note": "Shipped in #2102: all five Kobo collection routes answer 503 on a rolled-back commit; red->green on six routes; main Test Suite green on bae46d9d4e.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "All four Kobo collection handlers answer success on a rolled-back commit; the device clears its delta queue and the shelf operation is permanently lost"
 }

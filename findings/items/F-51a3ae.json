@@ -1,0 +1,19 @@
+{
+  "area": "ci",
+  "body": "docker-image-build-dev.yml's \"Alias unchanged image to commit\" job runs as soon as the image-neutral push lands, but scripts/alias-e2e-image.sh (correctly) refuses unless ghcr :sha-<source> already exists and :dev names it. When the source commit's own build is still in flight the alias fails. OBSERVED 2026-09-01: source 87036d2a (#2096) built 16:59:24-17:07:30Z; translations bot pushed 4d23102b at 16:59:56Z; its alias job ran 17:01:22Z -> \"ERROR: immutable image ...:sha-87036d2a... is missing or malformed\" (run 33535148624). The bot pushes translations right after merges, so this race is the common case, not an edge. The refusal itself is right; the ordering is wrong: the alias job must wait (bounded, tied to the producer run's status) for the source build, or the workflow must serialize image jobs on main.",
+  "created": "2026-09-01",
+  "id": "F-51a3ae",
+  "refs": [
+    "#2096"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-01",
+    "note": "Alias waits only while the exact source Build & Push run is live, fails on a terminal run/job with its Actions URL, and retains immutable-source plus :dev digest invariants; wait capped at the producer's 95-minute pipeline budget.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Image-alias job races the source image build it depends on; any push within ~8 min of an image-relevant push (the translations bot does exactly this) fails alias by design"
+}

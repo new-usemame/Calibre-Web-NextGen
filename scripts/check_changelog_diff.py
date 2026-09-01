@@ -40,6 +40,12 @@ NON_SHIPPING_PATH_PREFIXES = (
 )
 NON_SHIPPING_PATHS = frozenset(
     {
+        # CI image-verdict plumbing controls when an existing commit image is
+        # built, aliased, or tested; none of these files enter the image or the
+        # application. Changes confined to this harness are operational fixes,
+        # not user-facing release-note events.
+        ".github/workflows/docker-image-build-dev.yml",
+        ".github/workflows/tests.yml",
         # The upstream-comparison ledger records changes that have ALREADY
         # shipped, with their squash SHA and containing release tag. A
         # post-release backfill of those fields is bookkeeping about the past,
@@ -49,7 +55,10 @@ NON_SHIPPING_PATHS = frozenset(
         "CHANGES-vs-upstream.md",
         "changelog.d/README.md",
         "messages.pot",
+        "scripts/alias-e2e-image.sh",
         "scripts/check_changelog_diff.py",
+        "scripts/check-e2e-image-producer.py",
+        "scripts/resolve-e2e-image.sh",
     }
 )
 

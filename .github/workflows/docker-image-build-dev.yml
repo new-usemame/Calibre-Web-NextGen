@@ -45,6 +45,7 @@ concurrency:
 # package". Mirrors the release workflow minus id-token/attestations,
 # which the dev workflow explicitly disables (provenance: false).
 permissions:
+  actions: read
   contents: read
   packages: write
 jobs:
@@ -620,7 +621,10 @@ jobs:
   alias-image-neutral-commit:
     name: Alias unchanged image to commit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The source producer may legitimately consume its full 95-minute
+    # classify+mirror+architecture+merge budget. The script stops sooner when
+    # that exact run/job fails and never substitutes the floating :dev tag.
+    timeout-minutes: 100
     needs: classify
     if: needs.classify.outputs.alias_image == 'true'
     steps:
@@ -644,8 +648,11 @@ jobs:
 
       - name: Publish immutable commit alias
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           IMAGE_SOURCE: ${{ needs.classify.outputs.image_source }}
           SUBJECT_SHA: ${{ github.sha }}
         run: |
           base="ghcr.io/${{ github.repository_owner }}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
-          bash scripts/alias-e2e-image.sh "$base" "$IMAGE_SOURCE" "$SUBJECT_SHA"
+          bash scripts/alias-e2e-image.sh \
+            "$base" "$IMAGE_SOURCE" "$SUBJECT_SHA" 191 30 \
+            "${{ github.repository }}" push "${{ github.api_url }}"

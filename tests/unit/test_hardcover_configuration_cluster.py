@@ -11,8 +11,13 @@ only for the DOM invariant that browsers enforce (unique IDs / form nesting).
 
 from __future__ import annotations
 
+import inspect
+import re
 from pathlib import Path
+from types import SimpleNamespace
 
+import flask
+import jinja2
 import pytest
 
 
@@ -599,3 +604,217 @@ def test_scheduler_logs_presence_and_source_without_token_value(monkeypatch, cap
     assert "Hardcover token is configured via HARDCOVER_TOKEN" in caplog.text
     assert token not in caplog.text
     assert len(jobs) == 1
+
+
+def _enabled_hardcover_config():
+    return SimpleNamespace(
+        config_hardcover_sync=True,
+        hardcover_sync_source=lambda: "database",
+        resolved_hardcover_token=lambda: "present-not-logged",
+        hardcover_token_source=lambda: "database",
+    )
+
+
+def test_never_refresh_removes_auto_fetch_without_disabling_sync_or_other_jobs(
+    monkeypatch, caplog
+):
+    import cps.schedule as schedule
+
+    unrelated = SimpleNamespace(id="duplicate-scan", name="duplicate scan")
+    old_hardcover = SimpleNamespace(
+        id="hardcover-old", name="hardcover auto-fetch"
+    )
+    jobs = [unrelated, old_hardcover]
+
+    class FakeScheduler:
+        def get_jobs(self):
+            return list(jobs)
+
+        def remove_job(self, job_id):
+            jobs[:] = [job for job in jobs if job.id != job_id]
+
+        def schedule_task(self, _task, **kwargs):
+            jobs.append(
+                SimpleNamespace(id="hardcover-new", name=kwargs["name"])
+            )
+
+    cfg = _enabled_hardcover_config()
+    monkeypatch.setattr(schedule, "config", cfg)
+    monkeypatch.setattr(schedule, "BackgroundScheduler", FakeScheduler)
+    monkeypatch.setattr(
+        schedule,
+        "reconcile_hardcover_configuration",
+        lambda: (
+            True,
+            {"hardcover_auto_fetch_schedule": "never"},
+        ),
+    )
+    caplog.set_level("INFO")
+
+    schedule.refresh_hardcover_auto_fetch()
+
+    assert cfg.config_hardcover_sync is True
+    assert [(job.id, job.name) for job in jobs] == [
+        ("duplicate-scan", "duplicate scan")
+    ]
+    assert "Hardcover auto-fetch is off by configuration" in caplog.text
+
+
+def test_unknown_auto_fetch_schedule_warns_and_falls_back_to_weekly(
+    monkeypatch, caplog
+):
+    import cps.schedule as schedule
+
+    cfg = _enabled_hardcover_config()
+    monkeypatch.setattr(schedule, "config", cfg)
+    jobs = []
+    scheduler = SimpleNamespace(
+        schedule_task=lambda *args, **kwargs: jobs.append((args, kwargs))
+    )
+
+    schedule._schedule_hardcover_auto_fetch(
+        scheduler,
+        None,
+        configuration=(
+            True,
+            {
+                "hardcover_auto_fetch_schedule": "fortnightly",
+                "hardcover_auto_fetch_schedule_day": "sunday",
+                "hardcover_auto_fetch_schedule_hour": 2,
+            },
+        ),
+    )
+
+    assert len(jobs) == 1
+    assert "fortnightly" in caplog.text
+    assert "weekly" in caplog.text
+    trigger = jobs[0][1]["trigger"]
+    assert str(trigger).startswith("cron[")
+    assert "day_of_week='sun'" in str(trigger)
+    assert "hour='2'" in str(trigger)
+
+
+def test_missing_auto_fetch_schedule_keeps_existing_weekly_default(monkeypatch):
+    import cps.schedule as schedule
+
+    assert schedule.DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE == "weekly"
+    assert "weekly" in schedule.HARDCOVER_AUTO_FETCH_SCHEDULES
+
+    monkeypatch.setattr(schedule, "config", _enabled_hardcover_config())
+    jobs = []
+    scheduler = SimpleNamespace(
+        schedule_task=lambda *args, **kwargs: jobs.append((args, kwargs))
+    )
+
+    schedule._schedule_hardcover_auto_fetch(
+        scheduler,
+        None,
+        configuration=(True, {}),
+    )
+
+    assert len(jobs) == 1
+    trigger = jobs[0][1]["trigger"]
+    assert "day_of_week='sun'" in str(trigger)
+    assert "hour='2'" in str(trigger)
+
+
+def test_settings_writer_keeps_previous_schedule_for_invalid_post(monkeypatch):
+    from cps import cwa_functions, schedule
+
+    class SettingsDB:
+        stored = {
+            "auto_convert_target_format": "epub",
+            "hardcover_auto_fetch_schedule": "daily",
+        }
+        updates = []
+
+        def __init__(self):
+            self.cwa_default_settings = dict(self.stored)
+            self.cwa_settings = dict(self.stored)
+
+        def update_cwa_settings(self, settings):
+            self.__class__.updates.append(dict(settings))
+            self.__class__.stored.update(settings)
+
+        def get_cwa_settings(self):
+            return dict(self.__class__.stored)
+
+    SettingsDB.updates = []
+    monkeypatch.setattr(cwa_functions, "CWA_DB", SettingsDB)
+    monkeypatch.setattr(cwa_functions, "INTEGER_SETTINGS", ())
+    monkeypatch.setattr(cwa_functions, "FLOAT_SETTINGS", ())
+    monkeypatch.setattr(cwa_functions, "JSON_SETTINGS", ())
+    monkeypatch.setattr(cwa_functions, "_", lambda text, **_kwargs: text)
+    monkeypatch.setattr(cwa_functions.config, "config_kobo_sync_magic_shelves", False, raising=False)
+    monkeypatch.setattr(cwa_functions.config, "config_hardcover_sync", True, raising=False)
+    monkeypatch.setattr(cwa_functions.config, "save", lambda: None)
+    monkeypatch.setattr(cwa_functions.config, "resolved_hardcover_token", lambda: "token")
+    monkeypatch.setattr(schedule, "refresh_hardcover_auto_fetch", lambda: None)
+    monkeypatch.setattr(cwa_functions, "get_next_duplicate_scan_run", lambda _settings: None)
+    monkeypatch.setattr(
+        cwa_functions,
+        "render_title_template",
+        lambda _template, **context: {"settings": context["cwa_settings"]},
+    )
+
+    app = flask.Flask(__name__)
+    app.config.update(TESTING=True)
+    app.register_blueprint(cwa_functions.cwa_settings)
+    app.view_functions["cwa_settings.set_cwa_settings"] = inspect.unwrap(
+        cwa_functions.set_cwa_settings
+    )
+
+    response = app.test_client().post(
+        "/cwa-settings",
+        data={
+            "settings_action": "save",
+            "auto_convert_target_format": "epub",
+            "hardcover_auto_fetch_schedule": "typo-value",
+        },
+    )
+
+    assert response.status_code == 200
+    assert SettingsDB.updates[-1]["hardcover_auto_fetch_schedule"] == "daily"
+    assert SettingsDB.stored["hardcover_auto_fetch_schedule"] == "daily"
+
+
+def test_auto_fetch_ui_has_first_off_option_and_truthful_status_combinations():
+    template = (REPO_ROOT / "cps/templates/cwa_settings.html").read_text(
+        encoding="utf-8"
+    )
+    select = template.split(
+        '<select name="hardcover_auto_fetch_schedule"', 1
+    )[1].split("</select>", 1)[0]
+    option_values = re.findall(r'<option value="([^"]+)"', select)
+    assert option_values[0] == "never"
+    assert "{{_('Never (auto-fetch off)')}}" in select
+
+    status_source = template.split(
+        '<p class="cwa-settings-tooltip" role="status">', 1
+    )[1].split("</p>", 1)[0]
+    environment = jinja2.Environment(autoescape=True)
+    status_template = environment.from_string(status_source)
+
+    expected = {
+        (True, "weekly"): (
+            "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
+        ),
+        (True, "never"): (
+            "Hardcover auto-fetch is off. Reading-progress and annotation sync are unaffected."
+        ),
+        (False, "weekly"): (
+            "Hardcover sync is disabled, so auto-fetch, reading-progress sync, and annotation sync are off."
+        ),
+        (False, "never"): (
+            "Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync separately in Basic Configuration when you want reading-progress or annotation sync."
+        ),
+    }
+    for (sync_enabled, schedule_value), message in expected.items():
+        rendered = status_template.render(
+            _=lambda text: text,
+            config=SimpleNamespace(
+                hardcover_sync_enabled=lambda enabled=sync_enabled: enabled
+            ),
+            cwa_settings={"hardcover_auto_fetch_schedule": schedule_value},
+        )
+        assert message in rendered

@@ -572,9 +572,17 @@
       <div style="margin-top: 20px;">
         <p class="cwa-settings-tooltip" role="status">
           {% if config.hardcover_sync_enabled() %}
-            {{_('Hardcover sync is enabled. The schedule below controls automatic ID fetching.')}}
+            {% if cwa_settings.get('hardcover_auto_fetch_schedule', 'weekly') == 'never' %}
+              {{_('Hardcover auto-fetch is off. Reading-progress and annotation sync are unaffected.')}}
+            {% else %}
+              {{_('Hardcover sync is enabled. The schedule below controls automatic ID fetching.')}}
+            {% endif %}
           {% else %}
-            {{_('Hardcover sync is disabled. Enable it once in Basic Configuration or set HARDCOVER_SYNC_ENABLED=true.')}}
+            {% if cwa_settings.get('hardcover_auto_fetch_schedule', 'weekly') == 'never' %}
+              {{_('Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync separately in Basic Configuration when you want reading-progress or annotation sync.')}}
+            {% else %}
+              {{_('Hardcover sync is disabled, so auto-fetch, reading-progress sync, and annotation sync are off.')}}
+            {% endif %}
           {% endif %}
         </p>
         <p class="cwa-settings-tooltip">
@@ -589,6 +597,7 @@
                   style="padding: 5px; border: 1px solid transparent; border-radius: 4px; background-color: #151e2680; min-width: 200px;"
                   onchange="toggleScheduleOptions()"
                   {% if not hardcover_token_available %}disabled{% endif %}>
+            <option value="never" {% if cwa_settings['hardcover_auto_fetch_schedule'] == 'never' %}selected{% endif %}>{{_('Never (auto-fetch off)')}}</option>
             <optgroup label="{{_('Frequent Intervals')}}">
               <option value="15min" {% if cwa_settings['hardcover_auto_fetch_schedule'] == '15min' %}selected{% endif %}>{{_('Every 15 Minutes')}}</option>
               <option value="30min" {% if cwa_settings['hardcover_auto_fetch_schedule'] == '30min' %}selected{% endif %}>{{_('Every 30 Minutes')}}</option>

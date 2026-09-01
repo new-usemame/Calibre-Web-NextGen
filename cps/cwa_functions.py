@@ -44,6 +44,10 @@ INTEGER_SETTINGS = _cwa_db_module.INTEGER_SETTINGS
 FLOAT_SETTINGS = _cwa_db_module.FLOAT_SETTINGS
 JSON_SETTINGS = _cwa_db_module.JSON_SETTINGS
 from .services.background_scheduler import BackgroundScheduler, DateTrigger
+from .schedule import (
+    DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE,
+    HARDCOVER_AUTO_FETCH_SCHEDULES,
+)
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 # TaskReconnectDatabase deliberately not imported here — the post-ingest
 # reconnect endpoint uses CalibreDB.refresh_for_new_data() instead, to avoid
@@ -849,6 +853,16 @@ def set_cwa_settings():
                 elif setting == "auto_convert_target_format":
                     if value is None:
                         value = cwa_db.cwa_settings['auto_convert_target_format']
+                elif setting == "hardcover_auto_fetch_schedule":
+                    if value not in HARDCOVER_AUTO_FETCH_SCHEDULES:
+                        log.warning(
+                            "Ignoring unrecognized Hardcover auto-fetch schedule %r",
+                            value,
+                        )
+                        value = cwa_db.cwa_settings.get(
+                            setting,
+                            DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE,
+                        )
 
                 result |= {setting:value}
             

@@ -2,12 +2,12 @@
 """Regression tests for #603 — the tail of #571.
 
 Behind a sub-path reverse proxy (app mounted at https://host/cwa/), the new UI's
-Admin page rendered its "More server configuration" cards as raw
+Admin surface rendered its "More server configuration" links as raw
 ``<a href="/admin/config">`` etc. — root-absolute legacy paths that skipped the
 reverse-proxy prefix helper #571 wired into the rest of the app. So a card that
 should point at ``/cwa/admin/config`` pointed at the domain root, landing outside
 the mount (404 / breaks out of the app). Reporter @chloeroform pinned the exact
-line (Admin.tsx server-config map).
+line (the original Admin.tsx server-config map).
 
 The fix routes those hrefs through ``resourceUrl()`` — the single-source-of-truth
 prefix helper in api.ts (idempotent, leaves external/data URLs untouched, and a
@@ -24,34 +24,44 @@ import re
 import pytest
 
 _FE = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
-_ADMIN = _FE / "pages" / "Admin.tsx"
+_CONTEXTS = _FE / "lib" / "contextSidebars.ts"
+_SIDEBAR = _FE / "components" / "ContextSidebar.tsx"
 
 
-def _admin_src() -> str:
-    return _ADMIN.read_text()
+def _context_src() -> str:
+    return _CONTEXTS.read_text()
+
+
+def _sidebar_src() -> str:
+    return _SIDEBAR.read_text()
+
+
+def _navigation_items() -> list[str]:
+    """Return every leaf context-navigation item containing an href."""
+    return re.findall(r"\{[^{}]*\bhref:\s*'[^']+'[^{}]*\}", _context_src(), re.S)
 
 
 @pytest.mark.unit
-def test_admin_imports_resource_url():
-    """Admin.tsx must import the prefix helper it now depends on."""
-    src = _admin_src()
+def test_admin_context_sidebar_imports_resource_url():
+    """The context-sidebar renderer must import its legacy-link prefix helper."""
+    src = _sidebar_src()
     assert re.search(r"import\s*{[^}]*\bresourceUrl\b[^}]*}\s*from\s*'\.\./lib/api'", src), \
-        "Admin.tsx must import resourceUrl from ../lib/api"
+        "ContextSidebar.tsx must import resourceUrl from ../lib/api"
 
 
 @pytest.mark.unit
 def test_server_config_links_go_through_resource_url():
-    """The 'More server configuration' cards must build their href via
-    resourceUrl(href). RED on main, where the anchor rendered raw href={href}."""
-    src = _admin_src()
-    assert "href={resourceUrl(href)}" in src, \
-        "server-config card anchor must use href={resourceUrl(href)}"
-    # A raw legacy <a href={href}> must stay gone — this is the exact #603 bug.
-    # Native SPA cards legitimately use Wouter <Link href={href}>; its Router
+    """Classic Admin context links must build their href via resourceUrl()."""
+    src = _sidebar_src()
+    assert "href={resourceUrl(item.href)}" in src, \
+        "classic context link must use href={resourceUrl(item.href)}"
+    # A raw legacy <a href={item.href}> must stay gone — this is the exact #603
+    # bug. Native destinations legitimately use Wouter <Link href={item.href}>;
+    # its Router
     # base adds /app and the reverse-proxy prefix (#909).
-    assert not re.search(r"<a\b[^>]*href=\{href\}", src, re.S), \
-        "raw legacy <a href={href}> leaks the reverse-proxy prefix (#603)"
-    assert "<Link key={href} href={href}" in src, \
+    assert not re.search(r"<a\b[^>]*href=\{item\.href\}", src, re.S), \
+        "raw legacy <a href={item.href}> leaks the reverse-proxy prefix (#603)"
+    assert "href={item.href}" in src and "<Link" in src, \
         "native settings destinations must stay inside the SPA router"
 
 
@@ -68,34 +78,34 @@ def test_no_server_setting_falls_through_to_classic_when_a_spa_route_exists():
     so pin the rule instead: cross-check every Classic row against the SPA's own
     route table.
     """
-    src = _admin_src()
     routes = (_FE / "lib" / "routes.ts").read_text()
     spa_paths = set(re.findall(r":\s*'(/[^']*)'", routes))
     assert "/duplicates" in spa_paths, "sanity: routes.ts should still own /duplicates"
 
-    block = re.search(r"const SERVER_SETTINGS[^=]*=\s*\[(.*?)\];", src, re.S)
-    assert block, "SERVER_SETTINGS array not found"
-    for entry in re.findall(r"\{[^{}]*href:[^{}]*\}", block.group(1)):
+    items = _navigation_items()
+    assert items, "context navigation items not found"
+    for entry in items:
         href = re.search(r"href:\s*'([^']+)'", entry).group(1)
         path = href.split("#")[0].split("?")[0]
-        if "spa: true" in entry:
+        if "classic: true" not in entry:
             continue
         assert path not in spa_paths, (
-            f"{path!r} has a native SPA route but this card falls through to "
+            f"{path!r} has a native SPA route but this item falls through to "
             f"Classic (#909). Mark it `spa: true` or point it somewhere else."
         )
 
 
 @pytest.mark.unit
 def test_server_settings_are_prefixable_app_paths():
-    """Every SERVER_SETTINGS entry must be a root-absolute in-app legacy path
+    """Every classic context item must be a root-absolute in-app legacy path
     (starts with '/', not an external/protocol-relative/data URL) so resourceUrl
     actually applies the mount prefix. If one were made external, resourceUrl
     would (correctly) leave it alone and the pin above would be a false comfort."""
-    src = _admin_src()
-    block = re.search(r"const SERVER_SETTINGS[^=]*=\s*\[(.*?)\];", src, re.S)
-    assert block, "SERVER_SETTINGS array not found"
-    hrefs = re.findall(r"href:\s*'([^']+)'", block.group(1))
+    hrefs = [
+        re.search(r"href:\s*'([^']+)'", item).group(1)
+        for item in _navigation_items()
+        if "classic: true" in item
+    ]
     assert len(hrefs) >= 5, f"expected the full legacy-config set, found {hrefs}"
     for h in hrefs:
         assert h.startswith("/"), f"{h!r} is not a root-absolute path"

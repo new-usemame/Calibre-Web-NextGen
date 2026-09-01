@@ -31,11 +31,11 @@
 {% if page == 'root' and current_user.is_authenticated and not current_user.is_anonymous and current_user.library_mode() == 'personal_library' and not current_user.my_library_intro_dismissed %}
 <div id="my-library-intro" class="alert alert-info alert-dismissible" role="status">
   <button type="button" class="close" id="dismiss-my-library-intro" aria-label="{{ _('Dismiss library introduction') }}"><span aria-hidden="true">&times;</span></button>
-  <strong>{{ _('New: your own library') }}</strong>
+  <strong>{{ _('New: My Library') }}</strong>
   {% if current_user.role_browse_global() %}
-    {{ _('The library is shared and holds every book once — what you keep is your own selection. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.') }}
+    {{ _('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.') }}
   {% else %}
-    {{ _('The library is shared and holds every book once — what you keep is your own selection. Nothing you had is gone. Your administrator manages what enters your selection.') }}
+    {{ _('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Your administrator manages what enters it.') }}
   {% endif %}
 </div>
 {% endif %}
@@ -274,7 +274,7 @@
         <div class="col-xs-12 text-center">
           <h3>{{ _('Your library is empty') }}</h3>
           {% if current_user.role_browse_global() %}
-            <p>{{ _('Nothing is missing — the whole library is still on the server. What you see here is your own selection. Add books from the global library; they appear here and on your e-reader.') }}</p>
+            <p>{{ _('Nothing is missing — the global library is still on the server. What you see here is your selection in My Library. Add books from the global library; they appear here and on your e-reader.') }}</p>
             <a class="btn btn-primary" href="{{ url_for('web.global_library') }}">{{ _('Browse the global library') }}</a>
           {% else %}
             <p>{{ _('Your administrator chooses which books are in your library. Ask them to add books, or to let you browse the global library.') }}</p>

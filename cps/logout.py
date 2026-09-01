@@ -4,7 +4,7 @@
 
 from flask import session as flask_session
 
-from . import config, oauth_auto_redirect, ub
+from . import config, oauth_auto_redirect, spa, ub
 from .cw_login import current_user, logout_user
 
 
@@ -24,3 +24,4 @@ def cleanup_local_logout():
     flask_session.pop(oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY, None)
     oauth_auto_redirect.clear_auto_redirect_state(flask_session)
     oauth_auto_redirect.clear_provider_oauth_states(flask_session)
+    spa.clear_prefer_classic_session()

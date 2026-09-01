@@ -54,10 +54,11 @@ test('JavaScript-disabled browser self-heals to prefixed Classic', async ({ brow
     } else {
       await expect(page.locator('#books').first()).toBeVisible();
     }
-    const classic = (await context.cookies()).find((cookie) =>
-      cookie.name === 'cwng_prefer_classic');
-    expect(classic?.value).toBe('1');
-    expect(classic?.path).toBe('/cwa');
+    const cookies = await context.cookies();
+    expect(cookies.find((cookie) => cookie.name === 'cwng_prefer_classic')).toBeUndefined();
+    const session = cookies.find((cookie) => cookie.name.endsWith('session'));
+    expect(session?.expires).toBe(-1);
+    expect(session?.path).toBe('/cwa');
   } finally {
     await context.close();
   }

@@ -377,13 +377,13 @@
         <div style="background: #202c34a3; padding: 2rem;">
           <div>
             <input type="radio" name="library_mode" id="library_mode_monolibrary" value="monolibrary" {% if content.library_mode() == 'monolibrary' %}checked{% endif %} {% if profile and not content.role_browse_global() %}disabled{% endif %} style="accent-color: var(--color-secondary);">
-            <label for="library_mode_monolibrary">{{_('The whole library')}}</label>
+            <label for="library_mode_monolibrary">{{_('The global library')}}</label>
             <p class="help-block">{{_('Everything on the server, including every new book added to it.')}}</p>
           </div>
           <div style="margin-top: 12px;">
             <input type="radio" name="library_mode" id="library_mode_personal" value="personal_library" {% if content.library_mode() == 'personal_library' %}checked{% endif %} {% if profile and not content.role_browse_global() %}disabled{% endif %} style="accent-color: var(--color-secondary);">
-            <label for="library_mode_personal">{{ profile and _('My selection') or _('Own selection') }}</label>
-            <p class="help-block">{{ profile and _('Only the books you choose. Add them from the global library; remove them any time.') or _('Switching a user to their own selection first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.') }}</p>
+            <label for="library_mode_personal">{{_('My Library')}}</label>
+            <p class="help-block">{{ profile and _('Only the books you choose. Add them from the global library; remove them any time.') or _('Switching a user to My Library first fills it with everything they can see now, so nothing changes for them until they remove books themselves. Switching back keeps the selection intact but unused.') }}</p>
           </div>
           {% if profile and not content.role_browse_global() %}
           <p class="settings-explanation">{{_('Your library contents are managed by an administrator.')}}</p>

@@ -509,6 +509,14 @@ export interface LibraryModePayload {
   library_mode_managed: boolean;
 }
 
+/** Server-wide state of the admin "Try My Library" intro card — shared by all
+ *  administrators and persisted in app.db, so it survives sessions and browsers. */
+export interface MyLibraryIntroState {
+  status: 'not_enabled' | 'enabled';
+  dismissed: boolean;
+  snapshot_accounts: number;
+}
+
 export interface GlobalLibraryPage extends BooksPage {
   library_mode: 'monolibrary' | 'personal_library';
   filter: 'all' | 'not_in_my_library';

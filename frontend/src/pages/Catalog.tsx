@@ -1032,6 +1032,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <div
           ref={setGridNode}
           data-testid="catalog-grid"
+          data-catalog-column-count={columnCount}
           data-virtualized-grid={usesGrid ? 'true' : undefined}
           className={`${styles.grid} ${styles[`density_${density}`]}`}
         >
@@ -1088,7 +1089,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <>{personalLibrary && isPlainLibrary && !search && !filterActive && readFilter === 'all' ? (
           <EmptyState title={t('Your library is empty')}
             message={me?.role?.browse_global
-              ? t('Nothing is missing — the whole library is still on the server. What you see here is your own selection. Add books from the global library; they appear here and on your e-reader.')
+              ? t('Nothing is missing — the global library is still on the server. What you see here is your selection in My Library. Add books from the global library; they appear here and on your e-reader.')
               : t('Your administrator chooses which books are in your library. Ask them to add books, or to let you browse the global library.')}>
             {me?.role?.browse_global && <Link href="/global" className={styles.uploadLink}>{t('Browse the global library')}</Link>}
           </EmptyState>

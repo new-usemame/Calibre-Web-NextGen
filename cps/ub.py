@@ -656,6 +656,36 @@ class DismissedDuplicateGroup(Base):
         return '<DismissedDuplicateGroup %d: user=%d hash=%s>' % (self.id, self.user_id, self.group_hash)
 
 
+class MyLibraryAdminIntro(Base):
+    """Server-wide state for the admin "Try My Library" intro card.
+
+    Single-row table (id is always 1): the card's state is shared by every
+    administrator and must survive sessions, so it lives in app.db rather than
+    per-user rows or browser storage. ``snapshot_json`` holds the pre-enable
+    restore point — {user_id: {"browse_global": bool, "has_own_library": bool}}
+    for every account the enable action touched — so Undo is a true restore
+    rather than a re-derivation. Membership rows and the seed-once fence are
+    deliberately NOT part of the snapshot: undo leaves each selection dormant
+    (the keep-dormant guarantee), exactly like a per-user mode switch back to
+    the global library.
+    """
+    __tablename__ = 'my_library_admin_intro'
+
+    STATUS_NOT_ENABLED = 'not_enabled'
+    STATUS_ENABLED = 'enabled'
+
+    id = Column(Integer, primary_key=True)
+    status = Column(String(16), nullable=False, default=STATUS_NOT_ENABLED)
+    dismissed = Column(Boolean, nullable=False, default=False)
+    snapshot_json = Column(Text, nullable=True)
+    updated_at = Column(DateTime, nullable=False,
+                        default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))
+
+    def __repr__(self):
+        return '<MyLibraryAdminIntro status=%s dismissed=%s>' % (self.status, self.dismissed)
+
+
 # Baseclass representing Relationship between books and Shelfs in Calibre-Web in app.db (N:M)
 class BookShelf(Base):
     __tablename__ = 'book_shelf_link'
@@ -3434,6 +3464,20 @@ def migrate_dismissed_duplicate_groups_table(engine, _session):
         print(f"[dup-dismiss-migration] Failed to add duplicate_key column: {e}", flush=True)
 
 
+def migrate_my_library_admin_intro_table(engine, _session):
+    """Create the single-row my_library_admin_intro table idempotently.
+
+    Fresh installs get it from Base.metadata.create_all; this covers upgraded
+    databases. checkfirst=True makes the call a no-op once the table exists.
+    """
+    try:
+        Base.metadata.create_all(
+            engine, tables=[MyLibraryAdminIntro.__table__], checkfirst=True,
+        )
+    except Exception as e:
+        print(f"[my-library-intro-migration] Failed to create table: {e}", flush=True)
+
+
 def migrate_book_cover_preview_table(engine, _session):
     """Create the book_cover_preview table if it doesn't exist.
     Idempotent — `BookCoverPreview.__table__.create(engine, checkfirst=True)`
@@ -4805,6 +4849,7 @@ def migrate_Database(_session):
     migrate_notice_tables(engine, _session)
     migrate_kepub_package_repair_disposition(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)
+    migrate_my_library_admin_intro_table(engine, _session)
 
     # Ensure progress syncing tables in app.db (user-related tables).
     # Schema invariant — must not be gated on KOReader sync being enabled.

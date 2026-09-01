@@ -1,9 +1,12 @@
 import { useState, useEffect, type ReactNode } from 'react';
+import { useLocation } from 'wouter';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
+import { ContextSidebar } from './ContextSidebar';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { SkipLink } from './SkipLink';
 import { UserNoticeBanner } from './UserNotices';
+import { contextSidebarForLocation } from '../lib/contextSidebars';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
@@ -15,6 +18,8 @@ interface AppShellProps {
 
 export function AppShell({ userName, instanceName, onLogout, children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [location] = useLocation();
+  const contextSidebar = contextSidebarForLocation(location);
 
   // Lock the page behind the mobile drawer: overscroll-behavior only stops scroll
   // chaining AT the drawer's edge, not touches on the scrim, so without this the
@@ -34,7 +39,16 @@ export function AppShell({ userName, instanceName, onLogout, children }: AppShel
       <UserNoticeBanner />
       <AnnouncementBanner />
       <div className={styles.body}>
-        <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} onNavigate={() => setDrawerOpen(false)} />
+        {contextSidebar ? (
+          <ContextSidebar
+            context={contextSidebar}
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            onNavigate={() => setDrawerOpen(false)}
+          />
+        ) : (
+          <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} onNavigate={() => setDrawerOpen(false)} />
+        )}
         {/* The one <main> landmark (SC 1.3.1); tabIndex=-1 lets route changes
             move focus here (see useRouteA11y). */}
         <main id="main" tabIndex={-1} className={styles.content}>

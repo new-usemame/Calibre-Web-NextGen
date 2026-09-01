@@ -11,10 +11,9 @@ Beyond being surprising navigation, the new tab landed users on a classic
 page that showed the "Switch to New UI" controls again, which read as the
 new-UI choice being lost (#739's most visible trigger).
 
-The fix drops ``target="_blank"`` from the server-settings cards and swaps
-the misleading external-link glyph for a chevron. Genuinely external links
+The fix drops ``target="_blank"`` from the server-settings navigation. Genuinely external links
 elsewhere (GitHub/Discord in the top bar, download/export links) keep
-their new-tab behaviour — this pin is scoped to Admin.tsx only.
+their new-tab behaviour — this pin is scoped to the Admin context navigation.
 
 Supersedes ``test_584_admin_legacy_link_new_tab.py`` (removed): #584's
 new-tab behaviour was a deliberate workaround for "entering a sub-menu
@@ -30,21 +29,24 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ADMIN_TSX = REPO_ROOT / "frontend" / "src" / "pages" / "Admin.tsx"
+CONTEXT_SIDEBAR_TSX = REPO_ROOT / "frontend" / "src" / "components" / "ContextSidebar.tsx"
+CONTEXT_DEFINITIONS_TS = REPO_ROOT / "frontend" / "src" / "lib" / "contextSidebars.ts"
 
 
 def test_admin_server_settings_cards_navigate_same_tab():
-    src = ADMIN_TSX.read_text(encoding="utf-8")
+    src = CONTEXT_SIDEBAR_TSX.read_text(encoding="utf-8")
     assert 'target="_blank"' not in src, (
-        "Admin.tsx must not open in-app configuration pages in a new tab "
+        "Admin context navigation must not open in-app pages in a new tab "
         "(issue #738) — if a genuinely external link was added to this page, "
-        "scope this pin to the SERVER_SETTINGS block instead."
+        "scope this pin to classic context items instead."
     )
 
 
 def test_admin_cards_do_not_use_external_link_glyph():
-    src = ADMIN_TSX.read_text(encoding="utf-8")
+    src = CONTEXT_SIDEBAR_TSX.read_text(encoding="utf-8")
+    definitions = CONTEXT_DEFINITIONS_TS.read_text(encoding="utf-8")
     assert "ExternalLink" not in src, (
-        "The server-settings cards are in-app navigation; the external-link "
-        "icon implies a new tab/site and should stay off this page (#738)."
+        "The Admin destinations are in-app navigation; the external-link icon "
+        "implies a new tab/site and should stay off the context rail (#738)."
     )
+    assert "ExternalLink" not in definitions

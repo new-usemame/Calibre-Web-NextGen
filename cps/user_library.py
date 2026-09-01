@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+import json as _json
 
 from sqlalchemy import delete, exists, false
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -286,6 +287,169 @@ def dismiss_intro(user, *, app_session=None):
     user.my_library_intro_dismissed = True
     app_session.commit()
     mark_response_user_specific()
+
+
+# ── Admin "Try My Library" intro card (server-wide, shared across admins) ────
+#
+# State lives in the single-row my_library_admin_intro table. The enable action
+# snapshots every targeted account's (browse_global, has_own_library) FIRST so
+# undo is a true restore; the seeded fence and membership rows are never part
+# of the snapshot, so an undone account re-enables later with its selection
+# intact and dormant — the same keep-dormant guarantee as a per-user switch.
+
+
+def _intro_row(*, app_session=None):
+    """Fetch-or-create the single intro state row."""
+    app_session = _session(app_session)
+    row = app_session.query(ub.MyLibraryAdminIntro).order_by(
+        ub.MyLibraryAdminIntro.id.asc()).first()
+    if row is None:
+        row = ub.MyLibraryAdminIntro(
+            id=1, status=ub.MyLibraryAdminIntro.STATUS_NOT_ENABLED)
+        app_session.add(row)
+        app_session.commit()
+    return row
+
+
+def intro_state_payload(*, app_session=None):
+    """Stable API contract for the admin intro card."""
+    row = _intro_row(app_session=app_session)
+    snapshot = _json.loads(row.snapshot_json) if row.snapshot_json else {}
+    return {
+        "status": row.status,
+        "dismissed": bool(row.dismissed),
+        "snapshot_accounts": len(snapshot),
+    }
+
+
+def _non_anonymous_users(app_session):
+    return (app_session.query(ub.User)
+            .filter(ub.User.role.op('&')(constants.ROLE_ANONYMOUS)
+                    != constants.ROLE_ANONYMOUS)
+            .order_by(ub.User.id.asc()).all())
+
+
+def enable_my_library_for_all(*, app_session=None, cdb=None,
+                              chunk_size=SEED_CHUNK_SIZE):
+    """Grant browse-global + personal mode to every non-anonymous account.
+
+    Idempotent at the state level: a second enable while already enabled is a
+    no-op that reports the current payload, so the snapshot is never clobbered
+    by a rerun. Per-account failures roll back only that account (the same
+    batch policy as the seed-once migration); the snapshot was taken before
+    any mutation, so undo remains a correct restore regardless.
+    """
+    app_session = _session(app_session)
+    cdb = cdb or calibre_db
+    row = _intro_row(app_session=app_session)
+    if row.status == ub.MyLibraryAdminIntro.STATUS_ENABLED:
+        return intro_state_payload(app_session=app_session), []
+
+    users = _non_anonymous_users(app_session)
+    snapshot = {
+        int(user.id): {
+            "browse_global": bool(user.role_browse_global()),
+            "has_own_library": bool(getattr(user, "has_own_library", False)),
+        }
+        for user in users
+    }
+    report = []
+    for user in users:
+        was_seeded = bool(getattr(user, "user_library_seeded", False))
+        previous_mode = mode_for_user(user)
+        try:
+            if not user.role_browse_global():
+                user.role |= constants.ROLE_BROWSE_GLOBAL
+            if not was_seeded:
+                prepare_user_library_seed(
+                    user, chunk_size=chunk_size,
+                    app_session=app_session, cdb=cdb,
+                )
+            set_library_mode(
+                user, constants.LIBRARY_MODE_PERSONAL,
+                app_session=app_session, cdb=cdb, chunk_size=chunk_size,
+                seed_rows_prepared=not was_seeded,
+            )
+            report.append({
+                "user_id": int(user.id),
+                "name": user.name,
+                "status": ("already_personal"
+                           if previous_mode == constants.LIBRARY_MODE_PERSONAL
+                           else "switched"),
+                "seeded_books": (
+                    membership_count(user.id, app_session)
+                    if not was_seeded else 0
+                ),
+                "library_mode": mode_for_user(user),
+            })
+        except Exception as ex:  # one account must not abort the batch
+            app_session.rollback()
+            report.append({
+                "user_id": int(user.id),
+                "name": user.name,
+                "status": "error",
+                "seeded_books": 0,
+                "library_mode": mode_for_user(user),
+                "error": str(ex),
+            })
+
+    row.snapshot_json = _json.dumps(snapshot)
+    row.status = ub.MyLibraryAdminIntro.STATUS_ENABLED
+    row.dismissed = False
+    app_session.commit()
+    invalidate_request_cache()
+    return intro_state_payload(app_session=app_session), report
+
+
+def undo_my_library_for_all(*, app_session=None):
+    """Restore the exact pre-enable roles and modes from the snapshot.
+
+    Selections are untouched: user_library_seeded and membership rows stay, so
+    the account's set lies dormant and is restored verbatim by a later enable.
+    Accounts deleted since the snapshot are skipped. Restoring the snapshot's
+    browse_global value in BOTH directions is deliberate — undo means "as if
+    the enable never happened", not "never strip a role".
+    """
+    app_session = _session(app_session)
+    row = _intro_row(app_session=app_session)
+    if row.status != ub.MyLibraryAdminIntro.STATUS_ENABLED \
+            or not row.snapshot_json:
+        raise UserLibraryError(
+            "Nothing to undo: My Library has not been enabled from this card."
+        )
+    snapshot = _json.loads(row.snapshot_json)
+    restored = 0
+    for user_id_text, snap in snapshot.items():
+        user = app_session.query(ub.User).filter(
+            ub.User.id == int(user_id_text)).first()
+        if user is None:
+            continue
+        if snap.get("browse_global"):
+            user.role |= constants.ROLE_BROWSE_GLOBAL
+        else:
+            user.role &= ~constants.ROLE_BROWSE_GLOBAL
+        user.has_own_library = bool(snap.get("has_own_library"))
+        restored += 1
+    row.status = ub.MyLibraryAdminIntro.STATUS_NOT_ENABLED
+    row.dismissed = False
+    row.snapshot_json = None
+    app_session.commit()
+    invalidate_request_cache()
+    return intro_state_payload(app_session=app_session), restored
+
+
+def dismiss_my_library_admin_intro(*, app_session=None):
+    """Permanently dismiss the card; only the enabled state offers dismiss."""
+    app_session = _session(app_session)
+    row = _intro_row(app_session=app_session)
+    if row.status != ub.MyLibraryAdminIntro.STATUS_ENABLED:
+        raise UserLibraryError(
+            "The introduction can only be dismissed once My Library is on."
+        )
+    row.dismissed = True
+    app_session.commit()
+    mark_response_user_specific()
+    return intro_state_payload(app_session=app_session)
 
 
 def _require_enabled_library(user):

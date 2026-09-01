@@ -945,6 +945,18 @@ jobs:
           E2E_BASE_URL: http://localhost:8083
         run: npm run test:e2e
 
+      # Server-state specs (e.g. the My Library admin intro card) flip settings
+      # for EVERY account at once, so they cannot interleave with the parallel
+      # lanes above — the broad projects always testIgnore them. This separate
+      # invocation is what serializes them after the main run.
+      - name: Run server-state e2e lane
+        working-directory: frontend
+        env:
+          CI: 'true'
+          E2E_BASE_URL: http://localhost:8083
+          E2E_SERVER_STATE: '1'
+        run: npx playwright test --project=server-state-chromium
+
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
         if: always()

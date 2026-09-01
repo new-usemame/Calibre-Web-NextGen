@@ -148,6 +148,61 @@ def admin_migrate_my_library():
     })
 
 
+@api_v1.route("/admin/my-library/intro")
+@login_required_if_no_ano
+def admin_my_library_intro_state():
+    """Server-wide state of the admin "Try My Library" intro card."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    return jsonify(user_library.intro_state_payload())
+
+
+@api_v1.route("/admin/my-library/intro/enable", methods=["POST"])
+@login_required_if_no_ano
+def admin_my_library_intro_enable():
+    """Snapshot, then grant browse-global + personal mode to non-guest users."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    payload, report = user_library.enable_my_library_for_all()
+    return jsonify({
+        **payload,
+        "results": report,
+        "accounts": len(report),
+        "seeded_books": sum(row["seeded_books"] for row in report),
+        "errors": sum(row["status"] == "error" for row in report),
+    })
+
+
+@api_v1.route("/admin/my-library/intro/undo", methods=["POST"])
+@login_required_if_no_ano
+def admin_my_library_intro_undo():
+    """Restore the snapshot taken at enable time; selections stay dormant."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    try:
+        payload, restored = user_library.undo_my_library_for_all()
+    except user_library.UserLibraryError as ex:
+        return _err("intro_undo_rejected", str(ex), 409)
+    return jsonify({**payload, "restored_accounts": restored})
+
+
+@api_v1.route("/admin/my-library/intro/dismiss", methods=["POST"])
+@login_required_if_no_ano
+def admin_my_library_intro_dismiss():
+    """Permanently dismiss the card (offered only in the enabled state)."""
+    guard = _require_admin()
+    if guard:
+        return guard
+    try:
+        payload = user_library.dismiss_my_library_admin_intro()
+    except user_library.UserLibraryError as ex:
+        return _err("intro_dismiss_rejected", str(ex), 409)
+    return jsonify(payload)
+
+
 @api_v1.route(
     "/admin/users/<int:user_id>/my-library/<int:book_id>",
     methods=["PUT"],

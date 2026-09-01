@@ -1,3 +1,7 @@
-### Fixed
+### Changed
 
-- **Opening a shared new-interface link no longer forgets a deliberate Classic-interface choice.** Classic remains selected for later library visits after following a new-interface book or page link; only using “Back to New UI” changes the saved preference.
+- **Classic is now a temporary compatibility fallback instead of a saved browser preference.** The new interface is restored after login, logout, or a new browser session. Existing year-long Classic cookies are removed automatically, and Classic’s “Back to New UI” control still returns immediately.
+
+### Removed
+
+- **The new interface’s account menu no longer includes a permanent switch to Classic.** Its account, administration, upload, sign-in, and sign-out actions are unchanged.

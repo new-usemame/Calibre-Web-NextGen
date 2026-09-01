@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Undo2, Sparkles, Shield, UploadCloud } from 'lucide-react';
+import { BookMarked, LogIn, LogOut, Menu, Search, ChevronDown, User, Bug, BookOpen, Sparkles, Shield, UploadCloud } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { GithubMark, DiscordMark } from './BrandIcons';
 import { KofiMark, KOFI_URL } from './KofiMark';
 import { BrandName } from './BrandName';
 import { Avatar } from './Avatar';
-import { BASE_PREFIX } from '../lib/api';
 import { useMe } from '../lib/queries';
 import { AUTH_ROUTES } from '../lib/routes';
 import { useT } from '../lib/i18n';
@@ -197,15 +196,6 @@ function HelpMenu() {
   );
 }
 
-/** Leave the SPA and return to the classic (legacy) interface. Uses a full-page
- *  navigation (not wouter) because the classic UI is a separate server-rendered
- *  surface, and appends a one-shot marker so the classic page offers the short
- *  "what made you switch back?" feedback prompt on arrival. The base prefix (if
- *  the app is served under a reverse-proxy subpath, before /app) is preserved. */
-function backToClassicView() {
-  window.location.assign(BASE_PREFIX + '/?cwng_feedback=newui');
-}
-
 function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => void }) {
   const t = useT();
   const { open, close, triggerRef, wrapperProps, onTriggerClick } = useMenu();
@@ -256,7 +246,6 @@ function UserMenu({ userName, onLogout }: { userName: string; onLogout: () => vo
           {isAdmin && (
             <MenuItem icon={<Shield size={15} />} label={t('Admin')} to="/admin" onSelect={close} />
           )}
-          <MenuItem icon={<Undo2 size={15} />} label={t('Back to the classic view')} onClick={backToClassicView} onSelect={close} />
           {isGuest ? (
             <MenuItem icon={<LogIn size={15} />} label={t('Sign in')} to={AUTH_ROUTES.login} onSelect={close} />
           ) : (

@@ -16,7 +16,7 @@ import type {
   BookMetadata, MetadataUpdate, UploadResult, AdminUser, AboutInfo, TaskItem, AuthConfig,
   NoticeInbox, KoboTwoWaySettings, KoboTwoWayBookState, KoboTwoWayUpdate,
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
-  DeviceDeliveryResult,
+  DeviceDeliveryResult, MyLibraryIntroState,
   KoboSyncToken,
 } from './api';
 
@@ -839,6 +839,60 @@ export function useMigrateMyLibrary() {
     }>('/api/v1/admin/my-library/migrate', userId === undefined ? {} : { user_id: userId }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });
+}
+
+// ── Admin "Try My Library" intro card (server-wide state) ───────────────────
+
+export function useMyLibraryIntro() {
+  return useQuery<MyLibraryIntroState>({
+    queryKey: ['admin-my-library-intro'],
+    queryFn: () => apiGet<MyLibraryIntroState>('/api/v1/admin/my-library/intro'),
+  });
+}
+
+function useIntroMutation<TExtra extends object>(path: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<MyLibraryIntroState & TExtra>(path, {}),
+    onSuccess: (data) => {
+      // Store only the state shape; the action summaries (results, counts)
+      // travel to the caller through the mutation's own onSuccess data.
+      qc.setQueryData<MyLibraryIntroState>(['admin-my-library-intro'], {
+        status: data.status,
+        dismissed: data.dismissed,
+        snapshot_accounts: data.snapshot_accounts,
+      });
+      // Enable/undo change every account's roles + mode; the user cards and
+      // the caller's own mode (sidebar My Library/Global Library split) move.
+      void qc.invalidateQueries({ queryKey: ['admin-users'] });
+      void qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export interface IntroEnableResult extends MyLibraryIntroState {
+  results: MyLibraryMigrationRow[];
+  accounts: number;
+  seeded_books: number;
+  errors: number;
+}
+
+export function useEnableMyLibraryIntro() {
+  return useIntroMutation<Pick<IntroEnableResult, 'results' | 'accounts' | 'seeded_books' | 'errors'>>(
+    '/api/v1/admin/my-library/intro/enable',
+  );
+}
+
+export function useUndoMyLibraryIntro() {
+  return useIntroMutation<{ restored_accounts: number }>(
+    '/api/v1/admin/my-library/intro/undo',
+  );
+}
+
+export function useDismissMyLibraryAdminIntro() {
+  return useIntroMutation<Record<string, never>>(
+    '/api/v1/admin/my-library/intro/dismiss',
+  );
 }
 
 export function useAdminAddBookToLibrary() {

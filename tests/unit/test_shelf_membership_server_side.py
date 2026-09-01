@@ -8,6 +8,7 @@ import inspect
 import pytest
 from flask import Flask
 from sqlalchemy import create_engine, event, true
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from cps import constants, db, ub
@@ -18,6 +19,18 @@ pytestmark = pytest.mark.unit
 MANAGED_REFUSAL = (
     "This book is not in your library. Ask an administrator to add it to "
     "My Library before adding it to a shelf."
+)
+MANAGED_OWNER_REFUSAL = (
+    "This book is not in the shelf owner's library. The shelf owner cannot "
+    "browse the global library; an administrator must add it to their My "
+    "Library first."
+)
+GENERIC_OWNER_REFUSAL = (
+    "This book cannot be added to this shelf. Ask an administrator for help."
+)
+INVALID_OWNER_REFUSAL = (
+    "This shelf has an invalid owner. Ask an administrator to repair it "
+    "before adding books."
 )
 
 
@@ -67,13 +80,19 @@ def shelf_server(monkeypatch):
     session.commit()
 
     def common_filters(**kwargs):
-        if kwargs.get("allow_show_global"):
-            return true()
-        return db.Books.id.in_(
-            session.query(ub.UserLibraryBook.book_id).filter(
-                ub.UserLibraryBook.user_id == int(user.id)
+        filter_user = kwargs.get("user") or user
+        visibility_filter = true()
+        if filter_user.filter_language() != "all":
+            visibility_filter &= db.Books.languages.any(
+                db.Languages.lang_code == filter_user.filter_language()
             )
-        )
+        if not kwargs.get("allow_show_global"):
+            visibility_filter &= db.Books.id.in_(
+                session.query(ub.UserLibraryBook.book_id).filter(
+                    ub.UserLibraryBook.user_id == int(filter_user.id)
+                )
+            )
+        return visibility_filter
 
     cdb = type("TestCalibreDB", (), {
         "session": session,
@@ -122,8 +141,8 @@ def _shelf_count(session, shelf_id, book_id):
     ).count()
 
 
-def test_api_adds_global_book_to_my_library_before_shelf(shelf_server):
-    """A non-SPA caller gets the documented membership-first invariant."""
+def test_owner_add_to_own_shelf_grants_membership(shelf_server):
+    """An owner gesture keeps the documented membership-first invariant."""
     app, session, user, shelf = shelf_server
 
     response = app.test_client().post("/api/v1/shelves/9/books/2")
@@ -138,10 +157,254 @@ def test_api_adds_global_book_to_my_library_before_shelf(shelf_server):
     assert _shelf_count(session, shelf.id, 2) == 1
 
 
-def test_api_refuses_managed_user_without_global_browse(shelf_server):
+def test_non_owner_repeat_add_does_not_grant_owner_membership(shelf_server):
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="shelf-owner",
+        email="shelf-owner@example.invalid",
+        password="",
+        role=constants.ROLE_BROWSE_GLOBAL,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    shelf.books.append(ub.BookShelf(shelf=shelf.id, book_id=2, order=1))
+    session.commit()
+    memberships_before = _membership_count(session, owner.id, 2)
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 409, response.get_json()
+    assert response.get_json()["error"]["code"] == "conflict"
+    assert _membership_count(session, owner.id, 2) == memberships_before
+    assert _shelf_count(session, shelf.id, 2) == 1
+
+
+def test_concurrent_shelf_insert_keeps_prepared_owner_membership(
+        shelf_server, monkeypatch):
+    from cps import shelf as shelf_module
+    from cps.api import shelves as shelves_api
+
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="shelf-owner",
+        email="shelf-owner@example.invalid",
+        password="",
+        role=constants.ROLE_BROWSE_GLOBAL,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+    monkeypatch.setattr(
+        shelves_api,
+        "add_book_to_shelf",
+        lambda *_args: (
+            shelf_module.SHELF_ALREADY_PRESENT,
+            "Book is already part of the shelf: Read later",
+        ),
+    )
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 409, response.get_json()
+    assert response.get_json()["error"]["code"] == "conflict"
+    assert _membership_count(session, owner.id, 2) == 1
+
+
+def test_non_owner_restricted_book_refusal_does_not_grant_owner_membership(
+        shelf_server):
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="shelf-owner",
+        email="shelf-owner@example.invalid",
+        password="",
+        role=constants.ROLE_BROWSE_GLOBAL,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    actor.default_language = "fra"
+    session.query(db.Books).filter_by(id=2).one().languages = [
+        db.Languages("eng")
+    ]
+    session.commit()
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 404, response.get_json()
+    assert response.get_json()["error"]["code"] == "not_found"
+    assert _membership_count(session, owner.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+
+def test_non_owner_add_grants_membership_to_shelf_owner_only(shelf_server):
+    """Curating another user's public shelf must not grow the curator's set."""
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="shelf-owner",
+        email="shelf-owner@example.invalid",
+        password="",
+        role=constants.ROLE_BROWSE_GLOBAL,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 200, response.get_json()
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _membership_count(session, owner.id, 2) == 1
+    assert _shelf_count(session, shelf.id, 2) == 1
+
+
+def test_non_owner_non_admin_refusal_discloses_no_owner_facts(shelf_server, monkeypatch):
+    from cps import shelf as shelf_module
+    from cps.api import shelves as shelves_api
+
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="managed-owner",
+        email="managed-owner@example.invalid",
+        password="",
+        role=0,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+    monkeypatch.setattr(shelf_module, "current_user", actor)
+    monkeypatch.setattr(shelves_api, "current_user", actor)
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 403, response.get_json()
+    assert response.get_json() == {
+        "error": {
+            "code": "library_membership_rejected",
+            "message": GENERIC_OWNER_REFUSAL,
+        }
+    }
+    response_message = response.get_json()["error"]["message"].lower()
+    assert "owner" not in response_message
+    assert "library" not in response_message
+    assert "global" not in response_message
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _membership_count(session, owner.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+
+def test_non_owner_admin_keeps_actionable_managed_owner_refusal(shelf_server, monkeypatch):
+    from cps import shelf as shelf_module, user_library
+    from cps.api import shelves as shelves_api
+
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="managed-owner",
+        email="managed-owner@example.invalid",
+        password="",
+        role=0,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_ADMIN | constants.ROLE_EDIT_SHELFS
+    session.commit()
+    monkeypatch.setattr(shelf_module, "current_user", actor)
+    monkeypatch.setattr(shelves_api, "current_user", actor)
+
+    with pytest.raises(user_library.UserLibraryError) as refusal:
+        shelf_module.prepare_user_shelf_add(shelf, 2)
+    assert str(refusal.value) == MANAGED_OWNER_REFUSAL
+    assert getattr(refusal.value, "reason", None) == "owner_managed_membership"
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 403, response.get_json()
+    assert response.get_json() == {
+        "error": {
+            "code": "library_membership_rejected",
+            "message": MANAGED_OWNER_REFUSAL,
+        }
+    }
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _membership_count(session, owner.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+
+def test_smart_shelf_add_gesture_grants_no_membership(shelf_server):
+    from cps import shelf as shelf_module
+
+    _app, session, actor, _shelf = shelf_server
+    smart_shelf = ub.MagicShelf(
+        name="Recent books",
+        user_id=actor.id,
+        rules={"match": "all", "rules": []},
+    )
+    session.add(smart_shelf)
+    session.commit()
+
+    shelf_module.prepare_user_shelf_add(smart_shelf, 2)
+
+    assert _membership_count(session, actor.id, 2) == 0
+
+
+def test_ownerless_shelf_add_does_not_grant_membership(shelf_server):
+    app, session, actor, shelf = shelf_server
+    shelf.user_id = None
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 200, response.get_json()
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 1
+
+
+def test_owner_on_own_shelf_managed_refusal_is_unchanged(shelf_server):
+    from cps import shelf as shelf_module, user_library
+
     app, session, user, shelf = shelf_server
     user.role &= ~constants.ROLE_BROWSE_GLOBAL
     session.commit()
+
+    with pytest.raises(user_library.UserLibraryError) as refusal:
+        shelf_module.prepare_user_shelf_add(shelf, 2)
+    assert str(refusal.value) == MANAGED_REFUSAL
+    assert getattr(refusal.value, "reason", None) == "self_managed_membership"
 
     response = app.test_client().post("/api/v1/shelves/9/books/2")
 
@@ -153,6 +416,103 @@ def test_api_refuses_managed_user_without_global_browse(shelf_server):
         }
     }
     assert _membership_count(session, user.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+
+def test_dangling_owner_refusal_hides_detail_from_non_owner_but_not_admin(
+        shelf_server):
+    app, session, actor, shelf = shelf_server
+    owner = ub.User(
+        name="managed-owner",
+        email="managed-owner@example.invalid",
+        password="",
+        role=0,
+        has_own_library=True,
+        user_library_seeded=True,
+        default_language="all",
+    )
+    session.add(owner)
+    session.flush()
+    shelf.user_id = owner.id
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+    client = app.test_client()
+
+    generic_response = client.post("/api/v1/shelves/9/books/2")
+    assert generic_response.status_code == 403, generic_response.get_json()
+    assert generic_response.get_json()["error"]["code"] == (
+        "library_membership_rejected"
+    )
+
+    shelf.user_id = 9999
+    session.commit()
+    response = client.post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 403, response.get_json()
+    assert response.data == generic_response.data
+    assert response.get_json()["error"]["code"] == (
+        "library_membership_rejected"
+    )
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+    actor.role |= constants.ROLE_ADMIN
+    session.commit()
+    admin_response = client.post("/api/v1/shelves/9/books/2")
+
+    assert admin_response.status_code == 403, admin_response.get_json()
+    assert admin_response.get_json() == {
+        "error": {
+            "code": "invalid_shelf_owner",
+            "message": INVALID_OWNER_REFUSAL,
+        }
+    }
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+
+def test_api_refuses_unresolved_owner_raised_by_shared_add_core(shelf_server, monkeypatch):
+    from cps.api import shelves as shelves_api
+
+    app, session, actor, shelf = shelf_server
+    shelf.user_id = 9999
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+    monkeypatch.setattr(shelves_api, "prepare_user_shelf_add", lambda *_args: None)
+
+    response = app.test_client().post("/api/v1/shelves/9/books/2")
+
+    assert response.status_code == 403, response.get_json()
+    assert response.get_json() == {
+        "error": {
+            "code": "library_membership_rejected",
+            "message": GENERIC_OWNER_REFUSAL,
+        }
+    }
+    assert _membership_count(session, actor.id, 2) == 0
+    assert _shelf_count(session, shelf.id, 2) == 0
+
+
+def test_non_numeric_owner_is_classic_refusal_not_server_error(shelf_server):
+    app, session, actor, shelf = shelf_server
+    shelf.user_id = "not-an-integer"
+    shelf.is_public = 1
+    actor.role |= constants.ROLE_EDIT_SHELFS
+    session.commit()
+    client = app.test_client()
+
+    response = client.post(
+        "/shelf/add/9/2",
+        headers={"Referer": "/book/2"},
+    )
+
+    assert response.status_code == 302
+    with client.session_transaction() as client_session:
+        flashes = client_session.get("_flashes", [])
+    assert ("error", GENERIC_OWNER_REFUSAL) in flashes
+    assert _membership_count(session, actor.id, 2) == 0
     assert _shelf_count(session, shelf.id, 2) == 0
 
 
@@ -233,3 +593,46 @@ def test_classic_add_establishes_membership_and_reports_managed_refusal(shelf_se
     )
     assert xhr_response.status_code == 403
     assert xhr_response.get_data(as_text=True) == MANAGED_REFUSAL
+
+
+def test_classic_db_error_response_survives_compensation_failure(
+        shelf_server, monkeypatch):
+    from cps import shelf as shelf_module
+
+    app, session, user, _shelf = shelf_server
+    app.config["PROPAGATE_EXCEPTIONS"] = False
+    compensation_armed = False
+    real_commit = session.commit
+
+    def fail_shelf_add(*_args):
+        nonlocal compensation_armed
+        compensation_armed = True
+        raise OperationalError(
+            "INSERT INTO book_shelf", {}, Exception("forced shelf failure")
+        )
+
+    def fail_compensation_commit():
+        if compensation_armed:
+            raise OperationalError(
+                "DELETE FROM user_library_book", {},
+                Exception("forced compensation failure"),
+            )
+        return real_commit()
+
+    monkeypatch.setattr(shelf_module, "add_book_to_shelf", fail_shelf_add)
+    monkeypatch.setattr(session, "commit", fail_compensation_commit)
+
+    client = app.test_client()
+    response = client.post(
+        "/shelf/add/9/2",
+        headers={"Referer": "/book/2"},
+    )
+
+    assert response.status_code == 302
+    with client.session_transaction() as client_session:
+        flashes = client_session.get("_flashes", [])
+    assert any(
+        category == "error" and message.startswith("Oops! Database Error:")
+        for category, message in flashes
+    )
+    assert _membership_count(session, user.id, 2) == 1

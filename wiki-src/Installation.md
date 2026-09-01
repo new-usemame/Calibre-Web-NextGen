@@ -30,4 +30,6 @@ Every guide covers both a **fresh install** and **switching from stock CWA**, an
 
 {{repo:README.md#full-docker-compose-setup|heading}}
 
+{{repo:README.md#runtime-path-overrides-for-packagers|heading}}
+
 **Next:** **[[First Run]]** → **[[Updating]]**.

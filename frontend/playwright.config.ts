@@ -21,6 +21,19 @@ const STORAGE = 'e2e/.auth/state.json';
 const isCI = !!process.env.CI;
 const WEBKIT_READER_SPEC = /native-reader-keyboard-scroll\.spec\.ts/;
 const IPAD_TOUCH_SPECS = /(?:book-card-actions|mobile|sidebar|sidebar-drawer-a11y|sidebar-pin)\.spec\.ts/;
+const CATALOG_LAYOUT_SPEC = /catalog-layout-watchdog\.spec\.ts/;
+const CATALOG_WATCHDOG_CLASSIFIER_SPEC = /catalog-layout-watchdog-classifier\.spec\.ts/;
+const CATALOG_LAYOUT_SPECS = [CATALOG_LAYOUT_SPEC, CATALOG_WATCHDOG_CLASSIFIER_SPEC];
+// Specs that mutate SERVER-WIDE state across every account at once (the My
+// Library admin intro card's enable/undo). They can never share an invocation
+// with the parallel lanes — the same reason the mobile project single-owns
+// default-library-view below ("a race, not a defect") — so the broad projects
+// always ignore them and they run only in the env-gated server-state project,
+// which CI invokes as a separate, serialized step (E2E_SERVER_STATE=1).
+const SERVER_STATE_SPECS = [/my-library-admin-intro\.spec\.ts/];
+const hostileLoadEnabled = process.env.E2E_HOSTILE_LOAD === '1';
+const HOSTILE_LOAD_PROFILES = ['css-slow', 'script-slow'] as const;
+const serverStateEnabled = process.env.E2E_SERVER_STATE === '1';
 
 export default defineConfig({
   testDir: './e2e',
@@ -44,12 +57,60 @@ export default defineConfig({
     // 1. Log in once; every authed project reuses the saved session.
     { name: 'setup', testMatch: /global\.setup\.ts/ },
 
+    // Focused always-on invariant coverage. The broad projects ignore this
+    // spec below so its explicit viewport sweep runs exactly once normally.
+    {
+      name: 'catalog-layout-chromium',
+      testMatch: CATALOG_LAYOUT_SPECS,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'catalog-layout-webkit',
+      testMatch: CATALOG_LAYOUT_SPEC,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+
+    // Opt-in hostile-load matrix. Response routing—not CDP throttling—keeps the
+    // same deterministic arrival profiles meaningful in Chromium and WebKit.
+    ...(hostileLoadEnabled
+      ? HOSTILE_LOAD_PROFILES.flatMap((hostileLoadProfile) => ([
+          {
+            name: `hostile-${hostileLoadProfile}-chromium`,
+            testMatch: CATALOG_LAYOUT_SPEC,
+            metadata: { hostileLoadProfile },
+            use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+            dependencies: ['setup'],
+          },
+          {
+            name: `hostile-${hostileLoadProfile}-webkit`,
+            testMatch: CATALOG_LAYOUT_SPEC,
+            metadata: { hostileLoadProfile },
+            use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+            dependencies: ['setup'],
+          },
+        ]))
+      : []),
+
+    // Opt-in server-state lane. These specs flip settings shared by EVERY
+    // account, so they run as their own invocation after the broad suite:
+    //   E2E_SERVER_STATE=1 npx playwright test --project=server-state-chromium
+    ...(serverStateEnabled
+      ? [{
+          name: 'server-state-chromium',
+          testMatch: SERVER_STATE_SPECS,
+          use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
+          dependencies: ['setup'],
+        }]
+      : []),
+
     // 2. Desktop — the full user flow + a11y (mobile-only specs excluded).
     {
       name: 'desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
       dependencies: ['setup'],
-      testIgnore: [/subpath\.spec\.ts/, /mobile\.spec\.ts/, WEBKIT_READER_SPEC],
+      testIgnore: [/subpath\.spec\.ts/, /mobile\.spec\.ts/, WEBKIT_READER_SPEC, ...CATALOG_LAYOUT_SPECS, ...SERVER_STATE_SPECS],
     },
 
     // 3. Mobile 375×667 (chromium mobile emulation — no webkit dep) — where every
@@ -69,7 +130,7 @@ export default defineConfig({
       // desktop makes each project clobber the other's writes — a race, not a
       // defect. Desktop owns it until the harness can hand each project its own
       // account; it passes standalone at 375px.
-      testIgnore: [/subpath\.spec\.ts/, /default-library-view\.spec\.ts/, WEBKIT_READER_SPEC],
+      testIgnore: [/subpath\.spec\.ts/, /default-library-view\.spec\.ts/, WEBKIT_READER_SPEC, ...CATALOG_LAYOUT_SPECS, ...SERVER_STATE_SPECS],
     },
 
     // 4. iPad-class touch viewport — card actions remain persistent and the

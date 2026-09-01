@@ -40,6 +40,7 @@ import { useMediaQuery } from '../lib/useMediaQuery';
    Drop the indirection on the React 19 upgrade, which knows the attribute. */
 type LowercaseFetchPriority = { fetchpriority: 'high' | 'low' | 'auto' };
 const COVER_PRIORITY: LowercaseFetchPriority = { fetchpriority: 'high' };
+const BOOK_DETAIL_NARROW_QUERY = '(max-width: 700px)';
 
 function formatBytes(bytes: number): string {
   const mb = bytes / (1024 * 1024);
@@ -199,8 +200,10 @@ function TagEditor({ bookId, tags, canEdit }:
   const [adding, setAdding] = useState(false);
   const [input, setInput] = useState('');
   const [expanded, setExpanded] = useState(false);
-  const visibleTags = expanded ? tags : tags.slice(0, 8);
-  const hasMore = tags.length > 8;
+  const narrowLayout = useMediaQuery(BOOK_DETAIL_NARROW_QUERY);
+  const collapsedTagLimit = narrowLayout ? 8 : 20;
+  const hasMore = tags.length - collapsedTagLimit >= 3;
+  const visibleTags = expanded || !hasMore ? tags : tags.slice(0, collapsedTagLimit);
 
   const names = tags.map((tg) => tg.name);
   const apply = (next: string[]) => update.mutate({ tags: next.join(', ') });
@@ -345,7 +348,7 @@ export function BookDetail() {
      an empty accessible name (it has none — it is not rendered) and failed
      hidden-books.spec's every-control-is-named sweep on desktop. Keep this
      query in sync with the 700px mobile cutover in BookDetail.module.css. */
-  const narrowLayout = useMediaQuery('(max-width: 700px)');
+  const narrowLayout = useMediaQuery(BOOK_DETAIL_NARROW_QUERY);
   // Shelf membership for the metadata list (#1254). Both queries are already
   // in flight for the always-rendered AddToShelf popover below and share its
   // cache keys, so reading them here costs no extra request.

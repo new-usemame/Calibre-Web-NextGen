@@ -4,8 +4,8 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
-"PO-Revision-Date: 2026-09-01 12:23+0200\n"
-"Last-Translator: luke_70it <luke_70it@yahoo.it>\n"
+"PO-Revision-Date: 2026-09-01 17:36+0200\n"
+"Last-Translator: Massimo Pissarello <mapi68@gmail.com>\n"
 "Language-Team: Italian\n"
 "Language: it\n"
 "MIME-Version: 1.0\n"
@@ -3070,7 +3070,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Only an administrator can add it back."
-msgstr "Solo un amministratore può riaggiungerlo."
+msgstr "Solo un amministratore può aggiungerlo di nuovo."
 
 #: cps/spa_strings.py
 msgid "Only the books chosen for this account."
@@ -3393,7 +3393,7 @@ msgstr "Impossibile caricare le regole dello scaffale intelligente."
 
 #: cps/spa_strings.py
 msgid "Has Cover"
-msgstr "Con copertina"
+msgstr "Ha copertina"
 
 #: cps/spa_strings.py
 msgid "Series Index"
@@ -3417,19 +3417,19 @@ msgstr "Non negli ultimi N giorni"
 
 #: cps/spa_strings.py
 msgid "is before / less than"
-msgstr "è prima di / minore di"
+msgstr "è precedente / minore di"
 
 #: cps/spa_strings.py
 msgid "is on or before / at most"
-msgstr "in data antecedente / al massimo"
+msgstr "entro / al massimo"
 
 #: cps/spa_strings.py
 msgid "is after / greater than"
-msgstr "è dopo / maggiore di"
+msgstr "è successivo / maggiore di"
 
 #: cps/spa_strings.py
 msgid "is on or after / at least"
-msgstr "in data successiva / almeno"
+msgstr "a partire da / almeno"
 
 #: cps/spa_strings.py
 msgid "is between"
@@ -3794,7 +3794,7 @@ msgstr "A larghezza fissa"
 
 #: cps/spa_strings.py
 msgid "Label (e.g. KOReader on phone)"
-msgstr "Label (es. KOReader sul telefono)"
+msgstr "Descrizione (es. KOReader sul telefono)"
 
 #: cps/spa_strings.py
 msgid "Languages (comma separated)"
@@ -4047,7 +4047,7 @@ msgstr "Titolo"
 
 #: cps/spa_strings.py
 msgid "Unread"
-msgstr "Non letti"
+msgstr "Non letto"
 
 #: cps/spa_strings.py
 msgid "Update password"
@@ -4190,7 +4190,7 @@ msgstr "Account"
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/layout.html
 #: cps/templates/user_table.html
 msgid "Admin"
-msgstr "Amministratore"
+msgstr "Amministrazione"
 
 #: cps/spa_strings.py
 msgid "Under the hood"
@@ -5032,7 +5032,7 @@ msgstr "Conrerma la cancellazione dell'etichetta {name}"
 
 #: cps/spa_strings.py
 msgid "Confirm new password"
-msgstr "Conferma la nuova password"
+msgstr "Conferma nuova password"
 
 #: cps/spa_strings.py
 msgid ""
@@ -5744,8 +5744,8 @@ msgstr "File"
 msgid ""
 "Files are queued for the library's ingest process and appear once imported."
 msgstr ""
-"I file svengono accodati per l'inserimento nella biblioteca e compariranno "
-"al termine dell'importazione."
+"I file vengono accodati per l'inserimento nella biblioteca e compariranno al "
+"termine dell'importazione."
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -6237,7 +6237,7 @@ msgstr "Gestisci gli scaffali"
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/book_table.html
 msgid "Mark as read"
-msgstr "Contrassegna come letto"
+msgstr "Segna come letto"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/book_table.html
@@ -7109,7 +7109,7 @@ msgstr "Testo da cercare"
 
 #: cps/spa_strings.py
 msgid "Search this book"
-msgstr "Cerca questo libro"
+msgstr "Cerca in questo libro"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
@@ -7422,7 +7422,7 @@ msgstr "Ordinamento"
 
 #: cps/spa_strings.py
 msgid "Source details"
-msgstr "Settagli delle fonti"
+msgstr "Dettagli delle fonti"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7505,7 +7505,7 @@ msgstr "Sincronizza solo i miei scaffali"
 
 #: cps/spa_strings.py
 msgid "Sync only selected shelves to Kobo"
-msgstr "Sincronizza con Kobo solo gli scaffali selezionato"
+msgstr "Sincronizza con Kobo solo gli scaffali selezionati"
 
 #: cps/spa_strings.py
 msgid "Table view"

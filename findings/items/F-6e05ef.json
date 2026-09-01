@@ -1,0 +1,11 @@
+{
+  "area": "kobo",
+  "body": "sync_shelves (kobo.py:2455-2465) deletes the ShelfArchive row while emitting its DeletedTag. With two Kobos on one account, only the first device to sync receives the tombstone; the second keeps a ghost collection retrying deletes. Pending-page replay only covers the same device. Upstream-inherited. CONFIDENCE: likely. Source: adversarial audit state/kobo-audit-2026-09-01.",
+  "created": "2026-09-01",
+  "id": "F-6e05ef",
+  "refs": [],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Shelf tombstone has a single consumer: second device on the same account never receives DeletedTag and keeps a ghost collection"
+}

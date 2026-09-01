@@ -1,0 +1,11 @@
+{
+  "area": "progress-sync",
+  "body": "kosync.py:707 docstring says \"the most recently updated record\"; the query orders desc(percentage), desc(timestamp) (:739-742) — furthest-wins, not recency. Honest-claim drift: the docstring shapes what callers believe they get. CONFIDENCE: certain. Source: adversarial audit state/kobo-audit-2026-09-01.",
+  "created": "2026-09-01",
+  "id": "F-5491a3",
+  "refs": [],
+  "severity": "docs",
+  "source": "audit",
+  "status": "open",
+  "title": "get_progress_record docstring claims recency ordering but the query is furthest-wins"
+}

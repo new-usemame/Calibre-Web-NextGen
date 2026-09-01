@@ -1,0 +1,13 @@
+{
+  "area": "kobo",
+  "body": "kobo.py:3081-3103 — change_archived_books/remove_synced_book commit internally with unchecked results; the route always answers 204. Same #1318 family as F-5dcb50 but low consequence: the device already deleted locally, and failure costs one extra re-delivery rather than data. CONFIDENCE: certain (code). Source: adversarial audit state/kobo-audit-2026-09-01.",
+  "created": "2026-09-01",
+  "id": "F-db823b",
+  "refs": [
+    "#1318"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "HandleBookDeletionRequest commits with unchecked results and always answers 204"
+}

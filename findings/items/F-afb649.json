@@ -1,0 +1,13 @@
+{
+  "area": "kobo",
+  "body": "The PATCH leg refuses on ownership-lookup failure (readingservices.py:1116-1129) and missing auth (:207-212) so the device retries. The GET leg on the same states proxies upstream: OWNERSHIP_UNKNOWN -> proxy (:1088-1094), body-read failure + UNKNOWN -> proxy (:1078-1081), unauthenticated GET -> proxy (:205-214). For an ever-authoritative book the module's own doctrine (:466-469) says Kobo's cloud copy has drifted because owned PATCHes stopped feeding it — the sticky-GET machinery (snapshot fallback, 503-never-proxy) exists to prevent serving it, but is only reached when ownership resolution succeeds and the session is authenticated.\n\nTrigger: metadata.db error mid-GET (live-documented: metadata.db is swapped under the app by auto-ingest, kobo.py:614-624) or a lapsed session cookie during a re-download GET. Damage: the starved cloud set is served 200; Nickel installs it as the replacement set — device-side wipe of that book's annotations; un-uploaded ones unrecoverable. Narrow window but this path guards the crown jewels and the fail-open/fail-closed asymmetry is unambiguous.\n\nCONFIDENCE: likely. Settle by making calibre_db.get_book_by_uuid raise during a sticky-authoritative GET and observing proxy instead of snapshot/503. Source: adversarial audit state/kobo-audit-2026-09-01.",
+  "created": "2026-09-01",
+  "id": "F-afb649",
+  "refs": [
+    "#1923"
+  ],
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "open",
+  "title": "Annotations GET fails open (proxies to Kobo's starved cloud copy) in exactly the failure states where the PATCH deliberately fails closed"
+}

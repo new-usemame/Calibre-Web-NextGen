@@ -34,8 +34,10 @@ on:
 concurrency:
   group: dev-image-${{ github.event.pull_request.number || github.ref }}
   # Superseded PR heads may cancel their own unpublished verification build.
-  # Main/manual runs publish load-bearing artifacts and must serialize: a
-  # later neutral commit cannot cancel the relevant build it needs to alias.
+  # Main/manual runs publish load-bearing artifacts and must serialize so an
+  # older build can never finish after a newer one and move :dev backwards.
+  # GitHub may still cancel an older pending main run when another one queues;
+  # the alias gate below recovers by building its exact subject in that case.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # GITHUB_TOKEN is read-only on packages by default. Builds push to
@@ -148,8 +150,8 @@ jobs:
   ensure-mirror:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: classify
-    if: needs.classify.outputs.full_build == 'true'
+    needs: [classify, alias-image-neutral-commit]
+    if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
       - name: Checkout (read Python pin from Dockerfile)
         uses: actions/checkout@v7
@@ -166,8 +168,8 @@ jobs:
   build-amd64:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [classify, ensure-mirror]
-    if: needs.classify.outputs.full_build == 'true'
+    needs: [classify, alias-image-neutral-commit, ensure-mirror]
+    if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
       - name: Set build ref
         env:
@@ -283,13 +285,14 @@ jobs:
           # "Compose docker outputs" step above, which conditionally
           # includes the DockerHub image name when DOCKERHUB_PUSH_ENABLED.
           outputs: ${{ env.DOCKER_BUILD_OUTPUTS }}
-          # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
-          # than the release CDN, which intermittently 404s the Actions egress.
-          # Contributors build without it and fall back to the CDN (see Dockerfile).
+          # Same-repository/main builds use the GHCR mirror rather than the
+          # flaky release CDN. Keep the selector fork-aware even though the
+          # build gate already excludes forks: the recovery gate must never
+          # make the private mirror reachable if its classification regresses.
           build-args: |
             BUILD_DATE=${{ github.event.repository.updated_at }}
             VERSION=DEV_BUILD-${{ env.IMAGE_TAG }}-${{ vars.CURRENT_DEV_BUILD_NUM }}
-            PBS_SOURCE=ghcr
+            PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true && 'upstream' || 'ghcr' }}
 
       # --- 4. Export Digest for Merge Job ---
       - name: Export digest
@@ -318,8 +321,8 @@ jobs:
     # operator hardware), so GitHub-hosted is the safer default.
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
-    needs: [classify, ensure-mirror]
-    if: needs.classify.outputs.full_build == 'true'
+    needs: [classify, alias-image-neutral-commit, ensure-mirror]
+    if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
       - name: Set build ref
         env:
@@ -436,13 +439,14 @@ jobs:
           # "Compose docker outputs" step below, which conditionally
           # includes the DockerHub image name when DOCKERHUB_PUSH_ENABLED.
           outputs: ${{ env.DOCKER_BUILD_OUTPUTS }}
-          # PBS_SOURCE=ghcr pulls Python/kepubify from our GHCR mirror rather
-          # than the release CDN, which intermittently 404s the Actions egress.
-          # Contributors build without it and fall back to the CDN (see Dockerfile).
+          # Same-repository/main builds use the GHCR mirror rather than the
+          # flaky release CDN. Keep the selector fork-aware even though the
+          # build gate already excludes forks: the recovery gate must never
+          # make the private mirror reachable if its classification regresses.
           build-args: |
             BUILD_DATE=${{ github.event.repository.updated_at }}
             VERSION=DEV_BUILD-${{ env.IMAGE_TAG }}-${{ vars.CURRENT_DEV_BUILD_NUM }}
-            PBS_SOURCE=ghcr
+            PBS_SOURCE=${{ github.event.pull_request.head.repo.fork == true && 'upstream' || 'ghcr' }}
 
       # --- 4. Rotate Cache (Prevent Infinite Growth) ---
       - name: Move cache
@@ -481,8 +485,8 @@ jobs:
   merge:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [classify, build-amd64, build-arm]
-    if: needs.classify.outputs.full_build == 'true'
+    needs: [classify, alias-image-neutral-commit, build-amd64, build-arm]
+    if: needs.alias-image-neutral-commit.outputs.build_required == 'true'
     steps:
       # --- 1. Calculate Variables ---
       - name: Set build ref
@@ -615,27 +619,33 @@ jobs:
           name: 'CURRENT_DEV_BUILD_NUM'
           token: ${{ secrets.GH_PAT || secrets.DEV_BUILD_NUM_INCREMENTOR_TOKEN }}
 
-  # Image-neutral main commits (docs/tests/workflow policy) deliberately do not
-  # rebuild or advance :dev. They still need an immutable subject identifier so
-  # Test Suite can prove which backend it exercised. Copying the existing
-  # manifest to sha-<commit> is registry-only and does not restart the canary.
+  # Image-neutral main commits normally do not rebuild or advance :dev. They
+  # still need an immutable subject identifier so Test Suite can prove which
+  # backend it exercised. Copying the existing manifest to sha-<commit> is
+  # registry-only and does not restart the canary. If the exact source producer
+  # was cancelled or failed, this gate promotes the subject into the ordinary
+  # serialized build path: rebuilding the subject is always byte-correct, while
+  # copying any older available image would not be.
   alias-image-neutral-commit:
-    name: Alias unchanged image to commit
+    name: Prepare immutable subject image
     runs-on: ubuntu-latest
     # The source producer may legitimately consume its full 95-minute
     # classify+mirror+architecture+merge budget. The script stops sooner when
     # that exact run/job fails and never substitutes the floating :dev tag.
     timeout-minutes: 100
     needs: classify
-    if: needs.classify.outputs.alias_image == 'true'
+    outputs:
+      build_required: ${{ steps.route.outputs.build_required }}
     steps:
       - name: Checkout exact subject
+        if: needs.classify.outputs.alias_image == 'true'
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
 
       - name: Log in to GHCR
+        if: needs.classify.outputs.alias_image == 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -643,11 +653,14 @@ jobs:
           password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx (registry-only)
+        if: needs.classify.outputs.alias_image == 'true'
         uses: docker/setup-buildx-action@v4
         with:
           driver: docker
 
       - name: Publish immutable commit alias
+        id: publish
+        if: needs.classify.outputs.alias_image == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           IMAGE_SOURCE: ${{ needs.classify.outputs.image_source }}
@@ -656,4 +669,17 @@ jobs:
           base="ghcr.io/${{ github.repository_owner }}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
           bash scripts/alias-e2e-image.sh \
             "$base" "$IMAGE_SOURCE" "$SUBJECT_SHA" 191 30 \
-            "${{ github.repository }}" push "${{ github.api_url }}"
+            "${{ github.repository }}" push "${{ github.api_url }}" \
+            "$GITHUB_OUTPUT"
+
+      - name: Route unavailable alias to exact-subject build
+        id: route
+        env:
+          CLASSIFIED_FULL_BUILD: ${{ needs.classify.outputs.full_build }}
+          RECOVERY_BUILD: ${{ steps.publish.outputs.recovery_build }}
+        run: |
+          if [[ "$CLASSIFIED_FULL_BUILD" == "true" || "$RECOVERY_BUILD" == "true" ]]; then
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_required=false" >> "$GITHUB_OUTPUT"
+          fi

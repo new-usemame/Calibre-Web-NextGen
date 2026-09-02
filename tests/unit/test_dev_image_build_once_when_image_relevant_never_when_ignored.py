@@ -376,7 +376,7 @@ def test_translation_commit_push_self_triggers_ci_premise():
 
 
 def test_dev_workflow_keeps_push_trigger_and_aliases_image_neutral_commits():
-    """Neutral commits alias only from the classifier-proven source commit."""
+    """Neutral commits alias or rebuild from the exact subject, never stale bytes."""
     _dev_push_trigger()
     wf = _load(DEV_WF)
     jobs = wf.get("jobs") or {}
@@ -384,7 +384,10 @@ def test_dev_workflow_keeps_push_trigger_and_aliases_image_neutral_commits():
     alias = jobs.get("alias-image-neutral-commit") or {}
     assert classifier, "dev workflow lost its path-classification job"
     assert alias, "image-neutral commits no longer get an immutable sha alias"
-    assert "alias_image" in str(alias.get("if") or "")
+    assert not alias.get("if"), (
+        "the alias/rebuild gate must finish on full builds too, so downstream "
+        "jobs have one build_required decision"
+    )
     outputs = classifier.get("outputs") or {}
     assert "image_source" in outputs
     publish = next(
@@ -392,6 +395,15 @@ def test_dev_workflow_keeps_push_trigger_and_aliases_image_neutral_commits():
     )
     assert "needs.classify.outputs.image_source" in str((publish.get("env") or {}).get("IMAGE_SOURCE"))
     assert "alias-e2e-image.sh" in str(publish.get("run") or "")
+    assert '"$GITHUB_OUTPUT"' in str(publish.get("run") or "")
+    assert "build_required" in (alias.get("outputs") or {})
+    for job_name in ("ensure-mirror", "build-amd64", "build-arm", "merge"):
+        job = jobs[job_name]
+        needs = job.get("needs") or []
+        if isinstance(needs, str):
+            needs = [needs]
+        assert "alias-image-neutral-commit" in needs, job_name
+        assert "build_required" in str(job.get("if") or ""), job_name
     assert classify_paths(["docs/usage.md"], REPO_ROOT)["image"] is False
     assert classify_paths(["tests/unit/test_example.py"], REPO_ROOT)["image"] is False
     assert classify_paths(["cps/web.py"], REPO_ROOT)["image"] is True

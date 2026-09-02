@@ -296,6 +296,7 @@ def _run_alias(
     dev_matches: bool = True,
     source_succeeds_on: int = 1,
     api_url: str | None = None,
+    recovery_output: Path | None = None,
 ):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -333,6 +334,8 @@ def _run_alias(
     command = ["bash", str(ALIASER), "registry.example/project/app", source, subject]
     if api_url:
         command.extend(["4", "0", "example/project", "push", api_url])
+        if recovery_output is not None:
+            command.append(str(recovery_output))
     proc = subprocess.run(
         command,
         cwd=tmp_path,
@@ -513,12 +516,15 @@ def test_alias_waits_for_live_source_producer_then_preserves_digest_invariants(t
     assert f"-t registry.example/project/app:sha-{subject}" in log
 
 
-def test_alias_stops_when_source_producer_has_failed(tmp_path):
+@pytest.mark.parametrize("conclusion", ["cancelled", "failure"])
+def test_alias_routes_terminal_source_producer_to_subject_rebuild(tmp_path, conclusion):
+    """Observed terminal producers recover without manufacturing an alias."""
     _git(tmp_path, "init", "-q")
     _stage_alias_test_dockerignore(tmp_path)
     source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
     subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
-    responses = [{"status": "completed", "conclusion": "failure"}]
+    recovery_output = tmp_path / "github-output"
+    responses = [{"status": "completed", "conclusion": conclusion}]
     with _ActionsApi(responses) as api:
         proc, log = _run_alias(
             tmp_path,
@@ -526,12 +532,14 @@ def test_alias_stops_when_source_producer_has_failed(tmp_path):
             subject,
             source_succeeds_on=99,
             api_url=api.url,
+            recovery_output=recovery_output,
         )
 
-    assert proc.returncode == 1
+    assert proc.returncode == 0, proc.stderr
     assert api.run_requests == 1
     assert "https://github.example/runs/77" in proc.stderr
-    assert "concluded failure" in proc.stderr
+    assert f"concluded {conclusion}" in proc.stderr
+    assert recovery_output.read_text(encoding="utf-8") == "recovery_build=true\n"
     assert log == ""
 
 

@@ -1,0 +1,14 @@
+{
+  "area": "kobo",
+  "body": "OBSERVED after #2128 and #2131 merged: `_log_sync_observability()` printed the structured `suppressed_replay` value twice, once under its real name and once under `suppressed_unchanged`. No `suppressed_unchanged` counter existed. The tests reinforced the ambiguity by asserting equal labels even though the sync handler already tracked live held-book suppressions and removed-entitlement suppressions separately.\n\nOBSERVED resolution: the structured observability payload now carries both meanings explicitly. `suppressed_replay` counts every exact same-reader fingerprint replay kept off the wire, including removal tombstones. `suppressed_unchanged` counts only live held books whose unchanged fingerprint prevents re-emission; `suppressed_removed` remains the tombstone subset. Mixed regression coverage proves the distinction as total = live + removed, while private capture receives the same truthful counters as the INFO line.\n\nASSUMED: existing external log consumers treat these fields by label rather than fixed field count. The line keeps both established labels and order, so the correction changes only the formerly false second value.\n\nOBSERVED in production log output from the deployed build: a single sync summary now carries `suppressed_replay=5 suppressed_unchanged=5 suppressed_removed=5`, and a separate same-session sync carries all three as 0. The counters move independently of one another rather than echoing one value under two labels, and the line keeps its established field order.",
+  "created": "2026-09-02",
+  "id": "F-483b14",
+  "refs": [
+    "#2128",
+    "#2131"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "closed",
+  "title": "Kobo INFO summary reports replay total twice under different labels"
+}

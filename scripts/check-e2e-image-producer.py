@@ -5,6 +5,8 @@
 Exit 0 only while the matching Build & Push run is queued or in progress.  A
 terminal producer, a failed producer job, an absent run, or an unreadable API
 all exit non-zero so callers never turn an unknown producer into a blind poll.
+Callers that can safely rebuild the exact subject may request a distinct exit
+code for terminal producers; unknown/absent API state still exits 1.
 """
 
 from __future__ import annotations
@@ -29,6 +31,12 @@ FAILED_CONCLUSIONS = frozenset(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--terminal-exit-code",
+        type=int,
+        default=1,
+        help="exit code for a terminal run/job (default: 1)",
+    )
     parser.add_argument("repository", help="GitHub owner/repository")
     parser.add_argument("sha", help="full producer commit SHA")
     parser.add_argument("event", choices=("push", "pull_request"))
@@ -63,6 +71,8 @@ def _error(message: str) -> int:
 
 def main() -> int:
     args = _parser().parse_args()
+    if not 1 <= args.terminal_exit_code <= 125:
+        return _error("terminal exit code must be between 1 and 125")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repository):
         return _error(f"invalid GitHub repository {args.repository!r}")
     if not re.fullmatch(r"[0-9a-fA-F]{40,64}", args.sha):
@@ -98,10 +108,11 @@ def main() -> int:
         conclusion = run.get("conclusion")
 
         if status == "completed":
-            return _error(
+            _error(
                 f"Build & Push producer run {run_id} concluded {conclusion or 'without a verdict'} "
                 f"but did not publish the required image: {run_url}"
             )
+            return args.terminal_exit_code
         if status not in LIVE_STATUSES:
             return _error(
                 f"Build & Push producer run {run_id} has unexpected status {status!r}: {run_url}"
@@ -122,10 +133,11 @@ def main() -> int:
             if job.get("status") == "completed" and job_conclusion in FAILED_CONCLUSIONS:
                 job_name = job.get("name") or job.get("id") or "unknown job"
                 job_url = job.get("html_url") or run_url
-                return _error(
+                _error(
                     f"Build & Push producer job {job_name!r} concluded {job_conclusion} "
                     f"in run {run_id}: {job_url} (run: {run_url})"
                 )
+                return args.terminal_exit_code
     except RuntimeError as exc:
         return _error(str(exc))
 

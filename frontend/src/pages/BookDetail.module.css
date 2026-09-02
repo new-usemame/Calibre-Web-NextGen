@@ -583,9 +583,13 @@
 /* Metadata definition list */
 .meta {
   display: grid;
-  grid-template-columns: auto 1fr;
+  /* Identifier types and values are user metadata and may be long unbroken
+     tokens. Keep the label content-sized only up to 40% of the row, then let
+     both tracks wrap instead of widening the document. */
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
   gap: var(--sp-1) var(--sp-4);
   margin: 0;
+  min-width: 0;
 }
 
 .metaLabel {
@@ -595,12 +599,16 @@
   letter-spacing: 0.05em;
   font-weight: var(--fw-medium);
   padding-top: 2px; /* align with value baseline */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .metaValue {
   font-size: var(--fs-sm);
   color: var(--text);
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Description prose. Since #1828 this sits directly under the title/author

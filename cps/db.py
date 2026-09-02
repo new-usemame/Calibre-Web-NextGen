@@ -384,6 +384,20 @@ books_publishers_link = Table('books_publishers_link', Base.metadata,
                               )
 
 
+# Calibre has no separate transactional sidecar table for per-source ingest
+# commits. The ingest helper therefore records its retry marker alongside book
+# identifiers so the book write and marker share one database transaction.
+# These rows are application state, not bibliographic identifiers. Keep the
+# default Books.identifiers relationship public-only so every ORM consumer gets
+# the safe view without remembering its own filter. Code that genuinely needs
+# ingest state must opt into Books.internal_identifiers by name.
+INTERNAL_IDENTIFIER_PREFIX = "cwng_ingest_sha256_"
+
+
+def is_internal_identifier_type(identifier_type):
+    return str(identifier_type or "").lower().startswith(INTERNAL_IDENTIFIER_PREFIX)
+
+
 class Library_Id(Base):
     __tablename__ = 'library_id'
     id = Column(Integer, primary_key=True)
@@ -729,7 +743,28 @@ class Books(Base):
     ratings = relationship(Ratings, secondary=books_ratings_link, backref='books', lazy='selectin')
     languages = relationship(Languages, secondary=books_languages_link, backref='books', lazy='selectin')
     publishers = relationship(Publishers, secondary=books_publishers_link, backref='books', lazy='selectin')
-    identifiers = relationship(Identifiers, backref='books', lazy='selectin')
+    identifiers = relationship(
+        Identifiers,
+        primaryjoin=lambda: and_(
+            Books.id == Identifiers.book,
+            func.substr(
+                func.lower(Identifiers.type), 1, len(INTERNAL_IDENTIFIER_PREFIX)
+            ) != INTERNAL_IDENTIFIER_PREFIX,
+        ),
+        backref='books',
+        lazy='selectin',
+    )
+    internal_identifiers = relationship(
+        Identifiers,
+        primaryjoin=lambda: and_(
+            Books.id == Identifiers.book,
+            func.substr(
+                func.lower(Identifiers.type), 1, len(INTERNAL_IDENTIFIER_PREFIX)
+            ) == INTERNAL_IDENTIFIER_PREFIX,
+        ),
+        viewonly=True,
+        lazy='select',
+    )
 
     def __init__(self, title, sort, author_sort, timestamp, pubdate, series_index, last_modified, path, has_cover,
                  authors, tags, languages=None):

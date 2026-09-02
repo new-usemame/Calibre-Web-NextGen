@@ -64,13 +64,13 @@ SYNC_ITEM_LIMIT = 100
 class TestFoldDefersWhenBatchFull:
     def test_fold_gate_uses_batch_drained_flag(self):
         """The fold must be gated on a `batch_drained` predicate
-        (``len(books_list) < SYNC_ITEM_LIMIT``), not just on
+        (the bounded candidate snapshot was exhausted), not just on
         ``magic_shelf_arm_active``. Pin the named flag so a future
         refactor can't silently revert to unconditional firing."""
         src = _function_source(KOBO_PY, "HandleSyncRequest")
         assert "batch_drained" in src, (
             "HandleSyncRequest must define a `batch_drained` flag from "
-            "len(books_list) < SYNC_ITEM_LIMIT. Without it the fold "
+            "candidate-snapshot exhaustion. Without it the fold "
             "unconditionally jumps cursor to T_magic, dropping pending "
             "regular books between batch max and T_magic — Greptile #361 "
             "P1 finding."

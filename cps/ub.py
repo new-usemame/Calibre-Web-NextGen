@@ -952,8 +952,9 @@ class KoboDeviceDeletedEntitlement(Base):
 
     Hard-deleted books no longer have a calibre ``book_id``.  Keep their UUID
     replay state separate from the live-book ledger so a stale archive cursor
-    cannot re-offer the same ``IsRemoved`` entitlement forever, while another
-    device and a tokenless factory-reset sync can still receive it.
+    cannot re-offer the same ``IsRemoved`` entitlement forever. Another device
+    still has its own ledger, and an explicit Full Sync clears this row before
+    requesting deliberate re-delivery.
     """
     __tablename__ = 'kobo_device_deleted_entitlement'
 

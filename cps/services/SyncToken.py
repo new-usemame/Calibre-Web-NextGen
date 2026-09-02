@@ -137,9 +137,10 @@ class SyncToken:
         # acknowledgment without adding the response payload to the token.
         self.delivery_epoch = delivery_epoch
         # Request provenance only; never serialized. True means from_headers
-        # successfully decoded and schema-validated a token produced by CWNG.
-        # Empty, malformed, and official-store tokens remain False so callers
-        # can preserve first-sync/factory-reset behavior.
+        # successfully decoded all original CWNG cursor fields. Empty,
+        # partial, malformed, and official-store tokens remain False. This is
+        # useful for pending-page chain handling, but an acknowledged
+        # same-device entitlement fingerprint does not depend on token shape.
         self.is_cwng_token = is_cwng_token
 
     @staticmethod
@@ -230,9 +231,10 @@ class SyncToken:
 
         # The historical schema intentionally accepts missing fields and
         # degrades them to datetime.min for cursor compatibility. That is too
-        # permissive as proof that a request returned a token CWNG actually
-        # emitted. Layer 2 provenance therefore requires every original v1
-        # cursor while leaving the parser's existing fallback behavior intact.
+        # permissive as proof that a request returned a complete token CWNG
+        # actually emitted. Pending-page provenance therefore requires every
+        # original v1 cursor while leaving the parser's existing fallback
+        # behavior intact.
         core_cursor_fields = {
             "books_last_modified",
             "books_last_created",

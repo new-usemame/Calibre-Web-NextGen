@@ -748,7 +748,7 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Italian (`it`) | `████████████████████` 99% | 3109/3127 | 0 |
+| Italian (`it`) | `████████████████████` 99% | 3108/3127 | 0 |
 | Russian (`ru`) | `██████████████████░░` 90% | 2813/3127 | 0 |
 | Spanish (`es`) | `█████████████████░░░` 83% | 2609/3127 | 0 |
 | French (`fr`) | `█████████████████░░░` 83% | 2601/3127 | 125 |

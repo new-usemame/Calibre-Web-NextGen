@@ -2617,13 +2617,17 @@ def modify_database_object(input_elements, db_book_object, db_object, db_session
 def modify_identifiers(input_identifiers, db_identifiers, db_session):
     """Modify Identifiers to match input information.
        input_identifiers is a list of read-to-persist Identifiers objects.
-       db_identifiers is a list of already persisted list of Identifiers objects."""
+       db_identifiers is a list of already persisted list of Identifiers objects.
+
+       Books.identifiers excludes reserved ingest state at the ORM boundary.
+       Still reject reserved input here so a crafted form/API payload cannot
+       create or replace an internal row."""
     changed = False
     error = False
     input_dict = {}
     for identifier in input_identifiers:
         identifier_type = (identifier.type or "").strip().lower()
-        if not identifier_type:
+        if not identifier_type or db.is_internal_identifier_type(identifier_type):
             continue
         if identifier_type in input_dict:
             error = True

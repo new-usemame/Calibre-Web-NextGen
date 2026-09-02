@@ -190,6 +190,29 @@ test('book detail with a "More by" strip has no horizontal overflow on mobile', 
   await assertNoHorizontalOverflow(page);
 });
 
+test('long custom identifier types and values stay within the metadata grid', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app');
+  const bookId = await firstBookId(page);
+  test.skip(bookId == null, 'seed has no books');
+
+  const longType = `external-catalog-${'x'.repeat(64)}`;
+  const longValue = `record-${'y'.repeat(96)}`;
+  await page.route(`**/api/v1/books/${bookId}`, async (route) => {
+    const res = await route.fetch();
+    const book = await res.json();
+    book.identifiers = [
+      ...(book.identifiers ?? []),
+      { type: longType, label: longType, val: longValue, url: null },
+    ];
+    await route.fulfill({ response: res, json: book });
+  });
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main dl')).toContainText(longType, { timeout: 10_000 });
+  await assertNoHorizontalOverflow(page);
+});
+
 // A reader without the edit role sees the read-only tag pills, and those pills
 // were `white-space: nowrap` with no max-width. Real libraries carry
 // Library-of-Congress subject headings ("France -- History -- Revolution,

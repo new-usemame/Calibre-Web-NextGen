@@ -52,6 +52,23 @@ def test_editable_metadata_includes_identifiers():
     ]
 
 
+def test_shared_identifier_reconciler_ignores_submitted_internal_marker():
+    from cps import editbooks
+    session = MagicMock()
+    digest = "c" * 64
+    submitted_marker = SimpleNamespace(
+        type=f"cwng_ingest_sha256_{digest}", val="forged",
+    )
+
+    changed, duplicate = editbooks.modify_identifiers(
+        [submitted_marker], [], session,
+    )
+
+    assert changed is False
+    assert duplicate is False
+    session.add.assert_not_called()
+
+
 def test_update_metadata_persists_identifiers_lowercased_and_skips_blank_rows():
     from cps.api import edit as mod
     session = MagicMock()

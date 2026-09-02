@@ -2713,8 +2713,12 @@ msgstr "Un livre doit conserver au moins un format."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup warnings; {failed} failed."
-msgstr "{succeeded} livre(s) supprimé(s) définitivement ; {warnings} supprimé(s) avec des avertissements de nettoyage ; {failed} échec(s)."
+msgid ""
+"{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
+"warnings; {failed} failed."
+msgstr ""
+"{succeeded} livre(s) supprimé(s) définitivement ; {warnings} supprimé(s) "
+"avec des avertissements de nettoyage ; {failed} échec(s)."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2728,8 +2732,12 @@ msgstr "Livre {id} : {message}"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "Failed: {failures}. The failed books remain selected; choose the action again to retry."
-msgstr "Échec : {failures}. Les livres en échec restent sélectionnés ; choisissez à nouveau l’action pour réessayer."
+msgid ""
+"Failed: {failures}. The failed books remain selected; choose the action "
+"again to retry."
+msgstr ""
+"Échec : {failures}. Les livres en échec restent sélectionnés ; choisissez à "
+"nouveau l’action pour réessayer."
 
 #: cps/spa_strings.py
 msgid "Could not delete this format."
@@ -10308,9 +10316,9 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid ""
-"On by default. Unchanged books are suppressed only when the device returns a "
-"valid but stale CWNG sync token. Requests without a valid CWNG token always "
-"receive the full library, including after a factory reset."
+"On by default. Books already acknowledged by the same reader are protected "
+"for every sync-token shape. Use Full Sync or resend to deliberately deliver "
+"them again."
 msgstr ""
 
 #: cps/templates/config_edit.html
@@ -11388,9 +11396,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
-"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
-"href=\"https://github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
+"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
+"github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"

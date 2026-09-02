@@ -912,7 +912,21 @@ jobs:
           python3 -c 'import json,sys; d=json.load(open("/tmp/ml.json")); sys.exit(0 if d.get("verify_url") else 1)' \
             || { echo "::error::magic-link/start returned 200 with no verify_url"; cat /tmp/ml.json; exit 1; }
 
+      - name: Resolve Playwright browser version
+        id: playwright-version
+        working-directory: frontend
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright
+        timeout-minutes: 3
         working-directory: frontend
         run: |
           npm ci

@@ -625,6 +625,29 @@ def _e2e_steps() -> list[dict]:
     return [s for s in (job.get("steps") or []) if isinstance(s, dict)]
 
 
+def test_e2e_playwright_install_is_version_cached_and_bounded():
+    """A browser-download stall must fail fast without wasting warm binaries."""
+    steps = _e2e_steps()
+    version = next(
+        s for s in steps if s.get("name") == "Resolve Playwright browser version"
+    )
+    cache = next(
+        s for s in steps if s.get("name") == "Cache Playwright browsers"
+    )
+    install = next(s for s in steps if s.get("name") == "Install Playwright")
+
+    assert version.get("id") == "playwright-version"
+    assert "node_modules/playwright-core" in str(version.get("run") or "")
+    assert cache.get("uses") == "actions/cache@v6"
+    cache_with = cache.get("with") or {}
+    assert cache_with.get("path") == "~/.cache/ms-playwright"
+    assert "steps.playwright-version.outputs.version" in str(
+        cache_with.get("key") or ""
+    )
+    assert install.get("timeout-minutes") == 3
+    assert steps.index(version) < steps.index(cache) < steps.index(install)
+
+
 def test_e2e_uses_head_backend_only_for_backend_prs():
     """Backend PRs need their Python code; frontend-only PRs keep the overlay."""
     wf = _load(WF_DIR / "tests.yml")

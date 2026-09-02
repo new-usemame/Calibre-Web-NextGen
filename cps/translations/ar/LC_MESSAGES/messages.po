@@ -9814,9 +9814,9 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid ""
-"On by default. Unchanged books are suppressed only when the device returns a "
-"valid but stale CWNG sync token. Requests without a valid CWNG token always "
-"receive the full library, including after a factory reset."
+"On by default. Books already acknowledged by the same reader are protected "
+"for every sync-token shape. Use Full Sync or resend to deliberately deliver "
+"them again."
 msgstr ""
 
 #: cps/templates/config_edit.html

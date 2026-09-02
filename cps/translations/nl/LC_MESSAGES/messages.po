@@ -12,8 +12,8 @@ msgstr ""
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
-"proton.me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
+"me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -2604,8 +2604,12 @@ msgstr "Een boek moet minstens één formaat behouden."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup warnings; {failed} failed."
-msgstr "{succeeded} boek(en) definitief verwijderd; {warnings} verwijderd met opschoningswaarschuwingen; {failed} mislukt."
+msgid ""
+"{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
+"warnings; {failed} failed."
+msgstr ""
+"{succeeded} boek(en) definitief verwijderd; {warnings} verwijderd met "
+"opschoningswaarschuwingen; {failed} mislukt."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2619,8 +2623,12 @@ msgstr "Boek {id}: {message}"
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "Failed: {failures}. The failed books remain selected; choose the action again to retry."
-msgstr "Mislukt: {failures}. De mislukte boeken blijven geselecteerd; kies de actie opnieuw om het nogmaals te proberen."
+msgid ""
+"Failed: {failures}. The failed books remain selected; choose the action "
+"again to retry."
+msgstr ""
+"Mislukt: {failures}. De mislukte boeken blijven geselecteerd; kies de actie "
+"opnieuw om het nogmaals te proberen."
 
 #: cps/spa_strings.py
 msgid "Could not delete this format."
@@ -8428,8 +8436,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
-"(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
+"%(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -10139,9 +10147,9 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid ""
-"On by default. Unchanged books are suppressed only when the device returns a "
-"valid but stale CWNG sync token. Requests without a valid CWNG token always "
-"receive the full library, including after a factory reset."
+"On by default. Books already acknowledged by the same reader are protected "
+"for every sync-token shape. Use Full Sync or resend to deliberately deliver "
+"them again."
 msgstr ""
 
 #: cps/templates/config_edit.html
@@ -14922,11 +14930,10 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
-#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
-#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
-#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
-#~ "bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
+#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
+#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
+#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

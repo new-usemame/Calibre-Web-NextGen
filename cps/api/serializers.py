@@ -4,7 +4,7 @@
 
 from datetime import date, datetime
 
-from .. import constants
+from .. import constants, db
 from ..clean_html import clean_string
 from ..cover_version import COVER_VERSION_ARG, cover_version_token
 from ..ui_themes import theme_slug

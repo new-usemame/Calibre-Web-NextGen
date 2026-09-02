@@ -1833,7 +1833,10 @@ def export_progress():
             # Chunk the id lookup so a user with a very large library (or one who
             # has seeded many numeric progress rows) can't blow past the SQLite
             # host's bound-parameter limit and 500 the export.
-            _CHUNK = 500
+            # Books.identifiers contributes three bound values for its reserved
+            # prefix predicate; leave room for them under this lane's 500-bind
+            # ceiling while retaining the same bounded-query behaviour.
+            _CHUNK = 497
             for start in range(0, len(book_ids), _CHUNK):
                 chunk = book_ids[start:start + _CHUNK]
                 calibre_query = (
@@ -1864,7 +1867,9 @@ def export_progress():
                         calibre_db.session.query(
                             Identifiers.book, Identifiers.type, Identifiers.val
                         )
-                        .filter(Identifiers.book.in_(matched_ids))
+                        .select_from(Books)
+                        .join(Books.identifiers)
+                        .filter(Books.id.in_(matched_ids))
                         .all()
                     )
                     for book_id, identifier_type, identifier_value in identifier_rows:

@@ -338,7 +338,7 @@ def test_unauthenticated_patch_401_captures_body_with_explicit_provenance_outsid
 
     assert response.status_code == 401
     [record] = _records(unauthenticated_root)
-    assert record["schema_version"] == 2
+    assert record["schema_version"] == 3
     assert record["exchange"] == "annotations_patch_unauthenticated"
     assert record["request_provenance"] == {
         "authentication": "unauthenticated",

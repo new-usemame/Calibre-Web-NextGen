@@ -1,4 +1,4 @@
-# Kobo Reading Services private exchange capture
+# Kobo private exchange capture
 
 This diagnostic is for short, operator-controlled hardware experiments. It is
 off by default and cannot be enabled with an ordinary boolean value.
@@ -26,7 +26,7 @@ a repository, issue attachment, or other shared artifact. External backup jobs
 that archive all of `/config` should explicitly exclude
 `.cwng-private-observability/`.
 
-Each schema-version-2 record contains:
+Each schema-version-3 record contains:
 
 - explicit request provenance (`authenticated`, `unauthenticated`, or
   `not_recorded`) and a local user ID only when one was authenticated;
@@ -37,10 +37,19 @@ Each schema-version-2 record contains:
 - Kobo's raw response body and redacted headers; and
 - the final status, redacted headers, and exact body returned to the device.
 
+Library-sync (`/v1/library/sync`) records use the same directory, file layout,
+size bounds, and retention policy. They contain the exact response body (which
+can include the user's library metadata), the incoming and outgoing opaque sync
+tokens, `x-kobo-sync`, the request's device ID hashed to the same short label as
+the INFO summary, and a structured pointer to that summary's counters. The raw
+device ID is not recorded.
+
 Bodies carry byte length and SHA-256 metadata. UTF-8 bodies are stored directly;
 any non-UTF-8 body is base64 encoded. Credential-like headers—including
 Authorization, cookies, Kobo user keys, API keys, secrets, and tokens—are
-replaced with `***REDACTED***` in every leg.
+replaced with `***REDACTED***` in every generic header leg. Library-sync's
+incoming and outgoing opaque tokens are deliberately retained in its private
+`sync_exchange` section so an interrupted page chain can be reconstructed.
 
 Retention is automatic and cross-process locked: at most 256 records, 64 MiB
 compressed total, seven days, and 16 MiB for any individual body. An exchange

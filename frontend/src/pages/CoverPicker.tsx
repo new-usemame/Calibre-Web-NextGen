@@ -27,9 +27,10 @@ const isEmbedded = (c: CoverCandidate) => c.source_id === 'embedded' || c.candid
 export function CoverPicker({ id }: { id: string }) {
   const t = useT();
   const qc = useQueryClient();
+  const personal = new URLSearchParams(window.location.search).get('personal') === '1';
   const { data: book } = useBook(id);
-  const { data: state } = useCoverState(id);
-  const candidatesQ = useCandidates(id);
+  const { data: state } = useCoverState(id, personal);
+  const candidatesQ = useCandidates(id, personal);
 
   const [locked, setLocked] = useState(false);
   const [coverBust, setCoverBust] = useState<string | null>(null);
@@ -56,11 +57,13 @@ export function CoverPicker({ id }: { id: string }) {
   }, [book?.cover_url, coverBust]);
 
   const onApplied = useCallback((coverUrl?: string) => {
-    setCoverBust(coverUrl ?? `/cover/${id}/og?ts=${Date.now()}`);
-    setBanner({ ok: true, text: t('Cover updated.') });
+    setCoverBust(coverUrl ?? (personal
+      ? `/api/v1/books/${id}/my-cover/image?ts=${Date.now()}`
+      : `/cover/${id}/og?ts=${Date.now()}`));
+    setBanner({ ok: true, text: personal ? t('Your cover was updated.') : t('Cover updated.') });
     qc.invalidateQueries({ queryKey: ['book', id] });
     qc.invalidateQueries({ queryKey: ['book-meta', id] });
-  }, [id, qc, t]);
+  }, [id, personal, qc, t]);
 
   const onError = useCallback((err: unknown) => {
     setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Something went wrong. Try again.') });
@@ -83,9 +86,11 @@ export function CoverPicker({ id }: { id: string }) {
         <Link href={back.href} className={styles.back}>
           <ChevronLeft size={16} /> {back.label}
         </Link>
-        <h1 className={styles.title}>{t('Change cover')}</h1>
+        <h1 className={styles.title}>{personal ? t('Use my own cover') : t('Change library cover')}</h1>
         <p className={styles.subtitle}>
-          {t('Pick a cover from any source we support, paste a URL, upload a file, or use the cover embedded in the book itself.')}
+          {personal
+            ? t('Your cover appears only to you and on books delivered to your e-readers. The library cover stays unchanged for everyone else, and administrators manage it.')
+            : t('Pick a cover from any source we support, paste a URL, upload a file, or use the cover embedded in the book itself.')}
         </p>
       </header>
 
@@ -112,24 +117,24 @@ export function CoverPicker({ id }: { id: string }) {
               {book.authors?.length ? <span>{formatAuthors(book.authors.map((a) => a.name))}</span> : null}
             </div>
 
-            <button className={`${styles.lockToggle} ${locked ? styles.lockOn : ''}`} onClick={toggleLock}
+            {!personal && <button className={`${styles.lockToggle} ${locked ? styles.lockOn : ''}`} onClick={toggleLock}
                     type="button" aria-pressed={locked}>
               <span className={styles.lockKnob}>{locked ? <Lock size={13} /> : <Unlock size={13} />}</span>
               <span>{locked ? t('Cover locked') : t('Lock cover')}</span>
-            </button>
-            <p className={styles.lockHelp}>
+            </button>}
+            {!personal && <p className={styles.lockHelp}>
               {t('When locked, fetching metadata will not overwrite this cover.')}
-            </p>
+            </p>}
           </div>
 
-          <AddOwnPanel id={id} locked={locked} onApplied={onApplied} onError={onError} />
+          <AddOwnPanel id={id} locked={locked} personal={personal} onApplied={onApplied} onError={onError} />
         </aside>
 
         <section className={styles.main}>
           {state?.ereader_enabled && (
             <EreaderPanel onChange={setEreaderState} value={ereaderState} />
           )}
-          <ApiKeysPanel />
+          {!personal && <ApiKeysPanel />}
 
           <div className={styles.gridToolbar}>
             <h2 className={styles.gridTitle}>{t('Choose a cover')}</h2>
@@ -148,6 +153,7 @@ export function CoverPicker({ id }: { id: string }) {
               id={id}
               candidates={candidatesQ.data?.candidates ?? []}
               locked={locked}
+              personal={personal}
               ereader={ereaderState}
               onPick={setConfirm}
             />
@@ -162,6 +168,7 @@ export function CoverPicker({ id }: { id: string }) {
           id={id}
           candidate={confirm}
           currentCover={currentCover}
+          personal={personal}
           onClose={() => setConfirm(null)}
           onApplied={(url) => { onApplied(url); setConfirm(null); }}
           onError={(e) => { onError(e); setConfirm(null); }}
@@ -223,7 +230,7 @@ function EreaderPanel({ value, onChange }: {
 
 /** Per-candidate e-reader render with a generation guard, concurrency cap and a
  *  settings-keyed cache — mirrors the legacy picker's behaviour. */
-function useEreaderPreviews(id: string, candidates: CoverCandidate[], s: EreaderState) {
+function useEreaderPreviews(id: string, candidates: CoverCandidate[], s: EreaderState, personal: boolean) {
   const [previews, setPreviews] = useState<Record<string, string | 'loading'>>({});
   const cache = useRef<Map<string, string>>(new Map());
   const gen = useRef(0);
@@ -248,7 +255,7 @@ function useEreaderPreviews(id: string, candidates: CoverCandidate[], s: Ereader
         };
         if (isEmbedded(c)) opts.embedded = true;
         else if (c.cover_url) opts.candidate_url = c.cover_url;
-        const r = await coverApi.ereaderPreview(id, opts);
+        const r = await coverApi.ereaderPreview(id, opts, personal);
         if (myGen !== gen.current) return; // settings changed mid-flight
         if (r.ok && r.data_url) {
           cache.current.set(key, r.data_url);
@@ -267,7 +274,7 @@ function useEreaderPreviews(id: string, candidates: CoverCandidate[], s: Ereader
     Promise.all(workers).catch(() => {});
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, s.enabled, settingsKey, candidates]);
+  }, [id, s.enabled, settingsKey, candidates, personal]);
 
   return s.enabled ? previews : {};
 }
@@ -276,12 +283,13 @@ function useEreaderPreviews(id: string, candidates: CoverCandidate[], s: Ereader
 // Candidate grid + cards
 // ============================================================================
 
-function CandidateGrid({ id, candidates, locked, ereader, onPick }: {
+function CandidateGrid({ id, candidates, locked, personal, ereader, onPick }: {
   id: string; candidates: CoverCandidate[]; locked: boolean;
+  personal: boolean;
   ereader: EreaderState; onPick: (c: CoverCandidate) => void;
 }) {
   const t = useT();
-  const previews = useEreaderPreviews(id, candidates, ereader);
+  const previews = useEreaderPreviews(id, candidates, ereader, personal);
   if (!candidates.length) {
     return <EmptyState message={t('No candidates found yet. Try a different search or refresh.')} />;
   }
@@ -370,8 +378,9 @@ function ProviderDetail({ providers }: { providers?: ProviderStatus[] }) {
 // "Add your own" — URL + upload tabs
 // ============================================================================
 
-function AddOwnPanel({ id, locked, onApplied, onError }: {
-  id: string; locked: boolean; onApplied: (url?: string) => void; onError: (e: unknown) => void;
+function AddOwnPanel({ id, locked, personal, onApplied, onError }: {
+  id: string; locked: boolean; personal: boolean;
+  onApplied: (url?: string) => void; onError: (e: unknown) => void;
 }) {
   const t = useT();
   const [tab, setTab] = useState<'url' | 'upload'>('url');
@@ -402,15 +411,16 @@ function AddOwnPanel({ id, locked, onApplied, onError }: {
            id={tab === 'url' ? 'cp-panel-url' : 'cp-panel-upload'}
            aria-labelledby={tab === 'url' ? 'cp-tab-url' : 'cp-tab-upload'}>
         {tab === 'url'
-          ? <UrlTab id={id} locked={locked} onApplied={onApplied} onError={onError} />
-          : <UploadTab id={id} locked={locked} onApplied={onApplied} onError={onError} />}
+          ? <UrlTab id={id} locked={locked} personal={personal} onApplied={onApplied} onError={onError} />
+          : <UploadTab id={id} locked={locked} personal={personal} onApplied={onApplied} onError={onError} />}
       </div>
     </div>
   );
 }
 
-function UrlTab({ id, locked, onApplied, onError }: {
-  id: string; locked: boolean; onApplied: (url?: string) => void; onError: (e: unknown) => void;
+function UrlTab({ id, locked, personal, onApplied, onError }: {
+  id: string; locked: boolean; personal: boolean;
+  onApplied: (url?: string) => void; onError: (e: unknown) => void;
 }) {
   const t = useT();
   const [url, setUrl] = useState('');
@@ -425,18 +435,18 @@ function UrlTab({ id, locked, onApplied, onError }: {
     setChecking(true);
     const mySeq = ++seq.current;
     const h = setTimeout(async () => {
-      try { const r = await coverApi.validate(id, v); if (mySeq === seq.current) setValid(r); }
+      try { const r = await coverApi.validate(id, v, personal); if (mySeq === seq.current) setValid(r); }
       catch { if (mySeq === seq.current) setValid(null); }
       finally { if (mySeq === seq.current) setChecking(false); }
     }, 400);
     return () => clearTimeout(h);
-  }, [url, id]);
+  }, [url, id, personal]);
 
   const apply = async () => {
     // Guard against applying a URL that's no longer the one shown/validated.
     if (!valid?.valid || checking || valid?.url !== url.trim() || locked) return;
     setApplying(true);
-    try { const r = await coverApi.applyUrl(id, valid.url); onApplied(r.cover_url); setUrl(''); setValid(null); }
+    try { const r = await coverApi.applyUrl(id, valid.url, personal); onApplied(r.cover_url); setUrl(''); setValid(null); }
     catch (e) { onError(e); }
     finally { setApplying(false); }
   };
@@ -466,8 +476,9 @@ function UrlTab({ id, locked, onApplied, onError }: {
   );
 }
 
-function UploadTab({ id, locked, onApplied, onError }: {
-  id: string; locked: boolean; onApplied: (url?: string) => void; onError: (e: unknown) => void;
+function UploadTab({ id, locked, personal, onApplied, onError }: {
+  id: string; locked: boolean; personal: boolean;
+  onApplied: (url?: string) => void; onError: (e: unknown) => void;
 }) {
   const t = useT();
   const [file, setFile] = useState<File | null>(null);
@@ -475,7 +486,7 @@ function UploadTab({ id, locked, onApplied, onError }: {
   const apply = async () => {
     if (!file || locked) return;
     setApplying(true);
-    try { const r = await coverApi.applyFile(id, file); onApplied(r.cover_url); setFile(null); }
+    try { const r = await coverApi.applyFile(id, file, personal); onApplied(r.cover_url); setFile(null); }
     catch (e) { onError(e); }
     finally { setApplying(false); }
   };
@@ -553,8 +564,9 @@ function KeyRow({ k }: { k: ProviderKey }) {
 // Confirm modal
 // ============================================================================
 
-function ConfirmModal({ id, candidate: c, currentCover, onClose, onApplied, onError }: {
+function ConfirmModal({ id, candidate: c, currentCover, personal, onClose, onApplied, onError }: {
   id: string; candidate: CoverCandidate; currentCover: string | null;
+  personal: boolean;
   onClose: () => void; onApplied: (url?: string) => void; onError: (e: unknown) => void;
 }) {
   const t = useT();
@@ -591,7 +603,9 @@ function ConfirmModal({ id, candidate: c, currentCover, onClose, onApplied, onEr
   const apply = async () => {
     setApplying(true);
     try {
-      const r = isEmbedded(c) ? await coverApi.applyEmbedded(id) : await coverApi.applyUrl(id, c.cover_url);
+      const r = isEmbedded(c)
+        ? await coverApi.applyEmbedded(id, personal)
+        : await coverApi.applyUrl(id, c.cover_url, personal);
       if (r.ok) onApplied(r.cover_url); else onError(new ApiError(400, r.error_message || t('Cover save failed.')));
     } catch (e) { onError(e); }
     finally { setApplying(false); }

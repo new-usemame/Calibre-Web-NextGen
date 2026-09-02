@@ -8,6 +8,7 @@ re-enable (snapshot never clobbered), and the Guest/anonymous exclusion that
 matches the bulk-migration precedent (#2026).
 """
 from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 from flask import Flask
@@ -173,6 +174,73 @@ def test_enable_snapshots_then_switches_every_non_guest_account(
         "browse_global": True, "has_own_library": True,
     }
     assert str(guest.id) not in snapshot
+
+
+def test_enable_seeds_each_accounts_full_allowed_catalogue_not_activity(
+        app_session, calibre_session, monkeypatch):
+    """First setup is a per-account visibility baseline, not prior ownership."""
+    english = db.Languages("eng")
+    french = db.Languages("fra")
+    books = calibre_session.query(db.Books).order_by(db.Books.id).all()
+    books[0].languages.append(english)
+    books[1].languages.append(english)
+    french_book = _book(3, "Three")
+    french_book.languages.append(french)
+    calibre_session.add(french_book)
+    calibre_session.commit()
+
+    admin = _admin_user(app_session)
+    english_reader = _user(app_session, "english-reader")
+    english_reader.default_language = "eng"
+    french_reader = _user(app_session, "french-reader")
+    french_reader.default_language = "fra"
+    shelf = ub.Shelf(name="Activity", user_id=english_reader.id, is_public=0)
+    app_session.add(shelf)
+    app_session.commit()
+    shelf_link = ub.BookShelf(shelf=shelf.id, book_id=1, order=1)
+    shelf_link.ub_shelf = shelf
+    app_session.add_all([
+        # Activity deliberately names only book 1. Book 2 must still be seeded.
+        shelf_link,
+        ub.ReadBook(user_id=english_reader.id, book_id=1,
+                    read_status=ub.ReadBook.STATUS_FINISHED),
+        ub.Downloads(user_id=english_reader.id, book_id=1),
+        # Hidden/archived are still part of the baseline so enabling cannot
+        # generate accidental device removals.
+        ub.UserHiddenBook(user_id=english_reader.id, book_id=2),
+        ub.ArchivedBook(user_id=english_reader.id, book_id=2,
+                        is_archived=True),
+    ])
+    app_session.commit()
+    api_admin = _wire(app_session, calibre_session, monkeypatch, admin)
+
+    response = _call(api_admin.admin_my_library_intro_enable,
+                     "/api/v1/admin/my-library/intro/enable", "POST", {})
+    assert response.get_json()["errors"] == 0
+
+    memberships = {
+        user.id: [row.book_id for row in app_session.query(ub.UserLibraryBook)
+                  .filter_by(user_id=user.id)
+                  .order_by(ub.UserLibraryBook.book_id)]
+        for user in (admin, english_reader, french_reader)
+    }
+    assert memberships == {
+        admin.id: [1, 2, 3],
+        english_reader.id: [1, 2],
+        french_reader.id: [3],
+    }
+
+
+def test_intro_copy_discloses_full_seed_before_household_action():
+    root = Path(__file__).resolve().parents[2]
+    component = (root / "frontend/src/components/MyLibraryIntro.tsx").read_text()
+    anchors = (root / "cps/spa_strings.py").read_text()
+    expected = (
+        "Each account starts with every book it can currently see—not only "
+        "books it has shelved, read, or downloaded."
+    )
+    assert expected in component
+    assert '_("%s")' % expected.replace('"', '\\"') in anchors
 
 
 def test_enable_is_idempotent_and_never_re_snapshots(

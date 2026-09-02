@@ -106,7 +106,7 @@ def test_cold_download_keeps_flask_context_while_conversion_is_prepared(monkeypa
     monkeypatch.setattr(helper.calibre_db, "get_filtered_book", lambda *_args, **_kwargs: book)
     monkeypatch.setattr(helper.calibre_db, "get_book_format", get_format)
     monkeypatch.setattr(helper, "convert_book_format", context_sensitive_conversion)
-    monkeypatch.setattr(helper, "do_download_file", lambda *_args: "served")
+    monkeypatch.setattr(helper, "do_download_file", lambda *_args, **_kwargs: "served")
     monkeypatch.setattr(helper, "get_valid_filename", lambda value, **_: value)
     monkeypatch.setattr(helper, "current_user", SimpleNamespace(is_authenticated=False, role_admin=lambda: False))
     monkeypatch.setattr(helper.config, "config_kepubifypath", "/bin/kepubify", raising=False)
@@ -390,7 +390,7 @@ def test_download_serves_epub_immediately_while_backfill_is_in_flight(monkeypatc
                         lambda _book_id, fmt: epub if fmt == "EPUB" else None)
     monkeypatch.setattr(helper, "convert_book_format",
                         lambda *_args, **_kwargs: pytest.fail("download blocked on conversion"))
-    monkeypatch.setattr(helper, "do_download_file", lambda *_args: "served")
+    monkeypatch.setattr(helper, "do_download_file", lambda *_args, **_kwargs: "served")
     monkeypatch.setattr(helper, "get_valid_filename", lambda value, **_: value)
     monkeypatch.setattr(helper, "current_user", SimpleNamespace(is_authenticated=False, role_admin=lambda: False))
     monkeypatch.setattr(helper.config, "config_kepubifypath", "/bin/kepubify", raising=False)

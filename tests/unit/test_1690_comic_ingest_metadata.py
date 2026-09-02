@@ -188,10 +188,10 @@ def test_missing_uploader_module_degrades_to_no_flags(tagged_cbz, monkeypatch):
     assert _FakeProcessor()._comic_calibredb_metadata_args(tagged_cbz) == []
 
 
-def test_comic_metadata_args_wired_into_calibredb_add_command():
+def test_comic_metadata_args_wired_into_calibre_transaction():
     """Source-pin: add_book_to_library's text=True branch must actually
     call _comic_calibredb_metadata_args and fold the result into the
-    calibredb add command, or this whole fix is dead code."""
+    Calibre database transaction, or this whole fix is dead code."""
     import inspect
 
     src = inspect.getsource(ingest_processor.NewBookProcessor.add_book_to_library)
@@ -199,11 +199,14 @@ def test_comic_metadata_args_wired_into_calibredb_add_command():
         "add_book_to_library must call _comic_calibredb_metadata_args "
         "for the text-format import path"
     )
-    # The result must reach the actual calibredb invocation, not just be
+    # The result must reach the actual transaction helper, not just be
     # computed and discarded.
-    calibredb_call = src[src.index('cmd=[\n                            "calibredb"'):]
-    calibredb_call = calibredb_call[: calibredb_call.index(")\n")]
-    assert "comic_meta_args" in calibredb_call, (
+    conversion = src.index("metadata_override = self._metadata_args_to_override(comic_meta_args)")
+    transaction = src.index(
+        "transaction_result = self._run_calibre_transaction(", conversion
+    )
+    assert conversion < transaction
+    assert "metadata_override" in src[transaction:transaction + 320], (
         "the computed comic metadata flags must be passed into the "
-        "calibredb add cmd, not just computed and dropped"
+        "Calibre database transaction, not just computed and dropped"
     )

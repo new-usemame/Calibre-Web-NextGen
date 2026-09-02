@@ -148,19 +148,22 @@ def test_queued_push_reaches_the_remote_and_flips_status(patched_session, queue)
 
 
 def test_request_path_does_not_wait_for_a_slow_remote(patched_session, queue):
-    """The measured symptom: N annotations x ~10s of frozen app. The dispatch
-    call must return in ~no time regardless of how slow the target is."""
+    """The request path queues every annotation without calling the remote."""
     s, user = patched_session
-    register_handler(SlowHandler(delay=0.4))
+    payloads = [_payload("uuid-a"), _payload("uuid-b"), _payload("uuid-c")]
+    handler = SlowHandler(delay=0.4)
+    register_handler(handler)
 
     started = time.monotonic()
-    dispatch_annotation_sync(
-        [_payload("uuid-a"), _payload("uuid-b"), _payload("uuid-c")], _book(), user,
-    )
+    dispatch_annotation_sync(payloads, _book(), user)
     elapsed = time.monotonic() - started
 
-    assert elapsed < 0.4, f"request path blocked on the remote for {elapsed:.2f}s"
-    assert len(queue) == 3
+    assert handler.calls == [], "remote push ran on the request path"
+    assert len(queue) == len(payloads), "not every annotation was queued"
+    # Together with the structural assertions above, this delay-derived sanity
+    # bound proves the request path did not wait for even one remote round trip;
+    # it is not a wall-clock performance budget.
+    assert elapsed < handler.delay * len(payloads)
 
 
 def test_existing_annotation_push_is_queued(patched_session, queue):

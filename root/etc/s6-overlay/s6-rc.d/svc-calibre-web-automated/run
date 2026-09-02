@@ -17,13 +17,14 @@ export CALIBRE_DBPATH=/config
 # enabled.
 export CALIBRE_CONFIG_DIRECTORY="${CALIBRE_CONFIG_DIRECTORY:-/config/.config/calibre-runtime}"
 
-# -P keeps the current directory off sys.path. This unit no longer chdirs into
-# the app root, so it inherits cwd /config (the Dockerfile WORKDIR) -- and
-# /config is a volume the user mounts and writes. `python -m` puts cwd at
-# sys.path[0], so without -P a stray /config/cps.py or /config/cps/ is imported
-# in place of the application and the server never starts. The package itself
-# resolves from anywhere because the image installs it editable (Dockerfile
-# STEP 6), which is what makes dropping the chdir safe in the first place.
+# The import environment has three separate controls. `-P` keeps the current
+# directory (/config, a user-mounted volume) off sys.path. `env -u PYTHONPATH`
+# prevents an injected environment path from outranking the application, and
+# PYTHONNOUSERSITE=1 excludes user-site .pth files and usercustomize (including
+# a site redirected under /config by HOME or PYTHONUSERBASE). This deliberately
+# still processes the image-controlled system site, including its editable .pth
+# for /app/calibre-web-automated and any system sitecustomize installed while
+# the image is built; those files are part of the trusted image, not /config.
 exec \
     s6-notifyoncheck -d -n 300 -w 1000 -c "nc -z localhost ${CWA_PORT_OVERRIDE:-8083}" \
-        cwa-as-abc python3 -P -m cps
+        cwa-as-abc /usr/bin/env -u PYTHONPATH PYTHONNOUSERSITE=1 python3 -P -m cps

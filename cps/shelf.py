@@ -840,8 +840,7 @@ def delete_shelf_helper(cur_shelf):
     ub.session.query(ub.BookShelf).filter(ub.BookShelf.shelf == shelf_id).delete()
     ub.session.query(ub.OpdsShelfExposure).filter(ub.OpdsShelfExposure.shelf_id == shelf_id).delete()
     ub.session.add(ub.ShelfArchive(uuid=cur_shelf.uuid, user_id=cur_shelf.user_id))
-    ub.session_commit("successfully deleted Shelf {}".format(cur_shelf.name))
-    return True
+    return ub.session_commit("successfully deleted Shelf {}".format(cur_shelf.name))
 
 
 def change_shelf_order(shelf_id, order):

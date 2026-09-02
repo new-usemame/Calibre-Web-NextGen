@@ -30,9 +30,79 @@ case "$WATCH_FOLDER" in
 esac
 echo "[cwa-ingest-service] Watching folder: $WATCH_FOLDER"
 
-# Create queue file for retry processing (persistent across restarts)
+# Persistent retry state. Each physical row is one path. As before, this
+# line-oriented format cannot represent a path containing a newline.
 QUEUE_FILE="${CWA_INGEST_RETRY_QUEUE:-/config/cwa_ingest_retry_queue}"
-touch "$QUEUE_FILE"
+
+cleanup_queue_transaction_temps() {
+        python3 - "$QUEUE_FILE" <<'PY'
+import glob
+import os
+import sys
+
+queue = os.path.abspath(sys.argv[1])
+for pattern in (queue + ".tmp.*", queue + ".trim.*"):
+    for candidate in glob.glob(pattern):
+        try:
+            os.unlink(candidate)
+        except FileNotFoundError:
+            pass
+PY
+}
+
+commit_queue_transaction() {
+        local staged_queue="$1"
+        local injected_failure="${2:-}"
+        python3 - "$QUEUE_FILE" "$staged_queue" "$injected_failure" <<'PY'
+import os
+import stat
+import sys
+
+target, staged = map(os.path.abspath, sys.argv[1:3])
+injected_failure = sys.argv[3]
+replaced = False
+try:
+    target_stat = os.stat(target, follow_symlinks=False)
+    os.chmod(staged, stat.S_IMODE(target_stat.st_mode), follow_symlinks=False)
+    staged_stat = os.stat(staged, follow_symlinks=False)
+    if (staged_stat.st_uid, staged_stat.st_gid) != (target_stat.st_uid, target_stat.st_gid):
+        os.chown(staged, target_stat.st_uid, target_stat.st_gid, follow_symlinks=False)
+    with open(staged, "rb") as stream:
+        os.fsync(stream.fileno())
+    os.replace(staged, target)
+    replaced = True
+    if injected_failure == "after-replace":
+        raise OSError("injected directory fsync failure")
+    directory_fd = os.open(os.path.dirname(target), os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+except Exception as error:
+    phase = "after replacement" if replaced else "before replacement"
+    print(f"queue commit failed {phase}: {error}", file=sys.stderr)
+    raise SystemExit(3 if replaced else 2)
+PY
+}
+
+report_queue_commit_failure() {
+        local status="$1"
+        local operation="$2"
+        if [ "$status" -eq 3 ]; then
+                echo "[cwa-ingest-service] ERROR: retry queue $operation replacement installed, but directory durability confirmation failed; crash durability is uncertain" >&2
+        else
+                echo "[cwa-ingest-service] ERROR: retry queue $operation failed before replacement; original preserved" >&2
+        fi
+}
+
+cleanup_queue_transaction_temps || {
+        echo "[cwa-ingest-service] ERROR: could not clean abandoned retry queue transactions"
+        exit 1
+}
+if ! touch "$QUEUE_FILE"; then
+        echo "[cwa-ingest-service] ERROR: could not initialize persistent ingest state"
+        exit 1
+fi
 
 # Create status file for basic status tracking (persistent across restarts)
 STATUS_FILE="${CWA_INGEST_STATUS_FILE:-/config/cwa_ingest_status}"
@@ -40,6 +110,31 @@ echo "idle" > "$STATUS_FILE"
 
 # Ensure failed backup directory exists
 mkdir -p "/config/processed_books/failed" 2>/dev/null || true
+
+# Treat cwa.db as untrusted at the shell boundary. SQLite affinity does not
+# guarantee that an existing INTEGER column contains digits, and Bash
+# recursively evaluates variable contents inside arithmetic expressions. Keep
+# this validator free of arithmetic so a DB value cannot be interpreted before
+# it has been reduced to canonical decimal digits. Leading zeroes are stripped
+# as well, preventing otherwise-valid values such as 08 from acquiring Bash's
+# octal semantics. The caller supplies the setting's documented schema default.
+non_negative_integer_or_default() {
+    local value="$1"
+    local default_value="$2"
+
+    case "$value" in
+        ""|*[!0-9]*)
+            value="$default_value"
+            ;;
+        *)
+            while [ "${#value}" -gt 1 ] && [ "${value:0:1}" = "0" ]; do
+                value="${value#0}"
+            done
+            ;;
+    esac
+
+    printf '%s\n' "$value"
+}
 
 # Function to get timeout from database
 get_timeout_from_db() {
@@ -62,12 +157,13 @@ except:
     print(15)
 " 2>/dev/null || echo "15")
     fi
-    echo $((timeout_minutes * 60))  # Convert to seconds
+    timeout_minutes=$(non_negative_integer_or_default "$timeout_minutes" 15)
+    printf '%s\n' "$((timeout_minutes * 60))"  # Convert to seconds
 }
 
 # Tunables (override via env)
 STABLE_CHECKS=${CWA_INGEST_STABLE_CHECKS:-6}
-STABLE_CONSEC_MATCH=${CWA_INGEST_STABLE_CONSEC_MATCH:-2}
+STABLE_CONSEC_MATCH=${CWA_INGEST_STABLE_CONSEC_MATCH:-6}
 STABLE_INTERVAL=${CWA_INGEST_STABLE_INTERVAL:-0.5}
 MAX_QUEUE_SIZE=${CWA_INGEST_MAX_QUEUE_SIZE:-50}
 SUPPORTED_EXT_REGEX='(epub|mobi|azw3|azw|azw4|pdf|txt|rtf|cbz|cbr|cb7|cbc|fb2|fbz|docx|html|htmlz|lit|lrf|odt|prc|pdb|pml|rb|snb|tcr|txtz|kepub|m4b|m4a|mp4|acsm|lcpl|chm|djvu|kfx|kfx-zip)$'
@@ -97,7 +193,7 @@ except:
     print(120)
 " 2>/dev/null || echo "120")
         fi
-        echo "$minutes"
+        non_negative_integer_or_default "$minutes" 120
 }
 
 get_stale_temp_interval_from_db() {
@@ -118,7 +214,7 @@ except:
     print(600)
 " 2>/dev/null || echo "600")
         fi
-        echo "$seconds"
+        non_negative_integer_or_default "$seconds" 600
 }
 
 wait_for_stable_file() {
@@ -138,14 +234,61 @@ wait_for_stable_file() {
                 fi
                 sleep "$STABLE_INTERVAL"
         done
-        # Exhausted every check without two consecutive identical sizes: the
-        # file is still growing. Report failure so callers leave it alone --
-        # both of them then wait for the close_write that will arrive when the
-        # writer finishes. This used to `return 0`, which told the caller a
-        # still-growing file was settled and invited a partial import; a
-        # file that stabilises normally returns from inside the loop on the
-        # second check and never reaches here.
+        # Exhausted every check without the configured run of identical sizes.
+        # The startup sweep leaves the file for the watcher's future
+        # close_write. A hardlink CREATE has no later close_write at this path,
+        # so its special event path simply declines this event and leaves the
+        # source untouched. Production defaults require 2.5 s of unchanged
+        # size (six samples, five equal intervals).
         return 1
+}
+
+append_retry_entry_to_file() {
+        local destination="$1"
+        local path="$2"
+        printf '%s\n' "$path" >> "$destination"
+}
+
+queue_retry_file() {
+        local path="$1"
+        local injected_failure="${2:-}"
+        local temp_queue trim_queue queue_size commit_status
+
+        if grep -Fqx -- "$path" "$QUEUE_FILE" 2>/dev/null; then
+                return 0
+        fi
+
+        if ! temp_queue=$(mktemp "${QUEUE_FILE}.tmp.XXXXXX"); then
+                echo "[cwa-ingest-service] ERROR: could not create retry queue transaction" >&2
+                return 1
+        fi
+        if ! cat "$QUEUE_FILE" > "$temp_queue" \
+                || ! append_retry_entry_to_file "$temp_queue" "$path"; then
+                echo "[cwa-ingest-service] ERROR: could not stage retry queue update; original preserved" >&2
+                rm -f "$temp_queue" 2>/dev/null || true
+                return 1
+        fi
+
+        queue_size=$(wc -l < "$temp_queue" 2>/dev/null || echo 0)
+        if [ "$queue_size" -gt "$MAX_QUEUE_SIZE" ]; then
+                echo "[cwa-ingest-service] Queue size ($queue_size) exceeds maximum ($MAX_QUEUE_SIZE), removing oldest entries"
+                if ! trim_queue=$(mktemp "${QUEUE_FILE}.trim.XXXXXX") \
+                        || ! tail -n "$MAX_QUEUE_SIZE" "$temp_queue" > "$trim_queue" \
+                        || ! mv -f -- "$trim_queue" "$temp_queue"; then
+                        echo "[cwa-ingest-service] ERROR: could not trim retry queue; original preserved" >&2
+                        rm -f "$temp_queue" "${trim_queue:-}" 2>/dev/null || true
+                        return 1
+                fi
+        fi
+
+        if commit_queue_transaction "$temp_queue" "$injected_failure"; then
+                :
+        else
+                commit_status=$?
+                report_queue_commit_failure "$commit_status" "update"
+                rm -f "$temp_queue" 2>/dev/null || true
+                return 1
+        fi
 }
 
 run_fallback() {
@@ -312,7 +455,7 @@ run_processor_with_timeout() {
 }
 
 has_processing_markers() {
-        find "$PROCESSING_DIR" -type f -name '*.processing' -print -quit 2>/dev/null | grep -q .
+	find "$PROCESSING_DIR" -type f -name '*.processing' -print -quit 2>/dev/null | grep -q .
 }
 
 is_supported_ingest_file() {
@@ -501,9 +644,16 @@ pause_before_pid_publication_for_test() {
 process_retry_queue() {
         if [ -s "$QUEUE_FILE" ]; then
                 echo "[cwa-ingest-service] Processing retry queue..."
-                local temp_queue=$(mktemp)
+                local temp_queue commit_status
+                if ! temp_queue=$(mktemp "${QUEUE_FILE}.tmp.XXXXXX"); then
+                        echo "[cwa-ingest-service] ERROR: could not create retry queue transaction; original preserved" >&2
+                        return 1
+                fi
+                local rewrite_ok=1
+                local queued_file
 
-                while IFS= read -r queued_file; do
+                while IFS= read -r queued_file || [ -n "$queued_file" ]; do
+                        [ -n "$queued_file" ] || continue
                         if [ -f "$queued_file" ]; then
                                 echo "[cwa-ingest-service] Retrying: $queued_file"
                                 local configured_timeout=$(get_timeout_from_db)  # Get configured timeout from database
@@ -518,7 +668,10 @@ process_retry_queue() {
 
                                 if [ $retry_exit -eq 2 ]; then
                                         # Still busy, keep in queue
-                                        echo "$queued_file" >> "$temp_queue"
+                                        if ! append_retry_entry_to_file "$temp_queue" "$queued_file"; then
+                                                rewrite_ok=0
+                                                break
+                                        fi
                                 elif [ $retry_exit -eq 124 ]; then
                                         # Timeout, remove problematic file
                                         echo "[cwa-ingest-service] TIMEOUT on retry: $queued_file, removing"
@@ -533,9 +686,16 @@ process_retry_queue() {
                                         echo "[cwa-ingest-service] Successfully processed retry: $queued_file"
                                         mark_recent_path "$queued_file"
                                         touch "$INGEST_BATCH_LAST_SUCCESS_FILE" 2>/dev/null || true
+                                elif [ $retry_exit -eq 3 ]; then
+                                        echo "[cwa-ingest-service] Terminal ingest failure; source retained: $queued_file" >&2
                                 else
-                                        echo "[cwa-ingest-service] Error on retry: $queued_file (exit: $retry_exit)"
-                                        mark_recent_path "$queued_file"
+                                        # Anything not explicitly terminal is
+                                        # transient and remains queued.
+                                        echo "[cwa-ingest-service] Error on retry: $queued_file (exit: $retry_exit); retaining"
+                                        if ! append_retry_entry_to_file "$temp_queue" "$queued_file"; then
+                                                rewrite_ok=0
+                                                break
+                                        fi
                                 fi
                         else
                                 echo "[cwa-ingest-service] Skipping vanished retry queue entry: $queued_file"
@@ -543,7 +703,20 @@ process_retry_queue() {
                         fi
                 done < "$QUEUE_FILE"
 
-                mv "$temp_queue" "$QUEUE_FILE"
+                if [ "$rewrite_ok" -ne 1 ]; then
+                        echo "[cwa-ingest-service] ERROR: retry queue rewrite failed; original preserved" >&2
+                        rm -f "$temp_queue" 2>/dev/null || true
+                        return 1
+                fi
+
+                if commit_queue_transaction "$temp_queue"; then
+                        :
+                else
+                        commit_status=$?
+                        report_queue_commit_failure "$commit_status" "rewrite"
+                        rm -f "$temp_queue" 2>/dev/null || true
+                        return 1
+                fi
 
                 if [ -s "$QUEUE_FILE" ]; then
                         echo "[cwa-ingest-service] $(wc -l < "$QUEUE_FILE") files remain in retry queue"
@@ -648,7 +821,7 @@ handle_event() {
                         return 0
                 fi
                 echo "[cwa-ingest-service] Detected completed hardlink (nlink=$_nlink): $filepath"
-                # Belt-and-suspenders: confirm the size has settled before ingest.
+                # Belt-and-suspenders: require the configured unchanged-size window.
                 wait_for_stable_file "$filepath" || return 0
         fi
 
@@ -704,21 +877,16 @@ handle_event() {
                 echo "[cwa-ingest-service] Processor busy, adding to retry queue: $filepath"
                 echo "queued:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
 
-                # Add to queue with size management
-                echo "$filepath" >> "$QUEUE_FILE"
-
-                # Check queue size and trim if necessary
-                local queue_size=$(wc -l < "$QUEUE_FILE" 2>/dev/null || echo 0)
-                if [ "$queue_size" -gt "$MAX_QUEUE_SIZE" ]; then
-                        echo "[cwa-ingest-service] Queue size ($queue_size) exceeds maximum ($MAX_QUEUE_SIZE), removing oldest entries"
-                        local temp_queue=$(mktemp)
-                        tail -n "$MAX_QUEUE_SIZE" "$QUEUE_FILE" > "$temp_queue"
-                        mv "$temp_queue" "$QUEUE_FILE"
-                fi
+                queue_retry_file "$filepath" || \
+                        echo "[cwa-ingest-service] ERROR: failed to persist retry entry: $filepath" >&2
+        elif [ $exit_code -eq 3 ]; then
+                echo "[cwa-ingest-service] Terminal ingest failure; source retained: $filepath" >&2
+                echo "error:$filename:source_retained:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
         elif [ $exit_code -ne 0 ]; then
                 echo "[cwa-ingest-service] Error processing $filepath (exit code: $exit_code)"
                 echo "error:$filename:$exit_code:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
-                mark_recent_path "$filepath"
+                queue_retry_file "$filepath" || \
+                        echo "[cwa-ingest-service] ERROR: failed to persist retry entry: $filepath" >&2
         else
                 echo "[cwa-ingest-service] Successfully processed: $filepath"
                 echo "completed:$filename:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"

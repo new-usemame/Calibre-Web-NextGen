@@ -21,6 +21,28 @@ from .tasks.auto_hardcover_id import TaskAutoHardcoverID
 log = logger.create()
 _hardcover_schedule_lock = threading.Lock()
 
+DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE = 'weekly'
+HARDCOVER_AUTO_FETCH_SCHEDULES = frozenset({
+    'never',
+    '15min',
+    '30min',
+    '1hour',
+    '2hours',
+    '4hours',
+    '6hours',
+    '12hours',
+    'daily',
+    'weekly',
+    'monthly',
+})
+
+
+def resolve_hardcover_auto_fetch_schedule(stored_value):
+    """Return the schedule the crawler will use for a persisted value."""
+    if stored_value in HARDCOVER_AUTO_FETCH_SCHEDULES:
+        return stored_value
+    return DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE
+
 
 def reconcile_hardcover_configuration():
     """Migrate the former two enable flags and maintain a rollback mirror."""
@@ -292,10 +314,24 @@ def _schedule_hardcover_auto_fetch(scheduler, timezone_info, configuration=None)
             )
             return
 
+        stored_schedule_type = cwa_settings.get(
+            'hardcover_auto_fetch_schedule',
+            DEFAULT_HARDCOVER_AUTO_FETCH_SCHEDULE,
+        )
+        schedule_type = resolve_hardcover_auto_fetch_schedule(stored_schedule_type)
+        if schedule_type == 'never':
+            log.info("Hardcover auto-fetch is off by configuration")
+            return
+        if stored_schedule_type != schedule_type:
+            log.warning(
+                "Unrecognized Hardcover auto-fetch schedule %r; falling back to %s",
+                stored_schedule_type,
+                schedule_type,
+            )
+
         if not enabled or not token_available:
             return
 
-        schedule_type = cwa_settings.get('hardcover_auto_fetch_schedule', 'weekly')
         schedule_day = cwa_settings.get('hardcover_auto_fetch_schedule_day', 'sunday')
         schedule_hour = int(cwa_settings.get('hardcover_auto_fetch_schedule_hour', 2))
         min_confidence = float(cwa_settings.get('hardcover_auto_fetch_min_confidence', 0.85))

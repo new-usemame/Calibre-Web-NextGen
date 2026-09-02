@@ -32,7 +32,7 @@ def test_convert_rejects_invalid_target():
         with patch.object(edit_mod, "current_user",
                           SimpleNamespace(is_authenticated=True, is_anonymous=False,
                                           role_edit=lambda: True, name="admin")), \
-             patch.object(edit_mod.calibre_db, "get_book", return_value=fake_book), \
+             patch.object(edit_mod.calibre_db, "get_filtered_book", return_value=fake_book), \
              patch.object(edit_mod, "get_convert_options",
                           return_value=(["epub"], ["mobi", "pdf"])):
             view = inspect.unwrap(edit_mod.convert_format)
@@ -62,7 +62,7 @@ def test_convert_accepts_valid_source_and_target():
         with patch.object(edit_mod, "current_user",
                           SimpleNamespace(is_authenticated=True, is_anonymous=False,
                                           role_edit=lambda: True, name="admin")), \
-             patch.object(edit_mod.calibre_db, "get_book", return_value=fake_book), \
+             patch.object(edit_mod.calibre_db, "get_filtered_book", return_value=fake_book), \
              patch.object(edit_mod, "get_convert_options",
                           return_value=(["epub"], ["mobi", "pdf"])), \
              patch.object(edit_mod.config, "get_book_path", return_value="/books"), \
@@ -95,7 +95,7 @@ def test_convert_rejects_invalid_source():
         with patch.object(edit_mod, "current_user",
                           SimpleNamespace(is_authenticated=True, is_anonymous=False,
                                           role_edit=lambda: True, name="admin")), \
-             patch.object(edit_mod.calibre_db, "get_book", return_value=fake_book), \
+             patch.object(edit_mod.calibre_db, "get_filtered_book", return_value=fake_book), \
              patch.object(edit_mod, "get_convert_options",
                           return_value=(["epub"], ["mobi", "pdf"])):
             view = inspect.unwrap(edit_mod.convert_format)

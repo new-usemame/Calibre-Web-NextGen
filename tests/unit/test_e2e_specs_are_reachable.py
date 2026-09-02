@@ -47,6 +47,10 @@ INFRASTRUCTURE_GATED = {
         "interleave with the parallel lanes. It runs in the env-gated "
         "server-state-chromium project (E2E_SERVER_STATE=1), which the "
         "e2e-tests job invokes as a separate step after the main harness run.",
+    "visual-regression.spec.ts":
+        "needs the pinned private Docker app/browser rig and its committed Linux "
+        "pixel baselines at E2E_VISUAL_REGRESSION=1. Ordinary CI deliberately "
+        "does not run or update this opt-in six-snapshot lane.",
 }
 
 

@@ -37,6 +37,7 @@ export function MyLibraryIntro() {
     err instanceof ApiError ? err.message : t('Could not complete the action.');
 
   const onTry = () => {
+    if (!window.confirm(t('Set up My Library for every non-anonymous account? Each account starts with every book it can currently see—not only books it has shelved, read, or downloaded. Users can curate from there by removing books. Accounts already set up are never reseeded.'))) return;
     setError('');
     enable.mutate(undefined, {
       onSuccess: (data) => {
@@ -121,6 +122,9 @@ export function MyLibraryIntro() {
         <>
           <p className={styles.body}>
             {t('Organize your library, your way. Checkout books from the Global Library to bring them into My Library.')}
+          </p>
+          <p className={styles.body}>
+            {t('Each account starts with every book it can currently see—not only books it has shelved, read, or downloaded.')}
           </p>
           <ul className={styles.points}>
             <li>

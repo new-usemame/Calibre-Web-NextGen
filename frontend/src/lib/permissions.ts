@@ -36,3 +36,14 @@ export function canReadBooks(me: Me | undefined | null): boolean {
 export function canDownloadBooks(me: Me | undefined | null): boolean {
   return !!me?.role?.download;
 }
+
+/**
+ * May this user permanently delete a whole book or one of its formats?
+ *
+ * Classic's detail control checks both roles directly. Its format and bulk
+ * controls sit behind edit-only routes and then call the delete-role core, so
+ * their effective policy is the same conjunction.
+ */
+export function canDeleteBooks(me: Me | undefined | null): boolean {
+  return !!me?.role?.delete_books && !!me?.role?.edit;
+}

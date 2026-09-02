@@ -9,6 +9,7 @@ import os
 import random
 import io
 import mimetypes
+import tempfile
 import time
 import re
 import regex
@@ -20,6 +21,8 @@ from datetime import datetime, timedelta, timezone
 import requests
 import unidecode
 from uuid import uuid4
+
+from PIL import Image as PILImage
 
 from flask import send_from_directory, make_response, abort, url_for, Response, after_this_request, has_request_context
 from flask_babel import gettext as _
@@ -76,6 +79,30 @@ from .epub_helper import (  # noqa: E402
 from .embed_helper import do_calibre_export  # noqa: E402
 
 log = logger.create()
+
+# Bound decoded work before Pillow allocates the raster. Encoded-byte limits
+# alone do not protect against tiny, highly compressed decompression bombs.
+MAX_COVER_PIXELS = 25_000_000
+MAX_COVER_DIMENSION = 12_000
+
+
+def validate_cover_dimensions(width, height):
+    """Reject unreasonable cover geometry before any full image decode."""
+    try:
+        width = int(width)
+        height = int(height)
+    except (TypeError, ValueError):
+        raise ValueError("cover dimensions are invalid")
+    if (width < 1 or height < 1
+            or width > MAX_COVER_DIMENSION
+            or height > MAX_COVER_DIMENSION
+            or width * height > MAX_COVER_PIXELS):
+        raise ValueError(
+            "cover dimensions exceed the {} pixel / {}px limits".format(
+                MAX_COVER_PIXELS, MAX_COVER_DIMENSION,
+            )
+        )
+    return width, height
 
 
 def mark_book_modified(book, *, set_dirty=True, unsync=False):
@@ -354,7 +381,8 @@ def get_convert_options(book):
 
 # Convert existing book entry to new format
 def convert_book_format(book_id, calibre_path, old_book_format, new_book_format, user_id,
-                        ereader_mail=None, subject=None, blocking=False, timeout=120):
+                        ereader_mail=None, subject=None, blocking=False, timeout=120,
+                        cover_user_id=None):
     book = calibre_db.get_book(book_id)
     data = calibre_db.get_book_format(book.id, old_book_format)
     if not data:
@@ -388,7 +416,10 @@ def convert_book_format(book_id, calibre_path, old_book_format, new_book_format,
            link)
     settings['old_book_format'] = old_book_format
     settings['new_book_format'] = new_book_format
-    task = TaskConvert(file_path, book.id, txt, settings, ereader_mail, user_id)
+    task = TaskConvert(
+        file_path, book.id, txt, settings, ereader_mail,
+        user=user_id, cover_user_id=cover_user_id,
+    )
     WorkerThread.add(user_id, task)
     if blocking:
         # Only the context-free Event wait crosses onto the bounded native
@@ -516,12 +547,25 @@ def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
     if not book:
         return _("Book not found")
 
+    cover_user_id = None
+    try:
+        if filter_user is not None and not getattr(filter_user, "is_anonymous", False):
+            cover_user_id = int(filter_user.id)
+    except (AttributeError, TypeError, ValueError):
+        pass
+
     if convert == 1:
         # returns None if success, otherwise errormessage
-        return convert_book_format(book_id, calibrepath, 'mobi', book_format.lower(), user_id, ereader_mail, subject)
+        return convert_book_format(
+            book_id, calibrepath, 'mobi', book_format.lower(), user_id,
+            ereader_mail, subject, cover_user_id=cover_user_id,
+        )
     if convert == 2:
         # returns None if success, otherwise errormessage
-        return convert_book_format(book_id, calibrepath, 'azw3', book_format.lower(), user_id, ereader_mail, subject)
+        return convert_book_format(
+            book_id, calibrepath, 'azw3', book_format.lower(), user_id,
+            ereader_mail, subject, cover_user_id=cover_user_id,
+        )
 
     if not subject or not subject.strip():
         subject = _("Send to eReader")
@@ -535,7 +579,8 @@ def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
                 email = strip_whitespaces(email)
                 WorkerThread.add(user_id, TaskEmail(subject, book.path, converted_file_name,
                                                     config.get_mail_settings(), email,
-                                                    email_text, get_email_body_text(), book.id))
+                                                    email_text, get_email_body_text(), book.id,
+                                                    cover_user_id=cover_user_id))
             return None
     return _("The requested file could not be read. Maybe wrong permissions?")
 
@@ -1764,7 +1809,23 @@ def get_book_cover(book_id, resolution=None):
     # OWN hidden books — they're shown in the /hidden/stored listing and
     # on the hidden book's detail page (#319 pushback @droM4X). Hidden
     # is a per-user listing exclusion, not an access revocation.
-    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True)
+    #
+    # A Global Library card is also allowed to render the book's GLOBAL cover
+    # before the viewer adds that book to My Library.  The list serializer has
+    # always emitted the global ``has_cover`` URL, but this resource lookup used
+    # the membership-scoped default filter and quietly served generic_cover.svg
+    # for non-members.  Keep the bypass tied to the same browse-global role as
+    # the list/detail APIs; knowing a cover URL does not grant archive access.
+    try:
+        allow_show_global = bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        allow_show_global = False
+    book = calibre_db.get_filtered_book(
+        book_id,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=allow_show_global,
+    )
     return get_book_cover_internal(book, resolution=resolution)
 
 
@@ -2181,8 +2242,156 @@ def save_cover_from_url(url, book_path):
             pass
 
 
-def save_cover_from_filestorage(filepath, saved_filename, img):
-    # check if file path exists, otherwise create it, copy file to calibre path and delete temp file
+class StagedCoverWrite:
+    """A validated sibling file that does not touch the live cover until publish.
+
+    The metadata owner calls :meth:`publish` only after its transaction commits
+    and attempts :meth:`discard` on ordinary rollback/error paths. Local stages
+    are siblings so ``os.replace`` is an atomic same-filesystem rename and the
+    previous cover remains intact until it succeeds. Startup scavenging logs
+    and removes stages left by process death; it never guesses whether to
+    publish them because the metadata commit may or may not have landed.
+    """
+
+    def __init__(self, staged_path, target_path):
+        self.staged_path = staged_path
+        self.target_path = target_path
+        self._published = False
+
+    def publish(self):
+        if self._published:
+            return True, None
+        try:
+            os.replace(self.staged_path, self.target_path)
+            self._published = True
+        except (IOError, OSError) as ex:
+            log.error(
+                "Publishing staged cover failed target=%s: %s: %s",
+                self.target_path,
+                type(ex).__name__,
+                ex,
+            )
+            return False, str(ex)
+
+        # The rename is already complete.  Directory fsync is best-effort on
+        # filesystems that support it; network shares commonly reject it even
+        # though their atomic rename succeeded.
+        try:
+            directory_fd = os.open(os.path.dirname(self.target_path), os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError as ex:
+            log.warning("Could not fsync published cover directory: %s", ex)
+        return True, None
+
+    def discard(self):
+        if self._published or not os.path.exists(self.staged_path):
+            return True, None
+        try:
+            os.remove(self.staged_path)
+            return True, None
+        except OSError as ex:
+            log.error("Removing staged cover %s failed: %s", self.staged_path, ex)
+            return False, str(ex)
+
+
+class GDriveStagedCoverWrite(StagedCoverWrite):
+    """Locally validated cover bytes awaiting a post-commit Drive upload."""
+
+    def __init__(self, staged_path, drive, parent_id, existing_file=None):
+        super().__init__(staged_path, "Google Drive cover.jpg")
+        self.drive = drive
+        self.parent_id = parent_id
+        self.existing_file = existing_file
+
+    def publish(self):
+        if self._published:
+            return True, None
+        drive_file = self.existing_file
+        try:
+            if drive_file is None:
+                drive_file = self.drive.CreateFile({
+                    "title": "cover.jpg",
+                    "parents": [{"kind": "drive#fileLink", "id": self.parent_id}],
+                })
+            drive_file.SetContentFile(self.staged_path)
+            drive_file.Upload()
+            self._published = True
+            self.existing_file = drive_file
+        except Exception as ex:
+            log.error(
+                "Publishing staged Google Drive cover failed: %s: %s",
+                type(ex).__name__,
+                ex,
+            )
+            return False, str(ex)
+
+        try:
+            os.remove(self.staged_path)
+        except OSError as ex:
+            # Remote publication has committed. Local cleanup cannot roll it
+            # back and is left to the startup scavenger.
+            log.warning("Could not remove published Google Drive cover stage %s: %s",
+                        self.staged_path, ex)
+        return True, None
+
+
+def _write_all(fd, content):
+    """Write every byte or raise; ``os.write`` is allowed to short-write."""
+    remaining = memoryview(content)
+    while remaining:
+        written = os.write(fd, remaining)
+        if not written:
+            raise OSError("short write while staging cover")
+        remaining = remaining[written:]
+
+
+def _write_stream(fd, stream):
+    while True:
+        chunk = stream.read(1024 * 1024)
+        if not chunk:
+            break
+        _write_all(fd, chunk)
+
+
+def _validate_and_normalize_staged_cover(staged_path):
+    """Decode accepted image bytes and normalize non-JPEG stages to JPEG."""
+    with PILImage.open(staged_path) as decoded:
+        image_format = decoded.format
+        width, height = decoded.size
+        validate_cover_dimensions(width, height)
+        decoded.load()
+        if image_format not in {"JPEG", "PNG", "WEBP", "BMP"} or width < 1 or height < 1:
+            raise ValueError("staged cover is not a supported decodable image")
+        if image_format == "JPEG":
+            return
+        # Work from the decoded pixels, not the declared MIME type. Flatten
+        # transparency onto white because JPEG has no alpha channel.
+        if decoded.mode in ("RGBA", "LA") or "transparency" in decoded.info:
+            rgba = decoded.convert("RGBA")
+            normalized = PILImage.new("RGB", rgba.size, "white")
+            normalized.paste(rgba, mask=rgba.getchannel("A"))
+        else:
+            normalized = decoded.convert("RGB")
+
+    normalized.save(staged_path, format="JPEG")
+    with open(staged_path, "rb") as staged_file:
+        os.fsync(staged_file.fileno())
+    with PILImage.open(staged_path) as verified:
+        if verified.format != "JPEG":
+            raise ValueError("normalized cover is not JPEG")
+        verified.load()
+
+
+def save_cover_from_filestorage(filepath, saved_filename, img, handle_factory=None):
+    """Write and validate a temporary sibling, returning a publish handle.
+
+    Despite the historical name, this function deliberately does not replace
+    ``saved_filename``.  It is the single storage primitive used by every cover
+    surface; callers own the surrounding metadata transaction.
+    """
     if not os.path.exists(filepath):
         try:
             os.makedirs(filepath)
@@ -2190,8 +2399,19 @@ def save_cover_from_filestorage(filepath, saved_filename, img):
             log.error("Failed to create cover path %s: %s", filepath, e)
             return False, _("Failed to create path for cover")
     target = os.path.join(filepath, saved_filename)
+    staged_path = None
+    fd = None
     try:
-        # upload of jpg file without wand
+        fd, staged_path = tempfile.mkstemp(
+            prefix=".{}.cwng-".format(saved_filename),
+            suffix=".stage",
+            dir=filepath,
+        )
+        try:
+            staged_mode = os.stat(target).st_mode & 0o777
+        except OSError:
+            staged_mode = 0o644
+        os.fchmod(fd, staged_mode)
         if isinstance(img, requests.Response):
             content_len = len(img.content) if img.content is not None else 0
             ct = img.headers.get("content-type") if hasattr(img, "headers") else None
@@ -2199,78 +2419,109 @@ def save_cover_from_filestorage(filepath, saved_filename, img):
                 log.error("Cover save aborted: empty response body (url=%s, content-type=%s, http=%s)",
                           getattr(getattr(img, "request", None), "url", "?"), ct,
                           getattr(img, "status_code", "?"))
-                return False, _("Cover-file is not a valid image file, or could not be stored")
-            with open(target, 'wb') as f:
-                f.write(img.content)
+                raise ValueError("empty response body")
+            _write_all(fd, img.content)
+            os.fsync(fd)
         else:
             if hasattr(img, "metadata"):
-                # upload of jpg/png... via url
-                img.save(filename=target)
+                os.close(fd)
+                fd = None
+                img.save(filename=staged_path)
                 img.close()
+            elif hasattr(img, "stream"):
+                _write_stream(fd, img.stream)
+                os.fsync(fd)
             else:
-                # upload of jpg/png... from hdd
-                img.save(target)
-    except (IOError, OSError) as e:
-        log.error("Cover save failed (filesystem) target=%s: %s: %s", target, type(e).__name__, e)
-        return False, _("Cover-file is not a valid image file, or could not be stored")
+                os.close(fd)
+                fd = None
+                img.save(staged_path)
+
+        if fd is not None:
+            os.close(fd)
+            fd = None
+        else:
+            sync_fd = os.open(staged_path, os.O_RDONLY)
+            try:
+                os.fsync(sync_fd)
+            finally:
+                os.close(sync_fd)
+        _validate_and_normalize_staged_cover(staged_path)
+        if handle_factory is not None:
+            return handle_factory(staged_path), None
+        return StagedCoverWrite(staged_path, target), None
+    except (IOError, OSError, ValueError) as e:
+        log.error("Cover staging failed target=%s: %s: %s", target, type(e).__name__, e)
     except Exception as e:
-        log.error("Cover save failed (unexpected) target=%s: %s: %s", target, type(e).__name__, e)
-        return False, _("Cover-file is not a valid image file, or could not be stored")
-    return True, None
+        log.error("Cover staging failed (unexpected) target=%s: %s: %s", target, type(e).__name__, e)
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+    if staged_path:
+        try:
+            os.remove(staged_path)
+        except OSError:
+            pass
+    return None, _("Cover-file is not a valid image file, or could not be stored")
 
 
 # saves book cover to gdrive or locally
 def save_cover(img, book_path):
-    content_type = img.headers.get('content-type')
-
-    # Clean content-type by removing charset and other parameters
-    if content_type:
-        separator = ';' if ';' in content_type else ',' if ',' in content_type else None
-        if separator:
-            content_type = content_type.split(separator)[0].strip()
-
-    if use_IM:
-        if content_type not in ('image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/bmp'):
-            log.error("Only jpg/jpeg/png/webp/bmp files are supported as coverfile")
-            return False, _("Only jpg/jpeg/png/webp/bmp files are supported as coverfile")
-        # Skip conversion for JPEG to avoid unnecessary ImageMagick work
-        if content_type not in ('image/jpeg', 'image/jpg'):
-            # convert to jpg because calibre only supports jpg
-            try:
-                if hasattr(img, 'stream'):
-                    imgc = Image(blob=img.stream)
-                else:
-                    imgc = Image(blob=io.BytesIO(img.content))
-                imgc.format = 'jpeg'
-                imgc.transform_colorspace("srgb")
-                img = imgc
-            except (BlobError, MissingDelegateError) as e:
-                log.error("Invalid cover file content (content-type=%s, bytes=%s): %s: %s",
-                          content_type, len(img.content) if hasattr(img, "content") else "?",
-                          type(e).__name__, e)
-                return False, _("Invalid cover file content")
-            except Exception as e:
-                log.error("Cover conversion failed (content-type=%s, bytes=%s): %s: %s",
-                          content_type, len(img.content) if hasattr(img, "content") else "?",
-                          type(e).__name__, e)
-                return False, _("Invalid cover file content")
-    else:
-        if content_type not in ['image/jpeg', 'image/jpg']:
-            log.error("Only jpg/jpeg files are supported as coverfile")
-            return False, _("Only jpg/jpeg files are supported as coverfile")
-
     if config.config_use_google_drive:
-        tmp_dir = get_temp_dir()
-        ret, message = save_cover_from_filestorage(tmp_dir, "uploaded_cover.jpg", img)
-        if ret is True:
-            gd.uploadFileToEbooksFolder(os.path.join(book_path, 'cover.jpg').replace("\\", "/"),
-                                        os.path.join(tmp_dir, "uploaded_cover.jpg"))
-            log.info("Cover is saved on Google Drive")
-            return True, None
-        else:
-            return False, message
-    else:
-        return save_cover_from_filestorage(os.path.join(config.get_book_path(), book_path), "cover.jpg", img)
+        def create_drive_handle(staged_path):
+            drive, parent_id, existing_file = gd.prepareCoverUpload(book_path)
+            return GDriveStagedCoverWrite(staged_path, drive, parent_id, existing_file)
+
+        return save_cover_from_filestorage(
+            get_temp_dir(),
+            "cover.jpg",
+            img,
+            handle_factory=create_drive_handle,
+        )
+
+    return save_cover_from_filestorage(
+        os.path.join(config.get_book_path(), book_path), "cover.jpg", img
+    )
+
+
+def scavenge_staged_cover_files():
+    """Log and remove orphan cover stages without attempting publication."""
+    roots = []
+    # Global covers stage beside the Calibre file (or in the temporary Drive
+    # upload directory). Per-user covers use the same StagedCoverWrite
+    # primitive below CONFIG_DIR, so an interrupted personal write needs the
+    # same startup cleanup without ever scanning or changing its live JPEG.
+    personal_cover_root = os.path.join(constants.CONFIG_DIR, "user-covers")
+    for root in (config.get_book_path(), get_temp_dir(), personal_cover_root):
+        if root and os.path.isdir(root) and root not in roots:
+            roots.append(root)
+
+    removed = 0
+    for root in roots:
+        for directory, _subdirs, filenames in os.walk(root):
+            for filename in filenames:
+                global_stage = (
+                    filename.startswith(".cover.jpg.cwng-")
+                    and filename.endswith(".stage")
+                )
+                personal_stage = re.fullmatch(
+                    r"\.\d+(?:-\d+)?\.jpg\.cwng-.+\.stage", filename) is not None
+                if not (global_stage or personal_stage):
+                    continue
+                staged_path = os.path.join(directory, filename)
+                log.warning(
+                    "Removing orphan cover stage after interrupted update; metadata may "
+                    "already reference an unpublished cover: %s",
+                    staged_path,
+                )
+                try:
+                    os.remove(staged_path)
+                    removed += 1
+                except OSError as ex:
+                    log.error("Could not remove orphan cover stage %s: %s", staged_path, ex)
+    return removed
 
 
 def trigger_thumbnail_generation_for_book(book_id):
@@ -2297,18 +2548,11 @@ def trigger_thumbnail_generation_for_book(book_id):
 
 
 def save_cover_with_thumbnail_update(img, book_path, book_id=None):
-    """Save cover and force thumbnail regeneration."""
-    result, message = save_cover(img, book_path)
-
-    # If cover save was successful and we have a book_id, force thumbnail regeneration
-    # Use replace_cover_thumbnail_cache to ensure fresh thumbnails even if generation is pending
-    if result and book_id:
-        replace_cover_thumbnail_cache(book_id)
-
-    return result, message
+    """Compatibility wrapper: stage only; transaction owners publish/cache."""
+    return save_cover(img, book_path)
 
 
-def do_download_file(book, book_format, client, data, headers):
+def do_download_file(book, book_format, client, data, headers, cover_user_id=None):
     # Fork issue #103 / mirrors janeczku/calibre-web#3274. Validate inputs so a
     # malformed call (None book_format, or a Data row with a NULL `name` because
     # the calibre.db is anomalous) surfaces as a clean 400 with a diagnostic log
@@ -2334,6 +2578,19 @@ def do_download_file(book, book_format, client, data, headers):
     book_name = data.name
     download_name = filename = None
     metadata_was_embedded = False
+    personal_override = None
+    if cover_user_id is None and has_request_context():
+        try:
+            if current_user.is_authenticated and not current_user.is_anonymous:
+                cover_user_id = int(current_user.id)
+        except (AttributeError, TypeError, ValueError):
+            cover_user_id = None
+    if cover_user_id is not None and book_format.lower() in ("epub", "kepub"):
+        try:
+            from .services import user_cover
+            personal_override = user_cover.override_for_user(cover_user_id, book.id)
+        except Exception as ex:
+            log.warning("Could not resolve personal cover for download: %s", ex)
 
     if config.config_use_google_drive:
         # startTime = time.time()
@@ -2364,6 +2621,15 @@ def do_download_file(book, book_format, client, data, headers):
                         filename = os.path.dirname(output)
                         download_name = os.path.splitext(os.path.basename(output))[0]
                         metadata_was_embedded = False
+            elif personal_override is not None:
+                filename = get_temp_dir()
+                os.makedirs(filename, exist_ok=True)
+                download_name = str(uuid4())
+                gd.downloadFile(
+                    book.path,
+                    book_name + "." + book_format,
+                    os.path.join(filename, download_name + "." + book_format),
+                )
             else:
                 return gd.do_gdrive_download(df, headers)
         else:
@@ -2414,6 +2680,24 @@ def do_download_file(book, book_format, client, data, headers):
                         log.error(f'Failed to rename exported file: {e}')
         else:
             download_name = book_name
+
+    if personal_override is not None and filename and download_name:
+        source_path = os.path.join(filename, download_name + "." + book_format)
+        try:
+            from .services import user_cover
+            personal_copy = user_cover.materialize_delivery_copy(
+                cover_user_id, book.id, source_path, book_format,
+            )
+            if personal_copy is not None:
+                if filename == get_temp_dir():
+                    try:
+                        os.remove(source_path)
+                    except OSError as ex:
+                        log.warning("Could not remove intermediate delivery copy %s: %s",
+                                    source_path, ex)
+                filename, download_name = personal_copy
+        except Exception as ex:
+            log.warning("Could not prepare personal-cover download: %s", ex)
 
     # Calculate and store the checksum of the file we actually serve, so
     # KOReader progress sync can map this device's file back to the book.
@@ -2694,7 +2978,16 @@ def get_download_link(book_id, book_format, client):
     headers["Content-Type"] = mimetypes.types_map.get('.' + book_format, "application/octet-stream")
     headers["Content-Disposition"] = "attachment; filename=%s.%s; filename*=UTF-8''%s.%s" % (
         quote(file_name), book_format, quote(file_name), book_format)
-    return do_download_file(book, book_format, client, data1, headers)
+    cover_user_id = None
+    try:
+        if current_user.is_authenticated and not current_user.is_anonymous:
+            cover_user_id = int(current_user.id)
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return do_download_file(
+        book, book_format, client, data1, headers,
+        cover_user_id=cover_user_id,
+    )
 
 
 def clear_cover_thumbnail_cache(book_id):

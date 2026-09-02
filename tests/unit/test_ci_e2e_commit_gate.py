@@ -6,7 +6,10 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -136,13 +139,17 @@ def test_pr_classification_executes_the_base_copy_in_both_consumers():
         assert 'classifier_ref="$BASE_SHA"' in text, workflow.name
         assert 'classifier_ref="$HEAD_SHA"' not in text
         assert "frontend=true\\nbuild=true\\nconcurrency=true\\nimage=true" in text
-        assert 'git archive "$classifier_ref" cps scripts/ci_path_classification.py' in text
+        assert 'git cat-file -e "$classifier_ref:.dockerignore"' in text
+        assert (
+            'git archive "$classifier_ref" cps .dockerignore '
+            'scripts/ci_path_classification.py' in text
+        )
         assert 'python3 "$classifier_root/scripts/ci_path_classification.py"' in text
         assert "| python3 scripts/ci_path_classification.py --github-output" not in text
 
 
 def test_wait_budget_covers_the_build_pipeline_and_retrying_suite():
-    """The resolver cannot time out before the producer's own job budgets."""
+    """The paired resolver is bounded by the producer's own job budgets."""
     import re
     import yaml
 
@@ -151,9 +158,11 @@ def test_wait_budget_covers_the_build_pipeline_and_retrying_suite():
     e2e = tests["jobs"]["e2e-tests"]
     resolve = next(step for step in e2e["steps"] if step.get("name") == "Resolve image to test")
     script = resolve["run"]
-    awaited_attempts = [int(value) for value in re.findall(r"attempts=(\d+)", script) if value != "1"]
-    assert awaited_attempts and len(set(awaited_attempts)) == 1
-    wait_seconds = (awaited_attempts[0] - 1) * 30
+    paired_attempt = re.search(
+        r"paired with.*?attempts=(\d+)", script, flags=re.DOTALL
+    )
+    assert paired_attempt
+    wait_seconds = (int(paired_attempt.group(1)) - 1) * 30
 
     jobs = dev["jobs"]
     producer_minutes = (
@@ -162,8 +171,17 @@ def test_wait_budget_covers_the_build_pipeline_and_retrying_suite():
         + max(jobs["build-amd64"]["timeout-minutes"], jobs["build-arm"]["timeout-minutes"])
         + jobs["merge"]["timeout-minutes"]
     )
-    assert wait_seconds >= (producer_minutes + 20) * 60
+    assert wait_seconds == producer_minutes * 60
     assert e2e["timeout-minutes"] * 60 - wait_seconds >= 60 * 60
+
+    alias = jobs["alias-image-neutral-commit"]
+    publish = next(
+        step for step in alias["steps"] if step.get("name") == "Publish immutable commit alias"
+    )
+    assert alias["timeout-minutes"] >= producer_minutes + 5
+    assert "191 30" in publish["run"]
+    assert (publish.get("env") or {}).get("GITHUB_TOKEN")
+    assert (e2e.get("permissions") or {}).get("actions") == "read"
 
 
 def test_dev_push_fails_fast_instead_of_waiting_for_a_nonexistent_producer():
@@ -181,7 +199,7 @@ def test_dev_push_fails_fast_instead_of_waiting_for_a_nonexistent_producer():
 
 def _git(repo: Path, *args: str) -> str:
     return subprocess.run(
-        ["git", *args], cwd=repo, check=True, capture_output=True, text=True
+        ["/usr/bin/git", *args], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
 
 
@@ -192,7 +210,7 @@ def _commit(repo: Path, message: str, path: str, content: str) -> str:
     _git(repo, "add", path)
     subprocess.run(
         [
-            "git",
+            "/usr/bin/git",
             "-c",
             "user.name=test",
             "-c",
@@ -209,7 +227,76 @@ def _commit(repo: Path, message: str, path: str, content: str) -> str:
     return _git(repo, "rev-parse", "HEAD")
 
 
-def _run_alias(tmp_path: Path, source: str, subject: str, *, dev_matches: bool = True):
+def _stage_alias_test_dockerignore(repo: Path) -> None:
+    """Give history fixtures the same SSOT the production classifier requires."""
+    (repo / ".dockerignore").write_text("docs\n", encoding="utf-8")
+    _git(repo, "add", ".dockerignore")
+
+
+class _ActionsApi:
+    def __init__(self, responses: list[dict[str, Any]]):
+        self.responses = responses
+        self.run_requests = 0
+        self.job_requests = 0
+        api = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802 - stdlib handler API
+                if "/actions/workflows/docker-image-build-dev.yml/runs" in self.path:
+                    index = min(api.run_requests, len(api.responses) - 1)
+                    response = dict(api.responses[index])
+                    api.run_requests += 1
+                    if response.pop("absent", False):
+                        payload = {"workflow_runs": []}
+                        self._send_json(payload)
+                        return
+                    response.setdefault("id", 77)
+                    response.setdefault("html_url", "https://github.example/runs/77")
+                    response["jobs_url"] = f"{api.url}/repos/example/project/actions/runs/77/jobs"
+                    payload = {"workflow_runs": [response]}
+                elif self.path.startswith("/repos/example/project/actions/runs/77/jobs"):
+                    api.job_requests += 1
+                    index = min(max(api.run_requests - 1, 0), len(api.responses) - 1)
+                    payload = {"jobs": api.responses[index].get("jobs", [])}
+                else:
+                    self.send_error(404)
+                    return
+                self._send_json(payload)
+
+            def _send_json(self, payload):
+                body = json.dumps(payload).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, _format, *_args):
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *_exc):
+        self.server.shutdown()
+        self.thread.join(timeout=5)
+        self.server.server_close()
+
+
+def _run_alias(
+    tmp_path: Path,
+    source: str,
+    subject: str,
+    *,
+    dev_matches: bool = True,
+    source_succeeds_on: int = 1,
+    api_url: str | None = None,
+):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     log = tmp_path / "docker.log"
@@ -219,8 +306,11 @@ def _run_alias(tmp_path: Path, source: str, subject: str, *, dev_matches: bool =
         "#!/usr/bin/env bash\n"
         "set -eu\n"
         "if [[ \"$1 $2 $3\" == \"buildx imagetools inspect\" ]]; then\n"
-        "  if [[ \"$4\" == *:dev ]]; then printf '\"%s\"\\n' \"$DEV_DIGEST\"; "
-        "else printf '\"%s\"\\n' \"$SOURCE_DIGEST\"; fi\n"
+        "  if [[ \"$4\" == *:dev ]]; then printf '\"%s\"\\n' \"$DEV_DIGEST\"; exit 0; fi\n"
+        "  n=0; [[ -f \"$SOURCE_STATE\" ]] && n=$(cat \"$SOURCE_STATE\")\n"
+        "  n=$((n+1)); echo \"$n\" > \"$SOURCE_STATE\"\n"
+        "  if (( n < SOURCE_SUCCEEDS_ON )); then exit 1; fi\n"
+        "  printf '\"%s\"\\n' \"$SOURCE_DIGEST\"\n"
         "  exit 0\n"
         "fi\n"
         "printf '%s\\n' \"$*\" >> \"$DOCKER_LOG\"\n",
@@ -236,9 +326,15 @@ def _run_alias(tmp_path: Path, source: str, subject: str, *, dev_matches: bool =
         "SOURCE_DIGEST": digest,
         "DEV_DIGEST": digest if dev_matches else "sha256:" + "b" * 64,
         "DOCKER_LOG": str(log),
+        "SOURCE_STATE": str(tmp_path / "source-calls"),
+        "SOURCE_SUCCEEDS_ON": str(source_succeeds_on),
+        "GITHUB_TOKEN": "test-token",
     }
+    command = ["bash", str(ALIASER), "registry.example/project/app", source, subject]
+    if api_url:
+        command.extend(["4", "0", "example/project", "push", api_url])
     proc = subprocess.run(
-        ["bash", str(ALIASER), "registry.example/project/app", source, subject],
+        command,
         cwd=tmp_path,
         env=env,
         capture_output=True,
@@ -250,6 +346,7 @@ def _run_alias(tmp_path: Path, source: str, subject: str, *, dev_matches: bool =
 
 def test_neutral_alias_requires_the_newest_relevant_ancestor_and_matching_dev(tmp_path):
     _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
     source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
     subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
 
@@ -266,6 +363,7 @@ def test_neutral_alias_requires_the_newest_relevant_ancestor_and_matching_dev(tm
 
 def test_neutral_alias_rejects_an_intervening_image_relevant_commit(tmp_path):
     _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
     old_source = _commit(tmp_path, "old backend", "cps/web.py", "WRITE = 1\n")
     _commit(tmp_path, "middle docs", "docs/one.md", "one\n")
     new_source = _commit(tmp_path, "new backend", "cps/kobo.py", "WRITE = 2\n")
@@ -278,7 +376,13 @@ def test_neutral_alias_rejects_an_intervening_image_relevant_commit(tmp_path):
     assert log == ""
 
 
-def _stubbed_resolve(tmp_path: Path, succeeds_on: int | None, digest: str | None = None):
+def _stubbed_resolve(
+    tmp_path: Path,
+    succeeds_on: int | None,
+    digest: str | None = None,
+    *,
+    api_url: str | None = None,
+):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     state = tmp_path / "calls"
@@ -302,9 +406,20 @@ def _stubbed_resolve(tmp_path: Path, succeeds_on: int | None, digest: str | None
         "STUB_STATE": str(state),
         "STUB_SUCCEEDS_ON": "" if succeeds_on is None else str(succeeds_on),
         "STUB_DIGEST": digest or "sha256:" + "a" * 64,
+        "GITHUB_TOKEN": "test-token",
     }
+    command = [
+        "bash",
+        str(RESOLVER),
+        "registry.example/project/app",
+        "sha-deadbeef",
+        "3",
+        "0",
+    ]
+    if api_url:
+        command.extend(["example/project", "a" * 40, "push", api_url])
     proc = subprocess.run(
-        ["bash", str(RESOLVER), "registry.example/project/app", "sha-deadbeef", "3", "0"],
+        command,
         cwd=REPO,
         env=env,
         capture_output=True,
@@ -336,3 +451,111 @@ def test_resolver_rejects_a_non_digest_response(tmp_path):
     assert proc.returncode == 1
     assert calls == 3
     assert proc.stdout == ""
+
+
+def test_resolver_stops_when_exact_sha_producer_has_failed(tmp_path):
+    responses = [{"status": "completed", "conclusion": "failure"}]
+    with _ActionsApi(responses) as api:
+        proc, calls = _stubbed_resolve(tmp_path, succeeds_on=None, api_url=api.url)
+
+    assert proc.returncode == 1
+    assert calls == 1
+    assert api.run_requests == 1
+    assert "https://github.example/runs/77" in proc.stderr
+    assert "concluded failure" in proc.stderr
+
+
+def test_resolver_fails_immediately_when_no_exact_producer_exists(tmp_path):
+    with _ActionsApi([{"absent": True}]) as api:
+        proc, calls = _stubbed_resolve(tmp_path, succeeds_on=None, api_url=api.url)
+
+    assert proc.returncode == 1
+    assert calls == 1
+    assert api.run_requests == 1
+    assert "no Build & Push producer run exists" in proc.stderr
+    assert "a" * 40 in proc.stderr
+
+
+def test_resolver_polls_only_while_producer_runs_then_returns_digest(tmp_path):
+    responses = [
+        {"status": "in_progress", "conclusion": None},
+        {"status": "in_progress", "conclusion": None},
+    ]
+    with _ActionsApi(responses) as api:
+        proc, calls = _stubbed_resolve(tmp_path, succeeds_on=3, api_url=api.url)
+
+    assert proc.returncode == 0, proc.stderr
+    assert calls == 3
+    assert api.run_requests == 2
+    assert proc.stdout.strip().endswith("@sha256:" + "a" * 64)
+
+
+def test_alias_waits_for_live_source_producer_then_preserves_digest_invariants(tmp_path):
+    _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
+    source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
+    subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
+    responses = [
+        {"status": "in_progress", "conclusion": None},
+        {"status": "in_progress", "conclusion": None},
+    ]
+    with _ActionsApi(responses) as api:
+        proc, log = _run_alias(
+            tmp_path,
+            source,
+            subject,
+            source_succeeds_on=3,
+            api_url=api.url,
+        )
+
+    assert proc.returncode == 0, proc.stderr
+    assert api.run_requests == 2
+    assert f"-t registry.example/project/app:sha-{subject}" in log
+
+
+def test_alias_stops_when_source_producer_has_failed(tmp_path):
+    _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
+    source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
+    subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
+    responses = [{"status": "completed", "conclusion": "failure"}]
+    with _ActionsApi(responses) as api:
+        proc, log = _run_alias(
+            tmp_path,
+            source,
+            subject,
+            source_succeeds_on=99,
+            api_url=api.url,
+        )
+
+    assert proc.returncode == 1
+    assert api.run_requests == 1
+    assert "https://github.example/runs/77" in proc.stderr
+    assert "concluded failure" in proc.stderr
+    assert log == ""
+
+
+def test_resolver_stops_on_failed_job_before_live_run_concludes(tmp_path):
+    responses = [
+        {
+            "status": "in_progress",
+            "conclusion": None,
+            "jobs": [
+                {
+                    "name": "Alias unchanged image to commit",
+                    "status": "completed",
+                    "conclusion": "failure",
+                    "html_url": "https://github.example/runs/77/jobs/88",
+                }
+            ],
+        }
+    ]
+    with _ActionsApi(responses) as api:
+        proc, calls = _stubbed_resolve(tmp_path, succeeds_on=None, api_url=api.url)
+
+    assert proc.returncode == 1
+    assert calls == 1
+    assert api.job_requests == 1
+    assert "Alias unchanged image to commit" in proc.stderr
+    assert "https://github.example/runs/77/jobs/88" in proc.stderr
+    assert "run: https://github.example/runs/77" in proc.stderr

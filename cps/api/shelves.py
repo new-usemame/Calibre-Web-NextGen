@@ -230,10 +230,11 @@ def delete_shelf_api(shelf_id):
     shelf = ub.session.query(ub.Shelf).filter(ub.Shelf.id == shelf_id).first()
     if shelf is None:
         return _err("not_found", "Shelf not found", 404)
-    # delete_shelf_helper re-checks edit permission and returns False if denied.
+    if not check_shelf_edit_permissions(shelf):
+        return _err("forbidden", "You are not allowed to delete this shelf", 403)
     try:
         if not delete_shelf_helper(shelf):
-            return _err("forbidden", "You are not allowed to delete this shelf", 403)
+            return _err("db_error", "Could not delete shelf", 500)
     except InvalidRequestError as e:
         ub.session.rollback()
         return _err("db_error", "Could not delete shelf: %s" % getattr(e, "orig", e), 500)

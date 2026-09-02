@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+
+// Playwright serializes config metadata to its workers, giving every ownership
+// record from one invocation the same durable run id without a user-facing env.
+const E2E_RUN_ID = randomUUID();
 
 /*
  * SPA end-to-end harness — Layer 2 of the verification system (notes/verify/).
@@ -31,11 +36,14 @@ const CATALOG_LAYOUT_SPECS = [CATALOG_LAYOUT_SPEC, CATALOG_WATCHDOG_CLASSIFIER_S
 // always ignore them and they run only in the env-gated server-state project,
 // which CI invokes as a separate, serialized step (E2E_SERVER_STATE=1).
 const SERVER_STATE_SPECS = [/my-library-admin-intro\.spec\.ts/];
+const VISUAL_REGRESSION_SPEC = /visual-regression\.spec\.ts/;
 const hostileLoadEnabled = process.env.E2E_HOSTILE_LOAD === '1';
+const visualRegressionEnabled = process.env.E2E_VISUAL_REGRESSION === '1';
 const HOSTILE_LOAD_PROFILES = ['css-slow', 'script-slow'] as const;
 const serverStateEnabled = process.env.E2E_SERVER_STATE === '1';
 
 export default defineConfig({
+  metadata: { cwngE2ERunId: E2E_RUN_ID },
   testDir: './e2e',
   outputDir: './e2e/.results',
   fullyParallel: true,
@@ -43,7 +51,16 @@ export default defineConfig({
   retries: isCI ? 2 : 0,
   workers: isCI ? 2 : undefined,
   timeout: 45_000,
-  expect: { timeout: 10_000 },
+  expect: {
+    timeout: 10_000,
+    toHaveScreenshot: {
+      animations: 'disabled',
+      caret: 'hide',
+      maxDiffPixels: 0,
+      scale: 'css',
+      threshold: 0.1,
+    },
+  },
   reporter: isCI
     ? [['list'], ['html', { outputFolder: 'e2e/.report', open: 'never' }], ['github']]
     : [['list'], ['html', { outputFolder: 'e2e/.report', open: 'never' }]],
@@ -71,6 +88,24 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
       dependencies: ['setup'],
     },
+
+    // Six curated pixel contracts, opt-in because their Linux baselines must
+    // only be produced/compared by local-dev/private-e2e-rig.sh. The rig pins
+    // the Chromium image, viewport scale, app image and served bundle bytes.
+    ...(visualRegressionEnabled
+      ? [{
+          name: 'visual-regression-chromium',
+          testMatch: VISUAL_REGRESSION_SPEC,
+          use: {
+            ...devices['Desktop Chrome'],
+            viewport: { width: 1440, height: 900 },
+            deviceScaleFactor: 1,
+            colorScheme: 'dark' as const,
+            storageState: STORAGE,
+          },
+          dependencies: ['setup'],
+        }]
+      : []),
 
     // Opt-in hostile-load matrix. Response routing—not CDP throttling—keeps the
     // same deterministic arrival profiles meaningful in Chromium and WebKit.
@@ -110,7 +145,14 @@ export default defineConfig({
       name: 'desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, storageState: STORAGE },
       dependencies: ['setup'],
-      testIgnore: [/subpath\.spec\.ts/, /mobile\.spec\.ts/, WEBKIT_READER_SPEC, ...CATALOG_LAYOUT_SPECS, ...SERVER_STATE_SPECS],
+      testIgnore: [
+        /subpath\.spec\.ts/,
+        /mobile\.spec\.ts/,
+        WEBKIT_READER_SPEC,
+        VISUAL_REGRESSION_SPEC,
+        ...CATALOG_LAYOUT_SPECS,
+        ...SERVER_STATE_SPECS,
+      ],
     },
 
     // 3. Mobile 375×667 (chromium mobile emulation — no webkit dep) — where every
@@ -130,7 +172,14 @@ export default defineConfig({
       // desktop makes each project clobber the other's writes — a race, not a
       // defect. Desktop owns it until the harness can hand each project its own
       // account; it passes standalone at 375px.
-      testIgnore: [/subpath\.spec\.ts/, /default-library-view\.spec\.ts/, WEBKIT_READER_SPEC, ...CATALOG_LAYOUT_SPECS, ...SERVER_STATE_SPECS],
+      testIgnore: [
+        /subpath\.spec\.ts/,
+        /default-library-view\.spec\.ts/,
+        WEBKIT_READER_SPEC,
+        VISUAL_REGRESSION_SPEC,
+        ...CATALOG_LAYOUT_SPECS,
+        ...SERVER_STATE_SPECS,
+      ],
     },
 
     // 4. iPad-class touch viewport — card actions remain persistent and the

@@ -4,27 +4,24 @@
 The policy this file pins has two arms, and the filename is meant to be
 read literally:
 
-  * A merge to main whose paths are image-relevant — i.e. NOT wholly
-    covered by docker-image-build-dev.yml's ``paths-ignore``
-    (``**.md``, ``docs/**``, ``tests/**``, ``.github/**``) — must produce
-    EXACTLY ONE ``:dev`` build, from the push trigger.
-  * A merge confined to those ignored paths must produce ZERO builds,
-    from any route. The ignore list is a deliberate decision that such
-    changes cannot alter image contents (the Dockerfile is not under
-    ``.github/``), so the second arm is not a gap in coverage; it is the
-    optimization working. The invariant is "one when image-relevant,
+  * A merge to main whose paths can change image bytes must produce EXACTLY
+    ONE ``:dev`` build, from the push trigger. Build-context relevance comes
+    from Docker's own ``.dockerignore`` policy, with explicit exceptions for
+    build inputs Docker reads outside that context.
+  * A merge confined to paths excluded from the build context must produce
+    ZERO builds, from any route. The invariant is "one when image-relevant,
     never when ignored" — NOT "every merge builds exactly once".
 
 The defect this pins: ``update-translations.yml`` used to end with an
 unconditional ``workflow_dispatch`` POST to ``docker-image-build-dev.yml``
 on every run, which broke both arms. For an image-relevant merge, the dev
 workflow's push trigger had already built the commit, so the dispatch
-built the same SHA twice. For an ignored-paths merge that happened to run
+built the same SHA twice. For an image-neutral merge that happened to run
 the translations workflow — an edit to ``update-translations.yml`` itself
-is the live example, since ``.github/**`` is ignored by the dev workflow
-but listed in the translations workflow's own ``paths`` — the dispatch
-force-built a commit the push trigger deliberately skipped, because
-``workflow_dispatch`` has no ``paths-ignore``. Every one of those builds
+is the live example, since ``.github/`` is outside the build context but
+that file does not supply dev-image build arguments — the dispatch
+force-built a commit the classifier deliberately skipped. Every one of those
+builds
 pushed a new ``:dev`` image, which the operator's household server
 auto-deploys via watchtower: a duplicate or unwanted build is a real
 user-visible restart, not wasted CI minutes. Measured on the live Actions
@@ -48,7 +45,7 @@ Rather than grep for the dispatch URL (a grep stays green on any rewrite
 that double-builds by another route), these tests MODEL the trigger matrix
 from the two workflow files as parsed YAML and count builds per commit:
 
-  * the dev workflow's own ``push`` trigger (branches + paths-ignore),
+  * the dev workflow's own ``push`` trigger plus its image classifier,
   * the translations workflow's ``push`` paths filter,
   * any step in the translations workflow that hits the dev workflow's
     ``dispatches`` endpoint,
@@ -70,7 +67,11 @@ from pathlib import Path
 
 import pytest
 
-from scripts.ci_path_classification import classify_paths
+from scripts.ci_path_classification import (
+    _dockerignore_excludes,
+    _dockerignore_patterns,
+    classify_paths,
+)
 
 try:
     import yaml
@@ -230,7 +231,7 @@ def _builds_of_merge_commit(changed_paths: list, translation_committed: bool) ->
     if _translations_runs(changed_paths) and not translation_committed:
         # With nothing committed, a dispatch targets github.sha — the merge
         # itself, which the push trigger already built (or deliberately
-        # skipped, for paths-ignore'd changes).
+        # skipped, for image-neutral changes).
         builds += len(_dispatch_steps())
     return builds
 
@@ -260,11 +261,11 @@ _SCENARIOS = [
     # A translations-only human PR: the workflow runs but finds nothing to
     # commit. Still exactly one build — of the merge.
     (["cps/translations/de/LC_MESSAGES/messages.po"], False, 1, 0),
-    # The translation machinery itself is image content (scripts/ is not in
-    # paths-ignore), so this merge must be built — once.
+    # The translation machinery itself is image content (scripts/ enters the
+    # build context), so this merge must be built — once.
     (["scripts/update_translations.sh"], False, 1, 0),
     # ZERO ARM + POSITIVE CONTROL: docs-only merges are deliberately skipped
-    # by the dev workflow's paths-ignore, and the translations workflow does
+    # because .dockerignore excludes docs/, and the translations workflow does
     # not run at all (its paths don't match). Zero builds, on every revision
     # of these workflows — a harness that rejected everything would go red
     # here.
@@ -272,10 +273,10 @@ _SCENARIOS = [
     (["README.md"], False, 0, 0),
     # The zero arm's live case: an edit to the translations workflow ITSELF
     # runs the workflow (its own file is in its paths) but lies wholly
-    # inside the dev workflow's ignored paths, so the push trigger
-    # deliberately skips it. The removed dispatch force-built exactly these
-    # commits. Zero builds is the intended, permanent behaviour for this
-    # class — the merge of the PR that introduced this test is itself such
+    # outside the build context and does not supply dev-image build arguments,
+    # so the classifier deliberately skips it. The removed dispatch force-built
+    # exactly these commits. Zero builds is the intended, permanent behaviour
+    # for this class — the merge of the PR that introduced this test is itself such
     # an event (it touches only .github/ and tests/).
     ([".github/workflows/update-translations.yml"], False, 0, 0),
 ]
@@ -298,7 +299,7 @@ def test_image_relevant_merges_build_exactly_once_ignored_merges_build_never(
     changed, committed, want_merge, want_translation
 ):
     """Both arms at once: image-relevant merges build exactly once, merges
-    confined to the dev workflow's paths-ignore build never — and nothing
+    confined to image-neutral paths build never — and nothing
     outside the push trigger (a dispatch, a re-run) may add a build either
     arm didn't ask for."""
     merge_builds = _builds_of_merge_commit(changed, committed)
@@ -394,6 +395,105 @@ def test_dev_workflow_keeps_push_trigger_and_aliases_image_neutral_commits():
     assert classify_paths(["docs/usage.md"], REPO_ROOT)["image"] is False
     assert classify_paths(["tests/unit/test_example.py"], REPO_ROOT)["image"] is False
     assert classify_paths(["cps/web.py"], REPO_ROOT)["image"] is True
+
+
+def test_findings_ledger_commit_29cc301acd_is_image_neutral():
+    """The exact paid no-op build from finding F-3b30c7 stays fixed."""
+    changed = [
+        "findings/INDEX.md",
+        "findings/items/F-34acae.json",
+        "findings/items/F-5dcb50.json",
+        "findings/items/F-db823b.json",
+        "state/E2E-FLAKE-LEDGER.md",
+    ]
+    assert classify_paths(changed, REPO_ROOT)["image"] is False
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "state/decision-ledger.md",
+        "notes/image-policy.txt",
+        "drafts/release-copy.rst",
+        "findings/items/F-example.json",
+        "local-dev/docker-compose.worktree.yml",
+        "wiki-src/Home.jinja",
+    ],
+)
+def test_dockerignored_neutral_paths_do_not_rebuild_the_image(path):
+    """Neutrality follows .dockerignore, not a filename-extension allowlist."""
+    assert classify_paths([path], REPO_ROOT)["image"] is False
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "Dockerfile",
+        "Dockerfile.dev",
+        ".dockerignore",
+        ".github/workflows/docker-image-build-dev.yml",
+    ],
+)
+def test_out_of_context_build_inputs_remain_image_relevant(path):
+    assert classify_paths([path], REPO_ROOT)["image"] is True
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        # Real sources from Dockerfile COPY instructions. COPY . makes the
+        # application/root/script rows relevant; the explicit COPY lines cover
+        # the frontend manifests/tree and pyproject.toml.
+        "frontend/package.json",
+        "frontend/package-lock.json",
+        "frontend/src/App.tsx",
+        "pyproject.toml",
+        "cps/web.py",
+        "root/etc/s6-overlay/s6-rc.d/cwa-init/run",
+        "scripts/ensure-python-mirror.sh",
+    ],
+)
+def test_real_dockerfile_copy_sources_remain_image_relevant(path):
+    assert classify_paths([path], REPO_ROOT)["image"] is True
+
+
+def test_dockerignore_globs_negations_and_directory_patterns(tmp_path):
+    (tmp_path / ".dockerignore").write_text(
+        """\
+ignored/**
+!ignored/**/keep.txt
+logs/
+root?.tmp
+""",
+        encoding="utf-8",
+    )
+
+    assert classify_paths(["ignored/deep/data.bin"], tmp_path)["image"] is False
+    assert classify_paths(["ignored/deep/keep.txt"], tmp_path)["image"] is True
+    assert classify_paths(["logs/deep/output.log"], tmp_path)["image"] is False
+    assert classify_paths(["root1.tmp"], tmp_path)["image"] is False
+    assert classify_paths(["nested/root1.tmp"], tmp_path)["image"] is True
+
+
+@pytest.mark.parametrize(
+    "pattern,path,excluded",
+    [
+        ("**/*.txt", "file.txt", True),
+        ("**/*.txt", "dir/deep/file.txt", True),
+        ("a/*.txt", "a/file.txt", True),
+        ("a/*.txt", "a/deep/file.txt", False),
+        ("dir/**", "dir/deep/file", True),
+        ("**/foo/bar", "deep/foo/bar", True),
+        ("**file", "prefixfile", True),
+        ("a[b-d]e", "ace", True),
+        ("a[^b-d]e", "aze", True),
+        ("root?.tmp", "nested/root1.tmp", False),
+        ("//logs//", "logs/output.txt", True),
+    ],
+)
+def test_dockerignore_matcher_tracks_moby_pattern_cases(pattern, path, excluded):
+    patterns = _dockerignore_patterns(pattern)
+    assert _dockerignore_excludes(path, patterns) is excluded
 
 
 def test_main_image_runs_serialize_while_pr_verification_can_cancel() -> None:

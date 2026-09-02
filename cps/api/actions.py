@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Per-book user actions for /api/v1: favorite, hide, archive, send-to-e-reader.
+"""Per-book user actions for /api/v1: favorite, covers, hide, archive, delivery.
 
 These mirror the legacy web.py routes (toggle_favorite / toggle_hidden /
 toggle_archived / send_to_ereader) and reuse the same models + helpers so the SPA
@@ -16,7 +16,7 @@ from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..helper import send_mail, valid_email
 from ..kobo_sync_status import change_archived_books, remove_synced_book
-from ..services import device_delivery
+from ..services import cover_extract, device_delivery, user_cover
 
 BATCH_MEMBERSHIP_LIMIT = 200
 
@@ -36,6 +36,163 @@ def _require_real_user():
 
 def _book_or_404(book_id):
     return calibre_db.get_book(book_id)
+
+
+def _personal_cover_book(book_id):
+    """Apply normal visibility, except for an explicit Global Library viewer."""
+    try:
+        allow_show_global = bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        allow_show_global = False
+    return calibre_db.get_filtered_book(
+        book_id,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=allow_show_global,
+    )
+
+
+def _my_cover_payload(book, row):
+    from .serializers import cover_url_for
+
+    using_my_cover = row is not None
+    return {
+        "ok": True,
+        "locked": False,
+        "using_my_cover": using_my_cover,
+        "cover_url": user_cover.cover_url(row) if row else cover_url_for(book, "md"),
+        "library_cover_url": cover_url_for(book, "md"),
+        "ereader_enabled": bool(getattr(config, "config_kobo_cover_padding_enabled", False)),
+        "ereader_defaults": {
+            "aspect": getattr(config, "config_kobo_cover_padding_aspect", None) or "kobo_libra_color",
+            "fill_mode": getattr(config, "config_kobo_cover_padding_fill_mode", None) or "edge_mirror",
+            "color": getattr(config, "config_kobo_cover_padding_color", None) or "",
+        },
+    }
+
+
+@api_v1.route("/books/<int:book_id>/my-cover", methods=["GET"])
+@login_required_if_no_ano
+def get_my_book_cover(book_id):
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+    book = _personal_cover_book(book_id)
+    if book is None:
+        return _err("not_found", "Book not found", 404)
+    row = user_cover.override_for_user(current_user.id, book_id)
+    return jsonify(_my_cover_payload(book, row))
+
+
+@api_v1.route("/books/<int:book_id>/my-cover/image", methods=["GET"])
+@login_required_if_no_ano
+def get_my_book_cover_image(book_id):
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+    if _personal_cover_book(book_id) is None:
+        return _err("not_found", "Book not found", 404)
+    row = user_cover.override_for_user(current_user.id, book_id)
+    if row is None:
+        return _err("not_found", "Personal cover not found", 404)
+    return user_cover.send_override(row)
+
+
+@api_v1.route("/books/<int:book_id>/my-cover", methods=["PUT"])
+@login_required_if_no_ano
+def set_my_book_cover(book_id):
+    """Set only the current user's cover from upload, URL, or embedded bytes."""
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+    book = _personal_cover_book(book_id)
+    if book is None:
+        return _err("not_found", "Book not found", 404)
+
+    existing = user_cover.row_for_user(current_user.id, book_id)
+    updated_at = user_cover.next_updated_at(existing)
+
+    if request.files.get("file"):
+        staged, message = user_cover.stage_upload(
+            current_user.id, book_id, updated_at, request.files["file"])
+    else:
+        body = request.get_json(silent=True) or {}
+        kind = body.get("kind") or "url"
+        if kind == "url":
+            url = (body.get("url") or "").strip()
+            if not url:
+                return _err("invalid_request", "Provide a cover URL", 400)
+            staged, message = user_cover.stage_url(
+                current_user.id, book_id, updated_at, url)
+        elif kind == "embedded":
+            extracted = cover_extract.extract_embedded_cover(book)
+            if extracted is None:
+                return _err("invalid_request", "This book has no embedded cover", 400)
+            staged, message = user_cover.stage_bytes(
+                current_user.id, book_id, updated_at, extracted.data)
+        else:
+            return _err("invalid_request", "Unknown cover source", 400)
+    if staged is None:
+        return _err("invalid_cover", str(message or "Cover could not be saved"), 400)
+
+    previous_updated_at = getattr(existing, "updated_at", None)
+    # Publish an immutable, version-named file before making the row point to
+    # it. Existing readers keep resolving the old row/file until the commit;
+    # a crash or DB failure can leave only an unreferenced file, never a row
+    # whose version URL serves different bytes.
+    published, publish_error = staged.publish()
+    if not published:
+        staged.discard()
+        return _err("save_failed", "Personal cover image could not be published", 500,
+                    reason=publish_error)
+
+    row = existing or ub.UserBookCover(
+        user_id=int(current_user.id), book_id=int(book_id))
+    row.updated_at = updated_at
+    if existing is None:
+        ub.session.add(row)
+    try:
+        ub.session.commit()
+    except Exception:
+        row.updated_at = previous_updated_at
+        ub.session.rollback()
+        user_cover.remove_file(
+            current_user.id, book_id,
+            version=user_cover.version_token(updated_at),
+        )
+        return _err("save_failed", "Personal cover preference could not be saved", 500)
+
+    if existing is not None and previous_updated_at is not None:
+        user_cover.remove_file(
+            current_user.id, book_id,
+            version=user_cover.version_token(previous_updated_at),
+        )
+    return jsonify(_my_cover_payload(book, row))
+
+
+@api_v1.route("/books/<int:book_id>/my-cover", methods=["DELETE"])
+@login_required_if_no_ano
+def clear_my_book_cover(book_id):
+    guard = _require_real_user()
+    if guard:
+        return guard
+    user_library.mark_response_user_specific()
+    book = _personal_cover_book(book_id)
+    if book is None:
+        return _err("not_found", "Book not found", 404)
+    row = user_cover.row_for_user(current_user.id, book_id)
+    if row is not None:
+        ub.session.delete(row)
+        try:
+            ub.session.commit()
+        except Exception:
+            ub.session.rollback()
+            return _err("save_failed", "Personal cover preference could not be cleared", 500)
+        user_cover.remove_file(current_user.id, book_id, row=row)
+    return jsonify(_my_cover_payload(book, None))
 
 
 @api_v1.route("/books/<int:book_id>/favorite", methods=["POST"])

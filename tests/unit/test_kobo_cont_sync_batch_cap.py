@@ -97,9 +97,10 @@ def test_reading_states_stay_page_capped_without_continuation_writer():
     """A full reading-state page must also let its returned cursor persist."""
     source = _handle_sync_request_source()
     assert (
-        "for kobo_reading_state in "
-        "changed_reading_states.limit(SYNC_ITEM_LIMIT).all():"
+        "reading_state_page = "
+        "changed_reading_states.limit(SYNC_ITEM_LIMIT).all()"
     ) in source
+    assert "for kobo_reading_state in reading_state_page:" in source
     assert "cont_sync |= bool(changed_reading_states" not in source
     assert "cont_sync = bool(changed_reading_states" not in source
 

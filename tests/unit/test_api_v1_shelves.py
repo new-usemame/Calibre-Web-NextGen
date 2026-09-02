@@ -196,10 +196,24 @@ def test_delete_forbidden_403():
     from cps.api import shelves as mod
     with _ctx("/api/v1/shelves/1/delete"):
         with patch.object(mod, "ub") as mock_ub, \
-             patch.object(mod, "delete_shelf_helper", return_value=False):
+             patch.object(mod, "check_shelf_edit_permissions", return_value=False), \
+             patch.object(mod, "delete_shelf_helper") as delete:
             mock_ub.session.query.return_value.filter.return_value.first.return_value = _shelf()
             resp = inspect.unwrap(mod.delete_shelf_api)(1)
     assert resp[1] == 403
+    delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_delete_commit_failure_500():
+    from cps.api import shelves as mod
+    with _ctx("/api/v1/shelves/1/delete"):
+        with patch.object(mod, "ub") as mock_ub, \
+             patch.object(mod, "check_shelf_edit_permissions", return_value=True), \
+             patch.object(mod, "delete_shelf_helper", return_value=False):
+            mock_ub.session.query.return_value.filter.return_value.first.return_value = _shelf()
+            resp = inspect.unwrap(mod.delete_shelf_api)(1)
+    assert resp[1] == 500
 
 
 @pytest.mark.unit
@@ -207,6 +221,7 @@ def test_delete_ok_204():
     from cps.api import shelves as mod
     with _ctx("/api/v1/shelves/1/delete"):
         with patch.object(mod, "ub") as mock_ub, \
+             patch.object(mod, "check_shelf_edit_permissions", return_value=True), \
              patch.object(mod, "delete_shelf_helper", return_value=True):
             mock_ub.session.query.return_value.filter.return_value.first.return_value = _shelf()
             resp = inspect.unwrap(mod.delete_shelf_api)(1)

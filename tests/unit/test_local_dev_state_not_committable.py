@@ -6,7 +6,7 @@
 If that path is inside the checkout, the application writes databases, secrets,
 annotation backups, and repaired book copies below ``local-dev/``.  A list of
 known rig directory names cannot protect the next rig, so ``local-dev/`` must be
-closed by default with explicit exceptions for its four repository source files.
+closed by default with explicit exceptions for its repository source files.
 """
 
 from fnmatch import fnmatch
@@ -22,6 +22,7 @@ TRACKED_LOCAL_DEV_SOURCES = {
     "local-dev/docker-compose.worktree.yml",
     "local-dev/koreader-emulator/Dockerfile",
     "local-dev/koreader-emulator/entrypoint.sh",
+    "local-dev/private-e2e-rig.sh",
 }
 REPRESENTATIVE_STATE_PATHS = (
     "local-dev/.rig-anything/config/app.db",
@@ -84,6 +85,6 @@ def test_only_source_files_are_tracked_under_local_dev():
         + ", ".join(state_files)
     )
     assert tracked == TRACKED_LOCAL_DEV_SOURCES, (
-        "local-dev must contain exactly the four explicitly committable source "
+        "local-dev must contain exactly the explicitly committable source "
         f"files; unexpected tracked paths: {sorted(tracked ^ TRACKED_LOCAL_DEV_SOURCES)}"
     )

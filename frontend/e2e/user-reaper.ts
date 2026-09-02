@@ -1,4 +1,3 @@
-import type { APIRequestContext } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { homedir, hostname } from 'node:os';
@@ -13,15 +12,14 @@ const DEFAULT_REGISTRY_ROOT = path.join(
   'cwng',
   'e2e-user-ownership-v1',
 );
-const REQUEST_TIMEOUT_MS = 5_000;
 const DELETE_ATTEMPTS = 3;
-
-type AdminRequest = Pick<APIRequestContext, 'get' | 'post'>;
 
 export interface OwnedUserIdentity {
   username: string;
   email: string;
 }
+
+type OwnershipState = 'intent' | 'created' | 'deferred';
 
 interface OwnershipRecord extends OwnedUserIdentity {
   version: typeof RECORD_VERSION;
@@ -31,7 +29,15 @@ interface OwnershipRecord extends OwnedUserIdentity {
   ownerPid: number;
   ownerHost: string;
   createdAt: string;
+  /** Added after v1 shipped; absent fields identify a recoverable legacy record. */
+  runId?: string;
+  workerId?: string;
+  state?: OwnershipState;
   userId?: number;
+  cleanupFailures?: number;
+  lastCleanupAttemptAt?: string;
+  lastCleanupError?: string;
+  lastReportedAt?: string;
 }
 
 export interface OwnershipHandle {
@@ -39,10 +45,38 @@ export interface OwnershipHandle {
   filePath: string;
 }
 
-interface AdminUser {
+export interface AdminUser {
   id: number;
   name: string;
   email: string;
+}
+
+export interface OwnedUserCreate {
+  name: string;
+  email: string;
+  password: string;
+  roles: Record<string, boolean>;
+}
+
+/**
+ * Page-free boundary used by both fixture teardown and next-run recovery.
+ * The production adapter owns an isolated authenticated API session; tests use
+ * an in-memory fake so no shared instance is touched.
+ */
+export interface OwnedUserAdminApi {
+  createUser(input: OwnedUserCreate): Promise<AdminUser>;
+  listUsers(): Promise<AdminUser[]>;
+  deleteUser(userId: number): Promise<{ deleted: boolean; detail: string }>;
+}
+
+export interface OwnershipOwner {
+  runId: string;
+  workerId: string;
+}
+
+export interface CreatedOwnedUser {
+  ownership: OwnershipHandle;
+  user: AdminUser;
 }
 
 export interface ReaperSummary {
@@ -59,6 +93,11 @@ interface RegistryOptions {
   isProcessAlive?: (pid: number) => boolean;
   warn?: (message: string) => void;
   retryDelayMs?: number;
+  ownerPid?: number;
+  runId?: string;
+  workerId?: string;
+  now?: () => Date;
+  intentGraceMs?: number;
 }
 
 function normalizedBaseURL(baseURL: string): string {
@@ -73,6 +112,13 @@ function instanceDirectory(baseURL: string, registryRoot = DEFAULT_REGISTRY_ROOT
     .digest('hex')
     .slice(0, 24);
   return path.join(registryRoot, instanceKey);
+}
+
+function ownershipKey(runId: string, workerId: string): string {
+  return createHash('sha256')
+    .update(`${runId}\0${workerId}`)
+    .digest('hex')
+    .slice(0, 20);
 }
 
 function assertSuiteUsername(username: string): void {
@@ -122,6 +168,9 @@ export async function registerOwnedUserIntent(
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });
   await fs.chmod(directory, 0o700);
   const recordId = randomUUID();
+  const runId = options.runId ?? `process-${process.pid}`;
+  const workerId = options.workerId ?? 'unknown-worker';
+  const ownerKey = ownershipKey(runId, workerId);
   const handle: OwnershipHandle = {
     record: {
       version: RECORD_VERSION,
@@ -130,19 +179,58 @@ export async function registerOwnedUserIntent(
       baseURL: normalizedBaseURL(baseURL),
       username: identity.username,
       email: identity.email,
-      ownerPid: process.pid,
+      ownerPid: options.ownerPid ?? process.pid,
       ownerHost: options.currentHost ?? hostname(),
-      createdAt: new Date().toISOString(),
+      createdAt: (options.now?.() ?? new Date()).toISOString(),
+      runId,
+      workerId,
+      state: 'intent',
     },
-    filePath: path.join(directory, `${recordId}.json`),
+    // The filename makes run/worker ownership visible without trusting JSON
+    // contents. recordId still permits multiple lazy fixtures in one worker.
+    filePath: path.join(directory, `${ownerKey}-${recordId}.json`),
   };
   await writeRecord(handle);
   return handle;
 }
 
 export async function recordCreatedUser(handle: OwnershipHandle, userId: number): Promise<void> {
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    throw new Error(`Refusing invalid owned user id: ${userId}`);
+  }
   handle.record.userId = userId;
+  handle.record.state = 'created';
   await writeRecord(handle);
+}
+
+/** Persist intent, create through the direct API, then bind its exact identity. */
+export async function createOwnedUser(
+  api: OwnedUserAdminApi,
+  baseURL: string,
+  input: OwnedUserCreate,
+  owner: OwnershipOwner,
+  options: RegistryOptions = {},
+): Promise<CreatedOwnedUser> {
+  const ownership = await registerOwnedUserIntent(baseURL, {
+    username: input.name,
+    email: input.email,
+  }, {
+    ...options,
+    runId: owner.runId,
+    workerId: owner.workerId,
+  });
+  const user = await api.createUser(input);
+  if (!Number.isSafeInteger(user.id) || user.id <= 0
+      || user.name !== input.name || user.email !== input.email) {
+    // The intent deliberately remains unbound. Recovery may safely locate only
+    // the exact requested username/email if the server committed unexpectedly.
+    throw new Error(
+      `Created secondary user identity mismatch: requested ${input.name}/${input.email}, `
+      + `received ${String(user.id)}/${user.name}/${user.email}`,
+    );
+  }
+  await recordCreatedUser(ownership, user.id);
+  return { ownership, user };
 }
 
 async function forgetRecord(handle: OwnershipHandle): Promise<void> {
@@ -171,34 +259,17 @@ export function ownerIsLive(
   return (options.isProcessAlive ?? processIsAlive)(record.ownerPid);
 }
 
-async function csrfToken(request: AdminRequest): Promise<string> {
-  const response = await request.get('/api/v1/auth/csrf', { timeout: REQUEST_TIMEOUT_MS });
-  if (!response.ok()) {
-    throw new Error(`CSRF endpoint returned HTTP ${response.status()}: ${await response.text()}`);
-  }
-  const payload = (await response.json()) as { csrf_token?: unknown };
-  if (typeof payload.csrf_token !== 'string' || !payload.csrf_token) {
-    throw new Error('CSRF endpoint returned no csrf_token');
-  }
-  return payload.csrf_token;
-}
-
 async function deleteUserWithRetry(
-  request: AdminRequest,
+  api: OwnedUserAdminApi,
   userId: number,
   retryDelayMs: number,
 ): Promise<{ deleted: boolean; detail: string }> {
   let detail = 'delete was not attempted';
   for (let attempt = 1; attempt <= DELETE_ATTEMPTS; attempt += 1) {
     try {
-      const response = await request.post(`/api/v1/admin/users/${userId}/delete`, {
-        headers: { 'X-CSRFToken': await csrfToken(request) },
-        timeout: REQUEST_TIMEOUT_MS,
-      });
-      if (response.status() === 204 || response.status() === 404) {
-        return { deleted: true, detail: `HTTP ${response.status()}` };
-      }
-      detail = `attempt ${attempt}/${DELETE_ATTEMPTS}: HTTP ${response.status()} ${await response.text()}`;
+      const result = await api.deleteUser(userId);
+      if (result.deleted) return result;
+      detail = `attempt ${attempt}/${DELETE_ATTEMPTS}: ${result.detail}`;
     } catch (error) {
       detail = `attempt ${attempt}/${DELETE_ATTEMPTS}: ${String(error)}`;
     }
@@ -209,16 +280,43 @@ async function deleteUserWithRetry(
   return { deleted: false, detail };
 }
 
+async function retainDeferredCleanup(
+  handle: OwnershipHandle,
+  detail: string,
+  options: RegistryOptions,
+): Promise<void> {
+  const now = (options.now?.() ?? new Date()).toISOString();
+  handle.record.state = 'deferred';
+  handle.record.cleanupFailures = (handle.record.cleanupFailures ?? 0) + 1;
+  handle.record.lastCleanupAttemptAt = now;
+  handle.record.lastCleanupError = detail;
+  handle.record.lastReportedAt = now;
+  await writeRecord(handle);
+}
+
 /** Normal fixture teardown: delete immediately, then forget ownership. */
 export async function cleanupOwnedUser(
-  request: AdminRequest,
+  api: OwnedUserAdminApi,
   handle: OwnershipHandle,
   userId: number,
   options: RegistryOptions = {},
 ): Promise<boolean> {
   const warn = options.warn ?? console.warn;
-  const result = await deleteUserWithRetry(request, userId, options.retryDelayMs ?? 150);
+  if (handle.record.userId !== userId) {
+    const detail = `cleanup id ${userId} does not match bound ownership id ${String(handle.record.userId)}`;
+    await retainDeferredCleanup(handle, detail, options).catch(() => undefined);
+    warn(`[e2e-user-cleanup] Deferred ${handle.record.username}; ${detail}`);
+    return false;
+  }
+  const result = await deleteUserWithRetry(api, userId, options.retryDelayMs ?? 150);
   if (!result.deleted) {
+    try {
+      await retainDeferredCleanup(handle, result.detail, options);
+    } catch (error) {
+      // The pre-existing intent remains on disk even if enriching it fails.
+      // Cleanup must not replace a product assertion with bookkeeping noise.
+      result.detail += `; could not persist deferred detail: ${String(error)}`;
+    }
     warn(
       `[e2e-user-cleanup] Deferred ${handle.record.username}; durable ownership record retained for the next setup run (${result.detail})`,
     );
@@ -245,9 +343,18 @@ function isOwnershipRecord(value: unknown, expectedBaseURL: string): value is Ow
     && Number.isSafeInteger(record.ownerPid)
     && record.ownerPid > 0
     && typeof record.ownerHost === 'string'
+    && typeof record.createdAt === 'string'
     && typeof record.username === 'string'
     && USERNAME_PATTERN.test(record.username)
     && record.email === `${record.username}@example.test`
+    && (record.runId === undefined || (typeof record.runId === 'string' && record.runId.length > 0))
+    && (record.workerId === undefined || (typeof record.workerId === 'string' && record.workerId.length > 0))
+    && ((record.runId === undefined) === (record.workerId === undefined))
+    && (record.state === undefined || ['intent', 'created', 'deferred'].includes(record.state))
+    && (record.cleanupFailures === undefined
+      || (typeof record.cleanupFailures === 'number'
+        && Number.isSafeInteger(record.cleanupFailures)
+        && record.cleanupFailures >= 0))
     && (record.userId === undefined
       || (typeof record.userId === 'number' && Number.isSafeInteger(record.userId) && record.userId > 0));
 }
@@ -274,6 +381,11 @@ async function readOwnershipHandles(
         options.warn?.(`[e2e-user-reaper] Ignoring invalid ownership record ${filePath}`);
         continue;
       }
+      if (record.runId !== undefined && record.workerId !== undefined
+          && !entry.name.startsWith(`${ownershipKey(record.runId, record.workerId)}-`)) {
+        options.warn?.(`[e2e-user-reaper] Ignoring ownership record with a mismatched run/worker key ${filePath}`);
+        continue;
+      }
       handles.push({ record, filePath });
     } catch (error) {
       options.warn?.(`[e2e-user-reaper] Ignoring unreadable ownership record ${filePath}: ${String(error)}`);
@@ -288,7 +400,7 @@ async function readOwnershipHandles(
  * an exact username/email/(when known) id match returned by this same server.
  */
 export async function reapOwnedE2EUsers(
-  request: AdminRequest,
+  api: OwnedUserAdminApi,
   baseURL: string,
   options: RegistryOptions = {},
 ): Promise<ReaperSummary> {
@@ -312,16 +424,20 @@ export async function reapOwnedE2EUsers(
 
   let users: AdminUser[];
   try {
-    const response = await request.get('/api/v1/admin/users', { timeout: REQUEST_TIMEOUT_MS });
-    if (!response.ok()) {
-      throw new Error(`HTTP ${response.status()}: ${await response.text()}`);
-    }
-    const payload = (await response.json()) as { items?: unknown };
-    if (!Array.isArray(payload.items)) throw new Error('response has no items array');
-    users = payload.items as AdminUser[];
+    users = await api.listUsers();
   } catch (error) {
     summary.deferred = stale.length;
-    warn(`[e2e-user-reaper] Could not list owned users; ${stale.length} cleanup(s) deferred: ${String(error)}`);
+    const stateErrors: string[] = [];
+    for (const handle of stale) {
+      await retainDeferredCleanup(handle, `user listing failed: ${String(error)}`, options)
+        .catch((stateError) => stateErrors.push(String(stateError)));
+    }
+    const stateDetail = stateErrors.length > 0
+      ? `; ${stateErrors.length} deferred record update(s) also failed: ${stateErrors.join('; ')}`
+      : '';
+    warn(
+      `[e2e-user-reaper] Could not list owned users; ${stale.length} cleanup(s) deferred: ${String(error)}${stateDetail}`,
+    );
     return summary;
   }
 
@@ -339,21 +455,55 @@ export async function reapOwnedE2EUsers(
       // POST was still committing. Retain it so a later run can see that late
       // commit instead of turning it into an untracked leak.
       if (record.userId === undefined) {
-        summary.deferred += 1;
+        const createdAt = Date.parse(record.createdAt);
+        const now = (options.now?.() ?? new Date()).getTime();
+        const intentGraceMs = options.intentGraceMs ?? 60_000;
+        if (Number.isFinite(createdAt) && now - createdAt >= intentGraceMs) {
+          try {
+            await forgetRecord(handle);
+            summary.absent += 1;
+          } catch (error) {
+            summary.deferred += 1;
+            warn(`[e2e-user-reaper] Could not reconcile expired intent ${record.username}: ${String(error)}`);
+          }
+        } else {
+          summary.deferred += 1;
+        }
       } else {
-        await forgetRecord(handle).catch((error) => {
-          warn(`[e2e-user-reaper] Could not reconcile absent ${record.username}: ${String(error)}`);
-        });
-        summary.absent += 1;
+        const conflictingIdentity = users.some((user) => (
+          user.id === record.userId
+          || (user.name === record.username && user.email === record.email)
+        ));
+        if (conflictingIdentity) {
+          const detail = 'bound id or exact account identity no longer matches the ownership record';
+          let reportDetail = detail;
+          await retainDeferredCleanup(handle, detail, options).catch((error) => {
+            reportDetail += `; could not persist deferred detail: ${String(error)}`;
+          });
+          summary.deferred += 1;
+          warn(`[e2e-user-reaper] Deferred ${record.username}; ${reportDetail}`);
+        } else {
+          try {
+            await forgetRecord(handle);
+            summary.absent += 1;
+          } catch (error) {
+            summary.deferred += 1;
+            warn(`[e2e-user-reaper] Could not reconcile absent ${record.username}: ${String(error)}`);
+          }
+        }
       }
       continue;
     }
 
-    const result = await deleteUserWithRetry(request, exact.id, options.retryDelayMs ?? 150);
+    const result = await deleteUserWithRetry(api, exact.id, options.retryDelayMs ?? 150);
     if (!result.deleted) {
+      let reportDetail = result.detail;
+      await retainDeferredCleanup(handle, result.detail, options).catch((error) => {
+        reportDetail += `; could not persist deferred detail: ${String(error)}`;
+      });
       summary.deferred += 1;
       warn(
-        `[e2e-user-reaper] Deferred stale ${record.username}; durable ownership record retained (${result.detail})`,
+        `[e2e-user-reaper] Deferred stale ${record.username}; durable ownership record retained (${reportDetail})`,
       );
       continue;
     }

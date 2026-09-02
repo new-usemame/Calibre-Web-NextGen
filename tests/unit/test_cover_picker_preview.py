@@ -266,14 +266,17 @@ class TestEreaderPreviewEndpointStructure:
             "to match the existing cover_picker_* naming pattern"
         )
 
-    def test_endpoint_is_login_and_edit_gated(self):
+    def test_endpoint_is_login_and_cover_source_gated(self):
         src = self._read()
         ereader_idx = src.find("def cover_picker_ereader_preview")
         assert ereader_idx != -1
         # Decorators sit above the function — look at the 400 chars before
         prefix = src[max(0, ereader_idx - 400):ereader_idx]
         assert "@user_login_required" in prefix, "endpoint must be auth-gated"
-        assert "@edit_required" in prefix, "endpoint must be edit-gated"
+        assert "@cover_source_required" in prefix, (
+            "endpoint must limit global sources to editors while allowing a "
+            "signed-in user to preview their personal cover"
+        )
 
     def test_endpoint_invokes_pad_blob_or_helper(self):
         src = self._read()

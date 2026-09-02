@@ -50,6 +50,13 @@ export function loadCatalog(key: string): CatalogSnapshot | undefined {
   return _cache.get(key);
 }
 
+/** Drop every route snapshot at an account boundary. Catalogue keys are route-
+ * scoped, not user-scoped, so retaining them across an in-place login could
+ * render the previous account's accumulated My Library cards before a refetch. */
+export function clearCatalogCache(): void {
+  _cache.clear();
+}
+
 /** Drop a book from every cached snapshot — call when a book is deleted so a
  *  later scroll-restore can't resurrect it as a ghost card that 404s on click
  *  (#578). A re-fetch would still contain it on pages we don't re-request, so we

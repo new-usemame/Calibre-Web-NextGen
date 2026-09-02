@@ -45,6 +45,7 @@ concurrency:
 # package". Mirrors the release workflow minus id-token/attestations,
 # which the dev workflow explicitly disables (provenance: false).
 permissions:
+  actions: read
   contents: read
   packages: write
 jobs:
@@ -85,14 +86,15 @@ jobs:
             # tree. This classifier's introducing PR fails closed into every
             # lane because its base has no trusted implementation yet.
             classifier_ref="$BASE_SHA"
-            if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py"; then
-              echo "::warning::Base has no path classifier; enabling every image gate"
+            if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py" \
+              || ! git cat-file -e "$classifier_ref:.dockerignore"; then
+              echo "::warning::Base has no trusted classifier policy; enabling every image gate"
               printf 'frontend=true\nbuild=true\nconcurrency=true\nimage=true\n' >> "$GITHUB_OUTPUT"
               exit 0
             fi
             classifier_root="$RUNNER_TEMP/base-path-classifier"
             mkdir -p "$classifier_root"
-            git archive "$classifier_ref" cps scripts/ci_path_classification.py \
+            git archive "$classifier_ref" cps .dockerignore scripts/ci_path_classification.py \
               | tar -x -C "$classifier_root"
           fi
           printf '%s\n' "$files" \
@@ -620,7 +622,10 @@ jobs:
   alias-image-neutral-commit:
     name: Alias unchanged image to commit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The source producer may legitimately consume its full 95-minute
+    # classify+mirror+architecture+merge budget. The script stops sooner when
+    # that exact run/job fails and never substitutes the floating :dev tag.
+    timeout-minutes: 100
     needs: classify
     if: needs.classify.outputs.alias_image == 'true'
     steps:
@@ -644,8 +649,11 @@ jobs:
 
       - name: Publish immutable commit alias
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           IMAGE_SOURCE: ${{ needs.classify.outputs.image_source }}
           SUBJECT_SHA: ${{ github.sha }}
         run: |
           base="ghcr.io/${{ github.repository_owner }}/$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
-          bash scripts/alias-e2e-image.sh "$base" "$IMAGE_SOURCE" "$SUBJECT_SHA"
+          bash scripts/alias-e2e-image.sh \
+            "$base" "$IMAGE_SOURCE" "$SUBJECT_SHA" 191 30 \
+            "${{ github.repository }}" push "${{ github.api_url }}"

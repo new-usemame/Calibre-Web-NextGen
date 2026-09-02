@@ -101,7 +101,7 @@ class EmailSSL(EmailBase, smtplib.SMTP_SSL):
 
 class TaskEmail(CalibreTask):
     def __init__(self, subject, filepath, attachment, settings, recipient, task_message, text, id=0, internal=False,
-                 html=None):
+                 html=None, cover_user_id=None):
         super(TaskEmail, self).__init__(task_message)
         self.subject = subject
         self.attachment = attachment
@@ -117,6 +117,7 @@ class TaskEmail(CalibreTask):
         self.html = html
         self.asyncSMTP = None
         self.book_id = id
+        self.cover_user_id = cover_user_id
         self.results = dict()
 
     # from calibre code:
@@ -300,12 +301,26 @@ class TaskEmail(CalibreTask):
                     datafile = os.path.join(data_path, data_file + "." + extension)
                 else:
                     log.warning('Metadata export produced no file, sending without embedded metadata')
+            source_datafile = datafile
+            personal_copy = None
+            try:
+                from cps.services import user_cover
+                personal_copy = user_cover.materialize_delivery_copy(
+                    self.cover_user_id, self.book_id, datafile, extension)
+                if personal_copy is not None:
+                    datafile = os.path.join(
+                        personal_copy[0], personal_copy[1] + "." + extension)
+            except Exception as ex:
+                log.warning("Could not prepare personal-cover email attachment: %s", ex)
             self._register_kosync_checksum(datafile, extension, filename)
             with open(datafile, 'rb') as file_:
                 data = file_.read()
-            os.remove(datafile)
+            if personal_copy is not None:
+                os.remove(datafile)
+            os.remove(source_datafile)
         else:
-            datafile = os.path.join(calibre_path, book_path, filename)
+            library_datafile = os.path.join(calibre_path, book_path, filename)
+            datafile = library_datafile
             try:
                 if config.config_binariesdir and config.config_embed_metadata:
                     data_path, data_file = do_calibre_export(self.book_id, extension)
@@ -315,11 +330,24 @@ class TaskEmail(CalibreTask):
                             datafile = export_file
                         else:
                             log.warning('Metadata export produced no file, sending without embedded metadata')
+                source_datafile = datafile
+                personal_copy = None
+                try:
+                    from cps.services import user_cover
+                    personal_copy = user_cover.materialize_delivery_copy(
+                        self.cover_user_id, self.book_id, datafile, extension)
+                    if personal_copy is not None:
+                        datafile = os.path.join(
+                            personal_copy[0], personal_copy[1] + "." + extension)
+                except Exception as ex:
+                    log.warning("Could not prepare personal-cover email attachment: %s", ex)
                 self._register_kosync_checksum(datafile, extension, filename)
                 with open(datafile, 'rb') as file_:
                     data = file_.read()
-                if config.config_binariesdir and config.config_embed_metadata and datafile != os.path.join(calibre_path, book_path, filename):
+                if personal_copy is not None:
                     os.remove(datafile)
+                if source_datafile != library_datafile:
+                    os.remove(source_datafile)
             except IOError as e:
                 log.error_or_exception(e, stacklevel=3)
                 log.error('The requested file could not be read. Maybe wrong permissions?')

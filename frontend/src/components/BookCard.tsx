@@ -41,8 +41,8 @@ interface BookCardProps {
   membership?: 'owned' | 'unowned';
   onAddToLibrary?: (book: Book) => void;
   addPending?: boolean;
-  /** The membership-scoped backend does not expose detail for an unowned book.
-   * Global cards therefore become static until the user adds them. */
+  /** Opt out only on surfaces that intentionally render a non-navigable card.
+   * Global Library details are membership-independent global metadata. */
   detailsEnabled?: boolean;
   /** The authenticated account's viewer role. Kept explicit so a catalog card
    *  can never infer file access from the formats it happens to receive. */

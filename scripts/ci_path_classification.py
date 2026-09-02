@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import posixpath
+import re
 import subprocess
 from pathlib import Path, PurePosixPath
 from typing import Iterable
@@ -50,6 +52,168 @@ UI_ROUTING_PATHS = {
     "cps/web.py",
     "cps/templates/layout.html",
 }
+
+# These files do not enter the ordinary build context, but can still change
+# image bytes and therefore override .dockerignore:
+#
+# * Dockerfile* is read by the builder separately from the filtered context.
+# * .dockerignore decides which context bytes the builder receives.
+# * docker-image-build-dev.yml supplies BUILD_DATE, VERSION, and PBS_SOURCE as
+#   build arguments, so changing it can change the produced image even though
+#   .github/ is excluded from the context.
+IMAGE_INPUTS_OUTSIDE_CONTEXT = {
+    ".dockerignore",
+    ".github/workflows/docker-image-build-dev.yml",
+}
+
+
+class DockerIgnorePatternError(ValueError):
+    """A .dockerignore pattern cannot be interpreted with Docker semantics."""
+
+
+def _clean_dockerignore_pattern(line: str, *, first: bool = False) -> str | None:
+    """Apply moby/patternmatcher ignorefile preprocessing on POSIX paths."""
+    if first:
+        line = line.removeprefix("\ufeff")
+    # Docker recognizes comments before trimming, so an indented # is a
+    # literal pattern rather than a comment.
+    if line.startswith("#"):
+        return None
+    pattern = line.strip()
+    if not pattern:
+        return None
+
+    negated = pattern.startswith("!")
+    if negated:
+        pattern = pattern[1:].strip()
+        if not pattern:
+            raise DockerIgnorePatternError('illegal exclusion pattern: "!"')
+
+    # Docker uses filepath.Clean before discarding one leading slash. On the
+    # Linux builders used by this project, posixpath.normpath is the equivalent
+    # lexical normalization (including removal of trailing slashes).
+    pattern = posixpath.normpath(pattern)
+    # Go filepath.Clean collapses repeated leading separators before Docker
+    # removes the remaining one. posixpath preserves exactly two leading
+    # slashes, so lstrip is needed for parity with Docker on that edge case.
+    pattern = pattern.lstrip("/")
+    if pattern in ("", "."):
+        return None
+    return f"!{pattern}" if negated else pattern
+
+
+def _dockerignore_regex(pattern: str) -> re.Pattern[str]:
+    """Compile one cleaned pattern like moby/patternmatcher on Linux.
+
+    Docker extends Go filepath.Match with ``**``. A ``**/`` consumes zero or
+    more complete directories, a terminal ``**`` consumes every suffix, and
+    ordinary ``*``/``?`` never cross a slash.
+    """
+    # Moby treats a leading ``**`` followed only by literals as a suffix
+    # match. In particular, ``**file`` matches both ``dir/file`` and
+    # ``prefixfile``; spelling it as a generic directory glob would miss the
+    # latter.
+    suffix = pattern[2:] if pattern.startswith("**") else ""
+    if pattern.startswith("**") and not any(
+        token in suffix for token in ("*", "?", "[", "\\")
+    ):
+        if suffix.startswith("/"):
+            return re.compile(r"^(?:.*/)?" + re.escape(suffix[1:]) + r"$")
+        return re.compile(r"^.*" + re.escape(suffix) + r"$")
+
+    regex = ["^"]
+    index = 0
+    in_class = False
+    while index < len(pattern):
+        char = pattern[index]
+        if char == "*":
+            if index + 1 < len(pattern) and pattern[index + 1] == "*":
+                index += 2
+                if index < len(pattern) and pattern[index] == "/":
+                    index += 1
+                if index == len(pattern):
+                    regex.append(".*")
+                else:
+                    regex.append("(?:.*/)?")
+                continue
+            regex.append("[^/]*")
+        elif char == "?":
+            regex.append("[^/]")
+        elif char == "\\":
+            index += 1
+            if index == len(pattern):
+                raise DockerIgnorePatternError(
+                    f"bad .dockerignore pattern {pattern!r}: trailing escape"
+                )
+            regex.append(re.escape(pattern[index]))
+        elif char == "[":
+            in_class = True
+            regex.append(char)
+        elif char == "]":
+            in_class = False
+            regex.append(char)
+        elif in_class:
+            regex.append(char)
+        else:
+            regex.append(re.escape(char))
+        index += 1
+    if in_class:
+        raise DockerIgnorePatternError(
+            f"bad .dockerignore pattern {pattern!r}: unterminated character class"
+        )
+    try:
+        return re.compile("".join(regex) + "$")
+    except re.error as exc:
+        raise DockerIgnorePatternError(
+            f"bad .dockerignore pattern {pattern!r}: {exc}"
+        ) from exc
+
+
+def _dockerignore_patterns(text: str) -> list[tuple[bool, re.Pattern[str]]]:
+    patterns: list[tuple[bool, re.Pattern[str]]] = []
+    for index, line in enumerate(text.splitlines()):
+        cleaned = _clean_dockerignore_pattern(line, first=index == 0)
+        if cleaned is None:
+            continue
+        negated = cleaned.startswith("!")
+        pattern = cleaned[1:] if negated else cleaned
+        patterns.append((negated, _dockerignore_regex(pattern)))
+    return patterns
+
+
+def _dockerignore_excludes(
+    path: str, patterns: list[tuple[bool, re.Pattern[str]]]
+) -> bool:
+    """Match a path or any parent, with Docker's last-applicable-rule wins."""
+    clean = posixpath.normpath(path.removeprefix("./"))
+    if clean in ("", "."):
+        return False
+    parts = clean.split("/")
+    candidates = ["/".join(parts[:end]) for end in range(1, len(parts) + 1)]
+    excluded = False
+    for negated, pattern in patterns:
+        if any(pattern.fullmatch(candidate) for candidate in candidates):
+            excluded = not negated
+    return excluded
+
+
+def _image_paths_changed_with_dockerignore(
+    paths: Iterable[str], dockerignore_text: str | None
+) -> bool:
+    changed = _clean_paths(paths)
+    if not changed:
+        return False
+    # Missing policy is not permission to alias an image: fail closed until a
+    # repository supplies the SSOT that proves a path is outside the context.
+    if dockerignore_text is None:
+        return True
+    patterns = _dockerignore_patterns(dockerignore_text)
+    return any(
+        path in IMAGE_INPUTS_OUTSIDE_CONTEXT
+        or ("/" not in path and path.startswith("Dockerfile"))
+        or not _dockerignore_excludes(path, patterns)
+        for path in changed
+    )
 
 
 def _path_to_module(path: str) -> str | None:
@@ -180,16 +344,15 @@ def _clean_paths(paths: Iterable[str]) -> set[str]:
     }
 
 
-def image_paths_changed(paths: Iterable[str]) -> bool:
-    """Whether a commit changes bytes that can affect the dev image."""
-    changed = _clean_paths(paths)
-    return any(
-        not (
-            path.endswith(".md")
-            or path.startswith(("docs/", "tests/", ".github/"))
+def image_paths_changed(paths: Iterable[str], repo_root: Path = Path.cwd()) -> bool:
+    """Whether paths can affect image bytes under the build-context policy."""
+    try:
+        dockerignore_text: str | None = (repo_root / ".dockerignore").read_text(
+            encoding="utf-8"
         )
-        for path in changed
-    )
+    except FileNotFoundError:
+        dockerignore_text = None
+    return _image_paths_changed_with_dockerignore(paths, dockerignore_text)
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -200,6 +363,26 @@ def _git(repo_root: Path, *args: str) -> str:
         capture_output=True,
         text=True,
     ).stdout
+
+
+def _git_file(repo_root: Path, revision: str, path: str) -> str | None:
+    result = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return result.stdout
+    # A history that predates .dockerignore has no policy proving neutrality.
+    if (
+        "does not exist" in result.stderr
+        or "exists on disk, but not in" in result.stderr
+    ):
+        return None
+    result.check_returncode()
+    return None  # pragma: no cover - check_returncode always raises
 
 
 def latest_image_commit(repo_root: Path, head: str) -> str:
@@ -231,7 +414,8 @@ def latest_image_commit(repo_root: Path, head: str) -> str:
             changed = _git(
                 repo_root, "diff", "--name-only", commit_and_parents[1], commit
             ).splitlines()
-        if image_paths_changed(changed):
+        dockerignore_text = _git_file(repo_root, commit, ".dockerignore")
+        if _image_paths_changed_with_dockerignore(changed, dockerignore_text):
             return commit
     raise ValueError(f"no image-relevant commit is reachable from {head}")
 
@@ -267,11 +451,10 @@ def classify_paths(paths: Iterable[str], repo_root: Path) -> dict[str, bool]:
         path in concurrency or path.startswith(CONCURRENCY_PREFIXES)
         for path in changed
     )
-    # Mirrors the dev channel's historical paths-ignore policy, but as data an
-    # alias job can consume.  Image-neutral main commits still get an immutable
-    # sha tag pointing at the unchanged :dev manifest; they do not rebuild or
-    # move :dev and therefore do not restart the canary deployment.
-    image = image_paths_changed(changed)
+    # .dockerignore is the build-context SSOT. Image-neutral main commits still
+    # get an immutable sha tag pointing at the unchanged :dev manifest; they do
+    # not rebuild or move :dev and therefore do not restart the canary.
+    image = image_paths_changed(changed, repo_root)
     return {
         "frontend": frontend,
         "build": build,

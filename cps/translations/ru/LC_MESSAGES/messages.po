@@ -1515,6 +1515,11 @@ msgstr ""
 msgid "'%(langname)s' is not a valid language"
 msgstr "Язык '%(langname)s' не поддерживается"
 
+#: cps/editbooks.py cps/helper.py
+msgid "Cover-file is not a valid image file, or could not be stored"
+msgstr ""
+"Файл обложки не является допустимым изображением или не может быть сохранён"
+
 #: cps/editbooks.py
 msgid "Metadata successfully updated"
 msgstr "Метаданные успешно обновлены"
@@ -1805,11 +1810,6 @@ msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr "Изображение обложки превышает максимальный размер %(size)s МБ"
 
 #: cps/helper.py
-msgid "Cover-file is not a valid image file, or could not be stored"
-msgstr ""
-"Файл обложки не является допустимым изображением или не может быть сохранён"
-
-#: cps/helper.py
 msgid "Cover Format Error"
 msgstr "Ошибка формата обложки"
 
@@ -1824,18 +1824,6 @@ msgstr ""
 #: cps/helper.py
 msgid "Failed to create path for cover"
 msgstr "Не удалось создать путь для обложки"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
-msgstr "Только файлы jpg/jpeg/png/webp/bmp поддерживаются в качестве обложки"
-
-#: cps/helper.py
-msgid "Invalid cover file content"
-msgstr "Неверное содержимое файла обложки"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg files are supported as coverfile"
-msgstr "Только файлы jpg/jpeg поддерживаются в качестве обложки"
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
@@ -2669,6 +2657,30 @@ msgid "A book must keep at least one format."
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
+"warnings; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Cleanup warning for book {id}: {message}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}: {message}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Failed: {failures}. The failed books remain selected; choose the action "
+"again to retry."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not delete this format."
 msgstr ""
 
@@ -3052,6 +3064,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Set up My Library for all users"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Set up My Library for every non-anonymous account? Each account starts with "
+"every book it can currently see—not only books it has shelved, read, or "
+"downloaded. Users can curate from there by removing books. Accounts already "
+"set up are never reseeded."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4809,10 +4829,13 @@ msgstr "Путь к файлу сертификата"
 msgid "Certificate path"
 msgstr "Путь к сертификату"
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cover_picker.html cps/templates/detail.html
-msgid "Change cover"
-msgstr "Изменить обложку"
+#: cps/spa_strings.py
+msgid "Change library cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Change my cover"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Check again"
@@ -5460,6 +5483,12 @@ msgstr "Предварительный просмотр для eReader"
 #: cps/spa_strings.py
 msgid "E-readers"
 msgstr "Электронные книги"
+
+#: cps/spa_strings.py
+msgid ""
+"Each account starts with every book it can currently see—not only books it "
+"has shelved, read, or downloaded."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
@@ -6847,6 +6876,10 @@ msgid "Restored the previous library mode for {accounts} accounts."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Restoring…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Retry"
 msgstr "Повторить попытку"
 
@@ -7571,6 +7604,14 @@ msgid "Uploading is not available for your account on this server."
 msgstr "Загрузка недоступна для вашего аккаунта на этом сервере."
 
 #: cps/spa_strings.py
+msgid "Use my own cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use the library cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
@@ -7739,6 +7780,23 @@ msgstr "Ваша библиотека"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Ваш браузер не может воспроизвести этот аудиоформат."
+
+#: cps/spa_strings.py
+msgid ""
+"Your cover appears only to you and on books delivered to your e-readers. The "
+"library cover stays unchanged for everyone else, and administrators manage "
+"it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your cover was updated."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your own cover is private to you and your e-reader deliveries. The library "
+"cover stays unchanged for everyone else."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your personal digital library"
@@ -9273,6 +9331,11 @@ msgstr "Удалить"
 #: cps/templates/book_edit.html
 msgid "Add Identifier"
 msgstr "Добавить идентификатор"
+
+#: cps/templates/book_edit.html cps/templates/cover_picker.html
+#: cps/templates/detail.html
+msgid "Change cover"
+msgstr "Изменить обложку"
 
 #: cps/templates/book_edit.html
 msgid ""
@@ -11583,6 +11646,12 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
+"Hardcover auto-fetch is off. Reading-progress and annotation sync are "
+"unaffected."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
 "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
 msgstr ""
 "Синхронизация с Hardcover включена. Расписание ниже управляет автоматическим "
@@ -11590,11 +11659,16 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"Hardcover sync is disabled. Enable it once in Basic Configuration or set "
-"HARDCOVER_SYNC_ENABLED=true."
+"Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync "
+"separately in Basic Configuration when you want reading-progress or "
+"annotation sync."
 msgstr ""
-"Синхронизация с Hardcover отключена. Включите её один раз в основных "
-"настройках или установите HARDCOVER_SYNC_ENABLED=true."
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"Hardcover sync is disabled, so auto-fetch, reading-progress sync, and "
+"annotation sync are off."
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11609,6 +11683,10 @@ msgstr ""
 #: cps/templates/cwa_settings.html
 msgid "Run Schedule:"
 msgstr "Расписание запуска:"
+
+#: cps/templates/cwa_settings.html
+msgid "Never (auto-fetch off)"
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "How often to automatically run the Hardcover ID fetch task"
@@ -14677,6 +14755,23 @@ msgstr "Показывать выбранные полки в OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Показать раздел прочитанного/непрочитанного"
+
+#~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
+#~ msgstr ""
+#~ "Только файлы jpg/jpeg/png/webp/bmp поддерживаются в качестве обложки"
+
+#~ msgid "Invalid cover file content"
+#~ msgstr "Неверное содержимое файла обложки"
+
+#~ msgid "Only jpg/jpeg files are supported as coverfile"
+#~ msgstr "Только файлы jpg/jpeg поддерживаются в качестве обложки"
+
+#~ msgid ""
+#~ "Hardcover sync is disabled. Enable it once in Basic Configuration or set "
+#~ "HARDCOVER_SYNC_ENABLED=true."
+#~ msgstr ""
+#~ "Синхронизация с Hardcover отключена. Включите её один раз в основных "
+#~ "настройках или установите HARDCOVER_SYNC_ENABLED=true."
 
 #~ msgid "Basic configuration"
 #~ msgstr "Основные настройки"

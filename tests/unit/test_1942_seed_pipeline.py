@@ -1694,7 +1694,7 @@ def test_ever_authoritative_lookup_failure_uses_known_local_evidence_for_get_pat
     ]
 
 
-def test_authority_lookup_failed_pre_authority_proxies_get_and_patch_status_quo(
+def test_authority_lookup_failed_refuses_get_but_patch_keeps_status_quo(
     app, session, monkeypatch,
 ):
     _book(monkeypatch)
@@ -1730,9 +1730,9 @@ def test_authority_lookup_failed_pre_authority_proxies_get_and_patch_status_quo(
         g.annotation_origin_device_id = DEVICE_A
         patched = rs.handle_annotations.__wrapped__(OWNED)
 
-    assert fetched.status_code == 200
+    assert fetched.status_code == 503
     assert patched.status_code == 200
-    assert proxy_calls == ["GET", "PATCH"]
+    assert proxy_calls == ["PATCH"]
 
 
 def test_authoritative_patch_growth_over_100_flags_and_serves_complete_single_page(

@@ -99,6 +99,48 @@
 .changeCover:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
 @media (prefers-reduced-motion: reduce) { .changeCover { transition: none; } }
 
+.coverPreferences {
+  margin-top: var(--sp-3);
+  display: grid;
+  gap: var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+
+.coverPreferences p { margin: 0; }
+
+.coverPreferenceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.coverPreferenceActions a,
+.coverPreferenceActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.coverPreferenceActions a:hover,
+.coverPreferenceActions button:hover { border-color: var(--accent); }
+.coverPreferenceActions button:disabled { opacity: .6; cursor: wait; }
+.coverPreferenceActions a:focus-visible,
+.coverPreferenceActions button:focus-visible {
+  outline: 3px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
 /* Coverless detail cover — a themed typographic cover (mirrors BookCover's
    card fallback, larger). Tokens only, so it adapts to every theme; never a
    dark logo on a light theme. */

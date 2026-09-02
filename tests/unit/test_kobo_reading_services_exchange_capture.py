@@ -338,7 +338,7 @@ def test_unauthenticated_patch_401_captures_body_with_explicit_provenance_outsid
 
     assert response.status_code == 401
     [record] = _records(unauthenticated_root)
-    assert record["schema_version"] == 2
+    assert record["schema_version"] == 3
     assert record["exchange"] == "annotations_patch_unauthenticated"
     assert record["request_provenance"] == {
         "authentication": "unauthenticated",
@@ -481,6 +481,7 @@ def test_annotations_get_and_patch_capture_both_proxy_legs_and_device_response(
 
     monkeypatch.setattr(rs, "current_user", SimpleNamespace(id=7, is_authenticated=True))
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: None)
+    monkeypatch.setattr(rs, "_possible_annotation_ownership", lambda _content_id: {})
     monkeypatch.setattr(rs, "log_annotation_data", lambda *_args, **_kwargs: None)
 
     def _proxy(*, data=None, capture_session=None):

@@ -4,8 +4,14 @@
   "created": "2026-08-13",
   "id": "F-8ebeb7",
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-02",
+    "note": "Production stability requires six 0.5-second size samples, exactly 2.5 seconds of unchanged size; live events retain CLOSE_WRITE protection, and the startup regression runs at production timings with a 1.1-second stalled writer.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "wait_for_stable_file can declare a stalled copy settled"
 }

@@ -210,21 +210,27 @@ class TestGetBookChecksumsRealDB:
 
 @pytest.mark.unit
 class TestPutRekeysOrphanToBookId:
-    """kosync Fix C — a PUT that resolves a book_id must converge the found
-    record onto the book_id key so the table self-heals."""
+    """kosync Fix C — a resolved PUT converges onto the canonical book key."""
 
     def test_put_source_rekeys_found_record_to_book_id(self):
-        """Source-pin: the PUT handler assigns the resolved book_id back to
-        the progress record's document so future lookups from any device
-        share it. Guards against reverting to checksum-only keying."""
+        """Source-pin the canonical conditional-upsert self-heal.
+
+        Exact-key uniqueness means a legacy checksum row cannot safely be
+        renamed when the canonical row already exists. The handler now seeds
+        the canonical book key through the shared conditional primitive, which
+        keeps the same convergence contract without a duplicate-key race.
+        """
         src = (REPO_ROOT / "cps" / "progress_syncing" / "protocols"
                / "kosync.py").read_text(encoding="utf-8")
-        # The PUT handler must, when book_id resolves, set the record's
-        # document to the book_id (str). Look for an assignment onto
-        # .document guarded by book_id within the PUT region.
-        assert re.search(r"\.document\s*=\s*str\(book_id\)", src), (
-            "PUT handler must re-key the found record onto str(book_id) when "
-            "the book resolves (#633 self-heal)"
+        assert "canonical_document = str(book_id or document)" in src
+        legacy_guard = "str(progress_record.document) != canonical_document"
+        assert legacy_guard in src
+        guard_at = src.index(legacy_guard)
+        seed_at = src.index("document=canonical_document", guard_at)
+        incoming_at = src.index("proposed_percentage = percentage_float", guard_at)
+        assert guard_at < seed_at < incoming_at, (
+            "the legacy winner must seed the canonical key before the incoming "
+            "PUT is arbitrated (#633 self-heal)"
         )
 
 

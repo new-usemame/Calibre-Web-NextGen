@@ -6,10 +6,13 @@ import {
 } from '@playwright/test';
 import {
   cleanupOwnedUser,
+  createOwnedUser,
   createOwnedUserIdentity,
-  recordCreatedUser,
-  registerOwnedUserIntent,
 } from './user-reaper';
+import {
+  adminCredentialsFromEnvironment,
+  DirectAdminApi,
+} from './direct-admin-api';
 
 export interface SecondaryUserSession {
   id: number;
@@ -23,55 +26,57 @@ type MultiUserFixtures = {
   /**
    * A unique, non-admin viewer in a separate browser context.
    *
-   * Creation and deletion use the primary admin's authenticated API session;
-   * login uses the production auth endpoint in its own browser context. The
-   * fixture is test-scoped, so existing specs pay nothing and parallel workers
-   * never share this account.
+   * Creation and deletion use a page-independent direct admin API session;
+   * user login uses the production auth endpoint in its own browser context.
+   * The fixture is test-scoped, so existing specs pay nothing and parallel
+   * workers never share this account.
    */
   secondaryUser: SecondaryUserSession;
 };
 
-async function csrfToken(page: Page): Promise<string> {
-  const response = await page.request.get('/api/v1/auth/csrf');
-  expect(response.ok(), 'CSRF endpoint must answer while arranging the secondary user').toBeTruthy();
-  return ((await response.json()) as { csrf_token: string }).csrf_token;
-}
-
 export const test = base.extend<MultiUserFixtures>({
-  secondaryUser: [async ({ page: adminPage, request: adminRequest, browser, baseURL }, use, testInfo) => {
+  secondaryUser: [async ({ browser, baseURL }, use, testInfo) => {
     if (!baseURL) throw new Error('secondaryUser requires Playwright use.baseURL');
     const { username, email } = createOwnedUserIdentity(
       testInfo.project.name,
       testInfo.workerIndex,
     );
-    const ownership = await registerOwnedUserIntent(baseURL, { username, email });
     // Keep every policy class deterministic. A UUID slice can (rarely) contain
     // only digits, which made the old generated password probabilistically
     // fail instances requiring a lowercase character.
     const password = `Aa7!zY9@${username.slice(-20)}`;
-    const created = await adminPage.request.post('/api/v1/admin/users', {
-      headers: { 'X-CSRFToken': await csrfToken(adminPage) },
-      data: {
-        name: username,
-        email,
-        password,
-        roles: {
-          admin: false,
-          viewer: true,
-          download: true,
-          upload: false,
-          edit: false,
-          edit_shelfs: false,
-          delete_books: false,
-        },
-      },
-    });
-    expect(created.status(), await created.text()).toBe(201);
-    const { id } = (await created.json()) as { id: number };
-    await recordCreatedUser(ownership, id);
-
+    const configuredRunId = testInfo.config.metadata.cwngE2ERunId;
+    if (typeof configuredRunId !== 'string' || !configuredRunId) {
+      throw new Error('secondaryUser requires Playwright metadata.cwngE2ERunId');
+    }
+    const adminApi = await DirectAdminApi.open(baseURL, adminCredentialsFromEnvironment());
+    let owned: Awaited<ReturnType<typeof createOwnedUser>> | undefined;
     let context: BrowserContext | undefined;
     try {
+      owned = await createOwnedUser(
+        adminApi,
+        baseURL,
+        {
+          name: username,
+          email,
+          password,
+          roles: {
+            admin: false,
+            viewer: true,
+            download: true,
+            upload: false,
+            edit: false,
+            edit_shelfs: false,
+            delete_books: false,
+          },
+        },
+        {
+          runId: configuredRunId,
+          workerId: `${testInfo.project.name}:${testInfo.workerIndex}:${testInfo.parallelIndex}`,
+        },
+      );
+      const { id } = owned.user;
+
       // Project context options include the global admin storage state. This
       // fixture logs in its own unique account, so start with an explicitly
       // empty jar/store: inherited admin localStorage must not be mistaken for
@@ -107,10 +112,13 @@ export const test = base.extend<MultiUserFixtures>({
       await use({ id, username, password, context, page: secondaryPage });
     } finally {
       await context?.close().catch(() => undefined);
-      // The request fixture is independent of the page lifecycle. Cleanup is
-      // bounded and retried; on persistent failure its durable ownership record
-      // remains for global.setup.ts to retry on the next run.
-      await cleanupOwnedUser(adminRequest, ownership, id);
+      // This API session owns a separate cookie jar and survives both browser
+      // page and secondary context closure. Bounded failure is deferred on disk
+      // rather than replacing an assertion thrown by the product flow.
+      if (owned) {
+        await cleanupOwnedUser(adminApi, owned.ownership, owned.user.id);
+      }
+      await adminApi.dispose().catch(() => undefined);
     }
   }, { timeout: 120_000 }],
 });

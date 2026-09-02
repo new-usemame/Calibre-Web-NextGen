@@ -330,6 +330,19 @@ def getFileFromEbooksFolder(path, fileName, nocase=False):
         return None
 
 
+def prepareCoverUpload(path):
+    """Resolve a Drive cover target without changing its remote contents.
+
+    The returned file object, when present, must be retained by the caller so
+    PyDrive2 publishes replacement bytes with ``files.update`` on the same ID.
+    """
+    drive = getDrive(Gdrive.Instance().drive)
+    folder_id = getFolderId(path, drive) if path else getEbooksFolderId(drive)
+    if not folder_id:
+        raise RuntimeError("Google Drive book folder could not be resolved")
+    return drive, folder_id, getFile(folder_id, "cover.jpg", drive, False)
+
+
 def moveGdriveFileRemote(origin_file_id, new_title):
     origin_file_id['title'] = new_title
     origin_file_id.Upload()

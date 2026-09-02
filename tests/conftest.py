@@ -171,7 +171,7 @@ else:
 
 def check_container_available(port=None):
     """
-    Check if a CWA container is available on the specified port.
+    Check if a CWA container is healthy on the specified port.
 
     Args:
         port: Port to check (defaults to CWA_TEST_PORT env var or 8085)
@@ -183,7 +183,7 @@ def check_container_available(port=None):
         port = os.getenv('CWA_TEST_PORT', '8085')
 
     try:
-        response = requests.get(f"http://localhost:{port}", timeout=2)
+        response = requests.get(f"http://localhost:{port}/health", timeout=2)
         return response.status_code == 200
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         return False
@@ -727,7 +727,7 @@ def test_volumes(tmp_path_factory) -> dict:
 @pytest.fixture(scope="session")
 def cwa_container(docker_compose_file: str, test_volumes: dict) -> Generator:
     """
-    Start the CWA Docker container and wait until it's reachable, measuring real startup time.
+    Start the CWA Docker container and wait until it's healthy, measuring real startup time.
     By default, no arbitrary timeout is imposed unless configured via env vars.
 
     Env controls:
@@ -801,37 +801,19 @@ services:
             if max_wait is not None and (time.time() - start_time) >= max_wait:
                 break
 
-            # Try to connect to the web interface (root and login)
+            # Match the image's own HEALTHCHECK contract. Bare / and /login can
+            # respond while the configured database and critical services are
+            # still unavailable, so neither is proof that the app is ready.
             ready = False
-            for path in ("/", "/login"):
-                try:
-                    resp = requests.get(
-                        f"http://localhost:{test_port}{path}", timeout=5, allow_redirects=False
-                    )
-                    if 200 <= resp.status_code < 400:
-                        ready = True
-                        break
-                except requests.exceptions.RequestException:
-                    pass
-
-            # Fallback readiness via logs: consider ready when ingest services are watching
-            if not ready:
-                try:
-                    logs = subprocess.run(
-                        ['docker', 'compose', '-f', str(compose_override), 'logs', '--no-color', '--tail', '200'],
-                        cwd=str(repo_root),
-                        check=False,
-                        capture_output=True,
-                        text=True,
-                    )
-                    log_text = logs.stdout or ""
-                    if (
-                        "Watching folder: /cwa-book-ingest" in log_text
-                        and "metadata-change-detector" in log_text
-                    ) or "Connection to localhost" in log_text:
-                        ready = True
-                except Exception:
-                    pass
+            try:
+                resp = requests.get(
+                    f"http://localhost:{test_port}/health",
+                    timeout=5,
+                    allow_redirects=False,
+                )
+                ready = resp.status_code == 200
+            except requests.exceptions.RequestException:
+                pass
 
             if ready:
                 duration = int(time.time() - start_time)
@@ -1064,12 +1046,115 @@ class CWAApiClient:
         return self.request("DELETE", path, **kwargs)
 
 
+_CSRF_TOKEN_PATTERN = re.compile(
+    r'name="csrf_token"[^>]*value="([^"]+)"',
+)
+
+
+def _wait_for_login_csrf_token(
+    session,
+    base_url,
+    *,
+    wait_seconds,
+    poll_interval=0.5,
+    clock=time.monotonic,
+    sleep=time.sleep,
+):
+    """Wait for the login form required by the integration-test client.
+
+    ``/health`` proves that the configured app and its critical services are
+    up, but the tests need a stronger readiness fact: a form they can use to
+    create an authenticated session. Keep that second gate bounded and report
+    it separately from a credential rejection; posting without a token turns
+    this startup state into a misleading HTTP 400 from the login handler.
+    """
+    started = clock()
+    deadline = started + wait_seconds
+    last_page = ""
+    attempted = False
+
+    while True:
+        remaining = deadline - clock()
+        if attempted and remaining <= 0:
+            pytest.fail(
+                f"no csrf token on /login after {wait_seconds:g} s "
+                f"(page: {last_page[:200]!r})"
+            )
+
+        attempted = True
+        try:
+            form = session.get(
+                f"{base_url}/login",
+                timeout=max(0.001, min(5, remaining)),
+            )
+            last_page = form.text
+            token_match = _CSRF_TOKEN_PATTERN.search(last_page)
+            if form.status_code == 200 and token_match:
+                return token_match.group(1)
+        except requests.exceptions.RequestException:
+            # A listener that is still settling is the same readiness fact as
+            # a token-less page. Preserve the last page for the bounded error.
+            pass
+
+        remaining = deadline - clock()
+        if remaining <= 0:
+            continue
+        sleep(min(poll_interval, remaining))
+
+
+def _authenticate_cwa_session(
+    session,
+    base_url,
+    *,
+    wait_seconds,
+    poll_interval=0.5,
+    clock=time.monotonic,
+    sleep=time.sleep,
+):
+    """Make ``session`` authenticated, posting the credentials exactly once."""
+    csrf_token = _wait_for_login_csrf_token(
+        session,
+        base_url,
+        wait_seconds=wait_seconds,
+        poll_interval=poll_interval,
+        clock=clock,
+        sleep=sleep,
+    )
+    login_response = session.post(
+        f"{base_url}/login",
+        data={
+            "username": "admin",
+            "password": "admin123",
+            "csrf_token": csrf_token,
+        },
+        allow_redirects=False,
+        timeout=10,
+    )
+
+    if login_response.status_code not in (200, 302):
+        pytest.fail(
+            f"CWA container credentials rejected "
+            f"(HTTP {login_response.status_code})"
+        )
+
+    # A failed login can redirect back to /login, so the POST status alone is
+    # not proof that the session is ready for the integration tests.
+    whoami = session.get(f"{base_url}/api/v1/me", timeout=10)
+    if whoami.status_code != 200:
+        pytest.fail(
+            f"CWA container credentials rejected (HTTP {whoami.status_code}); "
+            f"login POST returned HTTP {login_response.status_code} but "
+            "/api/v1/me did not authenticate the session"
+        )
+
+
 @pytest.fixture(scope="function")
 def cwa_api_client(cwa_container) -> "CWAApiClient":
     """
     Provide a configured API client for interacting with CWA container.
 
     Skips the test if no container is available on the configured port.
+    CWA_TEST_LOGIN_TIMEOUT bounds login-form readiness (default: 30 seconds).
 
     Returns a dict with:
     - base_url: The CWA web interface URL
@@ -1090,49 +1175,18 @@ def cwa_api_client(cwa_container) -> "CWAApiClient":
     # Create session with default credentials
     session = requests.Session()
 
-    # Login to CWA (default credentials: admin/admin123).
-    #
-    # The login form is CSRF-protected, so the token has to be read off the
-    # rendered page first. Posting credentials alone returns 400 -- which reads
-    # like a malformed request rather than a missing token, and is why this went
-    # unnoticed: the fixture treated it as "no usable container" and skipped.
+    # Login to CWA (default credentials: admin/admin123). Container health and
+    # an authenticable session are intentionally separate readiness gates: the
+    # former cannot promise that /login has rendered its CSRF-bearing form yet.
     try:
-        form = session.get(f"{base_url}/login", timeout=10)
-        token_match = re.search(
-            r'name="csrf_token"[^>]*value="([^"]+)"', form.text,
+        login_wait_seconds = float(
+            os.getenv("CWA_TEST_LOGIN_TIMEOUT", "30")
         )
-        credentials = {"username": "admin", "password": "admin123"}
-        if token_match:
-            credentials["csrf_token"] = token_match.group(1)
-
-        login_response = session.post(
-            f"{base_url}/login",
-            data=credentials,
-            allow_redirects=False,
-            timeout=10
+        _authenticate_cwa_session(
+            session,
+            base_url,
+            wait_seconds=login_wait_seconds,
         )
-
-        # A reachable container that refuses our credentials is a FAILURE, not a
-        # skip. The two are different facts and only one of them is about the
-        # environment: skipping here turned a login regression into 48 silently
-        # disabled tests while the CI lane still reported success.
-        if login_response.status_code not in (200, 302):
-            pytest.fail(
-                f"CWA container on port {test_port} is reachable but rejected the "
-                f"test credentials (HTTP {login_response.status_code}). This is a "
-                f"regression in the login flow, not a missing test environment."
-            )
-
-        # A 302 alone does not mean success: a failed login also redirects, back
-        # to the login page. Confirm the session is actually authenticated before
-        # handing it to tests that would otherwise all fail in confusing ways.
-        whoami = session.get(f"{base_url}/api/v1/me", timeout=10)
-        if whoami.status_code != 200:
-            pytest.fail(
-                f"login to the CWA container appeared to succeed (HTTP "
-                f"{login_response.status_code}) but the session is not "
-                f"authenticated (/api/v1/me returned {whoami.status_code})."
-            )
     except requests.exceptions.RequestException as e:
         pytest.skip(f"Could not connect to CWA container: {e}")
 
@@ -1209,5 +1263,3 @@ if USE_DOCKER_VOLUMES:
         return library_folder_dind
 
     print("✅ Docker Volume fixtures loaded successfully\n")
-
-

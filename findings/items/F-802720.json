@@ -1,0 +1,19 @@
+{
+  "area": "kobo",
+  "body": "HandleSyncRequest prunes expired pending pages (kobo.py:720-727, PENDING_SYNC_PAGE_TTL=7d in kobo_sync_status.py:18) BEFORE looking up the page the incoming token acknowledges. With a resolved device id, KoboSyncedBooks rows / ledger fingerprints / rehydrate-latch clears / removed-book deletions are written only via _acknowledge_pending_page, which fires on the device's NEXT sync. A Kobo idle >7 days (drawer/holiday device) therefore loses the confirmation of its session's final page every time.\n\nDamage: (a) books on the lost page get no ledger fingerprint -> replay suppression ineligible -> byte-identical re-emission, which the code's own comment (kobo.py:2157-2161) identifies as the proven Nickel de-download trigger #1925 fixed; (b) single-device users can re-enter the KoboSyncedBooks-empty full reset (:782) on return, re-arming every position latch; (c) a stuck rehydrate_needed makes the cover-reset guard (:2615-2632) reject genuine <=1% restarts and push the old position back.\n\nCONFIDENCE: likely. Settle by staging a page, aging created_at 8 days, presenting its outgoing token, observing prune-before-ack and NewEntitlement re-emission. Source: adversarial audit state/kobo-audit-2026-09-01.",
+  "created": "2026-09-01",
+  "id": "F-802720",
+  "refs": [
+    "#1925"
+  ],
+  "resolution": {
+    "commit": "413c4d96f3",
+    "date": "2026-09-01",
+    "note": "Shipped in #2113: exact outgoing-token ack promoted before TTL pruning, staged in the request transaction; orphan pages still expire.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "7-day pending-page TTL prunes the ack before it can be processed; the session's last page becomes replay-suppression-ineligible and re-arms the #1925 de-download hazard"
+}

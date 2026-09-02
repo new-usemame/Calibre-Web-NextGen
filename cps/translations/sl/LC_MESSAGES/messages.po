@@ -1496,6 +1496,12 @@ msgstr ""
 msgid "'%(langname)s' is not a valid language"
 msgstr "'%(langname)s' ni veljaven jezik"
 
+#: cps/editbooks.py cps/helper.py
+msgid "Cover-file is not a valid image file, or could not be stored"
+msgstr ""
+"Datoteka naslovnice ni veljavna slikovna datoteka ali je ni bilo mogoče "
+"shraniti"
+
 #: cps/editbooks.py
 msgid "Metadata successfully updated"
 msgstr "Metapodatki so bili uspešno posodobljeni"
@@ -1788,12 +1794,6 @@ msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr ""
 
 #: cps/helper.py
-msgid "Cover-file is not a valid image file, or could not be stored"
-msgstr ""
-"Datoteka naslovnice ni veljavna slikovna datoteka ali je ni bilo mogoče "
-"shraniti"
-
-#: cps/helper.py
 msgid "Cover Format Error"
 msgstr "Napaka vrste naslovnice"
 
@@ -1808,18 +1808,6 @@ msgstr ""
 #: cps/helper.py
 msgid "Failed to create path for cover"
 msgstr "Nisem uspel ustvariti poti za naslovnice"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
-msgstr "Za datoteke naslovnic so podprte samo datoteke jpg/jpeg/png/webp/bmp"
-
-#: cps/helper.py
-msgid "Invalid cover file content"
-msgstr "Nepravilna vsebina datoteke z naslovnico"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg files are supported as coverfile"
-msgstr "Samo datoteke jpg/jpeg so podprte kot datoteke naslovnic"
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
@@ -2648,6 +2636,30 @@ msgid "A book must keep at least one format."
 msgstr ""
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
+"warnings; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Cleanup warning for book {id}: {message}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}: {message}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Failed: {failures}. The failed books remain selected; choose the action "
+"again to retry."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not delete this format."
 msgstr ""
 
@@ -3031,6 +3043,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Set up My Library for all users"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Set up My Library for every non-anonymous account? Each account starts with "
+"every book it can currently see—not only books it has shelved, read, or "
+"downloaded. Users can curate from there by removing books. Accounts already "
+"set up are never reseeded."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4759,9 +4779,12 @@ msgstr ""
 msgid "Certificate path"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cover_picker.html cps/templates/detail.html
-msgid "Change cover"
+#: cps/spa_strings.py
+msgid "Change library cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Change my cover"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5403,6 +5426,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "E-readers"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Each account starts with every book it can currently see—not only books it "
+"has shelved, read, or downloaded."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6755,6 +6784,10 @@ msgid "Restored the previous library mode for {accounts} accounts."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Restoring…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Retry"
 msgstr ""
 
@@ -7462,6 +7495,14 @@ msgid "Uploading is not available for your account on this server."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Use my own cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use the library cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
@@ -7610,6 +7651,23 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your cover appears only to you and on books delivered to your e-readers. The "
+"library cover stays unchanged for everyone else, and administrators manage "
+"it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your cover was updated."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your own cover is private to you and your e-reader deliveries. The library "
+"cover stays unchanged for everyone else."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9167,6 +9225,11 @@ msgstr "Odstrani"
 #: cps/templates/book_edit.html
 msgid "Add Identifier"
 msgstr "Dodaj identifikator"
+
+#: cps/templates/book_edit.html cps/templates/cover_picker.html
+#: cps/templates/detail.html
+msgid "Change cover"
+msgstr ""
 
 #: cps/templates/book_edit.html
 msgid ""
@@ -11344,13 +11407,26 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
+"Hardcover auto-fetch is off. Reading-progress and annotation sync are "
+"unaffected."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
 "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
 msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"Hardcover sync is disabled. Enable it once in Basic Configuration or set "
-"HARDCOVER_SYNC_ENABLED=true."
+"Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync "
+"separately in Basic Configuration when you want reading-progress or "
+"annotation sync."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"Hardcover sync is disabled, so auto-fetch, reading-progress sync, and "
+"annotation sync are off."
 msgstr ""
 
 #: cps/templates/cwa_settings.html
@@ -11366,6 +11442,10 @@ msgstr ""
 #: cps/templates/cwa_settings.html
 msgid "Run Schedule:"
 msgstr "Urnik zagona:"
+
+#: cps/templates/cwa_settings.html
+msgid "Never (auto-fetch off)"
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "How often to automatically run the Hardcover ID fetch task"
@@ -14395,6 +14475,16 @@ msgstr "Usklajevanje izbrane police s Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Prikaži razdelek Prebrano/neprebrano"
+
+#~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
+#~ msgstr ""
+#~ "Za datoteke naslovnic so podprte samo datoteke jpg/jpeg/png/webp/bmp"
+
+#~ msgid "Invalid cover file content"
+#~ msgstr "Nepravilna vsebina datoteke z naslovnico"
+
+#~ msgid "Only jpg/jpeg files are supported as coverfile"
+#~ msgstr "Samo datoteke jpg/jpeg so podprte kot datoteke naslovnic"
 
 #, python-format
 #~ msgid "%(book_id)s is a invalid Book Id. Could not be added to Shelf"

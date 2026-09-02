@@ -153,6 +153,12 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
     Returns:
         bool: True if metadata was successfully applied
     """
+    cover_stage = None
+    previous_cover_metadata = (
+        getattr(book, 'has_cover', 0),
+        getattr(book, 'last_modified', None),
+    )
+    updated_without_cover = False
     try:
         # Get CWA settings to check smart application preference and field selections
         cwa_db = CWA_DB()
@@ -333,9 +339,12 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         cover_updated = False
         if (cwa_settings.get('auto_metadata_update_cover', True) and
                 not (use_smart_application and getattr(book, 'has_cover', 0))):
-            if _apply_cover_from_metadata(book, metadata):
+            cover_stage = _apply_cover_from_metadata(book, metadata)
+            if cover_stage:
+                updated_without_cover = updated
                 updated = True
                 cover_updated = True
+                book.has_cover = 1
 
         if cover_updated:
             # A replaced cover IS a book change and has to be recorded as one.
@@ -360,6 +369,21 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
             calibre_db_instance.session.commit()
             if cover_updated:
                 from cps import helper
+                published, publish_error = cover_stage.publish()
+                if not published:
+                    cover_stage.discard()
+                    cover_stage = None
+                    book.has_cover, book.last_modified = previous_cover_metadata
+                    try:
+                        calibre_db_instance.session.commit()
+                    except Exception as compensation_error:
+                        log.error(
+                            f"Cover metadata compensation failed for book {book.id} "
+                            f"after publish failure {publish_error}: {compensation_error}"
+                        )
+                        calibre_db_instance.session.rollback()
+                    return updated_without_cover
+                cover_stage = None
                 # #707: the new cover must also be embedded into the book file,
                 # not only written to cover.jpg. Best-effort by design — it
                 # queues an enforcement record, it does not perform the embed.
@@ -383,17 +407,20 @@ def _apply_metadata_to_book(book, metadata, calibre_db_instance) -> bool:
         
     except Exception as e:
         log.error(f"Error applying metadata to book {getattr(book, 'id', 'unknown')}: {e}")
+        if cover_stage is not None:
+            cover_stage.discard()
         calibre_db_instance.session.rollback()
+        book.has_cover, book.last_modified = previous_cover_metadata
         return False
 
 
-def _apply_cover_from_metadata(book, metadata) -> bool:
-    """Download the provider's cover and store it for ``book`` (fork #404).
+def _apply_cover_from_metadata(book, metadata):
+    """Download and validate a staged provider cover for ``book`` (fork #404).
 
     Routed through ``helper.save_cover_from_url`` so the ingest auto-fetch
     gets the exact safeguards of the manual editor: advocate SSRF guard,
-    download size cap, and image-format validation. Returns True only when
-    the cover was actually written (and sets ``book.has_cover``).
+    download size cap, and image-format validation. Returns a staged-cover
+    handle; the caller publishes it only after the metadata commit.
 
     Fully self-contained failure boundary: this runs in the ingest
     processor (no Flask app context, where the error-path ``_()`` calls in
@@ -412,8 +439,7 @@ def _apply_cover_from_metadata(book, metadata) -> bool:
             return False
         result, error = helper.save_cover_from_url(cover_url, book.path)
         if result:
-            book.has_cover = 1
-            return True
+            return result
         log.warning(f"Auto metadata fetch: cover download failed for book {book.id}: {error}")
     except Exception as e:
         log.warning(f"Auto metadata fetch: cover apply failed for book {book.id}: {e}")

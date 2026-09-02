@@ -69,7 +69,11 @@ def protocol(monkeypatch):
     monkeypatch.setattr(module, "ub", MagicMock(session=session))
     monkeypatch.setattr(module, "is_koreader_sync_enabled", lambda: True)
     monkeypatch.setattr(module, "authenticate_user", lambda: SimpleNamespace(id=USER_ID))
-    monkeypatch.setattr(module, "update_book_read_status", lambda *_a: None)
+    monkeypatch.setattr(
+        module,
+        "update_book_read_status",
+        lambda *_a: SimpleNamespace(accepted=True, percentage=45.67),
+    )
     monkeypatch.setattr(module, "push_reading_state_to_hardcover", lambda *_a: None)
     monkeypatch.setattr(module, "get_book_checksums",
                         lambda book_id: ["digest-a"] if book_id else [])
@@ -254,7 +258,11 @@ def test_record_web_reader_progress_writes_the_kosync_row(monkeypatch):
 
     # Both modules resolve the session off the shared ``ub`` module object.
     monkeypatch.setattr(ub, "session", session)
-    monkeypatch.setattr(module, "update_book_read_status", lambda *_a: None)
+    monkeypatch.setattr(
+        module,
+        "update_book_read_status",
+        lambda *_a: SimpleNamespace(accepted=True, percentage=45.67),
+    )
 
     advanced = reading_position.record_web_reader_progress(
         SimpleNamespace(id=USER_ID), BOOK_ID, 45.67)

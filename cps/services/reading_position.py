@@ -132,32 +132,9 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
         except Exception:
             log.warning("Best-effort web-reader device observation failed", exc_info=True)
 
-    # ``ub.session`` is a single long-lived Session shared across requests
-    # (``init_db`` builds it once), so a plain query can answer from the identity
-    # map rather than the row. ``populate_existing`` + ``refresh`` make this read
-    # authoritative *within this transaction* — cheap, and strictly better than
-    # comparing against whatever happens to be in memory.
-    #
-    # ``no_autoflush`` is load-bearing, not tidiness. Should a caller still have
-    # a pending write on this session, a bare query would autoflush it here, so
-    # a failure belonging to that REQUIRED write would surface inside this
-    # best-effort helper and be logged (and swallowed) by the routes as an
-    # optional progress-sharing failure. Reading without flushing keeps a read
-    # from being the thing that trips someone else's write.
-    #
-    # Honest limit: this is not cross-connection atomicity. The read-then-write
-    # below can still interleave with a writer on another connection, because
-    # acceptance is decided in Python rather than by the UPDATE itself. So the
-    # guarantee this gives is "never regresses a position it can observe", NOT
-    # an absolute no-regression guarantee: a device that commits a further
-    # position inside this window can still be rolled back to ours, and it only
-    # recovers if that device pushes again. That is a pre-existing property of
-    # this subsystem, not something introduced here — KOSync's own furthest-wins
-    # check (kosync.py:1106) has exactly the same shape. Closing it means one
-    # shared conditional-UPDATE primitive (accept in the WHERE clause, then
-    # check the affected-row count) used by BOTH writers, so the two cannot
-    # drift; that is tracked separately rather than half-done here.
-    stored = None
+    # Status remains an independent manual-intent guard. Position acceptance is
+    # deliberately absent from this read: the shared primitive decides that in
+    # its UPDATE WHERE clause after the caller's required write is settled.
     already_finished = False
     with ub.session.no_autoflush:
         read_row = (ub.session.query(ub.ReadBook)
@@ -167,15 +144,6 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
                     .first())
         already_finished = (read_row is not None
                             and read_row.read_status == ub.ReadBook.STATUS_FINISHED)
-
-        state = (ub.session.query(ub.KoboReadingState)
-                 .populate_existing()
-                 .filter(ub.KoboReadingState.user_id == user_id,
-                         ub.KoboReadingState.book_id == book_id)
-                 .first())
-        if state is not None and state.current_bookmark is not None:
-            ub.session.refresh(state.current_bookmark)
-            stored = state.current_bookmark.progress_percent
 
     # The device journal records what this browser actually reported even when
     # its percentage loses the resolved furthest-wins comparison below. Its
@@ -237,12 +205,6 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
                   user_id, book_id, percentage)
         return False
 
-    if stored is not None and percentage <= stored:
-        log.debug("Web reader position not advanced for user %s book %s: "
-                  "incoming %.2f%% <= stored %.2f%%",
-                  user_id, book_id, percentage, stored)
-        return False
-
     # Sharing a position must never cost the user their bookmark, so this write
     # goes in a SAVEPOINT: ``update_book_read_status`` creates ReadBook and
     # KoboReadingState rows carrying UNIQUE(user_id, book_id), and a first-ever
@@ -264,10 +226,29 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
     # neither being updated, which is a state the next save corrects.
     try:
         with ub.begin_contained_nested(ub.session):
-            update_book_read_status(user, book_id, percentage)
-            record_percentage_only_progress(
-                user_id, book_id, percentage, device="Web reader",
+            bookmark_outcome = update_book_read_status(
+                user, book_id, percentage,
             )
+            if not bookmark_outcome.accepted:
+                log.debug(
+                    "Web reader position not advanced for user %s book %s: "
+                    "incoming %.2f%% <= accepted %.2f%%",
+                    user_id, book_id, percentage,
+                    bookmark_outcome.percentage,
+                )
+                return False
+            kosync_outcome = record_percentage_only_progress(
+                user_id, book_id, percentage, device="Web reader",
+                _return_outcome=True,
+            )
+            if not kosync_outcome.accepted:
+                # A device may have advanced the KOReader carrier between the
+                # two SQL verdicts. Resolve the derived status/bookmark from
+                # the value that actually survived that second verdict.
+                update_book_read_status(
+                    user, book_id, kosync_outcome.percentage,
+                )
+                return False
     except Exception as e:
         log.warning("Could not share web reader progress for user %s book %s: %s",
                     user_id, book_id, e)

@@ -237,6 +237,14 @@ def create_app():
     from .calibre_init import init_calibre_db_from_config
     init_calibre_db_from_config(config, cli_param.settings_path)
     calibre_db.init_db()
+    # A process can die after staging or after committing cover metadata but
+    # before publication. The stage alone cannot tell us which occurred, so
+    # startup logs and removes it rather than guessing at publication.
+    try:
+        from . import helper
+        helper.scavenge_staged_cover_files()
+    except Exception as ex:
+        log.error("Cover stage startup scavenging failed: %s", ex)
     # The annotation content-id backfill needs both databases: app.db owns the
     # annotation, while metadata.db is authoritative for book UUID. Running it
     # earlier would let a filename choose the book and can cross-link rows.

@@ -34,6 +34,7 @@ Pinned here:
 import inspect
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -208,6 +209,57 @@ def test_completion_marks_the_book_finished(monkeypatch):
     read = (session.query(ub.ReadBook)
             .filter(ub.ReadBook.user_id == 7, ub.ReadBook.book_id == 42).first())
     assert read.read_status == ub.ReadBook.STATUS_FINISHED
+
+
+@pytest.mark.unit
+def test_missing_survivor_does_not_derive_state_from_proposed_value(
+        monkeypatch):
+    """No arbiter row means rejection, never permission to use the proposal."""
+    session = _session()
+    _service(monkeypatch, session)
+    read = _seed_progress(session, user_id=7, book_id=42, percent=40.0)
+    read.read_status = ub.ReadBook.STATUS_IN_PROGRESS
+    read.times_started_reading = 3
+    read.last_time_started_reading = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    read.last_modified = datetime(2026, 1, 3, tzinfo=timezone.utc)
+    session.commit()
+    before = (
+        read.read_status,
+        read.times_started_reading,
+        read.last_time_started_reading,
+        read.last_modified,
+    )
+
+    kosync = sys.modules["cps.progress_syncing.protocols.kosync"]
+    monkeypatch.setattr(
+        kosync.device_positions,
+        "advance_kobo_bookmark",
+        lambda *_args, **_kwargs: kosync.device_positions.PositionWriteOutcome(
+            False, None,
+        ),
+    )
+    custom_column_writes = []
+    monkeypatch.setattr(kosync.config, "config_read_column", 9, raising=False)
+    monkeypatch.setattr(
+        kosync,
+        "_mark_custom_read_column",
+        lambda book_id: custom_column_writes.append(book_id),
+    )
+
+    outcome = kosync.update_book_read_status(
+        SimpleNamespace(id=7), 42, 100.0,
+    )
+    session.flush()
+
+    assert outcome.accepted is False
+    assert outcome.percentage is None
+    assert (
+        read.read_status,
+        read.times_started_reading,
+        read.last_time_started_reading,
+        read.last_modified,
+    ) == before
+    assert custom_column_writes == []
 
 
 @pytest.mark.unit
@@ -511,7 +563,7 @@ def test_spa_reader_is_keyed_by_book_id():
 
 
 @pytest.mark.unit
-def test_progress_lookup_does_not_autoflush_the_callers_bookmark():
+def test_status_lookup_does_not_autoflush_the_callers_bookmark():
     """A bare query here would autoflush whatever the caller still has pending,
     making a failure of the user's REQUIRED write surface inside this
     best-effort helper — where both routes log and swallow it as an optional
@@ -527,12 +579,12 @@ def test_progress_lookup_does_not_autoflush_the_callers_bookmark():
     """
     src = (REPO / "cps/services/reading_position.py").read_text(encoding="utf-8")
     assert "with ub.session.no_autoflush:" in src, \
-        "the KoboReadingState lookup must not autoflush a caller's pending write"
-    lookup = src.index("query(ub.KoboReadingState)")
+        "the ReadBook status lookup must not autoflush a caller's pending write"
+    lookup = src.index("query(ub.ReadBook)")
     guard = src.index("with ub.session.no_autoflush:")
     savepoint = src.index("with ub.begin_contained_nested(ub.session):")
     assert guard < lookup < savepoint, \
-        "the no_autoflush guard must wrap the lookup, which must precede the savepoint"
+        "the no_autoflush guard must wrap the status lookup before the savepoint"
 
 
 # ── a book the user marked Read must stay Read (regression, v4.1.29 gate) ────

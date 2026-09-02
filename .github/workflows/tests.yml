@@ -441,14 +441,15 @@ jobs:
           # tree. The introducing PR has no trusted base implementation, so it
           # fails closed into every expensive gate instead of self-certifying.
           classifier_ref="$BASE_SHA"
-          if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py"; then
-            echo "::warning::Base has no path classifier; enabling every path-derived gate"
+          if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py" \
+            || ! git cat-file -e "$classifier_ref:.dockerignore"; then
+            echo "::warning::Base has no trusted classifier policy; enabling every path-derived gate"
             printf 'frontend=true\nbuild=true\nconcurrency=true\nimage=true\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           classifier_root="$RUNNER_TEMP/base-path-classifier"
           mkdir -p "$classifier_root"
-          git archive "$classifier_ref" cps scripts/ci_path_classification.py \
+          git archive "$classifier_ref" cps .dockerignore scripts/ci_path_classification.py \
             | tar -x -C "$classifier_root"
           printf '%s\n' "$files" \
             | python3 "$classifier_root/scripts/ci_path_classification.py" \
@@ -507,11 +508,11 @@ jobs:
         (needs.changed_paths.outputs.concurrency == 'true' && github.event.pull_request.head.repo.fork != true)
       ))
       )
-    # Awaited builds may consume their full 15m mirror + 60m architecture +
-    # 15m manifest budgets. Main image runs also serialize, so a neutral commit
-    # can wait behind the relevant build whose manifest it will honestly alias.
-    # Leave 60m after the 120m resolver budget for setup and Playwright's two
-    # retries of a roughly 15m suite.
+    # Main/PR dev-image producers may consume their full 5m classify + 15m
+    # mirror + 60m architecture + 15m manifest budgets. Their resolver is
+    # bounded to those 95m and exits as soon as the exact run/job fails. Release
+    # tags retain their independent 120m artifact wait. Leave at least 60m for
+    # setup and Playwright's two retries of a roughly 15m suite.
     #
     # Advisory ONLY for fork PRs now. A fork's runner gets no repo secrets, and
     # the resolve/pull/overlay path above has never been exercised from one —
@@ -524,6 +525,7 @@ jobs:
     continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
     timeout-minutes: 180
     permissions:
+      actions: read    # inspect the exact Build & Push producer before another poll
       contents: read
       packages: read   # pull the private pbs-cache mirror images the Dockerfile COPYs from
     steps:
@@ -586,9 +588,11 @@ jobs:
       - name: Resolve image to test
         id: img
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           image="ghcr.io/new-usemame/calibre-web-nextgen"
+          producer_args=()
           if [[ "${{ github.event_name }}" == "pull_request" \
                   && "${{ needs.changed_paths.outputs.build }}" == "true" \
                   && "${{ needs.changed_paths.outputs.concurrency }}" != "true" ]]; then
@@ -615,12 +619,20 @@ jobs:
             attempts=1
           else
             # Main pushes and concurrency-shaped same-repo PRs are paired with
-            # docker-image-build-dev.yml. Wait for this exact commit tag. No
-            # :dev fallback is allowed: an absent subject cannot earn a verdict.
+            # docker-image-build-dev.yml. Wait only while that exact run is
+            # live, and no longer than its 95-minute job budget. No :dev
+            # fallback is allowed: an absent subject cannot earn a verdict.
             tag="sha-$SUBJECT_SHA"
-            attempts=240
+            attempts=191
+            producer_args=(
+              "${{ github.repository }}"
+              "$SUBJECT_SHA"
+              "${{ github.event_name }}"
+              "${{ github.api_url }}"
+            )
           fi
-          resolved="$(bash scripts/resolve-e2e-image.sh "$image" "$tag" "$attempts" 30)"
+          resolved="$(bash scripts/resolve-e2e-image.sh \
+            "$image" "$tag" "$attempts" 30 "${producer_args[@]}")"
           echo "image=$resolved" >> "$GITHUB_OUTPUT"
 
       - name: Start container (SPA enabled)

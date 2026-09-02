@@ -63,6 +63,35 @@ def _require_edit():
     return None
 
 
+def _require_book_delete():
+    """Mirror Classic's effective destructive-book policy.
+
+    Whole-book controls on the detail page require both roles. Format and bulk
+    deletion live behind Classic's edit-only surfaces and then pass through the
+    delete-role core, so those paths have the same effective conjunction.
+    """
+    if not current_user.is_authenticated or current_user.is_anonymous:
+        return _err("unauthorized", "You must be signed in", 401)
+    if not current_user.role_delete_books() or not current_user.role_edit():
+        return _err("forbidden", "You are not allowed to delete books", 403)
+    return None
+
+
+def _editable_book(book_id):
+    """Resolve an edit target through visibility policy, bypassing membership.
+
+    Metadata is global, so an editor may manage a book reached from Global
+    Library even when it is outside their personal selection. Language, tag,
+    content and other common filters remain enforced by get_filtered_book.
+    """
+    return calibre_db.get_filtered_book(
+        book_id,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=True,
+    )
+
+
 def _parse_edit_result(result):
     """edit_book_param returns a JSON Response, an empty string, or a
     ``(message, status)`` tuple. Normalize to ``(ok: bool, message: str)``."""
@@ -132,11 +161,19 @@ def _delete_api_response(result):
                    if isinstance(item, dict) and item.get("type") == "danger"), None)
     if danger:
         return _err("delete_failed", str(danger.get("message") or "Deleting the book failed"), 500)
+    success = next((item for item in messages
+                   if isinstance(item, dict) and item.get("type") == "success"), None)
+    # Fail closed: render_delete_book_result always emits an explicit success
+    # entry. Empty, truncated, or otherwise unknown legacy output is not proof
+    # that a delete committed and must never become a false 204.
+    if not success:
+        return _err("delete_failed", "Deleting the book failed", 500)
     warning = next((item for item in messages
                     if isinstance(item, dict) and item.get("type") == "warning"), None)
     if warning:
         return jsonify({
             "deleted": True,
+            "status": "warning",
             "warning": {
                 "code": "cleanup_incomplete",
                 "message": str(warning.get("message") or "File cleanup was incomplete"),
@@ -339,7 +376,7 @@ def get_metadata(book_id):
     guard = _require_edit()
     if guard:
         return guard
-    book = calibre_db.get_book(book_id)
+    book = _editable_book(book_id)
     if not book:
         return _err("not_found", "Book not found", 404)
     return jsonify(_editable_metadata(book))
@@ -407,7 +444,7 @@ def update_metadata(book_id):
     guard = _require_edit()
     if guard:
         return guard
-    book = calibre_db.get_book(book_id)
+    book = _editable_book(book_id)
     if not book:
         return _err("not_found", "Book not found", 404)
 
@@ -485,7 +522,7 @@ def update_metadata(book_id):
                 errors["identifiers"] = str(exc)
 
     # Re-fetch so the response reflects the committed state.
-    fresh = calibre_db.get_book(book_id)
+    fresh = _editable_book(book_id)
     body = _editable_metadata(fresh) if fresh else {}
     if errors:
         body["errors"] = errors
@@ -495,16 +532,15 @@ def update_metadata(book_id):
 @api_v1.route("/books/<int:book_id>/delete", methods=["POST"])
 @login_required_if_no_ano
 def delete_book(book_id):
-    if not current_user.is_authenticated or current_user.is_anonymous:
-        return _err("unauthorized", "You must be signed in", 401)
-    if not current_user.role_delete_books() or not current_user.role_edit():
-        return _err("forbidden", "You are not allowed to delete books", 403)
+    guard = _require_book_delete()
+    if guard:
+        return guard
     # Authorize against the caller's VISIBLE library, not the raw table: a user
     # with the (global) delete role but a language/tag/custom-column visibility
     # restriction must not be able to enumerate and delete a book they cannot
     # see. allow_show_archived/hidden keep their OWN archived/hidden books
     # deletable (hidden is a listing exclusion, not an access revocation — #319).
-    if not calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True):
+    if not _editable_book(book_id):
         return _err("not_found", "Book not found", 404)
     # delete_book_from_table re-checks the role and does the data-safe (DB-first,
     # files-last) whole-book delete + shelf cleanup. book_format="" = whole book.
@@ -519,10 +555,9 @@ def delete_format(book_id, fmt):
     The shared core re-checks the role, performs the sole visibility-scoped
     lookup, and stages storage deletion reversibly across the metadata commit.
     """
-    if not current_user.is_authenticated or current_user.is_anonymous:
-        return _err("unauthorized", "You must be signed in", 401)
-    if not current_user.role_delete_books():
-        return _err("forbidden", "You are not allowed to delete books", 403)
+    guard = _require_book_delete()
+    if guard:
+        return guard
     return _delete_api_response(delete_book_from_table(book_id, fmt.upper(), True))
 
 
@@ -533,7 +568,7 @@ def convert_format(book_id):
     guard = _require_edit()
     if guard:
         return guard
-    book = calibre_db.get_book(book_id)
+    book = _editable_book(book_id)
     if not book:
         return _err("not_found", "Book not found", 404)
     data = request.get_json(silent=True) or {}
@@ -569,9 +604,7 @@ def set_cover(book_id):
     # Match the sibling endpoints in this module (and the detail endpoint the
     # edit page is opened from): a user may edit their OWN hidden or archived
     # book, so resolving with strict defaults 404s a page that opened fine.
-    book = calibre_db.get_filtered_book(
-        book_id, allow_show_archived=True, allow_show_hidden=True
-    )
+    book = _editable_book(book_id)
     if not book:
         return _err("not_found", "Book not found", 404)
 
@@ -588,15 +621,15 @@ def set_cover(book_id):
         )
 
     if request.files.get("file"):
-        ok, message = save_cover(request.files["file"], book.path)
+        staged_cover, message = save_cover(request.files["file"], book.path)
     else:
         data = request.get_json(silent=True) or {}
         url = (data.get("url") or "").strip()
         if not url:
             return _err("invalid_request", "Provide an image file or a cover URL", 400)
-        ok, message = save_cover_from_url(url, book.path)
+        staged_cover, message = save_cover_from_url(url, book.path)
 
-    if not ok:
+    if not staged_cover:
         return _err("cover_failed", str(message), 400)
 
     # A new cover IS a book change and has to be recorded as one. Writing
@@ -616,25 +649,42 @@ def set_cover(book_id):
     # raises — and adopting it here would turn a working cover upload into a 500
     # on exactly those installs. Recorded as a finding rather than papered over;
     # the fix belongs in the lock's path resolution, not in this caller.
+    previous_has_cover = book.has_cover
+    previous_last_modified = book.last_modified
     try:
         book.has_cover = 1
         mark_book_modified(book)
         calibre_db.session.commit()
     except Exception as exc:
-        # The bytes are already on disk — save_cover writes the library file
-        # before anything touches the database — so this is a PARTIALLY APPLIED
-        # change: the library file has changed, while has_cover/last_modified/
-        # Kobo state still describe the old cover. Which of the two a client
-        # then sees depends on the book: for a replacement, a fresh fetch gets
-        # the new image under the old version token; for a book that had no
-        # cover, the rolled-back has_cover=0 makes the route answer with the
-        # placeholder even though the file exists. Reporting success would hide
-        # either, so the caller is told the save failed and can retry.
         log.error("set_cover: failed to record cover change for book %s: %s", book_id, exc)
+        staged_cover.discard()
         try:
             calibre_db.session.rollback()
         except Exception:
             pass
+        book.has_cover = previous_has_cover
+        book.last_modified = previous_last_modified
+        return _err("cover_failed", "Cover save failed", 500)
+
+    published, publish_error = staged_cover.publish()
+    if not published:
+        staged_cover.discard()
+        book.has_cover = previous_has_cover
+        book.last_modified = previous_last_modified
+        try:
+            calibre_db.session.commit()
+        except Exception as compensation_exc:
+            log.error(
+                "set_cover: metadata compensation failed for book %s after "
+                "publish failure %s: %s",
+                book_id,
+                publish_error,
+                compensation_exc,
+            )
+            try:
+                calibre_db.session.rollback()
+            except Exception:
+                pass
         return _err("cover_failed", "Cover save failed", 500)
 
     # Post-commit housekeeping, mirroring cover_picker's apply path. Runs AFTER

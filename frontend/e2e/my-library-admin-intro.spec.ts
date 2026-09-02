@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 
 /*
  * The server-wide "Try My Library" intro card on /app/admin.
@@ -39,6 +39,14 @@ async function undoIfEnabled(page: import('@playwright/test').Page) {
   expect(res.ok()).toBeTruthy();
 }
 
+async function tryMyLibrary(page: Page, card: Locator) {
+  const confirmed = page.waitForEvent('dialog').then(async (dialog) => {
+    expect(dialog.message()).toContain('Each account starts with every book it can currently see');
+    await dialog.accept();
+  });
+  await Promise.all([confirmed, card.getByRole('button', { name: 'Try My Library' }).click()]);
+}
+
 test.describe('My Library admin intro card', () => {
   test('try → enabled with undo, undo restores, close dismisses permanently', async ({ page }) => {
     await undoIfEnabled(page);
@@ -56,7 +64,9 @@ test.describe('My Library admin intro card', () => {
 
       // Try → ENABLED: copy swaps, Undo activates, x-mark appears, and the
       // server reports a snapshot covering every non-guest account.
-      await card.getByRole('button', { name: 'Try My Library' }).click();
+      // Try is guarded by a native confirm naming the seed rule; Playwright
+      // dismisses dialogs by default, which would silently skip the enable.
+      await tryMyLibrary(page, card);
       await expect(card).toContainText('Explore the changes, you can always undo later.');
       await expect(card.getByRole('button', { name: 'Undo' })).toBeEnabled();
       await expect(card.getByRole('button', { name: 'Close' })).toBeVisible();
@@ -73,7 +83,9 @@ test.describe('My Library admin intro card', () => {
       expect(undone).toMatchObject({ status: 'not_enabled', dismissed: false, snapshot_accounts: 0 });
 
       // Enable once more, then Close dismisses permanently (survives reload).
-      await card.getByRole('button', { name: 'Try My Library' }).click();
+      // Try is guarded by a native confirm naming the seed rule; Playwright
+      // dismisses dialogs by default, which would silently skip the enable.
+      await tryMyLibrary(page, card);
       await expect(card).toContainText('Explore the changes, you can always undo later.');
       await card.getByRole('button', { name: 'Close' }).click();
       await expect(page.getByRole('region', { name: 'New Feature!' })).toHaveCount(0);

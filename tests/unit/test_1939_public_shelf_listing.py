@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import flask
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -43,13 +44,13 @@ def _seed_library(app_session, metadata_session):
         has_own_library=True,
         user_library_seeded=True,
         default_language="all",
+        sidebar_view=0,
     )
     public_shelf = ub.Shelf(name="Shared", user_id=99, is_public=1)
-    private_shelf = ub.Shelf(name="Private", user_id=1, is_public=0)
+    private_shelf = ub.Shelf(name="Private", user_id=99, is_public=0)
     app_session.add_all([user, public_shelf, private_shelf])
     app_session.flush()
     public_shelf.books.append(ub.BookShelf(book_id=2, order=1))
-    private_shelf.user_id = user.id
     private_shelf.books.append(ub.BookShelf(book_id=3, order=1))
     app_session.add(ub.UserLibraryBook(user_id=user.id, book_id=1))
     app_session.commit()
@@ -97,7 +98,7 @@ def opds_library(monkeypatch):
     db.Base.metadata.create_all(engine)
     app_session = sessionmaker(bind=engine)()
     metadata_session = sessionmaker(bind=engine)()
-    user, public_shelf, _private_shelf = _seed_library(app_session, metadata_session)
+    user, public_shelf, private_shelf = _seed_library(app_session, metadata_session)
 
     cdb = object.__new__(db.CalibreDB)
     cdb.session = metadata_session
@@ -107,13 +108,82 @@ def opds_library(monkeypatch):
         config_random_books=0,
     )
     monkeypatch.setattr(db.ub, "session", app_session)
-    monkeypatch.setattr(db, "current_user", user)
+    # Route tests let db.current_user resolve through the real LoginManager.
 
-    yield app_session, cdb, user, public_shelf
+    yield app_session, cdb, user, public_shelf, private_shelf
 
     metadata_session.close()
     app_session.close()
     engine.dispose()
+
+
+@pytest.fixture
+def shelf_route_client(opds_library, monkeypatch):
+    """Real shelf routes, login state, authorization, and database filters."""
+    from cps import config
+    from cps import shelf as shelf_module
+    from cps.api import api_v1
+    from cps.api import books as books_api
+    from cps.api import shelves as shelves_api
+    from cps.cw_login import LoginManager
+
+    app_session, cdb, user, public_shelf, private_shelf = opds_library
+
+    app = flask.Flask(__name__)
+    app.config.update(SECRET_KEY="test", SESSION_PROTECTION=None)
+    login_manager = LoginManager(app)
+
+    @login_manager.user_loader
+    def _load_user(user_id, _random, _session_key):
+        return app_session.get(ub.User, int(user_id))
+
+    app.register_blueprint(api_v1)
+    app.register_blueprint(shelf_module.shelf)
+
+    monkeypatch.setattr(shelves_api, "calibre_db", cdb)
+    monkeypatch.setattr(books_api, "calibre_db", cdb)
+    monkeypatch.setattr(shelf_module, "calibre_db", cdb)
+    monkeypatch.setattr(config, "config_anonbrowse", 0, raising=False)
+    monkeypatch.setattr(
+        config, "config_allow_reverse_proxy_header_login", False, raising=False
+    )
+    monkeypatch.setattr(config, "config_books_per_page", 20, raising=False)
+    monkeypatch.setattr(config, "config_random_books", 0, raising=False)
+    monkeypatch.setattr(config, "config_read_column", 0, raising=False)
+
+    def _id_items(entries, *_args, **_kwargs):
+        # The list-item serializer fans out into covers and reading-progress
+        # services that are unrelated to shelf visibility.  Keep the real
+        # route/query result and reduce only that rendering boundary to IDs.
+        return [
+            {"id": getattr(entry, "Books", entry).id}
+            for entry in entries
+        ]
+
+    monkeypatch.setattr(shelves_api, "_rows_to_items", _id_items)
+    monkeypatch.setattr(books_api, "_rows_to_items", _id_items)
+
+    def _render_shelf(_template, **kwargs):
+        # Jinja/Babel need the production localization/theme stack, which this
+        # in-process route harness deliberately does not boot.  Only rendering
+        # is stubbed; authorization and fill_indexpage's entries stay real.
+        return flask.jsonify({"items": _id_items(kwargs["entries"])})
+
+    monkeypatch.setattr(shelf_module, "render_title_template", _render_shelf)
+    monkeypatch.setattr(
+        shelf_module, "_", lambda message, **values: message % values
+    )
+
+    client = app.test_client()
+    with client.session_transaction() as session:
+        # Exercise the real LoginManager loader and both route decorators on
+        # every request, using the persisted non-owner user seeded above.
+        session["_user_id"] = str(user.id)
+        session["_random"] = "route-test-random"
+        session["_id"] = "route-test-session"
+        session["_fresh"] = True
+
+    return client, user, public_shelf, private_shelf
 
 
 def _visible_ids(metadata_session, cdb, **filter_options):
@@ -160,6 +230,43 @@ def test_ordinary_browse_stays_membership_scoped(library):
     assert _visible_ids(metadata_session, cdb) == [1]
 
 
+def test_spa_public_shelf_detail_lists_out_of_membership_book(
+    shelf_route_client,
+):
+    client, user, public_shelf, _private_shelf = shelf_route_client
+    assert public_shelf.user_id != user.id
+
+    ordinary = client.get("/api/v1/books")
+    assert ordinary.status_code == 200
+    assert [item["id"] for item in ordinary.get_json()["items"]] == [1]
+
+    response = client.get(f"/api/v1/shelves/{public_shelf.id}")
+    assert response.status_code == 200
+    assert [item["id"] for item in response.get_json()["items"]] == [2]
+
+
+def test_spa_foreign_private_shelf_detail_is_forbidden(shelf_route_client):
+    client, user, _public_shelf, private_shelf = shelf_route_client
+    assert private_shelf.user_id != user.id
+
+    response = client.get(f"/api/v1/shelves/{private_shelf.id}")
+
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == "forbidden"
+
+
+def test_classic_public_shelf_render_lists_out_of_membership_book(
+    shelf_route_client,
+):
+    client, user, public_shelf, _private_shelf = shelf_route_client
+    assert public_shelf.user_id != user.id
+
+    response = client.get(f"/shelf/{public_shelf.id}")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.get_json()["items"]] == [2]
+
+
 def test_viewing_public_shelf_does_not_create_membership(library):
     app_session, metadata_session, cdb, user, _public, _private = library
     before = app_session.query(ub.UserLibraryBook).filter_by(user_id=user.id).count()
@@ -175,12 +282,12 @@ def test_opds_public_shelf_feed_lists_out_of_membership_book(
 ):
     from cps import app, opds
 
-    app_session, cdb, user, public_shelf = opds_library
+    app_session, cdb, user, public_shelf, _private_shelf = opds_library
     assert public_shelf.user_id != user.id
     assert app_session.query(ub.UserLibraryBook).filter_by(
         user_id=user.id, book_id=2,
     ).count() == 0
-
+    monkeypatch.setattr(db, "current_user", user)
     monkeypatch.setattr(opds, "calibre_db", cdb)
     monkeypatch.setattr(opds.auth, "current_user", lambda: user)
     monkeypatch.setattr(

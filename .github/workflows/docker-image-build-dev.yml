@@ -17,7 +17,11 @@ on:
     branches: [main]
   # A cheap classifier runs on every PR, but only same-repository PRs whose
   # architectural concurrency closure changed build. Forks never receive a
-  # package-write job, and ordinary PRs pay only for checkout + classification.
+  # package-write job. An ordinary PR pays for checkout + classification plus
+  # one short routing job: the build gate below reads a single build_required
+  # decision, so that job has to reach a verdict on every event rather than
+  # being skipped. Its checkout, GHCR login and publish steps stay individually
+  # gated on alias_image, which no pull_request event can set.
   pull_request:
     branches: [main, dev]
   workflow_dispatch:

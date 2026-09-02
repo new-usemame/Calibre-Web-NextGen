@@ -42,6 +42,18 @@ def _changed_reading_states(response):
     ]
 
 
+def _response_wire(response):
+    """The review contract is status plus exact response bytes."""
+    return response.status_code, response.get_data()
+
+
+def _discard_pending_page(sync_harness):
+    from cps import kobo_sync_status
+
+    kobo_sync_status.delete_pending_sync_page(sync_harness.device.id)
+    sync_harness.session.commit()
+
+
 def _private_capture_records(root):
     return [
         json.loads(gzip.decompress(path.read_bytes()))
@@ -387,6 +399,12 @@ def test_library_sync_private_capture_records_exact_response_and_summary_link(
     assert record["upstream_request"] is None
     assert record["upstream_response"] is None
     assert raw_device_id not in json.dumps(record)
+    raw_capture = json.dumps(record)
+    assert sync_harness.book.title in raw_capture
+    assert "/v1/library/sync" in raw_capture
+    assert "/download/" in raw_capture
+    assert incoming_token in raw_capture
+    assert response.headers[sync_harness.token_header] in raw_capture
     info_summary = sync_exchange["info_summary"]
     assert info_summary["log_event"] == "Kobo Sync summary"
     assert info_summary["capture_id"] == record["capture_id"]
@@ -401,6 +419,16 @@ def test_library_sync_private_capture_records_exact_response_and_summary_link(
     assert "capture_id={}".format(record["capture_id"]) in summaries[-1]
     assert "device={}".format(expected_device_hash) in summaries[-1]
     assert "entitlements new=1 changed=0 removed=0" in summaries[-1]
+    for raw_value in (
+        raw_device_id,
+        sync_harness.user.name,
+        sync_harness.book.title,
+        "/v1/library/sync",
+        "/download/",
+        incoming_token,
+        response.headers[sync_harness.token_header],
+    ):
+        assert raw_value not in summaries[-1]
 
 
 def test_library_sync_private_capture_reuses_authenticated_retention(
@@ -473,6 +501,205 @@ def test_library_sync_capture_persistence_failure_never_changes_response(
         observed.headers.get("x-kobo-sync"),
     ) == baseline_wire
     assert not list(root.glob("exchange-*.json.gz")) if root.exists() else True
+
+
+def test_sync_summary_emission_failure_preserves_pending_replay_bytes(
+    sync_harness, monkeypatch, caplog,
+):
+    from cps import kobo
+
+    caplog.set_level(logging.WARNING, logger="cps.kobo")
+    sync_harness.sync(acknowledge=False)
+    baseline = sync_harness.sync(acknowledge=False)
+
+    def fail_cursor_format(_cursor):
+        raise RuntimeError("injected summary formatter failure")
+
+    monkeypatch.setattr(kobo, "_sync_cursor_log_value", fail_cursor_format)
+    observed = sync_harness.sync(acknowledge=False)
+
+    assert _response_wire(observed) == _response_wire(baseline)
+    assert any(
+        "reason=summary_emission_failed" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_sync_capture_summary_failure_preserves_pending_replay_bytes(
+    sync_harness, monkeypatch, caplog,
+):
+    from cps.services import kobo_exchange_capture as capture
+
+    class CaptureProbe:
+        capture_id = "capture-probe"
+
+        def __init__(self, fail):
+            self.fail = fail
+
+        def record_sync_request(self, **_kwargs):
+            return None
+
+        def record_sync_info_summary(self, **_kwargs):
+            if self.fail:
+                raise RuntimeError("injected capture summary failure")
+
+        def record_sync_response(self, **_kwargs):
+            return None
+
+        def finish(self, **_kwargs):
+            return True
+
+    caplog.set_level(logging.WARNING, logger="cps.kobo")
+    sync_harness.sync(acknowledge=False)
+    should_fail = {"value": False}
+    monkeypatch.setattr(
+        capture,
+        "begin_capture",
+        lambda **_kwargs: CaptureProbe(should_fail["value"]),
+    )
+    baseline = sync_harness.sync(acknowledge=False)
+    should_fail["value"] = True
+    observed = sync_harness.sync(acknowledge=False)
+
+    assert _response_wire(observed) == _response_wire(baseline)
+    assert any(
+        "reason=capture_summary_record_failed" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_reemit_reason_failure_preserves_non_cwng_reset_bytes(
+    sync_harness, monkeypatch, caplog,
+):
+    from cps import kobo
+
+    caplog.set_level(logging.WARNING, logger="cps.kobo")
+    sync_harness.sync()
+    monkeypatch.setattr(kobo.secrets, "token_hex", lambda _size: "a" * 32)
+    baseline = sync_harness.sync("official.store-token", acknowledge=False)
+    _discard_pending_page(sync_harness)
+
+    def fail_reason(*_args, **_kwargs):
+        raise RuntimeError("injected reason classification failure")
+
+    monkeypatch.setattr(kobo, "_entitlement_reemit_reason", fail_reason)
+    observed = sync_harness.sync("official.store-token", acknowledge=False)
+
+    assert _response_wire(observed) == _response_wire(baseline)
+    assert any(
+        "reason=reason_classification_failed" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_pending_observability_serialization_failure_preserves_response_bytes(
+    sync_harness, monkeypatch, caplog,
+):
+    from cps import kobo
+
+    caplog.set_level(logging.WARNING, logger="cps.kobo")
+    sync_harness.sync()
+    monkeypatch.setattr(kobo.secrets, "token_hex", lambda _size: "b" * 32)
+    baseline = sync_harness.sync("official.store-token", acknowledge=False)
+    _discard_pending_page(sync_harness)
+    real_observability = kobo._sync_observability
+
+    def unserializable_observability(*args, **kwargs):
+        counters = real_observability(*args, **kwargs)
+        counters["injected_unserializable"] = {"not-json"}
+        return counters
+
+    monkeypatch.setattr(
+        kobo, "_sync_observability", unserializable_observability,
+    )
+    observed = sync_harness.sync("official.store-token", acknowledge=False)
+
+    assert _response_wire(observed) == _response_wire(baseline)
+    assert any(
+        "reason=pending_observability_serialization_failed"
+        in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_diagnostic_reset_ledger_failure_preserves_response_bytes(
+    sync_harness, monkeypatch, caplog,
+):
+    from cps import kobo, kobo_sync_status
+
+    caplog.set_level(logging.WARNING, logger="cps.kobo")
+    sync_harness.sync()
+    monkeypatch.setattr(kobo.secrets, "token_hex", lambda _size: "c" * 32)
+    baseline = sync_harness.sync("official.store-token", acknowledge=False)
+    _discard_pending_page(sync_harness)
+
+    def fail_diagnostic_read(_device_id, _book_ids, *, _session=None):
+        assert _session is not None
+        raise RuntimeError("injected diagnostic ledger failure")
+
+    monkeypatch.setattr(
+        kobo_sync_status,
+        "get_device_entitlement_fingerprints",
+        fail_diagnostic_read,
+    )
+    observed = sync_harness.sync("official.store-token", acknowledge=False)
+
+    assert _response_wire(observed) == _response_wire(baseline)
+    assert any(
+        "reason=diagnostic_ledger_read_failed "
+        "scope=live_non_cwng_reset" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_live_removal_diagnostic_failure_preserves_staged_acknowledgement(
+    sync_harness, monkeypatch, caplog,
+):
+    from cps import kobo_sync_status, ub
+
+    caplog.set_level(logging.WARNING, logger="cps.kobo")
+    sync_harness.user.kobo_only_shelves_sync = True
+    _shelf, link = _add_kobo_shelf(sync_harness)
+    offered = sync_harness.sync(acknowledge=False)
+    offered_token = offered.headers[sync_harness.token_header]
+    sync_harness.session.delete(link)
+    sync_harness.session.commit()
+
+    real_lookup = kobo_sync_status.get_device_entitlement_fingerprints
+
+    def fail_diagnostic_read(device_id, book_ids, *, _session=None):
+        if _session is not None:
+            raise RuntimeError("injected live-removal ledger failure")
+        return real_lookup(device_id, book_ids)
+
+    monkeypatch.setattr(
+        kobo_sync_status,
+        "get_device_entitlement_fingerprints",
+        fail_diagnostic_read,
+    )
+    observed = sync_harness.sync(offered_token, acknowledge=False)
+
+    assert observed.status_code == 200
+    assert sync_harness.session.query(ub.KoboSyncedBooks).count() == 1
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 1
+    pending = kobo_sync_status.get_pending_sync_page(sync_harness.device.id)
+    assert pending is not None
+    assert pending.response_body.encode() == observed.get_data()
+    assert any(
+        "reason=diagnostic_ledger_read_failed "
+        "scope=live_scope_removal" in record.getMessage()
+        for record in caplog.records
+    )
+
+    monkeypatch.setattr(
+        kobo_sync_status,
+        "get_device_entitlement_fingerprints",
+        real_lookup,
+    )
+    no_fault_replay = sync_harness.sync(offered_token, acknowledge=False)
+    assert _response_wire(observed) == _response_wire(no_fault_replay)
 
 
 def test_sync_refresh_preserves_a_concurrent_library_session(

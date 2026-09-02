@@ -13,6 +13,15 @@ Unset the variable and restart immediately after the experiment. Values such as
 `1`, `true`, different case, or values with surrounding whitespace do not
 enable capture.
 
+**Captured request and response bodies are raw, not hashed or redacted.** They
+can contain book titles, reading data, endpoint and download paths, and other
+library metadata. Library-sync capture also deliberately stores the exact raw
+incoming and outgoing opaque sync tokens. This is why the gate names private
+reading data and why these records must remain local and short-lived. The
+ordinary `Kobo Sync summary` INFO line is separate: it contains only structural
+counters, cursor values, a capture ID, and a short hash of the device ID; it
+does not log raw titles, paths, user/device identifiers, or opaque sync tokens.
+
 Records are written to:
 
 ```text

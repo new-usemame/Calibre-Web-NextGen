@@ -23,6 +23,7 @@ TESTS_WORKFLOW = REPO / ".github" / "workflows" / "tests.yml"
 DEV_WORKFLOW = REPO / ".github" / "workflows" / "docker-image-build-dev.yml"
 RESOLVER = REPO / "scripts" / "resolve-e2e-image.sh"
 ALIASER = REPO / "scripts" / "alias-e2e-image.sh"
+PRODUCER_CHECKER = REPO / "scripts" / "check-e2e-image-producer.py"
 
 
 @pytest.mark.parametrize(
@@ -246,6 +247,9 @@ class _ActionsApi:
                     index = min(api.run_requests, len(api.responses) - 1)
                     response = dict(api.responses[index])
                     api.run_requests += 1
+                    if response.pop("malformed", False):
+                        self._send_body(b'{"workflow_runs":')
+                        return
                     if response.pop("absent", False):
                         payload = {"workflow_runs": []}
                         self._send_json(payload)
@@ -264,7 +268,9 @@ class _ActionsApi:
                 self._send_json(payload)
 
             def _send_json(self, payload):
-                body = json.dumps(payload).encode()
+                self._send_body(json.dumps(payload).encode())
+
+            def _send_body(self, body):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
@@ -371,11 +377,23 @@ def test_neutral_alias_rejects_an_intervening_image_relevant_commit(tmp_path):
     _commit(tmp_path, "middle docs", "docs/one.md", "one\n")
     new_source = _commit(tmp_path, "new backend", "cps/kobo.py", "WRITE = 2\n")
     subject = _commit(tmp_path, "new docs", "docs/two.md", "two\n")
+    recovery_output = tmp_path / "github-output"
+    recovery_output.write_text("sentinel=preserved\n", encoding="utf-8")
 
-    proc, log = _run_alias(tmp_path, old_source, subject)
+    with _ActionsApi([{"status": "completed", "conclusion": "failure"}]) as api:
+        proc, log = _run_alias(
+            tmp_path,
+            old_source,
+            subject,
+            api_url=api.url,
+            recovery_output=recovery_output,
+        )
+
     assert proc.returncode == 1
     assert "is not the newest image-relevant ancestor" in proc.stderr
     assert f"Expected source: {new_source}" in proc.stderr
+    assert api.run_requests == 0
+    assert recovery_output.read_text(encoding="utf-8") == "sentinel=preserved\n"
     assert log == ""
 
 
@@ -541,6 +559,99 @@ def test_alias_routes_terminal_source_producer_to_subject_rebuild(tmp_path, conc
     assert f"concluded {conclusion}" in proc.stderr
     assert recovery_output.read_text(encoding="utf-8") == "recovery_build=true\n"
     assert log == ""
+
+
+@pytest.mark.parametrize(
+    ("response", "error_fragment"),
+    [
+        ({"absent": True}, "no Build & Push producer run exists"),
+        ({"malformed": True}, "GitHub Actions API request failed"),
+    ],
+    ids=("absent-run", "malformed-api-response"),
+)
+def test_alias_recovery_refuses_unknown_producer_state(
+    tmp_path, response, error_fragment
+):
+    """Unknown producer state cannot authorize an exact-subject recovery build."""
+    _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
+    source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
+    subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
+    recovery_output = tmp_path / "github-output"
+    recovery_output.write_text("sentinel=preserved\n", encoding="utf-8")
+
+    with _ActionsApi([response]) as api:
+        proc, log = _run_alias(
+            tmp_path,
+            source,
+            subject,
+            source_succeeds_on=99,
+            api_url=api.url,
+            recovery_output=recovery_output,
+        )
+
+    output = recovery_output.read_text(encoding="utf-8")
+    assert proc.returncode == 1
+    assert api.run_requests == 1
+    assert error_fragment in proc.stderr
+    assert "recovery_build=" not in output
+    assert output == "sentinel=preserved\n"
+    assert log == ""
+
+
+@pytest.mark.parametrize(
+    ("response", "expected_exit", "error_fragment"),
+    [
+        (
+            {"status": "completed", "conclusion": "cancelled"},
+            75,
+            "concluded cancelled",
+        ),
+        (
+            {
+                "status": "in_progress",
+                "conclusion": None,
+                "jobs": [
+                    {
+                        "name": "Build and push",
+                        "status": "completed",
+                        "conclusion": "failure",
+                    }
+                ],
+            },
+            75,
+            "job 'Build and push' concluded failure",
+        ),
+        ({"absent": True}, 1, "no Build & Push producer run exists"),
+        ({"malformed": True}, 1, "GitHub Actions API request failed"),
+    ],
+    ids=("terminal-run", "terminal-job", "absent-run", "malformed-api-response"),
+)
+def test_producer_checker_reserves_terminal_exit_code_for_known_terminal_state(
+    response, expected_exit, error_fragment
+):
+    """The recovery-specific code distinguishes terminal facts from API unknowns."""
+    with _ActionsApi([response]) as api:
+        proc = subprocess.run(
+            [
+                "python3",
+                str(PRODUCER_CHECKER),
+                "--terminal-exit-code",
+                "75",
+                "example/project",
+                "a" * 40,
+                "push",
+                api.url,
+            ],
+            cwd=REPO,
+            env={**os.environ, "GITHUB_TOKEN": "test-token"},
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    assert proc.returncode == expected_exit
+    assert error_fragment in proc.stderr
 
 
 def test_resolver_stops_on_failed_job_before_live_run_concludes(tmp_path):

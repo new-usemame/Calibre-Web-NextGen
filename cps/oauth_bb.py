@@ -41,7 +41,7 @@ from urllib.parse import urlsplit
 # This fixes Issue #715 where missing 'groups' scope causes 500 Internal Server Error
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
-from flask import session, request, make_response, abort
+from flask import current_app, has_app_context, session, request, make_response, abort
 from flask import Blueprint, flash, redirect, url_for
 from flask_babel import gettext as _
 from flask_dance.consumer import (
@@ -200,6 +200,14 @@ oauth_check = {}
 oauthblueprints = []
 oauth = Blueprint('oauth', __name__)
 log = logger.create()
+_APP_OAUTH_BLUEPRINTS = "cps_oauth_blueprints"
+
+
+def get_oauth_blueprints():
+    """Return providers for the active app, with the legacy global as fallback."""
+    if has_app_context():
+        return current_app.extensions.get(_APP_OAUTH_BLUEPRINTS, oauthblueprints)
+    return oauthblueprints
 
 
 def _normalize_oauth_claim_values(value):
@@ -275,7 +283,7 @@ def generic_oauth_login_button():
     provider is present, so callers never need their own fallback string.
     """
     try:
-        for bp in oauthblueprints:
+        for bp in get_oauth_blueprints():
             if bp.get('provider_name') == 'generic':
                 return bp.get('login_button') or GENERIC_OAUTH_FALLBACK_LABEL
     except Exception:
@@ -326,7 +334,7 @@ def fetch_metadata_from_url(metadata_url):
 
 
 def register_user_from_generic_oauth(token=None):
-    generic = oauthblueprints[2]
+    generic = get_oauth_blueprints()[2]
     blueprint = generic['blueprint']
 
     try:
@@ -728,7 +736,8 @@ def unlink_oauth(provider):
     return redirect(url_for('web.profile'))
 
 
-def generate_oauth_blueprints():
+def generate_oauth_blueprints(application):
+    generated = []
     if not ub.session.query(ub.OAuthProvider).count():
         for provider in ("github", "google"):
             oauthProvider = ub.OAuthProvider()
@@ -762,8 +771,8 @@ def generate_oauth_blueprints():
                 oauth_client_id=google_provider.oauth_client_id,
                 oauth_client_secret=google_provider.oauth_client_secret,
                 obtain_link='https://console.developers.google.com/apis/credentials')
-    oauthblueprints.append(ele1)
-    oauthblueprints.append(ele2)
+    generated.append(ele1)
+    generated.append(ele2)
 
     generic = ub.session.query(ub.OAuthProvider).filter_by(provider_name='generic').first()
     # Create generic provider if missing
@@ -839,9 +848,9 @@ def generate_oauth_blueprints():
                 oauth_default_role_delete=_oauth_role_enabled(effective_default_role, constants.ROLE_DELETE_BOOKS),
                 oauth_default_role_passwd=_oauth_role_enabled(effective_default_role, constants.ROLE_PASSWD),
                 oauth_default_role_edit_shelf=_oauth_role_enabled(effective_default_role, constants.ROLE_EDIT_SHELFS))
-    oauthblueprints.append(ele3)
+    generated.append(ele3)
 
-    for element in oauthblueprints:
+    for element in generated:
         redirect_uri = None
         if hasattr(config, 'config_oauth_redirect_host') and config.config_oauth_redirect_host and config.config_oauth_redirect_host.strip():
             # Build absolute redirect URI for consistent OAuth flows
@@ -919,10 +928,10 @@ def generate_oauth_blueprints():
         element['blueprint'] = blueprint
         element['blueprint'].backend = OAuthBackend(ub.OAuth, ub.session, str(element['id']),
                                                     user=current_user, user_required=True)
-        app.register_blueprint(blueprint, url_prefix="/login")
+        application.register_blueprint(blueprint, url_prefix="/login")
         if element['active']:
             register_oauth_blueprint(element['id'], element['provider_name'])
-    return oauthblueprints
+    return generated
 
 
 _AUTHORIZED_ENDPOINT_PROVIDERS = {
@@ -1009,20 +1018,21 @@ def _oauth_success_redirect(provider_name):
     return next_url
 
 
-def _register_auto_redirect_hooks(blueprints):
+def _register_auto_redirect_hooks(blueprints, application=None):
     """Attach state tracking and callback recovery to OAuth blueprints."""
+    application = application or app
     for element in blueprints:
         oauth_before_login.connect_via(element['blueprint'])(
             _remember_auto_redirect_state
         )
 
     guard_key = "cwa_oauth_auto_redirect_callback_guard"
-    if not app.extensions.get(guard_key):
-        app.before_request(_prepare_oauth_callback)
-        app.extensions[guard_key] = True
+    if not application.extensions.get(guard_key):
+        application.before_request(_prepare_oauth_callback)
+        application.extensions[guard_key] = True
 
 
-def init_oauth_blueprints():
+def init_oauth_blueprints(application=None):
     """
     Initialize OAuth blueprints and register signal handlers.
     
@@ -1035,13 +1045,25 @@ def init_oauth_blueprints():
     """
     if not ub.oauth_support:
         return []
-    
+
+    if application is None:
+        # Compatibility for callers predating the factory seam.
+        application = app
+
     global oauthblueprints
-    oauthblueprints = generate_oauth_blueprints()
+    # Each app needs fresh Flask-Dance blueprint objects. The compatibility
+    # global keeps the first initialized set until the stable singleton itself
+    # is initialized; explicit app B must not replace app A's fallback state.
+    providers = generate_oauth_blueprints(application)
+    if not oauthblueprints or application is app:
+        oauthblueprints = providers
+    application.extensions[_APP_OAUTH_BLUEPRINTS] = providers
 
-    _register_auto_redirect_hooks(oauthblueprints)
+    _register_auto_redirect_hooks(providers, application)
 
-    @oauth_authorized.connect_via(oauthblueprints[0]['blueprint'])
+    github_provider, google_provider, generic_provider = providers
+
+    @oauth_authorized.connect_via(github_provider['blueprint'])
     def github_logged_in(blueprint, token):
         if not token:
             flash(_("Failed to log in with GitHub."), category="error")
@@ -1058,17 +1080,17 @@ def init_oauth_blueprints():
         github_user_id = str(github_info["id"])
         
         # Save token to DB
-        oauth_update_token(str(oauthblueprints[0]['id']), token, github_user_id)
+        oauth_update_token(str(github_provider['id']), token, github_user_id)
         
         # DIRECT LOGIN: Hijack flow to prevent redirect loop
-        response = bind_oauth_or_register(oauthblueprints[0]['id'], github_user_id, 'github.login', 'github')
+        response = bind_oauth_or_register(github_provider['id'], github_user_id, 'github.login', 'github')
         if response:
             abort(response)
             
         return False
 
 
-    @oauth_authorized.connect_via(oauthblueprints[1]['blueprint'])
+    @oauth_authorized.connect_via(google_provider['blueprint'])
     def google_logged_in(blueprint, token):
         if not token:
             flash(_("Failed to log in with Google."), category="error")
@@ -1088,11 +1110,11 @@ def init_oauth_blueprints():
         google_user_id = str(google_info["id"])
         
         # Save token to DB
-        oauth_update_token(str(oauthblueprints[1]['id']), token, google_user_id)
+        oauth_update_token(str(google_provider['id']), token, google_user_id)
         
         # DIRECT LOGIN: Hijack flow to prevent redirect loop
         # We perform the binding/login logic right here
-        response = bind_oauth_or_register(oauthblueprints[1]['id'], google_user_id, 'google.login', 'google')
+        response = bind_oauth_or_register(google_provider['id'], google_user_id, 'google.login', 'google')
         
         # If we got a response (redirect), abort the current request and send it immediately
         # This stops Flask-Dance from doing its own redirect to /link/google
@@ -1102,7 +1124,7 @@ def init_oauth_blueprints():
         return False
 
 
-    @oauth_authorized.connect_via(oauthblueprints[2]['blueprint'])
+    @oauth_authorized.connect_via(generic_provider['blueprint'])
     def generic_logged_in(blueprint, token):
         if not token:
             flash(_("Failed to log in with Generic OAuth."), category="error")
@@ -1130,7 +1152,7 @@ def init_oauth_blueprints():
 
 
     # notify on OAuth provider error
-    @oauth_error.connect_via(oauthblueprints[0]['blueprint'])
+    @oauth_error.connect_via(github_provider['blueprint'])
     def github_error(blueprint, error, error_description=None, error_uri=None):
         if error and 'redirect_uri' in str(error).lower():
             msg = _("OAuth error: Invalid redirect URI. If you're experiencing this error repeatedly, "
@@ -1149,7 +1171,7 @@ def init_oauth_blueprints():
         log.error("GitHub OAuth error: %s", msg)
         return _oauth_failure_redirect(blueprint.name)
 
-    @oauth_error.connect_via(oauthblueprints[1]['blueprint'])
+    @oauth_error.connect_via(google_provider['blueprint'])
     def google_error(blueprint, error, error_description=None, error_uri=None):
         if error and 'redirect_uri' in str(error).lower():
             msg = _("OAuth error: Invalid redirect URI. If you're experiencing this error repeatedly, "
@@ -1168,7 +1190,7 @@ def init_oauth_blueprints():
         log.error("Google OAuth error: %s", msg)
         return _oauth_failure_redirect(blueprint.name)
 
-    @oauth_error.connect_via(oauthblueprints[2]['blueprint'])
+    @oauth_error.connect_via(generic_provider['blueprint'])
     def generic_error(blueprint, error, error_description=None, error_uri=None):
         if error and 'redirect_uri' in str(error).lower():
             msg = _("OAuth error: Invalid redirect URI. If you're experiencing this error repeatedly, "
@@ -1187,17 +1209,13 @@ def init_oauth_blueprints():
         log.error("Generic OAuth error: %s", msg)
         return _oauth_failure_redirect(blueprint.name)
 
-    return oauthblueprints
-
-
-# Initialize empty oauthblueprints list at module level
-# This will be populated when init_oauth_blueprints() is called
-oauthblueprints = []
+    return providers
 
 
 @oauth.route('/link/github')
 @oauth_required
 def github_login():
+    providers = get_oauth_blueprints()
     # This route is now only a fallback if the direct login hijack fails
     # or if the user navigates here manually.
     log.warning("Fallback OAuth route '/link/github' accessed - direct login may have failed")
@@ -1207,7 +1225,7 @@ def github_login():
         account_info = github.get('/user')
         if account_info.ok:
             account_info_json = account_info.json()
-            return bind_oauth_or_register(oauthblueprints[0]['id'], account_info_json['id'], 'github.login', 'github')
+            return bind_oauth_or_register(providers[0]['id'], account_info_json['id'], 'github.login', 'github')
         flash(_("GitHub Oauth error, please retry later."), category="error")
         log.error("GitHub Oauth error, please retry later")
     except (InvalidGrantError, TokenExpiredError) as e:
@@ -1224,15 +1242,16 @@ def github_login():
 @oauth.route('/unlink/github', methods=["GET"])
 @user_login_required
 def github_login_unlink():
-    return unlink_oauth(oauthblueprints[0]['id'])
+    return unlink_oauth(get_oauth_blueprints()[0]['id'])
 
 
 @oauth.route('/link/google')
 @oauth_required
 def google_login():
+    providers = get_oauth_blueprints()
     log.warning("Fallback OAuth route '/link/google' accessed - direct login may have failed")
     # Try to find token in session using the provider ID key
-    provider_id = str(oauthblueprints[1]['id'])
+    provider_id = str(providers[1]['id'])
     user_id_key = provider_id + "_oauth_user_id"
     
     # 1. Try to get User ID from session (Small cookie!)
@@ -1250,7 +1269,7 @@ def google_login():
             google.token = oauth_entry.token
             
             # 4. Proceed directly to login
-            return bind_oauth_or_register(oauthblueprints[1]['id'], provider_user_id, 'google.login', 'google')
+            return bind_oauth_or_register(providers[1]['id'], provider_user_id, 'google.login', 'google')
 
     if not google.authorized:
         return redirect(url_for("google.login"))
@@ -1263,7 +1282,7 @@ def google_login():
         resp = google.get("/oauth2/v2/userinfo")
         if resp.ok:
             account_info_json = resp.json()
-            return bind_oauth_or_register(oauthblueprints[1]['id'], account_info_json['id'], 'google.login', 'google')
+            return bind_oauth_or_register(providers[1]['id'], account_info_json['id'], 'google.login', 'google')
         
         flash(_("Google Oauth error, please retry later."), category="error")
         log.error("Google Oauth error, please retry later")
@@ -1284,19 +1303,20 @@ def google_login():
 @oauth.route('/unlink/google', methods=["GET"])
 @user_login_required
 def google_login_unlink():
-    return unlink_oauth(oauthblueprints[1]['id'])
+    return unlink_oauth(get_oauth_blueprints()[1]['id'])
 
 
 @oauth.route('/link/generic')
 @oauth_required
 def generic_login():
+    providers = get_oauth_blueprints()
     log.warning("Fallback OAuth route '/link/generic' accessed - direct login may have failed")
     # This route is now only a fallback if the direct login hijack fails
     # or if the user navigates here manually.
     if current_user and current_user.is_authenticated:
-        session['oauth_linking_provider'] = str(oauthblueprints[2]['id'])
+        session['oauth_linking_provider'] = str(providers[2]['id'])
         session.modified = True
-    if not oauthblueprints[2]['blueprint'].session.authorized:
+    if not providers[2]['blueprint'].session.authorized:
         return redirect(url_for("generic.login"))
     try:
         # Here we rely on the stored token since we don't have it in args
@@ -1305,7 +1325,7 @@ def generic_login():
         return register_user_from_generic_oauth()
     except (TokenExpiredError) as e:
         try:
-            del oauthblueprints[2]['blueprint'].token
+            del providers[2]['blueprint'].token
         except Exception:
             pass
         flash(_("OAuth error: {}").format(e), category="error")
@@ -1313,7 +1333,7 @@ def generic_login():
         return redirect(url_for("generic.login"))
     except (InvalidGrantError) as e:
         try:
-            del oauthblueprints[2]['blueprint'].token
+            del providers[2]['blueprint'].token
         except Exception:
             pass
         flash(_("OAuth error: {}").format(e), category="error")
@@ -1325,4 +1345,4 @@ def generic_login():
 @oauth.route('/unlink/generic', methods=["GET"])
 @user_login_required
 def generic_login_unlink():
-    return unlink_oauth(oauthblueprints[2]['id'])
+    return unlink_oauth(get_oauth_blueprints()[2]['id'])

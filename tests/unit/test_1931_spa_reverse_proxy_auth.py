@@ -54,6 +54,7 @@ def _factory_app(monkeypatch, tmp_path):
     app = flask.Flask("test_1931_production_factory")
     app.wsgi_app = ProxyFix(app.wsgi_app, **cps.proxyfix_hops)
     monkeypatch.setattr(cps, "app", app)
+    monkeypatch.setattr(cps, "_process_runtime_state", cps._ProcessRuntimeState())
 
     user = _user()
     state = {"known_user": True}

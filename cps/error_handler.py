@@ -14,7 +14,7 @@ try:
 except ImportError:
     from werkzeug.exceptions import UnprocessableEntity as FailedDependency
 
-from . import config, app, logger, services
+from . import config, logger, services
 from .cw_login import current_user
 from .report_link import build_issue_url
 from .url_policy import trailing_slash_redirect_url
@@ -84,19 +84,22 @@ def internal_error(error):
                            ), 500
 
 
-def init_errorhandler():
+def init_errorhandler(application=None):
+    if application is None:
+        # Compatibility for the pinned oracle and pre-factory callers.
+        from . import app as application
+
     # http error handling
     for ex in default_exceptions:
         if ex < 500:
-            app.register_error_handler(ex, error_http)
+            application.register_error_handler(ex, error_http)
         elif ex == 500:
-            app.register_error_handler(ex, internal_error)
+            application.register_error_handler(ex, internal_error)
 
     if services.ldap:
         # Only way of catching the LDAPException upon logging in with LDAP server down
-        @app.errorhandler(services.ldap.LDAPException)
+        @application.errorhandler(services.ldap.LDAPException)
         # pylint: disable=unused-variable
         def handle_exception(e):
             log.debug('LDAP server not accessible while trying to login to opds feed')
             return error_http(FailedDependency())
-

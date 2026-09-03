@@ -123,7 +123,6 @@ sqlalchemy_version2 = ([int(x) for x in sql_version.split('.')] >= [2, 0, 0])
 
 _start_time = time.time()
 
-@app.after_request
 def add_security_headers(resp):
     # The SPA reader (spa.spa_shell serves /app/*) renders EPUBs with epub.js,
     # which loads in-book images and CSS as blob: URLs inside an iframe — the
@@ -226,13 +225,28 @@ def is_immutable_static_asset(path):
     return '/' not in name and bool(_HASHED_ASSET_RE.search(name))
 
 
-@app.after_request
 def add_static_asset_cache_headers(resp):
     if (request.endpoint == 'static'
             and resp.status_code in _CACHEABLE_ASSET_STATUSES
             and is_immutable_static_asset(request.path)):
         resp.headers['Cache-Control'] = IMMUTABLE_ASSET_CACHE_CONTROL
     return resp
+
+
+_APP_HOOKS_MARKER = "cps_web_after_request_registered"
+
+
+def register_app_hooks(application):
+    """Attach web's app-wide response hooks once to ``application``."""
+    if application.extensions.get(_APP_HOOKS_MARKER):
+        return
+    application.after_request(add_security_headers)
+    application.after_request(add_static_asset_cache_headers)
+    application.extensions[_APP_HOOKS_MARKER] = True
+
+
+# Preserve the historical import-time binding for the compatibility singleton.
+register_app_hooks(app)
 
 
 web = Blueprint('web', __name__)
@@ -2938,7 +2952,7 @@ def login():
             and feature_support['oauth']):
         oauth_endpoint, next_url = oauth_auto_redirect.auto_redirect_decision(
             request.args,
-            oauth_bb.oauthblueprints,
+            oauth_bb.get_oauth_blueprints(),
             flask_session,
         )
         if oauth_endpoint:

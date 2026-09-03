@@ -668,7 +668,7 @@ def configuration():
             log.debug("Unable to inspect Hardcover token status", exc_info=True)
     return render_title_template("config_edit.html",
                                  config=config,
-                                 provider=oauth_bb.oauthblueprints,
+                                 provider=oauth_bb.get_oauth_blueprints(),
                                  feature_support=feature_support,
                                  kobo_two_way_emergency_disabled=(
                                      os.environ.get("CWNG_KOBO_TWO_WAY_ANNOTATIONS", "").strip().lower()
@@ -1878,7 +1878,7 @@ def _configuration_gdrive_helper(to_save):
 def _configuration_oauth_helper(to_save):
     reboot_required = False
 
-    for element in oauth_bb.oauthblueprints:
+    for element in oauth_bb.get_oauth_blueprints():
         update = {}
         if element["provider_name"] == "generic":
             if to_save["config_generic_oauth_client_id"] != element["oauth_client_id"]:

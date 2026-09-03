@@ -73,6 +73,7 @@ def test_create_app_survives_absent_profiles_directory(tmp_path, monkeypatch):
     monkeypatch.setattr(constants, "USER_PROFILES_JSON", str(profiles_path))
     startup_app = flask.Flask("test_1882_startup")
     monkeypatch.setattr(cps, "app", startup_app)
+    monkeypatch.setattr(cps, "_process_runtime_state", cps._ProcessRuntimeState())
 
     monkeypatch.setattr(cps, "csrf", None)
     monkeypatch.setattr(cps.cli_param, "init", lambda: None)

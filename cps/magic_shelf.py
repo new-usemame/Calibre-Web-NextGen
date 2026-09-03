@@ -1063,6 +1063,13 @@ def build_book_query_for_magic_shelf(shelf_id, sort_order=None, extra_filter=Non
         )
         if needs_series_join:
             query = query.outerjoin(db.books_series_link).outerjoin(db.Series)
+        # Configured scalar custom columns live in direct per-book tables.
+        # Join only the model referenced by a validated order expression.
+        for custom_model in db.cc_classes.values():
+            table_name = custom_model.__table__.name
+            if hasattr(custom_model, "book") and any(table_name in str(expr) for expr in order_list):
+                query = query.outerjoin(custom_model, db.Books.id == custom_model.book)
+                break
         if isinstance(sort_order, list):
             for order_expr in sort_order:
                 query = query.order_by(order_expr)

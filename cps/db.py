@@ -2219,7 +2219,12 @@ class CalibreDB:
         query = self.generate_linked_query(config.config_read_column, Books)
         if len(join) == 6:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4]).outerjoin(join[5])
-        if len(join) == 3:
+        elif len(join) == 5:
+            # A standard Series join (link, condition, Series) followed by a
+            # direct custom-column join (model, condition). This shape is used
+            # when a simple search orders by an enabled scalar custom column.
+            query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4])
+        elif len(join) == 3:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2])
         elif len(join) == 2:
             query = query.outerjoin(join[0], join[1])

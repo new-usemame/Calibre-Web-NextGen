@@ -62,6 +62,7 @@ from .cw_babel import (get_available_locale,
 from . import debug_info
 from .string_helper import strip_whitespaces
 from .sqlite_utils import copy_sqlite_database
+from .custom_column_sort import SORTABLE_DATATYPES
 
 log = logger.create()
 
@@ -707,10 +708,15 @@ def view_configuration():
         .filter(and_(db.CustomColumns.datatype == 'bool', db.CustomColumns.mark_for_delete == 0)).all()
     restrict_columns = calibre_db.session.query(db.CustomColumns) \
         .filter(and_(db.CustomColumns.datatype == 'text', db.CustomColumns.mark_for_delete == 0)).all()
+    sortable_columns = calibre_db.session.query(db.CustomColumns).filter(
+        db.CustomColumns.datatype.in_(SORTABLE_DATATYPES),
+        db.CustomColumns.is_multiple == False,  # noqa: E712 - SQLAlchemy expression
+        db.CustomColumns.mark_for_delete == 0,
+    ).all()
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
     return render_title_template("config_view_edit.html", conf=config, readColumns=read_column,
-                                 restrictColumns=restrict_columns,
+                                 restrictColumns=restrict_columns, sortableColumns=sortable_columns,
                                  languages=languages,
                                  translations=translations,
                                  title=_("UI Configuration"), page="uiconfig")
@@ -1034,6 +1040,16 @@ def update_view_configuration():
 
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
+    allowed_sort_ids = {
+        str(column.id) for column in calibre_db.session.query(db.CustomColumns).filter(
+            db.CustomColumns.datatype.in_(SORTABLE_DATATYPES),
+            db.CustomColumns.is_multiple == False,  # noqa: E712 - SQLAlchemy expression
+            db.CustomColumns.mark_for_delete == 0,
+        )
+    }
+    selected_sort_ids = sorted(set(request.form.getlist("config_sortable_custom_columns")) & allowed_sort_ids,
+                               key=int)
+    config.config_sortable_custom_columns = ",".join(selected_sort_ids)
     if _config_string(to_save, "config_title_regex"):
         # title_sort UDF reads ``CalibreDB.config.config_title_regex`` at
         # call time via closure in ``_register_sqlite_udfs``; updating the

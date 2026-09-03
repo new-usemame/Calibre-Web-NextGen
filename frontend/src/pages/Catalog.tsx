@@ -567,6 +567,16 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const advQuery = useAdvancedSearch(advParams, page, perPage);
   const { data, isLoading, isFetching, isPlaceholderData, error } =
     filterActive ? advQuery : booksQuery;
+  const customSortOptions = view === 'hot' || view === 'discover'
+    ? [] : (data?.custom_sort_options ?? []);
+  const activeSortOptions = [...sortOptions, ...customSortOptions];
+
+  // A saved custom sort can be removed by an administrator. Trust the server's
+  // effective value so the controlled select never retains an absent option.
+  useEffect(() => {
+    if (!data || isPlaceholderData || !data.sort || data.sort === sort) return;
+    setSort(data.sort);
+  }, [data, isPlaceholderData, sort]);
 
   // Accumulate pages; replace the accumulator whenever the filter set changes.
   // Skip placeholder data: on a filter change react-query briefly returns the
@@ -870,7 +880,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           onChange={(e) => setSort(e.target.value)}
           aria-label={t('Sort order')}
         >
-          {sortOptions.map((opt) => (
+          {activeSortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {t(opt.label)}
             </option>

@@ -33,6 +33,7 @@ interface FormState {
   exclude_language: (string | number)[];
   include_extension: string[];
   exclude_extension: string[];
+  sort: string;
 }
 
 const EMPTY: FormState = {
@@ -40,6 +41,7 @@ const EMPTY: FormState = {
   read_status: 'all', publishstart: '', publishend: '', rating_low: '', rating_high: '',
   include_tag: [], exclude_tag: [], include_serie: [], exclude_serie: [],
   include_language: [], exclude_language: [], include_extension: [], exclude_extension: [],
+  sort: 'new',
 };
 
 const RATINGS = ['', '1', '2', '3', '4', '5'];
@@ -81,6 +83,12 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
       setResults((prev) => dedupAppend(prev, data.items));
     }
   }, [data, isPlaceholderData, submitted]);
+
+  useEffect(() => {
+    if (!data || isPlaceholderData || !data.sort || data.sort === form.sort) return;
+    setForm((current) => ({ ...current, sort: data.sort! }));
+    setSubmitted((current) => current ? { ...current, sort: data.sort } : current);
+  }, [data, isPlaceholderData, form.sort]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -207,6 +215,16 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
           <Field label={t('Formats — exclude')}>
             <MultiSelect options={formatOptions} value={form.exclude_extension}
               onChange={(v) => set('exclude_extension', v.map(String))} placeholder={t('None')} />
+          </Field>
+          <Field label={t('Sort order')}>
+            <select value={form.sort} onChange={(event) => set('sort', event.target.value)}>
+              <option value="new">{t('Newest')}</option>
+              <option value="old">{t('Oldest')}</option>
+              <option value="abc">{t('Title A–Z')}</option>
+              <option value="authaz">{t('Author A–Z')}</option>
+              {(data?.custom_sort_options ?? []).map((option) =>
+                <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
           </Field>
         </div>
 

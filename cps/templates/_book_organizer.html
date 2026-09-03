@@ -173,7 +173,7 @@
 {# ---- Page-specific helpers that build the sort_options list and call organizer_bar. ---- #}
 
 {# index.html / search.html book lists. `page` is the route page key, `id` is the book_id param. #}
-{% macro books_list_organizer(page, id, order, query=none, multiselect=true, settings=true, can_delete=false, can_edit_public_shelf=false, shelves=none) %}
+{% macro books_list_organizer(page, id, order, query=none, multiselect=true, settings=true, can_delete=false, can_edit_public_shelf=false, shelves=none, custom_sort_columns=none) %}
 {% if page == 'hot' %}
   {% set opts = [
     {'key': 'hotasc', 'icons': ['glyphicon-sort-by-order'],
@@ -212,6 +212,20 @@
        'label': _('Published, oldest first'),
        'url': url_for('web.books_list', data=page, sort_param='pubold', query=query)},
     ] %}
+    {% if custom_sort_columns and page not in ['hot', 'download'] %}
+      {% set custom_opts = namespace(items=[]) %}
+      {% for column in custom_sort_columns %}
+        {% set custom_opts.items = custom_opts.items + [
+          {'key': 'cc-' ~ column.id ~ '-asc', 'icons': ['glyphicon-sort-by-order'],
+           'label': column.name ~ ', ' ~ _('low to high'),
+           'url': url_for('web.books_list', data=page, sort_param='cc-' ~ column.id ~ '-asc', query=query)},
+          {'key': 'cc-' ~ column.id ~ '-desc', 'icons': ['glyphicon-sort-by-order-alt'],
+           'label': column.name ~ ', ' ~ _('high to low'),
+           'url': url_for('web.books_list', data=page, sort_param='cc-' ~ column.id ~ '-desc', query=query)},
+        ] %}
+      {% endfor %}
+      {% set opts = opts + custom_opts.items %}
+    {% endif %}
   {% else %}
     {% set opts = opts + [
       {'key': 'new', 'icons': ['glyphicon-book', 'glyphicon-calendar', 'glyphicon-sort-by-order'],
@@ -239,6 +253,28 @@
        'label': _('Published, oldest first'),
        'url': url_for('web.books_list', data=page, book_id=id, sort_param='pubold')},
     ] %}
+    {% if custom_sort_columns and page not in ['hot', 'download'] %}
+      {% set custom_opts = namespace(items=[]) %}
+      {% for column in custom_sort_columns %}
+        {% if page == 'magicshelf' %}
+          {% set asc_url = url_for('web.render_magic_shelf', shelf_id=id, sort_param='cc-' ~ column.id ~ '-asc') %}
+          {% set desc_url = url_for('web.render_magic_shelf', shelf_id=id, sort_param='cc-' ~ column.id ~ '-desc') %}
+        {% elif query is not none %}
+          {% set asc_url = url_for('web.books_list', data=page, sort_param='cc-' ~ column.id ~ '-asc', query=query) %}
+          {% set desc_url = url_for('web.books_list', data=page, sort_param='cc-' ~ column.id ~ '-desc', query=query) %}
+        {% else %}
+          {% set asc_url = url_for('web.books_list', data=page, book_id=id, sort_param='cc-' ~ column.id ~ '-asc') %}
+          {% set desc_url = url_for('web.books_list', data=page, book_id=id, sort_param='cc-' ~ column.id ~ '-desc') %}
+        {% endif %}
+        {% set custom_opts.items = custom_opts.items + [
+          {'key': 'cc-' ~ column.id ~ '-asc', 'icons': ['glyphicon-sort-by-order'],
+           'label': column.name ~ ', ' ~ _('low to high'), 'url': asc_url},
+          {'key': 'cc-' ~ column.id ~ '-desc', 'icons': ['glyphicon-sort-by-order-alt'],
+           'label': column.name ~ ', ' ~ _('high to low'), 'url': desc_url},
+        ] %}
+      {% endfor %}
+      {% set opts = opts + custom_opts.items %}
+    {% endif %}
     {% if page == 'series' %}
       {% set opts = opts + [
         {'key': 'seriesasc', 'icons': ['glyphicon-sort-by-order'],

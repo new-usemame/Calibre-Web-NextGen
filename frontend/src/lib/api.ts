@@ -280,6 +280,9 @@ export interface BooksPage {
   page: number;
   per_page: number;
   total: number;
+  /** Effective server-validated sort and enabled scalar custom-column choices. */
+  sort?: string;
+  custom_sort_options?: { value: string; label: string }[];
 }
 
 /** One row in an entity-browse list, with how many books reference it. */
@@ -342,6 +345,8 @@ export interface AdvSearchResult {
   per_page: number;
   total: number;
   criteria: string;
+  sort?: string;
+  custom_sort_options?: { value: string; label: string }[];
 }
 
 export interface AppPassword {

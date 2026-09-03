@@ -1579,10 +1579,10 @@ export function useMagicShelves() {
   });
 }
 
-export function useMagicShelfBooks(id: string | number, page = 1) {
-  return useQuery<MagicShelfItem & BooksPage>({
-    queryKey: ['magicshelf', String(id), page],
-    queryFn: () => apiGet(`/api/v1/magicshelf/${id}?page=${page}`),
+export function useMagicShelfBooks(id: string | number, page = 1, sort = 'new') {
+  return useQuery<MagicShelfItem & { sort?: string; custom_sort_options?: { value: string; label: string }[] } & BooksPage>({
+    queryKey: ['magicshelf', String(id), page, sort],
+    queryFn: () => apiGet(`/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`),
     enabled: String(id).length > 0,
     // Same-shelf paging only — see useShelf (#612).
     placeholderData: (prev, prevQuery) =>

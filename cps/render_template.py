@@ -442,6 +442,19 @@ def _style_safe_css(value):
 
 
 def render_title_template(*args, **kwargs):
+    # All Classic list/search renderers share this context so the organizer can
+    # expose only the admin-enabled scalar custom sorts. Keeping it here avoids
+    # one route silently omitting a resolver-supported choice.
+    if args and args[0] in ('index.html', 'search.html') and 'custom_sort_columns' not in kwargs:
+        try:
+            from . import calibre_db, db
+            from .custom_column_sort import sortable_columns
+            kwargs['custom_sort_columns'] = sortable_columns(
+                calibre_db.session.query(db.CustomColumns).all(), config)
+        except Exception:
+            # Supplementary sort controls must not make an otherwise readable
+            # library view fail when the custom-column schema is unavailable.
+            kwargs['custom_sort_columns'] = []
     sidebar, simple = get_sidebar_config(kwargs)
     try:
         magic_shelf_routes = {

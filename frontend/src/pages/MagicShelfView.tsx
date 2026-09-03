@@ -15,6 +15,19 @@ import { ApiError } from '../lib/api';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 
+function magicShelfSortKey(id: string) {
+  return `cwng:magic-shelf-sort:${id}`;
+}
+
+function savedMagicShelfSort(id: string) {
+  try {
+    const value = localStorage.getItem(magicShelfSortKey(id));
+    return value || 'new';
+  } catch {
+    return 'new';
+  }
+}
+
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const seen = new Set(prev.map((b) => b.id));
   const fresh = next.filter((b) => !seen.has(b.id));
@@ -27,9 +40,10 @@ export function MagicShelfView({ id }: { id: string }) {
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState(() => savedMagicShelfSort(id));
   const [books, setBooks] = useState<Book[]>([]);
   const accKey = useRef('');
-  const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(id, page);
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(id, page, sort);
   const del = useDeleteMagicShelf();
   const dup = useDuplicateMagicShelf();
   const { data: me } = useMe();
@@ -38,18 +52,37 @@ export function MagicShelfView({ id }: { id: string }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [koboWarning, setKoboWarning] = useState<string | null>(null);
 
-  // Route reuse: reset paging when the shelf id changes (#612).
+  // Route reuse and a server-side sort change both replace, rather than append
+  // to, the infinite-scroll accumulator.
   useEffect(() => {
+    setSort(savedMagicShelfSort(id));
     setPage(1);
   }, [id]);
+
+  useEffect(() => {
+    try { localStorage.setItem(magicShelfSortKey(id), sort); } catch { /* storage can be disabled */ }
+  }, [id, sort]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [sort]);
+
+  // The server validates configured custom columns against the live Calibre
+  // schema. If a saved local choice was removed by an administrator, adopt its
+  // returned fallback so the controlled select and localStorage stay valid.
+  useEffect(() => {
+    if (!data || isPlaceholderData || !data.sort || data.sort === sort) return;
+    setSort(data.sort);
+  }, [data, isPlaceholderData, sort]);
 
   // Skip placeholder data — accumulating the previous shelf's briefly-served
   // rows under the new id would mix both shelves' books (#612, see Shelf.tsx).
   useEffect(() => {
     if (!data || isPlaceholderData) return;
-    if (String(id) !== accKey.current) { setBooks(data.items); accKey.current = String(id); }
+    const key = `${id}:${sort}`;
+    if (key !== accKey.current) { setBooks(data.items); accKey.current = key; }
     else setBooks((p) => dedupAppend(p, data.items));
-  }, [data, id, isPlaceholderData]);
+  }, [data, id, sort, isPlaceholderData]);
 
   // Infinite-scroll sentinel. Called before the conditional early returns below
   // so the hook order stays stable across the loading→loaded transition; `data`
@@ -69,6 +102,13 @@ export function MagicShelfView({ id }: { id: string }) {
 
   const total = data.total;
   const hasMore = books.length < total;
+  const sortOptions = [
+    { value: 'new', label: t('Newest') },
+    { value: 'old', label: t('Oldest') },
+    { value: 'abc', label: t('Title A–Z') },
+    { value: 'zyx', label: t('Title Z–A') },
+    ...(data.custom_sort_options ?? []),
+  ];
 
   // #870 (@auspex, umbrella #867): ordinary shelves have had this button since
   // the SPA landed; smart shelves were the only type you had to open the rule
@@ -114,6 +154,10 @@ export function MagicShelfView({ id }: { id: string }) {
         </div>
         <div className={styles.subRow}>
           <span className={styles.count}>{total} {t('books')}</span>
+          <select className={styles.manageBtn} value={sort}
+            onChange={(event) => setSort(event.target.value)} aria-label={t('Sort order')}>
+            {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
           {(data.can_edit || data.can_duplicate || canKobo || data.can_delete) && (
             <div className={styles.manage}>
               {data.can_edit && (

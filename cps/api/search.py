@@ -15,6 +15,7 @@ from .. import calibre_db, config, db
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..search import build_adv_search_query
+from ..custom_column_sort import resolve as resolve_custom_column_sort, sortable_columns
 
 # SPA read-status value -> the term value build_adv_search_query expects.
 _READ_STATUS = {"all": "Any", "read": "True", "unread": "False"}
@@ -96,7 +97,18 @@ def advanced_search():
     data = request.get_json(silent=True) or {}
     page = max(1, int(data.get("page", 1) or 1))
     per_page = int(data.get("per_page", config.config_books_per_page) or config.config_books_per_page)
-    order = SORT_MAP.get(data.get("sort", "new"), SORT_MAP["new"])
+    requested_sort = data.get("sort", "new")
+    custom_columns = calibre_db.session.query(db.CustomColumns).all()
+    custom_sort = resolve_custom_column_sort(requested_sort, config, custom_columns)
+    compatible_sorts = frozenset(set(SORT_MAP) - {"hotasc", "hotdesc"})
+    effective_sort = requested_sort if custom_sort is not None or requested_sort in compatible_sorts else "new"
+    order = custom_sort[1] if custom_sort is not None else SORT_MAP[effective_sort]
+    custom_options = [
+        option for column in sortable_columns(custom_columns, config) for option in (
+            {"value": f"cc-{column.id}-asc", "label": f"{column.name}, low to high"},
+            {"value": f"cc-{column.id}-desc", "label": f"{column.name}, high to low"},
+        )
+    ]
 
     term = _json_to_term(data)
     query, criteria = build_adv_search_query(term)
@@ -104,6 +116,8 @@ def advanced_search():
     # exclude support), so a book on N shelves yields N identical result rows.
     # DISTINCT collapses them — the selected (Books, is_archived, read_status)
     # tuple is identical per book — so total and items agree.
+    if custom_sort is not None:
+        query = query.outerjoin(custom_sort[0], db.Books.id == custom_sort[0].book)
     query = query.distinct().order_by(*order)
 
     total = query.count()
@@ -125,4 +139,6 @@ def advanced_search():
         "per_page": per_page,
         "total": total,
         "criteria": criteria_str,  # human-readable "you searched for…" summary
+        "sort": effective_sort,
+        "custom_sort_options": custom_options,
     })

@@ -34,7 +34,8 @@
       {{ organizer.books_list_organizer(page, none, order, query=query,
                                          can_delete=current_user.role_delete_books(),
                                          can_edit_public_shelf=current_user.role_edit_shelfs(),
-                                         shelves=g.shelves_access) }}
+                                         shelves=g.shelves_access,
+                                         custom_sort_columns=custom_sort_columns|default(none)) }}
   {% endif %}
 
   <div class="row display-flex">

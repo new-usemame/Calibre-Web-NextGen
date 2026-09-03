@@ -74,6 +74,23 @@
       </div>
       
       <div class="form-group">
+        <label>{{_('Custom Columns Available for Sorting')}}</label>
+        <p class="settings-explanation">{{_('Selected numeric and date columns appear in the Magic Shelf sort menu.')}}</p>
+        {% set selected_sort_columns = (conf.config_sortable_custom_columns or '').split(',') %}
+        {% for sortColumn in sortableColumns %}
+        <div class="checkbox">
+          <label>
+            <input type="checkbox" name="config_sortable_custom_columns" value="{{ sortColumn.id }}"
+                   {% if sortColumn.id|string in selected_sort_columns %}checked{% endif %}>
+            {{ sortColumn.name }} ({{ sortColumn.datatype }})
+          </label>
+        </div>
+        {% else %}
+        <p class="text-muted">{{_('No eligible Calibre custom columns were found.')}}</p>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
         <label for="config_read_column">{{_('Link Read/Unread Status to Calibre Column')}}</label>
         <select name="config_read_column" id="config_read_column" class="form-control">
           <option value="0" {% if conf.config_read_column == 0 %}selected{% endif %}>{{ _('None') }}</option>

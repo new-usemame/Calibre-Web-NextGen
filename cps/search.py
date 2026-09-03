@@ -20,6 +20,7 @@ from .string_helper import strip_whitespaces
 from .usermanagement import login_required_if_no_ano
 from .render_template import render_title_template
 from .pagination import Pagination
+from .custom_column_sort import sortable_columns
 
 
 search = Blueprint('search', __name__)
@@ -368,6 +369,9 @@ def render_adv_search_results(term, offset=None, order=None, limit=None):
     pagination = None
 
     q, search_term = build_adv_search_query(term)
+    custom_join = order[2] if order and len(order) > 2 else ()
+    if custom_join:
+        q = q.outerjoin(*custom_join)
     q = q.order_by(*sort)
     flask_session['query'] = json.dumps(term)
 
@@ -397,7 +401,9 @@ def render_adv_search_results(term, offset=None, order=None, limit=None):
                                  entries=entries,
                                  result_count=result_count,
                                  title=_("Advanced Search"), page="advsearch",
-                                 order=order[1])
+                                 order=order[1],
+                                 custom_sort_columns=sortable_columns(
+                                     calibre_db.session.query(db.CustomColumns).all(), config))
 
 
 def render_prepare_search_form(cc):
@@ -433,7 +439,9 @@ def render_prepare_search_form(cc):
 
 def render_search_results(term, offset=None, order=None, limit=None):
     if term:
-        join = db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series
+        custom_join = order[2] if order and len(order) > 2 else ()
+        join = (db.books_series_link, db.Books.id == db.books_series_link.c.book,
+                db.Series, *custom_join)
         entries, result_count, pagination = calibre_db.get_search_results(term,
                                                                           config,
                                                                           offset,
@@ -454,4 +462,6 @@ def render_search_results(term, offset=None, order=None, limit=None):
                                  result_count=result_count,
                                  title=_("Search"),
                                  page="search",
-                                 order=order[1])
+                                 order=order[1],
+                                 custom_sort_columns=sortable_columns(
+                                     calibre_db.session.query(db.CustomColumns).all(), config))

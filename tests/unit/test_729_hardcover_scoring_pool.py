@@ -100,7 +100,13 @@ def test_queue_for_review_caps_stored_candidates_at_three(monkeypatch):
     so the review template's derived "Top N" label matches the 3 rendered cards."""
     captured = {}
 
+    class FakeQuery:
+        def filter(self, *args): return self
+        def order_by(self, *args): return self
+        def first(self): return None
+
     class FakeSession:
+        def query(self, *args): return FakeQuery()
         def add(self, entry): captured["entry"] = entry
         def commit(self): pass
         def rollback(self): pass

@@ -2105,6 +2105,12 @@ class HardcoverBookBlacklist(Base):
 class HardcoverMatchQueue(Base):
     """Queue for ambiguous Hardcover metadata matches requiring manual review."""
     __tablename__ = 'hardcover_match_queue'
+    __table_args__ = (
+        Index(
+            'ix_hardcover_match_queue_review_state_book',
+            'reviewed', 'review_action', 'book_id',
+        ),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     book_id = Column(Integer, nullable=False)
@@ -3482,6 +3488,55 @@ def migrate_dismissed_duplicate_groups_table(engine, _session):
         print(f"[dup-dismiss-migration] Failed to add duplicate_key column: {e}", flush=True)
 
 
+def migrate_hardcover_match_queue_dedup(engine, _session):
+    """Keep only the newest pending Hardcover review row for each book.
+
+    Reviewed history is never selected by the DELETE. The set-based aggregate
+    is bounded by the queue table rather than issuing one query per book, and
+    the indexes make both runtime exclusion and pending-row upserts efficient.
+    Re-running performs no deletes and both index statements are no-ops.
+    """
+    with engine.begin() as connection:
+        table_exists = connection.execute(text(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+            "AND name = 'hardcover_match_queue'"
+        )).first()
+        if not table_exists:
+            return
+        deleted = connection.execute(text("""
+            DELETE FROM hardcover_match_queue
+            WHERE reviewed = 0
+              AND id NOT IN (
+                  SELECT MAX(queue.id)
+                  FROM hardcover_match_queue AS queue
+                  JOIN (
+                      SELECT book_id, MAX(created_at) AS newest_created_at
+                      FROM hardcover_match_queue
+                      WHERE reviewed = 0
+                      GROUP BY book_id
+                  ) AS newest
+                    ON newest.book_id = queue.book_id
+                   AND newest.newest_created_at = queue.created_at
+                  WHERE queue.reviewed = 0
+                  GROUP BY queue.book_id
+              )
+        """)).rowcount
+
+    _run_ddl_with_retry(engine, (
+        "CREATE INDEX IF NOT EXISTS "
+        "ix_hardcover_match_queue_review_state_book "
+        "ON hardcover_match_queue(reviewed, review_action, book_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS "
+        "uq_hardcover_match_queue_pending_book "
+        "ON hardcover_match_queue(book_id) WHERE reviewed = 0",
+    ))
+    if deleted:
+        log.info(
+            "[hardcover-match-queue-migration] removed %d duplicate pending row(s)",
+            deleted,
+        )
+
+
 def migrate_my_library_admin_intro_table(engine, _session):
     """Create the single-row my_library_admin_intro table idempotently.
 
@@ -4840,6 +4895,7 @@ def migrate_Database(_session):
     add_missing_tables(engine, _session)
     migrate_kobo_entitlement_ledger_columns(engine, _session)
     migrate_thumbnail_lookup_index(engine, _session)
+    migrate_hardcover_match_queue_dedup(engine, _session)
     migrate_registration_table(engine, _session)
     migrate_user_session_table(engine, _session)
     migrate_user_table(engine, _session)
@@ -5171,6 +5227,7 @@ def init_db(app_db_path):
         clean_database(session)
     else:
         Base.metadata.create_all(engine)
+        migrate_hardcover_match_queue_dedup(engine, session)
         _ensure_kobo_opaque_present_guards(engine)
         create_admin_user(session)
         create_anonymous_user(session)

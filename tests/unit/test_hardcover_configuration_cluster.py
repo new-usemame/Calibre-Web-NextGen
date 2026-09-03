@@ -920,3 +920,313 @@ def test_auto_fetch_ui_has_first_off_option_and_truthful_status_combinations():
             cwa_settings={"hardcover_auto_fetch_schedule": schedule_value},
         )
         assert message in rendered
+
+
+def _ambiguous_hardcover_result(result_id):
+    return SimpleNamespace(
+        id=result_id,
+        title=f"Candidate {result_id}",
+        authors=["Author"],
+        url="",
+        cover="",
+        description="",
+        series="",
+        series_index=None,
+        publisher="",
+        publishedDate="",
+        identifiers={"hardcover-id": result_id},
+    )
+
+
+def _ambiguous_scored_results(result_id):
+    return [{
+        "result": _ambiguous_hardcover_result(result_id),
+        "score": 0.5,
+        "reason": f"ambiguous-{result_id}",
+    }]
+
+
+@pytest.fixture
+def hardcover_queue_runtime(monkeypatch):
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine, event
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from cps import db, ub
+    from cps.tasks import auto_hardcover_id as module
+    from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
+
+    app_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    ub.HardcoverMatchQueue.__table__.create(app_engine)
+    AppSession = sessionmaker(bind=app_engine)
+    monkeypatch.setattr(module.ub, "init_db_thread", AppSession)
+
+    calibre_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    event.listen(
+        calibre_engine,
+        "connect",
+        lambda connection, _record: connection.execute(
+            "ATTACH DATABASE ':memory:' AS calibre"
+        ),
+    )
+    db.Base.metadata.create_all(calibre_engine)
+    CalibreSession = sessionmaker(bind=calibre_engine)
+    calibre_session = CalibreSession()
+    book = db.Books(
+        "Ambiguous Book",
+        "Ambiguous Book",
+        "Author",
+        datetime.now(timezone.utc),
+        datetime.now(timezone.utc),
+        "1.0",
+        datetime.now(timezone.utc),
+        "ambiguous-book",
+        False,
+        [],
+        [],
+    )
+    calibre_session.add(book)
+    calibre_session.commit()
+    book_id = book.id
+    calibre_session.close()
+
+    monkeypatch.setattr(
+        module.db,
+        "CalibreDB",
+        lambda **_kwargs: SimpleNamespace(session=CalibreSession()),
+    )
+    monkeypatch.setattr(module.config, "hardcover_sync_enabled", lambda: True)
+    monkeypatch.setattr(module.config, "resolved_hardcover_token", lambda: "token")
+    monkeypatch.setattr(TaskAutoHardcoverID, "_save_stats", lambda self: None)
+
+    searches = []
+
+    class AmbiguousProvider:
+        def search(self, query):
+            searches.append(query)
+            return [_ambiguous_hardcover_result("candidate-1")]
+
+        @staticmethod
+        def calculate_confidence_score(**_kwargs):
+            return 0.5, "ambiguous"
+
+    monkeypatch.setattr(module, "Hardcover", AmbiguousProvider)
+
+    runtime = SimpleNamespace(
+        AppSession=AppSession,
+        book_id=book_id,
+        searches=searches,
+    )
+    try:
+        yield runtime
+    finally:
+        app_engine.dispose()
+        calibre_engine.dispose()
+
+
+def test_two_ambiguous_crawls_leave_one_pending_row(
+    hardcover_queue_runtime, caplog
+):
+    from cps import ub
+    from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
+
+    first = TaskAutoHardcoverID(batch_size=10, rate_limit_delay=0)
+    second = TaskAutoHardcoverID(batch_size=10, rate_limit_delay=0)
+
+    first.run(None)
+    second.run(None)
+
+    session = hardcover_queue_runtime.AppSession()
+    try:
+        pending = session.query(ub.HardcoverMatchQueue).filter_by(
+            book_id=hardcover_queue_runtime.book_id,
+            reviewed=0,
+        ).all()
+    finally:
+        session.close()
+
+    assert len(hardcover_queue_runtime.searches) == 1
+    assert len(pending) == 1
+    assert first.books_processed == 1
+    assert second.books_processed == 0
+    assert caplog.text.count(
+        "Found 1 eligible books without Hardcover IDs"
+    ) == 1
+    assert "No books eligible for Hardcover ID auto-fetch" in caplog.text
+
+
+def test_queue_for_review_refreshes_existing_pending_row(
+    monkeypatch, hardcover_queue_runtime
+):
+    from cps import ub
+    from cps.tasks import auto_hardcover_id as module
+    from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
+
+    timestamps = iter(("2026-08-01T00:00:00", "2026-09-01T00:00:00"))
+    monkeypatch.setattr(
+        module,
+        "datetime",
+        SimpleNamespace(
+            utcnow=lambda: SimpleNamespace(isoformat=lambda: next(timestamps))
+        ),
+    )
+    task = TaskAutoHardcoverID()
+
+    task._queue_for_review(
+        hardcover_queue_runtime.book_id,
+        "Original title",
+        "Original author",
+        "original query",
+        _ambiguous_scored_results("old-result"),
+    )
+    task._queue_for_review(
+        hardcover_queue_runtime.book_id,
+        "Updated title",
+        "Updated author",
+        "updated query",
+        _ambiguous_scored_results("new-result"),
+    )
+
+    session = hardcover_queue_runtime.AppSession()
+    try:
+        rows = session.query(ub.HardcoverMatchQueue).filter_by(
+            book_id=hardcover_queue_runtime.book_id,
+            reviewed=0,
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].book_title == "Updated title"
+        assert rows[0].search_query == "updated query"
+        assert rows[0].created_at == "2026-09-01T00:00:00"
+        assert "new-result" in rows[0].hardcover_results
+        assert "ambiguous-new-result" in rows[0].confidence_scores
+    finally:
+        session.close()
+
+
+def test_rejected_book_is_not_researched_or_requeued(hardcover_queue_runtime):
+    from cps import ub
+    from cps.tasks.auto_hardcover_id import TaskAutoHardcoverID
+
+    session = hardcover_queue_runtime.AppSession()
+    session.add(ub.HardcoverMatchQueue(
+        book_id=hardcover_queue_runtime.book_id,
+        book_title="Ambiguous Book",
+        book_authors="Author",
+        search_query="Ambiguous Book Author",
+        hardcover_results="[]",
+        confidence_scores="[]",
+        created_at="2026-08-01T00:00:00",
+        reviewed=1,
+        review_action="reject",
+        reviewed_at="2026-08-02T00:00:00",
+    ))
+    session.commit()
+    session.close()
+
+    task = TaskAutoHardcoverID(batch_size=10, rate_limit_delay=0)
+    task.run(None)
+
+    session = hardcover_queue_runtime.AppSession()
+    try:
+        rows = session.query(ub.HardcoverMatchQueue).filter_by(
+            book_id=hardcover_queue_runtime.book_id,
+        ).all()
+    finally:
+        session.close()
+
+    assert hardcover_queue_runtime.searches == []
+    assert len(rows) == 1
+    assert rows[0].reviewed == 1
+    assert rows[0].review_action == "reject"
+
+
+def test_pending_queue_cleanup_keeps_newest_and_all_reviewed_rows(tmp_path):
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
+
+    from cps import ub
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'app.db'}")
+    with engine.begin() as connection:
+        connection.execute(text("""
+            CREATE TABLE hardcover_match_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id INTEGER NOT NULL,
+                created_at VARCHAR NOT NULL,
+                reviewed INTEGER NOT NULL,
+                review_action VARCHAR
+            )
+        """))
+        connection.execute(text("""
+            INSERT INTO hardcover_match_queue
+                (book_id, created_at, reviewed, review_action)
+            VALUES
+                (1, '2026-07-01T00:00:00', 0, NULL),
+                (1, '2026-08-01T00:00:00', 0, NULL),
+                (1, '2026-06-01T00:00:00', 1, 'reject'),
+                (2, '2026-07-15T00:00:00', 0, NULL),
+                (2, '2026-07-15T00:00:00', 0, NULL),
+                (2, '2026-05-01T00:00:00', 1, 'skip')
+        """))
+        connection.execute(
+            text(
+                "INSERT INTO hardcover_match_queue "
+                "(book_id, created_at, reviewed, review_action) "
+                "VALUES (:book_id, :created_at, 0, NULL)"
+            ),
+            [
+                {
+                    "book_id": 100 + (index % 274),
+                    "created_at": f"2026-08-01T00:00:00.{index:06d}",
+                }
+                for index in range(30000)
+            ],
+        )
+    session = sessionmaker(bind=engine)()
+    try:
+        ub.migrate_hardcover_match_queue_dedup(engine, session)
+        ub.migrate_hardcover_match_queue_dedup(engine, session)
+    finally:
+        session.close()
+
+    with engine.connect() as connection:
+        pending = connection.execute(text(
+            "SELECT id, book_id, created_at FROM hardcover_match_queue "
+            "WHERE reviewed = 0 AND book_id IN (1, 2) ORDER BY book_id"
+        )).fetchall()
+        pending_count = connection.execute(text(
+            "SELECT COUNT(*) FROM hardcover_match_queue WHERE reviewed = 0"
+        )).scalar()
+        reviewed = connection.execute(text(
+            "SELECT id, book_id, review_action FROM hardcover_match_queue "
+            "WHERE reviewed = 1 ORDER BY id"
+        )).fetchall()
+        indexes = {
+            row[1]: row[2]
+            for row in connection.execute(text(
+                "PRAGMA index_list(hardcover_match_queue)"
+            )).fetchall()
+        }
+
+    assert [tuple(row) for row in pending] == [
+        (2, 1, "2026-08-01T00:00:00"),
+        (5, 2, "2026-07-15T00:00:00"),
+    ]
+    assert pending_count == 276
+    assert [tuple(row) for row in reviewed] == [
+        (3, 1, "reject"),
+        (6, 2, "skip"),
+    ]
+    assert indexes["uq_hardcover_match_queue_pending_book"] == 1
+    assert "ix_hardcover_match_queue_review_state_book" in indexes
+    engine.dispose()

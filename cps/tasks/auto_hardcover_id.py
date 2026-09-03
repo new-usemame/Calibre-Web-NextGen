@@ -14,6 +14,7 @@ from typing import List, Optional
 from cps import config, db, logger, ub
 from cps.services.worker import CalibreTask, STAT_FAIL, STAT_FINISH_SUCCESS, STAT_CANCELLED, STAT_ENDED
 from flask_babel import lazy_gettext as N_
+from sqlalchemy import exc as sa_exc
 from sqlalchemy.orm import selectinload
 
 # Import the Hardcover provider
@@ -102,11 +103,14 @@ class TaskAutoHardcoverID(CalibreTask):
             total_books = len(book_ids)
             
             if total_books == 0:
-                self.log.info("No books found without Hardcover IDs")
+                self.log.info("No books eligible for Hardcover ID auto-fetch")
                 self._handleSuccess()
                 return
             
-            self.log.info(f"Found {total_books} books without Hardcover IDs. Processing in batches of {self.batch_size}...")
+            self.log.info(
+                f"Found {total_books} eligible books without Hardcover IDs. "
+                f"Processing in batches of {self.batch_size}..."
+            )
             
             # Process books in batches
             batch_count = (total_books + self.batch_size - 1) // self.batch_size
@@ -195,16 +199,62 @@ class TaskAutoHardcoverID(CalibreTask):
 
     def _get_books_without_hardcover_id(self) -> List[int]:
         """
-        Query book IDs that don't have any Hardcover identifiers.
-        Excludes books with hardcover-id, hardcover-slug, or hardcover-edition.
+        Query eligible book IDs that don't have any Hardcover identifiers.
+
+        Books with a pending review or a durable rejection are removed before
+        the caller performs any Hardcover API search. Calibre and app data use
+        separate SQLite databases, so page through Calibre IDs and filter via
+        one thread-local app.db review-state snapshot.
         """
-        rows = self.calibre_db.session.query(db.Books.id).filter(
+        excluded_book_ids = self._get_review_excluded_book_ids()
+        query = self.calibre_db.session.query(db.Books.id).filter(
             ~db.Books.identifiers.any(
                 db.Identifiers.type.in_(['hardcover-id', 'hardcover-slug', 'hardcover-edition'])
             )
-        ).limit(10000).all()  # Safety limit
+        )
 
-        return [row[0] for row in rows if row[0] is not None]
+        eligible_book_ids = []
+        last_book_id = 0
+        page_size = 1000
+        while len(eligible_book_ids) < 10000:  # Safety limit
+            rows = (
+                query.filter(db.Books.id > last_book_id)
+                .order_by(db.Books.id)
+                .limit(page_size)
+                .all()
+            )
+            if not rows:
+                break
+            last_book_id = rows[-1][0]
+            eligible_book_ids.extend(
+                row[0]
+                for row in rows
+                if row[0] is not None and row[0] not in excluded_book_ids
+            )
+
+        return eligible_book_ids[:10000]
+
+    def _get_review_excluded_book_ids(self) -> set[int]:
+        """Load pending and durably rejected book IDs from thread-local app.db."""
+        ub_session = None
+        try:
+            ub_session = ub.init_db_thread()
+            rows = (
+                ub_session.query(ub.HardcoverMatchQueue.book_id)
+                .filter(
+                    (ub.HardcoverMatchQueue.reviewed == 0)
+                    | (
+                        (ub.HardcoverMatchQueue.reviewed == 1)
+                        & (ub.HardcoverMatchQueue.review_action == 'reject')
+                    )
+                )
+                .distinct()
+                .all()
+            )
+            return {row[0] for row in rows if row[0] is not None}
+        finally:
+            if ub_session is not None:
+                ub_session.close()
 
     def _get_books_for_batch(self, book_ids: List[int]) -> List[db.Books]:
         """
@@ -323,9 +373,17 @@ class TaskAutoHardcoverID(CalibreTask):
             self.log.info(f"Auto-matched book {book_id} '{title}' to Hardcover ID {best_result.id} (confidence: {best_score:.3f})")
         else:
             # Queue for manual review
-            self._queue_for_review(book_id, title, authors_csv, search_query, scored_results)
-            self.queued_for_review += 1
-            self.log.debug(f"Queued book {book_id} '{title}' for manual review (confidence: {best_score:.3f})")
+            queued = self._queue_for_review(
+                book_id, title, authors_csv, search_query, scored_results
+            )
+            if queued:
+                self.queued_for_review += 1
+                self.log.debug(f"Queued book {book_id} '{title}' for manual review (confidence: {best_score:.3f})")
+            else:
+                self.log.info(
+                    f"Skipped review queue for book {book_id} '{title}' "
+                    "because it was rejected while auto-fetch was running"
+                )
 
     def _apply_hardcover_id(self, book_id: int, result):
         """Apply Hardcover identifiers to a book"""
@@ -355,8 +413,15 @@ class TaskAutoHardcoverID(CalibreTask):
             self.calibre_db.session.rollback()
             raise
 
-    def _queue_for_review(self, book_id: int, book_title: str, book_authors: str, search_query: str, scored_results: List[dict]):
-        """Queue ambiguous match for manual review"""
+    def _queue_for_review(
+        self,
+        book_id: int,
+        book_title: str,
+        book_authors: str,
+        search_query: str,
+        scored_results: List[dict],
+    ):
+        """Create or refresh one pending review row; return False after rejection."""
         ub_session = None
         try:
             # Background tasks must not touch the global web-request ub.session.
@@ -385,20 +450,60 @@ class TaskAutoHardcoverID(CalibreTask):
                 })
                 scores_json.append([item['score'], item['reason']])
             
-            # Create queue entry
-            queue_entry = ub.HardcoverMatchQueue(
-                book_id=book_id,
-                book_title=book_title,
-                book_authors=book_authors,
-                search_query=search_query,
-                hardcover_results=json.dumps(results_json),
-                confidence_scores=json.dumps(scores_json),
-                created_at=datetime.utcnow().isoformat(),
-                reviewed=0
+            rejected = ub_session.query(ub.HardcoverMatchQueue.id).filter(
+                ub.HardcoverMatchQueue.book_id == book_id,
+                ub.HardcoverMatchQueue.reviewed == 1,
+                ub.HardcoverMatchQueue.review_action == 'reject',
+            ).first()
+            if rejected is not None:
+                return False
+
+            queue_values = {
+                'book_title': book_title,
+                'book_authors': book_authors,
+                'search_query': search_query,
+                'hardcover_results': json.dumps(results_json),
+                'confidence_scores': json.dumps(scores_json),
+                'created_at': datetime.utcnow().isoformat(),
+            }
+            queue_entry = (
+                ub_session.query(ub.HardcoverMatchQueue)
+                .filter(
+                    ub.HardcoverMatchQueue.book_id == book_id,
+                    ub.HardcoverMatchQueue.reviewed == 0,
+                )
+                .order_by(ub.HardcoverMatchQueue.created_at.desc(),
+                          ub.HardcoverMatchQueue.id.desc())
+                .first()
             )
-            
-            ub_session.add(queue_entry)
-            ub_session.commit()
+            if queue_entry is None:
+                queue_entry = ub.HardcoverMatchQueue(
+                    book_id=book_id,
+                    reviewed=0,
+                    **queue_values,
+                )
+                ub_session.add(queue_entry)
+            else:
+                for field, value in queue_values.items():
+                    setattr(queue_entry, field, value)
+
+            try:
+                ub_session.commit()
+            except sa_exc.IntegrityError:
+                # A concurrent crawler may have inserted the unique pending
+                # row after our lookup. Refresh that row rather than surfacing
+                # a harmless race as a task failure.
+                ub_session.rollback()
+                queue_entry = ub_session.query(ub.HardcoverMatchQueue).filter(
+                    ub.HardcoverMatchQueue.book_id == book_id,
+                    ub.HardcoverMatchQueue.reviewed == 0,
+                ).first()
+                if queue_entry is None:
+                    raise
+                for field, value in queue_values.items():
+                    setattr(queue_entry, field, value)
+                ub_session.commit()
+            return True
             
         except Exception as e:
             self.log.error(f"Error queuing book {book_id} for review: {e}")

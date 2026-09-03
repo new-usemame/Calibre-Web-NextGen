@@ -69,6 +69,16 @@ def test_auto_hardcover_id_loads_books_with_a_worker_local_calibre_session(monke
     factory.  The provider is mocked only to avoid external HTTP.
     """
     engine, factory = _worker_local_calibre_db(monkeypatch)
+    from cps import ub
+
+    app_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    ub.HardcoverMatchQueue.__table__.create(app_engine)
+    app_factory = scoped_session(sessionmaker(bind=app_engine, future=True))
+    monkeypatch.setattr(module.ub, "init_db_thread", app_factory)
     monkeypatch.setattr(module.config, "hardcover_sync_enabled", lambda: True)
     monkeypatch.setattr(module.config, "resolved_hardcover_token", lambda: "token")
     monkeypatch.setattr(module, "Hardcover", _NoResultsHardcover)
@@ -112,6 +122,8 @@ def test_auto_hardcover_id_loads_books_with_a_worker_local_calibre_session(monke
         assert observed["book_session"] is observed["task_session"]
         assert task.books_processed == 1
     finally:
+        app_factory.remove()
+        app_engine.dispose()
         factory.remove()
         engine.dispose()
 
